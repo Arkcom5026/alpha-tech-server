@@ -5,8 +5,6 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
 
-// โหลด .env
-require('dotenv').config();
 dotenv.config();
 
 const authRoutes = require('./routes/authRoutes'); // ✅ ต้องมี
