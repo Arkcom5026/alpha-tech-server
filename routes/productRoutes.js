@@ -1,3 +1,7 @@
+
+
+
+
 // ✅ server/routes/productRoutes.js
 const express = require('express');
 const router = express.Router();
@@ -7,12 +11,16 @@ const {
   getAllProducts,
   getProductById,
   deleteProduct,
+  getProductDropdowns,
 } = require('../controllers/productController');
 
 router.post('/products', createProduct);
+router.get('/products/dropdowns', getProductDropdowns);
 router.put('/products/:id', updateProduct);
 router.get('/products', getAllProducts);
 router.get('/products/:id', getProductById);
 router.delete('/products/:id', deleteProduct);
+
+
 
 module.exports = router;

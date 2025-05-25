@@ -1,3 +1,4 @@
+
 // ✅ server/controllers/productController.js
 const { PrismaClient } = require('@prisma/client');
 const { cloudinary } = require('../utils/cloudinary');
@@ -135,6 +136,7 @@ const updateProduct = async (req, res) => {
 // ✅ ย้าย getAllProducts ออกนอก export block เพื่อแก้ 500
 const getAllProducts = async (req, res) => {
   const { branchId } = req.query;
+  console.log('📥 ----------------------------------------------------------------------- getAllProducts');
   if (!branchId) {
     return res.status(400).json({ error: 'ต้องระบุ branchId ใน query' });
   }
@@ -143,7 +145,7 @@ const getAllProducts = async (req, res) => {
     console.log('📥 getAllProducts branchId:', branchId);
 
     const products = await prisma.product.findMany({
-      where: { createdByBranchId: parseInt(branchId) },
+      where: { branchId: parseInt(branchId) },
       include: {
         images: true,
         prices: true,
@@ -175,7 +177,7 @@ const getProductById = async (req, res) => {
     const product = await prisma.product.findFirst({
       where: {
         id: parseInt(id),
-        createdByBranchId: parseInt(branchId),
+        branchId: parseInt(branchId),
       },
       include: {
         images: true,
@@ -205,7 +207,7 @@ const deleteProduct = async (req, res) => {
     const product = await prisma.product.findFirst({
       where: {
         id: parseInt(id),
-        createdByBranchId: parseInt(branchId),
+        branchId: parseInt(branchId),
       },
       include: { images: true },
     });
@@ -227,13 +229,17 @@ const deleteProduct = async (req, res) => {
 
 const getProductDropdowns = async (req, res) => {
   try {
-    const [templates, productProfiles, categories, units] = await Promise.all([
+    const [templates, productProfiles, productTypes, categories, units] = await Promise.all([
       prisma.productTemplate.findMany({
-        select: { id: true, name: true },
+        select: { id: true, name: true, productProfileId: true },
         orderBy: { name: 'asc' },
       }),
       prisma.productProfile.findMany({
-        select: { id: true, name: true },
+        select: { id: true, name: true, productTypeId: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.productType.findMany({
+        select: { id: true, name: true, categoryId: true }, // ✅ ต้องมี categoryId
         orderBy: { name: 'asc' },
       }),
       prisma.category.findMany({
@@ -246,12 +252,13 @@ const getProductDropdowns = async (req, res) => {
       }),
     ]);
 
-    res.json({ templates, productProfiles, categories, units });
+    res.json({ templates, productProfiles, productTypes, categories, units });
   } catch (error) {
     console.error('❌ getProductDropdowns error:', error);
     res.status(500).json({ error: 'Failed to load dropdowns' });
   }
 };
+
 
 module.exports = {
   createProduct,
