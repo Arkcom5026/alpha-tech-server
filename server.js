@@ -25,7 +25,8 @@ const app = express();
 app.use(express.json());
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://alpha-tech-client.vercel.app'
+  'https://alpha-tech-client.vercel.app',
+  'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app'
 ];
 
 app.use(cors({
