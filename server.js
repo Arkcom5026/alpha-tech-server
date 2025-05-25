@@ -25,12 +25,26 @@ const app = express();
 
 // ✅ Middleware
 app.use(express.json());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://alpha-tech-client.vercel.app'
+];
+
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // allow Postman, curl (ไม่มี origin) และ origin ที่อยู่ใน allowedOrigins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+
 app.use(morgan('dev'));
 
 // ✅ เปิดใช้งาน route
