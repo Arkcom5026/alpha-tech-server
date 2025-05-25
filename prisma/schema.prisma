@@ -1,0 +1,513 @@
+// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  customer
+  employee
+  admin
+}
+
+enum POStatus {
+  PENDING
+  PARTIAL
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  NOT_PROCESS
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum StockStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DAMAGED
+}
+
+enum ServiceStatus {
+  RECEIVED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+// 🔐 User & Profiles
+model User {
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  password    String
+  role        Role
+  enabled     Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  customerProfile CustomerProfile?
+  employeeProfile EmployeeProfile?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomerProfile {
+  id      Int     @id @default(autoincrement())
+  name    String?
+  picture String?
+  address String?
+  phone   String?
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int  @unique
+
+  orders   Order[]
+  cart     Cart[]
+  services ServiceOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmployeeProfile {
+  id    Int     @id @default(autoincrement())
+  name  String?
+  phone String?
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int  @unique
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId Int?
+
+  position   Position? @relation(fields: [positionId], references: [id])
+  positionId Int?
+
+  poCreated        PO[]
+  assignedServices ServiceOrder[]
+  approved         Boolean        @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 🏢 HR
+model Branch {
+  id      Int    @id @default(autoincrement())
+  name    String
+  address String
+
+  employees EmployeeProfile[]
+  stock     StockItem[]
+  suppliers Supplier[]
+  pos       PO[]
+  services  ServiceOrder[]
+  products  Product[]
+
+  RBACEnabled Boolean @default(true)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  productTemplate ProductTemplate[]
+}
+
+model Position {
+  id        Int               @id @default(autoincrement())
+  name      String
+  employees EmployeeProfile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 🛍️ Products
+
+/**
+ * Category
+ * └── ProductType
+ * └── ProductProfile
+ * └── ProductTemplate
+ * └── Product
+ */
+
+model Category {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  active Boolean @default(true)
+
+  productTypes ProductType[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductType {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  active Boolean @default(true)
+
+  profiles ProductProfile[]
+
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductProfile {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  productType   ProductType @relation(fields: [productTypeId], references: [id])
+  productTypeId Int
+
+  templates ProductTemplate[]
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductTemplate {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+    spec        String?
+  warranty    Int?
+  noSN        Boolean @default(false)
+  codeType    String  @default("D")
+  active      Boolean @default(true)
+
+  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
+  productProfileId Int
+
+  createdByBranch   Branch @relation(fields: [createdByBranchId], references: [id])
+  createdByBranchId Int
+
+  images TemplateImage[]
+  products Product[]
+  unit      Unit?    @relation(fields: [unitId], references: [id])
+  unitId    Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  title       String?
+  description String?
+  unit        String?
+  spec        String?
+  cost        Float?
+  sold        Int     @default(0)
+  quantity    Int?
+  warranty    Int?
+  noSN        Boolean @default(false)
+  codeType    String  @default("D")
+  active      Boolean @default(true)
+
+  template   ProductTemplate @relation(fields: [templateId], references: [id])
+  templateId Int
+
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  prices       ProductPrice[]
+  images       Image[]
+  stockItems   StockItem[]
+  poItems      POItem[]
+  orderItems   ProductOnOrder[]
+  cartItems    ProductOnCart[]
+  serviceItems ServiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TemplateImage {
+  id         Int    @id @default(autoincrement())
+  public_id  String @unique
+  url        String
+  secure_url String
+
+  templateId Int
+  template   ProductTemplate @relation(fields: [templateId], references: [id])
+  active     Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model ProductPrice {
+  id        Int     @id @default(autoincrement())
+  level     Int
+  price     Float
+  active    Boolean @default(true)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, level])
+}
+
+model Image {
+  id         Int     @id @default(autoincrement())
+  public_id  String  @unique
+  url        String
+  secure_url String
+  active     Boolean @default(true)
+  productId  Int
+  product    Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productTemplate ProductTemplate[]
+}
+
+// 📦 Stock System
+model StockItem {
+  id           Int         @id @default(autoincrement())
+  barcode      String      @unique
+  serialNumber String?
+  buyPrice     Float
+  sellPrice    Float?
+  receivedAt   DateTime    @default(now())
+  warrantyDays Int?
+  expiredAt    DateTime?
+  soldAt       DateTime?
+  status       StockStatus @default(IN_STOCK)
+  remark       String?
+
+  productId       Int
+  branchId        Int
+  poReceiptItemId Int?
+
+  product       Product        @relation(fields: [productId], references: [id])
+  branch        Branch         @relation(fields: [branchId], references: [id])
+  poReceiptItem POReceiptItem? @relation(fields: [poReceiptItemId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 🧾 Purchasing
+model Supplier {
+  id             Int     @id @default(autoincrement())
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  taxId          String?
+  address        String?
+  province       String?
+  postalCode     String?
+  country        String? @default("Thailand")
+  paymentTerms   Int?    @default(30)
+  creditLimit    Float?
+  currentBalance Float?  @default(0)
+  bankId         Int?
+  accountNumber  String?
+  accountType    String?
+  notes          String?
+  branchId       Int?
+  active         Boolean @default(true)
+  bank           Bank?   @relation(fields: [bankId], references: [id])
+  branch         Branch? @relation(fields: [branchId], references: [id])
+  pos            PO[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bank {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  supplier  Supplier[]
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model PO {
+  id     Int      @id @default(autoincrement())
+  code   String   @unique
+  date   DateTime @default(now())
+  note   String?
+  status POStatus @default(PENDING)
+
+  supplierId Int
+  branchId   Int
+  employeeId Int
+
+  supplier Supplier        @relation(fields: [supplierId], references: [id])
+  branch   Branch          @relation(fields: [branchId], references: [id])
+  employee EmployeeProfile @relation(fields: [employeeId], references: [id])
+
+  items    POItem[]
+  receipts POReceipt[]
+  payments POPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model POItem {
+  id        Int   @id @default(autoincrement())
+  poId      Int
+  productId Int
+  quantity  Int
+  price     Float
+
+  po       PO              @relation(fields: [poId], references: [id])
+  product  Product         @relation(fields: [productId], references: [id])
+  receipts POReceiptItem[]
+}
+
+model POReceipt {
+  id         Int      @id @default(autoincrement())
+  poId       Int
+  receivedAt DateTime @default(now())
+  note       String?
+
+  po    PO              @relation(fields: [poId], references: [id])
+  items POReceiptItem[]
+}
+
+model POReceiptItem {
+  id        Int @id @default(autoincrement())
+  receiptId Int
+  poItemId  Int
+  quantity  Int
+
+  receipt    POReceipt   @relation(fields: [receiptId], references: [id])
+  poItem     POItem      @relation(fields: [poItemId], references: [id])
+  stockItems StockItem[]
+}
+
+model POPayment {
+  id     Int      @id @default(autoincrement())
+  poId   Int
+  amount Float
+  paidAt DateTime @default(now())
+  method String
+  note   String?
+
+  po PO @relation(fields: [poId], references: [id])
+}
+
+// 🛒 Online Order + Cart
+model Order {
+  id              Int         @id @default(autoincrement())
+  cartTotal       Float
+  orderStatus     OrderStatus @default(NOT_PROCESS)
+  stripePaymentId String
+  status          String
+  amount          Int
+  currency        String
+
+  customerId Int?
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  products   ProductOnOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductOnOrder {
+  id        Int   @id @default(autoincrement())
+  productId Int
+  orderId   Int
+  count     Int
+  price     Float
+
+  product Product @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cart {
+  id         Int              @id @default(autoincrement())
+  customerId Int?
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  cartTotal  Float
+  products   ProductOnCart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductOnCart {
+  id        Int   @id @default(autoincrement())
+  cartId    Int
+  productId Int
+  count     Int
+  price     Float
+
+  cart    Cart    @relation(fields: [cartId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 🛠️ Service System
+model ServiceOrder {
+  id         Int  @id @default(autoincrement())
+  customerId Int?
+  branchId   Int?
+  employeeId Int?
+
+  receiveDate DateTime      @default(now())
+  status      ServiceStatus @default(RECEIVED)
+  description String?
+  note        String?
+
+  customer CustomerProfile? @relation(fields: [customerId], references: [id])
+  branch   Branch?          @relation(fields: [branchId], references: [id])
+  employee EmployeeProfile? @relation(fields: [employeeId], references: [id])
+
+  items ServiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceItem {
+  id           Int     @id @default(autoincrement())
+  serviceId    Int
+  productId    Int?
+  serialNumber String?
+  problem      String?
+  solution     String?
+  cost         Float?
+
+  service ServiceOrder @relation(fields: [serviceId], references: [id])
+  product Product?     @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
