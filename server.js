@@ -15,11 +15,10 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./routes/productTemplateRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const path = require('path');
-const productRoutes = require('./routes/productRoutes');
 const productProfileRoutes = require('./routes/productProfileRoutes'); // ✅
 const unitRoutes = require('./routes/unitRoutes'); // ✅
-
 const app = express();
+const productRoutes = require('./routes/productRoutes');
 
 // ✅ Middleware
 app.use(express.json());
@@ -54,9 +53,9 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/upload', uploadRoutes);
-app.use('/api/products', productRoutes);
 app.use('/api/product-profiles', productProfileRoutes); 
 app.use('/api/units', unitRoutes); 
+app.use('/api', productRoutes);
 
 // ✅ Error handler
 app.use((err, req, res, next) => {
