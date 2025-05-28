@@ -1,5 +1,6 @@
 // ✅ @filename: server/controllers/employeeController.js
-const prisma = require('../config/prisma');
+const prisma = require('../lib/prisma');
+
 
 // ✅ GET /api/employees?branchId=xx - ดึงพนักงานตามสาขา
 const getAllEmployees = async (req, res) => {

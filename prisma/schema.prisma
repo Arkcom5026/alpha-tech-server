@@ -185,7 +185,7 @@ model ProductTemplate {
   id          Int     @id @default(autoincrement())
   name        String
   description String?
-    spec        String?
+  spec        String?
   warranty    Int?
   noSN        Boolean @default(false)
   codeType    String  @default("D")
@@ -194,52 +194,74 @@ model ProductTemplate {
   productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
   productProfileId Int
 
-  createdByBranch   Branch @relation(fields: [createdByBranchId], references: [id])
-  createdByBranchId Int
+  branch            Branch           @relation(fields: [branchId], references: [id])
+  branchId          Int
 
-  images TemplateImage[]
-  products Product[]
-  unit      Unit?    @relation(fields: [unitId], references: [id])
-  unitId    Int?
+  templateImages ProductTemplateImage[]
+  products       Product[]
+  unit           Unit?                  @relation(fields: [unitId], references: [id])
+  unitId         Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 }
 
 model Product {
   id          Int     @id @default(autoincrement())
   title       String?
   description String?
-  unit        String?
-  spec        String?
-  cost        Float?
-  sold        Int     @default(0)
-  quantity    Int?
-  warranty    Int?
-  noSN        Boolean @default(false)
-  codeType    String  @default("D")
-  active      Boolean @default(true)
 
+  spec     String?
+  cost     Float?
+  sold     Int     @default(0)
+  quantity Int?
+  warranty Int?
+  noSN     Boolean @default(false)
+  codeType String  @default("D")
+  active   Boolean @default(true)
+  
+  unit      Unit?    @relation(fields: [unitId], references: [id])
+  unitId    Int?
+  
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   templateId Int
+  
 
-  branchId Int
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch            Branch           @relation(fields: [branchId], references: [id])
+  branchId          Int
+  
+  updatedByBranchId Int?
+  prices            ProductPrice[]
+  productImages     ProductImage[]
+  stockItems        StockItem[]
+  poItems           POItem[]
+  orderItems        ProductOnOrder[]
+  cartItems         ProductOnCart[]
+  serviceItems      ServiceItem[]
 
-  prices       ProductPrice[]
-  images       Image[]
-  stockItems   StockItem[]
-  poItems      POItem[]
-  orderItems   ProductOnOrder[]
-  cartItems    ProductOnCart[]
-  serviceItems ServiceItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+model ProductImage {
+  id         Int     @id @default(autoincrement())
+  public_id  String  @unique
+  url        String
+  secure_url String
+  active     Boolean @default(true)
+
+  caption String? // ✅ เพิ่มบรรทัดนี้
+  isCover Boolean? // ✅ เพิ่มบรรทัดนี้
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model TemplateImage {
+model ProductTemplateImage {
   id         Int    @id @default(autoincrement())
   public_id  String @unique
   url        String
@@ -248,8 +270,12 @@ model TemplateImage {
   templateId Int
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   active     Boolean         @default(true)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+
+  caption String? // ✅ เพิ่มบรรทัดนี้
+  isCover Boolean? // ✅ เพิ่มบรรทัดนี้
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ProductPrice {
@@ -263,26 +289,13 @@ model ProductPrice {
   @@unique([productId, level])
 }
 
-model Image {
-  id         Int     @id @default(autoincrement())
-  public_id  String  @unique
-  url        String
-  secure_url String
-  active     Boolean @default(true)
-  productId  Int
-  product    Product @relation(fields: [productId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Unit {
   id   Int    @id @default(autoincrement())
   name String @unique
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  product         Product[]       
   productTemplate ProductTemplate[]
 }
 

@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 
 // GET /api/product-templates
 const getAllProductTemplates = async (req, res) => {
+  console.log('📌 [GET] เรียกดู product templates ทั้งหมด');
   try {
     const templates = await prisma.productTemplate.findMany({
       include: {
@@ -32,32 +33,46 @@ const getAllProductTemplates = async (req, res) => {
 
 // POST /api/product-templates
 const createProductTemplate = async (req, res) => {
+  console.log('📌 [POST] เริ่มสร้าง product template ใหม่');
   const data = req.body;
+  console.log('🧾 req.body.imagesToDelete ที่ backend รับมา:', data.imagesToDelete);
 
-  if (!data.createdByBranchId) {
-    return res.status(400).json({ error: 'ต้องระบุ createdByBranchId' });
+  if (!data.branchId) {
+    return res.status(400).json({ error: 'ต้องระบุ branchId' });
   }
+
+  if (!data.productProfileId) {
+    return res.status(400).json({ error: 'ต้องระบุ productProfileId' });
+  }
+
   try {
     console.log('📥 req.body.images:', data.images);
 
     const newTemplate = await prisma.productTemplate.create({
       data: {
-        name: data.name,
-        productProfileId: parseInt(data.productProfileId),
-        unitId: parseInt(data.unitId),
+        title: data.title,
+
+        productProfile: { connect: { id: parseInt(data.productProfileId) }, },
+
+        unit: { connect: { id: parseInt(data.unitId) } },
+
         warranty: data.warranty ? parseInt(data.warranty) : null,
-        createdByBranchId: parseInt(data.createdByBranchId),
+
+        branch: { connect: { id: parseInt(data.branchId) }, },
+
         description: data.description,
         spec: data.spec,
-        images: {
+        codeType: data.codeType || 'D',
+
+        noSN: data.noSN || false,
+
+        templateImages: {
           create: Array.isArray(data.images)
-            ? data.images
-                .filter(img => img?.url && img?.public_id && img?.secure_url)
-                .map(img => ({
-                  url: img.url,
-                  public_id: img.public_id,
-                  secure_url: img.secure_url,
-                }))
+            ? data.images.map((img) => ({
+              url: img.url,
+              public_id: img.public_id,
+              secure_url: img.secure_url,
+            }))
             : [],
         },
       },
@@ -70,68 +85,57 @@ const createProductTemplate = async (req, res) => {
   }
 };
 
-// PUT /api/product-templates/:id
+
+
+
+
 const updateProductTemplate = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const data = req.body;
 
-    if (Array.isArray(data.imagesToDelete)) {
-      for (const public_id of data.imagesToDelete) {
-        try {
-          const result = await cloudinary.uploader.destroy(public_id);
-          console.log('🗑️ ลบภาพเฉพาะรายการจาก Cloudinary:', public_id, result);
-          await prisma.templateImage.deleteMany({ where: { public_id } });
-        } catch (err) {
-          console.error('❌ ลบภาพเฉพาะรายการล้มเหลว:', public_id, err);
-        }
-      }
-    }
-
     const updated = await prisma.productTemplate.update({
       where: { id },
       data: {
         name: data.name,
-        productTypeId: data.productTypeId,
-        categoryId: data.categoryId,
-        unitId: parseInt(data.unitId),
+        productProfile: {
+          connect: { id: parseInt(data.productProfileId) },
+        },
+        unit: data.unitId
+          ? { connect: { id: parseInt(data.unitId) } }
+          : undefined,
         warranty: data.warranty ? parseInt(data.warranty) : null,
-        createdByBranchId: data.createdByBranchId,
+        branch: {
+          connect: { id: parseInt(data.branchId) },
+        },
         description: data.description,
         spec: data.spec,
-        images: {
-          create: Array.isArray(data.images)
-            ? data.images
-                .filter(img => img?.url && img?.public_id && img?.secure_url)
-                .map(img => ({
-                  url: img.url,
-                  public_id: img.public_id,
-                  secure_url: img.secure_url,
-                }))
-            : [],
-        },
       },
       include: {
-        images: true,
+        templateImages: true,
       },
     });
 
     res.json(updated);
   } catch (error) {
     console.error('❌ updateProductTemplate error:', error);
-    res.status(500).json({ error: 'Failed to update template' });
+    res.status(500).json({ error: 'Failed to update product template' });
   }
 };
 
+
+
+
 // DELETE /api/product-templates/:id
 const deleteProductTemplate = async (req, res) => {
+  console.log('📌 [DELETE] เริ่มลบ product template');
   try {
     const id = parseInt(req.params.id);
-    const branchId = parseInt(req.body.createdByBranchId);
+    const branchId = parseInt(req.body.branchId);
     console.log('🧩 branchId from req.body:', branchId);
 
     const template = await prisma.productTemplate.findUnique({ where: { id } });
-    if (template.createdByBranchId !== branchId) {
+    if (template.branchId !== branchId) {
       return res.status(403).json({ error: 'ไม่มีสิทธิ์ลบข้อมูลของสาขาอื่น' });
     }
 
@@ -141,7 +145,7 @@ const deleteProductTemplate = async (req, res) => {
       return res.status(409).json({ error: 'ไม่สามารถลบได้ เพราะมีการใช้งานแล้ว' });
     }
 
-    const images = await prisma.templateImage.findMany({
+    const images = await prisma.productTemplateImage.findMany({
       where: { templateId: id },
     });
 
@@ -154,7 +158,7 @@ const deleteProductTemplate = async (req, res) => {
       }
     }
 
-    await prisma.templateImage.deleteMany({
+    await prisma.productTemplateImage.deleteMany({
       where: { templateId: id },
     });
 
@@ -169,23 +173,25 @@ const deleteProductTemplate = async (req, res) => {
 
 // GET /api/product-templates/:id
 const getProductTemplateById = async (req, res) => {
+  console.log('📌 [GET] โหลด product template ตาม ID');
   try {
     const id = parseInt(req.params.id);
 
     const template = await prisma.productTemplate.findUnique({
-      where: { id },
-      include: {
-        images: {
-          select: {
-            url: true,
-            public_id: true,
-            secure_url: true,
-          },
-        },
+  where: { id },
+  include: {
+    templateImages: {
+      select: {
+        url: true,
+        public_id: true,
+        secure_url: true,
       },
-    });
+    },
+  },
+});
 
-    console.log('🎯 template.images:', template.images);
+
+   console.log('🎯 template.templateImages:', template.templateImages);
 
     if (!template) return res.status(404).json({ error: 'ไม่พบข้อมูล' });
 
@@ -196,13 +202,40 @@ const getProductTemplateById = async (req, res) => {
   }
 };
 
+// DELETE /product-templates/:id/images/delete?public_id=xxx
+const deleteProductTemplateImage = async (req, res) => {
+  const templateId = parseInt(req.params.id);
+  const public_id = req.query.public_id;
+
+  if (!public_id) {
+    return res.status(400).json({ error: 'ต้องระบุ public_id' });
+  }
+
+  try {
+    // 🔥 ลบจาก Cloudinary ก่อน
+    const result = await cloudinary.uploader.destroy(public_id);
+    console.log('🗑️ ลบจาก Cloudinary:', public_id, result);
+
+    // ✅ ลบจาก Prisma DB
+    await prisma.productTemplateImage.deleteMany({
+      where: {
+        templateId: templateId,
+        public_id: public_id,
+      },
+    });
+
+    res.json({ message: 'ลบภาพสำเร็จ', public_id });
+  } catch (err) {
+    console.error('❌ deleteProductTemplateImage error:', err);
+    res.status(500).json({ error: 'Failed to delete product template image' });
+  }
+};
+
 module.exports = {
   getAllProductTemplates,
   createProductTemplate,
   updateProductTemplate,
   getProductTemplateById,
   deleteProductTemplate,
+  deleteProductTemplateImage,
 };
-
-
-

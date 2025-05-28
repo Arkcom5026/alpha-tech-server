@@ -1,9 +1,8 @@
 // controllers/unitController.js
 
 const { PrismaClient } = require("@prisma/client");
+const prisma = require('../lib/prisma');
 
-
-const prisma = new PrismaClient();
 
 // ✅ GET /api/units
 const getAllUnits = async (req, res) => {

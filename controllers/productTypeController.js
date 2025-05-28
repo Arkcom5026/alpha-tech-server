@@ -1,5 +1,5 @@
 // ✅ controllers/productTypeController.js 
-const prisma = require('../prisma/client');
+const prisma = require('../lib/prisma');
 
 // ✅ GET: โหลดประเภทสินค้าทั้งหมด
 const getAllProductType = async (req, res) => {

@@ -9,7 +9,7 @@ const {
   deleteProductType,
   getProductTypeDropdowns,
 } = require('../controllers/productTypeController');
-const { verifyToken } = require('../middleware/verifyToken');
+const { verifyToken } = require('../middlewares/verifyToken');
 
 router.get('/dropdowns', getProductTypeDropdowns);
 router.get('/', verifyToken, getAllProductType);

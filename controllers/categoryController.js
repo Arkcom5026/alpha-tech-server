@@ -1,5 +1,5 @@
 // ✅ controllers/categoryController.js
-const prisma = require('../prisma/client');
+const prisma = require('../lib/prisma');
 
 const getAllCategories = async (req, res) => {
   try {

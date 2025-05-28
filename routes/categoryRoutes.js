@@ -7,7 +7,7 @@ const {
   updateCategory,
   deleteCategory,
 } = require('../controllers/categoryController');
-const { verifyToken } = require('../middleware/verifyToken');
+const { verifyToken } = require('../middlewares/verifyToken');
 
 router.get('/', verifyToken, getAllCategories);
 router.post('/', createCategory);

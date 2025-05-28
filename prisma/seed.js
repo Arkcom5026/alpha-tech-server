@@ -2,8 +2,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
-
 async function main() {
   // ✅ ล้างข้อมูลเก่าถ้าไม่ต้องการซ้ำ
   await prisma.user.deleteMany();

@@ -1,5 +1,6 @@
 // ✅ controllers/supplierController.js
-const prisma = require('../config/prisma');
+const prisma = require('../lib/prisma');
+
 
 const getAllSuppliers = async (req, res) => {
   try {

@@ -1,5 +1,5 @@
 // productProfileController.js
-const prisma = require('../prisma/client');
+const prisma = require('../lib/prisma');
 
 exports.createProductProfile = async (req, res) => {
   try {

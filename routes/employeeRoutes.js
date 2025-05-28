@@ -9,7 +9,7 @@ const {
   getUsersByRole,
   searchUsers,
 } = require('../controllers/employeeController');
-const { verifyToken } = require('../middleware/verifyToken');
+const { verifyToken } = require('../middlewares/verifyToken');
 
 const router = express.Router();
 

@@ -3,9 +3,9 @@ const express = require('express');
 const router = express.Router();
 
 const { login,register } = require('../controllers/authController');
-const { verifyToken } = require('../middleware/verifyToken');
-const { protectRole } = require('../middleware/protectRole');
-const { validateRegister } = require('../middleware/validateRegister');
+const { verifyToken } = require('../middlewares/verifyToken');
+const { protectRole } = require('../middlewares/protectRole');
+const { validateRegister } = require('../middlewares/validateRegister');
 
 // 🔐 Login route
 router.post('/login', login);

@@ -1,7 +1,8 @@
 // ✅ API: รับสินค้าเข้า PO (Receive PO)
 // 📁 ตำแหน่งไฟล์: /server/controllers/purchase.controller.js
 
-const prisma = require('../config/prisma');
+const prisma = require('../lib/prisma');
+
 
 exports.receivePO = async (req, res) => {
   try {

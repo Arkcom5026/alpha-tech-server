@@ -1,3 +1,4 @@
+
 //  @filename: server.js
 
 const express = require('express');
@@ -12,15 +13,19 @@ const productTypeRoutes = require('./routes/productTypeRoutes'); // ✅ ต้�
 const categoryRoutes = require('./routes/categoryRoutes'); // ✅ ต้องมี
 const employeeRoutes = require('./routes/employeeRoutes'); // ✅ ต้องมี
 const supplierRoutes = require('./routes/supplierRoutes');
-const productTemplateRoutes = require('./routes/productTemplateRoutes');
+const productTemplateRoutes = require('./routes/productTemplateRoutes'); // ✅ CRUD
+
 const uploadRoutes = require('./routes/uploadRoutes');
-const path = require('path');
+const uploadProductTemplateRoutes = require('./routes/uploadProductTemplateRoutes'); // ✅ upload image
 const productProfileRoutes = require('./routes/productProfileRoutes'); // ✅
 const unitRoutes = require('./routes/unitRoutes'); // ✅
 const app = express();
 const productRoutes = require('./routes/productRoutes');
 
-// ✅ Middleware
+const uploadProductRoutes = require('./routes/uploadProductRoutes');
+
+
+// ✅ Middlewares
 app.use(express.json());
 const allowedOrigins = [
   'http://localhost:5173',
@@ -50,12 +55,16 @@ app.use('/api/product-types', productTypeRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
-app.use('/api/product-templates', productTemplateRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/upload', uploadRoutes);
+app.use('/api/product-templates', productTemplateRoutes); // ✅ route สำหรับ CRUD หลัก
 app.use('/api/product-profiles', productProfileRoutes); 
 app.use('/api/units', unitRoutes); 
 app.use('/api', productRoutes);
+
+app.use('/api', uploadRoutes);
+app.use('/api', uploadProductRoutes);
+app.use('/api', uploadProductTemplateRoutes); // ✅ route สำหรับอัปโหลดรูป
+
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {
