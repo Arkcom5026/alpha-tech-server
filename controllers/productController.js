@@ -39,8 +39,6 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-
-
 // POST /api/products
 const createProduct = async (req, res) => {
   console.log('📌 [POST] เริ่มสร้าง product ใหม่');
@@ -50,19 +48,17 @@ const createProduct = async (req, res) => {
     return res.status(400).json({ error: 'ต้องระบุ branchId' });
   }
 
-    try {
-    
+  try {
     const newProduct = await prisma.product.create({
       data: {
         name: data.name,
-        
+
         unit: { connect: { id: parseInt(data.unitId) } },
         template: { connect: { id: parseInt(data.templateId) } },
 
         branch: { connect: { id: parseInt(data.branchId) } },
 
         warranty: data.warranty ? parseInt(data.warranty) : null,
-
 
         description: data.description,
         spec: data.spec,
@@ -71,18 +67,16 @@ const createProduct = async (req, res) => {
         noSN: data.noSN || false,
 
         productImages: Array.isArray(data.images) && data.images.length > 0
-        ? {
-            create: data.images.map((img) => ({
-              url: img.url,
-              public_id: img.public_id,
-              secure_url: img.secure_url,
-              caption: img.caption || null,
-              isCover: img.isCover || false,
-            })),
-          }
-        : undefined,
-      
-        
+          ? {
+              create: data.images.map((img) => ({
+                url: img.url,
+                public_id: img.public_id,
+                secure_url: img.secure_url,
+                caption: img.caption || null,
+                isCover: img.isCover || false,
+              })),
+            }
+          : undefined,
       },
     });
 
@@ -93,13 +87,6 @@ const createProduct = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
-
 const updateProduct = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -108,21 +95,21 @@ const updateProduct = async (req, res) => {
     const updated = await prisma.product.update({
       where: { id },
       data: {
-        name: data.name,
-        productProfile: {
-          connect: { id: parseInt(data.productProfileId) },
+        title: data.title,
+        template: {
+          connect: { id: parseInt(data.templateId) },
         },
         unit: data.unitId
           ? { connect: { id: parseInt(data.unitId) } }
           : undefined,
         warranty: data.warranty ? parseInt(data.warranty) : null,
-
-
-        createdByBranch: {
-          connect: { id: parseInt(data.branchId) },
-        },
+        updatedByBranchId: parseInt(data.branchId),
         description: data.description,
         spec: data.spec,
+        cost: data.cost ? parseFloat(data.cost) : null,
+        codeType: data.codeType,
+        active: data.active,
+        noSN: data.noSN,
       },
       include: {
         productImages: true,
@@ -135,9 +122,6 @@ const updateProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to update product' });
   }
 };
-
-
-
 
 // DELETE /api/products/:id
 const deleteProduct = async (req, res) => {
@@ -183,8 +167,6 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-
-
 // GET /api/products/:id
 const getProductById = async (req, res) => {
   console.log('📌 [GET] โหลด product ตาม ID');
@@ -215,7 +197,6 @@ const getProductById = async (req, res) => {
   }
 };
 
-
 // DELETE /products/:id/images/delete?public_id=xxx
 const deleteProductImage = async (req, res) => {
   const productId = parseInt(req.params.id);
@@ -243,22 +224,107 @@ const deleteProductImage = async (req, res) => {
   }
 };
 
-const getProductDropdowns = async (req, res) => {
-  try {
-    const [templates, productProfiles, productTypes, categories, units] = await Promise.all([
-      prisma.productTemplate.findMany({ select: { id: true, name: true, productProfileId: true }, orderBy: { name: 'asc' } }),
-      prisma.productProfile.findMany({ select: { id: true, name: true, productTypeId: true }, orderBy: { name: 'asc' } }),
-      prisma.productType.findMany({ select: { id: true, name: true, categoryId: true }, orderBy: { name: 'asc' } }),
-      prisma.category.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.unit.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    ]);
 
-    res.json({ templates, productProfiles, productTypes, categories, units });
-   } catch (error) {
+
+
+
+
+
+
+
+
+
+
+// ✅ อัปเดตฟังก์ชัน getProductDropdowns ให้รองรับ productId และ include productImages
+
+
+
+const getProductDropdowns = async (req, res) => {
+  const { branchId, productId } = req.query;
+
+  if (!branchId) {
+    return res.status(400).json({ message: 'branchId is required' });
+  }
+
+  try {
+    const categories = await prisma.category.findMany();
+    const productTypes = await prisma.productType.findMany();
+    const productProfiles = await prisma.productProfile.findMany();
+    const templates = await prisma.productTemplate.findMany({
+      where: { branchId: Number(branchId) }, // ✅ เปลี่ยนจาก createdByBranchId เป็น branchId
+    });
+    const units = await prisma.unit.findMany();
+
+    let defaultValues = null;
+
+    if (productId) {
+      console.log('📌 productId:', productId);
+      const product = await prisma.product.findUnique({
+        where: { id: Number(productId) },
+        include: {
+          productImages: true,
+          template: {
+            include: {
+              productProfile: {
+                include: {
+                  productType: {
+                    include: {
+                      category: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log('📦 product:', product);
+
+      if (product) {
+        defaultValues = {
+          ...product,
+          templateId: product.template?.id || null,
+          productProfileId: product.template?.productProfile?.id || null,
+          productTypeId: product.template?.productProfile?.productType?.id || null,
+          categoryId: product.template?.productProfile?.productType?.category?.id || null,
+        };
+      }
+    }
+
+    console.log('📌 ---------------- [GET] เรียกดู dropdowns สำหรับ products สำเร็จ',
+      categories,
+      productTypes,
+      productProfiles,
+      templates,
+      units,
+      defaultValues
+    );
+
+    return res.json({
+      categories,
+      productTypes,
+      productProfiles,
+      templates,
+      units,
+      defaultValues,
+    });
+  } catch (error) {
     console.error('❌ getProductDropdowns error:', error);
-    res.status(500).json({ error: 'Failed to load dropdowns' });
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
 
 module.exports = {
   getAllProducts,
