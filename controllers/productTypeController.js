@@ -4,7 +4,11 @@ const prisma = require('../lib/prisma');
 // ✅ GET: โหลดประเภทสินค้าทั้งหมด
 const getAllProductType = async (req, res) => {
   try {
-    const productTypes = await prisma.productType.findMany({ orderBy: { id: 'asc' } });
+    const productTypes = await prisma.productType.findMany({
+      orderBy: { id: 'asc' },
+      include: { category: true }, // ✅ รวมข้อมูลหมวดหมู่สินค้า
+    });
+    console.log('📦 ได้ข้อมูลทั้งหมด:', productTypes); // ✅ ตรวจ field category
     res.json(productTypes);
   } catch (err) {
     console.error('❌ GET ProductTypes Failed:', err);
@@ -18,6 +22,7 @@ const getProductTypeById = async (req, res) => {
   try {
     const productType = await prisma.productType.findUnique({
       where: { id: Number(id) },
+      include: { category: true }, // ✅ เผื่อใช้ในหน้าแก้ไข
     });
 
     if (!productType) {
@@ -51,6 +56,7 @@ const createProductType = async (req, res) => {
         name: name.trim(),
         categoryId: Number(categoryId),
       },
+      include: { category: true }, // ✅ ส่งกลับพร้อม category ทันที
     });
 
     res.status(201).json(newType);
@@ -71,6 +77,7 @@ const updateProductType = async (req, res) => {
         name,
         categoryId: Number(categoryId),
       },
+      include: { category: true }, // ✅ เพื่อให้แสดงผลต่อเนื่องทันที
     });
     res.json(updated);
   } catch (err) {

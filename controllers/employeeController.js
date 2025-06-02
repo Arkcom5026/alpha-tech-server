@@ -5,7 +5,7 @@ const prisma = require('../lib/prisma');
 // ✅ GET /api/employees?branchId=xx - ดึงพนักงานตามสาขา
 const getAllEmployees = async (req, res) => {
   try {
-    const { branchId } = req.query;
+    const { branchId } = req.user?.branchId;
 
     if (!branchId) {
       return res.status(400).json({ message: 'กรุณาระบุ branchId' });
@@ -119,7 +119,7 @@ const getUsersByRole = async (req, res) => {
 
 const searchUsers = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q } = req.user?.branchId;
     if (!q || q.length < 2) return res.json([]);
 
     const users = await prisma.user.findMany({

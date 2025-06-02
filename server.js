@@ -15,7 +15,7 @@ const employeeRoutes = require('./routes/employeeRoutes'); // ✅ ต้อง�
 const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./routes/productTemplateRoutes'); // ✅ CRUD
 
-const uploadRoutes = require('./routes/uploadRoutes');
+
 const uploadProductTemplateRoutes = require('./routes/uploadProductTemplateRoutes'); // ✅ upload image
 const productProfileRoutes = require('./routes/productProfileRoutes'); // ✅
 const unitRoutes = require('./routes/unitRoutes'); // ✅
@@ -23,7 +23,10 @@ const app = express();
 const productRoutes = require('./routes/productRoutes');
 
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
-
+const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
+const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
+const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
+const stockItemRoutes = require('./routes/stockItemRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -51,20 +54,31 @@ app.use(morgan('dev'));
 
 // ✅ เปิดใช้งาน route
 app.use('/api/auth', authRoutes);
-app.use('/api/product-types', productTypeRoutes);
-app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
-app.use('/api/product-templates', productTemplateRoutes); // ✅ route สำหรับ CRUD หลัก
-app.use('/api/product-profiles', productProfileRoutes); 
 app.use('/api/units', unitRoutes); 
-app.use('/api', productRoutes);
 
-app.use('/api', uploadRoutes);
-app.use('/api', uploadProductRoutes);
-app.use('/api', uploadProductTemplateRoutes); // ✅ route สำหรับอัปโหลดรูป
+app.use('/api/categories', categoryRoutes);
+app.use('/api/product-types', productTypeRoutes);
+app.use('/api/product-profiles', productProfileRoutes); 
+app.use('/api/product-templates', productTemplateRoutes); // ✅ route สำหรับ CRUD หลัก
 
 
+app.use('/api/products', uploadProductRoutes);
+app.use('/api/products-templates', uploadProductTemplateRoutes);
+
+
+app.use('/api/products', productRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+              
+app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
+app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
+              
+
+app.use('/api/stock-items', stockItemRoutes);  
+         
+
+         
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

@@ -3,7 +3,9 @@ const prisma = require('../lib/prisma');
 
 const getAllCategories = async (req, res) => {
   try {
-    const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
+    const categories = await prisma.category.findMany({
+      orderBy: { id: 'asc' },
+    });
     res.json(categories);
   } catch (err) {
     console.error('❌ โหลดหมวดหมู่ล้มเหลว:', err);
@@ -11,13 +13,31 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-const createCategory = async (req, res) => {
+const getCategoryById = async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const { name } = req.body;
-    if (!name || name.trim() === '') {
-      return res.status(400).json({ message: 'กรุณาระบุชื่อหมวดหมู่' });
-    }
-    const created = await prisma.category.create({ data: { name: name.trim() } });
+    const category = await prisma.category.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!category) return res.status(404).json({ message: 'ไม่พบหมวดหมู่' });
+    res.json(category);
+  } catch (err) {
+    console.error('❌ ดึงหมวดหมู่ล้มเหลว:', err);
+    res.status(500).json({ message: 'ไม่สามารถดึงหมวดหมู่ได้' });
+  }
+};
+
+const createCategory = async (req, res) => {
+  const { name } = req.body;
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ message: 'กรุณาระบุชื่อหมวดหมู่' });
+  }
+
+  try {
+    const created = await prisma.category.create({
+      data: { name: name.trim() },
+    });
     res.status(201).json(created);
   } catch (err) {
     console.error('❌ สร้างหมวดหมู่ล้มเหลว:', err);
@@ -26,9 +46,15 @@ const createCategory = async (req, res) => {
 };
 
 const updateCategory = async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
   try {
-    const { id } = req.params;
-    const { name } = req.body;
+    const existing = await prisma.category.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!existing) return res.status(404).json({ message: 'ไม่พบหมวดหมู่' });
+
     const updated = await prisma.category.update({
       where: { id: Number(id) },
       data: { name },
@@ -41,8 +67,14 @@ const updateCategory = async (req, res) => {
 };
 
 const deleteCategory = async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
+    const existing = await prisma.category.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!existing) return res.status(404).json({ message: 'ไม่พบหมวดหมู่' });
+
     const deleted = await prisma.category.delete({
       where: { id: Number(id) },
     });
@@ -55,6 +87,7 @@ const deleteCategory = async (req, res) => {
 
 module.exports = {
   getAllCategories,
+  getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory,

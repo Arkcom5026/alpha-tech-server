@@ -16,7 +16,7 @@ enum Role {
   admin
 }
 
-enum POStatus {
+enum PurchaseOrderStatus {
   PENDING
   PARTIAL
   COMPLETED
@@ -42,6 +42,12 @@ enum ServiceStatus {
   RECEIVED
   IN_PROGRESS
   WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum ReceiptStatus {
+  PENDING
   COMPLETED
   CANCELLED
 }
@@ -94,9 +100,9 @@ model EmployeeProfile {
   position   Position? @relation(fields: [positionId], references: [id])
   positionId Int?
 
-  poCreated        PO[]
-  assignedServices ServiceOrder[]
-  approved         Boolean        @default(false)
+  purchaseOrderCreated PurchaseOrder[]
+  assignedServices     ServiceOrder[]
+  approved             Boolean         @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,18 +114,20 @@ model Branch {
   name    String
   address String
 
-  employees EmployeeProfile[]
-  stock     StockItem[]
-  suppliers Supplier[]
-  pos       PO[]
-  services  ServiceOrder[]
-  products  Product[]
+  employees       EmployeeProfile[]
+  stock           StockItem[]
+  suppliers       Supplier[]
+  pos             PurchaseOrder[]
+  services        ServiceOrder[]
+  products        Product[]
+  productPrice    ProductPrice[]
+  productTemplate ProductTemplate[]
 
   RBACEnabled Boolean @default(true)
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  productTemplate ProductTemplate[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  PurchaseOrderReceipt PurchaseOrderReceipt[]
 }
 
 model Position {
@@ -130,16 +138,6 @@ model Position {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
-// 🛍️ Products
-
-/**
- * Category
- * └── ProductType
- * └── ProductProfile
- * └── ProductTemplate
- * └── Product
- */
 
 model Category {
   id     Int     @id @default(autoincrement())
@@ -194,8 +192,8 @@ model ProductTemplate {
   productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
   productProfileId Int
 
-  branch            Branch           @relation(fields: [branchId], references: [id])
-  branchId          Int
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
 
   templateImages ProductTemplateImage[]
   products       Product[]
@@ -211,37 +209,35 @@ model Product {
   title       String?
   description String?
 
-  spec     String?
-  cost     Float?
-  sold     Int     @default(0)
-  quantity Int?
-  warranty Int?
-  noSN     Boolean @default(false)
-  codeType String  @default("D")
-  active   Boolean @default(true)
-  
-  unit      Unit?    @relation(fields: [unitId], references: [id])
-  unitId    Int?
-  
+  spec      String?
+  costPrice Float?
+  sold      Int     @default(0)
+  quantity  Int?
+  warranty  Int?
+  noSN      Boolean @default(false)
+  codeType  String  @default("D")
+  active    Boolean @default(true)
+
+  unit   Unit? @relation(fields: [unitId], references: [id])
+  unitId Int?
+
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   templateId Int
-  
 
-  branch            Branch           @relation(fields: [branchId], references: [id])
-  branchId          Int
-  
-  updatedByBranchId Int?
-  prices            ProductPrice[]
-  productImages     ProductImage[]
-  stockItems        StockItem[]
-  poItems           POItem[]
-  orderItems        ProductOnOrder[]
-  cartItems         ProductOnCart[]
-  serviceItems      ServiceItem[]
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
+
+  updatedByBranchId  Int?
+  prices             ProductPrice[]
+  productImages      ProductImage[]
+  stockItems         StockItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  orderItems         ProductOnOrder[]
+  cartItems          ProductOnCart[]
+  serviceItems       ServiceItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 }
 
 model ProductImage {
@@ -286,7 +282,10 @@ model ProductPrice {
   productId Int
   product   Product @relation(fields: [productId], references: [id])
 
-  @@unique([productId, level])
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
+
+  @@unique([productId, branchId, level])
 }
 
 model Unit {
@@ -295,16 +294,18 @@ model Unit {
 
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  product         Product[]       
+  product         Product[]
   productTemplate ProductTemplate[]
 }
+
 
 // 📦 Stock System
 model StockItem {
   id           Int         @id @default(autoincrement())
   barcode      String      @unique
   serialNumber String?
-  buyPrice     Float
+  qrCodeData   String? 
+  buyPrice     Float       // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
   sellPrice    Float?
   receivedAt   DateTime    @default(now())
   warrantyDays Int?
@@ -312,22 +313,30 @@ model StockItem {
   soldAt       DateTime?
   status       StockStatus @default(IN_STOCK)
   remark       String?
+  locationCode String?     // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
+  source       String?     // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
+  tag          String?     // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
+  batchNumber  String?     // หมายเลขลอตสินค้า
+  checkedBy    String?     // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
 
-  productId       Int
-  branchId        Int
-  poReceiptItemId Int?
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
 
-  product       Product        @relation(fields: [productId], references: [id])
-  branch        Branch         @relation(fields: [branchId], references: [id])
-  poReceiptItem POReceiptItem? @relation(fields: [poReceiptItemId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
+
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
+  purchaseOrderReceiptItemId Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
+} 
+
+
 
 // 🧾 Purchasing
 model Supplier {
-  id             Int     @id @default(autoincrement())
+  id             Int             @id @default(autoincrement())
   name           String
   contactPerson  String?
   phone          String?
@@ -336,19 +345,19 @@ model Supplier {
   address        String?
   province       String?
   postalCode     String?
-  country        String? @default("Thailand")
-  paymentTerms   Int?    @default(30)
+  country        String?         @default("Thailand")
+  paymentTerms   Int?            @default(30)
   creditLimit    Float?
-  currentBalance Float?  @default(0)
+  currentBalance Float?          @default(0)
   bankId         Int?
   accountNumber  String?
   accountType    String?
   notes          String?
   branchId       Int?
-  active         Boolean @default(true)
-  bank           Bank?   @relation(fields: [bankId], references: [id])
-  branch         Branch? @relation(fields: [branchId], references: [id])
-  pos            PO[]
+  active         Boolean         @default(true)
+  bank           Bank?           @relation(fields: [bankId], references: [id])
+  branch         Branch?         @relation(fields: [branchId], references: [id])
+  pos            PurchaseOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -363,12 +372,12 @@ model Bank {
   updatedAt DateTime   @updatedAt
 }
 
-model PO {
-  id     Int      @id @default(autoincrement())
-  code   String   @unique
-  date   DateTime @default(now())
+model PurchaseOrder {
+  id     Int                 @id @default(autoincrement())
+  code   String              @unique
+  date   DateTime            @default(now())
   note   String?
-  status POStatus @default(PENDING)
+  status PurchaseOrderStatus @default(PENDING)
 
   supplierId Int
   branchId   Int
@@ -378,56 +387,75 @@ model PO {
   branch   Branch          @relation(fields: [branchId], references: [id])
   employee EmployeeProfile @relation(fields: [employeeId], references: [id])
 
-  items    POItem[]
-  receipts POReceipt[]
-  payments POPayment[]
+  items    PurchaseOrderItem[]
+  receipts PurchaseOrderReceipt[]
+  payments PurchaseOrderPayment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model POItem {
-  id        Int   @id @default(autoincrement())
-  poId      Int
+
+model PurchaseOrderItem {
+  id Int @id @default(autoincrement())
+
   productId Int
   quantity  Int
+  receivedQuantity Int @default(0)
   price     Float
+  receipts PurchaseOrderReceiptItem[]
 
-  po       PO              @relation(fields: [poId], references: [id])
-  product  Product         @relation(fields: [productId], references: [id])
-  receipts POReceiptItem[]
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId Int
+
+  product  Product                    @relation(fields: [productId], references: [id])
+ 
 }
 
-model POReceipt {
-  id         Int      @id @default(autoincrement())
-  poId       Int
+
+model PurchaseOrderReceipt {
+  id Int @id @default(autoincrement())
+
   receivedAt DateTime @default(now())
   note       String?
 
-  po    PO              @relation(fields: [poId], references: [id])
-  items POReceiptItem[]
+  status       ReceiptStatus @default(PENDING)
+  receivedById Int
+
+  branch   Branch @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
+  branchId Int
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId Int
+
+  items PurchaseOrderReceiptItem[]
 }
 
-model POReceiptItem {
-  id        Int @id @default(autoincrement())
-  receiptId Int
-  poItemId  Int
-  quantity  Int
-
-  receipt    POReceipt   @relation(fields: [receiptId], references: [id])
-  poItem     POItem      @relation(fields: [poItemId], references: [id])
-  stockItems StockItem[]
+model PurchaseOrderReceiptItem {
+  id                  Int                  @id @default(autoincrement())
+  receiptId           Int
+  purchaseOrderItemId Int
+  quantity            Int
+  costPrice           Float
+  receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
+  purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id])
+  stockItems          StockItem[]
 }
 
-model POPayment {
-  id     Int      @id @default(autoincrement())
-  poId   Int
+model PurchaseOrderPayment {
+  id Int @id @default(autoincrement())
+
   amount Float
   paidAt DateTime @default(now())
   method String
   note   String?
 
-  po PO @relation(fields: [poId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // 🛒 Online Order + Cart

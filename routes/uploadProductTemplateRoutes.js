@@ -15,19 +15,19 @@ const uploadProductTemplateMiddleware = require('../middlewares/uploadProductTem
 
 // ✅ [POST] Upload รูปภาพ Product Template (แนบลง DB ทันที)
 router.post(
-  '/product-templates/:id/images/upload-full',
+  '/:id/images/upload-full',
   uploadProductTemplateMiddleware.array('images'),
   uploadAndSaveProductTemplateImages
 );
 
 // ✅ [POST] Upload รูปภาพ Product Template (เฉพาะอัปโหลด - ยังไม่แนบ DB)
 router.post(
-  '/product-templates/images/upload-temp',
+  '/images/upload-temp',
   uploadProductTemplateMiddleware.array('images'),
   uploadProductTemplateImagesOnly
 );
 
 // ✅ [DELETE] ลบภาพ Product Template ทั้งจาก Cloudinary และ Prisma
-router.delete('/product-templates/:id/images/delete', deleteProductTemplateImage);
+router.delete('/:id/images/delete', deleteProductTemplateImage);
 
 module.exports = router;

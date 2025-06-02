@@ -1,10 +1,9 @@
 // ✅ controllers/supplierController.js
 const prisma = require('../lib/prisma');
 
-
 const getAllSuppliers = async (req, res) => {
   try {
-    const branchId = req.branchId;
+    const branchId = req.user?.branchId;
     if (!branchId) return res.status(400).json({ error: 'branchId is required from token' });
 
     const suppliers = await prisma.supplier.findMany({
@@ -25,10 +24,11 @@ const getAllSuppliers = async (req, res) => {
 
 const getSupplierById = async (req, res) => {
   try {
+    const branchId = req.user?.branchId;
     const supplier = await prisma.supplier.findFirst({
       where: {
         id: parseInt(req.params.id),
-        branchId: parseInt(req.branchId),
+        branchId: parseInt(branchId),
       },
     });
     if (!supplier) return res.status(404).json({ message: 'ไม่พบ supplier ในสาขานี้' });
@@ -41,7 +41,7 @@ const getSupplierById = async (req, res) => {
 const createSupplier = async (req, res) => {
   try {
     const { name, contactPerson, phone, email, taxId, address } = req.body;
-    const branchId = req.branchId;
+    const branchId = req.user?.branchId;
     if (!name || !phone || !branchId) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
     }
@@ -67,10 +67,11 @@ const createSupplier = async (req, res) => {
 
 const updateSupplier = async (req, res) => {
   try {
+    const branchId = req.user?.branchId;
     const existing = await prisma.supplier.findFirst({
       where: {
         id: parseInt(req.params.id),
-        branchId: parseInt(req.branchId),
+        branchId: parseInt(branchId),
       },
     });
     if (!existing) return res.status(403).json({ message: 'ไม่พบ supplier หรือไม่มีสิทธิ์เข้าถึง' });
@@ -84,6 +85,7 @@ const updateSupplier = async (req, res) => {
     res.status(400).json({ message: 'แก้ไข supplier ล้มเหลว', error: err.message });
   }
 };
+
 const deleteSupplier = async (req, res) => {
   try {
     await prisma.supplier.delete({

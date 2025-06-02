@@ -53,7 +53,6 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   const { email, password } = req.body;
-  
 
   try {
     const user = await prisma.user.findUnique({
@@ -65,7 +64,7 @@ const login = async (req, res) => {
         },
       },
     });
-    
+
     if (!user || !user.enabled) {
       return res.status(401).json({ message: 'บัญชีไม่มีสิทธิ์เข้าใช้งาน' });
     }
@@ -83,6 +82,7 @@ const login = async (req, res) => {
         role: user.role,
         profileId: profile?.id || null,
         branchId: user.employeeProfile?.branchId || null,
+        employeeId: user.employeeProfile?.id || null, // ✅ เพิ่ม employeeId
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
@@ -99,8 +99,6 @@ const login = async (req, res) => {
           id: user.id,
           email: user.email,
           role: user.role,
-          position: true,
-
         },
       },
     });
@@ -114,4 +112,3 @@ module.exports = {
   register,
   login,
 };
-

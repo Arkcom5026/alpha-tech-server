@@ -1,0 +1,22 @@
+// ✅ purchaseOrderRoutes.js
+const express = require('express');
+const router = express.Router();
+const {
+  getAllPurchaseOrders,
+  getPurchaseOrderById,
+  createPurchaseOrder,
+  updatePurchaseOrder,
+  deletePurchaseOrder
+} = require('../controllers/purchaseOrderController');
+const { verifyToken } = require('../middlewares/verifyToken');
+router.use(verifyToken);
+
+router.get('/', getAllPurchaseOrders);
+
+router.post('/', createPurchaseOrder);
+router.put('/:id', updatePurchaseOrder);
+router.delete('/:id', deletePurchaseOrder);
+router.get('/:id', getPurchaseOrderById);
+
+
+module.exports = router;
