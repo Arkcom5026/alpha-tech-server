@@ -9,7 +9,8 @@ const { getStockItemsByReceipt,
     updateStockItemStatus,
     addStockItemFromReceipt,
   //  getStockItemsForBarcodePrint,
-    getStockItemsByReceiptIds
+    getStockItemsByReceiptIds,
+    receiveStockItem,
 } = require('../controllers/StockItemController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -23,6 +24,7 @@ router.delete('/:id', deleteStockItem);
 router.patch('/:id/status', updateStockItemStatus);
 //router.get('/for-barcode-print', getStockItemsForBarcodePrint);
 router.post('/by-receipt-ids', getStockItemsByReceiptIds);
+router.post('/receive-sn', receiveStockItem);
 
 
 module.exports = router;

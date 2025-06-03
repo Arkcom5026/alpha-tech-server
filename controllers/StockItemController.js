@@ -1,7 +1,8 @@
+// ✅ StockItemController.js — จัดการ SN และรายการสินค้าเข้าสต๊อก
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// POST /api/stock-items
+// ✅ POST /api/stock-items
 const addStockItemFromReceipt = async (req, res) => {
   try {
     const {
@@ -55,7 +56,49 @@ const addStockItemFromReceipt = async (req, res) => {
   }
 };
 
-// GET /api/stock-items/by-receipt/:receiptId
+// ✅ POST /api/stock-items/receive-sn
+const receiveStockItem = async (req, res) => {
+  try {
+    const { barcode, receiptItemId } = req.body;
+
+    if (!barcode || !receiptItemId) {
+      return res.status(400).json({ error: 'barcode และ receiptItemId จำเป็นต้องมี' });
+    }
+
+    const receiptItem = await prisma.purchaseOrderReceiptItem.findUnique({
+      where: { id: receiptItemId },
+      include: { stockItems: true },
+    });
+
+    if (!receiptItem) {
+      return res.status(404).json({ error: 'ไม่พบ receipt item นี้' });
+    }
+
+    const exists = await prisma.stockItem.findUnique({ where: { barcode } });
+    if (exists) {
+      return res.status(409).json({ error: 'บาร์โค้ดนี้มีอยู่แล้วในระบบ' });
+    }
+
+    if (receiptItem.stockItems.length >= receiptItem.quantity) {
+      return res.status(400).json({ error: 'จำนวน SN ครบแล้ว' });
+    }
+
+    const newItem = await prisma.stockItem.create({
+      data: {
+        barcode,
+        receiptItem: { connect: { id: receiptItemId } },
+        status: 'IN_STOCK',
+      },
+    });
+
+    return res.json(newItem);
+  } catch (err) {
+    console.error('[receiveStockItem]', err);
+    return res.status(500).json({ error: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
+  }
+};
+
+// ✅ GET /api/stock-items/by-receipt/:receiptId
 const getStockItemsByReceipt = async (req, res) => {
   try {
     const { receiptId } = req.params;
@@ -80,7 +123,7 @@ const getStockItemsByReceipt = async (req, res) => {
   }
 };
 
-// POST /api/stock-items/by-receipt-ids
+// ✅ POST /api/stock-items/by-receipt-ids
 const getStockItemsByReceiptIds = async (req, res) => {
   try {
     const { receiptIds } = req.body;
@@ -116,7 +159,7 @@ const getStockItemsByReceiptIds = async (req, res) => {
   }
 };
 
-// DELETE /api/stock-items/:id
+// ✅ DELETE /api/stock-items/:id
 const deleteStockItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,7 +171,7 @@ const deleteStockItem = async (req, res) => {
   }
 };
 
-// PATCH /api/stock-items/:id/status
+// ✅ PATCH /api/stock-items/:id/status
 const updateStockItemStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -146,6 +189,7 @@ const updateStockItemStatus = async (req, res) => {
 
 module.exports = {
   addStockItemFromReceipt,
+  receiveStockItem,
   getStockItemsByReceipt,
   getStockItemsByReceiptIds,
   deleteStockItem,

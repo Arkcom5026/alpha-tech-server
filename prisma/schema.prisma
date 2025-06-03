@@ -103,6 +103,8 @@ model EmployeeProfile {
   purchaseOrderCreated PurchaseOrder[]
   assignedServices     ServiceOrder[]
   approved             Boolean         @default(false)
+  active               Boolean         @default(true)
+  stockItem            StockItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -127,7 +129,9 @@ model Branch {
 
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
-  PurchaseOrderReceipt PurchaseOrderReceipt[]
+  purchaseOrderReceipt PurchaseOrderReceipt[]
+  barcodeCounter       BarcodeCounter[]
+  barcodeReceiptItem   BarcodeReceiptItem[]
 }
 
 model Position {
@@ -298,26 +302,29 @@ model Unit {
   productTemplate ProductTemplate[]
 }
 
-
 // 📦 Stock System
 model StockItem {
-  id           Int         @id @default(autoincrement())
-  barcode      String      @unique
-  serialNumber String?
-  qrCodeData   String? 
-  buyPrice     Float       // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
-  sellPrice    Float?
-  receivedAt   DateTime    @default(now())
-  warrantyDays Int?
-  expiredAt    DateTime?
-  soldAt       DateTime?
-  status       StockStatus @default(IN_STOCK)
-  remark       String?
-  locationCode String?     // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
-  source       String?     // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
-  tag          String?     // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
-  batchNumber  String?     // หมายเลขลอตสินค้า
-  checkedBy    String?     // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
+  id                   Int              @id @default(autoincrement())
+  barcode              String           @unique
+  serialNumber         String?
+  qrCodeData           String?
+  buyPrice             Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+  sellPrice            Float?
+  receivedAt           DateTime         @default(now())
+  warrantyDays         Int?
+  expiredAt            DateTime?
+  soldAt               DateTime?
+  status               StockStatus      @default(IN_STOCK)
+  remark               String?
+  locationCode         String? // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
+  source               String? // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
+  tag                  String? // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
+  batchNumber          String? // หมายเลขลอตสินค้า
+  checkedBy            String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
+  barcodeReceiptItemId String?
+  scannedAt            DateTime         @default(now())
+  scannedByEmployeeId  Int?
+  scannedBy            EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id])
 
   product   Product @relation(fields: [productId], references: [id])
   productId Int
@@ -330,9 +337,7 @@ model StockItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-} 
-
-
+}
 
 // 🧾 Purchasing
 model Supplier {
@@ -395,24 +400,20 @@ model PurchaseOrder {
   updatedAt DateTime @updatedAt
 }
 
-
 model PurchaseOrderItem {
   id Int @id @default(autoincrement())
 
-  productId Int
-  quantity  Int
-  receivedQuantity Int @default(0)
-  price     Float
-  receipts PurchaseOrderReceiptItem[]
-
+  productId        Int
+  quantity         Int
+  receivedQuantity Int                        @default(0)
+  price            Float
+  receipts         PurchaseOrderReceiptItem[]
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
 
-  product  Product                    @relation(fields: [productId], references: [id])
- 
+  product Product @relation(fields: [productId], references: [id])
 }
-
 
 model PurchaseOrderReceipt {
   id Int @id @default(autoincrement())
@@ -429,7 +430,8 @@ model PurchaseOrderReceipt {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
 
-  items PurchaseOrderReceiptItem[]
+  items              PurchaseOrderReceiptItem[]
+  BarcodeReceiptItem BarcodeReceiptItem[]
 }
 
 model PurchaseOrderReceiptItem {
@@ -441,6 +443,7 @@ model PurchaseOrderReceiptItem {
   receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
   purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id])
   stockItems          StockItem[]
+  barcodeReceiptItem  BarcodeReceiptItem[]
 }
 
 model PurchaseOrderPayment {
@@ -551,4 +554,38 @@ model ServiceItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model BarcodeCounter {
+  id         Int      @id @default(autoincrement())
+  branchId   Int
+  yearMonth  String // รูปแบบ: '2506' (ปี 2025 เดือน 06)
+  lastNumber Int
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, yearMonth]) // ป้องกันซ้ำในระดับเดือน+สาขา
+}
+
+model BarcodeReceiptItem {
+  id            Int    @id @default(autoincrement())
+  barcode       String @unique // เช่น 0225060001
+  branchId      Int
+  yearMonth     String // เช่น '2506'
+  runningNumber Int // เช่น 1 → 0001
+  status        String // READY | SN_RECEIVED | USED | VOID
+  receiptItemId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrderReceiptId Int
+  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
+
+  branch      Branch                   @relation(fields: [branchId], references: [id])
+  receiptItem PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
+
+  @@unique([branchId, yearMonth, runningNumber])
 }

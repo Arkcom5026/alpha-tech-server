@@ -27,6 +27,7 @@ const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
 const stockItemRoutes = require('./routes/stockItemRoutes');
+const barcodeRoutes = require('./routes/barcodeRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -76,8 +77,7 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
               
 
 app.use('/api/stock-items', stockItemRoutes);  
-         
-
+app.use('/api/barcodes/', barcodeRoutes);  
          
 
 // ✅ Error handler

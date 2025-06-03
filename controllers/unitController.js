@@ -1,13 +1,13 @@
 // controllers/unitController.js
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 
 // ✅ GET /api/units
 const getAllUnits = async (req, res) => {
   try {
-    console.log('📥 ---------------------------------------------------------- getAllUnits');
+
     const units = await prisma.unit.findMany({ orderBy: { name: 'asc' } });
     res.json(units);
   } catch (error) {
