@@ -60,82 +60,58 @@ const getStockItemsByReceipt = async (req, res) => {
   try {
     const { receiptId } = req.params;
 
-    const items = await prisma.stockItem.findMany({
-      where: {
-        purchaseOrderReceiptItem: {
-          receiptId: Number(receiptId)
-        }
-      },
+    const receiptItems = await prisma.purchaseOrderReceiptItem.findMany({
+      where: { receiptId: Number(receiptId) },
       include: {
         product: true,
-        purchaseOrderReceiptItem: {
+        purchaseOrderItem: {
           include: {
-            receipt: {
-              include: {
-                purchaseOrder: { select: { code: true } },
-                supplier: { select: { name: true } }
-              }
-            }
+            product: true
           }
         }
-      }
+      },
+      orderBy: { id: 'asc' }
     });
 
-    res.json(items);
+    res.json(receiptItems);
   } catch (error) {
     console.error('[getStockItemsByReceipt]', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// GET /api/stock-items/by-product/:productId
-const getStockItemsByProduct = async (req, res) => {
+// POST /api/stock-items/by-receipt-ids
+const getStockItemsByReceiptIds = async (req, res) => {
   try {
-    const { productId } = req.params;
-    const items = await prisma.stockItem.findMany({
-      where: { productId: Number(productId) },
-      include: { product: true },
-      orderBy: { id: 'asc' }
-    });
-    res.json(items);
-  } catch (error) {
-    console.error('[getStockItemsByProduct]', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
+    const { receiptIds } = req.body;
 
-// GET /api/stock-items/for-barcode-print
-const getStockItemsForBarcodePrint = async (req, res) => {
-  try {
+    if (!Array.isArray(receiptIds) || receiptIds.length === 0) {
+      return res.status(400).json({ message: 'receiptIds ต้องเป็น array ที่ไม่ว่าง' });
+    }
 
-    
-    const items = await prisma.stockItem.findMany({
-      where: {
-        purchaseOrderReceiptItemId: { not: null },
-        status: 'IN_STOCK'
-      },
-      orderBy: { id: 'asc' },
+    const receiptItems = await prisma.purchaseOrderReceiptItem.findMany({
+      where: { receiptId: { in: receiptIds.map(Number) } },
       include: {
         product: true,
-        purchaseOrderReceiptItem: {
+        purchaseOrderItem: {
           include: {
-            receipt: {
-              include: {
-                purchaseOrder: {
-                  include: { supplier: true }
-                }
-              }
+            product: true
+          }
+        },
+        receipt: {
+          include: {
+            purchaseOrder: {
+              include: { supplier: true }
             }
           }
         }
-      }
+      },
+      orderBy: { id: 'asc' }
     });
 
-    res.json(items);
-    console.log('[getStockItemsForBarcodePrint] Fetching stock items for barcode print : ', items);
-
+    res.json(receiptItems);
   } catch (error) {
-    console.error('[getStockItemsForBarcodePrint]', error);
+    console.error('[getStockItemsByReceiptIds]', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -171,8 +147,7 @@ const updateStockItemStatus = async (req, res) => {
 module.exports = {
   addStockItemFromReceipt,
   getStockItemsByReceipt,
-  getStockItemsByProduct,
+  getStockItemsByReceiptIds,
   deleteStockItem,
-  updateStockItemStatus,
-  getStockItemsForBarcodePrint
+  updateStockItemStatus
 };
