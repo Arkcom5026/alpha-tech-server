@@ -335,8 +335,9 @@ model StockItem {
   purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
   purchaseOrderReceiptItemId Int?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  BarcodeReceiptItem BarcodeReceiptItem[]
 }
 
 // 🧾 Purchasing
@@ -412,12 +413,14 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
 
-  product Product @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PurchaseOrderReceipt {
   id Int @id @default(autoincrement())
-
+  code      String   @unique  
   receivedAt DateTime @default(now())
   note       String?
 
@@ -431,7 +434,9 @@ model PurchaseOrderReceipt {
   purchaseOrderId Int
 
   items              PurchaseOrderReceiptItem[]
-  BarcodeReceiptItem BarcodeReceiptItem[]
+  barcodeReceiptItem BarcodeReceiptItem[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 }
 
 model PurchaseOrderReceiptItem {
@@ -444,6 +449,8 @@ model PurchaseOrderReceiptItem {
   purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id])
   stockItems          StockItem[]
   barcodeReceiptItem  BarcodeReceiptItem[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model PurchaseOrderPayment {
@@ -578,8 +585,8 @@ model BarcodeReceiptItem {
   status        String // READY | SN_RECEIVED | USED | VOID
   receiptItemId Int
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id])
+  stockItemId Int?
 
   purchaseOrderReceiptId Int
   purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
@@ -588,4 +595,8 @@ model BarcodeReceiptItem {
   receiptItem PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
 
   @@unique([branchId, yearMonth, runningNumber])
+
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

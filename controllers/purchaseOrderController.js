@@ -3,6 +3,42 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// ✅ ฟังก์ชัน gen code สำหรับใบสั่งซื้อ
+const generatePurchaseOrderCode = async (branchId) => {
+  const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เพิ่มเลข 0 นำหน้า branchId
+  const now = new Date();
+  const yymm = `${now.getFullYear().toString().slice(2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+  const count = await prisma.purchaseOrder.count({
+    where: {
+      branchId,
+      createdAt: {
+        gte: new Date(now.getFullYear(), now.getMonth(), 1),
+        lt: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      },
+    },
+  });
+  const sequence = `${(count + 1).toString().padStart(4, '0')}`;
+  return `PO-${paddedBranch}${yymm}-${sequence}`;
+};
+
+// ✅ PATCH: อัปเดตสถานะใบสั่งซื้อ (เช่น เป็น COMPLETED)
+const updatePurchaseOrderStatus = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid ID' });
+
+    const updated = await prisma.purchaseOrder.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+    });
+
+    res.json({ success: true, updated });
+  } catch (err) {
+    console.error('❌ updatePurchaseOrderStatus error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 // ✅ GET: All purchase orders (with optional filters)
 const getAllPurchaseOrders = async (req, res) => {
   try {
@@ -51,7 +87,33 @@ const getAllPurchaseOrders = async (req, res) => {
   }
 };
 
+// ✅ GET: Purchase orders that are still open for receiving
+const getEligiblePurchaseOrders = async (req, res) => {
+  try {
+    const branchId = req.user?.branchId;
+    if (!branchId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+    }
 
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: {
+        branchId,
+        status: {
+          in: ['PENDING', 'PARTIAL']
+        }
+      },
+      include: {
+        supplier: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(purchaseOrders);
+  } catch (err) {
+    console.error('❌ getEligiblePurchaseOrders error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 // ✅ GET: Single purchase order by ID
 const getPurchaseOrderById = async (req, res) => {
@@ -96,7 +158,7 @@ const createPurchaseOrder = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
     }
 
-    const code = `PO-${Date.now()}`;
+    const code = await generatePurchaseOrderCode(branchId);
 
     const newPO = await prisma.purchaseOrder.create({
       data: {
@@ -130,23 +192,13 @@ const updatePurchaseOrder = async (req, res) => {
 
     const poId = parseInt(id);
 
-    // อัปเดต PO หลัก
     const updated = await prisma.purchaseOrder.update({
       where: { id: poId },
-      data: {
-        note,
-        status,
-      },
+      data: { note, status },
     });
 
-    // อัปเดตรายการสินค้า (แบบลบแล้วเพิ่มใหม่ทั้งหมด)
     if (Array.isArray(items)) {
-      // ลบของเดิมก่อน
-      await prisma.purchaseOrderItem.deleteMany({
-        where: { purchaseOrderId: poId },
-      });
-
-      // เพิ่มรายการใหม่
+      await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: poId } });
       await prisma.purchaseOrder.update({
         where: { id: poId },
         data: {
@@ -168,16 +220,28 @@ const updatePurchaseOrder = async (req, res) => {
   }
 };
 
-
-// ✅ DELETE: Delete purchase order
 const deletePurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const branchId = req.user?.branchId;
 
-    await prisma.purchaseOrder.delete({
-      where: { id: parseInt(id) }
+    if (!id || !branchId) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+    }
+
+    // ตรวจสอบก่อนว่า PO นี้อยู่ใน branch ของผู้ใช้หรือไม่
+    const found = await prisma.purchaseOrder.findFirst({
+      where: {
+        id: parseInt(id),
+        branchId: branchId,
+      },
     });
 
+    if (!found) {
+      return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อนี้ในสาขาของคุณ' });
+    }
+
+    await prisma.purchaseOrder.delete({ where: { id: parseInt(id) } });
     res.json({ success: true });
   } catch (err) {
     console.error('❌ deletePurchaseOrder error:', err);
@@ -185,10 +249,14 @@ const deletePurchaseOrder = async (req, res) => {
   }
 };
 
+
 module.exports = {
   getAllPurchaseOrders,
+  getEligiblePurchaseOrders,
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
-  deletePurchaseOrder
+  deletePurchaseOrder,
+  generatePurchaseOrderCode,
+  updatePurchaseOrderStatus
 };

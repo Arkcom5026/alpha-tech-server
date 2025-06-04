@@ -1,6 +1,26 @@
-  
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const dayjs = require('dayjs');
+
+// 🔧 สร้างเลขที่ใบรับสินค้าอัตโนมัติ
+const generateReceiptCode = async (branchId) => {
+  const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เพิ่มเลข 0 นำหน้า branchId
+  const now = dayjs();
+  const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
+
+  const count = await prisma.purchaseOrderReceipt.count({
+    where: {
+      branchId,
+      createdAt: {
+        gte: now.startOf('month').toDate(),
+        lt: now.endOf('month').toDate(),
+      },
+    },
+  });
+
+  const running = String(count + 1).padStart(4, '0');
+  return `${prefix}-${running}`;
+};
 
 // 📥 สร้างใบรับสินค้าใหม่
 exports.createPurchaseOrderReceipt = async (req, res) => {
@@ -9,12 +29,15 @@ exports.createPurchaseOrderReceipt = async (req, res) => {
     const branchId = req.user.branchId;
     const receivedById = req.user.employeeId;
 
+    const code = await generateReceiptCode(branchId); // ✅ สร้างเลขใบรับสินค้า
+
     const created = await prisma.purchaseOrderReceipt.create({
       data: {
         purchaseOrderId,
         note,
         branchId,
         receivedById,
+        code,
       },
       include: {
         purchaseOrder: {
@@ -32,8 +55,6 @@ exports.createPurchaseOrderReceipt = async (req, res) => {
     res.status(500).json({ error: 'สร้างใบรับสินค้าไม่สำเร็จ' });
   }
 };
-
-
 
 // 📄 ดึงรายการใบรับสินค้าทั้งหมด (ตามสาขา)
 exports.getAllPurchaseOrderReceipts = async (req, res) => {
@@ -58,7 +79,6 @@ exports.getAllPurchaseOrderReceipts = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าได้' });
   }
 };
-
 
 // 🔍 ดึงใบรับสินค้ารายตัว (พร้อมรายการสินค้าเพื่อสร้าง SN)
 exports.getPurchaseOrderReceiptById = async (req, res) => {
@@ -95,13 +115,9 @@ exports.getPurchaseOrderReceiptById = async (req, res) => {
       },
     });
 
-    console.log('🔍 [getPurchaseOrderReceiptById] receipt-------------------------------------------------------- ', receipt);
-
     if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
 
-    // ✅ ปิด cache สำหรับ dev/debug เพื่อไม่ให้ browser/axios คืน 304
     res.set('Cache-Control', 'no-store');
-
     res.json(receipt);
   } catch (error) {
     console.error('❌ [getPurchaseOrderReceiptById] error:', error);
@@ -109,16 +125,11 @@ exports.getPurchaseOrderReceiptById = async (req, res) => {
   }
 };
 
-
-
-
-
 // 📦 ดึงรายละเอียดใบสั่งซื้อ (พร้อม supplier + สินค้า + ยอดรับแล้ว)
 exports.getPurchaseOrderDetailById = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
-    
 
     console.log('📦 [getPurchaseOrderDetailById] id:>> >> >> >> >>', id, 'branchId:', branchId);
 
@@ -135,11 +146,8 @@ exports.getPurchaseOrderDetailById = async (req, res) => {
       },
     });
 
-
-
     if (!purchaseOrder) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อนี้' });
 
-    // รวม receivedQuantity เข้าไปในแต่ละ item
     const itemsWithReceived = purchaseOrder.items.map(item => {
       const receivedQuantity = item.receiptItems?.reduce((sum, r) => sum + r.quantity, 0) || 0;
       return {
@@ -147,8 +155,6 @@ exports.getPurchaseOrderDetailById = async (req, res) => {
         receivedQuantity
       };
     });
-    
-  
 
     res.json({ ...purchaseOrder, items: itemsWithReceived });
   } catch (error) {
@@ -157,7 +163,26 @@ exports.getPurchaseOrderDetailById = async (req, res) => {
   }
 };
 
+// ✅ อัปเดตสถานะใบรับสินค้าเป็น COMPLETED (เมื่อบันทึกครบ)
+exports.markReceiptAsCompleted = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = req.user.branchId;
 
+    const found = await prisma.purchaseOrderReceipt.findFirst({ where: { id, branchId } });
+    if (!found) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
+
+    const updated = await prisma.purchaseOrderReceipt.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('❌ [markReceiptAsCompleted] error:', error);
+    res.status(500).json({ error: 'ไม่สามารถอัปเดตสถานะใบรับสินค้าได้' });
+  }
+};
 
 // ✏️ แก้ไขใบรับสินค้า
 exports.updatePurchaseOrderReceipt = async (req, res) => {
@@ -171,7 +196,7 @@ exports.updatePurchaseOrderReceipt = async (req, res) => {
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
       data: {
-        note,
+        note: req.body.note,
       },
       include: {
         purchaseOrder: {
@@ -254,7 +279,7 @@ exports.getReceiptBarcodeSummaries = async (req, res) => {
       };
     });
 
-    res.set('Cache-Control', 'no-store'); // ✅ ปิด cache เพื่อป้องกัน 304
+    res.set('Cache-Control', 'no-store');
     res.json(summaries);
   } catch (error) {
     console.error('❌ [getReceiptBarcodeSummaries] error:', error);

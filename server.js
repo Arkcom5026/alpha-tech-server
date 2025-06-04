@@ -75,10 +75,13 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
               
-
+             
 app.use('/api/stock-items', stockItemRoutes);  
+         ///api/stock-items/receive-sn 
+
 app.use('/api/barcodes/', barcodeRoutes);  
-         
+      
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

@@ -25,7 +25,7 @@ router.patch('/:id/status', updateStockItemStatus);
 //router.get('/for-barcode-print', getStockItemsForBarcodePrint);
 router.post('/by-receipt-ids', getStockItemsByReceiptIds);
 router.post('/receive-sn', receiveStockItem);
-
+             
 
 module.exports = router;
    

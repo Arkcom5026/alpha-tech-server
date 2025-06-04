@@ -6,7 +6,8 @@ const {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
-  deletePurchaseOrder
+  deletePurchaseOrder,
+  updatePurchaseOrderStatus
 } = require('../controllers/purchaseOrderController');
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
@@ -17,6 +18,6 @@ router.post('/', createPurchaseOrder);
 router.put('/:id', updatePurchaseOrder);
 router.delete('/:id', deletePurchaseOrder);
 router.get('/:id', getPurchaseOrderById);
-
+router.patch('/:id/status', updatePurchaseOrderStatus);
 
 module.exports = router;

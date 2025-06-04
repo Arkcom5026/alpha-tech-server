@@ -56,48 +56,6 @@ const addStockItemFromReceipt = async (req, res) => {
   }
 };
 
-// ✅ POST /api/stock-items/receive-sn
-const receiveStockItem = async (req, res) => {
-  try {
-    const { barcode, receiptItemId } = req.body;
-
-    if (!barcode || !receiptItemId) {
-      return res.status(400).json({ error: 'barcode และ receiptItemId จำเป็นต้องมี' });
-    }
-
-    const receiptItem = await prisma.purchaseOrderReceiptItem.findUnique({
-      where: { id: receiptItemId },
-      include: { stockItems: true },
-    });
-
-    if (!receiptItem) {
-      return res.status(404).json({ error: 'ไม่พบ receipt item นี้' });
-    }
-
-    const exists = await prisma.stockItem.findUnique({ where: { barcode } });
-    if (exists) {
-      return res.status(409).json({ error: 'บาร์โค้ดนี้มีอยู่แล้วในระบบ' });
-    }
-
-    if (receiptItem.stockItems.length >= receiptItem.quantity) {
-      return res.status(400).json({ error: 'จำนวน SN ครบแล้ว' });
-    }
-
-    const newItem = await prisma.stockItem.create({
-      data: {
-        barcode,
-        receiptItem: { connect: { id: receiptItemId } },
-        status: 'IN_STOCK',
-      },
-    });
-
-    return res.json(newItem);
-  } catch (err) {
-    console.error('[receiveStockItem]', err);
-    return res.status(500).json({ error: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
-  }
-};
-
 // ✅ GET /api/stock-items/by-receipt/:receiptId
 const getStockItemsByReceipt = async (req, res) => {
   try {
@@ -187,11 +145,84 @@ const updateStockItemStatus = async (req, res) => {
   }
 };
 
+
+
+const receiveStockItem = async (req, res) => {
+  const { barcode } = req.body;
+  const branchId = req.user?.branchId;
+  const employeeId = req.user?.employeeId;
+
+  if (!barcode || !branchId || !employeeId) {
+    return res.status(400).json({ error: 'Missing barcode, branchId, or employeeId' });
+  }
+
+  try {
+    const barcodeItem = await prisma.barcodeReceiptItem.findUnique({
+      where: { barcode },
+      include: {
+        receiptItem: {
+          include: {
+            purchaseOrderItem: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log('[receiveStockItem] 🔍 barcode =', barcode);
+    console.log('[receiveStockItem] 🔍 barcodeItem =', barcodeItem);
+
+    if (!barcodeItem) {
+      return res.status(400).json({ error: '❌ Barcode not found in system' });
+    }
+
+    if (barcodeItem.stockItemId) {
+      return res.status(400).json({ error: '❌ Barcode already received' });
+    }
+
+    const product = barcodeItem.receiptItem.purchaseOrderItem.product;
+    const buyPrice = barcodeItem.receiptItem.buyPrice ?? 0;
+
+    const stockItem = await prisma.stockItem.create({
+      data: {
+        productId: product.id,
+        barcode,
+        status: 'IN_STOCK',
+        purchaseOrderReceiptItemId: barcodeItem.receiptItem.id,
+        buyPrice,
+        branchId,
+        source: 'PURCHASE_ORDER',
+        scannedByEmployeeId: employeeId,
+        warrantyDays: product?.warrantyDays || null,
+      },
+    });
+
+    await prisma.barcodeReceiptItem.update({
+      where: { id: barcodeItem.id },
+      data: {
+        stockItemId: stockItem.id,
+        status: 'RECEIVED', // ✅ เปลี่ยนสถานะเมื่อยิง SN สำเร็จ
+      },
+    });
+
+    return res.json({ stockItem });
+  } catch (error) {
+    console.error('[receiveStockItem] ❌ Unexpected error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+
+
 module.exports = {
   addStockItemFromReceipt,
   receiveStockItem,
   getStockItemsByReceipt,
   getStockItemsByReceiptIds,
   deleteStockItem,
-  updateStockItemStatus
+  updateStockItemStatus,
 };

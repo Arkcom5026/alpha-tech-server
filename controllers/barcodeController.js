@@ -105,6 +105,10 @@ const generateMissingBarcodes = async (req, res) => {
   }
 };
 
+
+
+
+
 const getBarcodesByReceiptId = async (req, res) => {
   const { receiptId } = req.params;
   const branchId = req.user?.branchId;
@@ -114,8 +118,7 @@ const getBarcodesByReceiptId = async (req, res) => {
   }
 
   try {
-    console.log('📦 [getBarcodesByReceiptId] receiptId:', receiptId, 'branchId:', branchId);
-
+    console.log('----------- >> >> >> receiptId : ', receiptId);
     const barcodes = await prisma.barcodeReceiptItem.findMany({
       where: {
         purchaseOrderReceiptId: Number(receiptId),
@@ -139,10 +142,11 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
       orderBy: { id: 'asc' },
     });
-    console.log('barcodes : ',barcodes)
+
     const simplified = barcodes.map((b) => ({
       id: b.id,
       barcode: b.barcode,
+      stockItemId: b.stockItemId || null, // ✅ เพิ่มฟิลด์นี้
       product: {
         title: b.receiptItem?.purchaseOrderItem?.product?.title || '',
         spec: b.receiptItem?.purchaseOrderItem?.product?.spec || '',
@@ -160,7 +164,68 @@ const getBarcodesByReceiptId = async (req, res) => {
   }
 };
 
+
+
+
+
+const getReceiptsWithBarcodes = async (req, res) => {
+  const branchId = req.user?.branchId;
+
+  if (!branchId) {
+    return res.status(400).json({ error: 'Missing branchId' });
+  }
+
+  try {
+    const receipts = await prisma.purchaseOrderReceipt.findMany({
+      where: {
+        branchId: Number(branchId),
+        barcodeReceiptItem: {
+          some: {},
+        },
+      },
+      include: {
+        purchaseOrder: {
+          select: {
+            code: true,
+            supplier: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        barcodeReceiptItem: {
+          select: {
+            stockItemId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    const result = receipts.map((r) => ({
+      id: r.id,
+      code: r.code,
+      purchaseOrderCode: r.purchaseOrder?.code || '-',
+      supplier: r.purchaseOrder?.supplier?.name || '-',
+      createdAt: r.createdAt,
+      total: r.barcodeReceiptItem.length,
+      scanned: r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error('[getReceiptsWithBarcodes]', err);
+    res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
+  }
+};
+
+
 module.exports = {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
+  getReceiptsWithBarcodes,
+  
 };
