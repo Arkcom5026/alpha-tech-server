@@ -53,7 +53,11 @@ const getAllPurchaseOrders = async (req, res) => {
 
     const where = {
       branchId,
-      ...(status !== 'all' && { status: status.toUpperCase() }),
+      ...(status !== 'all' && {
+        status: {
+          in: status.split(',').map((s) => s.toUpperCase()),
+        },
+      }),
       ...(search && {
         OR: [
           { code: { contains: search, mode: 'insensitive' } },
@@ -115,6 +119,11 @@ const getEligiblePurchaseOrders = async (req, res) => {
   }
 };
 
+
+
+
+
+
 // ✅ GET: Single purchase order by ID
 const getPurchaseOrderById = async (req, res) => {
   try {
@@ -128,9 +137,8 @@ const getPurchaseOrderById = async (req, res) => {
         items: {
           include: {
             product: {
-              select: {
-                id: true,
-                title: true
+              include: {
+                template: true
               }
             }
           }
@@ -145,6 +153,11 @@ const getPurchaseOrderById = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+
+
+
+
 
 // ✅ POST: Create purchase order
 const createPurchaseOrder = async (req, res) => {

@@ -539,6 +539,36 @@ async function deleteProductPrice(req, res) {
 
 
 
+
+const searchProducts = async (req, res) => {
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ error: 'Missing search query' });
+
+  try {
+    const results = await prisma.product.findMany({
+      where: {
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        template: true,
+      },
+      take: 20,
+      orderBy: { title: 'asc' },
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('❌ [searchProducts]', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+};
+
+
+
+
 module.exports = {
   getAllProducts,
   createProduct,
@@ -551,4 +581,5 @@ module.exports = {
   addProductPrice,
   updateProductPrice,
   deleteProductPrice,
+  searchProducts,
 };

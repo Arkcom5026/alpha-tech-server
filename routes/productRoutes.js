@@ -13,6 +13,7 @@ const {
   addProductPrice,
   updateProductPrice,
   deleteProductPrice,
+  searchProducts,
 } = require('../controllers/productController');
 const { verifyToken } = require('../middlewares/verifyToken');
 
@@ -20,17 +21,18 @@ const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ Routes
-router.get('/', getAllProducts);                                // ✅ GET all products
-router.get('/dropdowns/:id', getProductDropdowns);       // ✅ GET dropdowns with productId (Edit mode)
-router.get('/dropdowns', getProductDropdowns);                  // ✅ GET dropdowns only (Create mode)
-router.get('/:id/prices', getProductPrices);                    // ✅ GET prices for product by ID
-router.get('/:id', getProductById);                             // ✅ GET product by ID
-router.post('/', createProduct);                                // ✅ CREATE product
-router.put('/:id', updateProduct);                              // ✅ UPDATE product
-router.delete('/:id', deleteProduct);                           // ✅ DELETE product
-router.delete('/:id/image', deleteProductImage);                // ✅ DELETE image of product
-router.post('/:id/prices', addProductPrice);                    // ✅ ADD product price
-router.put('/:productId/prices/:priceId', updateProductPrice); // ✅ UPDATE product price
-router.delete('/:productId/prices/:priceId', deleteProductPrice); // ✅ DELETE product price
+router.get('/', getAllProducts);
+router.get('/dropdowns/:id', getProductDropdowns);
+router.get('/dropdowns', getProductDropdowns);
+router.get('/search', searchProducts);                      // ✅ moved up before /:id
+router.get('/:id/prices', getProductPrices);
+router.get('/:id', getProductById);
+router.post('/', createProduct);
+router.put('/:id', updateProduct);
+router.delete('/:id', deleteProduct);
+router.delete('/:id/image', deleteProductImage);
+router.post('/:id/prices', addProductPrice);
+router.put('/:productId/prices/:priceId', updateProductPrice);
+router.delete('/:productId/prices/:priceId', deleteProductPrice);
 
 module.exports = router;

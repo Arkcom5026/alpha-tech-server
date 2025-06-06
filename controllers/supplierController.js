@@ -13,6 +13,15 @@ const getAllSuppliers = async (req, res) => {
       orderBy: {
         createdAt: 'desc',
       },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        contactPerson: true,
+        creditLimit: true,
+        currentBalance: true,
+        createdAt: true,
+      },
     });
 
     res.json(suppliers);
@@ -104,3 +113,4 @@ module.exports = {
   updateSupplier,
   deleteSupplier,
 };
+  

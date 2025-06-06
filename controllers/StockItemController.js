@@ -145,8 +145,6 @@ const updateStockItemStatus = async (req, res) => {
   }
 };
 
-
-
 const receiveStockItem = async (req, res) => {
   const { barcode } = req.body;
   const branchId = req.user?.branchId;
@@ -204,7 +202,7 @@ const receiveStockItem = async (req, res) => {
       where: { id: barcodeItem.id },
       data: {
         stockItemId: stockItem.id,
-        status: 'RECEIVED', // ✅ เปลี่ยนสถานะเมื่อยิง SN สำเร็จ
+        status: 'RECEIVED',
       },
     });
 
@@ -215,8 +213,32 @@ const receiveStockItem = async (req, res) => {
   }
 };
 
+// ✅ GET /stock-items/search?query=xxx
+const searchStockItem = async (req, res) => {
+  try {
+    const query = req.query.query || req.query.barcode;
+    if (!query) return res.status(400).json({ error: 'Missing query or barcode' });
 
+    const items = await prisma.stockItem.findMany({
+      where: {
+        status: 'IN_STOCK',
+        OR: [
+          { barcode: { equals: query } },
+          { product: { is: { title: { contains: query, mode: 'insensitive' } } } },
+        ]
+      },
+      include: {
+        product: true
+      },
+      orderBy: { id: 'asc' }
+    });
 
+    return res.json(items);
+  } catch (err) {
+    console.error('❌ [searchStockItem] error:', err);
+    return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาสินค้า' });
+  }
+};
 
 module.exports = {
   addStockItemFromReceipt,
@@ -225,4 +247,5 @@ module.exports = {
   getStockItemsByReceiptIds,
   deleteStockItem,
   updateStockItemStatus,
+  searchStockItem,
 };

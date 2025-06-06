@@ -28,6 +28,8 @@ const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes'
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
 const stockItemRoutes = require('./routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
+const saleOrderRoutes = require('./routes/saleOrderRoutes');
+
 
 // ✅ Middlewares
 app.use(express.json());
@@ -66,6 +68,7 @@ app.use('/api/product-templates', productTemplateRoutes); // ✅ route สำห
 
 
 app.use('/api/products', uploadProductRoutes);
+
 app.use('/api/products-templates', uploadProductTemplateRoutes);
 
 
@@ -76,10 +79,12 @@ app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
               
              
-app.use('/api/stock-items', stockItemRoutes);  
-         ///api/stock-items/receive-sn 
+app.use('/api/stock-items', stockItemRoutes);           
 
 app.use('/api/barcodes/', barcodeRoutes);  
+
+app.use('/api/sale-orders', saleOrderRoutes);
+
       
 
 
