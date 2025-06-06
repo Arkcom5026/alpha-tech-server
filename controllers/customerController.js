@@ -1,42 +1,70 @@
-// 📁 FILE: controllers/customerController.js
-// ✅ COMMENT: logic สำหรับสร้างลูกค้าแบบด่วนผ่านเบอร์โทร
-
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-exports.quickCreateCustomer = async (req, res) => {
+// ✅ ค้นหาลูกค้าจากเบอร์โทร
+const getCustomerByPhone = async (req, res) => {
   try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: 'กรุณาระบุเบอร์โทร' });
+    const { phone } = req.params;
 
-    const last4 = phone.slice(-4);
-    const email = `auto+${phone}@quick.pos`;
-
-    const customerUser = await prisma.user.upsert({
-      where: { email },
-      update: {},
-      create: {
-        email,
-        password: last4,
-        role: 'customer',
-        customerProfile: {
-          create: {
-            phone,
-            name: 'ลูกค้าใหม่',
-          },
-        },
-      },
-      include: { customerProfile: true },
+    const customer = await prisma.customerProfile.findFirst({
+      where: { phone },
+      include: { user: true },
     });
 
-    res.json({
-      userId: customerUser.id,
-      customerId: customerUser.customerProfile?.id,
-      phone: customerUser.customerProfile?.phone,
-      name: customerUser.customerProfile?.name,
-    });
+    if (!customer) {
+      return res.status(404).json({ message: 'ไม่พบลูกค้า' });
+    }
+
+    return res.json(customer);
   } catch (err) {
-    console.error('❌ [quick-create-customer]', err);
-    res.status(500).json({ error: 'ไม่สามารถสร้างลูกค้าอัตโนมัติได้' });
+    console.error('[getCustomerByPhone] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
   }
+};
+
+// ✅ สร้างลูกค้าใหม่ พร้อมสร้าง User + CustomerProfile
+const createCustomer = async (req, res) => {
+  try {
+    const { name, phone, email, address } = req.body;
+
+    if (!phone || !name) {
+      return res.status(400).json({ error: 'ต้องระบุชื่อและเบอร์โทร' });
+    }
+
+    const existing = await prisma.customerProfile.findFirst({ where: { phone } });
+    if (existing) {
+      return res.status(409).json({ error: 'เบอร์นี้ถูกลงทะเบียนแล้ว' });
+    }
+
+    const password = phone.slice(-4); // ใช้ 4 ตัวท้ายของเบอร์เป็น password เริ่มต้น
+
+    const newUser = await prisma.user.create({
+      data: {
+        email: email || null,
+        loginId: phone,
+        password,
+        role: 'customer',
+        loginType: 'PHONE',
+      },
+    });
+
+    const newCustomer = await prisma.customerProfile.create({
+      data: {
+        name,
+        phone,
+        address: address || null,
+        userId: newUser.id,
+      },
+    });
+
+    return res.status(201).json(newCustomer);
+  } catch (err) {
+    console.error('[createCustomer] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการสร้างลูกค้า' });
+  }
+};
+
+module.exports = {
+  getCustomerByPhone,
+  createCustomer,
 };

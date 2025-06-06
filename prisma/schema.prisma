@@ -52,14 +52,23 @@ enum ReceiptStatus {
   CANCELLED
 }
 
+enum LoginType {
+  PHONE
+  EMAIL
+  SOCIAL
+  ADMIN
+}
+
 // 🔐 User & Profiles
 model User {
   id          Int       @id @default(autoincrement())
-  email       String    @unique
+  email       String?   @unique // ✅ Optional, but must be unique if provided
+  loginId     String?   @unique // ✅ For phone number login
   password    String
   role        Role
   enabled     Boolean   @default(true)
   lastLoginAt DateTime?
+  loginType   LoginType @default(PHONE) // ✅ Track source of registration
 
   customerProfile CustomerProfile?
   employeeProfile EmployeeProfile?
@@ -84,6 +93,7 @@ model CustomerProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  sale      Sale[]
 }
 
 model EmployeeProfile {
@@ -108,6 +118,10 @@ model EmployeeProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  sale            Sale[]
+  saleReturns     SaleReturn[] // ผู้สร้างใบคืนสินค้า
+  refundedReturns SaleReturn[] @relation("RefundedBy") // ผู้คืนเงินจริง
 }
 
 // 🏢 HR
@@ -132,6 +146,8 @@ model Branch {
   purchaseOrderReceipt PurchaseOrderReceipt[]
   barcodeCounter       BarcodeCounter[]
   barcodeReceiptItem   BarcodeReceiptItem[]
+  sale                 Sale[]
+  saleReturn           SaleReturn[]
 }
 
 model Position {
@@ -338,6 +354,7 @@ model StockItem {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   BarcodeReceiptItem BarcodeReceiptItem[]
+  saleItem           SaleItem?
 }
 
 // 🧾 Purchasing
@@ -419,8 +436,8 @@ model PurchaseOrderItem {
 }
 
 model PurchaseOrderReceipt {
-  id Int @id @default(autoincrement())
-  code      String   @unique  
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
   receivedAt DateTime @default(now())
   note       String?
 
@@ -594,9 +611,98 @@ model BarcodeReceiptItem {
   branch      Branch                   @relation(fields: [branchId], references: [id])
   receiptItem PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
 
-  @@unique([branchId, yearMonth, runningNumber])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  
+  @@unique([branchId, yearMonth, runningNumber])
+}
+
+model Sale {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  soldAt     DateTime @default(now())
+  customerId Int?
+  employeeId Int
+  branchId   Int
+
+  totalBeforeDiscount Float
+  totalDiscount       Float
+  vat                 Float
+  vatRate             Float   @default(7)
+  totalAmount         Float
+  paymentMethod       String // เช่น CASH, QR, CREDIT
+  paymentDetails      Json? // กรณีมีหลายช่องทางการจ่ายเงิน
+  note                String?
+  status              String  @default("COMPLETED")
+  refCode             String?
+  isTaxInvoice        Boolean @default(false)
+
+  customer CustomerProfile? @relation(fields: [customerId], references: [id])
+  employee EmployeeProfile  @relation(fields: [employeeId], references: [id])
+  branch   Branch           @relation(fields: [branchId], references: [id])
+  items    SaleItem[]
+  returns  SaleReturn[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SaleItem {
+  id          Int @id @default(autoincrement())
+  saleId      Int
+  stockItemId Int @unique
+
+  basePrice      Float // ราคาก่อน VAT
+  vatAmount      Float // VAT 7% ของสินค้านี้
+  price          Float // ราคาขายต่อชิ้น (รวม VAT แล้ว)
+  discount       Float // ส่วนลดเฉพาะชิ้นนี้
+  refundedAmount Float   @default(0) // ยอดที่เคยคืนไปแล้วจากชิ้นนี้
+  remark         String?
+
+  sale        Sale             @relation(fields: [saleId], references: [id])
+  stockItem   StockItem        @relation(fields: [stockItemId], references: [id])
+  returnItems SaleReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SaleReturn {
+  id                   Int      @id @default(autoincrement())
+  code                 String   @unique
+  saleId               Int
+  returnedAt           DateTime @default(now())
+  employeeId           Int
+  refundedByEmployeeId Int?
+  branchId             Int
+
+  totalRefund  Float
+  refundMethod String // เช่น CASH, QR, CREDIT
+  note         String?
+  status       String  @default("PENDING") // PENDING, REFUNDED, REJECTED
+
+  sale       Sale             @relation(fields: [saleId], references: [id])
+  employee   EmployeeProfile  @relation(fields: [employeeId], references: [id])
+  refundedBy EmployeeProfile? @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id])
+  branch     Branch           @relation(fields: [branchId], references: [id])
+  items      SaleReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SaleReturnItem {
+  id           Int @id @default(autoincrement())
+  saleReturnId Int
+  saleItemId   Int
+
+  refundAmount Float // จำนวนเงินที่คืนให้ลูกค้า
+  reason       String? // เหตุผลการคืนสินค้า
+  reasonCode   String? // รหัสเหตุผล เช่น DEFECT, CHANGE_MIND
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

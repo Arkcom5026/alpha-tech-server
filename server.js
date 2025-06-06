@@ -28,7 +28,9 @@ const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes'
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
 const stockItemRoutes = require('./routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
-const saleOrderRoutes = require('./routes/saleOrderRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+const saleRoutes = require('./routes/saleRoutes');
+
 
 
 // ✅ Middlewares
@@ -83,10 +85,11 @@ app.use('/api/stock-items', stockItemRoutes);
 
 app.use('/api/barcodes/', barcodeRoutes);  
 
-app.use('/api/sale-orders', saleOrderRoutes);
 
+
+app.use('/api/customers', customerRoutes);
       
-
+app.use("/api/sale-orders", saleRoutes);
 
 // ✅ Error handler
 app.use((err, req, res, next) => {
