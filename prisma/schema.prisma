@@ -59,6 +59,28 @@ enum LoginType {
   ADMIN
 }
 
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  QR
+  CREDIT
+  OTHER
+}
+
+enum SaleType {
+  NORMAL
+  GOVERNMENT
+  WHOLESALE
+}
+
+enum SaleStatus {
+  DRAFT // ยังไม่ได้ส่งของ
+  DELIVERED // ส่งของแล้วแต่ยังไม่ตกลงราคา
+  PENDING_PRICING // รอเคาะราคา
+  FINALIZED // เคาะราคาแล้ว พร้อมคำนวณภาษี
+  COMPLETED // รับเงินครบแล้ว
+}
+
 // 🔐 User & Profiles
 model User {
   id          Int       @id @default(autoincrement())
@@ -119,9 +141,11 @@ model EmployeeProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sale            Sale[]
-  saleReturns     SaleReturn[] // ผู้สร้างใบคืนสินค้า
-  refundedReturns SaleReturn[] @relation("RefundedBy") // ผู้คืนเงินจริง
+  sale                 Sale[]
+  saleReturns          SaleReturn[] // ผู้สร้างใบคืนสินค้า
+  refundedReturns      SaleReturn[]           @relation("RefundedBy") // ผู้คืนเงินจริง
+  payment              Payment[]
+  combinedSaleDocument CombinedSaleDocument[]
 }
 
 // 🏢 HR
@@ -148,6 +172,8 @@ model Branch {
   barcodeReceiptItem   BarcodeReceiptItem[]
   sale                 Sale[]
   saleReturn           SaleReturn[]
+  payment              Payment[]
+  combinedSaleDocument CombinedSaleDocument[]
 }
 
 model Position {
@@ -628,14 +654,22 @@ model Sale {
   totalBeforeDiscount Float
   totalDiscount       Float
   vat                 Float
-  vatRate             Float   @default(7)
+  vatRate             Float      @default(7)
   totalAmount         Float
   paymentMethod       String // เช่น CASH, QR, CREDIT
   paymentDetails      Json? // กรณีมีหลายช่องทางการจ่ายเงิน
   note                String?
-  status              String  @default("COMPLETED")
+  status              SaleStatus @default(DRAFT)
   refCode             String?
-  isTaxInvoice        Boolean @default(false)
+  isTaxInvoice        Boolean    @default(false)
+
+  isCredit               Boolean               @default(false) // ลูกค้าเครดิตหรือไม่
+  dueDate                DateTime? // กำหนดชำระเงิน (30/45/60/90 วัน)
+  officialDocumentNumber String? // เลขหนังสือ/ใบสั่งจากหน่วยงาน
+  saleType               SaleType              @default(NORMAL)
+  finalizedAt            DateTime? // วันที่ราคาถูกเคาะเป็นทางการ
+  combinedDocumentId     Int?
+  combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id])
 
   customer CustomerProfile? @relation(fields: [customerId], references: [id])
   employee EmployeeProfile  @relation(fields: [employeeId], references: [id])
@@ -643,8 +677,13 @@ model Sale {
   items    SaleItem[]
   returns  SaleReturn[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Payment   Payment[]
+
+  @@index([branchId, soldAt])
+  @@index([isCredit, dueDate])
+  @@index([combinedDocumentId])
 }
 
 model SaleItem {
@@ -665,6 +704,47 @@ model SaleItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  sale   Sale   @relation(fields: [saleId], references: [id])
+  saleId Int
+
+  paymentMethod        PaymentMethod
+  amount               Decimal       @db.Decimal(10, 2)
+  receivedAt           DateTime      @default(now())
+  note                 String? // เช่น เลขอ้างอิงโอน, หมายเหตุ, ฯลฯ
+  combinedDocumentCode String?
+
+  
+  EmployeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
+  employeeProfileId Int?
+  
+  Branch            Branch?          @relation(fields: [branchId], references: [id])
+  branchId          Int?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model CombinedSaleDocument {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique
+  issueDate      DateTime @default(now())
+  note           String?
+  createdBy      Int
+  branchId       Int
+  totalAmount    Float
+  finalAmount    Float
+  adjustmentNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdByUser EmployeeProfile @relation(fields: [createdBy], references: [id])
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  sales         Sale[]          @relation("SalesCombined")
 }
 
 model SaleReturn {
