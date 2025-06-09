@@ -145,6 +145,42 @@ const updateStockItemStatus = async (req, res) => {
   }
 };
 
+
+
+
+
+// ✅ PATCH /api/stock-items/mark-sold/:saleId
+const markStockItemsAsSold = async (req, res) => {
+  try {
+    const { stockItemIds } = req.body;
+
+    if (!Array.isArray(stockItemIds) || stockItemIds.length === 0) {
+      return res.status(400).json({ message: 'stockItemIds ต้องเป็น array' });
+    }
+
+    const updated = await prisma.stockItem.updateMany({
+      where: {
+        id: { in: stockItemIds },
+      },
+      data: {
+        status: 'SOLD',
+        soldAt: new Date(),
+      },
+    });
+
+    return res.status(200).json({ count: updated.count });
+  } catch (err) {
+    console.error('❌ markStockItemsAsSold error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+
+
+
+
 const receiveStockItem = async (req, res) => {
   const { barcode } = req.body;
   const branchId = req.user?.branchId;
@@ -170,8 +206,7 @@ const receiveStockItem = async (req, res) => {
       },
     });
 
-    console.log('[receiveStockItem] 🔍 barcode =', barcode);
-    console.log('[receiveStockItem] 🔍 barcodeItem =', barcodeItem);
+
 
     if (!barcodeItem) {
       return res.status(400).json({ error: '❌ Barcode not found in system' });
@@ -248,4 +283,5 @@ module.exports = {
   deleteStockItem,
   updateStockItemStatus,
   searchStockItem,
+  markStockItemsAsSold,
 };

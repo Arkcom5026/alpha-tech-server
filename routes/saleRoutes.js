@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { createSale, getAllSales, getSaleById } = require("../controllers/saleController");
+const { createSale, getAllSales, getSaleById, markSaleAsPaid } = require("../controllers/saleController");
 
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -15,5 +15,8 @@ router.get("/", getAllSales);
 
 // ✅ GET /api/sales/:id
 router.get("/:id", getSaleById);
+
+
+router.post("/:id/mark-paid", markSaleAsPaid);
 
 module.exports = router;

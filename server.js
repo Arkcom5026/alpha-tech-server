@@ -30,7 +30,7 @@ const stockItemRoutes = require('./routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./routes/saleRoutes');
-
+const paymentRoutes = require('./routes/paymentRoutes');
 
 
 // ✅ Middlewares
@@ -90,6 +90,9 @@ app.use('/api/barcodes/', barcodeRoutes);
 app.use('/api/customers', customerRoutes);
       
 app.use("/api/sale-orders", saleRoutes);
+
+
+app.use('/api/payments', paymentRoutes); 
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

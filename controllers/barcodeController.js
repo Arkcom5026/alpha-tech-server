@@ -118,7 +118,7 @@ const getBarcodesByReceiptId = async (req, res) => {
   }
 
   try {
-    console.log('----------- >> >> >> receiptId : ', receiptId);
+
     const barcodes = await prisma.barcodeReceiptItem.findMany({
       where: {
         purchaseOrderReceiptId: Number(receiptId),

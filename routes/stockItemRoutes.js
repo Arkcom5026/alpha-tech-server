@@ -10,7 +10,8 @@ const {
   addStockItemFromReceipt,
   getStockItemsByReceiptIds,
   receiveStockItem,
-  searchStockItem, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, title, code)
+  searchStockItem,
+  markStockItemsAsSold, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, title, code)
 } = require('../controllers/StockItemController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -23,5 +24,6 @@ router.delete('/:id', deleteStockItem);
 router.patch('/:id/status', updateStockItemStatus);
 router.post('/by-receipt-ids', getStockItemsByReceiptIds);
 router.post('/receive-sn', receiveStockItem);
+router.patch('/mark-sold', markStockItemsAsSold);
 
 module.exports = router;

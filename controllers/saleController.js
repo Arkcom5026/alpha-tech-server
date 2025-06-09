@@ -24,10 +24,11 @@ const generateSaleCode = async (branchId) => {
   };
   
 
-// ✅ สร้างการขายใหม่
-const createSale = async (req, res) => {
-  
 
+// ✅ สร้างการขายใหม่ (ตามมาตรฐาน flow การขายที่ยืนยันแล้ว)
+// ✅ แยกขั้นตอน: ไม่เปลี่ยนสถานะ stockItem ในขั้นตอนนี้
+// ✅ จะเปลี่ยนสถานะ stockItem → 'SOLD' หลังจากบันทึก payment สำเร็จเท่านั้น ผ่าน markSaleAsPaid()
+const createSale = async (req, res) => {
   try {
     const {
       customerId,     
@@ -41,6 +42,7 @@ const createSale = async (req, res) => {
       note,
       items, // [{ stockItemId, barcodeId, price, discount, basePrice, vatAmount, remark }]
     } = req.body;
+
     const branchId = req.user?.branchId;
     const employeeId = req.user?.employeeId;
 
@@ -61,11 +63,8 @@ const createSale = async (req, res) => {
     }
 
     // สร้างเลขที่ใบขาย
-    console.log('-+------- -- - branchId ------ -------- ->>>>>',branchId)
     const code = await generateSaleCode(branchId);
   
-
-
     const sale = await prisma.sale.create({
       data: {
         code, // ✅ เพิ่มเลขที่ใบขาย
@@ -94,22 +93,23 @@ const createSale = async (req, res) => {
       include: { items: true },
     });
 
-    // อัปเดตสถานะ stockItem → SOLD
-    await prisma.stockItem.updateMany({
-      where: {
-        id: { in: barcodeIds },
-      },
-      data: {
-        status: 'SOLD',
-      },
-    });
+    const stockItemIds = sale.items.map((item) => item.stockItemId);
 
-    return res.status(201).json(sale);
+    return res.status(201).json({
+      id: sale.id,      // ✅ ใช้ UUID จริงของ Prisma
+      code: sale.code,  // ✅ สำหรับแสดงผลและอ้างอิงใบเสร็จ
+      stockItemIds,     // ✅ คืนรายการ stockItemIds ที่ขายแล้ว
+    });
   } catch (error) {
     console.error("❌ [createSale] Error:", error);
     return res.status(500).json({ error: "ไม่สามารถสร้างการขายได้" });
   }
 };
+
+
+
+
+
 
 // ✅ ดึงรายการขายทั้งหมด
 const getAllSales = async (req, res) => {
@@ -124,6 +124,12 @@ const getAllSales = async (req, res) => {
     return res.status(500).json({ error: "ไม่สามารถดึงรายการขายได้" });
   }
 };
+
+
+
+
+
+
 
 // ✅ ดึงข้อมูลการขายตาม ID
 const getSaleById = async (req, res) => {
@@ -142,8 +148,88 @@ const getSaleById = async (req, res) => {
   }
 };
 
+const getSalesByBranchId = async (req, res) => {
+  try {
+    
+    const branchId = req.user.branchId;
+    
+
+    if (!branchId) {
+      return res.status(400).json({ error: "branchId ไม่ถูกต้อง" });
+    }
+
+    const sales = await prisma.sale.findMany({
+      where: { branchId },
+      orderBy: { soldAt: "desc" },
+      include: {
+        customer: true, // ต้อง include customer เพื่อใช้ชื่อ/เบอร์โทร
+      },
+    });
+
+    const mapped = sales.map((sale) => ({
+      id: sale.id,
+      code: sale.code,
+      totalAmount: sale.totalAmount,
+      createdAt: sale.createdAt,
+      customerName: sale.customer?.name || "-",
+      customerPhone: sale.customer?.phone || "-",
+    }));
+
+    return res.json(mapped);
+  } catch (error) {
+    console.error("❌ [getSalesByBranchId] Error:", error);
+    return res.status(500).json({ error: "ไม่สามารถโหลดข้อมูลใบเสร็จย้อนหลัง" });
+  }
+};   
+
+
+const markSaleAsPaid = async (req, res) => {
+  const saleId =  parseInt(req.params.id);
+  const { branchId } = req.user;
+
+  console.log('markSaleAsPaid saleId : ',saleId)
+  console.log('markSaleAsPaid branchId : ',branchId)
+  try {
+    const sale = await prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { items: true },
+    });
+
+    if (!sale || sale.branchId !== branchId) {
+      return res.status(404).json({ message: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
+    }
+
+    await prisma.$transaction([
+      prisma.sale.update({
+        where: { id: saleId },
+        data: {
+          paid: true,
+          paidAt: new Date(),
+        },
+      }),
+      ...sale.items.map((item) =>
+        prisma.stockItem.update({
+          where: { id: item.stockItemId },
+          data: { status: 'SOLD' },
+        })
+      ),
+    ]);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('❌ [markSaleAsPaid]', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดขณะเปลี่ยนสถานะสินค้า' });
+  }
+};
+
+
 module.exports = {
   createSale,
   getAllSales,
   getSaleById,
+  getSalesByBranchId,
+  markSaleAsPaid,
+  
 };
+
+   

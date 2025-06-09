@@ -379,7 +379,7 @@ model StockItem {
 
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-  BarcodeReceiptItem BarcodeReceiptItem[]
+  barcodeReceiptItem BarcodeReceiptItem[]
   saleItem           SaleItem?
 }
 
@@ -662,6 +662,8 @@ model Sale {
   status              SaleStatus @default(DRAFT)
   refCode             String?
   isTaxInvoice        Boolean    @default(false)
+  paid                Boolean    @default(false)
+  paidAt              DateTime?
 
   isCredit               Boolean               @default(false) // ลูกค้าเครดิตหรือไม่
   dueDate                DateTime? // กำหนดชำระเงิน (30/45/60/90 วัน)
@@ -708,6 +710,7 @@ model SaleItem {
 
 model Payment {
   id     String @id @default(cuid())
+  code   String @unique
   sale   Sale   @relation(fields: [saleId], references: [id])
   saleId Int
 
@@ -717,15 +720,22 @@ model Payment {
   note                 String? // เช่น เลขอ้างอิงโอน, หมายเหตุ, ฯลฯ
   combinedDocumentCode String?
 
-  
-  EmployeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
-  employeeProfileId Int?
-  
-  Branch            Branch?          @relation(fields: [branchId], references: [id])
-  branchId          Int?
+  slipImage String? // ✅ สำหรับหลักฐานการโอน
+  cardRef   String? // ✅ สำหรับอ้างอิงบัตรเครดิต
+  govImage  String? // ✅ สำหรับภาพเอกสารหน่วยงาน
 
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  isCancelled Boolean   @default(false)
+  cancelNote  String?
+  cancelledAt DateTime?
+
+  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
+  employeeProfileId Int?
+
+  Branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CombinedSaleDocument {
