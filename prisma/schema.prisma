@@ -105,9 +105,9 @@ model CustomerProfile {
   picture String?
   address String?
   phone   String?
-
-  user   User @relation(fields: [userId], references: [id])
-  userId Int  @unique
+  taxId   String?
+  user    User    @relation(fields: [userId], references: [id])
+  userId  Int     @unique
 
   orders   Order[]
   cart     Cart[]
@@ -146,6 +146,7 @@ model EmployeeProfile {
   refundedReturns      SaleReturn[]           @relation("RefundedBy") // ผู้คืนเงินจริง
   payment              Payment[]
   combinedSaleDocument CombinedSaleDocument[]
+  refundTransaction    RefundTransaction[]
 }
 
 // 🏢 HR
@@ -174,6 +175,7 @@ model Branch {
   saleReturn           SaleReturn[]
   payment              Payment[]
   combinedSaleDocument CombinedSaleDocument[]
+  refundTransaction    RefundTransaction[]
 }
 
 model Position {
@@ -757,19 +759,29 @@ model CombinedSaleDocument {
   sales         Sale[]          @relation("SalesCombined")
 }
 
+enum ReturnType {
+  REFUND
+  CLAIM
+  EXCHANGE
+  CREDIT_NOTE
+  INTERNAL_USE
+  STOCK_ERROR
+}
+
 model SaleReturn {
-  id                   Int      @id @default(autoincrement())
-  code                 String   @unique
+  id                   Int        @id @default(autoincrement())
+  code                 String     @unique
   saleId               Int
-  returnedAt           DateTime @default(now())
+  returnedAt           DateTime   @default(now())
   employeeId           Int
   refundedByEmployeeId Int?
   branchId             Int
-
-  totalRefund  Float
-  refundMethod String // เช่น CASH, QR, CREDIT
-  note         String?
-  status       String  @default("PENDING") // PENDING, REFUNDED, REJECTED
+  reason               String?
+  totalRefund          Float
+  refundMethod         String // เช่น CASH, QR, CREDIT
+  returnType           ReturnType @default(REFUND) // ✅ ประเภทการคืน
+  note                 String?
+  status               String     @default("PENDING") // PENDING, REFUNDED, REJECTED
 
   sale       Sale             @relation(fields: [saleId], references: [id])
   employee   EmployeeProfile  @relation(fields: [employeeId], references: [id])
@@ -777,8 +789,9 @@ model SaleReturn {
   branch     Branch           @relation(fields: [branchId], references: [id])
   items      SaleReturnItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  refundTransaction RefundTransaction[]
 }
 
 model SaleReturnItem {
@@ -795,4 +808,19 @@ model SaleReturnItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model RefundTransaction {
+  id                   Int      @id @default(autoincrement())
+  saleReturnId         Int
+  amount               Float
+  method               String // CASH, QR, TRANSFER, CREDIT
+  note                 String?
+  refundedAt           DateTime @default(now())
+  refundedByEmployeeId Int
+  branchId             Int
+
+  saleReturn SaleReturn      @relation(fields: [saleReturnId], references: [id])
+  refundedBy EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id])
+  branch     Branch          @relation(fields: [branchId], references: [id])
 }

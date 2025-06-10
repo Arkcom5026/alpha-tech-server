@@ -153,7 +153,7 @@ const updateStockItemStatus = async (req, res) => {
 const markStockItemsAsSold = async (req, res) => {
   try {
     const { stockItemIds } = req.body;
-
+    console.log('req.body : ',req.body)
     if (!Array.isArray(stockItemIds) || stockItemIds.length === 0) {
       return res.status(400).json({ message: 'stockItemIds ต้องเป็น array' });
     }

@@ -31,7 +31,8 @@ const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
-
+const saleReturnRoutes = require('./routes/saleReturnRoutes');
+const refundRoutes = require('./routes/refundRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -73,7 +74,6 @@ app.use('/api/products', uploadProductRoutes);
 
 app.use('/api/products-templates', uploadProductTemplateRoutes);
 
-
 app.use('/api/products', productRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
               
@@ -82,17 +82,20 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
               
              
 app.use('/api/stock-items', stockItemRoutes);           
-
+         
 app.use('/api/barcodes/', barcodeRoutes);  
-
 
 
 app.use('/api/customers', customerRoutes);
       
 app.use("/api/sale-orders", saleRoutes);
 
-
 app.use('/api/payments', paymentRoutes); 
+
+app.use('/api/sale-returns', saleReturnRoutes);
+
+app.use('/api/refunds', refundRoutes);
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
-const dayjs = require('dayjs');
 const prisma = new PrismaClient();
+
+const dayjs = require('dayjs');
 
 // 🔧 สร้างเลขที่ใบขายอัตโนมัติ
 const generateSaleCode = async (branchId) => {
@@ -26,8 +27,6 @@ const generateSaleCode = async (branchId) => {
 
 
 // ✅ สร้างการขายใหม่ (ตามมาตรฐาน flow การขายที่ยืนยันแล้ว)
-// ✅ แยกขั้นตอน: ไม่เปลี่ยนสถานะ stockItem ในขั้นตอนนี้
-// ✅ จะเปลี่ยนสถานะ stockItem → 'SOLD' หลังจากบันทึก payment สำเร็จเท่านั้น ผ่าน markSaleAsPaid()
 const createSale = async (req, res) => {
   try {
     const {
@@ -64,10 +63,10 @@ const createSale = async (req, res) => {
 
     // สร้างเลขที่ใบขาย
     const code = await generateSaleCode(branchId);
-  
-    const sale = await prisma.sale.create({
+
+    const createdSale = await prisma.sale.create({
       data: {
-        code, // ✅ เพิ่มเลขที่ใบขาย
+        code,
         customerId,
         employeeId,
         branchId,
@@ -90,22 +89,37 @@ const createSale = async (req, res) => {
           })),
         },
       },
-      include: { items: true },
     });
 
-    const stockItemIds = sale.items.map((item) => item.stockItemId);
+    const stockItemIds = items.map((i) => i.stockItemId); // ✅ ดึง stockItemIds เพื่อคืนกลับ
+
+    const sale = await prisma.sale.findUnique({
+      where: { id: createdSale.id },
+      include: {
+        branch: true,
+        customer: true,
+        employee: true,
+        items: {
+          include: {
+            stockItem: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
     return res.status(201).json({
-      id: sale.id,      // ✅ ใช้ UUID จริงของ Prisma
-      code: sale.code,  // ✅ สำหรับแสดงผลและอ้างอิงใบเสร็จ
-      stockItemIds,     // ✅ คืนรายการ stockItemIds ที่ขายแล้ว
+      ...sale,
+      stockItemIds, // ✅ แนบไปด้วยใน response
     });
   } catch (error) {
     console.error("❌ [createSale] Error:", error);
     return res.status(500).json({ error: "ไม่สามารถสร้างการขายได้" });
   }
 };
-
 
 
 
@@ -129,24 +143,73 @@ const getAllSales = async (req, res) => {
 
 
 
+// ✅ ดึงรายการขายทั้งหมดเพื่อคืนสินค้า
+const getAllSalesReturn = async (req, res) => {
+  try {
+    const { branchId } = req.user;
+
+    const sales = await prisma.sale.findMany({
+      where: { branchId }, // ✅ เพิ่มเงื่อนไขสำคัญ
+      orderBy: { soldAt: 'desc' },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            stockItem: {
+              include: {
+                product: true, // ✅ เพื่อให้แสดงชื่อสินค้าได้
+              }
+            }
+          }
+        }
+      },
+    });
+
+    return res.json(sales);
+  } catch (error) {
+    console.error("❌ [getSalesByBranch] Error:", error);
+    return res.status(500).json({ error: "ไม่สามารถดึงรายการขายได้" });
+  }
+};
 
 
-// ✅ ดึงข้อมูลการขายตาม ID
+
+
+// ✅ ดึงข้อมูลการขายตาม ID โดยกรองตามสาขา (BRANCH_SCOPE_ENFORCED)
 const getSaleById = async (req, res) => {
   try {
     const { id } = req.params;
-    const sale = await prisma.sale.findUnique({
-      where: { id: Number(id) },
-      include: { items: true },
+    const { branchId } = req.user; // ✅ ต้องได้จาก token/user context เท่านั้น
+
+    const sale = await prisma.sale.findFirst({
+      where: {
+        id: Number(id),
+        branchId: branchId, // ✅ กรองตามสาขาเพื่อความปลอดภัย
+      },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            stockItem: {
+              include: {
+                product: true, // ✅ ดึงชื่อสินค้า
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (!sale) return res.status(404).json({ error: "ไม่พบรายการขายนี้" });
+    if (!sale) return res.status(404).json({ error: "ไม่พบรายการขายนี้ หรือไม่อยู่ในสาขานี้" });
     return res.json(sale);
   } catch (error) {
     console.error("❌ [getSaleById] Error:", error);
     return res.status(500).json({ error: "เกิดข้อผิดพลาดในการค้นหา" });
   }
 };
+
+
+
 
 const getSalesByBranchId = async (req, res) => {
   try {
@@ -229,6 +292,7 @@ module.exports = {
   getSaleById,
   getSalesByBranchId,
   markSaleAsPaid,
+  getAllSalesReturn,
   
 };
 
