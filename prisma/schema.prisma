@@ -81,6 +81,15 @@ enum SaleStatus {
   COMPLETED // รับเงินครบแล้ว
 }
 
+enum ReturnType {
+  REFUND
+  CLAIM
+  EXCHANGE
+  CREDIT_NOTE
+  INTERNAL_USE
+  STOCK_ERROR
+}
+
 // 🔐 User & Profiles
 model User {
   id          Int       @id @default(autoincrement())
@@ -759,14 +768,7 @@ model CombinedSaleDocument {
   sales         Sale[]          @relation("SalesCombined")
 }
 
-enum ReturnType {
-  REFUND
-  CLAIM
-  EXCHANGE
-  CREDIT_NOTE
-  INTERNAL_USE
-  STOCK_ERROR
-}
+
 
 model SaleReturn {
   id                   Int        @id @default(autoincrement())
@@ -778,7 +780,10 @@ model SaleReturn {
   branchId             Int
   reason               String?
   totalRefund          Float
-  refundMethod         String // เช่น CASH, QR, CREDIT
+  refundedAmount       Float      @default(0)     // ✅ รวมยอดที่คืนแล้วจริง
+  deductedAmount       Float      @default(0)     // ✅ รวมยอดที่หักไว้จากการคืน
+  isFullyRefunded      Boolean    @default(false) // ✅ คืนเงินครบแล้วหรือยัง
+  refundMethod         String     // เช่น CASH, QR, CREDIT
   returnType           ReturnType @default(REFUND) // ✅ ประเภทการคืน
   note                 String?
   status               String     @default("PENDING") // PENDING, REFUNDED, REJECTED

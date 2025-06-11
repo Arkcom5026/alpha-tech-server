@@ -12,7 +12,7 @@ const {
   receiveStockItem,
   searchStockItem,
   markStockItemsAsSold, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, title, code)
-} = require('../controllers/StockItemController');
+} = require('../controllers/stockItemController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);

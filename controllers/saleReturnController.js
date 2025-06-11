@@ -61,39 +61,47 @@ const createSaleReturn = async (req, res) => {
 
     const code = await generateReturnCode(branchId);
 
+    let totalRefund = 0;
+    const itemData = await Promise.all(items.map(async (i) => {
+      const saleItem = await prisma.saleItem.findUnique({
+        where: { id: i.saleItemId },
+        include: { stockItem: true },
+      });
+
+      if (!saleItem || saleItem.saleId !== sale.id) {
+        throw new Error(`ไม่พบ saleItem หรือไม่ตรงกับใบขาย: ${i.saleItemId}`);
+      }
+
+      await prisma.stockItem.update({
+        where: { id: saleItem.stockItemId },
+        data: { status: 'RETURNED' },
+      });
+
+      totalRefund += saleItem.price;
+
+      return {
+        saleItemId: i.saleItemId,
+        refundAmount: saleItem.price,
+        reason: i.reason || '',
+        reasonCode: i.reasonCode || '',
+      };
+    }));
+
     const created = await prisma.saleReturn.create({
       data: {
         code,
         saleId: sale.id,
         employeeId: Number(employeeId),
         branchId: Number(branchId),
-        totalRefund: 0,
+        totalRefund: totalRefund,
+        refundedAmount: 0,
+        deductedAmount: 0,
+        isFullyRefunded: false,
         refundMethod: '',
         status: 'PENDING',
         returnType: 'REFUND',
         items: {
-          create: await Promise.all(items.map(async (i) => {
-            const saleItem = await prisma.saleItem.findUnique({
-              where: { id: i.saleItemId },
-              include: { stockItem: true },
-            });
-
-            if (!saleItem || saleItem.saleId !== sale.id) {
-              throw new Error(`ไม่พบ saleItem หรือไม่ตรงกับใบขาย: ${i.saleItemId}`);
-            }
-
-            await prisma.stockItem.update({
-              where: { id: saleItem.stockItemId },
-              data: { status: 'RETURNED' },
-            });
-
-            return {
-              saleItemId: i.saleItemId,
-              refundAmount: saleItem.price,
-              reason: i.reason || '',
-              reasonCode: i.reasonCode || '',
-            };
-          })),
+          create: itemData,
         },
       },
     });
@@ -117,15 +125,27 @@ const getAllSaleReturns = async (req, res) => {
           include: { customer: true },
         },
         items: true,
+        refundTransaction: true,
       },
     });
 
-    return res.status(200).json(saleReturns);
+    const resultWithTotal = saleReturns.map((sr) => {
+      const totalItemRefund = sr.items.reduce((sum, item) => sum + (item.refundAmount || 0), 0);
+      const refundedAmount = sr.refundTransaction.reduce((sum, r) => sum + (r.amount || 0), 0);
+      return {
+        ...sr,
+        totalRefund: totalItemRefund,
+        refundedAmount,
+      };
+    });
+
+    return res.status(200).json(resultWithTotal);
   } catch (error) {
     console.error('❌ [getAllSaleReturns] Error:', error);
     return res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบคืนสินค้าได้' });
   }
 };
+
 const getSaleReturnById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -153,6 +173,7 @@ const getSaleReturnById = async (req, res) => {
             },
           },
         },
+        refundTransaction: true,
       },
     });
 
@@ -160,13 +181,19 @@ const getSaleReturnById = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบข้อมูลใบคืนสินค้า' });
     }
 
-    return res.status(200).json(saleReturn);
+    const totalRefund = saleReturn.items.reduce((sum, item) => sum + (item.refundAmount || 0), 0);
+    const refundedAmount = saleReturn.refundTransaction.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+    return res.status(200).json({
+      ...saleReturn,
+      totalRefund,
+      refundedAmount,
+    });
   } catch (error) {
     console.error('❌ [getSaleReturnById] error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการโหลดข้อมูลใบคืนสินค้า' });
   }
 };
-
 
 module.exports = {
   createSaleReturn,
