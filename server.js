@@ -33,6 +33,7 @@ const saleRoutes = require('./routes/saleRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const saleReturnRoutes = require('./routes/saleReturnRoutes');
 const refundRoutes = require('./routes/refundRoutes');
+const supplierPaymentRoutes = require('./routes/supplierPaymentRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -95,6 +96,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
 
 app.use('/api/refunds', refundRoutes);
+
+app.use('/api/supplier-payments',supplierPaymentRoutes);
 
 
 // ✅ Error handler

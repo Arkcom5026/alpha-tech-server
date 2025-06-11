@@ -113,6 +113,9 @@ const createSaleReturn = async (req, res) => {
   }
 };
 
+
+
+
 const getAllSaleReturns = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -125,17 +128,21 @@ const getAllSaleReturns = async (req, res) => {
           include: { customer: true },
         },
         items: true,
-        refundTransaction: true,
       },
     });
 
     const resultWithTotal = saleReturns.map((sr) => {
       const totalItemRefund = sr.items.reduce((sum, item) => sum + (item.refundAmount || 0), 0);
-      const refundedAmount = sr.refundTransaction.reduce((sum, r) => sum + (r.amount || 0), 0);
+      const refundedAmount = sr.refundedAmount || 0;
+      const deductedAmount = sr.deductedAmount || 0;
+
       return {
         ...sr,
         totalRefund: totalItemRefund,
         refundedAmount,
+        deductedAmount,
+        remainingAmount: totalItemRefund - (refundedAmount + deductedAmount),
+        isFullyRefunded: refundedAmount + deductedAmount >= totalItemRefund,
       };
     });
 
@@ -145,6 +152,11 @@ const getAllSaleReturns = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบคืนสินค้าได้' });
   }
 };
+
+
+
+
+
 
 const getSaleReturnById = async (req, res) => {
   try {

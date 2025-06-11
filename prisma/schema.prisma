@@ -507,6 +507,7 @@ model PurchaseOrderReceiptItem {
   updatedAt           DateTime             @updatedAt
 }
 
+
 model PurchaseOrderPayment {
   id Int @id @default(autoincrement())
 
@@ -521,6 +522,7 @@ model PurchaseOrderPayment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 // 🛒 Online Order + Cart
 model Order {
@@ -768,8 +770,6 @@ model CombinedSaleDocument {
   sales         Sale[]          @relation("SalesCombined")
 }
 
-
-
 model SaleReturn {
   id                   Int        @id @default(autoincrement())
   code                 String     @unique
@@ -780,10 +780,10 @@ model SaleReturn {
   branchId             Int
   reason               String?
   totalRefund          Float
-  refundedAmount       Float      @default(0)     // ✅ รวมยอดที่คืนแล้วจริง
-  deductedAmount       Float      @default(0)     // ✅ รวมยอดที่หักไว้จากการคืน
+  refundedAmount       Float      @default(0) // ✅ รวมยอดที่คืนแล้วจริง
+  deductedAmount       Float      @default(0) // ✅ รวมยอดที่หักไว้จากการคืน
   isFullyRefunded      Boolean    @default(false) // ✅ คืนเงินครบแล้วหรือยัง
-  refundMethod         String     // เช่น CASH, QR, CREDIT
+  refundMethod         String // เช่น CASH, QR, CREDIT
   returnType           ReturnType @default(REFUND) // ✅ ประเภทการคืน
   note                 String?
   status               String     @default("PENDING") // PENDING, REFUNDED, REJECTED
@@ -819,7 +819,8 @@ model RefundTransaction {
   id                   Int      @id @default(autoincrement())
   saleReturnId         Int
   amount               Float
-  method               String // CASH, QR, TRANSFER, CREDIT
+  deducted             Float    @default(0) 
+  method               String 
   note                 String?
   refundedAt           DateTime @default(now())
   refundedByEmployeeId Int
