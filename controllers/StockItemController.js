@@ -145,15 +145,11 @@ const updateStockItemStatus = async (req, res) => {
   }
 };
 
-
-
-
-
 // ✅ PATCH /api/stock-items/mark-sold/:saleId
 const markStockItemsAsSold = async (req, res) => {
   try {
     const { stockItemIds } = req.body;
-    console.log('req.body : ',req.body)
+    console.log('req.body : ', req.body);
     if (!Array.isArray(stockItemIds) || stockItemIds.length === 0) {
       return res.status(400).json({ message: 'stockItemIds ต้องเป็น array' });
     }
@@ -175,76 +171,76 @@ const markStockItemsAsSold = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 const receiveStockItem = async (req, res) => {
-  const { barcode } = req.body;
-  const branchId = req.user?.branchId;
-  const employeeId = req.user?.employeeId;
-
-  if (!barcode || !branchId || !employeeId) {
-    return res.status(400).json({ error: 'Missing barcode, branchId, or employeeId' });
-  }
-
   try {
+    const { barcode: barcodeData } = req.body;
+
+    if (!barcodeData || typeof barcodeData !== 'object') {
+      return res.status(400).json({ error: 'Invalid barcode payload.' });
+    }
+
+    const { barcode, serialNumber, keepSN } = barcodeData;
+
+    if (!barcode || typeof barcode !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid barcode.' });
+    }
+
     const barcodeItem = await prisma.barcodeReceiptItem.findUnique({
       where: { barcode },
       include: {
         receiptItem: {
           include: {
+            receipt: true,
             purchaseOrderItem: {
               include: {
-                product: true,
-              },
-            },
-          },
-        },
-      },
+                product: true
+              }
+            }
+          }
+        }
+      }
     });
 
-
-
     if (!barcodeItem) {
-      return res.status(400).json({ error: '❌ Barcode not found in system' });
+      return res.status(404).json({ error: 'Barcode not found.' });
     }
 
     if (barcodeItem.stockItemId) {
-      return res.status(400).json({ error: '❌ Barcode already received' });
+      return res.status(400).json({ error: 'This barcode has already been received.' });
     }
 
-    const product = barcodeItem.receiptItem.purchaseOrderItem.product;
-    const buyPrice = barcodeItem.receiptItem.buyPrice ?? 0;
+    const product = barcodeItem.receiptItem?.purchaseOrderItem?.product;
+    if (!product) {
+      return res.status(400).json({ error: 'Product data not found for this barcode.' });
+    }
 
-    const stockItem = await prisma.stockItem.create({
+    const branchId = barcodeItem.receiptItem.receipt?.branchId;
+    if (!branchId) {
+      return res.status(400).json({ error: 'Branch not found for this barcode.' });
+    }
+
+    const newStockItem = await prisma.stockItem.create({
       data: {
-        productId: product.id,
         barcode,
+        serialNumber: serialNumber || barcode,
         status: 'IN_STOCK',
-        purchaseOrderReceiptItemId: barcodeItem.receiptItem.id,
-        buyPrice,
-        branchId,
-        source: 'PURCHASE_ORDER',
-        scannedByEmployeeId: employeeId,
-        warrantyDays: product?.warrantyDays || null,
+        receivedAt: new Date(),
+        buyPrice: barcodeItem.receiptItem?.buyPrice || 0,
+        product: { connect: { id: product.id } },
+        branch: { connect: { id: branchId } },
+        purchaseOrderReceiptItem: { connect: { id: barcodeItem.receiptItem.id } }
       },
     });
 
     await prisma.barcodeReceiptItem.update({
-      where: { id: barcodeItem.id },
-      data: {
-        stockItemId: stockItem.id,
-        status: 'RECEIVED',
-      },
+      where: { barcode },
+      data: { stockItemId: newStockItem.id },
     });
 
-    return res.json({ stockItem });
+    return res.status(201).json({ message: '✅ รับสินค้าเข้าสต๊อกเรียบร้อยแล้ว', stockItem: newStockItem });
   } catch (error) {
     console.error('[receiveStockItem] ❌ Unexpected error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error.' });
   }
 };
 
@@ -275,6 +271,48 @@ const searchStockItem = async (req, res) => {
   }
 };
 
+// ✅ PATCH /api/stock-items/update-sn/:barcode
+const updateSerialNumber = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    const { serialNumber } = req.body;
+
+    if (!barcode) {
+      return res.status(400).json({ error: 'Missing barcode.' });
+    }
+
+    // หา stockItem ที่ตรงกับ barcode
+    const stockItem = await prisma.stockItem.findUnique({
+      where: { barcode },
+    });
+
+    if (!stockItem) {
+      return res.status(404).json({ error: 'Stock item not found.' });
+    }
+
+    const updated = await prisma.stockItem.update({
+      where: { id: stockItem.id },
+      data: {
+        serialNumber: serialNumber || null, // ✅ ถ้าไม่ส่ง serialNumber จะถือว่าลบ
+      },
+      include: {
+        purchaseOrderReceiptItem: {
+          select: {
+            receiptId: true,
+          },
+        },
+      },
+    });
+
+    res.json({ message: 'SN updated', stockItem: updated });
+  } catch (error) {
+    console.error('[updateSerialNumber] ❌ Error:', error);
+    res.status(500).json({ error: 'Failed to update serial number.' });
+  }
+};
+
+
+
 module.exports = {
   addStockItemFromReceipt,
   receiveStockItem,
@@ -284,4 +322,5 @@ module.exports = {
   updateStockItemStatus,
   searchStockItem,
   markStockItemsAsSold,
+  updateSerialNumber,
 };

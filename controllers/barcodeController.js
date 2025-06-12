@@ -125,6 +125,7 @@ const getBarcodesByReceiptId = async (req, res) => {
         branchId: Number(branchId),
       },
       include: {
+        stockItem: true, // ✅ include stockItem เพื่อให้ได้ serialNumber และ barcode จริง
         receiptItem: {
           include: {
             purchaseOrderItem: {
@@ -143,15 +144,19 @@ const getBarcodesByReceiptId = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
+
     const simplified = barcodes.map((b) => ({
       id: b.id,
       barcode: b.barcode,
-      stockItemId: b.stockItemId || null, // ✅ เพิ่มฟิลด์นี้
+      stockItemId: b.stockItemId || null,
+      serialNumber: b.stockItem?.serialNumber || null, // ✅ เพิ่ม serialNumber จาก stockItem
       product: {
         title: b.receiptItem?.purchaseOrderItem?.product?.title || '',
         spec: b.receiptItem?.purchaseOrderItem?.product?.spec || '',
       },
     }));
+
+    console.log('simplified : ',simplified)
 
     return res.status(200).json({
       success: true,

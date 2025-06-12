@@ -374,7 +374,7 @@ model Unit {
 // 📦 Stock System
 model StockItem {
   id                   Int              @id @default(autoincrement())
-  barcode              String           @unique
+  barcode              String           @unique  
   serialNumber         String?
   qrCodeData           String?
   buyPrice             Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
@@ -895,3 +895,6 @@ model SupplierPaymentPO {
 
   @@unique([paymentId, purchaseOrderId])
 }
+
+
+
