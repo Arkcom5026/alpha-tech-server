@@ -76,9 +76,12 @@ app.use('/api/products', uploadProductRoutes);
 app.use('/api/products-templates', uploadProductTemplateRoutes);
 
 app.use('/api/products', productRoutes);
-app.use('/api/purchase-orders', purchaseOrderRoutes);
-              
+
+app.use('/api/purchase-orders', purchaseOrderRoutes);     
+         
+
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
+
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
               
              

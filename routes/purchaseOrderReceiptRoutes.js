@@ -33,4 +33,7 @@ router.put('/:id', updatePurchaseOrderReceipt);
 // 🗑️ DELETE - ลบใบรับสินค้า
 router.delete('/:id', deletePurchaseOrderReceipt);
 
+
+
+
 module.exports = router;

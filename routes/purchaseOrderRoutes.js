@@ -7,17 +7,26 @@ const {
   createPurchaseOrder,
   updatePurchaseOrder,
   deletePurchaseOrder,
-  updatePurchaseOrderStatus
+  updatePurchaseOrderStatus,
+  getPurchaseOrdersBySupplier,
+  createPurchaseOrderWithAdvance,
+  
 } = require('../controllers/purchaseOrderController');
 const { verifyToken } = require('../middlewares/verifyToken');
+
 router.use(verifyToken);
 
 router.get('/', getAllPurchaseOrders);
-
 router.post('/', createPurchaseOrder);
+router.get('/by-supplier', getPurchaseOrdersBySupplier);
+router.post('/with-advance', createPurchaseOrderWithAdvance);
 router.put('/:id', updatePurchaseOrder);
 router.delete('/:id', deletePurchaseOrder);
 router.get('/:id', getPurchaseOrderById);
 router.patch('/:id/status', updatePurchaseOrderStatus);
+
+
+
+            
 
 module.exports = router;

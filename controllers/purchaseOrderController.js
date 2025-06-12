@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 // ✅ ฟังก์ชัน gen code สำหรับใบสั่งซื้อ
 const generatePurchaseOrderCode = async (branchId) => {
-  const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เพิ่มเลข 0 นำหน้า branchId
+  const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
   const yymm = `${now.getFullYear().toString().slice(2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
   const count = await prisma.purchaseOrder.count({
@@ -118,12 +118,52 @@ const getEligiblePurchaseOrders = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+// ✅ GET: Purchase orders by supplier
+const getPurchaseOrdersBySupplier = async (req, res) => {
+  try {
+    console.log('req.query.supplierId : ',req.query.supplierId)
+    const rawSupplierId = req.query.supplierId;
+    console.log('📥 supplierId query:', rawSupplierId);
 
+    if (!rawSupplierId || isNaN(Number(rawSupplierId))) {
+      return res.status(400).json({ error: 'Invalid supplierId' });
+    }
 
+    const supplierId = Number(rawSupplierId);
+    const branchId = req.user?.branchId;
 
+    if (!branchId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+    }
 
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: {
+        supplierId,
+        branchId,
+        status: {
+          in: ['PENDING', 'PARTIAL']
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: true,
+      },
+    });
 
+    const result = purchaseOrders.map((po) => ({
+      id: po.id,
+      code: po.code,
+      status: po.status,
+      createdAt: po.createdAt,
+      totalAmount: po.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+    }));
 
+    res.json(result);
+  } catch (err) {
+    console.error('❌ getPurchaseOrdersBySupplier error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 // ✅ GET: Single purchase order by ID
 const getPurchaseOrderById = async (req, res) => {
   try {
@@ -153,11 +193,6 @@ const getPurchaseOrderById = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-
-
-
-
-
 
 // ✅ POST: Create purchase order
 const createPurchaseOrder = async (req, res) => {
@@ -242,7 +277,6 @@ const deletePurchaseOrder = async (req, res) => {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
 
-    // ตรวจสอบก่อนว่า PO นี้อยู่ใน branch ของผู้ใช้หรือไม่
     const found = await prisma.purchaseOrder.findFirst({
       where: {
         id: parseInt(id),
@@ -263,6 +297,53 @@ const deletePurchaseOrder = async (req, res) => {
 };
 
 
+
+const createPurchaseOrderWithAdvance = async (req, res) => {
+  try {
+    const { supplierId, orderDate, note, items, advancePaymentIds } = req.body;
+    const branchId = req.user.branchId;
+    const employeeId = req.user.employeeId;
+
+    const code = await generatePurchaseOrderCode(branchId);
+
+    const createdPO = await prisma.purchaseOrder.create({
+      data: {
+        code,
+        employeeId,
+        supplierId,
+        branchId,
+        date: new Date(orderDate), // ✅ เปลี่ยนตรงนี้
+        note,
+        status: 'PENDING',
+        items: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.unitPrice,
+          })),
+        },
+      },
+    });
+    if (advancePaymentIds?.length > 0) {
+      await prisma.supplierPaymentPO.createMany({
+        data: advancePaymentIds.map((paymentId) => ({
+          paymentId,
+          purchaseOrderId: createdPO.id,
+          amountPaid: 0,
+        })),
+      });
+    }
+
+    res.status(201).json(createdPO);
+  } catch (error) {
+    console.error('❌ createPurchaseOrderWithAdvance error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+
+
+
 module.exports = {
   getAllPurchaseOrders,
   getEligiblePurchaseOrders,
@@ -271,5 +352,7 @@ module.exports = {
   updatePurchaseOrder,
   deletePurchaseOrder,
   generatePurchaseOrderCode,
-  updatePurchaseOrderStatus
+  updatePurchaseOrderStatus,
+  getPurchaseOrdersBySupplier,
+  createPurchaseOrderWithAdvance,
 };

@@ -24,28 +24,41 @@ const getAllSuppliers = async (req, res) => {
       },
     });
 
-    res.json(suppliers);
+    const suppliersWithCreditRemaining = suppliers.map((s) => ({
+      ...s,
+      creditRemaining: (s.creditLimit ?? 0) - (s.currentBalance ?? 0),
+    }));
+
+    res.json(suppliersWithCreditRemaining);
   } catch (error) {
     console.error('❌ getAllSuppliers error:', error);
     res.status(500).json({ error: 'Server error while fetching suppliers' });
   }
 };
 
+
+
+
 const getSupplierById = async (req, res) => {
   try {
-    const branchId = req.user?.branchId;
+    const supplierId = parseInt(req.params.id);
+    const branchId = req.user.branchId;
+
     const supplier = await prisma.supplier.findFirst({
-      where: {
-        id: parseInt(req.params.id),
-        branchId: parseInt(branchId),
-      },
+      where: { id: supplierId, branchId },
     });
-    if (!supplier) return res.status(404).json({ message: 'ไม่พบ supplier ในสาขานี้' });
+
+    if (!supplier) return res.status(404).json({ error: 'ไม่พบ Supplier' });
+
     res.json(supplier);
   } catch (err) {
-    res.status(404).json({ message: 'ไม่พบ supplier' });
+    console.error('❌ [getSupplierById] error:', err);
+    res.status(500).json({ error: 'โหลดข้อมูล supplier ล้มเหลว' });
   }
 };
+
+
+
 
 const createSupplier = async (req, res) => {
   try {
@@ -97,6 +110,15 @@ const updateSupplier = async (req, res) => {
 
 const deleteSupplier = async (req, res) => {
   try {
+    const branchId = req.user?.branchId;
+    const existing = await prisma.supplier.findFirst({
+      where: {
+        id: parseInt(req.params.id),
+        branchId: parseInt(branchId),
+      },
+    });
+    if (!existing) return res.status(403).json({ message: 'ไม่พบ supplier หรือไม่มีสิทธิ์ลบ' });
+
     await prisma.supplier.delete({
       where: { id: parseInt(req.params.id) },
     });
@@ -112,5 +134,4 @@ module.exports = {
   createSupplier,
   updateSupplier,
   deleteSupplier,
-};
-  
+};  

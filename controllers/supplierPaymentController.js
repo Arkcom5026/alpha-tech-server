@@ -3,60 +3,56 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-// ✅ POST /purchase-order-payments
+// ✅ POST /supplier-payments
 const createSupplierPayment = async (req, res) => {
   try {
-    const {
-      purchaseOrderId,
-      amount,
-      method,
-      note,
-      isRefund = false,
-    } = req.body;
-
+    const { debitAmount, creditAmount, method, note, paymentType, pos = [] } = req.body;
     const employeeId = req.user.employeeId;
     const branchId = req.user.branchId;
 
-    const file = req.file;
-    const attachmentPath = file ? `/uploads/${file.filename}` : null;
-
-    const created = await prisma.purchaseOrderPayment.create({
+    const created = await prisma.supplierPayment.create({
       data: {
-        purchaseOrderId: parseInt(purchaseOrderId),
-        amount: parseFloat(amount),
+        supplierId: parseInt(req.body.supplierId),
+        debitAmount: parseFloat(debitAmount) || 0,
+        creditAmount: parseFloat(creditAmount) || 0,
         method,
         note,
-        isRefund,
-        attachment: attachmentPath,
         paidAt: new Date(),
         employeeId,
         branchId,
+        paymentType,
       },
     });
 
-    // ✅ อัปเดตสถานะ PO หลังชำระ
-    const payments = await prisma.purchaseOrderPayment.findMany({
-      where: { purchaseOrderId: parseInt(purchaseOrderId) },
-    });
+    // ✅ ถ้าเป็นแบบ PO_BASED → สร้างรายการเชื่อมโยง PO + หักเครดิต
+    if (paymentType === 'PO_BASED' && Array.isArray(pos)) {
+      for (const entry of pos) {
+        const poId = parseInt(entry.poId);
+        const amountPaid = parseFloat(entry.amountPaid);
 
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        if (!isNaN(poId) && amountPaid > 0) {
+          await prisma.supplierPaymentPO.create({
+            data: {
+              supplierPaymentId: created.id,
+              purchaseOrderId: poId,
+              amountPaid,
+            },
+          });
 
-    const po = await prisma.purchaseOrder.findUnique({
-      where: { id: parseInt(purchaseOrderId) },
-    });
+          // ✅ หักเครดิตจาก supplier (เฉพาะ PO_BASED เท่านั้น)
+          await prisma.supplier.update({
+            where: { id: created.supplierId },
+            data: {
+              creditRemaining: {
+                decrement: amountPaid,
+              },
+            },
+          });
+        }
+      }
+    }
 
-    const newStatus =
-      totalPaid >= Number(po.totalAmount)
-        ? 'PAID'
-        : totalPaid > 0
-        ? 'PARTIAL'
-        : 'UNPAID';
-
-    await prisma.purchaseOrder.update({
-      where: { id: parseInt(purchaseOrderId) },
-      data: { status: newStatus },
-    });
-
+    // ✅ ถ้าเป็น ADVANCE หรือ CREDIT_NOTE → ไม่หักเครดิตทันที
     res.status(201).json(created);
   } catch (err) {
     console.error('❌ [createSupplierPayment] error:', err);
@@ -64,15 +60,15 @@ const createSupplierPayment = async (req, res) => {
   }
 };
 
-// ✅ GET /purchase-order-payments
+// ✅ GET /supplier-payments
 const getAllSupplierPayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
-    const payments = await prisma.purchaseOrderPayment.findMany({
+    const payments = await prisma.supplierPayment.findMany({
       where: { branchId },
       orderBy: { paidAt: 'desc' },
       include: {
-        purchaseOrder: { include: { supplier: true } },
+        supplier: true,
         employee: true,
       },
     });
@@ -83,7 +79,7 @@ const getAllSupplierPayments = async (req, res) => {
   }
 };
 
-// ✅ GET /purchase-order-payments/by-po/:poId
+// ✅ GET /supplier-payments/by-po/:poId (เฉพาะกรณีเก่าที่ผูก PO)
 const getSupplierPaymentsByPO = async (req, res) => {
   try {
     const poId = parseInt(req.params.poId);
@@ -107,13 +103,13 @@ const getSupplierPaymentsByPO = async (req, res) => {
   }
 };
 
-// ✅ DELETE /purchase-order-payments/:id
+// ✅ DELETE /supplier-payments/:id
 const deleteSupplierPayment = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const branchId = req.user.branchId;
 
-    const payment = await prisma.purchaseOrderPayment.findFirst({
+    const payment = await prisma.supplierPayment.findFirst({
       where: { id, branchId },
     });
 
@@ -121,15 +117,7 @@ const deleteSupplierPayment = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบรายการที่ต้องการลบ' });
     }
 
-    // ลบไฟล์แนบถ้ามี
-    if (payment.attachment) {
-      const filePath = path.join(__dirname, '../public', payment.attachment);
-      fs.unlink(filePath, (err) => {
-        if (err) console.warn('⚠️ ลบไฟล์แนบไม่สำเร็จ:', err.message);
-      });
-    }
-
-    await prisma.purchaseOrderPayment.delete({ where: { id } });
+    await prisma.supplierPayment.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
     console.error('❌ [deleteSupplierPayment] error:', err);
@@ -137,9 +125,40 @@ const deleteSupplierPayment = async (req, res) => {
   }
 };
 
+
+const getAdvancePaymentsBySupplier = async (req, res) => {
+  try {
+    const { supplierId } = req.query;
+
+    if (!supplierId) {
+      return res.status(400).json({ message: 'supplierId is required' });
+    }
+
+    const payments = await prisma.supplierPayment.findMany({
+      where: {
+        supplierId: parseInt(supplierId),
+        paymentType: 'ADVANCE',
+        SupplierPaymentPO: {
+          none: {}, // ยังไม่ถูกผูกกับ PO
+        },
+      },
+      orderBy: { paidAt: 'desc' }, // ✅ ใช้ field ที่มีอยู่จริง
+    });
+
+    res.json(payments);
+  } catch (err) {
+    console.error('❌ getAdvancePaymentsBySupplier error:', err);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+
+
 module.exports = {
   createSupplierPayment,
   getAllSupplierPayments,
   getSupplierPaymentsByPO,
   deleteSupplierPayment,
+  getAdvancePaymentsBySupplier,
+
 };

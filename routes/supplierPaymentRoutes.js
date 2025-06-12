@@ -1,11 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const { createSupplierPayment, getAllSupplierPayments, getSupplierPaymentsByPO, deleteSupplierPayment } = require('../controllers/supplierPaymentController');
+const {
+  createSupplierPayment,
+  getAllSupplierPayments,
+  getSupplierPaymentsByPO,
+  deleteSupplierPayment,
+  getAdvancePaymentsBySupplier,
+  
+} = require('../controllers/supplierPaymentController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
+// ✅ สร้างรายการชำระเงินใหม่
+router.post('/', createSupplierPayment);
 
 // ✅ ดูรายการชำระเงินทั้งหมด
 router.get('/', getAllSupplierPayments);
@@ -16,4 +25,10 @@ router.get('/by-po/:poId', getSupplierPaymentsByPO);
 // ✅ ลบรายการชำระเงิน
 router.delete('/:id', deleteSupplierPayment);
 
+router.get('/advance', getAdvancePaymentsBySupplier);
+
+
+
 module.exports = router;
+
+
