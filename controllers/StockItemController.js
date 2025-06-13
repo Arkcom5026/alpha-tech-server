@@ -290,10 +290,24 @@ const updateSerialNumber = async (req, res) => {
       return res.status(404).json({ error: 'Stock item not found.' });
     }
 
+    // ✅ ตรวจ SN ซ้ำก่อนบันทึก
+    if (serialNumber) {
+      const duplicate = await prisma.stockItem.findFirst({
+        where: {
+          serialNumber,
+          NOT: { id: stockItem.id },
+        },
+      });
+
+      if (duplicate) {
+        return res.status(400).json({ error: 'SN นี้ถูกใช้ไปแล้วกับสินค้ารายการอื่น' });
+      }
+    }
+
     const updated = await prisma.stockItem.update({
       where: { id: stockItem.id },
       data: {
-        serialNumber: serialNumber || null, // ✅ ถ้าไม่ส่ง serialNumber จะถือว่าลบ
+        serialNumber: serialNumber || null,
       },
       include: {
         purchaseOrderReceiptItem: {
@@ -310,8 +324,6 @@ const updateSerialNumber = async (req, res) => {
     res.status(500).json({ error: 'Failed to update serial number.' });
   }
 };
-
-
 
 module.exports = {
   addStockItemFromReceipt,

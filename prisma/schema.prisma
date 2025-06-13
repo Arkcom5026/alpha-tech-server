@@ -374,8 +374,8 @@ model Unit {
 // 📦 Stock System
 model StockItem {
   id                   Int              @id @default(autoincrement())
-  barcode              String           @unique  
-  serialNumber         String?
+  barcode              String           @unique
+  serialNumber         String?          @unique
   qrCodeData           String?
   buyPrice             Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
   sellPrice            Float?
@@ -852,9 +852,9 @@ model SupplierPayment {
   id         Int      @id @default(autoincrement())
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
-  
-  debitAmount  Float?   // ✅ จำนวนที่จ่ายออกจริง
-  creditAmount Float?   // ✅ จำนวนที่เป็นเครดิตโน้ตหรือหักลบ (ถ้ามี)
+
+  debitAmount  Float? // ✅ จำนวนที่จ่ายออกจริง
+  creditAmount Float? // ✅ จำนวนที่เป็นเครดิตโน้ตหรือหักลบ (ถ้ามี)
 
   method String // เช่น CASH, TRANSFER, CHEQUE
   note   String?
@@ -895,6 +895,3 @@ model SupplierPaymentPO {
 
   @@unique([paymentId, purchaseOrderId])
 }
-
-
-

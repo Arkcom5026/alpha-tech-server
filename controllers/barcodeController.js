@@ -156,7 +156,6 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
     }));
 
-    console.log('simplified : ',simplified)
 
     return res.status(200).json({
       success: true,
