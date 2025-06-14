@@ -7,21 +7,17 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 dotenv.config();
-
-const authRoutes = require('./routes/authRoutes'); // ✅ ต้องมี
-const productTypeRoutes = require('./routes/productTypeRoutes'); // ✅ ต้องมี
-const categoryRoutes = require('./routes/categoryRoutes'); // ✅ ต้องมี
-const employeeRoutes = require('./routes/employeeRoutes'); // ✅ ต้องมี
-const supplierRoutes = require('./routes/supplierRoutes');
-const productTemplateRoutes = require('./routes/productTemplateRoutes'); // ✅ CRUD
-
-
-const uploadProductTemplateRoutes = require('./routes/uploadProductTemplateRoutes'); // ✅ upload image
-const productProfileRoutes = require('./routes/productProfileRoutes'); // ✅
-const unitRoutes = require('./routes/unitRoutes'); // ✅
 const app = express();
+const authRoutes = require('./routes/authRoutes'); 
+const productTypeRoutes = require('./routes/productTypeRoutes'); 
+const categoryRoutes = require('./routes/categoryRoutes'); 
+const employeeRoutes = require('./routes/employeeRoutes'); 
+const supplierRoutes = require('./routes/supplierRoutes');
+const productTemplateRoutes = require('./routes/productTemplateRoutes'); 
+const uploadProductTemplateRoutes = require('./routes/uploadProductTemplateRoutes'); 
+const productProfileRoutes = require('./routes/productProfileRoutes'); 
+const unitRoutes = require('./routes/unitRoutes'); 
 const productRoutes = require('./routes/productRoutes');
-
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
@@ -64,43 +60,34 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
-
 app.use('/api/categories', categoryRoutes);
+app.use('/api/customers', customerRoutes);  
+
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes); 
-app.use('/api/product-templates', productTemplateRoutes); // ✅ route สำหรับ CRUD หลัก
-
-
+app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products', uploadProductRoutes);
-
 app.use('/api/products-templates', uploadProductTemplateRoutes);
-
 app.use('/api/products', productRoutes);
 
-app.use('/api/purchase-orders', purchaseOrderRoutes);     
-         
-
+app.use('/api/purchase-orders', purchaseOrderRoutes);              
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
-
+         //api/purchase-order-receipts
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
-              
-             
-app.use('/api/stock-items', stockItemRoutes);           
          
+
+app.use('/api/stock-items', stockItemRoutes);                   
 app.use('/api/barcodes/', barcodeRoutes);  
-
-
-app.use('/api/customers', customerRoutes);
-      
+         
 app.use("/api/sale-orders", saleRoutes);
-
-app.use('/api/payments', paymentRoutes); 
 
 app.use('/api/sale-returns', saleReturnRoutes);
 
 app.use('/api/refunds', refundRoutes);
 
+app.use('/api/payments', paymentRoutes); 
 app.use('/api/supplier-payments',supplierPaymentRoutes);
+
 
 
 // ✅ Error handler

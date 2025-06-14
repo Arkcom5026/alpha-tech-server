@@ -282,14 +282,13 @@ model Product {
   title       String?
   description String?
 
-  spec      String?
-  costPrice Float?
-  sold      Int     @default(0)
-  quantity  Int?
-  warranty  Int?
-  noSN      Boolean @default(false)
-  codeType  String  @default("D")
-  active    Boolean @default(true)
+  spec     String?
+  sold     Int     @default(0)
+  quantity Int?
+  warranty Int?
+  noSN     Boolean @default(false)
+  codeType String  @default("D")
+  active   Boolean @default(true)
 
   unit   Unit? @relation(fields: [unitId], references: [id])
   unitId Int?
@@ -373,11 +372,12 @@ model Unit {
 
 // 📦 Stock System
 model StockItem {
-  id                   Int              @id @default(autoincrement())
-  barcode              String           @unique
-  serialNumber         String?          @unique
-  qrCodeData           String?
-  buyPrice             Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+  id           Int     @id @default(autoincrement())
+  barcode      String  @unique
+  serialNumber String? @unique
+  qrCodeData   String?
+  costPrice    Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+
   sellPrice            Float?
   receivedAt           DateTime         @default(now())
   warrantyDays         Int?
@@ -412,28 +412,28 @@ model StockItem {
 
 // 🧾 Purchasing
 model Supplier {
-  id             Int             @id @default(autoincrement())
-  name           String
-  contactPerson  String?
-  phone          String?
-  email          String?
-  taxId          String?
-  address        String?
-  province       String?
-  postalCode     String?
-  country        String?         @default("Thailand")
-  paymentTerms   Int?            @default(30)
-  creditLimit    Float?
-  currentBalance Float?          @default(0)
-  bankId         Int?
-  accountNumber  String?
-  accountType    String?
-  notes          String?
-  branchId       Int?
-  active         Boolean         @default(true)
-  bank           Bank?           @relation(fields: [bankId], references: [id])
-  branch         Branch?         @relation(fields: [branchId], references: [id])
-  pos            PurchaseOrder[]
+  id            Int             @id @default(autoincrement())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  taxId         String?
+  address       String?
+  province      String?
+  postalCode    String?
+  country       String?         @default("Thailand")
+  paymentTerms  Int?            @default(30)
+  creditLimit   Float?
+  creditBalance Float?          @default(0)
+  bankId        Int?
+  accountNumber String?
+  accountType   String?
+  notes         String?
+  branchId      Int?
+  active        Boolean         @default(true)
+  bank          Bank?           @relation(fields: [bankId], references: [id])
+  branch        Branch?         @relation(fields: [branchId], references: [id])
+  pos           PurchaseOrder[]
 
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -480,7 +480,7 @@ model PurchaseOrderItem {
   productId        Int
   quantity         Int
   receivedQuantity Int                        @default(0)
-  price            Float
+  costPrice        Float
   receipts         PurchaseOrderReceiptItem[]
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
@@ -499,9 +499,9 @@ model PurchaseOrderReceipt {
 
   status       ReceiptStatus @default(PENDING)
   receivedById Int
-
-  branch   Branch @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
-  branchId Int
+  printed      Boolean       @default(false)
+  branch       Branch        @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
+  branchId     Int
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
@@ -650,22 +650,25 @@ model BarcodeCounter {
 }
 
 model BarcodeReceiptItem {
-  id            Int    @id @default(autoincrement())
-  barcode       String @unique // เช่น 0225060001
-  branchId      Int
+  id      Int    @id @default(autoincrement())
+  barcode String @unique // เช่น 0225060001
+
   yearMonth     String // เช่น '2506'
   runningNumber Int // เช่น 1 → 0001
   status        String // READY | SN_RECEIVED | USED | VOID
-  receiptItemId Int
 
+  printed     Boolean    @default(false)
   stockItem   StockItem? @relation(fields: [stockItemId], references: [id])
   stockItemId Int?
 
-  purchaseOrderReceiptId Int
-  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
 
-  branch      Branch                   @relation(fields: [branchId], references: [id])
-  receiptItem PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
+  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
+  purchaseOrderReceiptId Int
+
+  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
+  receiptItemId Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -888,7 +891,7 @@ model SupplierPaymentPO {
   paymentId       Int
   purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
-  amountPaid      Float
+  amountPaid      Float //เก็บจำนวนเงิน (amountPaid) ที่จ่ายให้แต่ละ PO
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

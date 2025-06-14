@@ -68,13 +68,14 @@ const generateMissingBarcodes = async (req, res) => {
         const code = `${String(branchId).padStart(2, '0')}${yearMonth}${padded}`;
 
         newBarcodes.push({
-          receiptItemId: item.id,
           barcode: code,
           branchId,
           yearMonth,
           runningNumber: counter.lastNumber,
           status: 'READY',
+          printed: false,
           purchaseOrderReceiptId: receipt.id,
+          receiptItemId: item.id,
         });
       }
     }
@@ -105,10 +106,6 @@ const generateMissingBarcodes = async (req, res) => {
   }
 };
 
-
-
-
-
 const getBarcodesByReceiptId = async (req, res) => {
   const { receiptId } = req.params;
   const branchId = req.user?.branchId;
@@ -118,14 +115,13 @@ const getBarcodesByReceiptId = async (req, res) => {
   }
 
   try {
-
     const barcodes = await prisma.barcodeReceiptItem.findMany({
       where: {
         purchaseOrderReceiptId: Number(receiptId),
         branchId: Number(branchId),
       },
       include: {
-        stockItem: true, // ✅ include stockItem เพื่อให้ได้ serialNumber และ barcode จริง
+        stockItem: true,
         receiptItem: {
           include: {
             purchaseOrderItem: {
@@ -144,18 +140,16 @@ const getBarcodesByReceiptId = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
-
     const simplified = barcodes.map((b) => ({
       id: b.id,
       barcode: b.barcode,
       stockItemId: b.stockItemId || null,
-      serialNumber: b.stockItem?.serialNumber || null, // ✅ เพิ่ม serialNumber จาก stockItem
+      serialNumber: b.stockItem?.serialNumber || null,
       product: {
         title: b.receiptItem?.purchaseOrderItem?.product?.title || '',
         spec: b.receiptItem?.purchaseOrderItem?.product?.spec || '',
       },
     }));
-
 
     return res.status(200).json({
       success: true,
@@ -167,10 +161,6 @@ const getBarcodesByReceiptId = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
-
-
-
-
 
 const getReceiptsWithBarcodes = async (req, res) => {
   const branchId = req.user?.branchId;
@@ -194,6 +184,8 @@ const getReceiptsWithBarcodes = async (req, res) => {
             supplier: {
               select: {
                 name: true,
+                creditLimit: true,
+                creditBalance: true,
               },
             },
           },
@@ -209,15 +201,25 @@ const getReceiptsWithBarcodes = async (req, res) => {
       },
     });
 
-    const result = receipts.map((r) => ({
-      id: r.id,
-      code: r.code,
-      purchaseOrderCode: r.purchaseOrder?.code || '-',
-      supplier: r.purchaseOrder?.supplier?.name || '-',
-      createdAt: r.createdAt,
-      total: r.barcodeReceiptItem.length,
-      scanned: r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length,
-    }));
+    const result = receipts.map((r) => {
+      const supplier = r.purchaseOrder?.supplier;
+      const creditLimit = supplier?.creditLimit || 0;
+      const creditUsed = supplier?.creditUsed || 0;
+      const debitAmount = supplier?.debitAmount || 0;
+      const creditAvailable = creditLimit - creditUsed + debitAmount;
+
+      return {
+        id: r.id,
+        code: r.code,
+        purchaseOrderCode: r.purchaseOrder?.code || '-',
+        supplier: supplier?.name || '-',
+        createdAt: r.createdAt,
+        total: r.barcodeReceiptItem.length,
+        scanned: r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length,
+        creditAvailable,
+        debitAmount,
+      };
+    });
 
     res.json(result);
   } catch (err) {
@@ -226,10 +228,34 @@ const getReceiptsWithBarcodes = async (req, res) => {
   }
 };
 
+const markBarcodesAsPrinted = async (req, res) => {
+  const rawId = req.body?.purchaseOrderReceiptId;
+  const branchId = req.user?.branchId;
+  const purchaseOrderReceiptId = Number(rawId);
+  
+  if (!purchaseOrderReceiptId || !branchId || isNaN(purchaseOrderReceiptId)) {
+    return res.status(400).json({ error: 'Missing or invalid purchaseOrderReceiptId or branchId' });
+  }
+
+  try {
+    const updated = await prisma.barcodeReceiptItem.updateMany({
+      where: {
+        purchaseOrderReceiptId: purchaseOrderReceiptId,
+        branchId: Number(branchId),
+      },
+      data: { printed: true },
+    });
+
+    return res.json({ success: true, updated: updated.count });
+  } catch (err) {
+    console.error('[markBarcodesAsPrinted] ❌', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 module.exports = {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
   getReceiptsWithBarcodes,
-  
+  markBarcodesAsPrinted,
 };

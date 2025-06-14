@@ -19,14 +19,14 @@ const getAllSuppliers = async (req, res) => {
         phone: true,
         contactPerson: true,
         creditLimit: true,
-        currentBalance: true,
+        creditBalance: true,
         createdAt: true,
       },
     });
 
     const suppliersWithCreditRemaining = suppliers.map((s) => ({
       ...s,
-      creditRemaining: (s.creditLimit ?? 0) - (s.currentBalance ?? 0),
+      creditRemaining: (s.creditLimit ?? 0) - (s.creditBalance ?? 0),
     }));
 
     res.json(suppliersWithCreditRemaining);

@@ -1,10 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const dayjs = require('dayjs');
+const { ReceiptStatus } = require('@prisma/client');
 
 // 🔧 สร้างเลขที่ใบรับสินค้าอัตโนมัติ
 const generateReceiptCode = async (branchId) => {
-  const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เพิ่มเลข 0 นำหน้า branchId
+  const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
   const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
 
@@ -23,21 +24,24 @@ const generateReceiptCode = async (branchId) => {
 };
 
 // 📥 สร้างใบรับสินค้าใหม่
-exports.createPurchaseOrderReceipt = async (req, res) => {
+const createPurchaseOrderReceipt = async (req, res) => {
   try {
     const { purchaseOrderId, note } = req.body;
     const branchId = req.user.branchId;
     const receivedById = req.user.employeeId;
+    if (!purchaseOrderId) {
+      return res.status(400).json({ error: 'กรุณาระบุใบสั่งซื้อ' });
+    }
 
-    const code = await generateReceiptCode(branchId); // ✅ สร้างเลขใบรับสินค้า
+    const code = await generateReceiptCode(branchId);
 
     const created = await prisma.purchaseOrderReceipt.create({
       data: {
-        purchaseOrderId,
         note,
-        branchId,
         receivedById,
         code,
+        branch: { connect: { id: branchId } },
+        purchaseOrder: { connect: { id: purchaseOrderId } },
       },
       include: {
         purchaseOrder: {
@@ -57,7 +61,7 @@ exports.createPurchaseOrderReceipt = async (req, res) => {
 };
 
 // 📄 ดึงรายการใบรับสินค้าทั้งหมด (ตามสาขา)
-exports.getAllPurchaseOrderReceipts = async (req, res) => {
+const getAllPurchaseOrderReceipts = async (req, res) => {
   try {
     const branchId = req.user.branchId;
 
@@ -80,12 +84,11 @@ exports.getAllPurchaseOrderReceipts = async (req, res) => {
   }
 };
 
-// 🔍 ดึงใบรับสินค้ารายตัว (พร้อมรายการสินค้าเพื่อสร้าง SN)
-exports.getPurchaseOrderReceiptById = async (req, res) => {
+// 🔍 ดึงใบรับสินค้ารายตัว
+const getPurchaseOrderReceiptById = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
-
     if (!id) return res.status(400).json({ error: 'Missing or invalid receipt ID' });
 
     const receipt = await prisma.purchaseOrderReceipt.findFirst({
@@ -96,20 +99,22 @@ exports.getPurchaseOrderReceiptById = async (req, res) => {
             id: true,
             quantity: true,
             purchaseOrderItem: {
-              select: {
-                product: {
-                  select: {
-                    title: true,
-                  },
-                },
-              },
+              select: { product: { select: { title: true } } },
             },
           },
         },
         purchaseOrder: {
           select: {
             code: true,
-            supplier: { select: { name: true } },
+            supplier: {
+              select: {
+                id: true,
+                name: true,
+                creditLimit: true,
+                creditBalance: true,
+              },
+            },
+            id: true,
           },
         },
       },
@@ -117,21 +122,37 @@ exports.getPurchaseOrderReceiptById = async (req, res) => {
 
     if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
 
+    const paymentLinks = await prisma.supplierPaymentPO.findMany({
+      where: { purchaseOrderId: receipt.purchaseOrder.id },
+      select: { amountPaid: true },
+    });
+
+    const totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
+
+    const response = {
+      ...receipt,
+      purchaseOrder: {
+        ...receipt.purchaseOrder,
+        supplier: {
+          ...receipt.purchaseOrder.supplier,
+          debitAmount: totalPaid,
+        },
+      },
+    };
+
     res.set('Cache-Control', 'no-store');
-    res.json(receipt);
+    res.json(response);
   } catch (error) {
     console.error('❌ [getPurchaseOrderReceiptById] error:', error);
     res.status(500).json({ error: 'ไม่สามารถดึงใบรับสินค้าได้' });
   }
 };
 
-// 📦 ดึงรายละเอียดใบสั่งซื้อ (พร้อม supplier + สินค้า + ยอดรับแล้ว)
-exports.getPurchaseOrderDetailById = async (req, res) => {
+// 📦 ดึงรายละเอียดใบสั่งซื้อ
+const getPurchaseOrderDetailById = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
-
-    console.log('📦 [getPurchaseOrderDetailById] id:>> >> >> >> >>', id, 'branchId:', branchId);
 
     const purchaseOrder = await prisma.purchaseOrder.findFirst({
       where: { id, branchId },
@@ -150,10 +171,7 @@ exports.getPurchaseOrderDetailById = async (req, res) => {
 
     const itemsWithReceived = purchaseOrder.items.map(item => {
       const receivedQuantity = item.receiptItems?.reduce((sum, r) => sum + r.quantity, 0) || 0;
-      return {
-        ...item,
-        receivedQuantity
-      };
+      return { ...item, receivedQuantity };
     });
 
     res.json({ ...purchaseOrder, items: itemsWithReceived });
@@ -163,8 +181,8 @@ exports.getPurchaseOrderDetailById = async (req, res) => {
   }
 };
 
-// ✅ อัปเดตสถานะใบรับสินค้าเป็น COMPLETED (เมื่อบันทึกครบ)
-exports.markReceiptAsCompleted = async (req, res) => {
+// ✅ อัปเดตสถานะใบรับสินค้าเป็น COMPLETED
+const markReceiptAsCompleted = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
@@ -185,7 +203,7 @@ exports.markReceiptAsCompleted = async (req, res) => {
 };
 
 // ✏️ แก้ไขใบรับสินค้า
-exports.updatePurchaseOrderReceipt = async (req, res) => {
+const updatePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
@@ -195,9 +213,7 @@ exports.updatePurchaseOrderReceipt = async (req, res) => {
 
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
-      data: {
-        note: req.body.note,
-      },
+      data: { note: req.body.note },
       include: {
         purchaseOrder: {
           select: {
@@ -216,7 +232,7 @@ exports.updatePurchaseOrderReceipt = async (req, res) => {
 };
 
 // 🗑️ ลบใบรับสินค้า
-exports.deletePurchaseOrderReceipt = async (req, res) => {
+const deletePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
@@ -232,34 +248,31 @@ exports.deletePurchaseOrderReceipt = async (req, res) => {
   }
 };
 
-// 📦 ดึงสรุปใบรับสินค้าพร้อมสถานะบาร์โค้ด (ใช้ในหน้าพิมพ์บาร์โค้ด)
-exports.getReceiptBarcodeSummaries = async (req, res) => {
+// 📦 ดึงสรุปใบรับสินค้าพร้อมสถานะบาร์โค้ด
+
+const getReceiptBarcodeSummaries = async (req, res) => {
   try {
     const branchId = req.user.branchId;
 
     const receipts = await prisma.purchaseOrderReceipt.findMany({
-      where: {
-        branchId,
-      },
-      include: {
+      where: { branchId },
+      select: {
+        id: true,
+        code: true,
+        receivedAt: true,
+        status: true, // ✅ เพิ่มฟิลด์สถานะ
         items: {
           include: {
             stockItems: true,
             purchaseOrderItem: {
-              select: {
-                product: {
-                  select: { title: true },
-                },
-              },
+              select: { product: { select: { title: true } } },
             },
           },
         },
         purchaseOrder: {
           select: {
             code: true,
-            supplier: {
-              select: { name: true },
-            },
+            supplier: { select: { name: true } },
           },
         },
       },
@@ -276,6 +289,7 @@ exports.getReceiptBarcodeSummaries = async (req, res) => {
         orderCode: receipt.purchaseOrder?.code || '-',
         totalItems: total,
         barcodeGenerated: generated,
+        status: receipt.status, // ✅ ส่ง status ไป frontend
       };
     });
 
@@ -285,4 +299,78 @@ exports.getReceiptBarcodeSummaries = async (req, res) => {
     console.error('❌ [getReceiptBarcodeSummaries] error:', error);
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลใบรับสินค้าสำหรับพิมพ์บาร์โค้ดได้' });
   }
+};
+
+
+
+
+// ✅ สรุปเฉพาะสถานะใบรับสินค้า (ไม่ตัดเครดิตอีกต่อไป)
+const finalizePurchaseOrderReceiptIfNeeded = async (receiptId) => {
+  const receipt = await prisma.purchaseOrderReceipt.findUnique({
+    where: { id: receiptId },
+    include: {
+      items: {
+        include: {
+          stockItems: true,
+          purchaseOrderItem: true,
+        },
+      },
+    },
+  });
+
+  if (!receipt) return;
+
+  const totalQuantity = receipt.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalSN = receipt.items.reduce((sum, item) => sum + item.stockItems.length, 0);
+
+  if (totalSN < totalQuantity) return;
+
+  await prisma.purchaseOrderReceipt.update({
+    where: { id: receiptId },
+    data: { status: 'COMPLETED' },
+  });
+};
+
+const finalizeReceiptController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await finalizePurchaseOrderReceiptIfNeeded(Number(id));
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('❌ finalizeReceiptController error:', err);
+    res.status(500).json({ success: false, error: 'Failed to finalize receipt.' });
+  }
+};
+
+// controllers/purchaseOrderReceiptController.js
+
+const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
+  try {
+    console.log('req.params.id : ', req.params.id)
+    const id = parseInt(req.params.id);
+
+    const updated = await prisma.purchaseOrderReceipt.update({
+      where: { id },
+      data: { status: ReceiptStatus.COMPLETED },
+    });
+    return res.json({ success: true, receipt: updated });
+  } catch (error) {
+    console.error('❌ markPurchaseOrderReceiptAsPrinted error:', error);
+    return res.status(500).json({ error: 'Failed to mark receipt as printed' });
+  }
+};
+
+
+module.exports = {
+  createPurchaseOrderReceipt,
+  getAllPurchaseOrderReceipts,
+  getPurchaseOrderReceiptById,
+  getPurchaseOrderDetailById,
+  markReceiptAsCompleted,
+  updatePurchaseOrderReceipt,
+  deletePurchaseOrderReceipt,
+  getReceiptBarcodeSummaries,
+  finalizePurchaseOrderReceiptIfNeeded,
+  finalizeReceiptController,
+  markPurchaseOrderReceiptAsPrinted,
 };

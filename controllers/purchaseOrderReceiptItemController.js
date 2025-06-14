@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 // ✅ Controller: addReceiptItem - ปลอดภัยและตรวจสอบ receiptId ครบถ้วน
 const addReceiptItem = async (req, res) => {
     try {
-      const { purchaseOrderReceiptId: receiptId, purchaseOrderItemId, quantity } = req.body;
+      const { purchaseOrderReceiptId: receiptId, purchaseOrderItemId, quantity, costPrice } = req.body;
 
       console.log('📦 [addReceiptItem] req.body:', req.body);
 
@@ -12,11 +12,13 @@ const addReceiptItem = async (req, res) => {
         receiptId === undefined ||
         purchaseOrderItemId === undefined ||
         quantity === undefined ||
+        costPrice === undefined ||
         receiptId === null ||
         purchaseOrderItemId === null ||
-        quantity === null
+        quantity === null ||
+        costPrice === null
       ) {
-        return res.status(400).json({ error: 'receiptId, purchaseOrderItemId และ quantity เป็นข้อมูลที่จำเป็น' });
+        return res.status(400).json({ error: 'receiptId, purchaseOrderItemId, quantity และ costPrice เป็นข้อมูลที่จำเป็น' });
       }
 
       const receipt = await prisma.purchaseOrderReceipt.findUnique({
@@ -36,14 +38,12 @@ const addReceiptItem = async (req, res) => {
         return res.status(400).json({ error: 'ไม่พบสินค้าในใบสั่งซื้อหรือสินค้าไม่มีข้อมูล' });
       }
 
-      const costPrice = poItem.product.costPrice || 0;
-
       const item = await prisma.purchaseOrderReceiptItem.create({
         data: {
           receiptId: Number(receiptId),
           purchaseOrderItemId: Number(purchaseOrderItemId),
           quantity: Number(quantity),
-          costPrice,
+          costPrice: Number(costPrice),
         },
       });
 
@@ -52,7 +52,7 @@ const addReceiptItem = async (req, res) => {
       console.error('❌ [addReceiptItem] error:', error);
       return res.status(500).json({ error: 'ไม่สามารถเพิ่มรายการรับสินค้าได้' });
     }
-  };
+};
 
 
 // 🔍 ดึงรายการสินค้าทั้งหมดในใบรับ
@@ -77,8 +77,7 @@ const getReceiptItemsByReceiptId = async (req, res) => {
               select: {
                 id: true,
                 title: true,
-                unit: true,
-                costPrice: true
+                unit: true
               }
             },
             purchaseOrder: {
@@ -136,7 +135,7 @@ const getPOItemsByPOId = async (req, res) => {
       where: { purchaseOrderId: parseInt(id) },
       include: {
         product: {
-          select: { id: true, title: true, costPrice: true, unit: true },
+          select: { id: true, title: true, unit: true },
         },
       },
     });
@@ -151,7 +150,7 @@ const getPOItemsByPOId = async (req, res) => {
 
 const updateReceiptItem = async (req, res) => {
   try {
-    const { purchaseOrderReceiptId: receiptId, purchaseOrderItemId, quantity } = req.body;
+    const { purchaseOrderReceiptId: receiptId, purchaseOrderItemId, quantity, costPrice } = req.body;
 
     console.log('🔄 [updateReceiptItem] req.body:', req.body);
 
@@ -159,11 +158,13 @@ const updateReceiptItem = async (req, res) => {
       receiptId === undefined ||
       purchaseOrderItemId === undefined ||
       quantity === undefined ||
+      costPrice === undefined ||
       receiptId === null ||
       purchaseOrderItemId === null ||
-      quantity === null
+      quantity === null ||
+      costPrice === null
     ) {
-      return res.status(400).json({ error: 'receiptId, purchaseOrderItemId และ quantity เป็นข้อมูลที่จำเป็น' });
+      return res.status(400).json({ error: 'receiptId, purchaseOrderItemId, quantity และ costPrice เป็นข้อมูลที่จำเป็น' });
     }
 
     const existingItem = await prisma.purchaseOrderReceiptItem.findFirst({
@@ -179,7 +180,10 @@ const updateReceiptItem = async (req, res) => {
 
     const updated = await prisma.purchaseOrderReceiptItem.update({
       where: { id: existingItem.id },
-      data: { quantity: Number(quantity) },
+      data: {
+        quantity: Number(quantity),
+        costPrice: Number(costPrice),
+      },
     });
 
     return res.json(updated);
@@ -195,7 +199,4 @@ module.exports = {
   deleteReceiptItem,
   getPOItemsByPOId,
   updateReceiptItem
-};    
-   
-
-
+};

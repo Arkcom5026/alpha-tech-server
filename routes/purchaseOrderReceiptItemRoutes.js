@@ -1,3 +1,5 @@
+
+// purchaseOrderReceiptItemRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -12,12 +14,13 @@ router.use(verifyToken);
 
 
 router.post('/', addReceiptItem);
+router.put('/update', updateReceiptItem); 
 router.get('/by-receipt/:receiptId', getReceiptItemsByReceiptId);
                                      
             
 router.delete('/:id', deleteReceiptItem);
 router.get('/:id/po-items', getPOItemsByPOId);
-router.put('/update', updateReceiptItem); 
+
 
 
 

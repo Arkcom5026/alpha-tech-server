@@ -118,6 +118,7 @@ const getEligiblePurchaseOrders = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 // ✅ GET: Purchase orders by supplier
 const getPurchaseOrdersBySupplier = async (req, res) => {
   try {
@@ -155,7 +156,7 @@ const getPurchaseOrdersBySupplier = async (req, res) => {
       code: po.code,
       status: po.status,
       createdAt: po.createdAt,
-      totalAmount: po.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+      totalAmount: po.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0),
     }));
 
     res.json(result);
@@ -164,6 +165,7 @@ const getPurchaseOrdersBySupplier = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 // ✅ GET: Single purchase order by ID
 const getPurchaseOrderById = async (req, res) => {
   try {
@@ -218,8 +220,8 @@ const createPurchaseOrder = async (req, res) => {
         items: {
           create: items.map(item => ({
             productId: item.productId,
-            quantity: item.quantity,
-            price: item.unitPrice || 0
+            quantity: item.quantity,            
+            costPrice: item.costPrice,
           }))
         }
       }
@@ -254,7 +256,7 @@ const updatePurchaseOrder = async (req, res) => {
             create: items.map((item) => ({
               productId: item.productId,
               quantity: item.quantity,
-              price: item.price || 0,
+              costPrice: item.costPrice,
             })),
           },
         },
@@ -296,11 +298,9 @@ const deletePurchaseOrder = async (req, res) => {
   }
 };
 
-
-
 const createPurchaseOrderWithAdvance = async (req, res) => {
   try {
-    const { supplierId, orderDate, note, items, advancePaymentIds } = req.body;
+    const { supplierId, orderDate, note, items, advancePaymentsUsed } = req.body;
     const branchId = req.user.branchId;
     const employeeId = req.user.employeeId;
 
@@ -312,24 +312,25 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
         employeeId,
         supplierId,
         branchId,
-        date: new Date(orderDate), // ✅ เปลี่ยนตรงนี้
+        date: new Date(orderDate),
         note,
         status: 'PENDING',
         items: {
           create: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.unitPrice,
+            costPrice: item.costPrice,
           })),
         },
       },
     });
-    if (advancePaymentIds?.length > 0) {
+
+    if (advancePaymentsUsed?.length > 0) {
       await prisma.supplierPaymentPO.createMany({
-        data: advancePaymentIds.map((paymentId) => ({
-          paymentId,
+        data: advancePaymentsUsed.map((entry) => ({
+          paymentId: entry.paymentId,
           purchaseOrderId: createdPO.id,
-          amountPaid: 0,
+          amountPaid: entry.amount || 0,
         })),
       });
     }
@@ -340,9 +341,6 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
-
-
-
 
 module.exports = {
   getAllPurchaseOrders,

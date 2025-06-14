@@ -8,7 +8,10 @@ const {
   getPurchaseOrderReceiptById, 
   updatePurchaseOrderReceipt, 
   deletePurchaseOrderReceipt,
-  getReceiptBarcodeSummaries
+  getReceiptBarcodeSummaries,
+  finalizeReceiptController,
+  markPurchaseOrderReceiptAsPrinted,
+  
 } = require('../controllers/purchaseOrderReceiptController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -33,7 +36,10 @@ router.put('/:id', updatePurchaseOrderReceipt);
 // 🗑️ DELETE - ลบใบรับสินค้า
 router.delete('/:id', deletePurchaseOrderReceipt);
 
+// ✅ PATCH - ตรวจสอบและปรับสถานะใบรับสินค้า + ตัดเครดิต
+router.patch('/:id/finalize', finalizeReceiptController);
 
+router.patch('/:id/printed', markPurchaseOrderReceiptAsPrinted);
 
 
 module.exports = router;

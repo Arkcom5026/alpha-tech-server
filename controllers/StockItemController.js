@@ -12,7 +12,7 @@ const addStockItemFromReceipt = async (req, res) => {
       barcode,
       serialNumber,
       qrCodeData,
-      buyPrice,
+      costPrice,
       sellPrice,
       warrantyDays,
       expiredAt,
@@ -24,7 +24,7 @@ const addStockItemFromReceipt = async (req, res) => {
       checkedBy
     } = req.body;
 
-    if (!receiptItemId || !productId || !branchId || !barcode || !buyPrice) {
+    if (!receiptItemId || !productId || !branchId || !barcode || !costPrice) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -33,7 +33,7 @@ const addStockItemFromReceipt = async (req, res) => {
         barcode,
         serialNumber,
         qrCodeData,
-        buyPrice,
+        costPrice,
         sellPrice,
         warrantyDays,
         expiredAt: expiredAt ? new Date(expiredAt) : null,
@@ -193,7 +193,8 @@ const receiveStockItem = async (req, res) => {
             receipt: true,
             purchaseOrderItem: {
               include: {
-                product: true
+                product: true,
+                purchaseOrder: true
               }
             }
           }
@@ -210,8 +211,9 @@ const receiveStockItem = async (req, res) => {
     }
 
     const product = barcodeItem.receiptItem?.purchaseOrderItem?.product;
-    if (!product) {
-      return res.status(400).json({ error: 'Product data not found for this barcode.' });
+    const purchaseOrder = barcodeItem.receiptItem?.purchaseOrderItem?.purchaseOrder;
+    if (!product || !purchaseOrder) {
+      return res.status(400).json({ error: 'Product or PO data missing.' });
     }
 
     const branchId = barcodeItem.receiptItem.receipt?.branchId;
@@ -225,16 +227,27 @@ const receiveStockItem = async (req, res) => {
         serialNumber: serialNumber || barcode,
         status: 'IN_STOCK',
         receivedAt: new Date(),
-        buyPrice: barcodeItem.receiptItem?.buyPrice || 0,
+        costPrice: barcodeItem.receiptItem?.costPrice || 0,
         product: { connect: { id: product.id } },
         branch: { connect: { id: branchId } },
         purchaseOrderReceiptItem: { connect: { id: barcodeItem.receiptItem.id } }
       },
     });
 
+    // ✅ Update barcode -> link to stockItem
     await prisma.barcodeReceiptItem.update({
       where: { barcode },
       data: { stockItemId: newStockItem.id },
+    });
+
+    // ✅ หักเครดิตจาก supplier ทันที
+    await prisma.supplier.update({
+      where: { id: purchaseOrder.supplierId },
+      data: {
+        creditBalance: {
+          increment: barcodeItem.receiptItem.costPrice || 0,
+        },
+      },
     });
 
     return res.status(201).json({ message: '✅ รับสินค้าเข้าสต๊อกเรียบร้อยแล้ว', stockItem: newStockItem });
