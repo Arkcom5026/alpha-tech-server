@@ -42,10 +42,9 @@ const getAllProducts = async (req, res) => {
           where: { status: 'IN_STOCK' },
           select: { id: true },
         },
-        prices: {
-          where: { level: 1 },
-          select: { price: true },
-        },
+
+        
+
       },
       take: parseInt(take),
       orderBy: { id: 'desc' },
@@ -58,7 +57,7 @@ const getAllProducts = async (req, res) => {
       productTemplate: t.template?.name ?? '-',
       warranty: t.warranty,
       quantity: t.stockItems?.length ?? 0,
-      price: t.prices?.[0]?.price ?? null,
+      // price: t.prices?.[0]?.price ?? null,
       branchId: t.branchId, // ✅ เพิ่ม branchId กลับเข้า response
     }));
 
@@ -108,8 +107,7 @@ const createProduct = async (req, res) => {
         spec: data.spec || '',
         codeType: data.codeType || 'D',
         noSN: data.noSN ?? false,
-        active: data.active ?? true,
-        costPrice: data.costPrice ? parseFloat(data.costPrice) : null,
+        active: data.active ?? true,        
 
         productImages: Array.isArray(data.images) && data.images.length > 0
           ? {
@@ -164,15 +162,13 @@ const updateProduct = async (req, res) => {
         warranty: data.warranty ? parseInt(data.warranty) : null,
         branch: { connect: { id: branchId } },
         description: data.description || '',
-        spec: data.spec || '',
-        costPrice: data.costPrice ? parseFloat(data.costPrice) : null,
+        spec: data.spec || '',        
         codeType: data.codeType || 'D',
         active: data.active ?? true,
         noSN: data.noSN ?? false,
       },
       include: {
-        productImages: true,
-        prices: true,
+        productImages: true,        
       },
     });
 
@@ -299,11 +295,6 @@ const deleteProductImage = async (req, res) => {
 
 
 
-
-
-
-
-
 const getProductDropdowns = async (req, res) => {
   const branchId = req.user?.branchId;
   const productId = req.params?.id; // ✅ เปลี่ยนจาก query เป็น params
@@ -333,8 +324,7 @@ const getProductDropdowns = async (req, res) => {
           description: true,
           spec: true,
           warranty: true,
-          active: true,
-          costPrice: true,
+          active: true,          
           codeType: true,
           noSN: true,
           unitId: true,
@@ -392,154 +382,6 @@ const getProductDropdowns = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-const getProductPrices = async (req, res) => {
-  try {
-    const productId = parseInt(req.params.id);
-    const branchId = req.user?.branchId;
-
-
-    if (!productId || !branchId) {
-      return res.status(400).json({ error: 'Missing product ID or branch ID' });
-    }
-
-    const prices = await prisma.productPrice.findMany({
-      where: {
-        productId,
-        branchId,
-      },
-      orderBy: { level: 'asc' },
-    });
-
-
-    res.json(prices);
-  } catch (error) {
-    console.error('❌ getProductPrices error:', error);
-    res.status(500).json({ error: 'Failed to load product prices' });
-  }
-};
-
-
-
-
-
-// ✅ Controller Function: Add Product Price
-async function addProductPrice(req, res) {
-  try {
-    const productId = parseInt(req.params.id);
-    const { level, price } = req.body;
-    const branchId = req.user?.branchId;
-
-    if (!productId || !level || !price || !branchId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const created = await prisma.productPrice.create({
-      data: {
-        productId,
-        branchId,
-        level,
-        price,
-        active: true,
-      },
-    });
-
-    return res.status(201).json(created);
-  } catch (error) {
-    console.error('❌ addProductPrice error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-
-// ✅ Controller Function: Update Product Price
-async function updateProductPrice(req, res) {
-  try {
-    const productId = parseInt(req.params.productId);
-    const priceId = parseInt(req.params.priceId);
-    const { level, price } = req.body;
-    const branchId = req.user?.branchId;
-
-    if (!productId || !priceId || !level || !price || !branchId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // ตรวจสอบว่า record นี้อยู่ภายใต้สาขานี้จริงหรือไม่
-    const existing = await prisma.productPrice.findFirst({
-      where: {
-        id: priceId,
-        productId,
-        branchId,
-      },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Product price not found in this branch' });
-    }
-
-    const updated = await prisma.productPrice.update({
-      where: { id: priceId },
-      data: {
-        level,
-        price,
-      },
-    });
-
-    return res.status(200).json(updated);
-  } catch (error) {
-    console.error('❌ updateProductPrice error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-
-
-// ✅ Controller Function: Delete Product Price
-async function deleteProductPrice(req, res) {
-  try {
-    const productId = parseInt(req.params.productId);
-    const priceId = parseInt(req.params.priceId);
-    const branchId = req.user?.branchId;
-
-    if (!productId || !priceId || !branchId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // ตรวจสอบสิทธิ์การลบ
-    const existing = await prisma.productPrice.findFirst({
-      where: {
-        id: priceId,
-        productId,
-        branchId,
-      },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Product price not found in this branch' });
-    }
-
-    await prisma.productPrice.delete({
-      where: { id: priceId },
-    });
-
-    return res.status(200).json({ message: 'Product price deleted successfully' });
-  } catch (error) {
-    console.error('❌ deleteProductPrice error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-
-
-
-
 const searchProducts = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
@@ -568,6 +410,146 @@ const searchProducts = async (req, res) => {
 
 
 
+const getProductsForOnline = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        active: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        spec: true,
+        sold: true,
+        quantity: true,
+        warranty: true,
+        
+        productImages: {
+          where: { isCover: true, active: true },
+          take: 1,
+          select: {
+            secure_url: true,
+          },
+        },
+        template: {
+          select: {
+            name: true,
+            productProfile: {
+              select: {
+                name: true,
+                productType: {
+                  select: {
+                    name: true,
+                    category: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = products.map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      spec: p.spec,
+      sold: p.sold,
+      quantity: p.quantity,
+      warranty: p.warranty,
+      price: p.price,
+      imageUrl: p.productImages[0]?.secure_url || null,
+      category: p.template?.productProfile?.productType?.category?.name || null,
+      productType: p.template?.productProfile?.productType?.name || null,
+      productProfile: p.template?.productProfile?.name || null,
+      productTemplate: p.template?.name || null,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error("❌ getProductsForOnline error:", error);
+    res.status(500).json({ error: "Failed to fetch online products" });
+  }
+};
+
+const getProductOnlineById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await prisma.product.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        spec: true,
+        sold: true,
+        quantity: true,
+        warranty: true,
+        productImages: {
+          where: { active: true },
+          select: {
+            secure_url: true,
+          },
+        },
+        template: {
+          select: {
+            name: true,
+            productProfile: {
+              select: {
+                name: true,
+                productType: {
+                  select: {
+                    name: true,
+                    category: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "ไม่พบสินค้า" });
+    }
+
+    const result = {
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      spec: product.spec,
+      sold: product.sold,
+      quantity: product.quantity,
+      warranty: product.warranty,
+      price: 0, // ใช้ 0 ตามที่คุณระบุไว้ก่อน
+      imageUrl: product.productImages?.[0]?.secure_url || null,
+      productImages: product.productImages || [],
+      category: product.template?.productProfile?.productType?.category?.name || null,
+      productType: product.template?.productProfile?.productType?.name || null,
+      productProfile: product.template?.productProfile?.name || null,
+      productTemplate: product.template?.name || null,
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error("❌ getProductOnlineById error:", error);
+    res.status(500).json({ error: "Failed to fetch product details" });
+  }
+};
+
+
 
 module.exports = {
   getAllProducts,
@@ -577,9 +559,7 @@ module.exports = {
   deleteProduct,
   deleteProductImage,
   getProductDropdowns,
-  getProductPrices,
-  addProductPrice,
-  updateProductPrice,
-  deleteProductPrice,
   searchProducts,
+  getProductsForOnline,
+  getProductOnlineById,
 };

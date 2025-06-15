@@ -30,6 +30,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const saleReturnRoutes = require('./routes/saleReturnRoutes');
 const refundRoutes = require('./routes/refundRoutes');
 const supplierPaymentRoutes = require('./routes/supplierPaymentRoutes');
+const bankRoutes = require('./routes/bankRoutes');
+const orderOnlineRoutes = require("./routes/orderOnlineRoutes");
 
 // ✅ Middlewares
 app.use(express.json());
@@ -66,13 +68,17 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes); 
 app.use('/api/product-templates', productTemplateRoutes);
-app.use('/api/products', uploadProductRoutes);
-app.use('/api/products-templates', uploadProductTemplateRoutes);
+
 app.use('/api/products', productRoutes);
+         
+app.use('/api/products', uploadProductRoutes);
+          
+app.use('/api/products-templates', uploadProductTemplateRoutes);
+
 
 app.use('/api/purchase-orders', purchaseOrderRoutes);              
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
-         //api/purchase-order-receipts
+      
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
          
 
@@ -88,7 +94,10 @@ app.use('/api/refunds', refundRoutes);
 app.use('/api/payments', paymentRoutes); 
 app.use('/api/supplier-payments',supplierPaymentRoutes);
 
+app.use('/api/banks', bankRoutes);
 
+
+app.use("/api/orders", orderOnlineRoutes);
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

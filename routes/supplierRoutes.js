@@ -2,7 +2,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middlewares/verifyToken');
 const {
   createSupplier,
   getAllSuppliers,
@@ -11,11 +10,15 @@ const {
   deleteSupplier
 } = require('../controllers/supplierController');
 
+const { verifyToken } = require('../middlewares/verifyToken');
+router.use(verifyToken);
+
+
 // ✅ CRUD Routes สำหรับ Supplier
-router.post('/', verifyToken, createSupplier);
-router.get('/', verifyToken, getAllSuppliers);
-router.get('/:id', verifyToken, getSupplierById);
-router.put('/:id', verifyToken, updateSupplier);
-router.delete('/:id', verifyToken, deleteSupplier);
+router.post('/',  createSupplier);
+router.get('/',  getAllSuppliers);
+router.get('/:id',  getSupplierById);
+router.put('/:id',  updateSupplier);
+router.delete('/:id',  deleteSupplier);
 
 module.exports = router;

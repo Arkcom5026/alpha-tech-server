@@ -201,25 +201,30 @@ const getReceiptsWithBarcodes = async (req, res) => {
       },
     });
 
-    const result = receipts.map((r) => {
-      const supplier = r.purchaseOrder?.supplier;
-      const creditLimit = supplier?.creditLimit || 0;
-      const creditUsed = supplier?.creditUsed || 0;
-      const debitAmount = supplier?.debitAmount || 0;
-      const creditAvailable = creditLimit - creditUsed + debitAmount;
+    const result = receipts
+      .map((r) => {
+        const supplier = r.purchaseOrder?.supplier;
+        const creditLimit = supplier?.creditLimit || 0;
+        const creditUsed = supplier?.creditUsed || 0;
+        const debitAmount = supplier?.debitAmount || 0;
+        const creditAvailable = creditLimit - creditUsed + debitAmount;
 
-      return {
-        id: r.id,
-        code: r.code,
-        purchaseOrderCode: r.purchaseOrder?.code || '-',
-        supplier: supplier?.name || '-',
-        createdAt: r.createdAt,
-        total: r.barcodeReceiptItem.length,
-        scanned: r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length,
-        creditAvailable,
-        debitAmount,
-      };
-    });
+        const total = r.barcodeReceiptItem.length;
+        const scanned = r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length;
+
+        return {
+          id: r.id,
+          code: r.code,
+          purchaseOrderCode: r.purchaseOrder?.code || '-',
+          supplier: supplier?.name || '-',
+          createdAt: r.createdAt,
+          total,
+          scanned,
+          creditAvailable,
+          debitAmount,
+        };
+      })
+      .filter((r) => r.total > r.scanned); // ✅ แสดงเฉพาะรายการที่ยังยิงไม่ครบ
 
     res.json(result);
   } catch (err) {
@@ -227,6 +232,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
   }
 };
+
 
 const markBarcodesAsPrinted = async (req, res) => {
   const rawId = req.body?.purchaseOrderReceiptId;

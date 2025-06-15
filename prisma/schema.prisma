@@ -104,6 +104,14 @@ enum PaymentType {
   CREDIT_NOTE
 }
 
+enum OrderOnlineStatus {
+  PENDING // สั่งซื้อเข้ามาแล้ว แต่ยังไม่ยืนยัน
+  CONFIRMED // ยืนยันคำสั่งซื้อแล้ว กำลังเตรียมของ
+  SHIPPED // ส่งของแล้ว
+  COMPLETED // จัดส่งสำเร็จ
+  CANCELLED // ยกเลิกคำสั่งซื้อ
+}
+
 // 🔐 User & Profiles
 model User {
   id          Int       @id @default(autoincrement())
@@ -118,8 +126,9 @@ model User {
   customerProfile CustomerProfile?
   employeeProfile EmployeeProfile?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  orderOnline OrderOnline[]
 }
 
 model CustomerProfile {
@@ -136,9 +145,11 @@ model CustomerProfile {
   cart     Cart[]
   services ServiceOrder[]
 
+  sale        Sale[]
+  orderOnline OrderOnline[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  sale      Sale[]
 }
 
 model EmployeeProfile {
@@ -155,15 +166,13 @@ model EmployeeProfile {
   position   Position? @relation(fields: [positionId], references: [id])
   positionId Int?
 
+  confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
+
   purchaseOrderCreated PurchaseOrder[]
   assignedServices     ServiceOrder[]
-  approved             Boolean         @default(false)
-  active               Boolean         @default(true)
+  approved             Boolean                @default(false)
+  active               Boolean                @default(true)
   stockItem            StockItem[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   sale                 Sale[]
   saleReturns          SaleReturn[] // ผู้สร้างใบคืนสินค้า
   refundedReturns      SaleReturn[]           @relation("RefundedBy") // ผู้คืนเงินจริง
@@ -171,6 +180,9 @@ model EmployeeProfile {
   combinedSaleDocument CombinedSaleDocument[]
   refundTransaction    RefundTransaction[]
   supplierPayment      SupplierPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // 🏢 HR
@@ -185,13 +197,9 @@ model Branch {
   pos             PurchaseOrder[]
   services        ServiceOrder[]
   products        Product[]
-  productPrice    ProductPrice[]
   productTemplate ProductTemplate[]
 
-  RBACEnabled Boolean @default(true)
-
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  RBACEnabled          Boolean                @default(true)
   purchaseOrderReceipt PurchaseOrderReceipt[]
   barcodeCounter       BarcodeCounter[]
   barcodeReceiptItem   BarcodeReceiptItem[]
@@ -201,6 +209,10 @@ model Branch {
   combinedSaleDocument CombinedSaleDocument[]
   refundTransaction    RefundTransaction[]
   supplierPayment      SupplierPayment[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  OrderOnline OrderOnline[]
 }
 
 model Position {
@@ -300,7 +312,6 @@ model Product {
   branchId Int
 
   updatedByBranchId  Int?
-  prices             ProductPrice[]
   productImages      ProductImage[]
   stockItems         StockItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -308,8 +319,9 @@ model Product {
   cartItems          ProductOnCart[]
   serviceItems       ServiceItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  orderOnlineItem OrderOnlineItem[]
 }
 
 model ProductImage {
@@ -346,20 +358,6 @@ model ProductTemplateImage {
   updatedAt DateTime @updatedAt
 }
 
-model ProductPrice {
-  id        Int     @id @default(autoincrement())
-  level     Int
-  price     Float
-  active    Boolean @default(true)
-  productId Int
-  product   Product @relation(fields: [productId], references: [id])
-
-  branch   Branch @relation(fields: [branchId], references: [id])
-  branchId Int
-
-  @@unique([productId, branchId, level])
-}
-
 model Unit {
   id   Int    @id @default(autoincrement())
   name String @unique
@@ -377,6 +375,9 @@ model StockItem {
   serialNumber String? @unique
   qrCodeData   String?
   costPrice    Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+  salePrice1   Float?
+  salePrice2   Float?
+  salePrice3   Float?
 
   sellPrice            Float?
   receivedAt           DateTime         @default(now())
@@ -560,11 +561,10 @@ model Order {
 }
 
 model ProductOnOrder {
-  id        Int   @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   productId Int
   orderId   Int
   count     Int
-  price     Float
 
   product Product @relation(fields: [productId], references: [id])
   order   Order   @relation(fields: [orderId], references: [id])
@@ -585,11 +585,10 @@ model Cart {
 }
 
 model ProductOnCart {
-  id        Int   @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   cartId    Int
   productId Int
   count     Int
-  price     Float
 
   cart    Cart    @relation(fields: [cartId], references: [id])
   product Product @relation(fields: [productId], references: [id])
@@ -897,4 +896,44 @@ model SupplierPaymentPO {
   updatedAt DateTime @updatedAt
 
   @@unique([paymentId, purchaseOrderId])
+}
+
+model OrderOnline {
+  id         Int              @id @default(autoincrement())
+  customerId Int?
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  fullName   String
+  phone      String
+  address    String
+  district   String
+  province   String
+  postalCode String
+
+  note   String?
+  status OrderOnlineStatus @default(PENDING)
+
+  confirmedByEmployeeId Int?
+  confirmedByEmployee   EmployeeProfile? @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id])
+
+  shippedAt    DateTime?
+  cancelReason String?
+
+  items     OrderOnlineItem[]
+  createdAt DateTime          @default(now())
+  User      User?             @relation(fields: [userId], references: [id])
+  userId    Int?
+}
+
+model OrderOnlineItem {
+  id        Int @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+
+  order   OrderOnline @relation(fields: [orderId], references: [id])
+  product Product     @relation(fields: [productId], references: [id])
 }
