@@ -267,31 +267,46 @@ const getProductById = async (req, res) => {
 
 
 
-// DELETE /products/:id/images/delete?public_id=xxx
 const deleteProductImage = async (req, res) => {
   const productId = parseInt(req.params.id);
   const { public_id } = req.body;
+  const branchId = req.user.branchId; // ✅ ต้องใช้จาก token เท่านั้น
 
   if (!public_id) {
     return res.status(400).json({ error: 'ต้องระบุ public_id' });
   }
 
   try {
+    // ตรวจสอบว่า productId นี้เป็นของ branch นั้นก่อน
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        branchId,
+      },
+    });
+
+    if (!product) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ลบภาพสินค้านี้' });
+    }
+
+    // ลบภาพจาก Cloudinary
     const result = await cloudinary.uploader.destroy(public_id);
 
+    // ลบจากฐานข้อมูลเฉพาะภาพที่ผูกกับสินค้านั้น ๆ
     await prisma.productImage.deleteMany({
       where: {
         productId,
-        public_id, // ✅ ใช้ชื่อ field ที่ถูกต้อง
+        public_id,
       },
     });
 
     res.json({ message: 'ลบภาพสำเร็จ', public_id });
   } catch (err) {
     console.error('❌ deleteProductImage error:', err);
-    res.status(500).json({ error: 'Failed to delete product image' });
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดขณะลบภาพสินค้า' });
   }
 };
+
 
 
 
@@ -380,6 +395,59 @@ const getProductDropdowns = async (req, res) => {
 };
 
 
+const getProductDropdownsForOnline = async (req, res) => {
+  try {
+    const categories = await prisma.category.findMany();
+
+    const productTypes = await prisma.productType.findMany({
+      select: {
+        id: true,
+        name: true,
+        categoryId: true,
+      },
+    });
+
+    const productProfiles = await prisma.productProfile.findMany({
+      include: {
+        productType: {
+          select: {
+            id: true,
+            name: true,
+            categoryId: true,
+          },
+        },
+      },
+    });
+
+    const templates = await prisma.productTemplate.findMany({
+      include: {
+        productProfile: {
+          include: {
+            productType: {
+              select: {
+                id: true,
+                name: true,
+                categoryId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return res.json({
+      categories,
+      productTypes,
+      productProfiles,
+      templates,
+    });
+  } catch (error) {
+    console.error('❌ getProductDropdownsForOnline error:', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
+  }
+};
+
+
 
 
 const searchProducts = async (req, res) => {
@@ -411,11 +479,51 @@ const searchProducts = async (req, res) => {
 
 
 const getProductsForOnline = async (req, res) => {
+  const {
+    categoryId,
+    productTypeId,
+    productProfileId,
+    templateId,
+    searchText = "", // ✅ เพิ่มตรงนี้
+  } = req.query;
+
   try {
     const products = await prisma.product.findMany({
       where: {
         active: true,
+        ...(templateId && { templateId: Number(templateId) }),
+        ...(productProfileId && {
+          template: {
+            productProfileId: Number(productProfileId),
+          },
+        }),
+        ...(productTypeId && {
+          template: {
+            productProfile: {
+              productTypeId: Number(productTypeId),
+            },
+          },
+        }),
+        ...(categoryId && {
+          template: {
+            productProfile: {
+              productType: {
+                categoryId: Number(categoryId),
+              },
+            },
+          },
+        }),
+
+        // ✅ เพิ่มส่วนนี้เพื่อให้ค้นหาด้วย title หรือ description ได้
+        ...(searchText && {
+          OR: [
+            { title: { contains: searchText, mode: "insensitive" } },
+            { description: { contains: searchText, mode: "insensitive" } },
+            { template: { name: { contains: searchText, mode: "insensitive" } } },
+          ],
+        }),
       },
+
       select: {
         id: true,
         title: true,
@@ -423,8 +531,7 @@ const getProductsForOnline = async (req, res) => {
         spec: true,
         sold: true,
         quantity: true,
-        warranty: true,
-        
+        warranty: true,        
         productImages: {
           where: { isCover: true, active: true },
           take: 1,
@@ -477,6 +584,8 @@ const getProductsForOnline = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
+
+
 
 const getProductOnlineById = async (req, res) => {
   try {
@@ -562,4 +671,5 @@ module.exports = {
   searchProducts,
   getProductsForOnline,
   getProductOnlineById,
+  getProductDropdownsForOnline,
 };

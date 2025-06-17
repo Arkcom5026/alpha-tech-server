@@ -2,15 +2,17 @@ const express = require('express');
 const router = express.Router();
 const {
   getCustomerByPhone,
+  getCustomerByUserId,
   createCustomer,
-  updateCustomer, // ✅ เพิ่ม controller ใหม่
+  updateCustomerProfile,
 } = require('../controllers/customerController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.get('/by-phone/:phone', getCustomerByPhone);
+router.get('/me', getCustomerByUserId);
 router.post('/', createCustomer);
-router.put('/:id', updateCustomer); // ✅ เพิ่ม route สำหรับอัปเดตลูกค้า
+router.patch('/me', updateCustomerProfile);
 
 module.exports = router;

@@ -50,7 +50,7 @@ const createProductTemplate = async (req, res) => {
 
     const newTemplate = await prisma.productTemplate.create({
       data: {
-        title: data.title,
+        name: data.name,
 
         productProfile: { connect: { id: parseInt(data.productProfileId) }, },
 
@@ -73,7 +73,7 @@ const createProductTemplate = async (req, res) => {
               public_id: img.public_id,
               secure_url: img.secure_url,
             }))
-            : [],
+            : [ ],
         },
       },
     });

@@ -1,7 +1,9 @@
 // ✅ authController.js (อัปเดตเพื่อแนบ branch, position, user info เข้ากับ profile)
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const prisma = require('../lib/prisma');
+
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const generateToken = (user) => {
   return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
@@ -11,7 +13,7 @@ const generateToken = (user) => {
 
 const register = async (req, res) => {
   const { email, password, name, phone } = req.body;
-
+  
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -52,11 +54,15 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const { email, password } = req.body;
-
+  const { emailOrPhone, password } = req.body;  
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: emailOrPhone },
+          { customerProfile: { phone: emailOrPhone } },
+        ],
+      },
       include: {
         customerProfile: true,
         employeeProfile: {
@@ -65,8 +71,12 @@ const login = async (req, res) => {
       },
     });
 
-    if (!user || !user.enabled) {
-      return res.status(401).json({ message: 'บัญชีไม่มีสิทธิ์เข้าใช้งาน' });
+    if (!user) {
+      return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    }
+
+    if (!user.enabled) {
+      return res.status(401).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -82,7 +92,7 @@ const login = async (req, res) => {
         role: user.role,
         profileId: profile?.id || null,
         branchId: user.employeeProfile?.branchId || null,
-        employeeId: user.employeeProfile?.id || null, // ✅ เพิ่ม employeeId
+        employeeId: user.employeeProfile?.id || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
@@ -108,7 +118,11 @@ const login = async (req, res) => {
   }
 };
 
+
 module.exports = {
   register,
   login,
+
 };
+
+

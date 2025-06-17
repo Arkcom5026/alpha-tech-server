@@ -32,6 +32,8 @@ const refundRoutes = require('./routes/refundRoutes');
 const supplierPaymentRoutes = require('./routes/supplierPaymentRoutes');
 const bankRoutes = require('./routes/bankRoutes');
 const orderOnlineRoutes = require("./routes/orderOnlineRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const cartSyncRoutes = require("./routes/cartSyncRoutes");
 
 // ✅ Middlewares
 app.use(express.json());
@@ -59,6 +61,7 @@ app.use(morgan('dev'));
 
 // ✅ เปิดใช้งาน route
 app.use('/api/auth', authRoutes);
+
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
@@ -98,6 +101,11 @@ app.use('/api/banks', bankRoutes);
 
 
 app.use("/api/orders", orderOnlineRoutes);
+
+app.use("/api/cart", cartRoutes);
+
+app.use("/api/cart-sync", cartSyncRoutes);
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

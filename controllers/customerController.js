@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const bcrypt = require('bcryptjs');
 
 // ✅ ค้นหาลูกค้าจากเบอร์โทร
 const getCustomerByPhone = async (req, res) => {
@@ -28,9 +29,37 @@ const getCustomerByPhone = async (req, res) => {
   }
 };
 
-// ✅ สร้างลูกค้าใหม่ พร้อมสร้าง User + CustomerProfile
-const bcrypt = require('bcryptjs');
+// ✅ ค้นหาลูกค้าด้วย userId
+const getCustomerByUserId = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้าในระบบ' });
+    }
+
+    return res.json({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      address: customer.address,
+      district: customer.district,
+      province: customer.province,
+      postalCode: customer.postalCode,
+      email: customer.user?.email || '',
+    });
+  } catch (err) {
+    console.error('[getCustomerByUserId] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการโหลดข้อมูลลูกค้า' });
+  }
+};
+
+// ✅ สร้างลูกค้าใหม่ พร้อมสร้าง User + CustomerProfile
 const createCustomer = async (req, res) => {
   try {
     const { name, phone, email, address } = req.body;
@@ -73,54 +102,43 @@ const createCustomer = async (req, res) => {
   }
 };
 
-
 // ✅ อัปเดตข้อมูลลูกค้า (CustomerProfile + User.email)
-const updateCustomer = async (req, res) => {
+const updateCustomerProfile = async (req, res) => {
+  console.log('updateCustomerProfile : ', req.body);
+
+  const userId = req.user.id;
+  const {
+    name,
+    phone,
+    address,
+    district,
+    province,
+    postalCode,
+  } = req.body;
+
   try {
-    const { id } = req.params;
-    const { name, email, address } = req.body;
-
-    const existing = await prisma.customerProfile.findUnique({
-      where: { id: Number(id) },
-      include: { user: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'ไม่พบลูกค้า' });
-    }
-
-    // อัปเดต CustomerProfile
-    const updatedCustomer = await prisma.customerProfile.update({
-      where: { id: Number(id) },
+    const updated = await prisma.customerProfile.update({
+      where: { userId },
       data: {
         name,
+        phone,
         address,
+        district,
+        province,
+        postalCode,
       },
     });
 
-    // อัปเดต email ใน User (ถ้ามีการส่ง email มา)
-    if (email !== undefined) {
-      await prisma.user.update({
-        where: { id: existing.userId },
-        data: { email },
-      });
-    }
-
-    return res.json(updatedCustomer);
-  } catch (err) {
-    console.error('[updateCustomer] ❌', err);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการอัปเดตลูกค้า' });
+    res.json(updated);
+  } catch (error) {
+    console.error('🔥 updateCustomerProfile error:', error);
+    res.status(500).json({ message: 'ไม่สามารถอัปเดตข้อมูลลูกค้าได้' });
   }
 };
 
-
 module.exports = {
   getCustomerByPhone,
+  getCustomerByUserId,
   createCustomer,
-  updateCustomer,
+  updateCustomerProfile,
 };
-
-
-
-
-

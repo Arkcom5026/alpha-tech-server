@@ -4,132 +4,122 @@ const prisma = new PrismaClient();
 const createOrderOnline = async (req, res) => {
   try {
     const {
-      items,
+      items = [],
+      customerId,
       branchId,
-      fullName,
-      phone,
-      address,
-      district,
-      province,
-      postalCode,
+      totalAmount,
+      deliveryDate,
       note,
     } = req.body;
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: "ไม่มีรายการสินค้า" });
+    if (!branchId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
 
-    if (!branchId) {
-      return res.status(400).json({ error: "กรุณาเลือกสาขา" });
-    }
-
-    const customerId = req.user?.customerProfileId || null; // ✅ รองรับ customer จาก token
-
-    const order = await prisma.orderOnline.create({
+    const newOrder = await prisma.orderOnline.create({
       data: {
-        customerId,
+        customerId: customerId || null,
         branchId,
-        fullName,
-        phone,
-        address,
-        district,
-        province,
-        postalCode,
-        note,
-        status: "PENDING",
-        items: {
+        totalAmount: totalAmount || 0,
+        deliveryDate: deliveryDate || undefined,
+        note: note || '',
+        paymentStatus: 'UNPAID',
+        paymentMethod: 'UNKNOWN',
+        source: 'ONLINE',
+        orderItems: {
           create: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
+            priceAtPurchase: item.price || 0,
+            note: item.note || '',
           })),
         },
       },
-      include: {
-        items: {
-          include: { product: true },
-        },
-        customer: {
-          include: { user: true },
-        },
-        branch: true,
-      },
     });
 
-    res.status(201).json(order);
-  } catch (err) {
-    console.error("❌ createOrderOnline error:", err);
-    res.status(500).json({ error: "ไม่สามารถสร้างคำสั่งซื้อได้" });
+    res.status(201).json({ message: 'สร้างคำสั่งซื้อสำเร็จ', order: newOrder });
+  } catch (error) {
+    console.error('❌ createOrderOnline error:', error);
+    res.status(500).json({ error: 'ไม่สามารถสร้างคำสั่งซื้อได้' });
   }
 };
 
-const getAllOrdersOnline = async (req, res) => {
+const getAllOrderOnline = async (req, res) => {
   try {
     const orders = await prisma.orderOnline.findMany({
-      orderBy: { createdAt: "desc" },
       include: {
-        items: {
-          include: { product: true },
-        },
         customer: true,
-        branch: true,
+        orderItems: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(orders);
-  } catch (err) {
-    console.error("❌ getAllOrdersOnline error:", err);
-    res.status(500).json({ error: "ไม่สามารถดึงรายการคำสั่งซื้อได้" });
+  } catch (error) {
+    console.error('❌ getAllOrderOnline error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
   }
 };
 
 const getOrderOnlineById = async (req, res) => {
   try {
     const { id } = req.params;
-
     const order = await prisma.orderOnline.findUnique({
       where: { id: Number(id) },
       include: {
-        items: {
+        customer: true,
+        orderItems: {
           include: { product: true },
         },
-        customer: true,
-        branch: true,
+      },
+    });
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+    res.json(order);
+  } catch (error) {
+    console.error('❌ getOrderOnlineById error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
+  }
+};
+
+const updateOrderOnlineStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentStatus, deliveryDate, note } = req.body;
+
+    const updated = await prisma.orderOnline.update({
+      where: { id: Number(id) },
+      data: {
+        paymentStatus,
+        deliveryDate,
+        note,
       },
     });
 
-    if (!order) {
-      return res.status(404).json({ error: "ไม่พบคำสั่งซื้อนี้" });
-    }
-
-    res.json(order);
-  } catch (err) {
-    console.error("❌ getOrderOnlineById error:", err);
-    res.status(500).json({ error: "เกิดข้อผิดพลาดในการค้นหาคำสั่งซื้อ" });
+    res.json({ message: 'อัปเดตคำสั่งซื้อสำเร็จ', order: updated });
+  } catch (error) {
+    console.error('❌ updateOrderOnlineStatus error:', error);
+    res.status(500).json({ error: 'ไม่สามารถอัปเดตคำสั่งซื้อได้' });
   }
 };
 
 const deleteOrderOnline = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // ลบ items ก่อนตาม foreign key constraint
-    await prisma.orderOnlineItem.deleteMany({
-      where: { orderId: Number(id) },
-    });
-
     await prisma.orderOnline.delete({
       where: { id: Number(id) },
     });
-
-    res.json({ message: "ลบคำสั่งซื้อเรียบร้อยแล้ว" });
-  } catch (err) {
-    console.error("❌ deleteOrderOnline error:", err);
-    res.status(500).json({ error: "ไม่สามารถลบคำสั่งซื้อได้" });
+    res.json({ message: 'ลบคำสั่งซื้อสำเร็จ' });
+  } catch (error) {
+    console.error('❌ deleteOrderOnline error:', error);
+    res.status(500).json({ error: 'ไม่สามารถลบคำสั่งซื้อได้' });
   }
 };
 
 module.exports = {
   createOrderOnline,
-  getAllOrdersOnline,
+  getAllOrderOnline,
   getOrderOnlineById,
+  updateOrderOnlineStatus,
   deleteOrderOnline,
 };
