@@ -16,6 +16,7 @@ router.use(verifyToken);
 
 router.post('/items', addToCart);
 router.delete('/items/:productId', removeFromCart);
+
 router.post('/clear', clearCart);
 router.get('/', getCart);
 router.post('/merge', mergeCart);
