@@ -22,14 +22,14 @@ const getAllProducts = async (req, res) => {
       where: {
         branchId: parseInt(branchId),
         active: true, // ✅ เพิ่มเงื่อนไขให้แสดงเฉพาะสินค้าที่เปิดใช้งานเท่านั้น
-        title: {
+        name: {
           contains: search,
           mode: 'insensitive',
         },
       },
       select: {
         id: true,
-        title: true,
+        name: true,
         description: true,
         warranty: true,
         branchId: true,
@@ -52,7 +52,7 @@ const getAllProducts = async (req, res) => {
 
     const mapped = products.map((t) => ({
       id: t.id,
-      title: t.title,
+      name: t.name,
       description: t.description,
       productTemplate: t.template?.name ?? '-',
       warranty: t.warranty,
@@ -90,7 +90,7 @@ const createProduct = async (req, res) => {
 
     const newProduct = await prisma.product.create({
       data: {
-        title: data.title,
+        name: data.name,
 
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
@@ -150,7 +150,7 @@ const updateProduct = async (req, res) => {
     const updated = await prisma.product.update({
       where: { id },
       data: {
-        title: data.title,
+        name: data.name,
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
           : undefined,
@@ -335,7 +335,7 @@ const getProductDropdowns = async (req, res) => {
         where: { id: Number(productId) },
         select: {
           id: true,
-          title: true,
+          name: true,
           description: true,
           spec: true,
           warranty: true,
@@ -458,7 +458,7 @@ const searchProducts = async (req, res) => {
     const results = await prisma.product.findMany({
       where: {
         OR: [
-          { title: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query, mode: 'insensitive' } },
           { description: { contains: query, mode: 'insensitive' } },
         ],
       },
@@ -466,7 +466,7 @@ const searchProducts = async (req, res) => {
         template: true,
       },
       take: 20,
-      orderBy: { title: 'asc' },
+      orderBy: { name: 'asc' },
     });
 
     res.json(results);
@@ -514,10 +514,10 @@ const getProductsForOnline = async (req, res) => {
           },
         }),
 
-        // ✅ เพิ่มส่วนนี้เพื่อให้ค้นหาด้วย title หรือ description ได้
+        // ✅ เพิ่มส่วนนี้เพื่อให้ค้นหาด้วย name หรือ description ได้
         ...(searchText && {
           OR: [
-            { title: { contains: searchText, mode: "insensitive" } },
+            { name: { contains: searchText, mode: "insensitive" } },
             { description: { contains: searchText, mode: "insensitive" } },
             { template: { name: { contains: searchText, mode: "insensitive" } } },
           ],
@@ -526,7 +526,7 @@ const getProductsForOnline = async (req, res) => {
 
       select: {
         id: true,
-        title: true,
+        name: true,
         description: true,
         spec: true,
         sold: true,
@@ -564,7 +564,7 @@ const getProductsForOnline = async (req, res) => {
 
     const result = products.map((p) => ({
       id: p.id,
-      title: p.title,
+      name: p.name,
       description: p.description,
       spec: p.spec,
       sold: p.sold,
@@ -595,7 +595,7 @@ const getProductOnlineById = async (req, res) => {
       where: { id: Number(id) },
       select: {
         id: true,
-        title: true,
+        name: true,
         description: true,
         spec: true,
         sold: true,
@@ -636,7 +636,7 @@ const getProductOnlineById = async (req, res) => {
 
     const result = {
       id: product.id,
-      title: product.title,
+      name: product.name,
       description: product.description,
       spec: product.spec,
       sold: product.sold,

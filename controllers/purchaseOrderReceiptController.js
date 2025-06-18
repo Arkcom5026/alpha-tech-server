@@ -99,7 +99,7 @@ const getPurchaseOrderReceiptById = async (req, res) => {
             id: true,
             quantity: true,
             purchaseOrderItem: {
-              select: { product: { select: { title: true } } },
+              select: { product: { select: { name: true } } },
             },
           },
         },
@@ -265,7 +265,7 @@ const getReceiptBarcodeSummaries = async (req, res) => {
           include: {
             stockItems: true,
             purchaseOrderItem: {
-              select: { product: { select: { title: true } } },
+              select: { product: { select: { name: true } } },
             },
           },
         },

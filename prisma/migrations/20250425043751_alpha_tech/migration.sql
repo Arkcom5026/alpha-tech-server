@@ -19,7 +19,7 @@ CREATE TABLE `User` (
 -- CreateTable
 CREATE TABLE `Product` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `title` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
     `description` VARCHAR(191) NOT NULL,
     `price` DOUBLE NOT NULL,
     `sold` INTEGER NOT NULL DEFAULT 0,

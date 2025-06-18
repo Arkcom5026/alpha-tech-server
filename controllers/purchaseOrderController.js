@@ -75,7 +75,7 @@ const getAllPurchaseOrders = async (req, res) => {
           include: {
             product: {
               select: {                
-                title: true
+                name: true
               }
             }
           }

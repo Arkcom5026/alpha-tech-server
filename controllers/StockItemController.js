@@ -268,7 +268,7 @@ const searchStockItem = async (req, res) => {
         status: 'IN_STOCK',
         OR: [
           { barcode: { equals: query } },
-          { product: { is: { title: { contains: query, mode: 'insensitive' } } } },
+          { product: { is: { name: { contains: query, mode: 'insensitive' } } } },
         ]
       },
       include: {

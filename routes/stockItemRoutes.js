@@ -12,7 +12,7 @@ const {
   receiveStockItem,
   searchStockItem,
   markStockItemsAsSold,
-  updateSerialNumber, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, title, code)
+  updateSerialNumber, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, name, code)
 } = require('../controllers/stockItemController');
 
 const { verifyToken } = require('../middlewares/verifyToken');

@@ -1,4 +1,4 @@
-// ✅ cartRoutes.js (รองรับ guest โดยไม่ใช้ authenticate middleware global)
+// ✅ cartRoutes.js (แก้ให้ทุกคำสั่งใน cart ต้อง login ก่อนด้วย verifyToken)
 const express = require('express');
 const router = express.Router();
 const {
@@ -6,13 +6,19 @@ const {
   addToCart,
   removeFromCart,
   clearCart,
+  mergeCart,
+  updateCartItem,
 } = require('../controllers/cartController');
+const { verifyToken } = require('../middlewares/verifyToken');
 
-// ✅ Route ที่ต้อง login จะตรวจสอบภายใน controller แทน
-router
-  .get('/', getCart)
-  .post('/items', addToCart)
-  .delete('/items/:productId', removeFromCart)
-  .post('/clear', clearCart);
+// ✅ ย้าย verifyToken ขึ้นบนสุด เพื่อให้ทุกคำสั่งผ่าน auth
+router.use(verifyToken);
+
+router.post('/items', addToCart);
+router.delete('/items/:productId', removeFromCart);
+router.post('/clear', clearCart);
+router.get('/', getCart);
+router.post('/merge', mergeCart);
+router.patch('/item/:productId', updateCartItem);
 
 module.exports = router;

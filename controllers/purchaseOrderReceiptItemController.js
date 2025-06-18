@@ -76,7 +76,7 @@ const getReceiptItemsByReceiptId = async (req, res) => {
             product: {
               select: {
                 id: true,
-                title: true,
+                name: true,
                 unit: true
               }
             },
@@ -135,7 +135,7 @@ const getPOItemsByPOId = async (req, res) => {
       where: { purchaseOrderId: parseInt(id) },
       include: {
         product: {
-          select: { id: true, title: true, unit: true },
+          select: { id: true, name: true, unit: true },
         },
       },
     });

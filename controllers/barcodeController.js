@@ -128,7 +128,7 @@ const getBarcodesByReceiptId = async (req, res) => {
               include: {
                 product: {
                   select: {
-                    title: true,
+                    name: true,
                     spec: true,
                   },
                 },
@@ -146,7 +146,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       stockItemId: b.stockItemId || null,
       serialNumber: b.stockItem?.serialNumber || null,
       product: {
-        title: b.receiptItem?.purchaseOrderItem?.product?.title || '',
+        name: b.receiptItem?.purchaseOrderItem?.product?.name || '',
         spec: b.receiptItem?.purchaseOrderItem?.product?.spec || '',
       },
     }));

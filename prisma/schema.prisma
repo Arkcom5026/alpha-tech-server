@@ -135,7 +135,7 @@ model User {
   updatedAt   DateTime      @updatedAt
   orderOnline OrderOnline[]
   cart        Cart[]
-  cartSync    CartSync[]
+
 }
 
 model CustomerProfile {
@@ -301,7 +301,7 @@ model ProductTemplate {
 
 model Product {
   id          Int     @id @default(autoincrement())
-  title       String?
+  name       String?
   description String?
 
   spec     String?
@@ -332,7 +332,7 @@ model Product {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   orderOnlineItem OrderOnlineItem[]
-  cartSync        CartSync[]
+
 }
 
 model ProductImage {
@@ -614,18 +614,6 @@ model CartItem {
   @@unique([cartId, productId])
 }
 
-model CartSync {
-  id         Int      @id @default(autoincrement())
-  customer   User     @relation(fields: [customerId], references: [id])
-  customerId Int
-  product    Product  @relation(fields: [productId], references: [id])
-  productId  Int
-  quantity   Int
-  updatedAt  DateTime @updatedAt
-  createdAt  DateTime @default(now())
-
-  @@unique([customerId, productId]) // ป้องกันซ้ำ
-}
 
 // 🛠️ Service System
 model ServiceOrder {
