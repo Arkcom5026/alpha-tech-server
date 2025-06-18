@@ -54,7 +54,7 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const { emailOrPhone, password } = req.body;  
+  const { emailOrPhone, password } = req.body;
   try {
     const user = await prisma.user.findFirst({
       where: {
@@ -85,11 +85,13 @@ const login = async (req, res) => {
     }
 
     const profile = user.customerProfile || user.employeeProfile;
+    const profileType = user.customerProfile ? 'customer' : 'employee';
 
     const token = jwt.sign(
       {
         id: user.id,
         role: user.role,
+        profileType,
         profileId: profile?.id || null,
         branchId: user.employeeProfile?.branchId || null,
         employeeId: user.employeeProfile?.id || null,
@@ -101,8 +103,11 @@ const login = async (req, res) => {
     res.json({
       token,
       role: user.role,
+      profileType,
       profile: {
-        ...profile,
+        id: profile?.id || null,
+        name: profile?.name || '',
+        phone: profile?.phone || '',
         branch: user.employeeProfile?.branch || null,
         position: user.employeeProfile?.position || null,
         user: {

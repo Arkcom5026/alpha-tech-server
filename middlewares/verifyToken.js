@@ -12,22 +12,20 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    
-
     req.user = {
       id: decoded.id,
-      branchId: decoded.branchId,
+      role: decoded.role,
+      profileType: decoded.profileType || 'customer',
+      profileId: decoded.profileId || null,
+      branchId: decoded.branchId || null,
       employeeId: decoded.employeeId || null,
-      
     };
-       
 
-    if (!decoded.employeeId) {
-      console.warn('⚠️ JWT missing employeeId');
+    if (decoded.profileType === 'employee' && !decoded.employeeId) {
+      console.warn('⚠️ JWT profileType = employee แต่ไม่มี employeeId');
     }
 
-   
-        next();
+    next();
   } catch (err) {
     console.error('❌ [verifyToken] JWT verification failed:', err.message);
     return res.status(401).json({ message: 'Token is not valid' });
