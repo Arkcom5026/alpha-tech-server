@@ -2,19 +2,15 @@
 
 const express = require('express');
 const router = express.Router();
-
-const {
+const { addStockItemFromReceipt,
+  markStockItemsAsSold,
   getStockItemsByReceipt,
+  searchStockItem,
   deleteStockItem,
   updateStockItemStatus,
-  addStockItemFromReceipt,
   getStockItemsByReceiptIds,
-  receiveStockItem,
-  searchStockItem,
-  markStockItemsAsSold,
-  updateSerialNumber, // ✅ ใช้ตัวเดียวสำหรับทุกกรณี (barcode, name, code)
+  receiveStockItem, updateSerialNumber
 } = require('../controllers/stockItemController');
-
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
