@@ -4,7 +4,6 @@ const prisma = new PrismaClient();
 const { cloudinary } = require('../utils/cloudinary');
 
 
-// GET /api/products (Optimized)
 
 const getAllProducts = async (req, res) => {
 
@@ -43,7 +42,7 @@ const getAllProducts = async (req, res) => {
           select: { id: true },
         },
 
-        
+
 
       },
       take: parseInt(take),
@@ -70,9 +69,6 @@ const getAllProducts = async (req, res) => {
 
 
 
-
-
-// POST /api/products
 const createProduct = async (req, res) => {
 
   const data = req.body;
@@ -107,18 +103,18 @@ const createProduct = async (req, res) => {
         spec: data.spec || '',
         codeType: data.codeType || 'D',
         noSN: data.noSN ?? false,
-        active: data.active ?? true,        
+        active: data.active ?? true,
 
         productImages: Array.isArray(data.images) && data.images.length > 0
           ? {
-              create: data.images.map((img) => ({
-                url: img.url,
-                public_id: img.public_id,
-                secure_url: img.secure_url,
-                caption: img.caption || null,
-                isCover: img.isCover || false,
-              })),
-            }
+            create: data.images.map((img) => ({
+              url: img.url,
+              public_id: img.public_id,
+              secure_url: img.secure_url,
+              caption: img.caption || null,
+              isCover: img.isCover || false,
+            })),
+          }
           : undefined,
       },
     });
@@ -130,6 +126,7 @@ const createProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to create product' });
   }
 };
+
 
 
 const updateProduct = async (req, res) => {
@@ -162,13 +159,13 @@ const updateProduct = async (req, res) => {
         warranty: data.warranty ? parseInt(data.warranty) : null,
         branch: { connect: { id: branchId } },
         description: data.description || '',
-        spec: data.spec || '',        
+        spec: data.spec || '',
         codeType: data.codeType || 'D',
         active: data.active ?? true,
         noSN: data.noSN ?? false,
       },
       include: {
-        productImages: true,        
+        productImages: true,
       },
     });
 
@@ -179,12 +176,32 @@ const updateProduct = async (req, res) => {
   }
 };
 
+const searchProducts = async (req, res) => {
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ error: 'Missing search query' });
 
+  try {
+    const results = await prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        template: true,
+      },
+      take: 20,
+      orderBy: { name: 'asc' },
+    });
 
+    res.json(results);
+  } catch (error) {
+    console.error('❌ [searchProducts]', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+};
 
-
-
-// DELETE /api/products/:id
 const deleteProduct = async (req, res) => {
 
   try {
@@ -229,10 +246,6 @@ const deleteProduct = async (req, res) => {
 };
 
 
-
-
-
-// GET /api/products/:id
 const getProductById = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -262,9 +275,6 @@ const getProductById = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลได้' });
   }
 };
-
-
-
 
 
 const deleteProductImage = async (req, res) => {
@@ -308,8 +318,6 @@ const deleteProductImage = async (req, res) => {
 };
 
 
-
-
 const getProductDropdowns = async (req, res) => {
   const branchId = req.user?.branchId;
   const productId = req.params?.id; // ✅ เปลี่ยนจาก query เป็น params
@@ -339,7 +347,7 @@ const getProductDropdowns = async (req, res) => {
           description: true,
           spec: true,
           warranty: true,
-          active: true,          
+          active: true,
           codeType: true,
           noSN: true,
           unitId: true,
@@ -379,7 +387,7 @@ const getProductDropdowns = async (req, res) => {
       console.warn('⚠️ productId ไม่ถูกต้องหรือไม่ได้ส่งมา:', productId);
     }
 
-    
+
     return res.json({
       categories,
       productTypes,
@@ -448,49 +456,28 @@ const getProductDropdownsForOnline = async (req, res) => {
 };
 
 
-
-
-const searchProducts = async (req, res) => {
-  const { query } = req.query;
-  if (!query) return res.status(400).json({ error: 'Missing search query' });
-
-  try {
-    const results = await prisma.product.findMany({
-      where: {
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { description: { contains: query, mode: 'insensitive' } },
-        ],
-      },
-      include: {
-        template: true,
-      },
-      take: 20,
-      orderBy: { name: 'asc' },
-    });
-
-    res.json(results);
-  } catch (error) {
-    console.error('❌ [searchProducts]', error);
-    res.status(500).json({ error: 'Search failed' });
-  }
-};
-
-
-
 const getProductsForOnline = async (req, res) => {
   const {
     categoryId,
     productTypeId,
     productProfileId,
     templateId,
-    searchText = "", // ✅ เพิ่มตรงนี้
+    searchText = "",
   } = req.query;
+
+  const branchId = req.user?.branchId ?? (req.query.branchId ? Number(req.query.branchId) : null);
+  if (!branchId) return res.status(400).json({ error: "branchId is required" });
 
   try {
     const products = await prisma.product.findMany({
       where: {
         active: true,
+        branchPrice: {
+          some: {
+            isActive: true,
+            branchId,
+          },
+        },
         ...(templateId && { templateId: Number(templateId) }),
         ...(productProfileId && {
           template: {
@@ -513,8 +500,6 @@ const getProductsForOnline = async (req, res) => {
             },
           },
         }),
-
-        // ✅ เพิ่มส่วนนี้เพื่อให้ค้นหาด้วย name หรือ description ได้
         ...(searchText && {
           OR: [
             { name: { contains: searchText, mode: "insensitive" } },
@@ -523,7 +508,6 @@ const getProductsForOnline = async (req, res) => {
           ],
         }),
       },
-
       select: {
         id: true,
         name: true,
@@ -531,7 +515,18 @@ const getProductsForOnline = async (req, res) => {
         spec: true,
         sold: true,
         quantity: true,
-        warranty: true,        
+        warranty: true,
+        branchPrice: {
+          where: {
+            isActive: true,
+            branchId,
+          },
+          select: { price: true },
+        },
+        stockItems: {
+          where: { status: 'IN_STOCK' },
+          select: { id: true },
+        },
         productImages: {
           where: { isCover: true, active: true },
           take: 1,
@@ -570,7 +565,8 @@ const getProductsForOnline = async (req, res) => {
       sold: p.sold,
       quantity: p.quantity,
       warranty: p.warranty,
-      price: p.price,
+      price: p.branchPrice[0]?.price ?? null,
+      isReady: p.stockItems?.length > 0,
       imageUrl: p.productImages[0]?.secure_url || null,
       category: p.template?.productProfile?.productType?.category?.name || null,
       productType: p.template?.productProfile?.productType?.name || null,
@@ -580,7 +576,7 @@ const getProductsForOnline = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error("❌ getProductsForOnline error:", error);
+    console.error("\u274C getProductsForOnline error:", error);
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
@@ -590,6 +586,8 @@ const getProductsForOnline = async (req, res) => {
 const getProductOnlineById = async (req, res) => {
   try {
     const { id } = req.params;
+    const branchId = req.query.branchId ? Number(req.query.branchId) : null;
+    if (!branchId) return res.status(400).json({ error: "branchId is required" });
 
     const product = await prisma.product.findUnique({
       where: { id: Number(id) },
@@ -601,6 +599,17 @@ const getProductOnlineById = async (req, res) => {
         sold: true,
         quantity: true,
         warranty: true,
+        branchPrice: {
+          where: {
+            isActive: true,
+            branchId,
+          },
+          select: { price: true },
+        },
+        stockItems: {
+          where: { status: 'IN_STOCK' },
+          select: { id: true },
+        },
         productImages: {
           where: { active: true },
           select: {
@@ -642,7 +651,8 @@ const getProductOnlineById = async (req, res) => {
       sold: product.sold,
       quantity: product.quantity,
       warranty: product.warranty,
-      price: 0, // ใช้ 0 ตามที่คุณระบุไว้ก่อน
+      price: product.branchPrice[0]?.price ?? 0,
+      isReady: product.stockItems?.length > 0,
       imageUrl: product.productImages?.[0]?.secure_url || null,
       productImages: product.productImages || [],
       category: product.template?.productProfile?.productType?.category?.name || null,
@@ -657,6 +667,7 @@ const getProductOnlineById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch product details" });
   }
 };
+
 
 
 

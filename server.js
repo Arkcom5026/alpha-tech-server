@@ -33,6 +33,8 @@ const supplierPaymentRoutes = require('./routes/supplierPaymentRoutes');
 const bankRoutes = require('./routes/bankRoutes');
 const orderOnlineRoutes = require("./routes/orderOnlineRoutes");
 const cartRoutes = require("./routes/cartRoutes");
+const branchPriceRoutes = require("./routes/branchPriceRoutes");
+const branchRoutes = require('./routes/branchRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -99,10 +101,15 @@ app.use('/api/supplier-payments',supplierPaymentRoutes);
 app.use('/api/banks', bankRoutes);
 
 
-app.use("/api/orders", orderOnlineRoutes);
+app.use("/api/order-online", orderOnlineRoutes);
 
 app.use("/api/cart", cartRoutes);
           
+app.use("/api/branch-prices", branchPriceRoutes);
+
+app.use('/api/branches', branchRoutes);
+
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

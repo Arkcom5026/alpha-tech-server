@@ -1,32 +1,63 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+
 const createOrderOnline = async (req, res) => {
+  console.log('createOrderOnline req.body ; ',req.body)
   try {
     const {
       items = [],
       customerId,
       branchId,
-      totalAmount,
       deliveryDate,
       note,
+      fullName,
+      phone,
+      email,
+      address,
+      district,
+      province,
+      postalCode,
     } = req.body;
 
-    if (!branchId || !Array.isArray(items) || items.length === 0) {
+    const userId = req.user?.id;
+
+    if (
+      !branchId ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !fullName ||
+      !phone ||
+      !address ||
+      !district ||
+      !province ||
+      !postalCode
+    ) {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
+
+    const calculatedTotal = items.reduce((sum, item) => {
+      const price = item.price || 0;
+      return sum + price * item.quantity;
+    }, 0);
 
     const newOrder = await prisma.orderOnline.create({
       data: {
         customerId: customerId || null,
         branchId,
-        totalAmount: totalAmount || 0,
         deliveryDate: deliveryDate || undefined,
         note: note || '',
-        paymentStatus: 'UNPAID',
-        paymentMethod: 'UNKNOWN',
+        paymentStatus: 'PENDING',
+        paymentMethod: 'CASH',
         source: 'ONLINE',
-        orderItems: {
+        fullName,
+        phone,
+        email: email || null,
+        address,
+        district,
+        province,
+        postalCode,
+        items: {
           create: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
@@ -34,8 +65,14 @@ const createOrderOnline = async (req, res) => {
             note: item.note || '',
           })),
         },
+        userId: userId || null
       },
     });
+
+    if (userId) {
+      await prisma.cartItem.deleteMany({ where: { cart: { userId } } });
+      await prisma.cart.deleteMany({ where: { userId } });
+    }
 
     res.status(201).json({ message: 'สร้างคำสั่งซื้อสำเร็จ', order: newOrder });
   } catch (error) {
@@ -44,12 +81,13 @@ const createOrderOnline = async (req, res) => {
   }
 };
 
+
 const getAllOrderOnline = async (req, res) => {
   try {
     const orders = await prisma.orderOnline.findMany({
       include: {
         customer: true,
-        orderItems: true,
+        items: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -67,7 +105,7 @@ const getOrderOnlineById = async (req, res) => {
       where: { id: Number(id) },
       include: {
         customer: true,
-        orderItems: {
+        items: {
           include: { product: true },
         },
       },

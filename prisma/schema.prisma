@@ -135,7 +135,6 @@ model User {
   updatedAt   DateTime      @updatedAt
   orderOnline OrderOnline[]
   cart        Cart[]
-
 }
 
 model CustomerProfile {
@@ -195,11 +194,19 @@ model EmployeeProfile {
   updatedAt DateTime @updatedAt
 }
 
-// 🏢 HR
+// 🏢 Branch
 model Branch {
   id      Int    @id @default(autoincrement())
   name    String
   address String
+
+  province  String?
+  district  String?
+  region    String? // เช่น ภาคกลาง ภาคเหนือ
+  latitude  Float?
+  longitude Float?
+
+  branchPrices BranchPrice[]
 
   employees       EmployeeProfile[]
   stock           StockItem[]
@@ -223,6 +230,30 @@ model Branch {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   orderOnline OrderOnline[]
+}
+
+// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services
+
+model BranchPrice {
+  id        Int   @id @default(autoincrement())
+  productId Int
+  branchId  Int
+  price     Float
+
+  // 🆕 ฟิลด์เพิ่มเติม
+  effectiveDate DateTime?
+  expiredDate   DateTime?
+  note          String?
+  updatedBy     Int?
+  isActive      Boolean   @default(true)
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
 }
 
 model Position {
@@ -301,7 +332,7 @@ model ProductTemplate {
 
 model Product {
   id          Int     @id @default(autoincrement())
-  name       String?
+  name        String?
   description String?
 
   spec     String?
@@ -333,6 +364,7 @@ model Product {
   updatedAt       DateTime          @updatedAt
   orderOnlineItem OrderOnlineItem[]
 
+  branchPrice BranchPrice[]
 }
 
 model ProductImage {
@@ -613,7 +645,6 @@ model CartItem {
 
   @@unique([cartId, productId])
 }
-
 
 // 🛠️ Service System
 model ServiceOrder {
