@@ -1,5 +1,6 @@
 // ✅ controllers/supplierController.js
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const getAllSuppliers = async (req, res) => {
   try {
@@ -11,7 +12,7 @@ const getAllSuppliers = async (req, res) => {
         branchId: Number(branchId),
       },
       orderBy: {
-        createdAt: 'desc',
+        name: 'asc', // ✅ เปลี่ยนจาก createdAt เป็น name ตามตัวอักษร
       },
       select: {
         id: true,
@@ -36,7 +37,6 @@ const getAllSuppliers = async (req, res) => {
     res.status(500).json({ error: 'Server error while fetching suppliers' });
   }
 };
-
 
 
 const getSupplierById = async (req, res) => {

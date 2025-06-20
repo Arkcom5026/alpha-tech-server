@@ -13,6 +13,7 @@ const {
   getProductsForOnline,
   getProductOnlineById,
   getProductDropdownsForOnline,
+  getProductsForPos, // ✅ เพิ่มใหม่
 } = require('../controllers/productController');
 const { verifyToken } = require('../middlewares/verifyToken');
 
@@ -29,6 +30,7 @@ router.get('/', getAllProducts);
 router.get('/dropdowns/:id', getProductDropdowns);
 router.get('/dropdowns', getProductDropdowns);
 router.get('/search', searchProducts);
+router.get('/pos/search', getProductsForPos); 
 router.get('/:id', getProductById);
 router.post('/', createProduct);
 router.put('/:id', updateProduct);
@@ -36,3 +38,4 @@ router.delete('/:id', deleteProduct);
 router.delete('/:id/image', deleteProductImage);
 
 module.exports = router;
+   

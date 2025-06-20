@@ -104,67 +104,109 @@ const getBranchPricesByBranch = async (req, res) => {
 // ✅ 4. ดึงสินค้าทุกชิ้น พร้อมราคา + ราคาทุนล่าสุดจาก StockItem (ลดข้อมูลซ้ำ)
 const getAllProductsWithBranchPrice = async (req, res) => {
     const branchId = req.user.branchId;
-
-    try {
-        const products = await prisma.product.findMany({
-            orderBy: { name: "asc" },
-        });
-
-        const prices = await prisma.branchPrice.findMany({
-            where: { branchId },
-        });
-
-        // ✅ ดึง StockItem ล่าสุดรายการเดียวต่อ productId
-        const latestStockItems = await prisma.stockItem.findMany({
-            where: { branchId },
-            orderBy: { receivedAt: 'desc' },
-            distinct: ['productId'],
-            select: {
-                productId: true,
-                costPrice: true,
-                salePrice1: true,
-                salePrice2: true,
-                salePrice3: true,
-                receivedAt: true,
-            },
-        });
-
-        const latestStockMap = latestStockItems.reduce((acc, item) => {
-            acc[item.productId] = item;
-            return acc;
-        }, {});
-
-        const result = products.map((product) => {
-            const matchedPrice = prices.find((p) => p.productId === product.id);
-            const latestStock = latestStockMap[product.id];
-
-            return {
-                product: {
-                    id: product.id,
-                    name: product.name,
-                },
-                branchPrice: matchedPrice || null,
-                rawPrices: latestStock ? [latestStock] : [],
-                latestCostPrice: latestStock?.costPrice || null,
-                avgCostPrice: latestStock?.costPrice || null, // ✅ ใช้ตัวเดียวกันเพราะมีรายการเดียว
-            };
-        });
-
-        console.log(
-            'getAllProductsWithBranchPrice : ',
-            result.map((r) => ({
-                product: r.product.name,
-                latestCostPrice: r.latestCostPrice,
-                avgCostPrice: r.avgCostPrice,
-            }))
-        );
-
-        res.json(result);
-    } catch (err) {
-        console.error("❌ getAllProductsWithBranchPrice error:", err);
-        res.status(500).json({ error: "ไม่สามารถโหลดรายการสินค้าได้" });
+    const {
+      categoryId,
+      productTypeId,
+      productProfileId,
+      templateId,
+      searchText,
+    } = req.query;
+  
+    // ✅ ถ้าข้อความค้นหาว่าง และไม่มี filter ใดเลย → ไม่ต้องค้นหา
+    if (!searchText && !categoryId && !productTypeId && !productProfileId && !templateId) {
+      return res.json([]); // ส่งกลับ array ว่างทันที
     }
-};
+  
+    try {
+      const products = await prisma.product.findMany({
+        where: {
+          active: true,
+          AND: [
+            templateId && { templateId: Number(templateId) },
+            productProfileId && {
+              template: {
+                productProfileId: Number(productProfileId),
+              },
+            },
+            productTypeId && {
+              template: {
+                productProfile: {
+                  productTypeId: Number(productTypeId),
+                },
+              },
+            },
+            categoryId && {
+              template: {
+                productProfile: {
+                  productType: {
+                    categoryId: Number(categoryId),
+                  },
+                },
+              },
+            },
+            searchText && searchText.trim() !== '' && {
+              OR: [
+                { name: { contains: searchText, mode: 'insensitive' } },
+                { description: { contains: searchText, mode: 'insensitive' } },
+                { spec: { contains: searchText, mode: 'insensitive' } },
+                { template: { name: { contains: searchText, mode: 'insensitive' } } },
+              ],
+            },
+          ].filter(Boolean),
+        },
+        orderBy: { name: "asc" },
+      });
+  
+      const prices = await prisma.branchPrice.findMany({
+        where: { branchId },
+      });
+  
+      const latestStockItems = await prisma.stockItem.findMany({
+        where: { branchId },
+        orderBy: { receivedAt: 'desc' },
+        distinct: ['productId'],
+        select: {
+          productId: true,
+          costPrice: true,
+          salePrice1: true,
+          salePrice2: true,
+          salePrice3: true,
+          receivedAt: true,
+        },
+      });
+  
+      const latestStockMap = latestStockItems.reduce((acc, item) => {
+        acc[item.productId] = item;
+        return acc;
+      }, {});
+  
+      const result = products.map((product) => {
+        const matchedPrice = prices.find((p) => p.productId === product.id);
+        const latestStock = latestStockMap[product.id];
+  
+        return {
+          product: {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            spec: product.spec,
+          },
+          branchPrice: matchedPrice || null,
+          rawPrices: latestStock ? [latestStock] : [],
+          latestCostPrice: latestStock?.costPrice || null,
+          avgCostPrice: latestStock?.costPrice || null,
+        };
+      });
+  
+      res.json(result);
+    } catch (err) {
+      console.error("❌ getAllProductsWithBranchPrice error:", err);
+      res.status(500).json({ error: "ไม่สามารถโหลดรายการสินค้าได้" });
+    }
+  };
+  
+  
+  
 
 
 
