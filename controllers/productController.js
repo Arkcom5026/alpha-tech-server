@@ -618,7 +618,7 @@ const getProductsForPos = async (req, res) => {
     templateId,
     searchText = "",
   } = req.query;
-
+  
   const branchId = req.user?.branchId;
   if (!branchId) return res.status(400).json({ error: "branchId is required" });
 

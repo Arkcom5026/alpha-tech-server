@@ -1,14 +1,13 @@
 // ✅ @filename: server/controllers/employeeController.js
 const prisma = require('../lib/prisma');
 
-
-// ✅ GET /api/employees?branchId=xx - ดึงพนักงานตามสาขา
+// ✅ GET /api/employees - ดึงพนักงานตามสาขาจาก req.user.branchId
 const getAllEmployees = async (req, res) => {
   try {
-    const { branchId } = req.user?.branchId;
+    const branchId = req.user?.branchId;
 
     if (!branchId) {
-      return res.status(400).json({ message: 'กรุณาระบุ branchId' });
+      return res.status(400).json({ message: 'กรุณาระบุ branchId จาก token' });
     }
 
     const employees = await prisma.employeeProfile.findMany({
@@ -52,14 +51,11 @@ const createEmployees = async (req, res) => {
     }
     console.log('📦 รับข้อมูลพนักงานใหม่:', { userId, name, phone, branchId, positionId });
 
-
-    // 1. อัปเดต role ของ user เป็น employee
     await prisma.user.update({
       where: { id: parseInt(userId) },
       data: { role: 'employee' },
     });
 
-    // 2. สร้าง employeeProfile
     const newEmployee = await prisma.employeeProfile.create({
       data: {
         userId: parseInt(userId),
@@ -117,9 +113,10 @@ const getUsersByRole = async (req, res) => {
   }
 };
 
+// ✅ GET /api/users/search?q=term - ค้นหาผู้ใช้แบบ customer
 const searchUsers = async (req, res) => {
   try {
-    const { q } = req.user?.branchId;
+    const { q } = req.query;
     if (!q || q.length < 2) return res.json([]);
 
     const users = await prisma.user.findMany({
@@ -160,4 +157,3 @@ module.exports = {
   getUsersByRole,
   searchUsers,
 };
-
