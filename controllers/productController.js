@@ -56,7 +56,6 @@ const getAllProducts = async (req, res) => {
       productTemplate: t.template?.name ?? '-',
       warranty: t.warranty,
       quantity: t.stockItems?.length ?? 0,
-      // price: t.prices?.[0]?.price ?? null,
       branchId: t.branchId, // ✅ เพิ่ม branchId กลับเข้า response
     }));
 
@@ -67,7 +66,46 @@ const getAllProducts = async (req, res) => {
   }
 };
 
+const getProductsByBranch = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
 
+    const products = await prisma.product.findMany({
+      where: {
+        branchPrices: {
+          some: {
+            branchId: branchId,
+          },
+        },
+      },
+      include: {
+        branchPrices: {
+          where: { branchId: branchId },
+          select: {
+            costPrice: true,
+            priceRetail: true,
+            priceWholesale: true,
+            priceTechnician: true,
+            priceOnline: true,
+            productId: true,
+            branchId: true,
+          },
+        },
+        unit: true,
+        category: true,
+        productType: true,
+        productProfile: true,
+        productTemplate: true,
+        productImages: true,
+      },
+    });
+
+    res.json(products);
+  } catch (error) {
+    console.error('getProductsByBranch error:', error);
+    res.status(500).json({ error: 'Failed to fetch products for this branch' });
+  }
+};
 
 const createProduct = async (req, res) => {
 
@@ -126,7 +164,6 @@ const createProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to create product' });
   }
 };
-
 
 
 const updateProduct = async (req, res) => {
@@ -248,33 +285,64 @@ const deleteProduct = async (req, res) => {
 
 const getProductById = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    if (!id) return res.status(400).json({ error: 'Invalid product ID' });
-
+    const { id } = req.params;
+    const branchId = req.user.branchId;
 
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
-        productImages: {
+        branchPrice: {
+          where: { branchId: branchId },
           select: {
-            url: true,
-            public_id: true,
-            secure_url: true,
+            id: true,
+            costPrice: true,
+            priceRetail: true,
+            priceWholesale: true,
+            priceTechnician: true,
+            priceOnline: true,
+            productId: true,
+            branchId: true,
+            effectiveDate: true,
+            expiredDate: true,
+            note: true,
+            updatedBy: true,
+            isActive: true,
+          },
+        },
+        unit: true,
+        productImages: true,
+        template: {
+          include: {
+            unit: true,
+            productProfile: {
+              include: {
+                productType: {
+                  include: {
+                    category: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
 
-
-
-    if (!product) return res.status(404).json({ error: 'ไม่พบข้อมูล' });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    console.log('getProductById product:', product);
 
     res.json(product);
   } catch (error) {
-    console.error('❌ getProductById error:', error);
-    res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลได้' });
+    console.error('getProductById error:', error);
+    res.status(500).json({ error: 'Failed to fetch product by ID' });
   }
 };
+
+
+
+
 
 
 const deleteProductImage = async (req, res) => {
@@ -417,6 +485,7 @@ const getProductDropdowns = async (req, res) => {
       }
     }
 
+
     return res.json({
       categories,
       productTypes,
@@ -429,7 +498,6 @@ const getProductDropdowns = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
-
 
 
 const getProductDropdownsForOnline = async (req, res) => {
@@ -550,7 +618,7 @@ const getProductsForOnline = async (req, res) => {
             isActive: true,
             branchId,
           },
-          select: { price: true },
+          select: { costPrice: true },
         },
         stockItems: {
           where: { status: 'IN_STOCK' },
@@ -618,7 +686,7 @@ const getProductsForPos = async (req, res) => {
     templateId,
     searchText = "",
   } = req.query;
-  
+
   const branchId = req.user?.branchId;
   if (!branchId) return res.status(400).json({ error: "branchId is required" });
 
@@ -670,7 +738,14 @@ const getProductsForPos = async (req, res) => {
           where: {
             branchId,
           },
-          select: { price: true, isActive: true },
+          select: {
+            costPrice: true,
+            priceRetail: true,
+            priceWholesale: true,
+            priceTechnician: true,
+            priceOnline: true,
+            isActive: true
+          },
         },
         stockItems: {
           where: { status: 'IN_STOCK' },
@@ -714,7 +789,12 @@ const getProductsForPos = async (req, res) => {
       sold: p.sold,
       quantity: p.quantity,
       warranty: p.warranty,
-      price: p.branchPrice[0]?.price ?? null,
+
+      costPrice: p.branchPrice[0]?.costPrice ?? null,
+      priceRetail: p.branchPrice[0]?.priceRetail ?? null,
+      priceWholesale: p.branchPrice[0]?.priceWholesale ?? null,
+      priceTechnician: p.branchPrice[0]?.priceTechnician ?? null,
+      priceOnline: p.branchPrice[0]?.priceOnline ?? null,
       isActive: p.branchPrice[0]?.isActive ?? false,
       isReady: p.stockItems?.length > 0,
       imageUrl: p.productImages[0]?.secure_url || null,
@@ -723,7 +803,7 @@ const getProductsForPos = async (req, res) => {
       productProfile: p.template?.productProfile?.name || null,
       productTemplate: p.template?.name || null,
     }));
-
+    console.log("getProductsForPos result:", result);
     res.json(result);
   } catch (error) {
     console.error("\u274C getProductsForPos error:", error);
@@ -754,7 +834,7 @@ const getProductOnlineById = async (req, res) => {
             isActive: true,
             branchId,
           },
-          select: { price: true },
+          select: { costPrice: true },
         },
         stockItems: {
           where: { status: 'IN_STOCK' },
@@ -834,4 +914,5 @@ module.exports = {
   getProductOnlineById,
   getProductDropdownsForOnline,
   getProductsForPos,
+  getProductsByBranch,
 };

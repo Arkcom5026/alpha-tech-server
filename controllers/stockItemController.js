@@ -12,8 +12,6 @@
         barcode,
         serialNumber,
         qrCodeData,
-        costPrice,
-        sellPrice,
         warrantyDays,
         expiredAt,
         remark,
@@ -24,7 +22,7 @@
         checkedBy
       } = req.body;
 
-      if (!receiptItemId || !productId || !branchId || !barcode || !costPrice) {
+      if (!receiptItemId || !productId || !branchId || !barcode ) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
@@ -33,8 +31,6 @@
           barcode,
           serialNumber,
           qrCodeData,
-          costPrice,
-          sellPrice,
           warrantyDays,
           expiredAt: expiredAt ? new Date(expiredAt) : null,
           remark,
@@ -227,7 +223,6 @@
           serialNumber: serialNumber || barcode,
           status: 'IN_STOCK',
           receivedAt: new Date(),
-          costPrice: barcodeItem.receiptItem?.costPrice || 0,
           product: { connect: { id: product.id } },
           branch: { connect: { id: branchId } },
           purchaseOrderReceiptItem: { connect: { id: barcodeItem.receiptItem.id } }
@@ -245,7 +240,7 @@
         where: { id: purchaseOrder.supplierId },
         data: {
           creditBalance: {
-            increment: barcodeItem.receiptItem.costPrice || 0,
+
           },
         },
       });

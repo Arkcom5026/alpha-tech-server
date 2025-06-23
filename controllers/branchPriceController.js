@@ -42,7 +42,19 @@ const getActiveBranchPrice = async (req, res) => {
 
 // ✅ 2. สร้างหรืออัปเดตราคาของสาขา (รองรับโปรโมชั่น)
 const upsertBranchPrice = async (req, res) => {
-    const { productId, price, effectiveDate, expiredDate, note, isActive } = req.body;
+    const {
+        productId,
+        costPrice,
+        priceRetail,
+        priceWholesale,
+        priceTechnician,
+        priceOnline,
+        effectiveDate,
+        expiredDate,
+        note,
+        isActive,
+    } = req.body;
+
     const branchId = req.user.branchId;
     const updatedBy = req.user.id;
 
@@ -55,7 +67,11 @@ const upsertBranchPrice = async (req, res) => {
                 },
             },
             update: {
-                price,
+                costPrice,
+                priceRetail,
+                priceWholesale,
+                priceTechnician,
+                priceOnline,
                 effectiveDate,
                 expiredDate,
                 note,
@@ -65,7 +81,11 @@ const upsertBranchPrice = async (req, res) => {
             create: {
                 productId,
                 branchId,
-                price,
+                costPrice,
+                priceRetail,
+                priceWholesale,
+                priceTechnician,
+                priceOnline,
                 effectiveDate,
                 expiredDate,
                 note,
@@ -112,9 +132,8 @@ const getAllProductsWithBranchPrice = async (req, res) => {
       searchText,
     } = req.query;
   
-    // ✅ ถ้าข้อความค้นหาว่าง และไม่มี filter ใดเลย → ไม่ต้องค้นหา
     if (!searchText && !categoryId && !productTypeId && !productProfileId && !templateId) {
-      return res.json([]); // ส่งกลับ array ว่างทันที
+      return res.json([]);
     }
   
     try {
@@ -167,10 +186,6 @@ const getAllProductsWithBranchPrice = async (req, res) => {
         distinct: ['productId'],
         select: {
           productId: true,
-          costPrice: true,
-          salePrice1: true,
-          salePrice2: true,
-          salePrice3: true,
           receivedAt: true,
         },
       });
@@ -203,12 +218,7 @@ const getAllProductsWithBranchPrice = async (req, res) => {
       console.error("❌ getAllProductsWithBranchPrice error:", err);
       res.status(500).json({ error: "ไม่สามารถโหลดรายการสินค้าได้" });
     }
-  };
-  
-  
-  
-
-
+};
 
 module.exports = {
     getActiveBranchPrice,

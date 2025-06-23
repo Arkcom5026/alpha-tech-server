@@ -196,10 +196,10 @@ model EmployeeProfile {
 
 // 🏢 Branch
 model Branch {
-  id      Int    @id @default(autoincrement())
-  name    String
-  address String
-  phone   String?
+  id        Int     @id @default(autoincrement())
+  name      String
+  address   String
+  phone     String?
   province  String?
   district  String?
   region    String? // เช่น ภาคกลาง ภาคเหนือ
@@ -232,29 +232,7 @@ model Branch {
   orderOnline OrderOnline[]
 }
 
-// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services
 
-model BranchPrice {
-  id        Int   @id @default(autoincrement())
-  productId Int
-  branchId  Int
-  price     Float
-
-  // 🆕 ฟิลด์เพิ่มเติม
-  effectiveDate DateTime?
-  expiredDate   DateTime?
-  note          String?
-  updatedBy     Int?
-  isActive      Boolean   @default(true)
-
-  product Product @relation(fields: [productId], references: [id])
-  branch  Branch  @relation(fields: [branchId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([productId, branchId])
-}
 
 model Position {
   id        Int               @id @default(autoincrement())
@@ -359,13 +337,41 @@ model Product {
   orderItems         ProductOnOrder[]
   cartItems          CartItem[]
   serviceItems       ServiceItem[]
+  branchPrice        BranchPrice[]
+  orderOnlineItem    OrderOnlineItem[]
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  orderOnlineItem OrderOnlineItem[]
-
-  branchPrice BranchPrice[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
+
+
+  model BranchPrice {
+    id        Int   @id @default(autoincrement())
+
+    costPrice    Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+    priceRetail     Int?     // ราคาขายปลีก
+    priceWholesale  Int?     // ราคาส่ง
+    priceTechnician Int?     // ราคาช่าง
+    priceOnline     Int?     // ราคาออนไลน์
+
+    // 🆕 ฟิลด์เพิ่มเติม
+    effectiveDate DateTime?
+    expiredDate   DateTime?
+    note          String?
+    updatedBy     Int?
+    isActive      Boolean   @default(true)
+
+    product Product @relation(fields: [productId], references: [id])
+    productId Int
+
+    branch  Branch  @relation(fields: [branchId], references: [id])
+    branchId  Int
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([productId, branchId])
+  }
 
 model ProductImage {
   id         Int     @id @default(autoincrement())
@@ -417,27 +423,22 @@ model StockItem {
   barcode      String  @unique
   serialNumber String? @unique
   qrCodeData   String?
-  costPrice    Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
-  salePrice1   Float?
-  salePrice2   Float?
-  salePrice3   Float?
 
-  sellPrice            Float?
-  receivedAt           DateTime         @default(now())
-  warrantyDays         Int?
-  expiredAt            DateTime?
-  soldAt               DateTime?
-  status               StockStatus      @default(IN_STOCK)
-  remark               String?
-  locationCode         String? // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
-  source               String? // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
-  tag                  String? // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
-  batchNumber          String? // หมายเลขลอตสินค้า
-  checkedBy            String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
-  barcodeReceiptItemId String?
-  scannedAt            DateTime         @default(now())
-  scannedByEmployeeId  Int?
-  scannedBy            EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id])
+  sellPrice    Float?
+  receivedAt   DateTime    @default(now())
+  warrantyDays Int?
+  expiredAt    DateTime?
+  soldAt       DateTime?
+  status       StockStatus @default(IN_STOCK)
+  remark       String?
+  locationCode String? // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
+  source       String? // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
+  tag          String? // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
+  batchNumber  String? // หมายเลขลอตสินค้า
+  checkedBy    String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
+
+  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id])
+  scannedByEmployeeId Int?
 
   product   Product @relation(fields: [productId], references: [id])
   productId Int
@@ -448,10 +449,13 @@ model StockItem {
   purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
   purchaseOrderReceiptItemId Int?
 
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  barcodeReceiptItem BarcodeReceiptItem[]
-  saleItem           SaleItem?
+  barcodeReceiptItem   BarcodeReceiptItem[]
+  barcodeReceiptItemId String?
+  saleItem             SaleItem?
+
+  scannedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // 🧾 Purchasing
