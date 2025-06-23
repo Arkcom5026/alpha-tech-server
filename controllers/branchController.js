@@ -31,12 +31,13 @@ const getBranchById = async (req, res) => {
 
 // ✅ POST: /api/branches
 const createBranch = async (req, res) => {
-  const { name, address, province, district, region, latitude, longitude, RBACEnabled } = req.body;
+  const { name, address,phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
   try {
     const created = await prisma.branch.create({
       data: {
         name,
         address,
+        phone,
         province,
         district,
         region,
@@ -55,13 +56,14 @@ const createBranch = async (req, res) => {
 // ✅ PUT: /api/branches/:id
 const updateBranch = async (req, res) => {
   const id = parseInt(req.params.id);
-  const { name, address, province, district, region, latitude, longitude, RBACEnabled } = req.body;
+  const { name, address,phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
   try {
     const updated = await prisma.branch.update({
       where: { id },
       data: {
         name,
         address,
+        phone,
         province,
         district,
         region,

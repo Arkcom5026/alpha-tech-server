@@ -199,7 +199,7 @@ model Branch {
   id      Int    @id @default(autoincrement())
   name    String
   address String
-
+  phone   String?
   province  String?
   district  String?
   region    String? // เช่น ภาคกลาง ภาคเหนือ
