@@ -168,11 +168,9 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-
     const id = parseInt(req.params.id);
     const data = req.body;
     const branchId = req.user?.branchId;
-
 
     if (!id || !branchId) {
       return res.status(400).json({ error: 'Missing product ID or branch ID' });
@@ -206,12 +204,41 @@ const updateProduct = async (req, res) => {
       },
     });
 
+    // ✅ Upsert BranchPrice
+    if (data.branchPrice) {
+      await prisma.branchPrice.upsert({
+        where: {
+          productId_branchId: {
+            productId: id,
+            branchId: branchId,
+          },
+        },
+        update: {
+          costPrice: data.branchPrice.costPrice,
+          priceWholesale: data.branchPrice.priceWholesale,
+          priceTechnician: data.branchPrice.priceTechnician,
+          priceRetail: data.branchPrice.priceRetail,
+          priceOnline: data.branchPrice.priceOnline,
+        },
+        create: {
+          productId: id,
+          branchId: branchId,
+          costPrice: data.branchPrice.costPrice,
+          priceWholesale: data.branchPrice.priceWholesale,
+          priceTechnician: data.branchPrice.priceTechnician,
+          priceRetail: data.branchPrice.priceRetail,
+          priceOnline: data.branchPrice.priceOnline,
+        },
+      });
+    }
+
     res.json(updated);
   } catch (error) {
     console.error('❌ updateProduct error:', error);
     res.status(500).json({ error: 'Failed to update product' });
   }
 };
+
 
 const searchProducts = async (req, res) => {
   const { query } = req.query;
@@ -339,10 +366,6 @@ const getProductById = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch product by ID' });
   }
 };
-
-
-
-
 
 
 const deleteProductImage = async (req, res) => {

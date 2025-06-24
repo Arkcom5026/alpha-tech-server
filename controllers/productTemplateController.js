@@ -4,7 +4,6 @@ const { cloudinary } = require('../utils/cloudinary'); // ✅ เพิ่ม cl
 const prisma = new PrismaClient();
 
 
-// GET /api/product-templates
 const getAllProductTemplates = async (req, res) => {
   console.log('📌 [GET] เรียกดู product templates ทั้งหมด');
   try {
@@ -30,15 +29,15 @@ const getAllProductTemplates = async (req, res) => {
   }
 }
 
-
-// POST /api/product-templates
 const createProductTemplate = async (req, res) => {
   console.log('📌 [POST] เริ่มสร้าง product template ใหม่');
   const data = req.body;
   console.log('🧾 req.body.imagesToDelete ที่ backend รับมา:', data.imagesToDelete);
 
-  if (!data.branchId) {
-    return res.status(400).json({ error: 'ต้องระบุ branchId' });
+  const branchId = req.user?.branchId;
+
+  if (!branchId) {
+    return res.status(400).json({ error: 'Missing branch ID from token' });
   }
 
   if (!data.productProfileId) {
@@ -58,7 +57,7 @@ const createProductTemplate = async (req, res) => {
 
         warranty: data.warranty ? parseInt(data.warranty) : null,
 
-        branch: { connect: { id: parseInt(data.branchId) }, },
+        branch: { connect: { id: branchId }, },
 
         description: data.description,
         spec: data.spec,
@@ -86,13 +85,16 @@ const createProductTemplate = async (req, res) => {
 };
 
 
-
-
-
 const updateProductTemplate = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const data = req.body;
+    const branchId = req.user?.branchId;
+
+    const template = await prisma.productTemplate.findUnique({ where: { id } });
+    if (!template || template.branchId !== branchId) {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์แก้ไขข้อมูลของสาขาอื่น' });
+    }
 
     const updated = await prisma.productTemplate.update({
       where: { id },
@@ -105,9 +107,6 @@ const updateProductTemplate = async (req, res) => {
           ? { connect: { id: parseInt(data.unitId) } }
           : undefined,
         warranty: data.warranty ? parseInt(data.warranty) : null,
-        branch: {
-          connect: { id: parseInt(data.branchId) },
-        },
         description: data.description,
         spec: data.spec,
       },
@@ -123,16 +122,12 @@ const updateProductTemplate = async (req, res) => {
   }
 };
 
-
-
-
-// DELETE /api/product-templates/:id
 const deleteProductTemplate = async (req, res) => {
   console.log('📌 [DELETE] เริ่มลบ product template');
   try {
     const id = parseInt(req.params.id);
-    const branchId = parseInt(req.body.branchId);
-    console.log('🧩 branchId from req.body:', branchId);
+    const branchId = req.user?.branchId;
+    console.log('🧩 branchId from token:', branchId);
 
     const template = await prisma.productTemplate.findUnique({ where: { id } });
     if (template.branchId !== branchId) {
@@ -171,7 +166,6 @@ const deleteProductTemplate = async (req, res) => {
   }
 };
 
-// GET /api/product-templates/:id
 const getProductTemplateById = async (req, res) => {
   console.log('📌 [GET] โหลด product template ตาม ID');
   try {
@@ -202,7 +196,7 @@ const getProductTemplateById = async (req, res) => {
   }
 };
 
-// DELETE /product-templates/:id/images/delete?public_id=xxx
+
 const deleteProductTemplateImage = async (req, res) => {
   const templateId = parseInt(req.params.id);
   const public_id = req.query.public_id;

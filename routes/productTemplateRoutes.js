@@ -10,6 +10,9 @@ const {
   deleteProductTemplate,
 } = require('../controllers/productTemplateController');
 
+const { verifyToken } = require('../middlewares/verifyToken');
+router.use(verifyToken);
+
 router.get('/', getAllProductTemplates);
 router.get('/:id', getProductTemplateById);
 router.post('/', createProductTemplate);
