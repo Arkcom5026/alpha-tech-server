@@ -29,6 +29,8 @@ const getAllProducts = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
+        model: true,
         description: true,
         warranty: true,
         branchId: true,
@@ -125,6 +127,7 @@ const createProduct = async (req, res) => {
     const newProduct = await prisma.product.create({
       data: {
         name: data.name,
+        model: data.model || null,
 
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
@@ -158,12 +161,26 @@ const createProduct = async (req, res) => {
     });
 
 
+    const bp = data.branchPrice || {};
+    await prisma.branchPrice.create({
+      data: {
+        product: { connect: { id: newProduct.id } },
+        branch: { connect: { id: branchId } },
+        costPrice: bp.costPrice ?? 0,
+        priceWholesale: bp.priceWholesale ?? 0,
+        priceTechnician: bp.priceTechnician ?? 0,
+        priceRetail: bp.priceRetail ?? 0,
+        priceOnline: bp.priceOnline ?? 0,
+      },
+    });
+
     res.status(201).json(newProduct);
   } catch (error) {
     console.error('❌ createProduct error:', error);
     res.status(500).json({ error: 'Failed to create product' });
   }
 };
+
 
 
 const updateProduct = async (req, res) => {
@@ -183,6 +200,7 @@ const updateProduct = async (req, res) => {
       where: { id },
       data: {
         name: data.name,
+        model: data.model || null,
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
           : undefined,
@@ -214,20 +232,20 @@ const updateProduct = async (req, res) => {
           },
         },
         update: {
-          costPrice: data.branchPrice.costPrice,
-          priceWholesale: data.branchPrice.priceWholesale,
-          priceTechnician: data.branchPrice.priceTechnician,
-          priceRetail: data.branchPrice.priceRetail,
-          priceOnline: data.branchPrice.priceOnline,
+          costPrice: parseFloat(data.branchPrice.costPrice) || 0,
+          priceWholesale: parseFloat(data.branchPrice.priceWholesale) || 0,
+          priceTechnician: parseFloat(data.branchPrice.priceTechnician) || 0,
+          priceRetail: parseFloat(data.branchPrice.priceRetail) || 0,
+          priceOnline: parseFloat(data.branchPrice.priceOnline) || 0,
         },
         create: {
           productId: id,
           branchId: branchId,
-          costPrice: data.branchPrice.costPrice,
-          priceWholesale: data.branchPrice.priceWholesale,
-          priceTechnician: data.branchPrice.priceTechnician,
-          priceRetail: data.branchPrice.priceRetail,
-          priceOnline: data.branchPrice.priceOnline,
+          costPrice: parseFloat(data.branchPrice.costPrice) || 0,
+          priceWholesale: parseFloat(data.branchPrice.priceWholesale) || 0,
+          priceTechnician: parseFloat(data.branchPrice.priceTechnician) || 0,
+          priceRetail: parseFloat(data.branchPrice.priceRetail) || 0,
+          priceOnline: parseFloat(data.branchPrice.priceOnline) || 0,
         },
       });
     }
@@ -240,6 +258,7 @@ const updateProduct = async (req, res) => {
 };
 
 
+
 const searchProducts = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
@@ -249,6 +268,7 @@ const searchProducts = async (req, res) => {
       where: {
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
+          { model: { contains: query, mode: 'insensitive' } },
           { description: { contains: query, mode: 'insensitive' } },
         ],
       },
@@ -465,8 +485,9 @@ const getProductDropdowns = async (req, res) => {
       const product = await prisma.product.findUnique({
         where: { id: Number(productId) },
         select: {
-          id: true,
-          name: true,
+        id: true,
+        name: true,
+        model: true,
           description: true,
           spec: true,
           warranty: true,
@@ -531,6 +552,7 @@ const getProductDropdownsForOnline = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
         categoryId: true,
       },
     });
@@ -539,8 +561,9 @@ const getProductDropdownsForOnline = async (req, res) => {
       include: {
         productType: {
           select: {
-            id: true,
-            name: true,
+        id: true,
+        name: true,
+        model: true,
             categoryId: true,
           },
         },
@@ -553,8 +576,9 @@ const getProductDropdownsForOnline = async (req, res) => {
           include: {
             productType: {
               select: {
-                id: true,
-                name: true,
+        id: true,
+        name: true,
+        model: true,
                 categoryId: true,
               },
             },
@@ -631,6 +655,7 @@ const getProductsForOnline = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -680,6 +705,7 @@ const getProductsForOnline = async (req, res) => {
     const result = products.map((p) => ({
       id: p.id,
       name: p.name,
+      model: p.model,
       description: p.description,
       spec: p.spec,
       sold: p.sold,
@@ -752,6 +778,7 @@ const getProductsForPos = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -807,6 +834,7 @@ const getProductsForPos = async (req, res) => {
     const result = products.map((p) => ({
       id: p.id,
       name: p.name,
+      model: p.model,
       description: p.description,
       spec: p.spec,
       sold: p.sold,
@@ -847,6 +875,7 @@ const getProductOnlineById = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -939,3 +968,7 @@ module.exports = {
   getProductsForPos,
   getProductsByBranch,
 };
+
+
+
+

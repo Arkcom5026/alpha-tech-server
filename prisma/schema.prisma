@@ -311,6 +311,7 @@ model ProductTemplate {
 model Product {
   id          Int     @id @default(autoincrement())
   name        String?
+  model       String?
   description String?
 
   spec     String?
