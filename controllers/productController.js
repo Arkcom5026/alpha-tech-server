@@ -30,7 +30,6 @@ const getAllProducts = async (req, res) => {
         id: true,
         name: true,
         model: true,
-        model: true,
         description: true,
         warranty: true,
         branchId: true,
@@ -93,7 +92,7 @@ const getProductsByBranch = async (req, res) => {
             branchId: true,
           },
         },
-        unit: true,
+        
         category: true,
         productType: true,
         productProfile: true,
@@ -133,9 +132,7 @@ const createProduct = async (req, res) => {
           ? { connect: { id: templateId } }
           : undefined,
 
-        unit: !Number.isNaN(unitId)
-          ? { connect: { id: unitId } }
-          : undefined,
+        
 
         branch: { connect: { id: branchId } },
 
@@ -182,7 +179,6 @@ const createProduct = async (req, res) => {
 };
 
 
-
 const updateProduct = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -205,9 +201,7 @@ const updateProduct = async (req, res) => {
           ? { connect: { id: templateId } }
           : undefined,
 
-        unit: !Number.isNaN(unitId)
-          ? { connect: { id: unitId } }
-          : undefined,
+        
 
         warranty: data.warranty ? parseInt(data.warranty) : null,
         branch: { connect: { id: branchId } },
@@ -232,20 +226,20 @@ const updateProduct = async (req, res) => {
           },
         },
         update: {
-          costPrice: parseFloat(data.branchPrice.costPrice) || 0,
-          priceWholesale: parseFloat(data.branchPrice.priceWholesale) || 0,
-          priceTechnician: parseFloat(data.branchPrice.priceTechnician) || 0,
-          priceRetail: parseFloat(data.branchPrice.priceRetail) || 0,
-          priceOnline: parseFloat(data.branchPrice.priceOnline) || 0,
+          costPrice: data.branchPrice.costPrice,
+          priceWholesale: data.branchPrice.priceWholesale,
+          priceTechnician: data.branchPrice.priceTechnician,
+          priceRetail: data.branchPrice.priceRetail,
+          priceOnline: data.branchPrice.priceOnline,
         },
         create: {
           productId: id,
           branchId: branchId,
-          costPrice: parseFloat(data.branchPrice.costPrice) || 0,
-          priceWholesale: parseFloat(data.branchPrice.priceWholesale) || 0,
-          priceTechnician: parseFloat(data.branchPrice.priceTechnician) || 0,
-          priceRetail: parseFloat(data.branchPrice.priceRetail) || 0,
-          priceOnline: parseFloat(data.branchPrice.priceOnline) || 0,
+          costPrice: data.branchPrice.costPrice,
+          priceWholesale: data.branchPrice.priceWholesale,
+          priceTechnician: data.branchPrice.priceTechnician,
+          priceRetail: data.branchPrice.priceRetail,
+          priceOnline: data.branchPrice.priceOnline,
         },
       });
     }
@@ -258,7 +252,6 @@ const updateProduct = async (req, res) => {
 };
 
 
-
 const searchProducts = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
@@ -268,7 +261,6 @@ const searchProducts = async (req, res) => {
       where: {
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
-          { model: { contains: query, mode: 'insensitive' } },
           { description: { contains: query, mode: 'insensitive' } },
         ],
       },
@@ -285,14 +277,10 @@ const searchProducts = async (req, res) => {
     res.status(500).json({ error: 'Search failed' });
   }
 };
-
 const deleteProduct = async (req, res) => {
-
   try {
     const id = parseInt(req.params.id);
     const branchId = req.user?.branchId;
-
-
 
     const product = await prisma.product.findUnique({ where: { id } });
     if (product.branchId !== branchId) {
@@ -316,6 +304,11 @@ const deleteProduct = async (req, res) => {
       }
     }
 
+    // 🔥 ลบราคาสินค้าที่สาขาทั้งหมดก่อนลบ product
+    await prisma.branchPrice.deleteMany({
+      where: { productId: id },
+    });
+
     await prisma.productImage.deleteMany({
       where: { productId: id },
     });
@@ -328,7 +321,6 @@ const deleteProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete product' });
   }
 };
-
 
 const getProductById = async (req, res) => {
   try {
@@ -356,11 +348,11 @@ const getProductById = async (req, res) => {
             isActive: true,
           },
         },
-        unit: true,
+        
         productImages: true,
         template: {
           include: {
-            unit: true,
+            
             productProfile: {
               include: {
                 productType: {
@@ -485,16 +477,15 @@ const getProductDropdowns = async (req, res) => {
       const product = await prisma.product.findUnique({
         where: { id: Number(productId) },
         select: {
-        id: true,
-        name: true,
-        model: true,
+          id: true,
+          name: true,
           description: true,
           spec: true,
           warranty: true,
           active: true,
           codeType: true,
           noSN: true,
-          unitId: true,
+          
           template: {
             select: {
               id: true,
@@ -524,7 +515,7 @@ const getProductDropdowns = async (req, res) => {
           productProfileId: product.template?.productProfile?.id || null,
           productTypeId: product.template?.productProfile?.productType?.id || null,
           categoryId: product.template?.productProfile?.productType?.category?.id || null,
-          unitId: product.unitId || null,
+          
         };
       }
     }
@@ -552,7 +543,6 @@ const getProductDropdownsForOnline = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
         categoryId: true,
       },
     });
@@ -561,9 +551,8 @@ const getProductDropdownsForOnline = async (req, res) => {
       include: {
         productType: {
           select: {
-        id: true,
-        name: true,
-        model: true,
+            id: true,
+            name: true,
             categoryId: true,
           },
         },
@@ -576,9 +565,8 @@ const getProductDropdownsForOnline = async (req, res) => {
           include: {
             productType: {
               select: {
-        id: true,
-        name: true,
-        model: true,
+                id: true,
+                name: true,
                 categoryId: true,
               },
             },
@@ -655,7 +643,6 @@ const getProductsForOnline = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -666,7 +653,10 @@ const getProductsForOnline = async (req, res) => {
             isActive: true,
             branchId,
           },
-          select: { costPrice: true },
+          select: {
+            costPrice: true,
+            priceOnline: true,
+          },
         },
         stockItems: {
           where: { status: 'IN_STOCK' },
@@ -705,13 +695,12 @@ const getProductsForOnline = async (req, res) => {
     const result = products.map((p) => ({
       id: p.id,
       name: p.name,
-      model: p.model,
       description: p.description,
       spec: p.spec,
       sold: p.sold,
       quantity: p.quantity,
       warranty: p.warranty,
-      price: p.branchPrice[0]?.price ?? null,
+      priceOnline: p.branchPrice[0]?.priceOnline ?? null,
       isReady: p.stockItems?.length > 0,
       imageUrl: p.productImages[0]?.secure_url || null,
       category: p.template?.productProfile?.productType?.category?.name || null,
@@ -726,6 +715,7 @@ const getProductsForOnline = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
+
 
 const getProductsForPos = async (req, res) => {
   const {
@@ -778,7 +768,7 @@ const getProductsForPos = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
+        model: true, // ✅ เพิ่ม model ที่นี่
         description: true,
         spec: true,
         sold: true,
@@ -834,7 +824,7 @@ const getProductsForPos = async (req, res) => {
     const result = products.map((p) => ({
       id: p.id,
       name: p.name,
-      model: p.model,
+      model: p.model || null, // ✅ เพิ่มส่ง model ออกมาด้วย
       description: p.description,
       spec: p.spec,
       sold: p.sold,
@@ -853,14 +843,14 @@ const getProductsForPos = async (req, res) => {
       productType: p.template?.productProfile?.productType?.name || null,
       productProfile: p.template?.productProfile?.name || null,
       productTemplate: p.template?.name || null,
-    }));
-    console.log("getProductsForPos result:", result);
+    }));    
     res.json(result);
   } catch (error) {
     console.error("\u274C getProductsForPos error:", error);
     res.status(500).json({ error: "Failed to fetch POS products" });
   }
 };
+
 
 
 
@@ -875,7 +865,6 @@ const getProductOnlineById = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -968,7 +957,3 @@ module.exports = {
   getProductsForPos,
   getProductsByBranch,
 };
-
-
-
-

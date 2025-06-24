@@ -36,9 +36,26 @@ const createOrderOnline = async (req, res) => {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
 
-    const calculatedTotal = items.reduce((sum, item) => {
-      const price = item.price || 0;
-      return sum + price * item.quantity;
+    // ดึงราคาจาก branchPrice สำหรับสินค้าที่เกี่ยวข้อง
+    const productIds = items.map((item) => item.productId);
+    const branchPrices = await prisma.branchPrice.findMany({
+      where: {
+        branchId,
+        productId: { in: productIds },
+      },
+    });
+
+    const enrichedItems = items.map((item) => {
+      const found = branchPrices.find((bp) => bp.productId === item.productId);
+      const price = found?.priceOnline || 0;
+      return {
+        ...item,
+        price,
+      };
+    });
+
+    const calculatedTotal = enrichedItems.reduce((sum, item) => {
+      return sum + item.price * item.quantity;
     }, 0);
 
     const newOrder = await prisma.orderOnline.create({
@@ -58,10 +75,10 @@ const createOrderOnline = async (req, res) => {
         province,
         postalCode,
         items: {
-          create: items.map((item) => ({
+          create: enrichedItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            priceAtPurchase: item.price || 0,
+            priceAtPurchase: item.price,
             note: item.note || '',
           })),
         },
@@ -98,6 +115,7 @@ const getAllOrderOnline = async (req, res) => {
   }
 };
 
+
 const getOrderOnlineById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -120,6 +138,7 @@ const getOrderOnlineById = async (req, res) => {
   }
 };
 
+
 const updateOrderOnlineStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -140,6 +159,7 @@ const updateOrderOnlineStatus = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถอัปเดตคำสั่งซื้อได้' });
   }
 };
+
 
 const deleteOrderOnline = async (req, res) => {
   try {

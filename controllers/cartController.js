@@ -4,9 +4,8 @@ const prisma = new PrismaClient();
 
 const getCart = async (req, res) => {
   try {
-    console.log('req.user?.id : ', req.user?.id);
-
     const userId = req.user?.id;
+    const branchId = req.user?.branchId || req.query.branchId || null;
     if (!userId) return res.status(401).json({ error: 'ต้องเข้าสู่ระบบเพื่อดูตะกร้า' });
 
     const cart = await prisma.cart.findFirst({
@@ -21,6 +20,10 @@ const getCart = async (req, res) => {
                 productImages: {
                   where: { isCover: true },
                   select: { secure_url: true }
+                },
+                branchPrice: {
+                  where: branchId ? { branchId } : undefined,
+                  select: { priceOnline: true }
                 }
               }
             }
@@ -33,17 +36,26 @@ const getCart = async (req, res) => {
       return res.json({ cartItems: [], cartTotal: 0 });
     }
 
-    const cartTotal = cart.cartItems.reduce(
+    const cartItemsWithOnlinePrice = cart.cartItems.map((item) => {
+      const onlinePrice = item.product.branchPrice?.[0]?.priceOnline ?? item.priceAtThatTime ?? 0;
+      return {
+        ...item,
+        priceAtThatTime: onlinePrice
+      };
+    });
+
+    const cartTotal = cartItemsWithOnlinePrice.reduce(
       (sum, item) => sum + item.quantity * (item.priceAtThatTime || 0),
       0
     );
 
-    res.json({ cartItems: cart.cartItems, cartTotal });
+    res.json({ cartItems: cartItemsWithOnlinePrice, cartTotal });
   } catch (err) {
     console.error('❌ getCart error:', err);
     res.status(500).json({ error: 'Failed to fetch cart' });
   }
 };
+
 
 const addToCart = async (req, res) => {
   try {
@@ -66,7 +78,7 @@ const addToCart = async (req, res) => {
         where: { id: existing.id },
         data: {
           quantity: existing.quantity + quantity,
-          priceAtThatTime: priceAtThatTime || existing.priceAtThatTime || 0 // ✅ fallback
+          priceAtThatTime: priceAtThatTime || existing.priceAtThatTime || 0
         }
       });
     } else {
@@ -75,7 +87,7 @@ const addToCart = async (req, res) => {
           cartId: cart.id,
           productId,
           quantity,
-          priceAtThatTime: priceAtThatTime || 0 // ✅ fallback
+          priceAtThatTime: priceAtThatTime || 0
         }
       });
     }
@@ -96,11 +108,8 @@ const removeFromCart = async (req, res) => {
     const cart = await prisma.cart.findFirst({ where: { userId } });
     if (!cart) return res.status(404).json({ error: 'Cart not found' });
 
-    await prisma.cartItem.deleteMany({
-      where: { cartId: cart.id, productId }
-    });
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId } });
 
-    // ✅ ลบ cart หากไม่มี cartItem เหลืออยู่
     const remainingItems = await prisma.cartItem.count({ where: { cartId: cart.id } });
     if (remainingItems === 0) {
       await prisma.cart.delete({ where: { id: cart.id } });
@@ -112,7 +121,6 @@ const removeFromCart = async (req, res) => {
     res.status(500).json({ error: 'Failed to remove from cart' });
   }
 };
-
 
 const clearCart = async (req, res) => {
   try {
@@ -133,13 +141,13 @@ const clearCart = async (req, res) => {
 
 const mergeCart = async (req, res) => {
   try {
-    console.log('req.body mergeCart : ', req.body)
+    console.log('req.body mergeCart : ', req.body);
     const userId = req.user?.id;
     console.log('mergeCart userId : ', userId);
     console.log('mergeCart req.body : ', req.body);
     if (!userId) return res.status(401).json({ error: 'ต้องเข้าสู่ระบบเพื่อ merge cart' });
 
-    const { items } = req.body; // [{ productId, quantity, priceAtThatTime }]
+    const { items } = req.body;
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: 'Invalid items' });
     }
@@ -159,7 +167,7 @@ const mergeCart = async (req, res) => {
           where: { id: existing.id },
           data: {
             quantity: existing.quantity + item.quantity,
-            priceAtThatTime: item.priceAtThatTime || existing.priceAtThatTime || 0, // ✅ fallback
+            priceAtThatTime: item.priceAtThatTime || existing.priceAtThatTime || 0,
           },
         });
       } else {
@@ -168,7 +176,7 @@ const mergeCart = async (req, res) => {
             cartId: cart.id,
             productId: item.productId,
             quantity: item.quantity,
-            priceAtThatTime: item.priceAtThatTime || 0, // ✅ fallback
+            priceAtThatTime: item.priceAtThatTime || 0,
           },
         });
       }
@@ -183,29 +191,20 @@ const mergeCart = async (req, res) => {
 
 const updateCartItem = async (req, res) => {
   try {
-    
     const userId = req.user?.id;
     const productId = parseInt(req.params.productId);
     const { quantity } = req.body;
-
-
 
     if (!userId || !productId || !quantity || quantity < 1) {
       return res.status(400).json({ error: 'ข้อมูลไม่ถูกต้อง' });
     }
 
-    console.log('updateCartItem req.body : ',req.body)
-    console.log('updateCartItem userId : ',userId)
-
     const cart = await prisma.cart.findFirst({ where: { userId } });
     if (!cart) return res.status(404).json({ error: 'Cart not found' });
-    
-    console.log('updateCartItem cart : ',cart)
 
     const existing = await prisma.cartItem.findFirst({
       where: { cartId: cart.id, productId }
     });
-    console.log('updateCartItem existing : ',existing)
     if (!existing) return res.status(404).json({ error: 'Cart item not found' });
 
     await prisma.cartItem.update({

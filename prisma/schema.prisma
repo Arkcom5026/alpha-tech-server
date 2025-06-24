@@ -313,7 +313,7 @@ model Product {
   name        String?
   model       String?
   description String?
-
+  
   spec     String?
   sold     Int     @default(0)
   quantity Int?
@@ -322,8 +322,7 @@ model Product {
   codeType String  @default("D")
   active   Boolean @default(true)
 
-  unit   Unit? @relation(fields: [unitId], references: [id])
-  unitId Int?
+
 
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   templateId Int
@@ -381,8 +380,8 @@ model ProductImage {
   secure_url String
   active     Boolean @default(true)
 
-  caption String? // ✅ เพิ่มบรรทัดนี้
-  isCover Boolean? // ✅ เพิ่มบรรทัดนี้
+  caption String? 
+  isCover Boolean? 
 
   product   Product @relation(fields: [productId], references: [id])
   productId Int
@@ -401,8 +400,8 @@ model ProductTemplateImage {
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   active     Boolean         @default(true)
 
-  caption String? // ✅ เพิ่มบรรทัดนี้
-  isCover Boolean? // ✅ เพิ่มบรรทัดนี้
+  caption String? 
+  isCover Boolean? 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -414,10 +413,8 @@ model Unit {
 
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  product         Product[]
   productTemplate ProductTemplate[]
 }
-
 // 📦 Stock System
 model StockItem {
   id           Int     @id @default(autoincrement())
@@ -437,6 +434,7 @@ model StockItem {
   tag          String? // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
   batchNumber  String? // หมายเลขลอตสินค้า
   checkedBy    String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
+  color        String? // สีของสินค้ารายชิ้น เช่น "ดำ", "ขาว"
 
   scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id])
   scannedByEmployeeId Int?
@@ -458,6 +456,7 @@ model StockItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 // 🧾 Purchasing
 model Supplier {
