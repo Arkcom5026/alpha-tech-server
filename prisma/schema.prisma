@@ -317,11 +317,8 @@ model Product {
   spec     String?
   sold     Int     @default(0)
   quantity Int?
-  warranty Int?
   noSN     Boolean @default(false)
-  codeType String  @default("D")
   active   Boolean @default(true)
-
 
 
   template   ProductTemplate @relation(fields: [templateId], references: [id])

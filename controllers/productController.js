@@ -30,8 +30,7 @@ const getAllProducts = async (req, res) => {
         id: true,
         name: true,
         model: true,
-        description: true,
-        warranty: true,
+        description: true,        
         branchId: true,
         template: {
           select: {
@@ -54,8 +53,7 @@ const getAllProducts = async (req, res) => {
       id: t.id,
       name: t.name,
       description: t.description,
-      productTemplate: t.template?.name ?? '-',
-      warranty: t.warranty,
+      productTemplate: t.template?.name ?? '-',      
       quantity: t.stockItems?.length ?? 0,
       branchId: t.branchId, // ✅ เพิ่ม branchId กลับเข้า response
     }));
@@ -135,11 +133,9 @@ const createProduct = async (req, res) => {
         
 
         branch: { connect: { id: branchId } },
-
-        warranty: data.warranty ? parseInt(data.warranty) : null,
+        
         description: data.description || '',
-        spec: data.spec || '',
-        codeType: data.codeType || 'D',
+        spec: data.spec || '',        
         noSN: data.noSN ?? false,
         active: data.active ?? true,
 
@@ -203,11 +199,9 @@ const updateProduct = async (req, res) => {
 
         
 
-        warranty: data.warranty ? parseInt(data.warranty) : null,
         branch: { connect: { id: branchId } },
         description: data.description || '',
-        spec: data.spec || '',
-        codeType: data.codeType || 'D',
+        spec: data.spec || '',        
         active: data.active ?? true,
         noSN: data.noSN ?? false,
       },
@@ -277,6 +271,7 @@ const searchProducts = async (req, res) => {
     res.status(500).json({ error: 'Search failed' });
   }
 };
+
 const deleteProduct = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -348,11 +343,9 @@ const getProductById = async (req, res) => {
             isActive: true,
           },
         },
-        
         productImages: true,
         template: {
           include: {
-            
             productProfile: {
               include: {
                 productType: {
@@ -370,14 +363,22 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    console.log('getProductById product:', product);
 
-    res.json(product);
+    const fullProduct = {
+      ...product,
+      templateId: product.template?.id ?? null,
+      productProfileId: product.template?.productProfile?.id ?? null,
+      productTypeId: product.template?.productProfile?.productType?.id ?? null,
+      categoryId: product.template?.productProfile?.productType?.category?.id ?? null,
+    };
+
+    res.json(fullProduct);
   } catch (error) {
     console.error('getProductById error:', error);
     res.status(500).json({ error: 'Failed to fetch product by ID' });
   }
 };
+
 
 
 const deleteProductImage = async (req, res) => {
@@ -481,11 +482,8 @@ const getProductDropdowns = async (req, res) => {
           name: true,
           description: true,
           spec: true,
-          warranty: true,
-          active: true,
-          codeType: true,
-          noSN: true,
-          
+          active: true,          
+          noSN: true,          
           template: {
             select: {
               id: true,
@@ -646,8 +644,7 @@ const getProductsForOnline = async (req, res) => {
         description: true,
         spec: true,
         sold: true,
-        quantity: true,
-        warranty: true,
+        quantity: true,        
         branchPrice: {
           where: {
             isActive: true,
@@ -698,8 +695,7 @@ const getProductsForOnline = async (req, res) => {
       description: p.description,
       spec: p.spec,
       sold: p.sold,
-      quantity: p.quantity,
-      warranty: p.warranty,
+      quantity: p.quantity,      
       priceOnline: p.branchPrice[0]?.priceOnline ?? null,
       isReady: p.stockItems?.length > 0,
       imageUrl: p.productImages[0]?.secure_url || null,
@@ -772,8 +768,7 @@ const getProductsForPos = async (req, res) => {
         description: true,
         spec: true,
         sold: true,
-        quantity: true,
-        warranty: true,
+        quantity: true,        
         branchPrice: {
           where: {
             branchId,
@@ -828,8 +823,7 @@ const getProductsForPos = async (req, res) => {
       description: p.description,
       spec: p.spec,
       sold: p.sold,
-      quantity: p.quantity,
-      warranty: p.warranty,
+      quantity: p.quantity,      
 
       costPrice: p.branchPrice[0]?.costPrice ?? null,
       priceRetail: p.branchPrice[0]?.priceRetail ?? null,
@@ -852,8 +846,6 @@ const getProductsForPos = async (req, res) => {
 };
 
 
-
-
 const getProductOnlineById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -868,8 +860,7 @@ const getProductOnlineById = async (req, res) => {
         description: true,
         spec: true,
         sold: true,
-        quantity: true,
-        warranty: true,
+        quantity: true,        
         branchPrice: {
           where: {
             isActive: true,
@@ -920,8 +911,7 @@ const getProductOnlineById = async (req, res) => {
       description: product.description,
       spec: product.spec,
       sold: product.sold,
-      quantity: product.quantity,
-      warranty: product.warranty,
+      quantity: product.quantity,      
       price: product.branchPrice[0]?.price ?? 0,
       isReady: product.stockItems?.length > 0,
       imageUrl: product.productImages?.[0]?.secure_url || null,

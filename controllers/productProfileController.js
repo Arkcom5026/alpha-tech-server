@@ -34,13 +34,39 @@ exports.getAllProductProfiles = async (req, res) => {
   }
 };
 
+exports.getProfilesByCategory = async (req, res) => {
+  try {
+    const categoryId = Number(req.params.categoryId);
+    const profiles = await prisma.productProfile.findMany({
+      where: {
+        productType: {
+          categoryId: categoryId,
+        },
+      },
+      include: {
+        productType: {
+          select: { id: true, name: true, categoryId: true },
+        },
+      },
+    });
+    res.json(profiles);
+  } catch (err) {
+    console.error('Fetch by Category Error:', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลตามหมวดหมู่' });
+  }
+};
+
 exports.getProductProfileById = async (req, res) => {
   try {
     const profile = await prisma.productProfile.findUnique({
       where: { id: Number(req.params.id) },
       include: {
         productType: {
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+            categoryId: true, // ✅ เพิ่ม categoryId เข้ามาเพื่อใช้งานใน frontend
+          },
         },
       },
     });
