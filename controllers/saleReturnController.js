@@ -1,9 +1,10 @@
 // controllers/saleReturnController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
 const dayjs = require('dayjs');
 
-// ✅ สร้างเลขที่ใบคืนอัตโนมัติ
+
 const generateReturnCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
@@ -113,9 +114,6 @@ const createSaleReturn = async (req, res) => {
   }
 };
 
-
-
-
 const getAllSaleReturns = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -152,11 +150,6 @@ const getAllSaleReturns = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบคืนสินค้าได้' });
   }
 };
-
-
-
-
-
 
 const getSaleReturnById = async (req, res) => {
   try {

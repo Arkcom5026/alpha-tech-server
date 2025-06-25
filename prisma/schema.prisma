@@ -213,8 +213,6 @@ model Branch {
   suppliers       Supplier[]
   pos             PurchaseOrder[]
   services        ServiceOrder[]
-  products        Product[]
-  productTemplate ProductTemplate[]
 
   RBACEnabled          Boolean                @default(true)
   purchaseOrderReceipt PurchaseOrderReceipt[]
@@ -231,8 +229,6 @@ model Branch {
   updatedAt   DateTime      @updatedAt
   orderOnline OrderOnline[]
 }
-
-
 
 model Position {
   id        Int               @id @default(autoincrement())
@@ -283,11 +279,10 @@ model ProductProfile {
   updatedAt DateTime @updatedAt
 }
 
+
 model ProductTemplate {
   id          Int     @id @default(autoincrement())
   name        String
-  description String?
-  spec        String?
   warranty    Int?
   noSN        Boolean @default(false)
   codeType    String  @default("D")
@@ -296,10 +291,7 @@ model ProductTemplate {
   productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
   productProfileId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
-  branchId Int
 
-  templateImages ProductTemplateImage[]
   products       Product[]
   unit           Unit?                  @relation(fields: [unitId], references: [id])
   unitId         Int?
@@ -313,21 +305,16 @@ model Product {
   name        String?
   model       String?
   description String?
-  
+
   spec     String?
   sold     Int     @default(0)
   quantity Int?
   noSN     Boolean @default(false)
   active   Boolean @default(true)
 
-
   template   ProductTemplate @relation(fields: [templateId], references: [id])
   templateId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
-  branchId Int
-
-  updatedByBranchId  Int?
   productImages      ProductImage[]
   stockItems         StockItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -341,34 +328,33 @@ model Product {
   updatedAt DateTime @updatedAt
 }
 
+model BranchPrice {
+  id Int @id @default(autoincrement())
 
-  model BranchPrice {
-    id        Int   @id @default(autoincrement())
+  costPrice       Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
+  priceRetail     Int? // ราคาขายปลีก
+  priceWholesale  Int? // ราคาส่ง
+  priceTechnician Int? // ราคาช่าง
+  priceOnline     Int? // ราคาออนไลน์
 
-    costPrice    Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
-    priceRetail     Int?     // ราคาขายปลีก
-    priceWholesale  Int?     // ราคาส่ง
-    priceTechnician Int?     // ราคาช่าง
-    priceOnline     Int?     // ราคาออนไลน์
+  // 🆕 ฟิลด์เพิ่มเติม
+  effectiveDate DateTime?
+  expiredDate   DateTime?
+  note          String?
+  updatedBy     Int?
+  isActive      Boolean   @default(true)
 
-    // 🆕 ฟิลด์เพิ่มเติม
-    effectiveDate DateTime?
-    expiredDate   DateTime?
-    note          String?
-    updatedBy     Int?
-    isActive      Boolean   @default(true)
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
 
-    product Product @relation(fields: [productId], references: [id])
-    productId Int
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
 
-    branch  Branch  @relation(fields: [branchId], references: [id])
-    branchId  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([productId, branchId])
-  }
+  @@unique([productId, branchId])
+}
 
 model ProductImage {
   id         Int     @id @default(autoincrement())
@@ -377,28 +363,11 @@ model ProductImage {
   secure_url String
   active     Boolean @default(true)
 
-  caption String? 
-  isCover Boolean? 
+  caption String?
+  isCover Boolean?
 
   product   Product @relation(fields: [productId], references: [id])
   productId Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ProductTemplateImage {
-  id         Int    @id @default(autoincrement())
-  public_id  String @unique
-  url        String
-  secure_url String
-
-  templateId Int
-  template   ProductTemplate @relation(fields: [templateId], references: [id])
-  active     Boolean         @default(true)
-
-  caption String? 
-  isCover Boolean? 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -412,6 +381,7 @@ model Unit {
   updatedAt       DateTime          @updatedAt
   productTemplate ProductTemplate[]
 }
+
 // 📦 Stock System
 model StockItem {
   id           Int     @id @default(autoincrement())
@@ -453,7 +423,6 @@ model StockItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
 
 // 🧾 Purchasing
 model Supplier {

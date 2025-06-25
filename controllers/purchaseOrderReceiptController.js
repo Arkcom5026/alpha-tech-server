@@ -1,9 +1,8 @@
+
+const dayjs = require('dayjs');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const dayjs = require('dayjs');
-const { ReceiptStatus } = require('@prisma/client');
 
-// 🔧 สร้างเลขที่ใบรับสินค้าอัตโนมัติ
 const generateReceiptCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
@@ -23,7 +22,6 @@ const generateReceiptCode = async (branchId) => {
   return `${prefix}-${running}`;
 };
 
-// 📥 สร้างใบรับสินค้าใหม่
 const createPurchaseOrderReceipt = async (req, res) => {
   try {
     const { purchaseOrderId, note } = req.body;
@@ -60,7 +58,6 @@ const createPurchaseOrderReceipt = async (req, res) => {
   }
 };
 
-// 📄 ดึงรายการใบรับสินค้าทั้งหมด (ตามสาขา)
 const getAllPurchaseOrderReceipts = async (req, res) => {
   try {
     const branchId = req.user.branchId;
@@ -84,7 +81,6 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
   }
 };
 
-// 🔍 ดึงใบรับสินค้ารายตัว
 const getPurchaseOrderReceiptById = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -148,7 +144,6 @@ const getPurchaseOrderReceiptById = async (req, res) => {
   }
 };
 
-// 📦 ดึงรายละเอียดใบสั่งซื้อ
 const getPurchaseOrderDetailById = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -181,7 +176,6 @@ const getPurchaseOrderDetailById = async (req, res) => {
   }
 };
 
-// ✅ อัปเดตสถานะใบรับสินค้าเป็น COMPLETED
 const markReceiptAsCompleted = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -202,7 +196,6 @@ const markReceiptAsCompleted = async (req, res) => {
   }
 };
 
-// ✏️ แก้ไขใบรับสินค้า
 const updatePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -231,7 +224,6 @@ const updatePurchaseOrderReceipt = async (req, res) => {
   }
 };
 
-// 🗑️ ลบใบรับสินค้า
 const deletePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -247,8 +239,6 @@ const deletePurchaseOrderReceipt = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถลบใบรับสินค้าได้' });
   }
 };
-
-// 📦 ดึงสรุปใบรับสินค้าพร้อมสถานะบาร์โค้ด
 
 const getReceiptBarcodeSummaries = async (req, res) => {
   try {
@@ -301,10 +291,6 @@ const getReceiptBarcodeSummaries = async (req, res) => {
   }
 };
 
-
-
-
-// ✅ สรุปเฉพาะสถานะใบรับสินค้า (ไม่ตัดเครดิตอีกต่อไป)
 const finalizePurchaseOrderReceiptIfNeeded = async (receiptId) => {
   const receipt = await prisma.purchaseOrderReceipt.findUnique({
     where: { id: receiptId },
@@ -342,7 +328,6 @@ const finalizeReceiptController = async (req, res) => {
   }
 };
 
-// controllers/purchaseOrderReceiptController.js
 
 const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   try {
@@ -359,7 +344,6 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
     return res.status(500).json({ error: 'Failed to mark receipt as printed' });
   }
 };
-
 
 module.exports = {
   createPurchaseOrderReceipt,

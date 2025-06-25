@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 const dayjs = require('dayjs');
 
-// 🔧 สร้างเลขที่ใบขายอัตโนมัติ
+
 const generateSaleCode = async (branchId) => {
     const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เติม 0 ด้านหน้า
     const now = dayjs();
@@ -23,10 +23,7 @@ const generateSaleCode = async (branchId) => {
    
     return `${prefix}-${running}`;
   };
-  
 
-
-// ✅ สร้างการขายใหม่ (ตามมาตรฐาน flow การขายที่ยืนยันแล้ว)
 const createSale = async (req, res) => {
   try {
     const {
@@ -121,11 +118,6 @@ const createSale = async (req, res) => {
   }
 };
 
-
-
-
-
-// ✅ ดึงรายการขายทั้งหมด
 const getAllSales = async (req, res) => {
   try {
     const sales = await prisma.sale.findMany({
@@ -139,11 +131,6 @@ const getAllSales = async (req, res) => {
   }
 };
 
-
-
-
-
-// ✅ ดึงรายการขายทั้งหมดเพื่อคืนสินค้า
 const getAllSalesReturn = async (req, res) => {
   try {
     const { branchId } = req.user;
@@ -172,10 +159,6 @@ const getAllSalesReturn = async (req, res) => {
   }
 };
 
-
-
-
-// ✅ ดึงข้อมูลการขายตาม ID โดยกรองตามสาขา (BRANCH_SCOPE_ENFORCED)
 const getSaleById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -207,9 +190,6 @@ const getSaleById = async (req, res) => {
     return res.status(500).json({ error: "เกิดข้อผิดพลาดในการค้นหา" });
   }
 };
-
-
-
 
 const getSalesByBranchId = async (req, res) => {
   try {
@@ -244,7 +224,6 @@ const getSalesByBranchId = async (req, res) => {
     return res.status(500).json({ error: "ไม่สามารถโหลดข้อมูลใบเสร็จย้อนหลัง" });
   }
 };   
-
 
 const markSaleAsPaid = async (req, res) => {
   const saleId =  parseInt(req.params.id);
@@ -284,7 +263,6 @@ const markSaleAsPaid = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดขณะเปลี่ยนสถานะสินค้า' });
   }
 };
-
 
 module.exports = {
   createSale,

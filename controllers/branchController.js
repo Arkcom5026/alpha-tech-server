@@ -1,7 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-// ✅ GET: /api/branches
+
 const getAllBranches = async (req, res) => {
   try {
     const branches = await prisma.branch.findMany({
@@ -14,7 +14,6 @@ const getAllBranches = async (req, res) => {
   }
 };
 
-// ✅ GET: /api/branches/:id
 const getBranchById = async (req, res) => {
   const id = parseInt(req.params.id);
   try {
@@ -29,7 +28,6 @@ const getBranchById = async (req, res) => {
   }
 };
 
-// ✅ POST: /api/branches
 const createBranch = async (req, res) => {
   const { name, address,phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
   try {
@@ -53,7 +51,6 @@ const createBranch = async (req, res) => {
   }
 };
 
-// ✅ PUT: /api/branches/:id
 const updateBranch = async (req, res) => {
   const id = parseInt(req.params.id);
   const { name, address,phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
@@ -79,7 +76,6 @@ const updateBranch = async (req, res) => {
   }
 };
 
-// ✅ DELETE: /api/branches/:id
 const deleteBranch = async (req, res) => {
   const id = parseInt(req.params.id);
   try {

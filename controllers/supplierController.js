@@ -38,7 +38,6 @@ const getAllSuppliers = async (req, res) => {
   }
 };
 
-
 const getSupplierById = async (req, res) => {
   try {
     const rawId = req.params.id;
@@ -63,10 +62,6 @@ const getSupplierById = async (req, res) => {
     res.status(500).json({ error: 'โหลดข้อมูล supplier ล้มเหลว' });
   }
 };
-
-
-
-
 
 const createSupplier = async (req, res) => {
   try {
@@ -159,8 +154,6 @@ const updateSupplier = async (req, res) => {
     res.status(400).json({ message: 'แก้ไข supplier ล้มเหลว', error: err.message });
   }
 };
-
-
 
 const deleteSupplier = async (req, res) => {
   try {

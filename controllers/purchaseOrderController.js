@@ -1,9 +1,7 @@
 // controllers/purchaseOrderController.js
-
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// ✅ ฟังก์ชัน gen code สำหรับใบสั่งซื้อ
 const generatePurchaseOrderCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
@@ -21,7 +19,6 @@ const generatePurchaseOrderCode = async (branchId) => {
   return `PO-${paddedBranch}${yymm}-${sequence}`;
 };
 
-// ✅ PATCH: อัปเดตสถานะใบสั่งซื้อ (เช่น เป็น COMPLETED)
 const updatePurchaseOrderStatus = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -39,7 +36,6 @@ const updatePurchaseOrderStatus = async (req, res) => {
   }
 };
 
-// ✅ GET: All purchase orders (with optional filters)
 const getAllPurchaseOrders = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -91,7 +87,6 @@ const getAllPurchaseOrders = async (req, res) => {
   }
 };
 
-// ✅ GET: Purchase orders that are still open for receiving
 const getEligiblePurchaseOrders = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -119,7 +114,6 @@ const getEligiblePurchaseOrders = async (req, res) => {
   }
 };
 
-// ✅ GET: Purchase orders by supplier
 const getPurchaseOrdersBySupplier = async (req, res) => {
   try {
     console.log('req.query.supplierId : ',req.query.supplierId)
@@ -166,7 +160,6 @@ const getPurchaseOrdersBySupplier = async (req, res) => {
   }
 };
 
-// ✅ GET: Single purchase order by ID
 const getPurchaseOrderById = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -196,7 +189,6 @@ const getPurchaseOrderById = async (req, res) => {
   }
 };
 
-// ✅ POST: Create purchase order
 const createPurchaseOrder = async (req, res) => {
   try {
     const { supplierId, items, note } = req.body;
@@ -234,7 +226,6 @@ const createPurchaseOrder = async (req, res) => {
   }
 };
 
-// ✅ PUT: Update purchase order
 const updatePurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;

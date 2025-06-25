@@ -1,8 +1,11 @@
 // ✅ server/controllers/upload/uploadProductController.js
+
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
 const { v4: uuidv4 } = require('uuid');
 const streamifier = require('streamifier');
 const { cloudinary } = require('../../utils/cloudinary');
-const prisma = require('../../lib/prisma');
 
 const uploadAndSaveProductImages = async (req, res) => {
   const productId = parseInt(req.params.id);

@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// ✅ Controller: addReceiptItem - ปลอดภัยและตรวจสอบ receiptId ครบถ้วน
+
 const addReceiptItem = async (req, res) => {
     try {
       const { purchaseOrderReceiptId: receiptId, purchaseOrderItemId, quantity, costPrice } = req.body;
@@ -54,8 +54,6 @@ const addReceiptItem = async (req, res) => {
     }
 };
 
-
-// 🔍 ดึงรายการสินค้าทั้งหมดในใบรับ
 const getReceiptItemsByReceiptId = async (req, res) => {
   try {
     console.log('[getReceiptItemsByReceiptId] 🔍req.params >> >> >> ', req.params);
@@ -99,8 +97,6 @@ const getReceiptItemsByReceiptId = async (req, res) => {
   }
 };
 
-
-// 🗑️ ลบรายการสินค้าออกจากใบรับ
 const deleteReceiptItem = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -122,7 +118,6 @@ const deleteReceiptItem = async (req, res) => {
     return res.status(500).json({ error: 'ไม่สามารถลบรายการสินค้าได้' });
   }
 };
-
 
 const getPOItemsByPOId = async (req, res) => {
   try {
@@ -146,7 +141,6 @@ const getPOItemsByPOId = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 const updateReceiptItem = async (req, res) => {
   try {

@@ -1,7 +1,7 @@
 // ✅ @filename: server/controllers/employeeController.js
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-// ✅ GET /api/employees - ดึงพนักงานตามสาขาจาก req.user.branchId
 const getAllEmployees = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -28,7 +28,6 @@ const getAllEmployees = async (req, res) => {
   }
 };
 
-// ✅ GET /api/employees/:id - ดึงข้อมูลพนักงานรายคน
 const getEmployeesById = async (req, res) => {
   try {
     const employee = await prisma.employeeProfile.findUnique({
@@ -41,7 +40,6 @@ const getEmployeesById = async (req, res) => {
   }
 };
 
-// ✅ POST /api/employees - เปลี่ยน role + สร้างโปรไฟล์พนักงานใหม่
 const createEmployees = async (req, res) => {
   try {
     const { userId, name, phone, branchId, positionId } = req.body;
@@ -73,7 +71,6 @@ const createEmployees = async (req, res) => {
   }
 };
 
-// ✅ PUT /api/employees/:id - อัปเดตข้อมูลพนักงาน
 const updateEmployees = async (req, res) => {
   try {
     const { name, phone, positionId } = req.body;
@@ -87,7 +84,6 @@ const updateEmployees = async (req, res) => {
   }
 };
 
-// ✅ DELETE /api/employees/:id - ลบข้อมูลพนักงาน
 const deleteEmployees = async (req, res) => {
   try {
     await prisma.employeeProfile.delete({
@@ -99,7 +95,6 @@ const deleteEmployees = async (req, res) => {
   }
 };
 
-// ✅ GET /api/users?role=user - สำหรับ dropdown เลือกผู้ใช้ที่ยังไม่เป็นพนักงาน
 const getUsersByRole = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -113,7 +108,6 @@ const getUsersByRole = async (req, res) => {
   }
 };
 
-// ✅ GET /api/users/search?q=term - ค้นหาผู้ใช้แบบ customer
 const searchUsers = async (req, res) => {
   try {
     const { q } = req.query;

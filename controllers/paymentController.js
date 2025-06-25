@@ -21,7 +21,6 @@ const generatePaymentCode = async (branchId) => {
   return `PMT-${paddedBranch}${yymm}-${sequence}`;
 };
 
-
 const createPayments = async (req, res) => {
   try {
     const payments = req.body;
@@ -65,10 +64,6 @@ const createPayments = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
   }
 };
-
-
-
-
 
 const searchPrintablePayments = async (req, res) => {
   try {
@@ -140,12 +135,6 @@ const searchPrintablePayments = async (req, res) => {
     res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบเสร็จได้' });
   }
 };
-
-
-
-
-
-
 
 
 const cancelPayment = async (req, res) => {

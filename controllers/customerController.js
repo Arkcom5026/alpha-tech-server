@@ -1,8 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
 const bcrypt = require('bcryptjs');
 
-// ✅ ค้นหาลูกค้าจากเบอร์โทร
 const getCustomerByPhone = async (req, res) => {
   try {
     const { phone } = req.params;
@@ -29,7 +29,6 @@ const getCustomerByPhone = async (req, res) => {
   }
 };
 
-// ✅ ค้นหาลูกค้าด้วย userId
 const getCustomerByUserId = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -59,7 +58,6 @@ const getCustomerByUserId = async (req, res) => {
   }
 };
 
-// ✅ สร้างลูกค้าใหม่ พร้อมสร้าง User + CustomerProfile
 const createCustomer = async (req, res) => {
   try {
     const { name, phone, email, address } = req.body;
@@ -102,7 +100,6 @@ const createCustomer = async (req, res) => {
   }
 };
 
-// ✅ อัปเดตข้อมูลลูกค้า (CustomerProfile + User.email)
 const updateCustomerProfile = async (req, res) => {
   console.log('updateCustomerProfile : ', req.body);
 

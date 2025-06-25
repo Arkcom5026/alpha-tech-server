@@ -3,8 +3,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-
-// ✅ GET /api/units
 const getAllUnits = async (req, res) => {
   try {
 
@@ -16,7 +14,6 @@ const getAllUnits = async (req, res) => {
   }
 };
 
-// ✅ GET /api/units/:id
 const getUnitById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -29,7 +26,6 @@ const getUnitById = async (req, res) => {
   }
 };
 
-// ✅ POST /api/units
 const createUnit = async (req, res) => {
   try {
     
@@ -42,7 +38,6 @@ const createUnit = async (req, res) => {
   }
 };
 
-// ✅ PUT /api/units/:id
 const updateUnit = async (req, res) => {
   try {
     const { id } = req.params;
@@ -58,7 +53,6 @@ const updateUnit = async (req, res) => {
   }
 };
 
-// ✅ DELETE /api/units/:id
 const deleteUnit = async (req, res) => {
   try {
     const { id } = req.params;

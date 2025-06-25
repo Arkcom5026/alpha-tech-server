@@ -2,6 +2,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
 const dayjs = require('dayjs');
 
 const generateMissingBarcodes = async (req, res) => {
@@ -232,7 +233,6 @@ const getReceiptsWithBarcodes = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
   }
 };
-
 
 const markBarcodesAsPrinted = async (req, res) => {
   const rawId = req.body?.purchaseOrderReceiptId;

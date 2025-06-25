@@ -7,6 +7,7 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryDropdowns, // ✅ เพิ่มฟังก์ชันใหม่
 } = require('../controllers/categoryController');
 const { verifyToken } = require('../middlewares/verifyToken');
 
@@ -18,5 +19,6 @@ router.get('/:id', getCategoryById);             // GET /api/categories/:id?bran
 router.post('/', createCategory);                // POST /api/categories { name, branchId }
 router.put('/:id', updateCategory);              // PUT /api/categories/:id { name, branchId }
 router.delete('/:id', deleteCategory);           // DELETE /api/categories/:id { branchId }
+router.get('/dropdowns', getCategoryDropdowns);  // ✅ GET /api/categories/dropdowns
 
 module.exports = router;

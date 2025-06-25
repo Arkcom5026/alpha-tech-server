@@ -3,7 +3,6 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-// ✅ POST /supplier-payments
 const createSupplierPayment = async (req, res) => {
   try {
     const { debitAmount, creditAmount, method, note, paymentType, pos = [] } = req.body;
@@ -60,7 +59,6 @@ const createSupplierPayment = async (req, res) => {
   }
 };
 
-// ✅ GET /supplier-payments
 const getAllSupplierPayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
@@ -79,7 +77,6 @@ const getAllSupplierPayments = async (req, res) => {
   }
 };
 
-// ✅ GET /supplier-payments/by-po/:poId (เฉพาะกรณีเก่าที่ผูก PO)
 const getSupplierPaymentsByPO = async (req, res) => {
   try {
     const poId = parseInt(req.params.poId);
@@ -103,7 +100,6 @@ const getSupplierPaymentsByPO = async (req, res) => {
   }
 };
 
-// ✅ DELETE /supplier-payments/:id
 const deleteSupplierPayment = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -124,7 +120,6 @@ const deleteSupplierPayment = async (req, res) => {
     res.status(500).json({ error: 'ลบข้อมูลไม่สำเร็จ' });
   }
 };
-
 
 const getAdvancePaymentsBySupplier = async (req, res) => {
   try {
@@ -151,8 +146,6 @@ const getAdvancePaymentsBySupplier = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
-
-
 
 module.exports = {
   createSupplierPayment,

@@ -1,7 +1,8 @@
 // productProfileController.js
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-exports.createProductProfile = async (req, res) => {
+const createProductProfile = async (req, res) => {
   try {
     const { name, description, productTypeId } = req.body;
     const profile = await prisma.productProfile.create({
@@ -18,12 +19,19 @@ exports.createProductProfile = async (req, res) => {
   }
 };
 
-exports.getAllProductProfiles = async (req, res) => {
+const getAllProductProfiles = async (req, res) => {
   try {
     const profiles = await prisma.productProfile.findMany({
+      orderBy: {
+        name: 'asc',
+      },
       include: {
         productType: {
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+            categoryId: true,
+          },
         },
       },
     });
@@ -34,7 +42,7 @@ exports.getAllProductProfiles = async (req, res) => {
   }
 };
 
-exports.getProfilesByCategory = async (req, res) => {
+const getProfilesByCategory = async (req, res) => {
   try {
     const categoryId = Number(req.params.categoryId);
     const profiles = await prisma.productProfile.findMany({
@@ -56,7 +64,7 @@ exports.getProfilesByCategory = async (req, res) => {
   }
 };
 
-exports.getProductProfileById = async (req, res) => {
+const getProductProfileById = async (req, res) => {
   try {
     const profile = await prisma.productProfile.findUnique({
       where: { id: Number(req.params.id) },
@@ -65,7 +73,7 @@ exports.getProductProfileById = async (req, res) => {
           select: {
             id: true,
             name: true,
-            categoryId: true, // ✅ เพิ่ม categoryId เข้ามาเพื่อใช้งานใน frontend
+            categoryId: true,
           },
         },
       },
@@ -78,7 +86,7 @@ exports.getProductProfileById = async (req, res) => {
   }
 };
 
-exports.updateProductProfile = async (req, res) => {
+const updateProductProfile = async (req, res) => {
   try {
     const { name, description, productTypeId } = req.body;
     const updated = await prisma.productProfile.update({
@@ -96,7 +104,7 @@ exports.updateProductProfile = async (req, res) => {
   }
 };
 
-exports.deleteProductProfile = async (req, res) => {
+const deleteProductProfile = async (req, res) => {
   try {
     await prisma.productProfile.delete({
       where: { id: Number(req.params.id) },
@@ -106,4 +114,13 @@ exports.deleteProductProfile = async (req, res) => {
     console.error('Delete Error:', err);
     res.status(500).json({ error: 'ไม่สามารถลบข้อมูลได้' });
   }
+};
+
+module.exports = {
+  createProductProfile,
+  getAllProductProfiles,
+  getProfilesByCategory,
+  getProductProfileById,
+  updateProductProfile,
+  deleteProductProfile,
 };

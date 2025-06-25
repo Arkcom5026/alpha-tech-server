@@ -3,7 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const dayjs = require('dayjs');
 
-// 🔧 สร้างเลขที่ใบคืนเงิน
 const generateRefundCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();

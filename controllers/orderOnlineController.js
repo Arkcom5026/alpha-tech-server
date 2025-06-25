@@ -98,7 +98,6 @@ const createOrderOnline = async (req, res) => {
   }
 };
 
-
 const getAllOrderOnline = async (req, res) => {
   try {
     const orders = await prisma.orderOnline.findMany({
@@ -114,7 +113,6 @@ const getAllOrderOnline = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
   }
 };
-
 
 const getOrderOnlineById = async (req, res) => {
   try {
@@ -138,7 +136,6 @@ const getOrderOnlineById = async (req, res) => {
   }
 };
 
-
 const updateOrderOnlineStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -159,7 +156,6 @@ const updateOrderOnlineStatus = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถอัปเดตคำสั่งซื้อได้' });
   }
 };
-
 
 const deleteOrderOnline = async (req, res) => {
   try {

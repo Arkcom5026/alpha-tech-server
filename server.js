@@ -14,7 +14,6 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const employeeRoutes = require('./routes/employeeRoutes'); 
 const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./routes/productTemplateRoutes'); 
-const uploadProductTemplateRoutes = require('./routes/uploadProductTemplateRoutes'); 
 const productProfileRoutes = require('./routes/productProfileRoutes'); 
 const unitRoutes = require('./routes/unitRoutes'); 
 const productRoutes = require('./routes/productRoutes');
@@ -77,9 +76,6 @@ app.use('/api/products', productRoutes);
          
 app.use('/api/products', uploadProductRoutes);
           
-app.use('/api/products-templates', uploadProductTemplateRoutes);
-
-
 app.use('/api/purchase-orders', purchaseOrderRoutes);              
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
       
@@ -100,7 +96,6 @@ app.use('/api/supplier-payments',supplierPaymentRoutes);
 
 app.use('/api/banks', bankRoutes);
 
-
 app.use("/api/order-online", orderOnlineRoutes);
 
 app.use("/api/cart", cartRoutes);
@@ -108,7 +103,6 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/branch-prices", branchPriceRoutes);
 
 app.use('/api/branches', branchRoutes);
-
 
 
 // ✅ Error handler

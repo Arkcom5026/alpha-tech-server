@@ -1,5 +1,5 @@
-// ✅ controllers/productTypeController.js 
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // ✅ GET: โหลดประเภทสินค้าทั้งหมด
 const getAllProductType = async (req, res) => {
@@ -16,7 +16,6 @@ const getAllProductType = async (req, res) => {
   }
 };
 
-// ✅ GET: ดึงประเภทสินค้าตาม ID
 const getProductTypeById = async (req, res) => {
   const { id } = req.params;
   try {
@@ -36,7 +35,6 @@ const getProductTypeById = async (req, res) => {
   }
 };
 
-// ✅ POST: สร้างประเภทสินค้าใหม่
 const createProductType = async (req, res) => {
   try {
     const { name, categoryId } = req.body;
@@ -66,7 +64,6 @@ const createProductType = async (req, res) => {
   }
 };
 
-// ✅ PATCH: แก้ไขประเภทสินค้า
 const updateProductType = async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,7 +83,6 @@ const updateProductType = async (req, res) => {
   }
 };
 
-// ✅ DELETE: ลบประเภทสินค้า
 const deleteProductType = async (req, res) => {
   try {
     const { id } = req.params;
@@ -100,7 +96,6 @@ const deleteProductType = async (req, res) => {
   }
 };
 
-// ✅ DROPDOWN: ใช้ในฟอร์มเลือกประเภทสินค้า
 const getProductTypeDropdowns = async (req, res) => {
   try {
     const types = await prisma.productType.findMany({

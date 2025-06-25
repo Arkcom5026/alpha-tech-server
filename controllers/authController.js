@@ -1,9 +1,10 @@
-// ✅ authController.js (อัปเดตเพื่อแนบ branch, position, user info เข้ากับ profile)
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+// ✅ authController.js
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const generateToken = (user) => {
   return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
@@ -122,7 +123,6 @@ const login = async (req, res) => {
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
-
 
 module.exports = {
   register,

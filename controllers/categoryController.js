@@ -1,5 +1,6 @@
 // ✅ controllers/categoryController.js
-const prisma = require('../lib/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const getAllCategories = async (req, res) => {
   try {
@@ -85,10 +86,27 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+const getCategoryDropdowns = async (req, res) => {
+  try {
+    const dropdowns = await prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    res.json(dropdowns);
+  } catch (err) {
+    console.error('❌ ดึง dropdown หมวดหมู่ล้มเหลว:', err);
+    res.status(500).json({ message: 'ไม่สามารถดึง dropdown หมวดหมู่ได้' });
+  }
+};
+
 module.exports = {
   getAllCategories,
   getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryDropdowns, // ✅ export ฟังก์ชันใหม่
 };

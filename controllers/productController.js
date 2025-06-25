@@ -1,16 +1,11 @@
 // ✅ server/controllers/productController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { cloudinary } = require('../utils/cloudinary');
-
 
 
 const getAllProducts = async (req, res) => {
-
-
   const branchId = req.user?.branchId;
   const { search = '', take = 100 } = req.query;
-
 
   if (!branchId) {
     return res.status(400).json({ error: 'Missing branchId' });
@@ -19,8 +14,10 @@ const getAllProducts = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: {
-        branchId: parseInt(branchId),
-        active: true, // ✅ เพิ่มเงื่อนไขให้แสดงเฉพาะสินค้าที่เปิดใช้งานเท่านั้น
+        active: true,
+        branchPrice: {
+          some: { branchId: branchId },
+        },
         name: {
           contains: search,
           mode: 'insensitive',
@@ -30,8 +27,7 @@ const getAllProducts = async (req, res) => {
         id: true,
         name: true,
         model: true,
-        description: true,        
-        branchId: true,
+        description: true,
         template: {
           select: {
             name: true,
@@ -41,9 +37,6 @@ const getAllProducts = async (req, res) => {
           where: { status: 'IN_STOCK' },
           select: { id: true },
         },
-
-
-
       },
       take: parseInt(take),
       orderBy: { id: 'desc' },
@@ -53,9 +46,8 @@ const getAllProducts = async (req, res) => {
       id: t.id,
       name: t.name,
       description: t.description,
-      productTemplate: t.template?.name ?? '-',      
+      productTemplate: t.template?.name ?? '-',
       quantity: t.stockItems?.length ?? 0,
-      branchId: t.branchId, // ✅ เพิ่ม branchId กลับเข้า response
     }));
 
     res.json(mapped);
@@ -107,11 +99,8 @@ const getProductsByBranch = async (req, res) => {
 };
 
 const createProduct = async (req, res) => {
-
   const data = req.body;
   const branchId = req.user?.branchId;
-
-
 
   if (!branchId) {
     return res.status(400).json({ error: 'Missing branchId' });
@@ -119,40 +108,31 @@ const createProduct = async (req, res) => {
 
   try {
     const templateId = parseInt(data.templateId);
-    const unitId = parseInt(data.unitId);
 
     const newProduct = await prisma.product.create({
       data: {
         name: data.name,
         model: data.model || null,
-
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
           : undefined,
-
-        
-
-        branch: { connect: { id: branchId } },
-        
         description: data.description || '',
-        spec: data.spec || '',        
+        spec: data.spec || '',
         noSN: data.noSN ?? false,
         active: data.active ?? true,
-
         productImages: Array.isArray(data.images) && data.images.length > 0
           ? {
-            create: data.images.map((img) => ({
-              url: img.url,
-              public_id: img.public_id,
-              secure_url: img.secure_url,
-              caption: img.caption || null,
-              isCover: img.isCover || false,
-            })),
-          }
+              create: data.images.map((img) => ({
+                url: img.url,
+                public_id: img.public_id,
+                secure_url: img.secure_url,
+                caption: img.caption || null,
+                isCover: img.isCover || false,
+              })),
+            }
           : undefined,
       },
     });
-
 
     const bp = data.branchPrice || {};
     await prisma.branchPrice.create({
@@ -174,7 +154,6 @@ const createProduct = async (req, res) => {
   }
 };
 
-
 const updateProduct = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -186,7 +165,6 @@ const updateProduct = async (req, res) => {
     }
 
     const templateId = parseInt(data.templateId);
-    const unitId = parseInt(data.unitId);
 
     const updated = await prisma.product.update({
       where: { id },
@@ -196,12 +174,8 @@ const updateProduct = async (req, res) => {
         template: !Number.isNaN(templateId)
           ? { connect: { id: templateId } }
           : undefined,
-
-        
-
-        branch: { connect: { id: branchId } },
         description: data.description || '',
-        spec: data.spec || '',        
+        spec: data.spec || '',
         active: data.active ?? true,
         noSN: data.noSN ?? false,
       },
@@ -210,7 +184,6 @@ const updateProduct = async (req, res) => {
       },
     });
 
-    // ✅ Upsert BranchPrice
     if (data.branchPrice) {
       await prisma.branchPrice.upsert({
         where: {
@@ -245,7 +218,6 @@ const updateProduct = async (req, res) => {
   }
 };
 
-
 const searchProducts = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
@@ -277,8 +249,13 @@ const deleteProduct = async (req, res) => {
     const id = parseInt(req.params.id);
     const branchId = req.user?.branchId;
 
-    const product = await prisma.product.findUnique({ where: { id } });
-    if (product.branchId !== branchId) {
+    const price = await prisma.branchPrice.findFirst({
+      where: {
+        productId: id,
+        branchId,
+      },
+    });
+    if (!price) {
       return res.status(403).json({ error: 'ไม่มีสิทธิ์ลบข้อมูลของสาขาอื่น' });
     }
 
@@ -299,15 +276,8 @@ const deleteProduct = async (req, res) => {
       }
     }
 
-    // 🔥 ลบราคาสินค้าที่สาขาทั้งหมดก่อนลบ product
-    await prisma.branchPrice.deleteMany({
-      where: { productId: id },
-    });
-
-    await prisma.productImage.deleteMany({
-      where: { productId: id },
-    });
-
+    await prisma.branchPrice.deleteMany({ where: { productId: id } });
+    await prisma.productImage.deleteMany({ where: { productId: id } });
     await prisma.product.delete({ where: { id } });
 
     res.json({ message: 'Deleted successfully' });
@@ -379,34 +349,28 @@ const getProductById = async (req, res) => {
   }
 };
 
-
-
 const deleteProductImage = async (req, res) => {
   const productId = parseInt(req.params.id);
   const { public_id } = req.body;
-  const branchId = req.user.branchId; // ✅ ต้องใช้จาก token เท่านั้น
+  const branchId = req.user.branchId;
 
   if (!public_id) {
     return res.status(400).json({ error: 'ต้องระบุ public_id' });
   }
 
   try {
-    // ตรวจสอบว่า productId นี้เป็นของ branch นั้นก่อน
-    const product = await prisma.product.findFirst({
+    const price = await prisma.branchPrice.findFirst({
       where: {
-        id: productId,
+        productId,
         branchId,
       },
     });
-
-    if (!product) {
+    if (!price) {
       return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ลบภาพสินค้านี้' });
     }
 
-    // ลบภาพจาก Cloudinary
-    const result = await cloudinary.uploader.destroy(public_id);
+    await cloudinary.uploader.destroy(public_id);
 
-    // ลบจากฐานข้อมูลเฉพาะภาพที่ผูกกับสินค้านั้น ๆ
     await prisma.productImage.deleteMany({
       where: {
         productId,
@@ -420,7 +384,6 @@ const deleteProductImage = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดขณะลบภาพสินค้า' });
   }
 };
-
 
 const getProductDropdowns = async (req, res) => {
   const branchId = req.user?.branchId;
@@ -455,8 +418,7 @@ const getProductDropdowns = async (req, res) => {
 
     const templates = await prisma.productTemplate.findMany({
       where: {
-        active: true,
-        branchId,
+        active: true
       },
       orderBy: { name: 'asc' },
       include: {
@@ -585,7 +547,6 @@ const getProductDropdownsForOnline = async (req, res) => {
   }
 };
 
-
 const getProductsForOnline = async (req, res) => {
   const {
     categoryId,
@@ -711,7 +672,6 @@ const getProductsForOnline = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
-
 
 const getProductsForPos = async (req, res) => {
   const {
@@ -845,7 +805,6 @@ const getProductsForPos = async (req, res) => {
   }
 };
 
-
 const getProductOnlineById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -928,9 +887,6 @@ const getProductOnlineById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch product details" });
   }
 };
-
-
-
 
 module.exports = {
   getAllProducts,

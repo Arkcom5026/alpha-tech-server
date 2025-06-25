@@ -3,7 +3,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-// ✅ 1. ดึงราคาที่ใช้งานอยู่ ณ เวลานี้ (รองรับโปรโมชั่น)
 const getActiveBranchPrice = async (req, res) => {
     const { productId } = req.params;
     const branchId = req.user.branchId;
@@ -40,7 +39,6 @@ const getActiveBranchPrice = async (req, res) => {
     }
 };
 
-// ✅ 2. สร้างหรืออัปเดตราคาของสาขา (รองรับโปรโมชั่น)
 const upsertBranchPrice = async (req, res) => {
     const {
         productId,
@@ -101,7 +99,6 @@ const upsertBranchPrice = async (req, res) => {
     }
 };
 
-// ✅ 3. ดึงราคาทั้งหมดของสาขา (ใช้ในหน้า list ราคาต่อสาขา)
 const getBranchPricesByBranch = async (req, res) => {
     const branchId = req.user.branchId;
 
@@ -121,7 +118,6 @@ const getBranchPricesByBranch = async (req, res) => {
     }
 };
 
-// ✅ 4. ดึงสินค้าทุกชิ้น พร้อมราคา + ราคาทุนล่าสุดจาก StockItem (ลดข้อมูลซ้ำ)
 const getAllProductsWithBranchPrice = async (req, res) => {
     const branchId = req.user.branchId;
     const {

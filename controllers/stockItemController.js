@@ -2,7 +2,6 @@
   const { PrismaClient } = require('@prisma/client');
   const prisma = new PrismaClient();
 
-  // ✅ POST /api/stock-items
   const addStockItemFromReceipt = async (req, res) => {
     try {
       const {
@@ -52,7 +51,6 @@
     }
   };
 
-  // ✅ GET /api/stock-items/by-receipt/:receiptId
   const getStockItemsByReceipt = async (req, res) => {
     try {
       const { receiptId } = req.params;
@@ -77,7 +75,6 @@
     }
   };
 
-  // ✅ POST /api/stock-items/by-receipt-ids
   const getStockItemsByReceiptIds = async (req, res) => {
     try {
       const { receiptIds } = req.body;
@@ -113,7 +110,6 @@
     }
   };
 
-  // ✅ DELETE /api/stock-items/:id
   const deleteStockItem = async (req, res) => {
     try {
       const { id } = req.params;
@@ -125,7 +121,6 @@
     }
   };
 
-  // ✅ PATCH /api/stock-items/:id/status
   const updateStockItemStatus = async (req, res) => {
     try {
       const { id } = req.params;
@@ -141,7 +136,6 @@
     }
   };
 
-  // ✅ PATCH /api/stock-items/mark-sold/:saleId
   const markStockItemsAsSold = async (req, res) => {
     try {
       const { stockItemIds } = req.body;
@@ -252,7 +246,6 @@
     }
   };
 
-  // ✅ GET /stock-items/search?query=xxx
   const searchStockItem = async (req, res) => {
     try {
       const query = req.query.query || req.query.barcode;
@@ -279,7 +272,6 @@
     }
   };
 
-  // ✅ PATCH /api/stock-items/update-sn/:barcode
   const updateSerialNumber = async (req, res) => {
     try {
       const { barcode } = req.params;
