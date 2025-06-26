@@ -56,6 +56,34 @@ const getCart = async (req, res) => {
   }
 };
 
+const getBranchPrices = async (req, res) => {
+  try {
+    const branchId = parseInt(req.params.branchId || req.user?.branchId);
+    if (!branchId) return res.status(400).json({ error: 'Missing branchId' });
+
+    const prices = await prisma.branchPrice.findMany({
+      where: { branchId },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            productImages: {
+              where: { isCover: true },
+              select: { secure_url: true }
+            },
+          }
+        }
+      }
+    });
+
+    res.json(prices);
+  } catch (err) {
+    console.error('❌ getBranchPrices error:', err);
+    res.status(500).json({ error: 'Failed to fetch branch prices' });
+  }
+};
+
 const addToCart = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -225,4 +253,5 @@ module.exports = {
   clearCart,
   mergeCart,
   updateCartItem,
+  getBranchPrices,
 };

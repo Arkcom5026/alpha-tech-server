@@ -8,6 +8,7 @@ const {
   clearCart,
   mergeCart,
   updateCartItem,
+  getBranchPrices, // ✅ เพิ่มฟังก์ชันใหม่
 } = require('../controllers/cartController');
 const { verifyToken } = require('../middlewares/verifyToken');
 
@@ -21,5 +22,8 @@ router.post('/clear', clearCart);
 router.get('/', getCart);
 router.post('/merge', mergeCart);
 router.patch('/item/:productId', updateCartItem);
+
+// ✅ route สำหรับดึงราคาขายของแต่ละ branch
+router.get('/branch-prices/:branchId', getBranchPrices);
 
 module.exports = router;
