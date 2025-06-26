@@ -372,13 +372,6 @@ const getProductPosById = async (req, res) => {
 };
 
 const getProductDropdowns = async (req, res) => {
-  const branchId = req.user?.branchId;
-  const productId = req.params?.id;
-
-  if (!branchId) {
-    return res.status(400).json({ message: 'Missing branchId from user context' });
-  }
-
   try {
     const categories = await prisma.category.findMany({
       where: { active: true },
@@ -420,65 +413,19 @@ const getProductDropdowns = async (req, res) => {
       },
     });
 
-    let defaultValues = null;
-
-    if (productId && !isNaN(Number(productId))) {
-      const product = await prisma.product.findUnique({
-        where: { id: Number(productId) },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          spec: true,
-          active: true,          
-          noSN: true,          
-          template: {
-            select: {
-              id: true,
-              productProfile: {
-                select: {
-                  id: true,
-                  productType: {
-                    select: {
-                      id: true,
-                      category: {
-                        select: { id: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          productImages: true,
-        },
-      });
-
-      if (product) {
-        defaultValues = {
-          ...product,
-          templateId: product.template?.id || null,
-          productProfileId: product.template?.productProfile?.id || null,
-          productTypeId: product.template?.productProfile?.productType?.id || null,
-          categoryId: product.template?.productProfile?.productType?.category?.id || null,
-          
-        };
-      }
-    }
-
-
     return res.json({
       categories,
       productTypes,
       productProfiles,
       templates,
-      defaultValues,
+      defaultValues: null
     });
   } catch (error) {
     console.error('❌ getProductDropdowns error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
+
 
 const getProductDropdownsForOnline = async (req, res) => {
   try {
