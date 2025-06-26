@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getAllProducts,
-  getProductById,
+  getProductPosById,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -20,15 +20,14 @@ const { verifyToken } = require('../middlewares/verifyToken');
 router.get("/online/search", getProductsForOnline); 
 router.get('/online/dropdowns', getProductDropdownsForOnline);
 router.get("/online/detail/:id", getProductOnlineById);
+router.get('/dropdowns', getProductDropdowns); // ✅ เปลี่ยนให้เป็น public
 
 // ✅ Protected routes (ต้อง login)
 router.use(verifyToken);
 
 router.get('/', getAllProducts);
-router.get('/dropdowns/:id', getProductDropdowns);
-router.get('/dropdowns', getProductDropdowns);
-router.get('/pos/search', getProductsForPos); // ✅ ใช้เฉพาะสำหรับ POS เท่านั้น
-router.get('/:id', getProductById);
+router.get('/pos/search', getProductsForPos); 
+router.get('/:id', getProductPosById);
 router.post('/', createProduct);
 router.put('/:id', updateProduct);
 router.delete('/:id', deleteProduct);
