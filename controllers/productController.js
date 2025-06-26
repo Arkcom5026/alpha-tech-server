@@ -205,28 +205,6 @@ const getProductsForOnline = async (req, res) => {
             branchId,
           },
         },
-        ...(templateId && { templateId: Number(templateId) }),
-        ...(productProfileId && {
-          template: {
-            productProfileId: Number(productProfileId),
-          },
-        }),
-        ...(productTypeId && {
-          template: {
-            productProfile: {
-              productTypeId: Number(productTypeId),
-            },
-          },
-        }),
-        ...(categoryId && {
-          template: {
-            productProfile: {
-              productType: {
-                categoryId: Number(categoryId),
-              },
-            },
-          },
-        }),
         ...(searchText && {
           OR: [
             { name: { contains: searchText, mode: "insensitive" } },
@@ -234,6 +212,24 @@ const getProductsForOnline = async (req, res) => {
             { template: { name: { contains: searchText, mode: "insensitive" } } },
           ],
         }),
+        template: {
+          ...(templateId && { id: Number(templateId) }),
+          ...(productProfileId || productTypeId || categoryId
+            ? {
+                productProfile: {
+                  ...(productProfileId && { id: Number(productProfileId) }),
+                  ...(productTypeId || categoryId
+                    ? {
+                        productType: {
+                          ...(productTypeId && { id: Number(productTypeId) }),
+                          ...(categoryId && { categoryId: Number(categoryId) }),
+                        },
+                      }
+                    : {}),
+                },
+              }
+            : {}),
+        },
       },
       select: {
         id: true,
@@ -308,6 +304,7 @@ const getProductsForOnline = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
+
 
 const getProductPosById = async (req, res) => {
   try {
@@ -429,9 +426,12 @@ const getProductDropdowns = async (req, res) => {
 
 const getProductDropdownsForOnline = async (req, res) => {
   try {
+    const { categoryId, productTypeId, productProfileId } = req.query;
+
     const categories = await prisma.category.findMany();
 
     const productTypes = await prisma.productType.findMany({
+      where: categoryId ? { categoryId: Number(categoryId) } : undefined,
       select: {
         id: true,
         name: true,
@@ -440,6 +440,7 @@ const getProductDropdownsForOnline = async (req, res) => {
     });
 
     const productProfiles = await prisma.productProfile.findMany({
+      where: productTypeId ? { productTypeId: Number(productTypeId) } : undefined,
       include: {
         productType: {
           select: {
@@ -452,6 +453,21 @@ const getProductDropdownsForOnline = async (req, res) => {
     });
 
     const templates = await prisma.productTemplate.findMany({
+      where: {
+        ...(productProfileId && { productProfileId: Number(productProfileId) }),
+        ...(productTypeId && {
+          productProfile: {
+            productTypeId: Number(productTypeId),
+          },
+        }),
+        ...(categoryId && {
+          productProfile: {
+            productType: {
+              categoryId: Number(categoryId),
+            },
+          },
+        }),
+      },
       include: {
         productProfile: {
           include: {

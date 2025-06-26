@@ -19,6 +19,63 @@ const generatePurchaseOrderCode = async (branchId) => {
   return `PO-${paddedBranch}${yymm}-${sequence}`;
 };
 
+const createPurchaseOrder = async (req, res) => {
+  try {
+    const { supplierId, items, note } = req.body;
+    const branchId = req.user?.branchId;
+    const employeeId = req.user?.employeeId;
+
+    if (!branchId) {
+      console.warn('⚠️ Missing branchId in token payload');
+      return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+    }
+
+    const code = await generatePurchaseOrderCode(branchId);
+
+    const newPO = await prisma.purchaseOrder.create({
+      data: {
+        code,
+        supplier: { connect: { id: supplierId } },
+        branch: { connect: { id: branchId } },
+        employee: { connect: { id: employeeId } },
+        note,
+        items: {
+          create: items.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,            
+            costPrice: item.costPrice,
+          }))
+        }
+      }
+    });
+
+    // ✅ Update or create costPrice in BranchPrice
+    for (const item of items) {
+      await prisma.branchPrice.upsert({
+        where: {
+          productId_branchId: {
+            productId: item.productId,
+            branchId,
+          },
+        },
+        update: {
+          costPrice: item.costPrice,
+        },
+        create: {
+          productId: item.productId,
+          branchId,
+          costPrice: item.costPrice,
+        },
+      });
+    }
+
+    res.status(201).json(newPO);
+  } catch (err) {
+    console.error('❌ createPurchaseOrder error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 const updatePurchaseOrderStatus = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -189,47 +246,11 @@ const getPurchaseOrderById = async (req, res) => {
   }
 };
 
-const createPurchaseOrder = async (req, res) => {
-  try {
-    const { supplierId, items, note } = req.body;
-    const branchId = req.user?.branchId;
-    const employeeId = req.user?.employeeId;
-
-    if (!branchId) {
-      console.warn('⚠️ Missing branchId in token payload');
-      return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
-    }
-
-    const code = await generatePurchaseOrderCode(branchId);
-
-    const newPO = await prisma.purchaseOrder.create({
-      data: {
-        code,
-        supplier: { connect: { id: supplierId } },
-        branch: { connect: { id: branchId } },
-        employee: { connect: { id: employeeId } },
-        note,
-        items: {
-          create: items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,            
-            costPrice: item.costPrice,
-          }))
-        }
-      }
-    });
-
-    res.status(201).json(newPO);
-  } catch (err) {
-    console.error('❌ createPurchaseOrder error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
 const updatePurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const { note, status, items } = req.body;
+    const branchId = req.user?.branchId;
 
     const poId = parseInt(id);
 
@@ -252,6 +273,25 @@ const updatePurchaseOrder = async (req, res) => {
           },
         },
       });
+
+      for (const item of items) {
+        await prisma.branchPrice.upsert({
+          where: {
+            productId_branchId: {
+              productId: item.productId,
+              branchId,
+            },
+          },
+          update: {
+            costPrice: item.costPrice,
+          },
+          create: {
+            productId: item.productId,
+            branchId,
+            costPrice: item.costPrice,
+          },
+        });
+      }
     }
 
     res.json({ success: true });
@@ -315,6 +355,25 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
         },
       },
     });
+
+    for (const item of items) {
+      await prisma.branchPrice.upsert({
+        where: {
+          productId_branchId: {
+            productId: item.productId,
+            branchId,
+          },
+        },
+        update: {
+          costPrice: item.costPrice,
+        },
+        create: {
+          productId: item.productId,
+          branchId,
+          costPrice: item.costPrice,
+        },
+      });
+    }
 
     if (advancePaymentsUsed?.length > 0) {
       await prisma.supplierPaymentPO.createMany({

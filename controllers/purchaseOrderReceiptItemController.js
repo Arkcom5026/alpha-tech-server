@@ -47,6 +47,22 @@ const addReceiptItem = async (req, res) => {
         },
       });
 
+      // ✅ อัปเดตราคาทุนล่าสุดของสาขา
+      await prisma.branchPrice.upsert({
+        where: {
+          productId_branchId: {
+            productId: poItem.productId,
+            branchId: receipt.branchId,
+          },
+        },
+        update: { costPrice: Number(costPrice) },
+        create: {
+          productId: poItem.productId,
+          branchId: receipt.branchId,
+          costPrice: Number(costPrice),
+        },
+      });
+
       return res.status(201).json(item);
     } catch (error) {
       console.error('❌ [addReceiptItem] error:', error);
@@ -166,6 +182,10 @@ const updateReceiptItem = async (req, res) => {
         receiptId: Number(receiptId),
         purchaseOrderItemId: Number(purchaseOrderItemId),
       },
+      include: {
+        receipt: true,
+        purchaseOrderItem: true
+      }
     });
 
     if (!existingItem) {
@@ -176,6 +196,21 @@ const updateReceiptItem = async (req, res) => {
       where: { id: existingItem.id },
       data: {
         quantity: Number(quantity),
+        costPrice: Number(costPrice),
+      },
+    });
+
+    await prisma.branchPrice.upsert({
+      where: {
+        productId_branchId: {
+          productId: existingItem.purchaseOrderItem.productId,
+          branchId: existingItem.receipt.branchId,
+        },
+      },
+      update: { costPrice: Number(costPrice) },
+      create: {
+        productId: existingItem.purchaseOrderItem.productId,
+        branchId: existingItem.receipt.branchId,
         costPrice: Number(costPrice),
       },
     });

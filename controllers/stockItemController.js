@@ -164,17 +164,17 @@
   const receiveStockItem = async (req, res) => {
     try {
       const { barcode: barcodeData } = req.body;
-
+  
       if (!barcodeData || typeof barcodeData !== 'object') {
         return res.status(400).json({ error: 'Invalid barcode payload.' });
       }
-
+  
       const { barcode, serialNumber, keepSN } = barcodeData;
-
+  
       if (!barcode || typeof barcode !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid barcode.' });
       }
-
+  
       const barcodeItem = await prisma.barcodeReceiptItem.findUnique({
         where: { barcode },
         include: {
@@ -191,26 +191,26 @@
           }
         }
       });
-
+  
       if (!barcodeItem) {
         return res.status(404).json({ error: 'Barcode not found.' });
       }
-
+  
       if (barcodeItem.stockItemId) {
         return res.status(400).json({ error: 'This barcode has already been received.' });
       }
-
+  
       const product = barcodeItem.receiptItem?.purchaseOrderItem?.product;
       const purchaseOrder = barcodeItem.receiptItem?.purchaseOrderItem?.purchaseOrder;
       if (!product || !purchaseOrder) {
         return res.status(400).json({ error: 'Product or PO data missing.' });
       }
-
+  
       const branchId = barcodeItem.receiptItem.receipt?.branchId;
       if (!branchId) {
         return res.status(400).json({ error: 'Branch not found for this barcode.' });
       }
-
+  
       const newStockItem = await prisma.stockItem.create({
         data: {
           barcode,
@@ -222,29 +222,36 @@
           purchaseOrderReceiptItem: { connect: { id: barcodeItem.receiptItem.id } }
         },
       });
-
+  
       // ✅ Update barcode -> link to stockItem
       await prisma.barcodeReceiptItem.update({
         where: { barcode },
         data: { stockItemId: newStockItem.id },
       });
-
+  
       // ✅ หักเครดิตจาก supplier ทันที
-      await prisma.supplier.update({
-        where: { id: purchaseOrder.supplierId },
-        data: {
-          creditBalance: {
-
+      const quantity = barcodeItem.receiptItem.quantity || 1;
+      const costPrice = barcodeItem.receiptItem.costPrice || 0;
+      const totalCost = quantity * costPrice;
+  
+      if (totalCost > 0) {
+        await prisma.supplier.update({
+          where: { id: purchaseOrder.supplierId },
+          data: {
+            creditBalance: {
+              decrement: totalCost
+            },
           },
-        },
-      });
-
+        });
+      }
+  
       return res.status(201).json({ message: '✅ รับสินค้าเข้าสต๊อกเรียบร้อยแล้ว', stockItem: newStockItem });
     } catch (error) {
       console.error('[receiveStockItem] ❌ Unexpected error:', error);
       return res.status(500).json({ error: 'Internal server error.' });
     }
   };
+  
 
   const searchStockItem = async (req, res) => {
     try {

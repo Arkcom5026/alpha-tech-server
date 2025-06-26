@@ -1,6 +1,5 @@
-
 const dayjs = require('dayjs');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient,ReceiptStatus  } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const generateReceiptCode = async (branchId) => {
@@ -46,10 +45,31 @@ const createPurchaseOrderReceipt = async (req, res) => {
           select: {
             code: true,
             supplier: { select: { name: true } },
+            items: true,
           },
         },
       },
     });
+
+    // ✅ Update costPrice จากใบส่งของ (กรณีราคาสินค้ามีการเปลี่ยน)
+    for (const item of created.purchaseOrder.items) {
+      await prisma.branchPrice.upsert({
+        where: {
+          productId_branchId: {
+            productId: item.productId,
+            branchId,
+          },
+        },
+        update: {
+          costPrice: item.costPrice,
+        },
+        create: {
+          productId: item.productId,
+          branchId,
+          costPrice: item.costPrice,
+        },
+      });
+    }
 
     res.status(201).json(created);
   } catch (error) {
@@ -57,6 +77,7 @@ const createPurchaseOrderReceipt = async (req, res) => {
     res.status(500).json({ error: 'สร้างใบรับสินค้าไม่สำเร็จ' });
   }
 };
+
 
 const getAllPurchaseOrderReceipts = async (req, res) => {
   try {
@@ -328,7 +349,6 @@ const finalizeReceiptController = async (req, res) => {
   }
 };
 
-
 const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   try {
     console.log('req.params.id : ', req.params.id)
@@ -344,6 +364,7 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
     return res.status(500).json({ error: 'Failed to mark receipt as printed' });
   }
 };
+
 
 module.exports = {
   createPurchaseOrderReceipt,
