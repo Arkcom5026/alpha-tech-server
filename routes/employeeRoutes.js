@@ -1,5 +1,6 @@
 // ✅ @filename: server/routes/employeeRoutes.js
 const express = require('express');
+const router = express.Router();
 const {
   getAllEmployees,
   getEmployeesById,
@@ -7,19 +8,21 @@ const {
   updateEmployees,
   deleteEmployees,
   getUsersByRole,
-  searchUsers,
+  approveEmployee,
+  getAllPositions,
 } = require('../controllers/employeeController');
+
 const { verifyToken } = require('../middlewares/verifyToken');
+router.use(verifyToken);
 
-const router = express.Router();
+router.get('/',  getAllEmployees);
+router.get('/positions', getAllPositions);
+router.get('/:id',  getEmployeesById);
+router.post('/',  createEmployees);
+router.put('/:id',  updateEmployees);
+router.delete('/:id',  deleteEmployees);
+router.get('/users/by-role',  getUsersByRole);
+router.post('/approve-employee', approveEmployee);
 
-router.get('/', verifyToken, getAllEmployees);
-router.get('/:id', verifyToken, getEmployeesById);
-router.post('/', verifyToken, createEmployees);
-router.put('/:id', verifyToken, updateEmployees);
-router.delete('/:id', verifyToken, deleteEmployees);
-
-router.get('/users/by-role', verifyToken, getUsersByRole);
-router.get('/users/search', verifyToken, searchUsers);
 
 module.exports = router;

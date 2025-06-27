@@ -47,20 +47,25 @@ const createEmployees = async (req, res) => {
     if (!userId || !name || !branchId || !positionId) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
     }
+
     console.log('📦 รับข้อมูลพนักงานใหม่:', { userId, name, phone, branchId, positionId });
 
+    if (isNaN(parsedUserId) || isNaN(parsedBranchId) || isNaN(parsedPositionId)) {
+      return res.status(400).json({ message: 'รหัสไม่ถูกต้อง' });
+    }
+
     await prisma.user.update({
-      where: { id: parseInt(userId) },
+      where: { id: parsedUserId },
       data: { role: 'employee' },
     });
 
     const newEmployee = await prisma.employeeProfile.create({
       data: {
-        userId: parseInt(userId),
+        userId: Number(userId),
         name,
         phone,
-        branchId: parseInt(branchId),
-        positionId: parseInt(positionId),
+        branchId: Number(branchId),
+        positionId: Number(positionId),
       },
     });
 
@@ -108,37 +113,52 @@ const getUsersByRole = async (req, res) => {
   }
 };
 
-const searchUsers = async (req, res) => {
-  try {
-    const { q } = req.query;
-    if (!q || q.length < 2) return res.json([]);
+const approveEmployee = async (req, res) => {
+  const { userId, positionId, role, branchId, name, phone } = req.body;
+  const requestedBranchId = branchId;
+  console.log('📦 approveEmployee received data:',req.body )
+  
 
-    const users = await prisma.user.findMany({
-      where: {
-        role: 'customer',
-        OR: [
-          { email: { contains: q, mode: 'insensitive' } },
-          { customerProfile: { name: { contains: q, mode: 'insensitive' } } },
-          { customerProfile: { phone: { contains: q, mode: 'insensitive' } } },
-        ],
+  try {
+    const MAIN_BRANCH_ID = parseInt(process.env.MAIN_BRANCH_ID, 10);
+    const isMainBranchAdmin =
+      req.user.role === 'employee' && req.user.branchId === MAIN_BRANCH_ID;
+
+    const branchIdToUse = isMainBranchAdmin
+      ? requestedBranchId
+      : req.user.branchId;
+
+    await prisma.employeeProfile.create({
+      data: {
+        userId: parseInt(userId, 10),
+        branchId: parseInt(branchIdToUse, 10),
+        positionId: parseInt(positionId, 10),
+        name,
+        phone,
       },
-      select: {
-        id: true,
-        email: true,
-        customerProfile: {
-          select: {
-            name: true,
-            phone: true,
-          },
-        },
-      },
-      take: 20,
     });
 
-    res.json(users);
+    await prisma.user.update({
+      where: { id: parseInt(userId, 10) },
+      data: { role },
+    });
+
+    res.json({ message: '✅ อนุมัติพนักงานเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('❌ approveEmployee error:', error);
+    res.status(500).json({ message: 'ไม่สามารถอนุมัติพนักงานได้' });
+  }
+};
+
+const getAllPositions = async (req, res) => {
+  try {
+    const positions = await prisma.position.findMany({
+      orderBy: { name: 'asc' },
+    });
+    res.json(positions);
   } catch (err) {
-    console.error('❌ searchUsers error:', err);
-    res.status(500).json({ message: 'ค้นหาผู้ใช้ล้มเหลว' });
+    console.error('❌ getAllPositions error:', err);
+    res.status(500).json({ message: 'โหลดตำแหน่งล้มเหลว' });
   }
 };
 
@@ -149,5 +169,6 @@ module.exports = {
   updateEmployees,
   deleteEmployees,
   getUsersByRole,
-  searchUsers,
+  approveEmployee,
+  getAllPositions,
 };

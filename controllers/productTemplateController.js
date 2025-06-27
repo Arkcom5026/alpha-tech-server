@@ -2,8 +2,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const getAllProductTemplates = async (req, res) => {
-  console.log('📌 [GET] เรียกดู product templates ทั้งหมด');
+const getAllProductTemplates = async (req, res) => {  
   try {
     const templates = await prisma.productTemplate.findMany({
       include: {
@@ -107,8 +106,7 @@ const deleteProductTemplate = async (req, res) => {
   }
 };
 
-const getProductTemplateById = async (req, res) => {
-  console.log('📌 [GET] โหลด product template ตาม ID');
+const getProductTemplateById = async (req, res) => {  
   try {
     const id = parseInt(req.params.id);
 

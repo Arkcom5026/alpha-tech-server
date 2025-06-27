@@ -124,10 +124,35 @@ const login = async (req, res) => {
   }
 };
 
+const findUserByEmail = async (req, res) => {
+  const email = req.query.email;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        customerProfile: true,
+        employeeProfile: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ message: 'ไม่พบผู้ใช้อีเมลนี้' });
+
+    return res.json({
+      id: user.id,
+      email: user.email,
+      name: user.customerProfile?.name || '',
+      phone: user.customerProfile?.phone || '',
+      alreadyEmployee: !!user.employeeProfile,
+    });
+  } catch (error) {
+    console.error('❌ findUserByEmail error:', error);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+};
+
 module.exports = {
   register,
   login,
-
+  findUserByEmail,
 };
-
-

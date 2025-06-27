@@ -208,11 +208,11 @@ model Branch {
 
   branchPrices BranchPrice[]
 
-  employees       EmployeeProfile[]
-  stock           StockItem[]
-  suppliers       Supplier[]
-  pos             PurchaseOrder[]
-  services        ServiceOrder[]
+  employees EmployeeProfile[]
+  stock     StockItem[]
+  suppliers Supplier[]
+  pos       PurchaseOrder[]
+  services  ServiceOrder[]
 
   RBACEnabled          Boolean                @default(true)
   purchaseOrderReceipt PurchaseOrderReceipt[]
@@ -279,22 +279,20 @@ model ProductProfile {
   updatedAt DateTime @updatedAt
 }
 
-
 model ProductTemplate {
-  id          Int     @id @default(autoincrement())
-  name        String
-  warranty    Int?
-  noSN        Boolean @default(false)
-  codeType    String  @default("D")
-  active      Boolean @default(true)
+  id       Int     @id @default(autoincrement())
+  name     String
+  warranty Int?
+  noSN     Boolean @default(false)
+  codeType String  @default("D")
+  active   Boolean @default(true)
 
   productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
   productProfileId Int
 
-
-  products       Product[]
-  unit           Unit?                  @relation(fields: [unitId], references: [id])
-  unitId         Int?
+  products Product[]
+  unit     Unit?     @relation(fields: [unitId], references: [id])
+  unitId   Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -384,11 +382,11 @@ model Unit {
 
 // 📦 Stock System
 model StockItem {
-  id           Int     @id @default(autoincrement())
-  barcode      String  @unique
-  serialNumber String? @unique
+  id           Int         @id @default(autoincrement())
+  barcode      String      @unique
+  serialNumber String?     @unique
   qrCodeData   String?
-
+  costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก
   sellPrice    Float?
   receivedAt   DateTime    @default(now())
   warrantyDays Int?

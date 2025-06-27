@@ -8,7 +8,6 @@ const getAllProductType = async (req, res) => {
       orderBy: { id: 'asc' },
       include: { category: true }, // ✅ รวมข้อมูลหมวดหมู่สินค้า
     });
-    console.log('📦 ได้ข้อมูลทั้งหมด:', productTypes); // ✅ ตรวจ field category
     res.json(productTypes);
   } catch (err) {
     console.error('❌ GET ProductTypes Failed:', err);

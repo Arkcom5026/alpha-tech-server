@@ -29,8 +29,11 @@ const getBranchById = async (req, res) => {
 };
 
 const createBranch = async (req, res) => {
-  const { name, address,phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
+  const { name, address, phone, province, district, region, latitude, longitude, RBACEnabled } = req.body;
+  const BASE_BRANCH_ID = 2; // ✅ สาขาหลักที่ใช้เป็นต้นแบบ
+
   try {
+    // ✅ สร้างสาขาใหม่
     const created = await prisma.branch.create({
       data: {
         name,
@@ -44,7 +47,43 @@ const createBranch = async (req, res) => {
         RBACEnabled: RBACEnabled ?? true,
       },
     });
-    res.status(201).json(created);
+
+    // ✅ Clone ราคาจาก BASE_BRANCH_ID ไปยังสาขาใหม่
+    try {
+      const basePrices = await prisma.branchPrice.findMany({
+        where: { branchId: BASE_BRANCH_ID },
+      });
+
+      const clonedPrices = basePrices.map((item) => ({
+        productId: item.productId,
+        branchId: created.id,
+        isActive: true,
+        costPrice: item.costPrice,
+        priceRetail: item.priceRetail,
+        priceOnline: item.priceOnline,
+        priceTechnician: item.priceTechnician,
+        priceWholesale: item.priceWholesale,
+      }));
+
+      if (clonedPrices.length > 0) {
+        await prisma.branchPrice.createMany({
+          data: clonedPrices,
+          skipDuplicates: true,
+        });
+      }
+
+      res.status(201).json({
+        ...created,
+        clonedPrices: clonedPrices.length,
+      });
+    } catch (cloneErr) {
+      console.warn('⚠️ Clone branchPrice error:', cloneErr);
+      res.status(201).json({
+        ...created,
+        clonedPrices: 0,
+        cloneWarning: 'Clone ราคาสำเร็จบางส่วน หรือไม่สมบูรณ์',
+      });
+    }
   } catch (err) {
     console.error('❌ createBranch error:', err);
     res.status(500).json({ error: 'ไม่สามารถสร้างสาขาได้' });

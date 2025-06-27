@@ -63,6 +63,7 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 
 app.use('/api/employees', employeeRoutes);
+         
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
 app.use('/api/categories', categoryRoutes);
@@ -81,7 +82,6 @@ app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
       
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
          
-
 app.use('/api/stock-items', stockItemRoutes);                   
 app.use('/api/barcodes/', barcodeRoutes);  
          
@@ -103,6 +103,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/branch-prices", branchPriceRoutes);
 
 app.use('/api/branches', branchRoutes);
+
 
 
 // ✅ Error handler
