@@ -93,6 +93,7 @@ const getProductsForPos = async (req, res) => {
           searchText && {
             OR: [
               { name: { contains: searchText, mode: "insensitive" } },
+              { model: { contains: searchText, mode: "insensitive" } },
               { description: { contains: searchText, mode: "insensitive" } },
               { template: { name: { contains: searchText, mode: "insensitive" } } },
             ],
@@ -183,6 +184,7 @@ const getProductsForPos = async (req, res) => {
   }
 };
 
+
 const getProductsForOnline = async (req, res) => {
   const {
     categoryId,
@@ -234,6 +236,7 @@ const getProductsForOnline = async (req, res) => {
       select: {
         id: true,
         name: true,
+        model: true,
         description: true,
         spec: true,
         sold: true,
@@ -285,6 +288,7 @@ const getProductsForOnline = async (req, res) => {
     const result = products.map((p) => ({
       id: p.id,
       name: p.name,
+      model: p.model,
       description: p.description,
       spec: p.spec,
       sold: p.sold,

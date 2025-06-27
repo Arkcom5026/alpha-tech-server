@@ -12,6 +12,8 @@ const getCustomerByPhone = async (req, res) => {
       include: { user: true },
     });
 
+
+
     if (!customer) {
       return res.status(404).json({ message: 'ไม่พบลูกค้า' });
     }
