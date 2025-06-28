@@ -1,9 +1,7 @@
 // controllers/saleReturnController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
 const dayjs = require('dayjs');
-
 
 const generateReturnCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
@@ -27,7 +25,6 @@ const generateReturnCode = async (branchId) => {
 const createSaleReturn = async (req, res) => {
   try {
     const { saleId, reason, items } = req.body;
-
     const branchId = req.user?.branchId;
     const employeeId = req.user?.employeeId;
 
@@ -36,8 +33,6 @@ const createSaleReturn = async (req, res) => {
     console.log('💬 req.user.employeeId:', employeeId);
 
     const saleIdNum = parseInt(saleId, 10);
-    console.log('💬 saleIdNum (parsed):', saleIdNum);
-
     if (isNaN(saleIdNum)) {
       return res.status(400).json({ message: 'saleId ไม่ถูกต้อง' });
     }
@@ -61,8 +56,8 @@ const createSaleReturn = async (req, res) => {
     }
 
     const code = await generateReturnCode(branchId);
-
     let totalRefund = 0;
+
     const itemData = await Promise.all(items.map(async (i) => {
       const saleItem = await prisma.saleItem.findUnique({
         where: { id: i.saleItemId },
@@ -71,6 +66,10 @@ const createSaleReturn = async (req, res) => {
 
       if (!saleItem || saleItem.saleId !== sale.id) {
         throw new Error(`ไม่พบ saleItem หรือไม่ตรงกับใบขาย: ${i.saleItemId}`);
+      }
+
+      if (saleItem.stockItem.status === 'RETURNED') {
+        throw new Error(`สินค้าชิ้นนี้ถูกคืนไปแล้ว: ${i.saleItemId}`);
       }
 
       await prisma.stockItem.update({
@@ -109,7 +108,12 @@ const createSaleReturn = async (req, res) => {
 
     return res.status(201).json({ message: 'สร้างใบคืนสินค้าเรียบร้อย', returnCode: created.code });
   } catch (error) {
-    console.error("❌ [createSaleReturn] Error:", error);
+    console.error("❌ [createSaleReturn] Error:", {
+      error,
+      saleId: req.body?.saleId,
+      branchId: req.user?.branchId,
+      employeeId: req.user?.employeeId,
+    });
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการคืนสินค้า' });
   }
 };
@@ -187,7 +191,10 @@ const getSaleReturnById = async (req, res) => {
     }
 
     const totalRefund = saleReturn.items.reduce((sum, item) => sum + (item.refundAmount || 0), 0);
-    const refundedAmount = saleReturn.refundTransaction.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const refundedAmount = (saleReturn.refundTransaction || []).reduce(
+      (sum, r) => sum + (r.amount || 0),
+      0
+    );
 
     return res.status(200).json({
       ...saleReturn,

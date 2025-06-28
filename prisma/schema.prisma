@@ -386,8 +386,7 @@ model StockItem {
   barcode      String      @unique
   serialNumber String?     @unique
   qrCodeData   String?
-  costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก
-  sellPrice    Float?
+  costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก  
   receivedAt   DateTime    @default(now())
   warrantyDays Int?
   expiredAt    DateTime?

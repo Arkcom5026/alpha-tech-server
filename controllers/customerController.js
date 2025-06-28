@@ -1,3 +1,5 @@
+// customerController.js
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -11,8 +13,6 @@ const getCustomerByPhone = async (req, res) => {
       where: { phone },
       include: { user: true },
     });
-
-
 
     if (!customer) {
       return res.status(404).json({ message: 'ไม่พบลูกค้า' });
@@ -28,6 +28,40 @@ const getCustomerByPhone = async (req, res) => {
   } catch (err) {
     console.error('[getCustomerByPhone] ❌', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
+  }
+};
+
+const getCustomerByName = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({ error: 'กรุณาระบุคำค้นหา' });
+    }
+
+    const customers = await prisma.customerProfile.findMany({
+      where: {
+        name: {
+          contains: q,
+          mode: 'insensitive',
+        },
+      },
+      take: 10,
+      include: { user: true },
+    });
+
+    return res.json(
+      customers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        address: c.address,
+        email: c.user?.email || '',
+      }))
+    );
+  } catch (err) {
+    console.error('[getCustomerByName] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาด้วยชื่อ' });
   }
 };
 
@@ -137,6 +171,7 @@ const updateCustomerProfile = async (req, res) => {
 
 module.exports = {
   getCustomerByPhone,
+  getCustomerByName,
   getCustomerByUserId,
   createCustomer,
   updateCustomerProfile,
