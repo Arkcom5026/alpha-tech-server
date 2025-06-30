@@ -3,62 +3,80 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const generatePaymentCode = async (branchId) => {
-  const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
-  const yymm = `${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getFullYear().toString().slice(2)}`;
+  const year = String(now.getFullYear()).slice(-2); // "25"
+  const month = String(now.getMonth() + 1).padStart(2, '0'); // "06"
+  const prefix = `PMT-${branchId}${year}${month}`; // เช่น "PMT-022506"
 
-  const count = await prisma.payment.count({
+  const existing = await prisma.payment.findMany({
     where: {
-      branchId,
-      createdAt: {
-        gte: new Date(now.getFullYear(), now.getMonth(), 1),
-        lt: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      code: {
+        startsWith: prefix,
       },
     },
+    select: {
+      code: true,
+    },
+    orderBy: {
+      code: 'desc',
+    },
+    take: 1,
   });
 
-  const sequence = String(count + 1).padStart(4, '0');
-  return `PMT-${paddedBranch}${yymm}-${sequence}`;
+  let nextNumber = 1;
+  if (existing.length > 0) {
+    const lastCode = existing[0].code;
+    const lastNumber = parseInt(lastCode.split('-').pop());
+    if (!isNaN(lastNumber)) {
+      nextNumber = lastNumber + 1;
+    }
+  }
+
+  return `${prefix}-${String(nextNumber).padStart(3, '0')}`; // เช่น "PMT-022506-001"
 };
 
 const createPayments = async (req, res) => {
   try {
-    const payments = req.body;
-
+    const body = req.body;
     const branchId = req.user?.branchId;
     const employeeId = req.user?.employeeId;
 
-    if (!Array.isArray(payments) || payments.length === 0) {
-      return res.status(400).json({ message: 'ไม่มีข้อมูลรายการชำระเงิน' });
+    console.log('createPayments req.body : ', body);
+
+    const { saleId, note, combinedDocumentCode, paymentItems } = body;
+
+    if (!saleId || !Array.isArray(paymentItems) || paymentItems.length === 0) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน saleId หรือรายการชำระเงินหายไป' });
     }
 
-    const paymentData = [];
-    for (const item of payments) {
-      const code = await generatePaymentCode(branchId);
-      paymentData.push({
+    const code = await generatePaymentCode(branchId);
+    console.log('📌 generatePaymentCode:', code);
+
+    const created = await prisma.payment.create({
+      data: {
         code,
-        saleId: parseInt(item.saleId),
-        paymentMethod: item.paymentMethod,
-        amount: parseFloat(item.amount),
-        note: item.note || null,
-        slipImage: item.slipImage || null,
-        cardRef: item.cardRef || null,
-        govImage: item.govImage || null,
         receivedAt: new Date(),
-        employeeProfileId: employeeId,
-        branchId: branchId,
-      });
-    }
+        note: note || null,
+        combinedDocumentCode: combinedDocumentCode || null,
 
-    const created = await Promise.all(
-      paymentData.map((item) =>
-        prisma.payment.create({
-          data: item,
-        })
-      )
-    );
+        sale: { connect: { id: Number(saleId) } },
+        employeeProfile: employeeId ? { connect: { id: employeeId } } : undefined,
+        branch: branchId ? { connect: { id: branchId } } : undefined,
 
-    return res.status(201).json({ message: 'บันทึกข้อมูลการชำระเงินแล้ว', count: created.length });
+        items: {
+          create: paymentItems.map((item) => ({
+            paymentMethod: item.paymentMethod,
+            amount: parseFloat(item.amount || 0),
+            note: item.note || null,
+            slipImage: item.slipImage || null,
+            cardRef: item.cardRef || null,
+            govImage: item.govImage || null,
+          })),
+        },
+      },
+    });
+
+    return res.status(201).json({ message: 'บันทึกข้อมูลการชำระเงินแล้ว', paymentId: created.id });
   } catch (error) {
     console.error('❌ [createPayments] error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
@@ -109,8 +127,8 @@ const searchPrintablePayments = async (req, res) => {
       orderBy: { receivedAt: 'desc' },
       include: {
         sale: {
-        include: {
-          branch: true,
+          include: {
+            branch: true,
             customer: true,
             items: {
               include: {

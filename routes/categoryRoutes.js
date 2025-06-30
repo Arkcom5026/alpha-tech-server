@@ -10,8 +10,6 @@ const {
   getCategoryDropdowns, // ✅ เพิ่มฟังก์ชันใหม่
 } = require('../controllers/categoryController');
 const { verifyToken } = require('../middlewares/verifyToken');
-
-// ✅ Apply verifyToken to all routes
 router.use(verifyToken);
 
 router.get('/', getAllCategories);               // GET /api/categories?branchId=...

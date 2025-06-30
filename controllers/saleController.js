@@ -5,29 +5,29 @@ const dayjs = require('dayjs');
 
 
 const generateSaleCode = async (branchId) => {
-    const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เติม 0 ด้านหน้า
-    const now = dayjs();
-    const prefix = `SL-${paddedBranch}${now.format('YYMM')}`;
+  const paddedBranch = String(branchId).padStart(2, '0'); // ✅ เติม 0 ด้านหน้า
+  const now = dayjs();
+  const prefix = `SL-${paddedBranch}${now.format('YYMM')}`;
 
-    const count = await prisma.sale.count({
-      where: {
-        branchId: Number(branchId), // ✅ บังคับให้เป็นตัวเลข
-        createdAt: {
-          gte: now.startOf('month').toDate(),
-          lt: now.endOf('month').toDate(),
-        },
+  const count = await prisma.sale.count({
+    where: {
+      branchId: Number(branchId), // ✅ บังคับให้เป็นตัวเลข
+      createdAt: {
+        gte: now.startOf('month').toDate(),
+        lt: now.endOf('month').toDate(),
       },
-    });
-  
-    const running = String(count + 1).padStart(4, '0');
-   
-    return `${prefix}-${running}`;
-  };
+    },
+  });
+
+  const running = String(count + 1).padStart(4, '0');
+
+  return `${prefix}-${running}`;
+};
 
 const createSale = async (req, res) => {
   try {
     const {
-      customerId,     
+      customerId,
       totalBeforeDiscount,
       totalDiscount,
       vat,
@@ -40,16 +40,16 @@ const createSale = async (req, res) => {
     } = req.body;
 
     const branchId = req.user?.branchId;
-    const employeeId = req.user?.employeeId;
+    const employeeId = req.user?.employeeId;  
 
-    const barcodeIds = items
-      .map((i) => i.barcodeId)
+    const stockItemIds = items
+      .map((i) => i.stockItemId)
       .filter((id) => !!id);
 
-    // ตรวจสอบว่า barcodeId เหล่านี้เป็นของสินค้าที่ยังไม่ได้ขาย
+    // ตรวจสอบว่า stockItemId เหล่านี้เป็นของสินค้าที่ยังไม่ได้ขาย
     const stockItems = await prisma.stockItem.findMany({
       where: {
-        id: { in: barcodeIds },
+        id: { in: stockItemIds },
         status: 'IN_STOCK',
       },
     });
@@ -61,34 +61,44 @@ const createSale = async (req, res) => {
     // สร้างเลขที่ใบขาย
     const code = await generateSaleCode(branchId);
 
-    const createdSale = await prisma.sale.create({
-      data: {
-        code,
-        customerId,
-        employeeId,
-        branchId,
-        totalBeforeDiscount,
-        totalDiscount,
-        vat,
-        vatRate,
-        totalAmount,
-        paymentMethod,
-        paymentDetails,
-        note,
-        items: {
-          create: items.map((item) => ({
-            stockItemId: item.stockItemId,
-            basePrice: item.basePrice,
-            vatAmount: item.vatAmount,
-            price: item.price,
-            discount: item.discount,
-            remark: item.remark,
-          })),
+    const [createdSale] = await prisma.$transaction([
+      prisma.sale.create({
+        data: {
+          code,
+          customerId,
+          employeeId,
+          branchId,
+          totalBeforeDiscount,
+          totalDiscount,
+          vat,
+          vatRate,
+          totalAmount,
+          paymentMethod,
+          paymentDetails,
+          note,
+          items: {
+            create: items.map((item) => ({
+              stockItemId: item.stockItemId,
+              basePrice: item.basePrice,
+              vatAmount: item.vatAmount,
+              price: item.price,
+              discount: item.discount,
+              remark: item.remark,
+            })),
+          },
         },
-      },
-    });
-
-    const stockItemIds = items.map((i) => i.stockItemId); // ✅ ดึง stockItemIds เพื่อคืนกลับ
+      }),
+      prisma.stockItem.updateMany({
+        where: {
+          id: { in: stockItemIds },
+          status: 'IN_STOCK',
+        },
+        data: {
+          status: 'SOLD',
+          soldAt: new Date(),
+        },
+      }),
+    ]);
 
     const sale = await prisma.sale.findUnique({
       where: { id: createdSale.id },
@@ -193,9 +203,9 @@ const getSaleById = async (req, res) => {
 
 const getSalesByBranchId = async (req, res) => {
   try {
-    
+
     const branchId = req.user.branchId;
-    
+
 
     if (!branchId) {
       return res.status(400).json({ error: "branchId ไม่ถูกต้อง" });
@@ -223,14 +233,14 @@ const getSalesByBranchId = async (req, res) => {
     console.error("❌ [getSalesByBranchId] Error:", error);
     return res.status(500).json({ error: "ไม่สามารถโหลดข้อมูลใบเสร็จย้อนหลัง" });
   }
-};   
+};
 
 const markSaleAsPaid = async (req, res) => {
-  const saleId =  parseInt(req.params.id);
+  const saleId = parseInt(req.params.id);
   const { branchId } = req.user;
 
-  console.log('markSaleAsPaid saleId : ',saleId)
-  console.log('markSaleAsPaid branchId : ',branchId)
+  console.log('markSaleAsPaid saleId : ', saleId)
+  console.log('markSaleAsPaid branchId : ', branchId)
   try {
     const sale = await prisma.sale.findUnique({
       where: { id: saleId },
@@ -271,7 +281,7 @@ module.exports = {
   getSalesByBranchId,
   markSaleAsPaid,
   getAllSalesReturn,
-  
+
 };
 
-   
+

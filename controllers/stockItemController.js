@@ -274,8 +274,10 @@ const searchStockItem = async (req, res) => {
     const stockItems = await prisma.stockItem.findMany({
       where: {
         status: 'IN_STOCK',
+        branchId,
         OR: [
           { barcode: { equals: query } },
+          { serialNumber: { equals: query } },
           { product: { is: { name: { contains: query, mode: 'insensitive' } } } },
           { product: { is: { model: { contains: query, mode: 'insensitive' } } } },
         ],
@@ -321,8 +323,6 @@ const searchStockItem = async (req, res) => {
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาสินค้า' });
   }
 };
-
-
 
 
 const updateSerialNumber = async (req, res) => {

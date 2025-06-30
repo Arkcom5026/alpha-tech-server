@@ -154,11 +154,38 @@ model CustomerProfile {
   cart     Cart[]
   services ServiceOrder[]
 
-  sale        Sale[]
-  orderOnline OrderOnline[]
+  sale            Sale[]
+  orderOnline     OrderOnline[]
+  customerDeposit CustomerDeposit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CustomerDeposit {
+  id Int @id @default(autoincrement())
+
+  cashAmount     Float   @default(0)
+  transferAmount Float   @default(0)
+  cardAmount     Float   @default(0) // ✅ เพิ่ม field
+  note           String? @db.Text
+
+  totalAmount Float
+
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  customerId Int?
+
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  branchId Int?
+
+  status String @default("ACTIVE") // ✅ สำหรับ soft delete: ACTIVE หรือ CANCELLED
+
+  createdAt DateTime @default(now())
+  createdBy String // employeeId หรือ userId
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([branchId])
 }
 
 model EmployeeProfile {
@@ -224,10 +251,11 @@ model Branch {
   combinedSaleDocument CombinedSaleDocument[]
   refundTransaction    RefundTransaction[]
   supplierPayment      SupplierPayment[]
+  customerDeposit      CustomerDeposit[]
+  orderOnline          OrderOnline[]
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  orderOnline OrderOnline[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Position {
@@ -757,20 +785,14 @@ model SaleItem {
 }
 
 model Payment {
-  id     String @id @default(cuid())
+  id     Int    @id @default(autoincrement())
   code   String @unique
   sale   Sale   @relation(fields: [saleId], references: [id])
   saleId Int
 
-  paymentMethod        PaymentMethod
-  amount               Decimal       @db.Decimal(10, 2)
-  receivedAt           DateTime      @default(now())
-  note                 String? // เช่น เลขอ้างอิงโอน, หมายเหตุ, ฯลฯ
+  receivedAt           DateTime @default(now())
+  note                 String?
   combinedDocumentCode String?
-
-  slipImage String? // ✅ สำหรับหลักฐานการโอน
-  cardRef   String? // ✅ สำหรับอ้างอิงบัตรเครดิต
-  govImage  String? // ✅ สำหรับภาพเอกสารหน่วยงาน
 
   isCancelled Boolean   @default(false)
   cancelNote  String?
@@ -779,11 +801,31 @@ model Payment {
   employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
   employeeProfileId Int?
 
-  Branch   Branch? @relation(fields: [branchId], references: [id])
+  branch   Branch? @relation(fields: [branchId], references: [id])
   branchId Int?
+  
+  items PaymentItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+ 
+}
+
+model PaymentItem {
+  id        Int     @id @default(autoincrement())
+  payment   Payment @relation(fields: [paymentId], references: [id])
+  paymentId Int
+
+  paymentMethod PaymentMethod
+  amount        Decimal       @db.Decimal(10, 2)
+  note          String?
+
+  slipImage String?
+  cardRef   String?
+  govImage  String?
+
+  createdAt DateTime @default(now())
 }
 
 model CombinedSaleDocument {

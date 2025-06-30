@@ -34,6 +34,7 @@ const orderOnlineRoutes = require("./routes/orderOnlineRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const branchPriceRoutes = require("./routes/branchPriceRoutes");
 const branchRoutes = require('./routes/branchRoutes');
+const customerDepositRoutes = require('./routes/customerDepositRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -68,6 +69,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
 app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);  
+app.use('/api/customer-deposits', customerDepositRoutes);            
 
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes); 
