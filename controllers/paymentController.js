@@ -52,6 +52,43 @@ const createPayments = async (req, res) => {
     const code = await generatePaymentCode(branchId);
     console.log('📌 generatePaymentCode:', code);
 
+    // ✅ ตรวจสอบและจัดการ DEPOSIT ก่อนสร้าง payment
+    for (const item of paymentItems) {
+      if (item.paymentMethod === 'DEPOSIT') {
+        const { customerDepositId, amount } = item;
+        if (!customerDepositId) {
+          return res.status(400).json({ message: 'ต้องระบุ customerDepositId สำหรับการชำระแบบ DEPOSIT' });
+        }
+
+        const deposit = await prisma.customerDeposit.findUnique({
+          where: { id: customerDepositId },
+          include: { depositUsage: true },
+        });
+
+        if (!deposit || deposit.status !== 'ACTIVE') {
+          return res.status(404).json({ message: 'ไม่พบยอดเงินมัดจำที่ใช้งานได้' });
+        }
+
+        const usedAmount = deposit.depositUsage.reduce((sum, u) => sum + u.amountUsed, 0);
+        const available = deposit.totalAmount - usedAmount;
+
+        if (parseFloat(amount) > available) {
+          return res.status(400).json({ message: 'ยอดเงินมัดจำไม่เพียงพอ' });
+        }
+
+        // ✅ สร้าง DepositUsage
+        await prisma.depositUsage.create({
+          data: {
+            customerDepositId,
+            saleId,
+            amountUsed: parseFloat(amount),
+          },
+        });
+
+        console.log(`✅ ใช้มัดจำ ${amount} บาท จาก customerDepositId=${customerDepositId}`);
+      }
+    }
+
     const created = await prisma.payment.create({
       data: {
         code,
@@ -76,12 +113,24 @@ const createPayments = async (req, res) => {
       },
     });
 
+    // ✅ ตรวจสอบยอดรวมและอัปเดตสถานะ paid ใน Sale ถ้าชำระครบ
+    const totalPaid = paymentItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const sale = await prisma.sale.findUnique({ where: { id: Number(saleId) } });
+
+    if (sale && totalPaid >= sale.totalAmount) {
+      await prisma.sale.update({
+        where: { id: Number(saleId) },
+        data: { paid: true, paidAt: new Date() },
+      });
+    }
+
     return res.status(201).json({ message: 'บันทึกข้อมูลการชำระเงินแล้ว', paymentId: created.id });
   } catch (error) {
     console.error('❌ [createPayments] error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
   }
 };
+
 
 const searchPrintablePayments = async (req, res) => {
   try {

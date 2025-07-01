@@ -180,12 +180,25 @@ model CustomerDeposit {
 
   status String @default("ACTIVE") // ✅ สำหรับ soft delete: ACTIVE หรือ CANCELLED
 
-  createdAt DateTime @default(now())
-  createdBy String // employeeId หรือ userId
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  createdBy    String // employeeId หรือ userId
+  updatedAt    DateTime       @updatedAt
+  depositUsage DepositUsage[]
 
   @@index([customerId])
   @@index([branchId])
+}
+
+model DepositUsage {
+  id                Int             @id @default(autoincrement())
+  customerDeposit   CustomerDeposit @relation(fields: [customerDepositId], references: [id])
+  customerDepositId Int
+
+  sale   Sale @relation(fields: [saleId], references: [id])
+  saleId Int
+
+  amountUsed Float
+  createdAt  DateTime @default(now())
 }
 
 model EmployeeProfile {
@@ -732,8 +745,6 @@ model Sale {
   vat                 Float
   vatRate             Float      @default(7)
   totalAmount         Float
-  paymentMethod       String // เช่น CASH, QR, CREDIT
-  paymentDetails      Json? // กรณีมีหลายช่องทางการจ่ายเงิน
   note                String?
   status              SaleStatus @default(DRAFT)
   refCode             String?
@@ -755,9 +766,10 @@ model Sale {
   items    SaleItem[]
   returns  SaleReturn[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  Payment   Payment[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  Payment      Payment[]
+  DepositUsage DepositUsage[]
 
   @@index([branchId, soldAt])
   @@index([isCredit, dueDate])
@@ -803,13 +815,11 @@ model Payment {
 
   branch   Branch? @relation(fields: [branchId], references: [id])
   branchId Int?
-  
+
   items PaymentItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
- 
 }
 
 model PaymentItem {

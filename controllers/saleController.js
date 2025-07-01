@@ -33,8 +33,6 @@ const createSale = async (req, res) => {
       vat,
       vatRate,
       totalAmount,
-      paymentMethod,
-      paymentDetails,
       note,
       items, // [{ stockItemId, barcodeId, price, discount, basePrice, vatAmount, remark }]
     } = req.body;
@@ -73,8 +71,6 @@ const createSale = async (req, res) => {
           vat,
           vatRate,
           totalAmount,
-          paymentMethod,
-          paymentDetails,
           note,
           items: {
             create: items.map((item) => ({
@@ -127,6 +123,7 @@ const createSale = async (req, res) => {
     return res.status(500).json({ error: "ไม่สามารถสร้างการขายได้" });
   }
 };
+
 
 const getAllSales = async (req, res) => {
   try {
