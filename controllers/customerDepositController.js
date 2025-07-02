@@ -236,6 +236,47 @@ const deleteCustomerDeposit = async (req, res) => {
   }
 };
 
+const useCustomerDeposit = async (req, res) => {
+  try {
+    const { depositId, amountUsed, saleId } = req.body;
+    const branchId = req.user.branchId;
+
+    if (!depositId || !amountUsed || !saleId) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
+    }
+
+    const deposit = await prisma.customerDeposit.findFirst({
+      where: {
+        id: depositId,
+        branchId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!deposit) {
+      return res.status(404).json({ message: 'ไม่พบรายการมัดจำ' });
+    }
+
+    if (deposit.totalAmount < amountUsed) {
+      return res.status(400).json({ message: 'ยอดมัดจำไม่พอสำหรับการใช้งาน' });
+    }
+
+    await prisma.customerDeposit.update({
+      where: { id: depositId },
+      data: {
+        status: 'USED',
+        usedAmount: amountUsed,
+        usedSaleId: saleId,
+      },
+    });
+
+    return res.json({ message: 'ใช้มัดจำสำเร็จ' });
+  } catch (err) {
+    console.error('❌ useCustomerDeposit error:', err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการใช้เงินมัดจำ' });
+  }
+};
+
 module.exports = {
   createCustomerDeposit,
   getAllCustomerDeposits,
@@ -243,4 +284,5 @@ module.exports = {
   updateCustomerDeposit,
   deleteCustomerDeposit,
   getCustomerAndDepositByPhone,
+  useCustomerDeposit,
 };

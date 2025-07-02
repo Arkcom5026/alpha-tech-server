@@ -65,6 +65,7 @@ enum PaymentMethod {
   QR
   CREDIT
   OTHER
+  DEPOSIT
 }
 
 enum SaleType {
@@ -167,7 +168,9 @@ model CustomerDeposit {
 
   cashAmount     Float   @default(0)
   transferAmount Float   @default(0)
-  cardAmount     Float   @default(0) // ✅ เพิ่ม field
+  cardAmount     Float   @default(0) 
+  usedAmount     Float  @default(0) 
+  usedSaleId     Int? 
   note           String? @db.Text
 
   totalAmount Float

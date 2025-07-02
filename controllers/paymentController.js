@@ -6,7 +6,8 @@ const generatePaymentCode = async (branchId) => {
   const now = new Date();
   const year = String(now.getFullYear()).slice(-2); // "25"
   const month = String(now.getMonth() + 1).padStart(2, '0'); // "06"
-  const prefix = `PMT-${branchId}${year}${month}`; // เช่น "PMT-022506"
+  const branchCode = String(branchId).padStart(2, '0');
+  const prefix = `PMT-${branchCode}${year}${month}`; // เช่น "PMT-022506"
 
   const existing = await prisma.payment.findMany({
     where: {
@@ -32,7 +33,7 @@ const generatePaymentCode = async (branchId) => {
     }
   }
 
-  return `${prefix}-${String(nextNumber).padStart(3, '0')}`; // เช่น "PMT-022506-001"
+  return `${prefix}${String(nextNumber).padStart(3, '0')}`; // เช่น "PMT-022506-001"
 };
 
 const createPayments = async (req, res) => {
@@ -41,8 +42,6 @@ const createPayments = async (req, res) => {
     const branchId = req.user?.branchId;
     const employeeId = req.user?.employeeId;
 
-    console.log('createPayments req.body : ', body);
-
     const { saleId, note, combinedDocumentCode, paymentItems } = body;
 
     if (!saleId || !Array.isArray(paymentItems) || paymentItems.length === 0) {
@@ -50,7 +49,7 @@ const createPayments = async (req, res) => {
     }
 
     const code = await generatePaymentCode(branchId);
-    console.log('📌 generatePaymentCode:', code);
+
 
     // ✅ ตรวจสอบและจัดการ DEPOSIT ก่อนสร้าง payment
     for (const item of paymentItems) {
@@ -242,3 +241,4 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
+
