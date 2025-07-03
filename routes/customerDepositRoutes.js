@@ -11,6 +11,7 @@ const {
   updateCustomerDeposit,
   deleteCustomerDeposit,
   getCustomerAndDepositByPhone,
+  getCustomerAndDepositByName,
   useCustomerDeposit,
 } = require('../controllers/customerDepositController');
 
@@ -21,6 +22,10 @@ router.post('/', createCustomerDeposit);
 
 // ✅ Read All
 router.get('/', getAllCustomerDeposits);
+
+// ✅ ดึงข้อมูลลูกค้า + ยอดเงินมัดจำ ด้วยชื่อ
+router.get('/by-name', getCustomerAndDepositByName);
+
 
 // ✅ Read One
 router.get('/:id', getCustomerDepositById);
@@ -33,6 +38,8 @@ router.delete('/:id', deleteCustomerDeposit);
 
 // ✅ ดึงข้อมูลลูกค้า + ยอดเงินมัดจำ (ใช้ใน DepositPage)
 router.get('/by-phone/:phone', getCustomerAndDepositByPhone);
+
+
 
 // ✅ ใช้ยอดเงินมัดจำในการขาย
 router.post('/use', useCustomerDeposit);

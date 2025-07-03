@@ -157,6 +157,85 @@ const getCustomerAndDepositByPhone = async (req, res) => {
   }
 };
 
+const getCustomerAndDepositByName = async (req, res) => {
+  try {
+    console.log('========== Controller Triggered =========');
+    console.log('getCustomerAndDepositByName req.query', req.query);
+    let { q } = req.query;
+    const branchId = req.user.branchId;
+
+    if (!q || typeof q !== 'string' || q.trim() === '') {
+      console.log('[getCustomerAndDepositByName] ❌ Invalid query param `q`');
+      return res.status(400).json({ error: 'กรุณาระบุคำค้นหาที่ถูกต้อง' });
+    }
+    q = q.trim();
+    console.log('[getCustomerAndDepositByName] q =', q);
+    console.log('[getCustomerAndDepositByName] branchId =', branchId);
+
+    const customers = await prisma.customerProfile.findMany({
+      where: {
+        name: {
+          contains: q,
+          mode: 'insensitive',
+        },
+      },
+      take: 10,
+      include: {
+        user: true,
+        customerDeposit: {
+          where: {
+            branchId,
+            status: 'ACTIVE',
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    console.log('[getCustomerAndDepositByName] Raw customers found:', customers.length);
+
+    const result = customers.map((c) => {
+      const totalDeposit = c.customerDeposit?.reduce(
+        (sum, d) =>
+          sum + d.cashAmount + d.transferAmount + d.cardAmount,
+        0
+      ) || 0;
+
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        email: c.user?.email || '',
+        totalDeposit,
+        deposits: c.customerDeposit,
+      };
+    });
+
+    console.log(`[getCustomerAndDepositByName] ✅ พบลูกค้า ${result.length} คน`);
+
+    if (result.length > 0) {
+      const first = result[0];
+      return res.json({
+        customer: {
+          id: first.id,
+          name: first.name,
+          phone: first.phone,
+          email: first.email,
+        },
+        totalDeposit: first.totalDeposit,
+        deposits: first.deposits,
+      });
+    } else {
+      return res.status(404).json({ error: 'ไม่พบลูกค้า' });
+    }
+  } catch (err) {
+    console.error('[getCustomerAndDepositByName] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
+  }
+};
+
+
+
 const updateCustomerDeposit = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -285,4 +364,5 @@ module.exports = {
   deleteCustomerDeposit,
   getCustomerAndDepositByPhone,
   useCustomerDeposit,
+  getCustomerAndDepositByName,
 };

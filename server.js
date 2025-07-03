@@ -69,7 +69,8 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
 app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);  
-app.use('/api/customer-deposits', customerDepositRoutes);            
+app.use('/api/customer-deposits', customerDepositRoutes);    
+
 
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes); 
