@@ -252,7 +252,10 @@ const getProductsForOnline = async (req, res) => {
           },
         },
         stockItems: {
-          where: { status: 'IN_STOCK' },
+          where: {
+            status: 'IN_STOCK',
+            branchId,
+          },
           select: { id: true },
         },
         productImages: {
@@ -308,6 +311,7 @@ const getProductsForOnline = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch online products" });
   }
 };
+
 
 
 const getProductPosById = async (req, res) => {

@@ -424,11 +424,12 @@ model Unit {
   productTemplate ProductTemplate[]
 }
 
-// 📦 Stock System
 model StockItem {
   id           Int         @id @default(autoincrement())
   barcode      String      @unique
-  serialNumber String?     @unique
+  serialNumber String?  
+  @@unique([serialNumber, productId]) // ✅ ซ้ำได้ถ้า productId เดียวกัน แม้ข้ามสาขา
+    
   qrCodeData   String?
   costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก  
   receivedAt   DateTime    @default(now())
@@ -465,7 +466,6 @@ model StockItem {
   updatedAt DateTime @updatedAt
 }
 
-// 🧾 Purchasing
 model Supplier {
   id            Int             @id @default(autoincrement())
   name          String
