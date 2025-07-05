@@ -11,6 +11,7 @@ const {
   getReceiptBarcodeSummaries,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
+  getReceiptsReadyToPay,
   
 } = require('../controllers/purchaseOrderReceiptController');
 
@@ -23,6 +24,9 @@ router.post('/', createPurchaseOrderReceipt);
 
 // 📄 GET - รายการใบรับสินค้าทั้งหมด (ตามสาขา)
 router.get('/', getAllPurchaseOrderReceipts);
+
+// 💰 GET - ดึงใบรับสินค้าที่รอการชำระเงิน (ใช้ยอดจริงจากสินค้าในใบรับ)
+router.get('/ready-to-pay', getReceiptsReadyToPay);
 
 // 📦 GET - ใบรับสินค้าพร้อมสรุปสถานะ SN (สำหรับพิมพ์บาร์โค้ด)
 router.get('/with-barcode-status', getReceiptBarcodeSummaries);
@@ -40,6 +44,7 @@ router.delete('/:id', deletePurchaseOrderReceipt);
 router.patch('/:id/finalize', finalizeReceiptController);
 
 router.patch('/:id/printed', markPurchaseOrderReceiptAsPrinted);
+
 
 
 module.exports = router;

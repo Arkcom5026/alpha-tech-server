@@ -18,8 +18,17 @@ enum Role {
 
 enum PurchaseOrderStatus {
   PENDING
-  PARTIAL
+  PARTIALLY_RECEIVED
+  RECEIVED
+  PAID
   COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatusSupplier {
+  UNPAID // ยังไม่ได้จ่ายเลย
+  PARTIALLY_PAID // จ่ายบางส่วน
+  PAID // จ่ายครบแล้ว
   CANCELLED
 }
 
@@ -91,14 +100,12 @@ enum ReturnType {
   STOCK_ERROR
 }
 
-// ✅ ENUM สำหรับสถานะการชำระเงิน
 enum PaymentStatus {
   PENDING
   COMPLETED
   CANCELLED
 }
 
-// ✅ ENUM สำหรับประเภทการชำระเงิน
 enum PaymentType {
   ADVANCE
   PO_BASED
@@ -118,7 +125,6 @@ enum OrderSource {
   ONLINE
 }
 
-// 🔐 User & Profiles
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique // ✅ Optional, but must be unique if provided
@@ -168,9 +174,9 @@ model CustomerDeposit {
 
   cashAmount     Float   @default(0)
   transferAmount Float   @default(0)
-  cardAmount     Float   @default(0) 
-  usedAmount     Float  @default(0) 
-  usedSaleId     Int? 
+  cardAmount     Float   @default(0)
+  usedAmount     Float   @default(0)
+  usedSaleId     Int?
   note           String? @db.Text
 
   totalAmount Float
@@ -237,7 +243,6 @@ model EmployeeProfile {
   updatedAt DateTime @updatedAt
 }
 
-// 🏢 Branch
 model Branch {
   id        Int     @id @default(autoincrement())
   name      String
@@ -425,11 +430,10 @@ model Unit {
 }
 
 model StockItem {
-  id           Int         @id @default(autoincrement())
-  barcode      String      @unique
-  serialNumber String?  
-  @@unique([serialNumber, productId]) // ✅ ซ้ำได้ถ้า productId เดียวกัน แม้ข้ามสาขา
-    
+  id           Int     @id @default(autoincrement())
+  barcode      String  @unique
+  serialNumber String?
+
   qrCodeData   String?
   costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก  
   receivedAt   DateTime    @default(now())
@@ -464,6 +468,8 @@ model StockItem {
   scannedAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([serialNumber, productId]) // ✅ ซ้ำได้ถ้า productId เดียวกัน แม้ข้ามสาขา
 }
 
 model Supplier {
@@ -505,28 +511,31 @@ model Bank {
 }
 
 model PurchaseOrder {
-  id     Int                 @id @default(autoincrement())
-  code   String              @unique
-  date   DateTime            @default(now())
-  note   String?
-  status PurchaseOrderStatus @default(PENDING)
+  id            Int                   @id @default(autoincrement())
+  code          String                @unique
+  date          DateTime              @default(now())
+  note          String?
+  status        PurchaseOrderStatus   @default(PENDING)
+  paymentStatus PaymentStatusSupplier @default(UNPAID)
 
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
-  branchId   Int
-  employeeId Int
 
-  supplier Supplier        @relation(fields: [supplierId], references: [id])
-  branch   Branch          @relation(fields: [branchId], references: [id])
-  employee EmployeeProfile @relation(fields: [employeeId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId Int
+
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id])
+  employeeId Int
 
   items    PurchaseOrderItem[]
   receipts PurchaseOrderReceipt[]
   payments PurchaseOrderPayment[]
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
   supplierPayment   SupplierPayment[]
   SupplierPaymentPO SupplierPaymentPO[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PurchaseOrderItem {
@@ -596,7 +605,6 @@ model PurchaseOrderPayment {
   updatedAt DateTime @updatedAt
 }
 
-// 🛒 Online Order + Cart
 model Order {
   id              Int         @id @default(autoincrement())
   cartTotal       Float
@@ -657,7 +665,6 @@ model CartItem {
   @@unique([cartId, productId])
 }
 
-// 🛠️ Service System
 model ServiceOrder {
   id         Int  @id @default(autoincrement())
   customerId Int?
@@ -923,6 +930,7 @@ model RefundTransaction {
 
 model SupplierPayment {
   id         Int      @id @default(autoincrement())
+  code       String?  @unique
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
 
@@ -949,17 +957,18 @@ model SupplierPayment {
   branch   Branch @relation(fields: [branchId], references: [id])
   branchId Int
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  SupplierPaymentPO SupplierPaymentPO[]
+  supplierPaymentPO SupplierPaymentPO[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// ✅ schema.prisma - SupplierPaymentPO (ความสัมพันธ์การจ่ายต่อ PO)
 model SupplierPaymentPO {
-  id              Int             @id @default(autoincrement())
-  payment         SupplierPayment @relation(fields: [paymentId], references: [id])
-  paymentId       Int
-  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  id        Int             @id @default(autoincrement())
+  payment   SupplierPayment @relation(fields: [paymentId], references: [id])
+  paymentId Int
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
   amountPaid      Float //เก็บจำนวนเงิน (amountPaid) ที่จ่ายให้แต่ละ PO
 

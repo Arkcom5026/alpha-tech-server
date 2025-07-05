@@ -349,6 +349,7 @@ const finalizeReceiptController = async (req, res) => {
   }
 };
 
+
 const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   try {
     console.log('req.params.id : ', req.params.id)
@@ -366,6 +367,96 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
 };
 
 
+
+const getReceiptsReadyToPay = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
+    const { startDate, endDate, limit } = req.query;
+
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
+    const receipts = await prisma.purchaseOrderReceipt.findMany({
+      where: {
+        branchId,
+        status: 'COMPLETED',
+        receivedAt: Object.keys(dateFilter).length ? dateFilter : undefined,
+      },
+      include: {
+        items: {
+          select: {
+            quantity: true,
+            costPrice: true,
+          },
+        },
+        purchaseOrder: {
+          select: {
+            id: true,
+            code: true,
+            supplier: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+      orderBy: { receivedAt: 'desc' },
+      take: limit ? parseInt(limit) : undefined,
+    });
+
+    const purchaseOrderIds = receipts.map(r => r.purchaseOrder.id);
+
+    const paymentMapRaw = await prisma.supplierPaymentPO.groupBy({
+      by: ['purchaseOrderId'],
+      _sum: { amountPaid: true },
+      where: {
+        purchaseOrderId: { in: purchaseOrderIds },
+      },
+    });
+
+    const paymentMap = new Map();
+    paymentMapRaw.forEach(p => {
+      paymentMap.set(p.purchaseOrderId, p._sum.amountPaid || 0);
+    });
+
+    const results = receipts
+      .map((receipt) => {
+        const totalAmount = receipt.items.reduce(
+          (sum, item) => sum + item.quantity * item.costPrice,
+          0
+        );
+
+        const totalPaid = paymentMap.get(receipt.purchaseOrder.id) || 0;
+        const remainingAmount = totalAmount - totalPaid;
+
+        if (remainingAmount > 0) {
+          return {
+            id: receipt.id,
+            code: receipt.code,
+            orderCode: receipt.purchaseOrder.code,
+            supplier: receipt.purchaseOrder.supplier,
+            totalAmount,
+            totalPaid,
+            remainingAmount,
+            receivedDate: receipt.receivedAt,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    return res.json(results);
+  } catch (error) {
+    console.error('❌ [getReceiptsReadyToPay] error:', error);
+    res.status(500).json({ error: 'ไม่สามารถโหลดใบรับสินค้าที่ค้างชำระได้' });
+  }
+};
+
+
+
+
+
 module.exports = {
   createPurchaseOrderReceipt,
   getAllPurchaseOrderReceipts,
@@ -378,4 +469,5 @@ module.exports = {
   finalizePurchaseOrderReceiptIfNeeded,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
+  getReceiptsReadyToPay,
 };

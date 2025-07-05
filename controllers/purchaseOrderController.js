@@ -154,8 +154,8 @@ const getEligiblePurchaseOrders = async (req, res) => {
     const purchaseOrders = await prisma.purchaseOrder.findMany({
       where: {
         branchId,
-        status: {
-          in: ['PENDING', 'PARTIAL']
+        paymentStatus: {
+          in: ['UNPAID', 'PARTIALLY_PAID']
         }
       },
       include: {
@@ -192,8 +192,8 @@ const getPurchaseOrdersBySupplier = async (req, res) => {
       where: {
         supplierId,
         branchId,
-        status: {
-          in: ['PENDING', 'PARTIAL']
+        paymentStatus: {
+          in: ['UNPAID', 'PARTIALLY_PAID'], // ✅ เงื่อนไขใหม่
         }
       },
       orderBy: { createdAt: 'desc' },
