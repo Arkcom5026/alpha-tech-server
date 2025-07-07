@@ -173,7 +173,7 @@ const getEligiblePurchaseOrders = async (req, res) => {
 
 const getPurchaseOrdersBySupplier = async (req, res) => {
   try {
-    console.log('req.query.supplierId : ',req.query.supplierId)
+
     const rawSupplierId = req.query.supplierId;
     console.log('📥 supplierId query:', rawSupplierId);
 

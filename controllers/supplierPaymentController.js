@@ -5,14 +5,14 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-const generateSupplierPaymentCode = async (branchId) => {
+const generateSupplierPaymentCode = async (tx, branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
   const year = now.getFullYear().toString().slice(2); // ปี ค.ศ. 2025 → '25'
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const yymm = `${year}${month}`; // เช่น '2507'
 
-  const count = await prisma.supplierPayment.count({
+  const count = await tx.supplierPayment.count({
     where: {
       branchId,
       paidAt: {
@@ -28,95 +28,165 @@ const generateSupplierPaymentCode = async (branchId) => {
 
 const createSupplierPayment = async (req, res) => {
   try {
-    const { debitAmount, creditAmount, method, note, paymentType, pos = [] } = req.body;
-    const employeeId = req.user.employeeId;
-    const branchId = req.user.branchId;
+    const {
+      supplierId,
+      paymentDate,
+      amount, // Total amount of this payment transaction
+      method,
+      paymentType,
+      note,
+      receipts: selectedReceiptsData, // This will be an array of { receiptId, amountPaid } from frontend
+    } = req.body;
 
-    const code = await generateSupplierPaymentCode(branchId);
+    console.log('➡️ Incoming createSupplierPayment', req.body);
 
-    const created = await prisma.supplierPayment.create({
-      data: {
-        code,
-        supplierId: parseInt(req.body.supplierId),
-        debitAmount: parseFloat(debitAmount) || 0,
-        creditAmount: parseFloat(creditAmount) || 0,
-        method,
-        note,
-        paidAt: new Date(),
-        employeeId,
-        branchId,
-        paymentType,
-      },
-    });
+    const branchId = req.user?.branchId || 1; // fallback for mock or test
+    const employeeId = req.user?.employeeId;
 
-    if (paymentType === 'PO_BASED' && Array.isArray(pos)) {
-      for (const entry of pos) {
-        const poId = parseInt(entry.poId);
-        const amountPaid = parseFloat(entry.amountPaid);
+    if (!employeeId) {
+      throw new Error('Missing employeeId');
+    }
 
-        if (!isNaN(poId) && amountPaid > 0) {
-          const po = await prisma.purchaseOrder.findUnique({ where: { id: poId } });
-          const newRemaining = po.remainingAmount - amountPaid;
+    const result = await prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findUnique({
+        where: { id: supplierId },
+        select: { creditBalance: true },
+      });
 
-          let newPaymentStatus = 'UNPAID';
-          if (newRemaining <= 0) {
-            newPaymentStatus = 'PAID';
-          } else if (newRemaining < po.totalAmount) {
-            newPaymentStatus = 'PARTIALLY_PAID';
+      if (!supplier) throw new Error('Supplier not found.');
+
+      if (paymentType === 'PO_BASED' && selectedReceiptsData && selectedReceiptsData.length > 0) {
+        const sumOfReceiptAmounts = selectedReceiptsData.reduce((sum, r) => sum + r.amountPaid, 0);
+        if (Math.abs(sumOfReceiptAmounts - amount) > 0.01) {
+          throw new Error('ยอดรวมใบรับของที่เลือกไม่ตรงกับจำนวนเงินที่ชำระ');
+        }
+      }
+
+      if (amount > supplier.creditBalance) {
+        throw new Error('ยอดชำระเกินกว่ายอดเครดิตที่เหลือของ Supplier');
+      }
+
+      const payment = await tx.supplierPayment.create({
+        data: {
+          code: await generateSupplierPaymentCode(tx, branchId),
+          paidAt: new Date(paymentDate),
+          amount,
+          method,
+          paymentType,
+          note,
+          supplier: { connect: { id: supplierId } },
+          employee: { connect: { id: employeeId } },
+          branch: { connect: { id: branchId } },
+        },
+      });
+
+      console.log('✅ Created SupplierPayment with ID:', payment.id);
+
+      if (paymentType === 'PO_BASED' && selectedReceiptsData && selectedReceiptsData.length > 0) {
+
+        for (const selectedReceipt of selectedReceiptsData) {
+          const { receiptId, amountPaid: requestedAmountPaid } = selectedReceipt;
+
+          const reReceipt = await tx.purchaseOrderReceipt.findUnique({
+            where: { id: receiptId },
+            select: { totalAmount: true, paidAmount: true, statusReceipt: true },
+          });
+
+          if (!reReceipt) {
+            console.warn(`Receipt with ID ${receiptId} not found. Skipping.`);
+            continue;
           }
 
-          await prisma.supplierPaymentPO.create({
-            data: {
-              payment: { connect: { id: created.id } },
-              purchaseOrder: { connect: { id: poId } },
-              amountPaid,
+          const currentOutstanding = (reReceipt.totalAmount || 0) - (reReceipt.paidAmount || 0);
+          const actualAmountToPay = Math.min(requestedAmountPaid, currentOutstanding);
+
+          if (actualAmountToPay <= 0) {
+            console.warn(`Amount to pay for receipt ${receiptId} is zero or negative or fully paid. Skipping.`);
+            continue;
+          }
+
+          if (!requestedAmountPaid || isNaN(requestedAmountPaid)) {
+            console.warn(`❌ Invalid amountPaid for receipt ${receiptId}. Skipping.`);
+            continue;
+          }
+
+          await tx.supplierPaymentReceipt.create({
+            data: {              
+              paymentId: payment.id,
+              receiptId: receiptId,
+              amountPaid: actualAmountToPay,
             },
           });
+          console.log(`✅ Created SupplierPaymentReceipt for receipt ${receiptId} with amountPaid: ${actualAmountToPay}`);
 
-          await prisma.purchaseOrder.update({
-            where: { id: poId },
-            data: {
-              remainingAmount: newRemaining,
-              paymentStatus: newPaymentStatus,
-            },
-          });
+          const newPaidAmountForReceipt = (reReceipt.paidAmount || 0) + actualAmountToPay;
+          let newStatus = reReceipt.statusReceipt;
 
-          await prisma.supplier.update({
-            where: { id: created.supplierId },
+          if (newPaidAmountForReceipt >= reReceipt.totalAmount) {
+            newStatus = 'PAID';
+          } else if (newPaidAmountForReceipt > 0 && newPaidAmountForReceipt < reReceipt.totalAmount) {
+            newStatus = 'PARTIALLY_PAID';
+          }
+
+          console.log(`✅ Updating receipt ${receiptId} statusReceipt to ${newStatus} and paidAmount to ${newPaidAmountForReceipt}`);
+          await tx.purchaseOrderReceipt.update({
+            where: { id: receiptId },
             data: {
-              creditBalance: {
-                decrement: amountPaid,
-              },
+              statusPayment: newStatus,
+              paidAmount: newPaidAmountForReceipt,
             },
           });
         }
-      }
-    }
 
-    res.status(201).json(created);
-  } catch (err) {
-    console.error('❌ [createSupplierPayment] error:', err);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการบันทึกการชำระเงิน' });
+      }
+
+      console.log(`🔻 Decreasing supplier ${supplierId} creditBalance by ${amount}`);
+      await tx.supplier.update({
+        where: { id: supplierId },
+        data: {
+          creditBalance: { decrement: amount },
+        },
+      });
+
+      return payment;
+    }, {
+      timeout: 15000
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('❌ Error in createSupplierPayment:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 };
+
 
 const getAllSupplierPayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
+    console.log('getAllSupplierPayments branchId : ', branchId);
+
     const payments = await prisma.supplierPayment.findMany({
       where: { branchId },
       orderBy: { paidAt: 'desc' },
       include: {
         supplier: true,
         employee: true,
+        supplierPaymentReceipts: {
+          include: {
+            receipt: true, // ✅ เปลี่ยนจาก purchaseOrderReceipt เป็น receipt ตาม schema Prisma ล่าสุด
+          },
+        },
       },
     });
+
     res.json(payments);
   } catch (err) {
     console.error('❌ [getAllSupplierPayments] error:', err);
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลการชำระเงินได้' });
   }
 };
+
 
 const getSupplierPaymentsByPO = async (req, res) => {
   try {
@@ -183,20 +253,43 @@ const getAdvancePaymentsBySupplier = async (req, res) => {
     const payments = await prisma.supplierPayment.findMany({
       where: {
         supplierId: parseInt(supplierId),
-        paymentType: 'ADVANCE',
-        SupplierPaymentPO: {
-          none: {},
-        },
       },
       orderBy: { paidAt: 'desc' },
+      select: {
+        id: true,
+        code: true,
+        paidAt: true,
+        paymentType: true,
+        debitAmount: true,
+        creditAmount: true,
+        amount: true,
+        method: true,
+        note: true,
+        supplierId: true,
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            creditLimit: true,
+          },
+        },
+        employee: {
+          select: {
+            name: true,
+          },
+        },
+        supplierPaymentReceipts: true,
+      },
     });
-
+        
     res.json(payments);
   } catch (err) {
     console.error('❌ getAdvancePaymentsBySupplier error:', err);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
 
 module.exports = {
   createSupplierPayment,

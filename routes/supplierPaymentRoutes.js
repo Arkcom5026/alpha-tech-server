@@ -16,6 +16,8 @@ router.use(verifyToken);
 // ✅ สร้างรายการชำระเงินใหม่
 router.post('/', createSupplierPayment);
 
+router.get('/advance', getAdvancePaymentsBySupplier);
+
 // ✅ ดูรายการชำระเงินทั้งหมด
 router.get('/', getAllSupplierPayments);
 
@@ -25,7 +27,7 @@ router.get('/by-po/:poId', getSupplierPaymentsByPO);
 // ✅ ลบรายการชำระเงิน
 router.delete('/:id', deleteSupplierPayment);
 
-router.get('/advance', getAdvancePaymentsBySupplier);
+
 
 
 

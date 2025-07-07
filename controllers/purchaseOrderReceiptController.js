@@ -366,8 +366,6 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   }
 };
 
-
-
 const getReceiptsReadyToPay = async (req, res) => {
   try {
     const branchId = req.user.branchId;
@@ -380,7 +378,10 @@ const getReceiptsReadyToPay = async (req, res) => {
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where: {
         branchId,
-        status: 'COMPLETED',
+        statusReceipt: 'COMPLETED',
+        statusPayment: {
+          not: 'PAID',
+        },
         receivedAt: Object.keys(dateFilter).length ? dateFilter : undefined,
       },
       include: {
@@ -395,28 +396,20 @@ const getReceiptsReadyToPay = async (req, res) => {
             id: true,
             code: true,
             supplier: {
-              select: { id: true, name: true },
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                creditLimit: true,
+                creditBalance: true,
+              },
             },
           },
         },
-      },
-      orderBy: { receivedAt: 'desc' },
+      },      
+      orderBy: { receivedAt: 'asc' },
       take: limit ? parseInt(limit) : undefined,
-    });
-
-    const purchaseOrderIds = receipts.map(r => r.purchaseOrder.id);
-
-    const paymentMapRaw = await prisma.supplierPaymentPO.groupBy({
-      by: ['purchaseOrderId'],
-      _sum: { amountPaid: true },
-      where: {
-        purchaseOrderId: { in: purchaseOrderIds },
-      },
-    });
-
-    const paymentMap = new Map();
-    paymentMapRaw.forEach(p => {
-      paymentMap.set(p.purchaseOrderId, p._sum.amountPaid || 0);
     });
 
     const results = receipts
@@ -426,36 +419,29 @@ const getReceiptsReadyToPay = async (req, res) => {
           0
         );
 
-        const totalPaid = paymentMap.get(receipt.purchaseOrder.id) || 0;
-        const remainingAmount = totalAmount - totalPaid;
+        const supplier = receipt.purchaseOrder.supplier;
+        const paidAmount = receipt.paidAmount || 0; // Renamed from totalPaid to paidAmount
+        const remainingAmount = totalAmount - paidAmount; // Use paidAmount here
 
-        if (remainingAmount > 0) {
-          return {
-            id: receipt.id,
-            code: receipt.code,
-            orderCode: receipt.purchaseOrder.code,
-            supplier: receipt.purchaseOrder.supplier,
-            totalAmount,
-            totalPaid,
-            remainingAmount,
-            receivedDate: receipt.receivedAt,
-          };
-        }
-
-        return null;
+        return {
+          id: receipt.id,
+          code: receipt.code,
+          orderCode: receipt.purchaseOrder.code,
+          supplier,
+          totalAmount,
+          paidAmount, // Now sending as paidAmount
+          remainingAmount,
+          receivedDate: receipt.receivedAt,
+        };
       })
-      .filter(Boolean);
+      .filter((r) => r.remainingAmount > 0); // ✅ Changed filter condition
 
     return res.json(results);
   } catch (error) {
     console.error('❌ [getReceiptsReadyToPay] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถโหลดใบรับสินค้าที่ค้างชำระได้' });
+    res.status(500).json({ error: 'Failed to load outstanding receipts.' });
   }
 };
-
-
-
-
 
 module.exports = {
   createPurchaseOrderReceipt,

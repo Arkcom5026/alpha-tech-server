@@ -25,13 +25,6 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
-enum PaymentStatusSupplier {
-  UNPAID // ยังไม่ได้จ่ายเลย
-  PARTIALLY_PAID // จ่ายบางส่วน
-  PAID // จ่ายครบแล้ว
-  CANCELLED
-}
-
 enum OrderStatus {
   NOT_PROCESS
   PROCESSING
@@ -59,6 +52,14 @@ enum ReceiptStatus {
   PENDING
   COMPLETED
   CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+
 }
 
 enum LoginType {
@@ -98,12 +99,6 @@ enum ReturnType {
   CREDIT_NOTE
   INTERNAL_USE
   STOCK_ERROR
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  CANCELLED
 }
 
 enum PaymentType {
@@ -483,7 +478,7 @@ model Supplier {
   province      String?
   postalCode    String?
   country       String?         @default("Thailand")
-  paymentTerms  Int?            @default(30)
+  paymentTerms  Int?            @default(0)
   creditLimit   Float?
   creditBalance Float?          @default(0)
   bankId        Int?
@@ -511,12 +506,11 @@ model Bank {
 }
 
 model PurchaseOrder {
-  id            Int                   @id @default(autoincrement())
-  code          String                @unique
-  date          DateTime              @default(now())
-  note          String?
-  status        PurchaseOrderStatus   @default(PENDING)
-  paymentStatus PaymentStatusSupplier @default(UNPAID)
+  id     Int                 @id @default(autoincrement())
+  code   String              @unique
+  date   DateTime            @default(now())
+  note   String?
+  status PurchaseOrderStatus @default(PENDING)
 
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
@@ -529,10 +523,6 @@ model PurchaseOrder {
 
   items    PurchaseOrderItem[]
   receipts PurchaseOrderReceipt[]
-  payments PurchaseOrderPayment[]
-
-  supplierPayment   SupplierPayment[]
-  SupplierPaymentPO SupplierPaymentPO[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -556,24 +546,28 @@ model PurchaseOrderItem {
 }
 
 model PurchaseOrderReceipt {
-  id         Int      @id @default(autoincrement())
-  code       String   @unique
-  receivedAt DateTime @default(now())
-  note       String?
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  receivedAt  DateTime @default(now())
+  note        String?
+  totalAmount Float?
+  paidAmount  Float?
 
-  status       ReceiptStatus @default(PENDING)
-  receivedById Int
-  printed      Boolean       @default(false)
-  branch       Branch        @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
-  branchId     Int
+  statusReceipt ReceiptStatus @default(PENDING)
+  statusPayment PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
+  receivedById  Int
+  printed       Boolean       @default(false)
+  branch        Branch        @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
+  branchId      Int
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId Int
 
-  items              PurchaseOrderReceiptItem[]
-  barcodeReceiptItem BarcodeReceiptItem[]
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
+  items                  PurchaseOrderReceiptItem[]
+  barcodeReceiptItem     BarcodeReceiptItem[]
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  SupplierPaymentReceipt SupplierPaymentReceipt[]
 }
 
 model PurchaseOrderReceiptItem {
@@ -588,21 +582,6 @@ model PurchaseOrderReceiptItem {
   barcodeReceiptItem  BarcodeReceiptItem[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
-}
-
-model PurchaseOrderPayment {
-  id Int @id @default(autoincrement())
-
-  amount Float
-  paidAt DateTime @default(now())
-  method String
-  note   String?
-
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  purchaseOrderId Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Order {
@@ -934,21 +913,20 @@ model SupplierPayment {
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
 
-  debitAmount  Float? // ✅ จำนวนที่จ่ายออกจริง
-  creditAmount Float? // ✅ จำนวนที่เป็นเครดิตโน้ตหรือหักลบ (ถ้ามี)
+  debitAmount  Float?
+  creditAmount Float?
+  amount       Float?
 
-  method String // เช่น CASH, TRANSFER, CHEQUE
+  method String
   note   String?
 
-  paymentRef      String? // ✅ รหัสอ้างอิง (PM-xxx)
-  paymentProofUrl String? // ✅ แนบ URL สลิป
-  paymentStatus   String  @default("CONFIRMED") // ✅ สถานะ
-  sourceType      String? // เช่น Manual, FromPO
-  sourcePOId      Int? // ถ้ามี PO ผูกไว้
+  paymentRef      String?
+  paymentProofUrl String?
+  statusPayment   PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
+  sourceType      String?
+  sourcePOId      Int?
 
-  paymentType PaymentType @default(PO_BASED) // ✅ ประเภทการจ่ายเงิน: ล่วงหน้า, ตามใบสั่งซื้อ, เครดิตโน้ต
-
-  sourcePO PurchaseOrder? @relation(fields: [sourcePOId], references: [id])
+  paymentType PaymentType @default(PO_BASED)
 
   paidAt     DateTime        @default(now())
   employee   EmployeeProfile @relation(fields: [employeeId], references: [id])
@@ -957,25 +935,27 @@ model SupplierPayment {
   branch   Branch @relation(fields: [branchId], references: [id])
   branchId Int
 
-  supplierPaymentPO SupplierPaymentPO[]
+  supplierPaymentReceipts SupplierPaymentReceipt[] // 🟡 เปลี่ยนชื่อให้สื่อความหมายชัดเจนขึ้น
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model SupplierPaymentPO {
-  id        Int             @id @default(autoincrement())
+model SupplierPaymentReceipt {
+  id Int @id @default(autoincrement())
+
   payment   SupplierPayment @relation(fields: [paymentId], references: [id])
   paymentId Int
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  purchaseOrderId Int
-  amountPaid      Float //เก็บจำนวนเงิน (amountPaid) ที่จ่ายให้แต่ละ PO
+  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
+  receiptId Int
+
+  amountPaid Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([paymentId, purchaseOrderId])
+  @@unique([paymentId, receiptId]) // ✅ ห้ามซ้ำในคู่เดียวกัน
 }
 
 model OrderOnline {
@@ -996,7 +976,7 @@ model OrderOnline {
 
   note          String?
   status        OrderOnlineStatus @default(PENDING)
-  paymentStatus PaymentStatus?
+  statusPayment PaymentStatus     @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
   paymentMethod String?
   trackingCode  String?
   source        OrderSource?
