@@ -271,7 +271,6 @@ const getReceiptBarcodeSummaries = async (req, res) => {
         id: true,
         code: true,
         receivedAt: true,
-        status: true, // ✅ เพิ่มฟิลด์สถานะ
         items: {
           include: {
             stockItems: true,

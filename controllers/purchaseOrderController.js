@@ -104,11 +104,25 @@ const getAllPurchaseOrders = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
     }
 
+    const VALID_STATUSES = [
+      'PENDING',
+      'PARTIALLY_RECEIVED',
+      'RECEIVED',
+      'PAID',
+      'COMPLETED',
+      'CANCELLED',
+    ];
+
+    const parsedStatuses = status
+      .split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => VALID_STATUSES.includes(s));
+
     const where = {
       branchId,
-      ...(status !== 'all' && {
+      ...(parsedStatuses.length > 0 && status !== 'all' && {
         status: {
-          in: status.split(',').map((s) => s.toUpperCase()),
+          in: parsedStatuses,
         },
       }),
       ...(search && {
@@ -126,13 +140,9 @@ const getAllPurchaseOrders = async (req, res) => {
         supplier: true,
         items: {
           include: {
-            product: {
-              select: {                
-                name: true
-              }
-            }
-          }
-        }
+            product: { select: { name: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -193,7 +203,7 @@ const getPurchaseOrdersBySupplier = async (req, res) => {
         supplierId,
         branchId,
         paymentStatus: {
-          in: ['UNPAID', 'PARTIALLY_PAID'], // ✅ เงื่อนไขใหม่
+          in: ['PENDING', 'PARTIALLY_RECEIVED'], // ✅ เงื่อนไขใหม่
         }
       },
       orderBy: { createdAt: 'desc' },

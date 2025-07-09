@@ -103,7 +103,7 @@ enum ReturnType {
 
 enum PaymentType {
   ADVANCE
-  PO_BASED
+  RECEIPT_BASED
   CREDIT_NOTE
 }
 
@@ -926,7 +926,7 @@ model SupplierPayment {
   sourceType      String?
   sourcePOId      Int?
 
-  paymentType PaymentType @default(PO_BASED)
+  paymentType PaymentType @default(RECEIPT_BASED)
 
   paidAt     DateTime        @default(now())
   employee   EmployeeProfile @relation(fields: [employeeId], references: [id])

@@ -35,6 +35,7 @@ const cartRoutes = require("./routes/cartRoutes");
 const branchPriceRoutes = require("./routes/branchPriceRoutes");
 const branchRoutes = require('./routes/branchRoutes');
 const customerDepositRoutes = require('./routes/customerDepositRoutes');
+const purchaseReportRoutes = require('./routes/purchaseReportRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -106,6 +107,8 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/branch-prices", branchPriceRoutes);
 
 app.use('/api/branches', branchRoutes);
+
+app.use('/api/purchase-reports',purchaseReportRoutes);
 
 
 
