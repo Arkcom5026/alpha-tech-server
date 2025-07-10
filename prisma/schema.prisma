@@ -474,6 +474,8 @@ model Supplier {
   phone         String?
   email         String?
   taxId         String?
+  // ✨ ฟิลด์ที่เพิ่มสำหรับรายงานภาษีซื้อ
+  taxBranchCode String?         @default("00000") // รหัสสาขาของผู้ขาย (00000 = สนง.ใหญ่)
   address       String?
   province      String?
   postalCode    String?
@@ -552,6 +554,10 @@ model PurchaseOrderReceipt {
   note        String?
   totalAmount Float?
   paidAmount  Float?
+
+  supplierTaxInvoiceNumber String?
+  supplierTaxInvoiceDate   DateTime?
+  vatRate                  Float?      @default(7) // อัตราภาษี ณ วันที่รับของ
 
   statusReceipt ReceiptStatus @default(PENDING)
   statusPayment PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
@@ -1005,3 +1011,4 @@ model OrderOnlineItem {
   order   OrderOnline @relation(fields: [orderId], references: [id])
   product Product     @relation(fields: [productId], references: [id])
 }
+

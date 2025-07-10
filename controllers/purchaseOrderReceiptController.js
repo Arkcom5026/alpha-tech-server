@@ -38,7 +38,7 @@ const createPurchaseOrderReceipt = async (req, res) => {
         receivedById,
         code,
         branch: { connect: { id: branchId } },
-        purchaseOrder: { connect: { id: purchaseOrderId } },
+        purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } }, // ✅ แปลงเป็น Int
       },
       include: {
         purchaseOrder: {

@@ -46,6 +46,7 @@ const addReceiptItem = async (req, res) => {
           costPrice: Number(costPrice),
         },
       });
+      console.log('item : ',item)
 
       // ✅ อัปเดตราคาทุนล่าสุดของสาขา
       await prisma.branchPrice.upsert({
