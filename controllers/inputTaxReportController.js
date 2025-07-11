@@ -41,46 +41,49 @@ exports.getInputTaxReport = async (req, res) => {
         },
       },
       include: {
-        // ดึงข้อมูลที่เกี่ยวข้องมาด้วย
+        branch: true,
         purchaseOrder: {
           include: {
-            supplier: true, // ข้อมูลผู้ขาย
+            supplier: true,
           },
         },
-        items: true, // รายการสินค้าในใบรับเพื่อคำนวณยอด
+        items: true,
       },
       orderBy: {
-        supplierTaxInvoiceDate: 'asc', // เรียงตามวันที่ในใบกำกับภาษี
+        supplierTaxInvoiceDate: 'asc',
       },
     });
 
     // 5. จัดรูปแบบข้อมูลให้ตรงตามรายงานภาษีซื้อ
     const formattedData = receipts.map(receipt => {
-      // คำนวณยอดรวมของใบรับนั้นๆ
-      const totalBaseAmount = receipt.items.reduce((sum, item) => {
-        return sum + (item.quantity * item.costPrice);
-      }, 0);
+      // ✨ FIXED: ทำให้การคำนวณรัดกุมขึ้น
+      const totalAmount = receipt.items?.reduce((sum, item) => {
+        return sum + ((item.quantity || 0) * (item.costPrice || 0));
+      }, 0) || 0;
 
-      // คำนวณภาษี (ใช้ vatRate จากใบรับ หรือ 7% เป็นค่า default)
       const vatRate = receipt.vatRate || 7;
-      const vatAmount = (totalBaseAmount * vatRate) / 100;
+      const vatAmount = (totalAmount * vatRate) / 100;
+      const grandTotal = totalAmount + vatAmount;
 
+      // ✨ FIXED: ใช้ Optional Chaining (?.) เพื่อป้องกัน Error กรณีข้อมูล relation เป็น null
       return {
         id: receipt.id,
-        taxInvoiceDate: receipt.supplierTaxInvoiceDate,
-        taxInvoiceNumber: receipt.supplierTaxInvoiceNumber,
-        supplierName: receipt.purchaseOrder.supplier.name,
-        supplierTaxId: receipt.purchaseOrder.supplier.taxId,
-        supplierTaxBranchCode: receipt.purchaseOrder.supplier.taxBranchCode,
-        baseAmount: totalBaseAmount,
+        supplierTaxInvoiceDate: receipt.supplierTaxInvoiceDate,
+        supplierTaxInvoiceNumber: receipt.supplierTaxInvoiceNumber,
+        supplierName: receipt.purchaseOrder?.supplier?.name || 'N/A',
+        supplierTaxId: receipt.purchaseOrder?.supplier?.taxId || 'N/A',
+        branchName: receipt.branch?.name || 'N/A',
+        totalAmount: totalAmount,
         vatAmount: vatAmount,
+        grandTotal: grandTotal,
       };
     });
 
     // 6. คำนวณยอดสรุปของรายงาน
     const summary = {
-      totalBaseAmount: formattedData.reduce((sum, item) => sum + item.baseAmount, 0),
-      totalVatAmount: formattedData.reduce((sum, item) => sum + item.vatAmount, 0),
+      totalAmount: formattedData.reduce((sum, item) => sum + item.totalAmount, 0),
+      vatAmount: formattedData.reduce((sum, item) => sum + item.vatAmount, 0),
+      grandTotal: formattedData.reduce((sum, item) => sum + item.grandTotal, 0),
     };
 
     // 7. ส่งข้อมูลกลับไปให้ Frontend
@@ -98,5 +101,3 @@ exports.getInputTaxReport = async (req, res) => {
     });
   }
 };
-
-

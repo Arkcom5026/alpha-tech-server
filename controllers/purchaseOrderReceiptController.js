@@ -23,7 +23,8 @@ const generateReceiptCode = async (branchId) => {
 
 const createPurchaseOrderReceipt = async (req, res) => {
   try {
-    const { purchaseOrderId, note } = req.body;
+    // ✨ CHANGED: รับค่า supplierTaxInvoiceNumber และ supplierTaxInvoiceDate เพิ่ม
+    const { purchaseOrderId, note, supplierTaxInvoiceNumber, supplierTaxInvoiceDate } = req.body;
     const branchId = req.user.branchId;
     const receivedById = req.user.employeeId;
     if (!purchaseOrderId) {
@@ -32,13 +33,19 @@ const createPurchaseOrderReceipt = async (req, res) => {
 
     const code = await generateReceiptCode(branchId);
 
+    // ✨ ADDED: จัดการข้อมูลวันที่ หากมีค่าส่งมา ให้แปลงเป็น Date object
+    const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
+
     const created = await prisma.purchaseOrderReceipt.create({
       data: {
         note,
         receivedById,
         code,
+        // ✨ CHANGED: เพิ่ม field สำหรับบันทึกข้อมูลภาษี
+        supplierTaxInvoiceNumber,
+        supplierTaxInvoiceDate: taxDate,
         branch: { connect: { id: branchId } },
-        purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } }, // ✅ แปลงเป็น Int
+        purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } },
       },
       include: {
         purchaseOrder: {
@@ -51,7 +58,7 @@ const createPurchaseOrderReceipt = async (req, res) => {
       },
     });
 
-    // ✅ Update costPrice จากใบส่งของ (กรณีราคาสินค้ามีการเปลี่ยน)
+    // Update costPrice จากใบส่งของ (กรณีราคาสินค้ามีการเปลี่ยน)
     for (const item of created.purchaseOrder.items) {
       await prisma.branchPrice.upsert({
         where: {
@@ -207,7 +214,7 @@ const markReceiptAsCompleted = async (req, res) => {
 
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
-      data: { status: 'COMPLETED' },
+      data: { statusReceipt: 'COMPLETED' },
     });
 
     res.json(updated);
@@ -270,6 +277,8 @@ const getReceiptBarcodeSummaries = async (req, res) => {
       select: {
         id: true,
         code: true,
+        supplierTaxInvoiceNumber: true,
+        statusReceipt: true,
         receivedAt: true,
         items: {
           include: {
@@ -294,12 +303,13 @@ const getReceiptBarcodeSummaries = async (req, res) => {
       return {
         id: receipt.id,
         code: receipt.code,
+        tax: receipt.supplierTaxInvoiceNumber,
         receivedAt: receipt.receivedAt,
         supplierName: receipt.purchaseOrder?.supplier?.name || '-',
-        orderCode: receipt.purchaseOrder?.code || '-',
+        orderCode: receipt.purchaseOrder?.code || '-',        
         totalItems: total,
         barcodeGenerated: generated,
-        status: receipt.status, // ✅ ส่ง status ไป frontend
+        status: receipt.statusReceipt, // ✅ ส่ง status ไป frontend
       };
     });
 
@@ -356,7 +366,7 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
 
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
-      data: { status: ReceiptStatus.COMPLETED },
+      data: { statusReceipt: ReceiptStatus.COMPLETED },
     });
     return res.json({ success: true, receipt: updated });
   } catch (error) {

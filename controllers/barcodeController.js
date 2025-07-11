@@ -182,6 +182,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
         purchaseOrder: {
           select: {
             code: true,
+            supplierTaxInvoiceNumber: true,
             supplier: {
               select: {
                 name: true,
@@ -216,6 +217,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
         return {
           id: r.id,
           code: r.code,
+          tax: r.supplierTaxInvoiceNumber,
           purchaseOrderCode: r.purchaseOrder?.code || '-',
           supplier: supplier?.name || '-',
           createdAt: r.createdAt,
