@@ -182,7 +182,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
         purchaseOrder: {
           select: {
             code: true,
-            supplierTaxInvoiceNumber: true,
+           
             supplier: {
               select: {
                 name: true,
@@ -194,7 +194,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
         },
         barcodeReceiptItem: {
           select: {
-            stockItemId: true,
+            stockItemId: true,            
           },
         },
       },
