@@ -59,7 +59,6 @@ enum PaymentStatus {
   PARTIALLY_PAID
   PAID
   CANCELLED
-
 }
 
 enum LoginType {
@@ -90,6 +89,7 @@ enum SaleStatus {
   PENDING_PRICING // รอเคาะราคา
   FINALIZED // เคาะราคาแล้ว พร้อมคำนวณภาษี
   COMPLETED // รับเงินครบแล้ว
+  CANCELLED // ยกเลิก
 }
 
 enum ReturnType {
@@ -120,6 +120,12 @@ enum OrderSource {
   ONLINE
 }
 
+enum CustomerType {
+  INDIVIDUAL // บุคคลทั่วไป
+  ORGANIZATION // หน่วยงาน / บริษัท
+  GOVERNMENT // ✨ หน่วยงานราชการ
+}
+
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique // ✅ Optional, but must be unique if provided
@@ -140,17 +146,23 @@ model User {
 }
 
 model CustomerProfile {
-  id         Int     @id @default(autoincrement())
-  name       String?
-  picture    String?
-  address    String?
-  district   String?
-  province   String?
-  postalCode String?
-  phone      String?
-  taxId      String?
-  user       User    @relation(fields: [userId], references: [id])
-  userId     Int     @unique
+  id          Int          @id @default(autoincrement())
+  name        String?
+  picture     String?
+  companyName String?
+  address     String?
+  district    String?
+  province    String?
+  postalCode  String?
+  phone       String?
+  taxId       String?
+  type        CustomerType @default(INDIVIDUAL)
+  user        User         @relation(fields: [userId], references: [id])
+  userId      Int          @unique
+
+  paymentTerms  Int?   @default(0) // เครดิตเทอม (วัน)
+  creditLimit   Float? @default(0) // วงเงินเครดิตสูงสุด
+  creditBalance Float? @default(0) // ยอดเครดิตคงเหลือที่ใช้ไป
 
   orders   Order[]
   cart     Cart[]
@@ -557,7 +569,7 @@ model PurchaseOrderReceipt {
 
   supplierTaxInvoiceNumber String?
   supplierTaxInvoiceDate   DateTime?
-  vatRate                  Float?      @default(7) // อัตราภาษี ณ วันที่รับของ
+  vatRate                  Float?    @default(7) // อัตราภาษี ณ วันที่รับของ
 
   statusReceipt ReceiptStatus @default(PENDING)
   statusPayment PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
@@ -730,6 +742,7 @@ model BarcodeReceiptItem {
 model Sale {
   id         Int      @id @default(autoincrement())
   code       String   @unique
+
   soldAt     DateTime @default(now())
   customerId Int?
   employeeId Int
@@ -1011,4 +1024,3 @@ model OrderOnlineItem {
   order   OrderOnline @relation(fields: [orderId], references: [id])
   product Product     @relation(fields: [productId], references: [id])
 }
-

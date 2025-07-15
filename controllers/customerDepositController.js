@@ -147,6 +147,13 @@ const getCustomerAndDepositByPhone = async (req, res) => {
         name: customer.name,
         phone: customer.phone,
         email: customer.user?.email || '',
+        type: customer.type,
+        companyName: customer.companyName,
+        address: customer.address,
+        taxId: customer.taxId,
+        creditLimit: customer.creditLimit,
+        creditBalance: customer.creditBalance,
+        
       },
       totalDeposit,
       deposits: customer.customerDeposit,

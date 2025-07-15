@@ -18,18 +18,28 @@ const getCustomerByPhone = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบลูกค้า' });
     }
 
+    // ✨ ปรับปรุง: ส่งข้อมูลลูกค้ากลับไปให้ครบถ้วน
     return res.json({
       id: customer.id,
       name: customer.name,
       phone: customer.phone,
       address: customer.address,
       email: customer.user?.email || '',
+      // เพิ่มฟิลด์ใหม่ที่จำเป็นสำหรับหน้าขาย
+      type: customer.type,
+      companyName: customer.companyName,
+      taxId: customer.taxId,
+      creditLimit: customer.creditLimit,
+      creditBalance: customer.creditBalance,
     });
   } catch (err) {
     console.error('[getCustomerByPhone] ❌', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
   }
 };
+
+
+
 
 const getCustomerByName = async (req, res) => {
   try {
@@ -50,6 +60,7 @@ const getCustomerByName = async (req, res) => {
       include: { user: true },
     });
 
+    // ✨ แก้ไข: map ข้อมูลลูกค้าให้ครบถ้วนก่อนส่งกลับ
     return res.json(
       customers.map((c) => ({
         id: c.id,
@@ -57,6 +68,12 @@ const getCustomerByName = async (req, res) => {
         phone: c.phone,
         address: c.address,
         email: c.user?.email || '',
+        // เพิ่มฟิลด์ที่จำเป็นสำหรับหน้าขาย
+        type: c.type,
+        companyName: c.companyName,
+        taxId: c.taxId,
+        creditLimit: c.creditLimit,
+        creditBalance: c.creditBalance,
       }))
     );
   } catch (err) {
@@ -64,6 +81,8 @@ const getCustomerByName = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาด้วยชื่อ' });
   }
 };
+
+
 
 const getCustomerByUserId = async (req, res) => {
   try {
@@ -94,9 +113,11 @@ const getCustomerByUserId = async (req, res) => {
   }
 };
 
+
 const createCustomer = async (req, res) => {
   try {
-    const { name, phone, email, address } = req.body;
+    // ✨ รับข้อมูลใหม่ๆ จาก req.body
+    const { name, phone, email, address, type, companyName, taxId } = req.body;
 
     if (!phone || !name) {
       return res.status(400).json({ error: 'ต้องระบุชื่อและเบอร์โทร' });
@@ -120,12 +141,18 @@ const createCustomer = async (req, res) => {
       },
     });
 
+    // ✨ เพิ่ม field ใหม่ๆ ตอนสร้าง CustomerProfile
     const newCustomer = await prisma.customerProfile.create({
       data: {
         name,
         phone,
         address: address || null,
         userId: newUser.id,
+        type: type || 'INDIVIDUAL', // 'INDIVIDUAL', 'ORGANIZATION', 'GOVERNMENT'
+        companyName: companyName || null,
+        taxId: taxId || null,
+        // สามารถกำหนดค่าเริ่มต้นสำหรับ creditLimit ที่นี่ได้ถ้าต้องการ
+        // creditLimit: 0, 
       },
     });
 
@@ -135,6 +162,7 @@ const createCustomer = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการสร้างลูกค้า' });
   }
 };
+
 
 const updateCustomerProfile = async (req, res) => {
   console.log('updateCustomerProfile : ', req.body);
