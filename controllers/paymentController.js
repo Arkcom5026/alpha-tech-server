@@ -134,7 +134,7 @@ const createPayments = async (req, res) => {
 const searchPrintablePayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
-    const { keyword } = req.query;
+    const { keyword, fromDate, toDate } = req.query; // รับ fromDate และ toDate มาจาก query
 
     const payments = await prisma.payment.findMany({
       where: {
@@ -171,29 +171,59 @@ const searchPrintablePayments = async (req, res) => {
             },
           ],
         }),
+        // เพิ่มเงื่อนไขการกรองตามช่วงวันที่ receivedAt
+        ...(fromDate && { receivedAt: { gte: new Date(fromDate) } }),
+        ...(toDate && { receivedAt: { lte: new Date(toDate) } }),
       },
       orderBy: { receivedAt: 'desc' },
       include: {
+        // Include payment items for details on payment methods and amounts
+        items: true,
         sale: {
           include: {
-            branch: true,
-            customer: true,
-            items: {
+            branch: true, // Branch info for config
+            customer: true, // Customer info
+            items: { // Sale items
               include: {
-                stockItem: {
+                // SaleItem.price จะถูกดึงมาโดยอัตโนมัติหากเป็น scalar field
+                stockItem: { // Stock item for product details
                   include: {
-                    product: true,
+                    product: { // Product for name and unit
+                      include: {
+                        // Assuming 'template' and 'unit' relations exist for product unit
+                        template: {
+                          include: {
+                            unit: true, // Unit name
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
             },
+            // Note: Sale.paymentTerms and Sale.dueDate are used in BillLayoutFullTax but are not
+            // present in the Sale model in the provided schema. If required, add them to the Sale model.
           },
         },
-        employeeProfile: true,
+        employeeProfile: true, // Employee who processed the payment
       },
     });
 
-    console.log('searchPrintablePayments :', payments);
+    // สำคัญ: เปลี่ยน console.log ให้แสดงผลแบบเต็มรูปแบบเพื่อการดีบัก
+    console.log('searchPrintablePayments :', JSON.stringify(payments, null, 2));
+
+    // Note: The BillLayoutFullTax component expects 'sale', 'saleItems', 'payments', and 'config'
+    // as separate props. The frontend will need to transform this 'payments' array
+    // into the required structure for BillLayoutFullTax.
+
+    // Missing fields in current schema/query for BillLayoutFullTax (consider adding to Prisma Schema if needed):
+    // 1. SaleItem.quantity: The current schema for SaleItem does not explicitly have a 'quantity' field.
+    //    If a SaleItem represents multiple units of a product, a 'quantity' field needs to be added to the SaleItem model.
+    //    Currently, BillLayoutFullTax assumes 'item.quantity'. If each SaleItem is 1 unit, this is implicitly 1.
+    // 2. config.vatRate: BillLayoutFullTax uses this for VAT calculation. It's assumed to be part of the 'config' prop.
+    //    This value should ideally come from the 'branch' data (e.g., branch.vatRate) or a system-wide setting.
+    //    Ensure 'branch' model has 'vatRate' or pass it separately.
 
     res.json(payments);
   } catch (error) {

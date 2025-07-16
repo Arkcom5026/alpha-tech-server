@@ -6,18 +6,17 @@ const generatePurchaseOrderCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
   const yymm = `${now.getFullYear().toString().slice(2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-  const count = await prisma.purchaseOrder.count({
-    where: {
-      branchId,
-      createdAt: {
-        gte: new Date(now.getFullYear(), now.getMonth(), 1),
-        lt: new Date(now.getFullYear(), now.getMonth() + 1, 1),
-      },
-    },
-  });
-  const sequence = `${(count + 1).toString().padStart(4, '0')}`;
-  return `PO-${paddedBranch}${yymm}-${sequence}`;
+
+  for (let i = 1; i <= 9999; i++) {
+    const sequence = `${i.toString().padStart(4, '0')}`;
+    const code = `PO-${paddedBranch}${yymm}-${sequence}`;
+    const existing = await prisma.purchaseOrder.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
+
+  throw new Error('ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้');
 };
+
 
 const createPurchaseOrder = async (req, res) => {
   try {
@@ -345,26 +344,44 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
     const branchId = req.user.branchId;
     const employeeId = req.user.employeeId;
 
-    const code = await generatePurchaseOrderCode(branchId);
+    let createdPO = null;
+    let retryCount = 0;
+    const maxRetries = 5;
 
-    const createdPO = await prisma.purchaseOrder.create({
-      data: {
-        code,
-        employeeId,
-        supplierId,
-        branchId,
-        date: new Date(orderDate),
-        note,
-        status: 'PENDING',
-        items: {
-          create: items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            costPrice: item.costPrice,
-          })),
-        },
-      },
-    });
+    while (!createdPO && retryCount < maxRetries) {
+      const code = await generatePurchaseOrderCode(branchId);
+      try {
+        createdPO = await prisma.purchaseOrder.create({
+          data: {
+            code,
+            employeeId,
+            supplierId,
+            branchId,
+            date: new Date(orderDate),
+            note,
+            status: 'PENDING',
+            items: {
+              create: items.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                costPrice: item.costPrice,
+              })),
+            },
+          },
+        });
+      } catch (err) {
+        if (err.code === 'P2002' && err.meta?.target?.includes('code')) {
+          retryCount++;
+          console.warn(`🔁 Duplicate code retrying... (${retryCount})`);
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (!createdPO) {
+      return res.status(500).json({ message: 'ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้ กรุณาลองใหม่' });
+    }
 
     for (const item of items) {
       await prisma.branchPrice.upsert({
@@ -401,6 +418,7 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
 
 module.exports = {
   getAllPurchaseOrders,
