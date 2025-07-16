@@ -1,4 +1,7 @@
 // ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services
+// ⚠️ WARNING: onDelete: Cascade has been added to ALL relations as requested.
+// This is a destructive action and can lead to unintended data loss.
+// Review carefully before deploying to production.
 
 generator client {
   provider = "prisma-client-js"
@@ -126,6 +129,8 @@ enum CustomerType {
   GOVERNMENT // ✨ หน่วยงานราชการ
 }
 
+
+
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique // ✅ Optional, but must be unique if provided
@@ -157,7 +162,7 @@ model CustomerProfile {
   phone       String?
   taxId       String?
   type        CustomerType @default(INDIVIDUAL)
-  user        User         @relation(fields: [userId], references: [id])
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int          @unique
 
   paymentTerms  Int?   @default(0) // เครดิตเทอม (วัน)
@@ -188,10 +193,10 @@ model CustomerDeposit {
 
   totalAmount Float
 
-  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId Int?
 
-  branch   Branch? @relation(fields: [branchId], references: [id])
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int?
 
   status String @default("ACTIVE") // ✅ สำหรับ soft delete: ACTIVE หรือ CANCELLED
@@ -207,10 +212,10 @@ model CustomerDeposit {
 
 model DepositUsage {
   id                Int             @id @default(autoincrement())
-  customerDeposit   CustomerDeposit @relation(fields: [customerDepositId], references: [id])
+  customerDeposit   CustomerDeposit @relation(fields: [customerDepositId], references: [id], onDelete: Cascade)
   customerDepositId Int
 
-  sale   Sale @relation(fields: [saleId], references: [id])
+  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
   saleId Int
 
   amountUsed Float
@@ -222,13 +227,13 @@ model EmployeeProfile {
   name  String?
   phone String?
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int  @unique
 
-  branch   Branch? @relation(fields: [branchId], references: [id])
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int?
 
-  position   Position? @relation(fields: [positionId], references: [id])
+  position   Position? @relation(fields: [positionId], references: [id], onDelete: Cascade)
   positionId Int?
 
   confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
@@ -313,7 +318,7 @@ model ProductType {
 
   profiles ProductProfile[]
 
-  category   Category? @relation(fields: [categoryId], references: [id])
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId Int?
 
   createdAt DateTime @default(now())
@@ -325,7 +330,7 @@ model ProductProfile {
   name        String
   description String?
 
-  productType   ProductType @relation(fields: [productTypeId], references: [id])
+  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
   productTypeId Int
 
   templates ProductTemplate[]
@@ -343,11 +348,11 @@ model ProductTemplate {
   codeType String  @default("D")
   active   Boolean @default(true)
 
-  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id])
+  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
   productProfileId Int
 
   products Product[]
-  unit     Unit?     @relation(fields: [unitId], references: [id])
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   unitId   Int?
 
   createdAt DateTime @default(now())
@@ -366,7 +371,7 @@ model Product {
   noSN     Boolean @default(false)
   active   Boolean @default(true)
 
-  template   ProductTemplate @relation(fields: [templateId], references: [id])
+  template   ProductTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   templateId Int
 
   productImages      ProductImage[]
@@ -398,10 +403,10 @@ model BranchPrice {
   updatedBy     Int?
   isActive      Boolean   @default(true)
 
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
   createdAt DateTime @default(now())
@@ -420,7 +425,7 @@ model ProductImage {
   caption String?
   isCover Boolean?
 
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId Int
 
   createdAt DateTime @default(now())
@@ -456,16 +461,16 @@ model StockItem {
   checkedBy    String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
   color        String? // สีของสินค้ารายชิ้น เช่น "ดำ", "ขาว"
 
-  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id])
+  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id], onDelete: Cascade)
   scannedByEmployeeId Int?
 
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
-  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptItemId Int?
 
   barcodeReceiptItem   BarcodeReceiptItem[]
@@ -501,8 +506,8 @@ model Supplier {
   notes         String?
   branchId      Int?
   active        Boolean         @default(true)
-  bank          Bank?           @relation(fields: [bankId], references: [id])
-  branch        Branch?         @relation(fields: [branchId], references: [id])
+  bank          Bank?           @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  branch        Branch?         @relation(fields: [branchId], references: [id], onDelete: Cascade)
   pos           PurchaseOrder[]
 
   createdAt       DateTime          @default(now())
@@ -526,13 +531,13 @@ model PurchaseOrder {
   note   String?
   status PurchaseOrderStatus @default(PENDING)
 
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
-  employee   EmployeeProfile @relation(fields: [employeeId], references: [id])
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId Int
 
   items    PurchaseOrderItem[]
@@ -551,10 +556,10 @@ model PurchaseOrderItem {
   costPrice        Float
   receipts         PurchaseOrderReceiptItem[]
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   purchaseOrderId Int
 
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -575,10 +580,10 @@ model PurchaseOrderReceipt {
   statusPayment PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
   receivedById  Int
   printed       Boolean       @default(false)
-  branch        Branch        @relation(fields: [branchId], references: [id]) // ✅ ความสัมพันธ์กับ Branch
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade) // ✅ ความสัมพันธ์กับ Branch
   branchId      Int
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   purchaseOrderId Int
 
   items                  PurchaseOrderReceiptItem[]
@@ -594,8 +599,8 @@ model PurchaseOrderReceiptItem {
   purchaseOrderItemId Int
   quantity            Int
   costPrice           Float
-  receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
-  purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id])
+  receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Cascade)
   stockItems          StockItem[]
   barcodeReceiptItem  BarcodeReceiptItem[]
   createdAt           DateTime             @default(now())
@@ -612,7 +617,7 @@ model Order {
   currency        String
 
   customerId Int?
-  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   products   ProductOnOrder[]
 
   createdAt DateTime @default(now())
@@ -625,8 +630,8 @@ model ProductOnOrder {
   orderId   Int
   count     Int
 
-  product Product @relation(fields: [productId], references: [id])
-  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -636,23 +641,23 @@ model Cart {
   id Int @id @default(autoincrement())
 
   userId Int // FK ไปที่ User (ลูกค้า)
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   cartItems CartItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id])
+  CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
   customerProfileId Int?
 }
 
 model CartItem {
   id              Int     @id @default(autoincrement())
   cartId          Int
-  cart            Cart    @relation(fields: [cartId], references: [id])
+  cart            Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId       Int
-  product         Product @relation(fields: [productId], references: [id])
+  product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity        Int     @default(1)
   priceAtThatTime Float
 
@@ -673,9 +678,9 @@ model ServiceOrder {
   description String?
   note        String?
 
-  customer CustomerProfile? @relation(fields: [customerId], references: [id])
-  branch   Branch?          @relation(fields: [branchId], references: [id])
-  employee EmployeeProfile? @relation(fields: [employeeId], references: [id])
+  customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branch   Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employee EmployeeProfile? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   items ServiceItem[]
 
@@ -692,8 +697,8 @@ model ServiceItem {
   solution     String?
   cost         Float?
 
-  service ServiceOrder @relation(fields: [serviceId], references: [id])
-  product Product?     @relation(fields: [productId], references: [id])
+  service ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  product Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -707,7 +712,7 @@ model BarcodeCounter {
   updatedAt  DateTime @updatedAt
   createdAt  DateTime @default(now())
 
-  branch Branch @relation(fields: [branchId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@unique([branchId, yearMonth]) // ป้องกันซ้ำในระดับเดือน+สาขา
 }
@@ -721,16 +726,16 @@ model BarcodeReceiptItem {
   status        String // READY | SN_RECEIVED | USED | VOID
 
   printed     Boolean    @default(false)
-  stockItem   StockItem? @relation(fields: [stockItemId], references: [id])
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
   stockItemId Int?
 
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
-  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
+  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptId Int
 
-  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id])
+  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
   receiptItemId Int
 
   createdAt DateTime @default(now())
@@ -766,11 +771,11 @@ model Sale {
   saleType               SaleType              @default(NORMAL)
   finalizedAt            DateTime? // วันที่ราคาถูกเคาะเป็นทางการ
   combinedDocumentId     Int?
-  combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id])
+  combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id], onDelete: Cascade)
 
-  customer CustomerProfile? @relation(fields: [customerId], references: [id])
-  employee EmployeeProfile  @relation(fields: [employeeId], references: [id])
-  branch   Branch           @relation(fields: [branchId], references: [id])
+  customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  employee EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch   Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
   items    SaleItem[]
   returns  SaleReturn[]
 
@@ -796,8 +801,8 @@ model SaleItem {
   refundedAmount Float   @default(0) // ยอดที่เคยคืนไปแล้วจากชิ้นนี้
   remark         String?
 
-  sale        Sale             @relation(fields: [saleId], references: [id])
-  stockItem   StockItem        @relation(fields: [stockItemId], references: [id])
+  sale        Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  stockItem   StockItem        @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
   returnItems SaleReturnItem[]
 
   createdAt DateTime @default(now())
@@ -807,7 +812,7 @@ model SaleItem {
 model Payment {
   id     Int    @id @default(autoincrement())
   code   String @unique
-  sale   Sale   @relation(fields: [saleId], references: [id])
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
   saleId Int
 
   receivedAt           DateTime @default(now())
@@ -818,10 +823,10 @@ model Payment {
   cancelNote  String?
   cancelledAt DateTime?
 
-  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
+  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
   employeeProfileId Int?
 
-  branch   Branch? @relation(fields: [branchId], references: [id])
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int?
 
   items PaymentItem[]
@@ -832,7 +837,7 @@ model Payment {
 
 model PaymentItem {
   id        Int     @id @default(autoincrement())
-  payment   Payment @relation(fields: [paymentId], references: [id])
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   paymentId Int
 
   paymentMethod PaymentMethod
@@ -860,8 +865,8 @@ model CombinedSaleDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  createdByUser EmployeeProfile @relation(fields: [createdBy], references: [id])
-  branch        Branch          @relation(fields: [branchId], references: [id])
+  createdByUser EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   sales         Sale[]          @relation("SalesCombined")
 }
 
@@ -883,10 +888,10 @@ model SaleReturn {
   note                 String?
   status               String     @default("PENDING") // PENDING, REFUNDED, REJECTED
 
-  sale       Sale             @relation(fields: [saleId], references: [id])
-  employee   EmployeeProfile  @relation(fields: [employeeId], references: [id])
-  refundedBy EmployeeProfile? @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id])
-  branch     Branch           @relation(fields: [branchId], references: [id])
+  sale       Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  employee   EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  refundedBy EmployeeProfile? @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
+  branch     Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
   items      SaleReturnItem[]
 
   createdAt         DateTime            @default(now())
@@ -903,8 +908,8 @@ model SaleReturnItem {
   reason       String? // เหตุผลการคืนสินค้า
   reasonCode   String? // รหัสเหตุผล เช่น DEFECT, CHANGE_MIND
 
-  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
-  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -921,15 +926,15 @@ model RefundTransaction {
   refundedByEmployeeId Int
   branchId             Int
 
-  saleReturn SaleReturn      @relation(fields: [saleReturnId], references: [id])
-  refundedBy EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id])
-  branch     Branch          @relation(fields: [branchId], references: [id])
+  saleReturn SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  refundedBy EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
+  branch     Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
 }
 
 model SupplierPayment {
   id         Int      @id @default(autoincrement())
   code       String?  @unique
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierId Int
 
   debitAmount  Float?
@@ -948,10 +953,10 @@ model SupplierPayment {
   paymentType PaymentType @default(RECEIPT_BASED)
 
   paidAt     DateTime        @default(now())
-  employee   EmployeeProfile @relation(fields: [employeeId], references: [id])
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId Int
 
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
   supplierPaymentReceipts SupplierPaymentReceipt[] // 🟡 เปลี่ยนชื่อให้สื่อความหมายชัดเจนขึ้น
@@ -963,10 +968,10 @@ model SupplierPayment {
 model SupplierPaymentReceipt {
   id Int @id @default(autoincrement())
 
-  payment   SupplierPayment @relation(fields: [paymentId], references: [id])
+  payment   SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   paymentId Int
 
-  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
+  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   receiptId Int
 
   amountPaid Float
@@ -980,10 +985,10 @@ model SupplierPaymentReceipt {
 model OrderOnline {
   id         Int              @id @default(autoincrement())
   customerId Int?
-  customer   CustomerProfile? @relation(fields: [customerId], references: [id])
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   branchId Int
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   fullName   String
   phone      String
@@ -1002,14 +1007,14 @@ model OrderOnline {
   deliveryDate  DateTime?
 
   confirmedByEmployeeId Int?
-  confirmedByEmployee   EmployeeProfile? @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id])
+  confirmedByEmployee   EmployeeProfile? @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id], onDelete: Cascade)
 
   shippedAt    DateTime?
   cancelReason String?
 
   items     OrderOnlineItem[]
   createdAt DateTime          @default(now())
-  User      User?             @relation(fields: [userId], references: [id])
+  User      User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int?
 }
 
@@ -1021,6 +1026,8 @@ model OrderOnlineItem {
   priceAtPurchase Float?
   note            String?
 
-  order   OrderOnline @relation(fields: [orderId], references: [id])
-  product Product     @relation(fields: [productId], references: [id])
+  order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
+
+

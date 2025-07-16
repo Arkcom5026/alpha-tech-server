@@ -7,23 +7,18 @@ const generateReceiptCode = async (branchId) => {
   const now = dayjs();
   const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
 
-  const count = await prisma.purchaseOrderReceipt.count({
-    where: {
-      branchId,
-      createdAt: {
-        gte: now.startOf('month').toDate(),
-        lt: now.endOf('month').toDate(),
-      },
-    },
-  });
+  for (let i = 1; i <= 9999; i++) {
+    const running = String(i).padStart(4, '0');
+    const code = `${prefix}-${running}`;
+    const existing = await prisma.purchaseOrderReceipt.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
 
-  const running = String(count + 1).padStart(4, '0');
-  return `${prefix}-${running}`;
+  throw new Error('ไม่สามารถสร้างรหัสใบรับสินค้าแบบไม่ซ้ำได้');
 };
 
 const createPurchaseOrderReceipt = async (req, res) => {
   try {
-    // ✨ CHANGED: รับค่า supplierTaxInvoiceNumber และ supplierTaxInvoiceDate เพิ่ม
     const { purchaseOrderId, note, supplierTaxInvoiceNumber, supplierTaxInvoiceDate } = req.body;
     const branchId = req.user.branchId;
     const receivedById = req.user.employeeId;
@@ -31,34 +26,50 @@ const createPurchaseOrderReceipt = async (req, res) => {
       return res.status(400).json({ error: 'กรุณาระบุใบสั่งซื้อ' });
     }
 
-    const code = await generateReceiptCode(branchId);
+    let created = null;
+    let retryCount = 0;
+    const maxRetries = 5;
 
-    // ✨ ADDED: จัดการข้อมูลวันที่ หากมีค่าส่งมา ให้แปลงเป็น Date object
-    const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
+    while (!created && retryCount < maxRetries) {
+      const code = await generateReceiptCode(branchId);
 
-    const created = await prisma.purchaseOrderReceipt.create({
-      data: {
-        note,
-        receivedById,
-        code,
-        // ✨ CHANGED: เพิ่ม field สำหรับบันทึกข้อมูลภาษี
-        supplierTaxInvoiceNumber,
-        supplierTaxInvoiceDate: taxDate,
-        branch: { connect: { id: branchId } },
-        purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } },
-      },
-      include: {
-        purchaseOrder: {
-          select: {
-            code: true,
-            supplier: { select: { name: true } },
-            items: true,
+      const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
+
+      try {
+        created = await prisma.purchaseOrderReceipt.create({
+          data: {
+            note,
+            receivedById,
+            code,
+            supplierTaxInvoiceNumber,
+            supplierTaxInvoiceDate: taxDate,
+            branch: { connect: { id: branchId } },
+            purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } },
           },
-        },
-      },
-    });
+          include: {
+            purchaseOrder: {
+              select: {
+                code: true,
+                supplier: { select: { name: true } },
+                items: true,
+              },
+            },
+          },
+        });
+      } catch (err) {
+        if (err.code === 'P2002' && err.meta?.target?.includes('code')) {
+          retryCount++;
+          console.warn(`🔁 Duplicate receipt code retrying... (${retryCount})`);
+        } else {
+          throw err;
+        }
+      }
+    }
 
-    // Update costPrice จากใบส่งของ (กรณีราคาสินค้ามีการเปลี่ยน)
+    if (!created) {
+      return res.status(500).json({ error: 'ไม่สามารถสร้างรหัสใบรับสินค้าแบบไม่ซ้ำได้ กรุณาลองใหม่' });
+    }
+
     for (const item of created.purchaseOrder.items) {
       await prisma.branchPrice.upsert({
         where: {
@@ -113,7 +124,9 @@ const getPurchaseOrderReceiptById = async (req, res) => {
   try {
     const id = Number(req.params.id);
     const branchId = req.user.branchId;
-    if (!id) return res.status(400).json({ error: 'Missing or invalid receipt ID' });
+    if (!id) {
+      return res.status(400).json({ error: 'Missing or invalid receipt ID' });
+    }
 
     const receipt = await prisma.purchaseOrderReceipt.findFirst({
       where: { id, branchId },
@@ -123,12 +136,29 @@ const getPurchaseOrderReceiptById = async (req, res) => {
             id: true,
             quantity: true,
             purchaseOrderItem: {
-              select: { product: { select: { name: true } } },
+              select: {
+                product: {
+                  // ✅ CORRECTED: Access 'unit' through the 'template' relation
+                  select: {
+                    name: true,
+                    template: {
+                      select: {
+                        unit: {
+                          select: {
+                            name: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
         purchaseOrder: {
           select: {
+            id: true,
             code: true,
             supplier: {
               select: {
@@ -138,28 +168,64 @@ const getPurchaseOrderReceiptById = async (req, res) => {
                 creditBalance: true,
               },
             },
-            id: true,
           },
         },
       },
     });
 
-    if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
+    if (!receipt) {
+      return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
+    }
 
-    const paymentLinks = await prisma.supplierPaymentPO.findMany({
-      where: { purchaseOrderId: receipt.purchaseOrder.id },
-      select: { amountPaid: true },
+    if (!receipt.purchaseOrder || !receipt.purchaseOrder.id) {
+      return res.status(400).json({ error: 'ไม่พบข้อมูลใบสั่งซื้อที่เชื่อมโยงกับใบรับนี้' });
+    }
+    
+    // --- CORRECTED LOGIC TO CALCULATE TOTAL PAID FOR THE ENTIRE PO ---
+
+    // 1. ค้นหา ID ของใบรับสินค้า (Receipts) ทั้งหมดที่อยู่ในใบสั่งซื้อ (PO) เดียวกัน
+    const allReceiptsForPO = await prisma.purchaseOrderReceipt.findMany({
+        where: { purchaseOrderId: receipt.purchaseOrder.id },
+        select: { id: true }
     });
+    const receiptIds = allReceiptsForPO.map(r => r.id);
 
-    const totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
+    let totalPaid = 0;
+    // 2. ถ้ามีใบรับสินค้า, ให้ค้นหาการจ่ายเงินที่เชื่อมโยงกับใบรับเหล่านั้น
+    if (receiptIds.length > 0) {
+        // ✅ ใช้ชื่อ Model ที่ถูกต้อง: 'supplierPaymentReceipt'
+        const paymentLinks = await prisma.supplierPaymentReceipt.findMany({
+            where: {
+                receiptId: {
+                    in: receiptIds,
+                },
+            },
+            select: { amountPaid: true },
+        });
+
+        // 3. คำนวณยอดรวมที่จ่ายแล้ว
+        totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
+    }
+    
+    // We need to re-format the response to be easily usable on the frontend
+    const formattedReceipt = {
+        ...receipt,
+        items: receipt.items.map(item => ({
+            id: item.id,
+            quantity: item.quantity,
+            productName: item.purchaseOrderItem.product.name,
+            // Safely access the unit name
+            unitName: item.purchaseOrderItem.product.template?.unit?.name || 'N/A',
+        })),
+    };
 
     const response = {
-      ...receipt,
+      ...formattedReceipt,
       purchaseOrder: {
         ...receipt.purchaseOrder,
         supplier: {
           ...receipt.purchaseOrder.supplier,
-          debitAmount: totalPaid,
+          debitAmount: totalPaid, // ✅ ยอดนี้คือยอดที่จ่ายทั้งหมดของ PO ใบนี้
         },
       },
     };
@@ -168,9 +234,10 @@ const getPurchaseOrderReceiptById = async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error('❌ [getPurchaseOrderReceiptById] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถดึงใบรับสินค้าได้' });
+    res.status(500).json({ error: 'เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลใบรับสินค้าได้' });
   }
 };
+
 
 const getPurchaseOrderDetailById = async (req, res) => {
   try {
