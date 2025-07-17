@@ -21,8 +21,7 @@ const generatePurchaseOrderCode = async (branchId) => {
 
   let nextSequence = 1;
   if (latestPO) {
-    const parts = latestPO.code.split('-');
-    const lastSequence = parseInt(parts[2], 10);
+    const lastSequence = parseInt(latestPO.code.slice(-4), 10); // ✅ ปรับให้ปลอดภัย
     nextSequence = lastSequence + 1;
   }
 

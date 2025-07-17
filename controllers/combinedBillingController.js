@@ -19,7 +19,7 @@ const generateCombinedBillingCode = async (branchId) => {
   });
 
   const nextNumber = lastCode
-    ? parseInt(lastCode.code.split('-')[2], 10) + 1
+    ? parseInt(lastCode.code.slice(-4), 10) + 1
     : 1;
 
   const code = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
@@ -79,6 +79,7 @@ const createCombinedBillingDocument = async (req, res) => {
 };
 
 
+
 // ✅ ดึงรายการ Sale ที่รวมบิลได้ (status = DELIVERED เท่านั้น)
 const getCombinableSales = async (req, res) => {
   try {
@@ -128,12 +129,23 @@ const getCombinedBillingById = async (req, res) => {
 const getCustomersWithPendingSales = async (req, res) => {
   try {
     const { branchId } = req.user;
+    const { keyword } = req.query;
+
     const sales = await prisma.sale.findMany({
       where: {
         branchId,
         status: 'DELIVERED',
         combinedBillingId: null,
         customerId: { not: null },
+        customer: keyword
+          ? {
+              OR: [
+                { name: { contains: keyword, mode: 'insensitive' } },
+                { phone: { contains: keyword, mode: 'insensitive' } },
+                { companyName: { contains: keyword, mode: 'insensitive' } },
+              ],
+            }
+          : undefined,
       },
       include: {
         customer: true,
@@ -153,6 +165,7 @@ const getCustomersWithPendingSales = async (req, res) => {
           email: sale.customer.email,
           address: sale.customer.address,
           customerType: sale.customer.customerType,
+          companyName: sale.customer.companyName,
           sales: [],
         });
       }
@@ -173,6 +186,8 @@ const getCustomersWithPendingSales = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลลูกค้าได้' });
   }
 };
+
+
 
 
 module.exports = {

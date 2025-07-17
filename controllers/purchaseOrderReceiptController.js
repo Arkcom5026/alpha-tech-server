@@ -20,10 +20,8 @@ const generateReceiptCode = async (branchId) => {
 
   let nextNumber = 1;
   if (latest) {
-    const parts = latest.code.split('-');
-    if (parts.length === 3) {
-      nextNumber = parseInt(parts[2], 10) + 1;
-    }
+    const lastSequence = parseInt(latest.code.slice(-4), 10); // ✅ ใช้ slice แทน split
+    nextNumber = lastSequence + 1;
   }
 
   const running = String(nextNumber).padStart(4, '0');
