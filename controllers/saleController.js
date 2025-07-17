@@ -24,11 +24,6 @@ const generateSaleCode = async (branchId) => {
   return `${prefix}-${running}`;
 };
 
-
-// Assume prisma and generateSaleCode are defined elsewhere
-// const prisma = new PrismaClient();
-// const generateSaleCode = async (branchId) => { /* ... */ };
-
 const createSale = async (req, res) => {
   try {
     const {

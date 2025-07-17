@@ -7,8 +7,9 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-  getCategoryDropdowns, // ✅ เพิ่มฟังก์ชันใหม่
+  getCategoryDropdowns, 
 } = require('../controllers/categoryController');
+
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 

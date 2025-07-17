@@ -35,9 +35,10 @@ const branchPriceRoutes = require("./routes/branchPriceRoutes");
 const branchRoutes = require('./routes/branchRoutes');
 const customerDepositRoutes = require('./routes/customerDepositRoutes');
 const purchaseReportRoutes = require('./routes/purchaseReportRoutes');
-// ✨ 1. นำเข้า route สำหรับรายงานภาษีซื้อ
 const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
 const taxReportRoutes = require('./routes/taxReportRoutes');
+const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
+
 
 // ✅ Middlewares
 app.use(express.json());
@@ -115,6 +116,8 @@ app.use('/api/purchase-reports',purchaseReportRoutes);
 app.use('/api/input-tax-reports', inputTaxReportRoutes);
 
 app.use('/api/reports', taxReportRoutes);
+
+app.use('/api/combined-billing', combinedBillingRoutes);
 
 
 

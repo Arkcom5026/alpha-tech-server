@@ -2,19 +2,32 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+
 const generatePurchaseOrderCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
   const yymm = `${now.getFullYear().toString().slice(2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
-  for (let i = 1; i <= 9999; i++) {
-    const sequence = `${i.toString().padStart(4, '0')}`;
-    const code = `PO-${paddedBranch}${yymm}-${sequence}`;
-    const existing = await prisma.purchaseOrder.findUnique({ where: { code } });
-    if (!existing) return code;
+  const latestPO = await prisma.purchaseOrder.findFirst({
+    where: {
+      code: {
+        startsWith: `PO-${paddedBranch}${yymm}-`
+      }
+    },
+    orderBy: {
+      code: 'desc'
+    }
+  });
+
+  let nextSequence = 1;
+  if (latestPO) {
+    const parts = latestPO.code.split('-');
+    const lastSequence = parseInt(parts[2], 10);
+    nextSequence = lastSequence + 1;
   }
 
-  throw new Error('ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้');
+  const sequence = `${nextSequence.toString().padStart(4, '0')}`;
+  return `PO-${paddedBranch}${yymm}-${sequence}`;
 };
 
 
@@ -74,6 +87,7 @@ const createPurchaseOrder = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 const updatePurchaseOrderStatus = async (req, res) => {
   try {

@@ -7,14 +7,27 @@ const generateReceiptCode = async (branchId) => {
   const now = dayjs();
   const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
 
-  for (let i = 1; i <= 9999; i++) {
-    const running = String(i).padStart(4, '0');
-    const code = `${prefix}-${running}`;
-    const existing = await prisma.purchaseOrderReceipt.findUnique({ where: { code } });
-    if (!existing) return code;
+  const latest = await prisma.purchaseOrderReceipt.findFirst({
+    where: {
+      code: {
+        startsWith: prefix,
+      },
+    },
+    orderBy: {
+      code: 'desc',
+    },
+  });
+
+  let nextNumber = 1;
+  if (latest) {
+    const parts = latest.code.split('-');
+    if (parts.length === 3) {
+      nextNumber = parseInt(parts[2], 10) + 1;
+    }
   }
 
-  throw new Error('ไม่สามารถสร้างรหัสใบรับสินค้าแบบไม่ซ้ำได้');
+  const running = String(nextNumber).padStart(4, '0');
+  return `${prefix}-${running}`;
 };
 
 const createPurchaseOrderReceipt = async (req, res) => {

@@ -89,7 +89,6 @@ enum SaleType {
 enum SaleStatus {
   DRAFT // ยังไม่ได้ส่งของ
   DELIVERED // ส่งของแล้วแต่ยังไม่ตกลงราคา
-  PENDING_PRICING // รอเคาะราคา
   FINALIZED // เคาะราคาแล้ว พร้อมคำนวณภาษี
   COMPLETED // รับเงินครบแล้ว
   CANCELLED // ยกเลิก
@@ -128,8 +127,6 @@ enum CustomerType {
   ORGANIZATION // หน่วยงาน / บริษัท
   GOVERNMENT // ✨ หน่วยงานราชการ
 }
-
-
 
 model User {
   id          Int       @id @default(autoincrement())
@@ -177,8 +174,9 @@ model CustomerProfile {
   orderOnline     OrderOnline[]
   customerDeposit CustomerDeposit[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  CombinedBillingDocument CombinedBillingDocument[]
 }
 
 model CustomerDeposit {
@@ -251,8 +249,9 @@ model EmployeeProfile {
   refundTransaction    RefundTransaction[]
   supplierPayment      SupplierPayment[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  CombinedBillingDocument CombinedBillingDocument[]
 }
 
 model Branch {
@@ -287,8 +286,9 @@ model Branch {
   customerDeposit      CustomerDeposit[]
   orderOnline          OrderOnline[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  CombinedBillingDocument CombinedBillingDocument[]
 }
 
 model Position {
@@ -745,8 +745,8 @@ model BarcodeReceiptItem {
 }
 
 model Sale {
-  id         Int      @id @default(autoincrement())
-  code       String   @unique
+  id   Int    @id @default(autoincrement())
+  code String @unique
 
   soldAt     DateTime @default(now())
   customerId Int?
@@ -784,6 +784,10 @@ model Sale {
   Payment      Payment[]
   DepositUsage DepositUsage[]
 
+  combinedBillingId Int?
+  combinedBilling   CombinedBillingDocument? @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
+
+  @@index([combinedBillingId])
   @@index([branchId, soldAt])
   @@index([isCredit, dueDate])
   @@index([combinedDocumentId])
@@ -1030,4 +1034,25 @@ model OrderOnlineItem {
   product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
+model CombinedBillingDocument {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  issueDate  DateTime @default(now())
+  note       String?
+  createdBy  Int
+  customerId Int
+  branchId   Int
 
+  totalBeforeVat Float?
+  vatAmount      Float?
+  totalAmount    Float?
+  status         String @default("ACTIVE") // ACTIVE | CANCELLED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  sales    Sale[]          @relation("CombinedBillingSales")
+}
