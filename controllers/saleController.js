@@ -38,36 +38,35 @@ const createSale = async (req, res) => {
       mode = 'CASH', // เพิ่ม mode จาก body, ค่าเริ่มต้นเป็น 'CASH'
     } = req.body;
 
+     console.log('createSale  req.body', req.body)
+
     const branchId = req.user?.branchId;
     const employeeId = req.user?.employeeId;
 
     // --- Input Validation ---
-    // ตรวจสอบว่ามี branchId และ employeeId จากข้อมูลผู้ใช้งานหรือไม่
     if (!branchId || !employeeId) {
       return res.status(401).json({ error: 'ไม่ได้รับข้อมูลสาขาหรือพนักงานที่ถูกต้อง' });
     }
 
-    // ตรวจสอบว่ามีรายการสินค้าและเป็นอาร์เรย์ที่ไม่ว่างเปล่า
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'ต้องมีรายการสินค้าอย่างน้อยหนึ่งรายการ' });
     }
 
-    // ตรวจสอบความถูกต้องของข้อมูลตัวเลขหลัก
     const numericFields = { totalBeforeDiscount, totalDiscount, vat, vatRate, totalAmount };
     for (const [key, value] of Object.entries(numericFields)) {
-      if (typeof value !== 'number' || isNaN(value) || value < 0) {
+      if (typeof value !== 'number' || isNaN(value) || (key !== 'totalDiscount' && value < 0)) {
         return res.status(400).json({ error: `ข้อมูล ${key} ไม่ถูกต้อง หรือเป็นค่าติดลบ` });
       }
     }
 
-    // ตรวจสอบความถูกต้องของข้อมูลแต่ละรายการสินค้า
     for (const item of items) {
       if (!item.stockItemId || typeof item.stockItemId !== 'number') {
         return res.status(400).json({ error: 'รายการสินค้าต้องมี stockItemId ที่ถูกต้องและเป็นตัวเลข' });
       }
       const itemNumericFields = { price: item.price, discount: item.discount, basePrice: item.basePrice, vatAmount: item.vatAmount };
       for (const [key, value] of Object.entries(itemNumericFields)) {
-        if (typeof value !== 'number' || isNaN(value) || value < 0) {
+        if (typeof value !== 'number' || isNaN(value) || (key !== 'discount' && value < 0)) {
+          console.warn(`❌ Invalid field: ${key}, value: ${value}, item:`, item); // ✅ เพิ่ม log สำหรับ debug
           return res.status(400).json({ error: `ข้อมูล ${key} ในรายการสินค้า (stockItemId: ${item.stockItemId}) ไม่ถูกต้อง หรือเป็นค่าติดลบ` });
         }
       }
@@ -78,44 +77,40 @@ const createSale = async (req, res) => {
     let paidStatus = false;
     let paidAtDate = null;
     let dueDate = null;
-    let customerSaleType = 'NORMAL'; // Default saleType
+    let customerSaleType = 'NORMAL';
 
     let customerProfile = null;
     if (customerId) {
       customerProfile = await prisma.customerProfile.findUnique({
         where: { id: customerId },
-        select: { paymentTerms: true, type: true }, // Select type as well
+        select: { paymentTerms: true, type: true },
       });
 
       if (customerProfile) {
-        // Set saleType based on customer type
         if (customerProfile.type === 'ORGANIZATION') {
-          customerSaleType = 'WHOLESALE'; // หรือ 'GOVERNMENT' ขึ้นอยู่กับว่าต้องการแยกอย่างไร
+          customerSaleType = 'WHOLESALE';
         } else if (customerProfile.type === 'GOVERNMENT') {
           customerSaleType = 'GOVERNMENT';
         }
       }
     }
 
-    // กำหนดสถานะและข้อมูลที่เกี่ยวข้องกับการขายตามโหมด (เงินสด/เครดิต)
     if (mode === 'CREDIT') {
       if (!customerId) {
         return res.status(400).json({ error: 'กรณีขายเครดิต ต้องระบุลูกค้า (customerId)' });
       }
       isCreditSale = true;
-      saleStatus = 'DRAFT'; // สำหรับการขายเครดิต เริ่มต้นที่สถานะ DRAFT
+      saleStatus = 'DRAFT';
       paidStatus = false;
 
-      // คำนวณวันครบกำหนดชำระ (dueDate) สำหรับการขายเครดิต
       if (customerProfile && typeof customerProfile.paymentTerms === 'number' && customerProfile.paymentTerms >= 0) {
         dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + customerProfile.paymentTerms);
       } else {
-        // หากไม่พบ paymentTerms หรือไม่ถูกต้อง อาจจะกำหนดค่าเริ่มต้นหรือแจ้งข้อผิดพลาด
         console.warn(`[createSale] Customer ${customerId} has no valid paymentTerms. Due date not set.`);
       }
-    } else { // mode === 'CASH' (โหมดเงินสด)
-      saleStatus = 'COMPLETED'; // การขายเงินสดถือว่าเสร็จสมบูรณ์ทันที
+    } else {
+      saleStatus = 'COMPLETED';
       paidStatus = true;
       paidAtDate = new Date();
     }
@@ -124,8 +119,6 @@ const createSale = async (req, res) => {
       .map((i) => i.stockItemId)
       .filter((id) => !!id);
 
-    // ตรวจสอบว่า stockItemId เหล่านี้เป็นของสินค้าที่ยังไม่ได้ขายและอยู่ในสต็อก
-    // การตรวจสอบนี้สำคัญสำหรับทุกโหมดการขาย
     const stockItems = await prisma.stockItem.findMany({
       where: {
         id: { in: stockItemIds },
@@ -133,8 +126,13 @@ const createSale = async (req, res) => {
       },
     });
 
+    console.warn('🧾 ตรวจสอบจำนวน stockItems', {
+      stockItemIds,
+      stockItemsFound: stockItems.length,
+      itemsSent: items.length,
+    });
+
     if (stockItems.length !== items.length) {
-      // ระบุรายการที่ไม่พร้อมขายเพื่อช่วยในการแก้ไข
       const availableStockItemIds = new Set(stockItems.map(si => si.id));
       const unavailableItems = items.filter(item => !availableStockItemIds.has(item.stockItemId));
       const unavailableStockIds = unavailableItems.map(item => item.stockItemId);
@@ -144,20 +142,18 @@ const createSale = async (req, res) => {
       });
     }
 
-    // สร้างเลขที่ใบขายที่ไม่ซ้ำกัน
     const code = await generateSaleCode(branchId);
 
-    // เริ่มต้น Transaction เพื่อสร้างใบขายและอัปเดตสต็อกพร้อมกัน
     const transactionOps = [
       prisma.sale.create({
         data: {
           code,
-          status: saleStatus, // ใช้สถานะที่กำหนดจาก mode (DRAFT หรือ COMPLETED)
-          isCredit: isCreditSale, // กำหนดว่าเป็นลูกค้าเครดิตหรือไม่
-          paid: paidStatus, // กำหนดสถานะการชำระเงิน
-          paidAt: paidAtDate, // กำหนดวันที่ชำระเงิน (ถ้าชำระแล้ว)
-          dueDate: dueDate, // กำหนดวันครบกำหนดชำระ (สำหรับเครดิต)
-          customerId: customerId, // ใช้ customerId ที่รับมา (อาจเป็น null สำหรับเงินสด)
+          status: saleStatus,
+          isCredit: isCreditSale,
+          paid: paidStatus,
+          paidAt: paidAtDate,
+          dueDate: dueDate,
+          customerId: customerId,
           employeeId,
           branchId,
           totalBeforeDiscount,
@@ -166,7 +162,7 @@ const createSale = async (req, res) => {
           vatRate,
           totalAmount,
           note,
-          saleType: customerSaleType, // ✅ กำหนด saleType ตามประเภทลูกค้า
+          saleType: customerSaleType,
           items: {
             create: items.map((item) => ({
               stockItemId: item.stockItemId,
@@ -179,11 +175,10 @@ const createSale = async (req, res) => {
           },
         },
       }),
-      // อัปเดตสถานะ StockItem เป็น 'SOLD' สำหรับสินค้าที่ขายไปแล้ว
       prisma.stockItem.updateMany({
         where: {
           id: { in: stockItemIds },
-          status: 'IN_STOCK', // ตรวจสอบสถานะอีกครั้งเพื่อความปลอดภัยก่อนอัปเดต
+          status: 'IN_STOCK',
         },
         data: {
           status: 'SOLD',
@@ -192,10 +187,8 @@ const createSale = async (req, res) => {
       })
     ];
 
-    // ดำเนินการ Transaction
     const [createdSale] = await prisma.$transaction(transactionOps);
 
-    // ดึงข้อมูลใบขายที่สร้างขึ้นมาพร้อมกับข้อมูลที่เกี่ยวข้อง
     const sale = await prisma.sale.findUnique({
       where: { id: createdSale.id },
       include: {
@@ -214,22 +207,20 @@ const createSale = async (req, res) => {
       },
     });
 
-    // ส่งคืนข้อมูลใบขายที่สร้างขึ้นพร้อมกับ stockItemIds ที่เกี่ยวข้อง
     return res.status(201).json({
       ...sale,
-      stockItemIds, // ✅ แนบไปด้วยใน response เพื่อการตรวจสอบเพิ่มเติม
+      stockItemIds,
     });
 
   } catch (error) {
     console.error("❌ [createSale] Error:", error);
-    // จัดการข้อผิดพลาดเฉพาะที่ทราบ
-    if (error.code === 'P2002') { // Prisma error code สำหรับ unique constraint violation
+    if (error.code === 'P2002') {
       return res.status(409).json({ error: "ข้อมูลซ้ำซ้อน เช่น หมายเลขใบขายถูกใช้ไปแล้ว" });
     }
-    // ข้อผิดพลาดทั่วไป
     return res.status(500).json({ error: "ไม่สามารถสร้างการขายได้ เนื่องจากเกิดข้อผิดพลาดภายในระบบ" });
   }
 };
+
 
 
 const getAllSales = async (req, res) => {
@@ -275,21 +266,20 @@ const getAllSalesReturn = async (req, res) => {
 
 const getSaleById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { branchId } = req.user; // ✅ ต้องได้จาก token/user context เท่านั้น
-
-    const sale = await prisma.sale.findFirst({
-      where: {
-        id: Number(id),
-        branchId: branchId, // ✅ กรองตามสาขาเพื่อความปลอดภัย
-      },
+    const sale = await prisma.sale.findUnique({
+      where: { id: parseInt(req.params.id) },
       include: {
         customer: true,
+        employee: true,
         items: {
           include: {
             stockItem: {
               include: {
-                product: true, // ✅ ดึงชื่อสินค้า
+                product: {
+                  include: {
+                    productTemplate: true,
+                  },
+                },
               },
             },
           },
@@ -297,13 +287,42 @@ const getSaleById = async (req, res) => {
       },
     });
 
-    if (!sale) return res.status(404).json({ error: "ไม่พบรายการขายนี้ หรือไม่อยู่ในสาขานี้" });
-    return res.json(sale);
+    if (!sale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    const printableSale = {
+      id: sale.id,
+      createdAt: sale.createdAt,
+      customerName: sale.customer?.fullName || sale.customer?.companyName || '-',
+      customerType: sale.customer?.type || '-',
+      employeeName: sale.employee?.fullName || '-',
+      note: sale.note || '',
+      vatRate: sale.vatRate,
+      vat: sale.vat,
+      totalBeforeDiscount: sale.totalBeforeDiscount,
+      totalDiscount: sale.totalDiscount,
+      totalAmount: sale.totalAmount,
+      items: sale.items.map((item) => ({
+        stockItemId: item.stockItemId,
+        barcode: item.stockItem?.barcode || '-',
+        productName: item.stockItem?.product?.name || '-',
+        productTemplateName: item.stockItem?.product?.productTemplate?.name || '-',
+        price: item.price,
+        basePrice: item.basePrice,
+        discount: item.discount,
+        vatAmount: item.vatAmount,
+        remark: item.remark || '',
+      })),
+    };
+
+    return res.json(printableSale);
   } catch (error) {
-    console.error("❌ [getSaleById] Error:", error);
-    return res.status(500).json({ error: "เกิดข้อผิดพลาดในการค้นหา" });
+    console.error('[getSaleById] error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 const getSalesByBranchId = async (req, res) => {
   try {

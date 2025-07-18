@@ -264,6 +264,7 @@ model Branch {
   region    String? // เช่น ภาคกลาง ภาคเหนือ
   latitude  Float?
   longitude Float?
+  taxId     String?
 
   branchPrices BranchPrice[]
 
