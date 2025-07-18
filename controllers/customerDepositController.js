@@ -181,10 +181,10 @@ const getCustomerAndDepositByName = async (req, res) => {
 
     const customers = await prisma.customerProfile.findMany({
       where: {
-        name: {
-          contains: q,
-          mode: 'insensitive',
-        },
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { companyName: { contains: q, mode: 'insensitive' } },
+        ],
       },
       take: 10,
       include: {
@@ -213,6 +213,10 @@ const getCustomerAndDepositByName = async (req, res) => {
         name: c.name,
         phone: c.phone,
         email: c.user?.email || '',
+        type: c.type || '',
+        companyName: c.companyName || '',
+        taxId: c.taxId || '',
+        address: c.address || '',
         totalDeposit,
         deposits: c.customerDeposit,
       };
@@ -228,6 +232,10 @@ const getCustomerAndDepositByName = async (req, res) => {
           name: first.name,
           phone: first.phone,
           email: first.email,
+          type: first.type,
+          companyName: first.companyName || '',
+          taxId: first.taxId || '',
+          address: first.address || '',
         },
         totalDeposit: first.totalDeposit,
         deposits: first.deposits,
@@ -240,6 +248,12 @@ const getCustomerAndDepositByName = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
   }
 };
+
+
+
+
+
+
 
 
 
