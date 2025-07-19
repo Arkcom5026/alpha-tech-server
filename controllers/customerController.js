@@ -71,6 +71,8 @@ const getCustomerByName = async (req, res) => {
       include: { user: true },
     });
 
+    console.log('getCustomerByName : ',customers)
+
     return res.json(
       customers.map((c) => ({
         id: c.id,
@@ -179,35 +181,28 @@ const createCustomer = async (req, res) => {
 
 
 const updateCustomerProfile = async (req, res) => {
-  // ฟังก์ชันนี้สำหรับลูกค้าอัปเดตข้อมูลตัวเอง ไม่เกี่ยวกับสาขาของพนักงาน
-  const userId = req.user.id;
-  const { role } = req.user;
-
-  if (role !== 'customer') {
-      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
-  }
-
-  const {
-    name,
-    phone,
-    address,
-    district,
-    province,
-    postalCode,
-  } = req.body;
-
   try {
+    const customerId = req.body.id; // ใช้ customerId ที่ส่งมาจากฝั่ง POS
+    const data = req.body;
+
     const updated = await prisma.customerProfile.update({
-      where: { userId },
-      data: { name, phone, address, district, province, postalCode },
+      where: { id: customerId },
+      data: {
+        name: data.name,
+        address: data.address,
+        companyName: data.companyName,
+        taxId: data.taxId,
+      },
     });
 
     res.json(updated);
   } catch (error) {
-    console.error('🔥 updateCustomerProfile error:', error);
-    res.status(500).json({ message: 'ไม่สามารถอัปเดตข้อมูลลูกค้าได้' });
+    console.error('❌ [updateCustomerProfile] error', error);
+    res.status(500).json({ message: 'Failed to update customer profile' });
   }
 };
+
+
 
 module.exports = {
   getCustomerByPhone,

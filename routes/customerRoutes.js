@@ -19,6 +19,5 @@ router.get('/me', getCustomerByUserId);
 router.post('/', createCustomer);
 router.patch('/me', updateCustomerProfile);
 
-router.put('/profile', updateCustomerProfile);
 
 module.exports = router;

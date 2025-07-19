@@ -108,7 +108,7 @@ const getCustomerDepositById = async (req, res) => {
 const getCustomerAndDepositByPhone = async (req, res) => {
   try {
     const rawPhone = req.params.phone;
-    const phone = rawPhone?.trim();
+    const phone = rawPhone?.replace(/\D/g, '').trim(); // Normalize เบอร์โทร
     const branchId = req.user.branchId;
 
     if (!phone) {
@@ -135,6 +135,10 @@ const getCustomerAndDepositByPhone = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบลูกค้า' });
     }
 
+    if (customer.customerDeposit.length === 0) {
+      console.warn(`[ไม่มีมัดจำ] ลูกค้า ${customer.name} (${phone}) มีโปรไฟล์แต่ยังไม่มีมัดจำในสาขา ${branchId}`);
+    }
+
     const totalDeposit = customer.customerDeposit.reduce(
       (sum, item) =>
         sum + item.cashAmount + item.transferAmount + item.cardAmount,
@@ -153,7 +157,6 @@ const getCustomerAndDepositByPhone = async (req, res) => {
         taxId: customer.taxId,
         creditLimit: customer.creditLimit,
         creditBalance: customer.creditBalance,
-        
       },
       totalDeposit,
       deposits: customer.customerDeposit,
@@ -163,6 +166,7 @@ const getCustomerAndDepositByPhone = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้าและมัดจำ' });
   }
 };
+
 
 const getCustomerAndDepositByName = async (req, res) => {
   try {
@@ -224,6 +228,7 @@ const getCustomerAndDepositByName = async (req, res) => {
 
     console.log(`[getCustomerAndDepositByName] ✅ พบลูกค้า ${result.length} คน`);
 
+   
     if (result.length > 0) {
       const first = result[0];
       return res.json({
@@ -248,13 +253,6 @@ const getCustomerAndDepositByName = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
   }
 };
-
-
-
-
-
-
-
 
 
 const updateCustomerDeposit = async (req, res) => {
