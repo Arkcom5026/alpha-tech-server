@@ -7,7 +7,7 @@ const {
   getSupplierPaymentsByPO,
   deleteSupplierPayment,
   getAdvancePaymentsBySupplier,
-  
+  getSupplierPaymentsBySupplier,
 } = require('../controllers/supplierPaymentController');
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -17,6 +17,9 @@ router.use(verifyToken);
 router.post('/', createSupplierPayment);
 
 router.get('/advance', getAdvancePaymentsBySupplier);
+
+// ✅ ดูรายการชำระเงินทั้งหมดของ Supplier รายใดรายหนึ่ง
+router.get('/by-supplier/:supplierId', getSupplierPaymentsBySupplier);
 
 // ✅ ดูรายการชำระเงินทั้งหมด
 router.get('/', getAllSupplierPayments);
@@ -29,8 +32,7 @@ router.delete('/:id', deleteSupplierPayment);
 
 
 
-
-
 module.exports = router;
+
 
 

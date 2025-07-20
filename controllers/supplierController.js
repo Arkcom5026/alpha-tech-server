@@ -31,6 +31,8 @@ const getAllSuppliers = async (req, res) => {
       creditRemaining: (s.creditLimit ?? 0) - (s.creditBalance ?? 0),
     }));
 
+    console.log('getAllSuppliers ',suppliersWithCreditRemaining)
+
     res.json(suppliersWithCreditRemaining);
   } catch (error) {
     console.error('❌ getAllSuppliers error:', error);

@@ -44,6 +44,7 @@ const createCustomerDeposit = async (req, res) => {
   }
 };
 
+
 const getAllCustomerDeposits = async (req, res) => {
   try {
     const branchId = req.user.branchId;

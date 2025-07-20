@@ -1,5 +1,5 @@
 const dayjs = require('dayjs');
-const { PrismaClient,ReceiptStatus  } = require('@prisma/client');
+const { PrismaClient, ReceiptStatus } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const generateReceiptCode = async (branchId) => {
@@ -191,43 +191,43 @@ const getPurchaseOrderReceiptById = async (req, res) => {
     if (!receipt.purchaseOrder || !receipt.purchaseOrder.id) {
       return res.status(400).json({ error: 'ไม่พบข้อมูลใบสั่งซื้อที่เชื่อมโยงกับใบรับนี้' });
     }
-    
+
     // --- CORRECTED LOGIC TO CALCULATE TOTAL PAID FOR THE ENTIRE PO ---
 
     // 1. ค้นหา ID ของใบรับสินค้า (Receipts) ทั้งหมดที่อยู่ในใบสั่งซื้อ (PO) เดียวกัน
     const allReceiptsForPO = await prisma.purchaseOrderReceipt.findMany({
-        where: { purchaseOrderId: receipt.purchaseOrder.id },
-        select: { id: true }
+      where: { purchaseOrderId: receipt.purchaseOrder.id },
+      select: { id: true }
     });
     const receiptIds = allReceiptsForPO.map(r => r.id);
 
     let totalPaid = 0;
     // 2. ถ้ามีใบรับสินค้า, ให้ค้นหาการจ่ายเงินที่เชื่อมโยงกับใบรับเหล่านั้น
     if (receiptIds.length > 0) {
-        // ✅ ใช้ชื่อ Model ที่ถูกต้อง: 'supplierPaymentReceipt'
-        const paymentLinks = await prisma.supplierPaymentReceipt.findMany({
-            where: {
-                receiptId: {
-                    in: receiptIds,
-                },
-            },
-            select: { amountPaid: true },
-        });
+      // ✅ ใช้ชื่อ Model ที่ถูกต้อง: 'supplierPaymentReceipt'
+      const paymentLinks = await prisma.supplierPaymentReceipt.findMany({
+        where: {
+          receiptId: {
+            in: receiptIds,
+          },
+        },
+        select: { amountPaid: true },
+      });
 
-        // 3. คำนวณยอดรวมที่จ่ายแล้ว
-        totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
+      // 3. คำนวณยอดรวมที่จ่ายแล้ว
+      totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
     }
-    
+
     // We need to re-format the response to be easily usable on the frontend
     const formattedReceipt = {
-        ...receipt,
-        items: receipt.items.map(item => ({
-            id: item.id,
-            quantity: item.quantity,
-            productName: item.purchaseOrderItem.product.name,
-            // Safely access the unit name
-            unitName: item.purchaseOrderItem.product.template?.unit?.name || 'N/A',
-        })),
+      ...receipt,
+      items: receipt.items.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        productName: item.purchaseOrderItem.product.name,
+        // Safely access the unit name
+        unitName: item.purchaseOrderItem.product.template?.unit?.name || 'N/A',
+      })),
     };
 
     const response = {
@@ -384,7 +384,7 @@ const getReceiptBarcodeSummaries = async (req, res) => {
         tax: receipt.supplierTaxInvoiceNumber,
         receivedAt: receipt.receivedAt,
         supplierName: receipt.purchaseOrder?.supplier?.name || '-',
-        orderCode: receipt.purchaseOrder?.code || '-',        
+        orderCode: receipt.purchaseOrder?.code || '-',
         totalItems: total,
         barcodeGenerated: generated,
         status: receipt.statusReceipt, // ✅ ส่ง status ไป frontend
@@ -494,7 +494,7 @@ const getReceiptsReadyToPay = async (req, res) => {
             },
           },
         },
-      },      
+      },
       orderBy: { receivedAt: 'asc' },
       take: limit ? parseInt(limit) : undefined,
     });

@@ -240,7 +240,7 @@ const receiveStockItem = async (req, res) => {
       data: { stockItemId: newStockItem.id },
     });
 
-    const quantity = barcodeItem.receiptItem.quantity || 1;
+    const quantity = 1; // แก้ให้ถูกต้อง: 1 barcode = 1 ชิ้น
     const costPrice = barcodeItem.receiptItem.costPrice || 0;
     const totalCost = quantity * costPrice;
 
@@ -249,7 +249,7 @@ const receiveStockItem = async (req, res) => {
         where: { id: purchaseOrder.supplierId },
         data: {
           creditBalance: {
-            decrement: totalCost
+            increment: totalCost
           },
         },
       });
@@ -261,6 +261,7 @@ const receiveStockItem = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error.' });
   }
 };
+
 
 
 const searchStockItem = async (req, res) => {

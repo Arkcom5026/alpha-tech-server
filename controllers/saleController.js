@@ -266,11 +266,18 @@ const getAllSalesReturn = async (req, res) => {
 
 const getSaleById = async (req, res) => {
   try {
+    const id = parseInt(req.params.id, 10); // ✅ แปลงให้ชัดเจน
+
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid sale ID' });
+    }
+
     const sale = await prisma.sale.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         customer: true,
         employee: true,
+        payments: true,
         items: {
           include: {
             stockItem: {
@@ -287,41 +294,15 @@ const getSaleById = async (req, res) => {
       },
     });
 
-    if (!sale) {
-      return res.status(404).json({ error: 'Sale not found' });
-    }
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
 
-    const printableSale = {
-      id: sale.id,
-      createdAt: sale.createdAt,
-      customerName: sale.customer?.fullName || sale.customer?.companyName || '-',
-      customerType: sale.customer?.type || '-',
-      employeeName: sale.employee?.fullName || '-',
-      note: sale.note || '',
-      vatRate: sale.vatRate,
-      vat: sale.vat,
-      totalBeforeDiscount: sale.totalBeforeDiscount,
-      totalDiscount: sale.totalDiscount,
-      totalAmount: sale.totalAmount,
-      items: sale.items.map((item) => ({
-        stockItemId: item.stockItemId,
-        barcode: item.stockItem?.barcode || '-',
-        productName: item.stockItem?.product?.name || '-',
-        productTemplateName: item.stockItem?.product?.productTemplate?.name || '-',
-        price: item.price,
-        basePrice: item.basePrice,
-        discount: item.discount,
-        vatAmount: item.vatAmount,
-        remark: item.remark || '',
-      })),
-    };
-
-    return res.json(printableSale);
+    res.json(sale);
   } catch (error) {
-    console.error('[getSaleById] error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ [getSaleById] error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 
 const getSalesByBranchId = async (req, res) => {

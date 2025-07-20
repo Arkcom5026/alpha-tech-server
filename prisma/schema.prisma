@@ -491,15 +491,14 @@ model Supplier {
   contactPerson String?
   phone         String?
   email         String?
-  taxId         String?
-  // ✨ ฟิลด์ที่เพิ่มสำหรับรายงานภาษีซื้อ
+  taxId         String?  
   taxBranchCode String?         @default("00000") // รหัสสาขาของผู้ขาย (00000 = สนง.ใหญ่)
   address       String?
   province      String?
   postalCode    String?
   country       String?         @default("Thailand")
   paymentTerms  Int?            @default(0)
-  creditLimit   Float?
+  creditLimit   Float?          @default(0)
   creditBalance Float?          @default(0)
   bankId        Int?
   accountNumber String?

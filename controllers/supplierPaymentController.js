@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
+
 const generateSupplierPaymentCode = async (tx, branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = new Date();
@@ -58,17 +59,17 @@ const createSupplierPayment = async (req, res) => {
       // --- FIX [1]: Check credit balance only when paying off debt (RECEIPT_BASED) ---
       // For ADVANCE payments, this check is skipped.
       if (paymentType === 'RECEIPT_BASED') {
-        if (amount > supplier.creditBalance) {
-          throw new Error('ยอดชำระเกินกว่ายอดเครดิตที่เหลือของ Supplier');
+        const creditOwed = supplier.creditBalance;
+        if (amount > creditOwed) {
+          throw new Error('ยอดชำระเกินกว่ายอดหนี้ที่มีอยู่ของ Supplier');
         }
         if (selectedReceiptsData && selectedReceiptsData.length > 0) {
-            const sumOfReceiptAmounts = selectedReceiptsData.reduce((sum, r) => sum + r.amountPaid, 0);
-            if (Math.abs(sumOfReceiptAmounts - amount) > 0.01) {
-              throw new Error('ยอดรวมใบรับของที่เลือกไม่ตรงกับจำนวนเงินที่ชำระ');
-            }
+          const sumOfReceiptAmounts = selectedReceiptsData.reduce((sum, r) => sum + r.amountPaid, 0);
+          if (Math.abs(sumOfReceiptAmounts - amount) > 0.01) {
+            throw new Error('ยอดรวมใบรับของที่เลือกไม่ตรงกับจำนวนเงินที่ชำระ');
+          }
         }
       }
-
 
       const payment = await tx.supplierPayment.create({
         data: {
@@ -145,12 +146,12 @@ const createSupplierPayment = async (req, res) => {
 
       // --- FIX [2]: Adjust credit balance based on paymentType ---
       if (paymentType === 'ADVANCE') {
-        // For ADVANCE payments, INCREMENT the credit balance.
-        console.log(`🔼 Increasing supplier ${supplierId} creditBalance by ${amount}`);
+        // For ADVANCE payments, DECREMENT the credit balance (Supplier owes us)
+        console.log(`🔻 Decreasing supplier ${supplierId} creditBalance by ${amount} (Advance payment)`);
         await tx.supplier.update({
           where: { id: supplierId },
           data: {
-            creditBalance: { increment: amount },
+            creditBalance: { decrement: amount },
           },
         });
       } else {
@@ -177,10 +178,11 @@ const createSupplierPayment = async (req, res) => {
 };
 
 
+
 const getAllSupplierPayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
-    console.log('getAllSupplierPayments branchId : ', branchId);
+   
 
     const payments = await prisma.supplierPayment.findMany({
       where: { branchId },
@@ -195,7 +197,7 @@ const getAllSupplierPayments = async (req, res) => {
         },
       },
     });
-
+    console.log('getAllSupplierPayments payments : ', payments);
     res.json(payments);
   } catch (err) {
     console.error('❌ [getAllSupplierPayments] error:', err);
@@ -298,10 +300,46 @@ const getAdvancePaymentsBySupplier = async (req, res) => {
 };
 
 
+const getSupplierPaymentsBySupplier = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
+    const supplierId = parseInt(req.params.supplierId);
+
+    if (!supplierId) {
+      return res.status(400).json({ error: 'Missing supplierId parameter' });
+    }
+
+    const payments = await prisma.supplierPayment.findMany({
+      where: {
+        branchId,
+        supplierId,
+      },
+      orderBy: { paidAt: 'desc' },
+      include: {
+        supplier: true,
+        employee: true,
+        supplierPaymentReceipts: {
+          include: {
+            receipt: true,
+          },
+        },
+      },
+    });
+
+    res.json(payments);
+  } catch (err) {
+    console.error('❌ [getSupplierPaymentsBySupplier] error:', err);
+    res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลการชำระเงินของ Supplier นี้ได้' });
+  }
+};
+
 module.exports = {
   createSupplierPayment,
   getAllSupplierPayments,
   getSupplierPaymentsByPO,
   deleteSupplierPayment,
   getAdvancePaymentsBySupplier,
-};
+  getSupplierPaymentsBySupplier,
+};;
+
+

@@ -168,6 +168,16 @@ const searchPrintablePayments = async (req, res) => {
                 },
               },
             },
+            {
+              sale: {
+                customer: {
+                  companyName: {
+                    contains: keyword,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
           ],
         }),
 
@@ -181,9 +191,9 @@ const searchPrintablePayments = async (req, res) => {
           include: {
             branch: true, 
             customer: true, 
-            items: { // Sale items
+            items: {
               include: {              
-                stockItem: { // Stock item for product details
+                stockItem: {
                   include: {
                     product: {
                       select: {
@@ -198,11 +208,17 @@ const searchPrintablePayments = async (req, res) => {
             },
           },
         },
-        employeeProfile: true, // Employee who processed the payment
+        employeeProfile: true,
       },
     });
-    console.log('payments : ',payments)
-    res.json(payments);
+
+    const result = payments.map((p) => ({
+      ...p,
+      amount: p.items.reduce((sum, item) => sum + item.amount, 0),
+    }));
+
+    console.log('payments : ', result);
+    res.json(result);
   } catch (error) {
     console.error('❌ [searchPrintablePayments] error:', error);
     res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบเสร็จได้' });
