@@ -36,8 +36,8 @@ const branchRoutes = require('./routes/branchRoutes');
 const customerDepositRoutes = require('./routes/customerDepositRoutes');
 const purchaseReportRoutes = require('./routes/purchaseReportRoutes');
 const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
-const taxReportRoutes = require('./routes/taxReportRoutes');
 const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
+const salesReportRoutes = require('./routes/salesReportRoutes');
 
 
 // ✅ Middlewares
@@ -115,10 +115,10 @@ app.use('/api/purchase-reports',purchaseReportRoutes);
 
 app.use('/api/input-tax-reports', inputTaxReportRoutes);
 
-app.use('/api/reports', taxReportRoutes);
 
 app.use('/api/combined-billing', combinedBillingRoutes);
 
+app.use('/api/sales-reports', salesReportRoutes);
 
 
 // ✅ Error handler
