@@ -1,42 +1,45 @@
+// orderOnlineController.js
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+const generateOrderOnlineCode = async (branchId) => {
+  const dayjs = require('dayjs');
+  const today = dayjs().format('YYMMDD');
+  const count = await prisma.orderOnline.count({
+    where: {
+      branchId,
+      createdAt: {
+        gte: new Date(new Date().setHours(0, 0, 0, 0)),
+      },
+    },
+  });
+  const paddedCount = String(count + 1).padStart(3, '0');
+  return `ORD${branchId}-${today}-${paddedCount}`;
+};
 
 const createOrderOnline = async (req, res) => {
-  console.log('createOrderOnline req.body ; ',req.body)
   try {
     const {
       items = [],
       customerId,
       branchId,
       deliveryDate,
-      note,
-      fullName,
-      phone,
-      email,
-      address,
-      district,
-      province,
-      postalCode,
+      note
     } = req.body;
 
     const userId = req.user?.id;
 
-    if (
-      !branchId ||
-      !Array.isArray(items) ||
-      items.length === 0 ||
-      !fullName ||
-      !phone ||
-      !address ||
-      !district ||
-      !province ||
-      !postalCode
-    ) {
+    if (!branchId || !Array.isArray(items) || items.length === 0) {
+      console.warn('🛑 ข้อมูลไม่ครบ:', {
+        branchId,
+        items,
+      });
       return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
     }
 
-    // ดึงราคาจาก branchPrice สำหรับสินค้าที่เกี่ยวข้อง
+    console.log('📦 createOrderOnline req.body:', req.body);
+
     const productIds = items.map((item) => item.productId);
     const branchPrices = await prisma.branchPrice.findMany({
       where: {
@@ -47,6 +50,9 @@ const createOrderOnline = async (req, res) => {
 
     const enrichedItems = items.map((item) => {
       const found = branchPrices.find((bp) => bp.productId === item.productId);
+      if (!found) {
+        console.warn('⚠️ ไม่พบราคาใน branchPrices สำหรับ productId:', item.productId);
+      }
       const price = found?.priceOnline || 0;
       return {
         ...item,
@@ -58,22 +64,18 @@ const createOrderOnline = async (req, res) => {
       return sum + item.price * item.quantity;
     }, 0);
 
+    const code = await generateOrderOnlineCode(branchId);
+
     const newOrder = await prisma.orderOnline.create({
       data: {
+        code,
         customerId: customerId || null,
         branchId,
         deliveryDate: deliveryDate || undefined,
         note: note || '',
-        paymentStatus: 'PENDING',
+        statusPayment: 'UNPAID', // ✅ ใช้ enum PaymentStatus อย่างถูกต้อง
         paymentMethod: 'CASH',
         source: 'ONLINE',
-        fullName,
-        phone,
-        email: email || null,
-        address,
-        district,
-        province,
-        postalCode,
         items: {
           create: enrichedItems.map((item) => ({
             productId: item.productId,
@@ -82,7 +84,7 @@ const createOrderOnline = async (req, res) => {
             note: item.note || '',
           })),
         },
-        userId: userId || null
+        userId: userId || null,
       },
     });
 
@@ -94,9 +96,11 @@ const createOrderOnline = async (req, res) => {
     res.status(201).json({ message: 'สร้างคำสั่งซื้อสำเร็จ', order: newOrder });
   } catch (error) {
     console.error('❌ createOrderOnline error:', error);
+    console.error('📦 req.body:', req.body);
     res.status(500).json({ error: 'ไม่สามารถสร้างคำสั่งซื้อได้' });
   }
 };
+
 
 const getAllOrderOnline = async (req, res) => {
   try {

@@ -986,21 +986,16 @@ model SupplierPaymentReceipt {
   @@unique([paymentId, receiptId]) // ✅ ห้ามซ้ำในคู่เดียวกัน
 }
 
+
 model OrderOnline {
   id         Int              @id @default(autoincrement())
+  code String @unique
+  
   customerId Int?
   customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
+  
   branchId Int
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-  fullName   String
-  phone      String
-  email      String?
-  address    String
-  district   String
-  province   String
-  postalCode String
 
   note          String?
   status        OrderOnlineStatus @default(PENDING)
@@ -1033,6 +1028,8 @@ model OrderOnlineItem {
   order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
+
+
 
 model CombinedBillingDocument {
   id         Int      @id @default(autoincrement())
