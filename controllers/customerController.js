@@ -204,10 +204,43 @@ const updateCustomerProfile = async (req, res) => {
 
 
 
+const updateCustomerProfileOnline = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (req.user.role !== 'customer') {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
+    }
+
+    const data = req.body;
+
+    const updated = await prisma.customerProfile.update({
+      where: { userId },
+      data: {
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
+        district: data.district,
+        province: data.province,
+        postalCode: data.postalCode,
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('❌ [updateCustomerProfileOnline] error', error);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+};
+
+
 module.exports = {
   getCustomerByPhone,
   getCustomerByName,
   getCustomerByUserId,
   createCustomer,
   updateCustomerProfile,
+  updateCustomerProfileOnline,
 };
+
+
+
