@@ -204,14 +204,14 @@ const updateMultipleBranchPrices = async (req, res) => {
 
     const results = await Promise.all(
       updates.map(item =>
-        prisma.branchPrice.update({
+        prisma.branchPrice.upsert({
           where: {
             productId_branchId: {
               productId: item.product?.id || item.productId,
               branchId: req.user.branchId,
             }
           },
-          data: {
+          update: {
             costPrice: item.costPrice,
             priceRetail: item.retailPrice,
             priceWholesale: item.wholesalePrice,
@@ -223,6 +223,20 @@ const updateMultipleBranchPrices = async (req, res) => {
             isActive: item.isActive,
             updatedBy: req.user.id,
           },
+          create: {
+            productId: item.product?.id || item.productId,
+            branchId: req.user.branchId,
+            costPrice: item.costPrice,
+            priceRetail: item.retailPrice,
+            priceWholesale: item.wholesalePrice,
+            priceTechnician: item.technicianPrice,
+            priceOnline: item.priceOnline,
+            effectiveDate: item.effectiveDate,
+            expiredDate: item.expiredDate,
+            note: item.note,
+            isActive: item.isActive,
+            updatedBy: req.user.id,
+          }
         })
       )
     );
