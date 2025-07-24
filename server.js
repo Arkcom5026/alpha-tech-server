@@ -38,6 +38,7 @@ const purchaseReportRoutes = require('./routes/purchaseReportRoutes');
 const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
 const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
 const salesReportRoutes = require('./routes/salesReportRoutes');
+const uploadSlipRoutes = require('./routes/uploadSlipRoutes');
 
 
 // ✅ Middlewares
@@ -120,6 +121,7 @@ app.use('/api/combined-billing', combinedBillingRoutes);
 
 app.use('/api/sales-reports', salesReportRoutes);
 
+app.use('/api/upload-slips', uploadSlipRoutes);
 
 // ✅ Error handler
 app.use((err, req, res, next) => {

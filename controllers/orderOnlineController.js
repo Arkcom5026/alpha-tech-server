@@ -73,7 +73,7 @@ const createOrderOnline = async (req, res) => {
         branchId,
         deliveryDate: deliveryDate || undefined,
         note: note || '',
-        statusPayment: 'UNPAID', // ✅ ใช้ enum PaymentStatus อย่างถูกต้อง
+        statusPayment: 'UNPAID',
         paymentMethod: 'CASH',
         source: 'ONLINE',
         items: {
@@ -104,13 +104,28 @@ const createOrderOnline = async (req, res) => {
 
 const getAllOrderOnline = async (req, res) => {
   try {
+    const branchId = req.user.branchId;
+    const status = req.query.status;
+
+    const where = {
+      branchId,
+      ...(status && status !== 'ALL' && { status }),
+    };
+
     const orders = await prisma.orderOnline.findMany({
+      where,
       include: {
-        customer: true,
+        customer: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
         items: true,
       },
       orderBy: { createdAt: 'desc' },
     });
+
     res.json(orders);
   } catch (error) {
     console.error('❌ getAllOrderOnline error:', error);
@@ -118,32 +133,29 @@ const getAllOrderOnline = async (req, res) => {
   }
 };
 
-const getOrderOnlineById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const order = await prisma.orderOnline.findUnique({
-      where: { id: Number(id) },
-      include: {
-        customer: true,
-        items: {
-          include: { product: true },
-        },
-      },
-    });
-    if (!order) {
-      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
-    }
-    res.json(order);
-  } catch (error) {
-    console.error('❌ getOrderOnlineById error:', error);
-    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
-  }
-};
 
 const updateOrderOnlineStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { paymentStatus, deliveryDate, note } = req.body;
+    const userId = req.user?.id;
+    const isEmployee = !!req.user?.branchId;
+
+    const existingOrder = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (!isEmployee && existingOrder.customerId !== userId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์อัปเดตคำสั่งซื้อนี้' });
+    }
+
+    if (isEmployee && existingOrder.branchId !== req.user.branchId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์อัปเดตคำสั่งซื้อของสาขาอื่น' });
+    }
 
     const updated = await prisma.orderOnline.update({
       where: { id: Number(id) },
@@ -161,12 +173,33 @@ const updateOrderOnlineStatus = async (req, res) => {
   }
 };
 
+
 const deleteOrderOnline = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user?.id;
+    const isEmployee = !!req.user?.branchId;
+
+    const existingOrder = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (!isEmployee && existingOrder.customerId !== userId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ลบคำสั่งซื้อนี้' });
+    }
+
+    if (isEmployee && existingOrder.branchId !== req.user.branchId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ลบคำสั่งซื้อของสาขาอื่น' });
+    }
+
     await prisma.orderOnline.delete({
       where: { id: Number(id) },
     });
+
     res.json({ message: 'ลบคำสั่งซื้อสำเร็จ' });
   } catch (error) {
     console.error('❌ deleteOrderOnline error:', error);
@@ -174,10 +207,375 @@ const deleteOrderOnline = async (req, res) => {
   }
 };
 
+
+
+const getOrderOnlineByIdForEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+      include: {
+        customer: true,
+        items: {
+          include: { product: true },
+        }
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (order.branchId !== req.user.branchId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์เข้าถึงคำสั่งซื้อของสาขาอื่น' });
+    }
+
+    const formattedOrder = {
+      id: order.id,
+      code: order.code,
+      customerName: order.customer.name,
+      customerPhone: order.customer.phone,
+      customerAddress: [
+        order.customer.address,
+        order.customer.district,
+        order.customer.province,
+        order.customer.postalCode
+      ].filter(Boolean).join(' '),
+      status: order.status,
+      paymentSlipStatus: order.paymentSlipStatus, // ✅ เพิ่มฟิลด์นี้เพื่อให้ frontend แสดงปุ่มอนุมัติได้
+      totalAmount: order.totalAmount,
+      createdAt: order.createdAt,
+      slipImageUrl: order.paymentSlipUrl || null, // ✅ เปลี่ยนมาใช้ฟิลด์ตรง
+      items: order.items.map((item) => {
+        const unitPrice = Number(item.priceAtPurchase) || 0;
+        return {
+          productName: item.product.name,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice: item.quantity * unitPrice,
+        };
+      }),
+    };
+
+    res.json(formattedOrder);
+  } catch (error) {
+    console.error('❌ getOrderOnlineByIdForEmployee error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
+  }
+};
+
+
+const getOrderOnlineByIdForCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(403).json({ error: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+      include: {
+        customer: true,
+        items: {
+          include: { product: true },
+        },
+      },
+    });
+
+    if (!order || order.customerId !== customerProfile.id) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์เข้าถึงคำสั่งซื้อนี้' });
+    }
+
+    const formattedOrder = {
+      id: order.id,
+      code: order.code,
+      customerName: order.customer.name,
+      customerPhone: order.customer.phone,
+      customerAddress: [
+        order.customer.address,
+        order.customer.district,
+        order.customer.province,
+        order.customer.postalCode
+      ].filter(Boolean).join(' '),
+      status: order.status,
+      totalAmount: order.totalAmount,
+      createdAt: order.createdAt,
+      items: order.items.map((item) => {
+        const unitPrice = Number(item.priceAtPurchase) || 0;
+        return {
+          productName: item.product.name,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice: item.quantity * unitPrice,
+        };
+      }),
+    };
+
+    res.json(formattedOrder);
+  } catch (error) {
+    console.error('❌ getOrderOnlineByIdForCustomer error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
+  }
+};
+
+
+const getOrderOnlineByCustomer = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const status = req.query.status;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    const where = {
+      customerId: customerProfile.id,
+      ...(status && status !== 'ALL' && { status }),
+    };
+
+    const orders = await prisma.orderOnline.findMany({
+      where,
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+            phone: true,
+          },
+        },
+        
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = orders.map((order) => {
+  const totalAmount = order.items.reduce((sum, item) => {
+    return sum + (item.priceAtPurchase || 0) * item.quantity;
+  }, 0);
+
+  const paymentStatusLabel = order.statusPayment === 'PAID' ? 'ชำระแล้ว' : 'ยังไม่ชำระ';
+
+  return { ...order, totalAmount, paymentStatusLabel };
+});
+res.json(formatted);
+  } catch (error) {
+    console.error('❌ getOrderOnlineByCustomer error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงคำสั่งซื้อของคุณได้' });
+  }
+};
+
+
+const getOrderOnlineList = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
+    const status = req.query.status;
+
+    const where = {
+      branchId,
+      ...(status && status !== 'ALL' && { status }),
+    };
+
+    const orders = await prisma.orderOnline.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+
+    res.json(orders);
+  } catch (error) {
+    console.error('❌ [getOrderOnlineList] error:', error);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลคำสั่งซื้อ' });
+  }
+};
+
+
+const submitOrderOnlinePaymentSlip = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { note = '', slipUrl } = req.body;
+
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(orderId) },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (order.statusPayment === 'PAID') {
+      return res.status(400).json({ message: 'คำสั่งซื้อนี้ชำระเงินแล้ว' });
+    }
+
+    const imageUrl = slipUrl?.url || slipUrl;
+    console.log('📦 slipUrl =', imageUrl);
+
+    await prisma.orderOnline.update({
+      where: { id: Number(orderId) },
+      data: {
+        paymentNote: note,
+        paymentSlipUrl: imageUrl,
+        statusPayment: 'WAITING_APPROVAL',
+        paymentSlipStatus: 'WAITING_APPROVAL',
+      },
+    });
+
+    return res.json({ message: 'ส่งข้อมูลการชำระเงินเรียบร้อยแล้ว กรุณารอการตรวจสอบสลิป' });
+  } catch (error) {
+    console.error('submitOrderOnlinePaymentSlip error:', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการส่งข้อมูลการชำระเงิน' });
+  }
+};
+
+
+const approveOrderOnlineSlip = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (order.branchId !== req.user.branchId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ยืนยันคำสั่งซื้อของสาขาอื่น' });
+    }
+
+    if (order.statusPayment === 'PAID') {
+      return res.status(400).json({ error: 'คำสั่งซื้อนี้ชำระเงินแล้ว' });
+    }
+
+    const updated = await prisma.orderOnline.update({
+      where: { id: Number(id) },
+      data: {
+        statusPayment: 'PAID', // ✅ ใช้ชื่อที่ตรงกับ Prisma schema
+        paymentDate: new Date(),
+        paymentSlipStatus: 'APPROVED',
+        confirmedByEmployeeId: req.user.employeeId || null,
+      },
+    });
+
+    res.json({ message: 'อนุมัติสลิปการชำระเงินสำเร็จ', order: updated });
+  } catch (error) {
+    console.error('❌ approveOrderOnlineSlip error:', error);
+    res.status(500).json({ error: 'ไม่สามารถอนุมัติการชำระเงินได้' });
+  }
+};
+
+
+const rejectOrderOnlineSlip = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    if (order.branchId !== req.user.branchId) {
+      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ดำเนินการกับคำสั่งซื้อของสาขาอื่น' });
+    }
+
+    if (order.paymentSlipStatus !== 'WAITING_APPROVAL') {
+      return res.status(400).json({ error: 'ไม่สามารถปฏิเสธสลิปในสถานะนี้ได้' });
+    }
+
+    const updated = await prisma.orderOnline.update({
+      where: { id: Number(id) },
+      data: {
+        paymentSlipStatus: 'REJECTED',
+        statusPayment: 'NONE',               // ✅ reset สถานะการชำระเงิน
+        paymentDate: null,                   // ✅ ล้างวันที่
+        confirmedByEmployeeId: null,        // ✅ ล้างผู้อนุมัติ
+      },
+    });
+
+    res.json({ message: 'ปฏิเสธสลิปเรียบร้อยแล้ว', order: updated });
+  } catch (error) {
+    console.error('❌ rejectOrderOnlineSlip error:', error);
+    res.status(500).json({ error: 'ไม่สามารถปฏิเสธสลิปได้' });
+  }
+};
+
+
+const getOrderOnlineByBranch = async (req, res) => {
+  try {
+    const branchId = req.user.branchId;
+
+    const orders = await prisma.orderOnline.findMany({
+      where: { branchId },
+      include: {
+        customer: true,
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = orders.map((order) => {
+      const totalAmount = order.items.reduce((sum, item) => {
+        const unitPrice = Number(item.priceAtPurchase) || 0;
+        return sum + unitPrice * item.quantity;
+      }, 0);
+
+      return {
+        id: order.id,
+        code: order.code,
+        createdAt: order.createdAt,
+        status: order.status,
+        paymentSlipStatus: order.paymentSlipStatus, // ✅ เพิ่มให้ส่งค่า paymentSlipStatus
+        statusPayment: order.statusPayment,         // ✅ เพิ่มให้ส่งค่า statusPayment
+        customerName: order.customer?.name || '-',
+        totalAmount,
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('❌ getOrderOnlineByBranch error:', error);
+    res.status(500).json({ error: 'ไม่สามารถดึงคำสั่งซื้อได้' });
+  }
+};
+
+
+
+
+
 module.exports = {
   createOrderOnline,
   getAllOrderOnline,
-  getOrderOnlineById,
+  getOrderOnlineByIdForEmployee,
+  getOrderOnlineByIdForCustomer,
   updateOrderOnlineStatus,
   deleteOrderOnline,
+  getOrderOnlineList,
+  getOrderOnlineByCustomer,
+  submitOrderOnlinePaymentSlip,
+  approveOrderOnlineSlip,
+  rejectOrderOnlineSlip,
+  getOrderOnlineByBranch,
 };

@@ -60,8 +60,16 @@ enum ReceiptStatus {
 enum PaymentStatus {
   UNPAID
   PARTIALLY_PAID
+  WAITING_APPROVAL
   PAID
   CANCELLED
+}
+
+enum PaymentSlipStatus {
+  NONE
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum LoginType {
@@ -491,7 +499,7 @@ model Supplier {
   contactPerson String?
   phone         String?
   email         String?
-  taxId         String?  
+  taxId         String?
   taxBranchCode String?         @default("00000") // รหัสสาขาของผู้ขาย (00000 = สนง.ใหญ่)
   address       String?
   province      String?
@@ -986,18 +994,18 @@ model SupplierPaymentReceipt {
   @@unique([paymentId, receiptId]) // ✅ ห้ามซ้ำในคู่เดียวกัน
 }
 
-
 model OrderOnline {
-  id         Int              @id @default(autoincrement())
+  id   Int    @id @default(autoincrement())
   code String @unique
-  
+
   customerId Int?
   customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
+
   branchId Int
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   note          String?
+  paymentNote   String?
   status        OrderOnlineStatus @default(PENDING)
   statusPayment PaymentStatus     @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
   paymentMethod String?
@@ -1011,10 +1019,16 @@ model OrderOnline {
   shippedAt    DateTime?
   cancelReason String?
 
-  items     OrderOnlineItem[]
-  createdAt DateTime          @default(now())
-  User      User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int?
+  paymentSlipUrl    String?
+  
+  paymentSlipStatus PaymentSlipStatus @default(NONE)
+
+  items       OrderOnlineItem[]
+  createdAt   DateTime          @default(now())
+  User        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int?
+  paymentDate DateTime?
+
 }
 
 model OrderOnlineItem {
@@ -1028,8 +1042,6 @@ model OrderOnlineItem {
   order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
-
-
 
 model CombinedBillingDocument {
   id         Int      @id @default(autoincrement())
