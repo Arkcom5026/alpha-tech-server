@@ -208,7 +208,6 @@ const deleteOrderOnline = async (req, res) => {
 };
 
 
-
 const getOrderOnlineByIdForEmployee = async (req, res) => {
   try {
     const { id } = req.params;
@@ -218,8 +217,10 @@ const getOrderOnlineByIdForEmployee = async (req, res) => {
       include: {
         customer: true,
         items: {
-          include: { product: true },
-        }
+          include: {
+            product: true, // ✅ ensure product details are included
+          },
+        },
       },
     });
 
@@ -240,20 +241,23 @@ const getOrderOnlineByIdForEmployee = async (req, res) => {
         order.customer.address,
         order.customer.district,
         order.customer.province,
-        order.customer.postalCode
+        order.customer.postalCode,
       ].filter(Boolean).join(' '),
       status: order.status,
-      paymentSlipStatus: order.paymentSlipStatus, // ✅ เพิ่มฟิลด์นี้เพื่อให้ frontend แสดงปุ่มอนุมัติได้
+      paymentSlipStatus: order.paymentSlipStatus,
       totalAmount: order.totalAmount,
       createdAt: order.createdAt,
-      slipImageUrl: order.paymentSlipUrl || null, // ✅ เปลี่ยนมาใช้ฟิลด์ตรง
+      slipImageUrl: order.paymentSlipUrl || null,
       items: order.items.map((item) => {
         const unitPrice = Number(item.priceAtPurchase) || 0;
         return {
-          productName: item.product.name,
+          productId: item.productId,
           quantity: item.quantity,
           unitPrice,
           totalPrice: item.quantity * unitPrice,
+          product: {
+            name: item.product?.name || '',
+          },
         };
       }),
     };
@@ -264,6 +268,7 @@ const getOrderOnlineByIdForEmployee = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลคำสั่งซื้อได้' });
   }
 };
+
 
 
 const getOrderOnlineByIdForCustomer = async (req, res) => {
@@ -562,7 +567,52 @@ const getOrderOnlineByBranch = async (req, res) => {
 };
 
 
+const getOrderOnlineSummary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const branchId = req.user.branchId;
 
+    const order = await prisma.orderOnline.findUnique({
+      where: { id: Number(id) },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: {
+              include: {
+                template: {
+                  include: {
+                    productProfile: {
+                      include: {
+                        productType: {
+                          include: {
+                            category: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                branchPrice: {
+                  where: { branchId },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'ไม่พบคำสั่งซื้อนี้' });
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('❌ getOrderOnlineSummary error:', error);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลคำสั่งซื้อ' });
+  }
+};
 
 
 module.exports = {
@@ -578,4 +628,5 @@ module.exports = {
   approveOrderOnlineSlip,
   rejectOrderOnlineSlip,
   getOrderOnlineByBranch,
+  getOrderOnlineSummary,
 };

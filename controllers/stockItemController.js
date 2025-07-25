@@ -262,8 +262,6 @@ const receiveStockItem = async (req, res) => {
   }
 };
 
-
-
 const searchStockItem = async (req, res) => {
   try {
     const query = req.query.query || req.query.barcode;
@@ -377,6 +375,74 @@ const updateSerialNumber = async (req, res) => {
   }
 };
 
+
+const getAvailableStockItemsByProduct = async (req, res) => {
+  try {
+    const { productId } = req.query;
+    const branchId = req.user?.branchId;
+    console.log('---------------------------------------------------------------------------------- getAvailableStockItemsByProduct ');
+
+    if (!productId || !branchId) {
+      return res.status(400).json({ error: 'ต้องระบุ productId และอยู่ภายใต้ branch ที่ล็อกอิน' });
+    }
+
+    const items = await prisma.stockItem.findMany({
+      where: {
+        productId: Number(productId),
+        branchId: Number(branchId),
+        status: 'IN_STOCK',
+      },
+      orderBy: {
+        receivedAt: 'asc',
+      },
+      select: {
+        id: true,
+        barcode: true,
+        serialNumber: true,
+        productId: true,
+        costPrice: true,
+        receivedAt: true,
+        product: {
+          select: {
+            name: true,
+            model: true,
+            brand: true,
+            code: true,
+            barcode: true,
+            productProfile: {
+              select: {
+                name: true,
+              },
+            },
+            productType: {
+              select: {
+                name: true,
+              },
+            },
+            category: {
+              select: {
+                name: true,
+              },
+            },
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return res.json(items);
+  } catch (error) {
+    console.error('[getAvailableStockItemsByProduct]', error);
+    return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการโหลด stock item' });
+  }
+};
+
+
+
 module.exports = {
   addStockItemFromReceipt,
   receiveStockItem,
@@ -387,4 +453,5 @@ module.exports = {
   searchStockItem,
   markStockItemsAsSold,
   updateSerialNumber,
+  getAvailableStockItemsByProduct,
 };

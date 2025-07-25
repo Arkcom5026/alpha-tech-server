@@ -15,6 +15,7 @@ const {
   rejectOrderOnlineSlip,
   submitOrderOnlinePaymentSlip,
   getOrderOnlineByBranch,
+  getOrderOnlineSummary, // ✅ เพิ่มฟังก์ชันใหม่
 } = require("../controllers/orderOnlineController");
 
 const { verifyToken } = require('../middlewares/verifyToken');
@@ -22,13 +23,16 @@ router.use(verifyToken);
 
 // 🧾 ฝั่งลูกค้า
 router.get("/my", getOrderOnlineByCustomer);
+
 router.get("/customer/:id", getOrderOnlineByIdForCustomer);
+
 router.post("/", createOrderOnline);
 router.post("/:orderId/payment-slip", submitOrderOnlinePaymentSlip); // ✅ แก้ไข path ให้ถูกต้อง
 
 // 🧾 ฝั่ง POS / พนักงาน
 router.get("/branch", getOrderOnlineByBranch); // ✅ รายการคำสั่งซื้อของสาขาปัจจุบัน
 router.get("/:id", getOrderOnlineByIdForEmployee); // ✅ ดูรายการแบบเจาะจง
+router.get("/:id/summary", getOrderOnlineSummary); // ✅ สำหรับแปลงใบจอง/แสดงรายละเอียดเต็ม
 router.patch("/:id/status", updateOrderOnlineStatus); // ✅ อัปเดตสถานะคำสั่งซื้อ POS
 router.post("/:id/approve-slip", approveOrderOnlineSlip);
 router.post("/:id/reject-slip", rejectOrderOnlineSlip);
@@ -38,4 +42,3 @@ router.delete("/:id", deleteOrderOnline);
 router.get("/", getAllOrderOnline);
 
 module.exports = router;
-
