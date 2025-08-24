@@ -39,6 +39,7 @@ const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
 const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
 const salesReportRoutes = require('./routes/salesReportRoutes');
 const uploadSlipRoutes = require('./routes/uploadSlipRoutes');
+const stockAuditRoutes = require('./routes/stockAuditRoutes');
 
 
 // ✅ Middlewares
@@ -122,6 +123,7 @@ app.use('/api/combined-billing', combinedBillingRoutes);
 app.use('/api/sales-reports', salesReportRoutes);
 
 app.use('/api/upload-slips', uploadSlipRoutes);
+app.use('/api/stock-audit', stockAuditRoutes);
 
 // ✅ Error handler
 app.use((err, req, res, next) => {
@@ -138,3 +140,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+

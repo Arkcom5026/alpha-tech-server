@@ -41,6 +41,10 @@ enum StockStatus {
   SOLD
   RETURNED
   DAMAGED
+  LOST
+  CLAIMED
+  USED
+  MISSING_PENDING_REVIEW
 }
 
 enum ServiceStatus {
@@ -260,6 +264,8 @@ model EmployeeProfile {
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   CombinedBillingDocument CombinedBillingDocument[]
+  StockAuditSession       StockAuditSession[]
+  StockAuditScanLog       StockAuditScanLog[]
 }
 
 model Branch {
@@ -298,6 +304,7 @@ model Branch {
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   CombinedBillingDocument CombinedBillingDocument[]
+  StockAuditSession       StockAuditSession[]
 }
 
 model Position {
@@ -392,8 +399,9 @@ model Product {
   branchPrice        BranchPrice[]
   orderOnlineItem    OrderOnlineItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  StockAuditSnapshotItem StockAuditSnapshotItem[]
 }
 
 model BranchPrice {
@@ -486,9 +494,11 @@ model StockItem {
   barcodeReceiptItemId String?
   saleItem             SaleItem?
 
-  scannedAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  scannedAt              DateTime                 @default(now())
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  StockAuditSnapshotItem StockAuditSnapshotItem[]
+  StockAuditScanLog      StockAuditScanLog[]
 
   @@unique([serialNumber, productId]) // ✅ ซ้ำได้ถ้า productId เดียวกัน แม้ข้ามสาขา
 }
@@ -1019,8 +1029,8 @@ model OrderOnline {
   shippedAt    DateTime?
   cancelReason String?
 
-  paymentSlipUrl    String?
-  
+  paymentSlipUrl String?
+
   paymentSlipStatus PaymentSlipStatus @default(NONE)
 
   items       OrderOnlineItem[]
@@ -1028,7 +1038,6 @@ model OrderOnline {
   User        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int?
   paymentDate DateTime?
-
 }
 
 model OrderOnlineItem {
@@ -1064,4 +1073,69 @@ model CombinedBillingDocument {
   customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
   branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   sales    Sale[]          @relation("CombinedBillingSales")
+}
+
+model StockAuditSession {
+  id            Int       @id @default(autoincrement())
+  branchId      Int
+  employeeId    Int
+  mode          String    @default("READY_TO_SELL") // เผื่ออนาคตมีโหมดอื่น
+  status        String    @default("DRAFT") // DRAFT | CONFIRMED | CANCELLED
+  expectedCount Int       @default(0)
+  scannedCount  Int       @default(0)
+  startedAt     DateTime  @default(now())
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  note          String?
+
+  branch        Branch                   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employee      EmployeeProfile          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  snapshotItems StockAuditSnapshotItem[]
+  scanLogs      StockAuditScanLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, status])
+  @@index([startedAt])
+}
+
+
+model StockAuditSnapshotItem {
+  id             Int         @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  productId      Int
+  barcode        String
+  expectedStatus StockStatus @default(IN_STOCK)
+  isScanned      Boolean     @default(false)
+  scannedAt      DateTime?
+
+  auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([auditSessionId, stockItemId])
+  @@index([auditSessionId, isScanned])
+  @@index([barcode])
+}
+
+
+model StockAuditScanLog {
+  id             Int      @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  barcode        String
+  scannedAt      DateTime @default(now())
+  byEmployeeId   Int
+
+  auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  employee     EmployeeProfile   @relation(fields: [byEmployeeId], references: [id], onDelete: Cascade)
+
+  @@index([auditSessionId, scannedAt])
+  @@index([barcode])
 }

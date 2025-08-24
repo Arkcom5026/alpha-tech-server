@@ -2,8 +2,10 @@
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
 const bcrypt = require('bcryptjs');
+
+// 🔧 helper: กันการเขียนทับด้วย undefined
+const omitUndefined = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 
 const getCustomerByPhone = async (req, res) => {
   try {
@@ -71,7 +73,7 @@ const getCustomerByName = async (req, res) => {
       include: { user: true },
     });
 
-    console.log('getCustomerByName : ',customers)
+    console.log('getCustomerByName : ', customers);
 
     return res.json(
       customers.map((c) => ({
@@ -93,7 +95,6 @@ const getCustomerByName = async (req, res) => {
   }
 };
 
-
 const getCustomerByUserId = async (req, res) => {
   try {
     // ฟังก์ชันนี้สำหรับลูกค้าดูข้อมูลตัวเอง ไม่เกี่ยวกับสาขาของพนักงาน
@@ -101,7 +102,7 @@ const getCustomerByUserId = async (req, res) => {
     const { role } = req.user;
 
     if (role !== 'customer') {
-        return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
     }
 
     const customer = await prisma.customerProfile.findUnique({
@@ -128,7 +129,6 @@ const getCustomerByUserId = async (req, res) => {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการโหลดข้อมูลลูกค้า' });
   }
 };
-
 
 const createCustomer = async (req, res) => {
   try {
@@ -180,58 +180,192 @@ const createCustomer = async (req, res) => {
 };
 
 
+
+// POS-side: staff updates any customer's profile (RBAC + branch scope)
 const updateCustomerProfile = async (req, res) => {
   try {
-    const customerId = req.body.id; // ใช้ customerId ที่ส่งมาจากฝั่ง POS
-    const data = req.body;
+    const actor = req.user;
+    if (!actor) {
+      console.warn('[me-pos] UNAUTHENTICATED request — missing req.user');
+      return res.status(401).json({ message: 'UNAUTHENTICATED: missing user context' });
+    }
+    console.log('[me-pos] actor =', { id: actor.id, role: actor.role, branchId: actor.branchId });
+    // 🔐 Accept both "staff" and "employee" (normalize to lowercase)
+    const role = String(actor.role || '').toLowerCase();
+    const STAFF_ROLES = new Set(['admin', 'manager', 'staff', 'employee']);
+    if (!STAFF_ROLES.has(role)) {
+      return res.status(403).json({ message: 'FORBIDDEN_ROLE: staff/employee only' });
+    }
 
-    const updated = await prisma.customerProfile.update({
-      where: { id: customerId },
-      data: {
-        name: data.name,
-        address: data.address,
-        companyName: data.companyName,
-        taxId: data.taxId,
-      },
+    const {
+      id,
+      userId, // ลูกค้าที่มาจาก Online
+      email, // ถ้ามี ต้องอัปเดตที่ตาราง user
+      phone,
+      name,
+      address,
+      district,
+      province,
+      postalCode,
+      companyName,
+      taxId,
+    } = req.body ?? {};
+
+    // 1) ระบุตัวลูกค้าให้ชัด (รองรับหลายกรณี)
+    const orConds = [];
+    if (id !== undefined && id !== null && !Number.isNaN(Number(id))) orConds.push({ id: Number(id) });
+    if (userId) orConds.push({ userId });
+    if (phone) orConds.push({ phone });
+    if (email) orConds.push({ user: { email } }); // ค้นผ่าน relation
+
+    if (orConds.length === 0) {
+      return res.status(400).json({ message: 'ต้องระบุ id หรือ userId หรือ email/phone อย่างน้อยหนึ่งค่า' });
+    }
+
+    // 2) ดึงโปรไฟล์ก่อน เพื่อเช็คสิทธิ์/สาขา และเตรียมอัปเดต
+    const target = await prisma.customerProfile.findFirst({
+      where: { OR: orConds },
+      include: { user: true },
     });
 
-    res.json(updated);
-  } catch (error) {
-    console.error('❌ [updateCustomerProfile] error', error);
-    res.status(500).json({ message: 'Failed to update customer profile' });
+    if (!target) {
+      return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    // 3) ป้องกันการใช้บัญชีพนักงานเป็นลูกค้า / และห้ามขายให้ตัวเอง
+    const targetRole = String(target.user?.role || '').toLowerCase();
+    if (STAFF_ROLES.has(targetRole)) {
+      return res.status(403).json({ message: 'FORBIDDEN_TARGET: ไม่อนุญาตให้ใช้บัญชีพนักงานเป็นลูกค้า POS' });
+    }
+    if (target.userId && Number(target.userId) === Number(actor.id)) {
+      return res.status(403).json({ message: 'FORBIDDEN_SELF_SALE: พนักงานห้ามขายให้ตัวเอง' });
+    }
+
+    // 4) บังคับใช้ BRANCH_SCOPE_ENFORCED (ถ้า schema มี branchId)
+    if (Object.prototype.hasOwnProperty.call(target, 'branchId')) {
+      if (actor.branchId && target.branchId && actor.branchId !== target.branchId) {
+        return res.status(403).json({ message: 'ข้ามสาขาไม่ได้ (BRANCH_SCOPE_ENFORCED)' });
+      }
+    }
+
+    // 4) เตรียมข้อมูลอัปเดต (เฉพาะ field ที่อนุญาต)
+    const profileData = omitUndefined({
+      name,
+      phone,
+      address,
+      district,
+      province,
+      postalCode,
+      companyName,
+      taxId,
+    });
+
+    // 5) อัปเดตภายใน transaction — ถ้ามี email ให้ไปอัปเดตที่ตาราง user
+    const updated = await prisma.$transaction(async (tx) => {
+      const upd = await tx.customerProfile.update({
+        where: { id: target.id },
+        data: profileData,
+      });
+
+      if (email && target.userId) {
+        await tx.user.update({ where: { id: target.userId }, data: { email } });
+      }
+
+      return upd;
+    });
+
+    const customerAddress = [
+      updated.address,
+      updated.district,
+      updated.province,
+      updated.postalCode,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return res.status(200).json({
+      ...updated,
+      email: email ?? target.user?.email ?? null,
+      customerAddress,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('P2025')) {
+      return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า (P2025)' });
+    }
+    console.error('❌ [updateCustomerProfile] error:', message);
+    return res.status(500).json({ message: 'Failed to update customer profile' });
   }
 };
 
 
 
+
+
+// Online-side: customer self-updates own profile (upsert + user.email update)
 const updateCustomerProfileOnline = async (req, res) => {
   try {
-    const userId = req.user.id;
-    if (req.user.role !== 'customer') {
+    const user = req.user;
+    if (!user || user.role !== 'customer') {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
     }
 
-    const data = req.body;
+    const { name, email, phone, address, district, province, postalCode, companyName, taxId } = req.body ?? {};
 
-    const updated = await prisma.customerProfile.update({
-      where: { userId },
-      data: {
-        name: data.name,
-        phone: data.phone,
-        address: data.address,
-        district: data.district,
-        province: data.province,
-        postalCode: data.postalCode,
-      },
+    const profileData = omitUndefined({
+      name,
+      phone,
+      address,
+      district,
+      province,
+      postalCode,
+      companyName,
+      taxId,
     });
 
-    res.json(updated);
-  } catch (error) {
-    console.error('❌ [updateCustomerProfileOnline] error', error);
-    res.status(500).json({ message: 'Failed to update profile' });
+    // เช็คว่ามีโปรไฟล์อยู่แล้วหรือยัง
+    const existing = await prisma.customerProfile.findUnique({
+      where: { userId: user.id },
+      include: { user: true },
+    });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      let upd;
+      if (existing) {
+        upd = await tx.customerProfile.update({ where: { id: existing.id }, data: profileData });
+      } else {
+        upd = await tx.customerProfile.create({ data: { userId: user.id, ...profileData } });
+      }
+
+      // อัปเดต email ที่ตาราง user กรณีผู้ใช้ต้องการเปลี่ยนอีเมล
+      if (email) {
+        await tx.user.update({ where: { id: user.id }, data: { email } });
+      }
+
+      return upd;
+    });
+
+    const customerAddress = [
+      updated.address,
+      updated.district,
+      updated.province,
+      updated.postalCode,
+    ].filter(Boolean).join(' ');
+
+    return res.status(200).json({
+      ...updated,
+      email: email ?? existing?.user?.email ?? user.email ?? null,
+      customerAddress,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('P2025')) {
+      return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า (P2025)' });
+    }
+    console.error('❌ [updateCustomerProfileOnline] error:', message);
+    return res.status(500).json({ message: 'Failed to update profile' });
   }
 };
-
 
 module.exports = {
   getCustomerByPhone,
@@ -241,6 +375,3 @@ module.exports = {
   updateCustomerProfile,
   updateCustomerProfileOnline,
 };
-
-
-
