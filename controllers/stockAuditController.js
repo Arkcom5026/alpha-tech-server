@@ -201,6 +201,99 @@ const scanBarcode = async (req, res) => {
   }
 }
 
+// POST /api/stock-audit/:sessionId/scan-sn  { sn }
+const scanSn = async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId, 10)
+    if (!Number.isFinite(sessionId)) {
+      return res.status(400).json({ message: 'sessionId ไม่ถูกต้อง' })
+    }
+
+    const session = await prisma.stockAuditSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, branchId: true, status: true, mode: true },
+    })
+    if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
+
+    const branchId = req.user?.branchId
+    if (!Number.isFinite(branchId) || session.branchId !== branchId) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
+    }
+    if (session.mode !== 'READY_TO_SELL') {
+      return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
+    }
+    if (session.status !== 'DRAFT') {
+      return res.status(409).json({ message: 'รอบนี้ถูกปิดการสแกนแล้ว' })
+    }
+
+    // รับค่า SN (รองรับทั้ง sn และ serialNumber จาก body)
+    const snRaw = req.body?.sn ? String(req.body.sn).trim() : (req.body?.serialNumber ? String(req.body.serialNumber).trim() : '')
+    if (!snRaw) return res.status(400).json({ message: 'กรุณาระบุ Serial Number (SN)' })
+
+    // ให้แน่ใจว่ามี employeeId สำหรับอ้าง FK
+    let employeeId = req.user?.employeeId ?? null
+    if (!employeeId && req.user?.id) {
+      const emp = await prisma.employeeProfile.findFirst({ where: { userId: req.user.id }, select: { id: true } })
+      employeeId = emp?.id ?? null
+    }
+    if (!employeeId) {
+      return res.status(403).json({ message: 'ไม่พบข้อมูลพนักงานของผู้ใช้งาน (employeeProfile)' })
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // หา stockItem จาก SN ภายในสาขานี้ และสถานะที่คาดหวัง (IN_STOCK)
+      const stockItem = await tx.stockItem.findFirst({
+        where: { branchId, status: 'IN_STOCK', serialNumber: snRaw },
+        select: { id: true, barcode: true },
+      })
+      if (!stockItem) return { status: 422, reason: 'SN_NOT_FOUND' }
+
+      // หา snapshot ที่คาดหวังของรอบนี้ด้วย stockItemId
+      const snap = await tx.stockAuditSnapshotItem.findFirst({
+        where: { auditSessionId: sessionId, stockItemId: stockItem.id },
+        select: { id: true, isScanned: true },
+      })
+      if (!snap) return { status: 422, reason: 'NOT_IN_EXPECTED_SET' }
+      if (snap.isScanned) return { status: 409, reason: 'DUPLICATE_SCAN' }
+
+      await tx.stockAuditSnapshotItem.update({
+        where: { id: snap.id },
+        data: { isScanned: true, scannedAt: new Date() },
+      })
+
+      await tx.stockAuditScanLog.create({
+        data: {
+          auditSessionId: sessionId,
+          stockItemId: stockItem.id,
+          barcode: stockItem.barcode, // เก็บ barcode ควบคู่ (schema เดิมรองรับแน่)
+          byEmployeeId: employeeId,
+        },
+      })
+
+      await tx.stockAuditSession.update({
+        where: { id: sessionId },
+        data: { scannedCount: { increment: 1 } },
+      })
+
+      return { status: 200 }
+    })
+
+    if (result.status !== 200) {
+      const map = {
+        SN_NOT_FOUND: 'ไม่พบ Serial Number นี้ในสต๊อกของสาขา',
+        NOT_IN_EXPECTED_SET: 'สินค้านี้ไม่อยู่ในชุดคาดหวังของรอบตรวจ',
+        DUPLICATE_SCAN: 'สินค้านี้ถูกสแกนไปแล้วในรอบนี้',
+      }
+      return res.status(result.status).json({ message: map[result.reason] || 'เกิดข้อผิดพลาดในการสแกน SN' })
+    }
+
+    return res.status(200).json({ scanned: true })
+  } catch (error) {
+    console.error('❌ [scanSn] error:', error)
+    return res.status(500).json({ message: 'สแกน SN ไม่สำเร็จ' })
+  }
+}
+
 // POST /api/stock-audit/:sessionId/confirm  { strategy?: 'MARK_PENDING' | 'MARK_LOST' }
 const confirmAudit = async (req, res) => {
   try {
@@ -290,6 +383,7 @@ const listAuditItems = async (req, res) => {
         ? {
             OR: [
               { barcode: { contains: q, mode: 'insensitive' } },
+              { stockItem: { serialNumber: { contains: q, mode: 'insensitive' } } },
               { product: { name: { contains: q, mode: 'insensitive' } } },
               { product: { model: { contains: q, mode: 'insensitive' } } },
             ],
@@ -306,6 +400,7 @@ const listAuditItems = async (req, res) => {
           isScanned: true,
           scannedAt: true,
           product: { select: { id: true, name: true, model: true } },
+          stockItem: { select: { serialNumber: true } },
         },
         orderBy: [{ isScanned: 'asc' }, { id: 'asc' }],
         skip,
@@ -314,7 +409,16 @@ const listAuditItems = async (req, res) => {
       prisma.stockAuditSnapshotItem.count({ where }),
     ])
 
-    return res.status(200).json({ items, total, page, pageSize })
+    const itemsOut = items.map((it) => ({
+      id: it.id,
+      barcode: it.barcode,
+      serialNumber: it.stockItem?.serialNumber || null,
+      isScanned: it.isScanned,
+      scannedAt: it.scannedAt,
+      product: it.product,
+    }))
+
+    return res.status(200).json({ items: itemsOut, total, page, pageSize })
   } catch (error) {
     console.error('❌ [listAuditItems] error:', error)
     return res.status(500).json({ message: 'ไม่สามารถดึงรายการได้' })
@@ -325,8 +429,10 @@ module.exports = {
   startReadyAudit,
   getOverview,
   scanBarcode,
+  scanSn,
   confirmAudit,
   listAuditItems,
 }
+
 
 
