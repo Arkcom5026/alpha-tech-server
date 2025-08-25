@@ -1,143 +1,148 @@
 const dayjs = require('dayjs');
-const { PrismaClient, ReceiptStatus } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { ReceiptStatus, Prisma } = require('@prisma/client');
+const { prisma } = require('../lib/prisma'); // ✅ singleton
 
+// ---- Helpers (Decimal-safe) ----
+const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
+const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
+
+// ---- Code generator (with monthly sequence) ----
 const generateReceiptCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
-  const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
+  const prefix = `RC-${paddedBranch}${now.format('YYMM')}`; // e.g., RC-022508
 
   const latest = await prisma.purchaseOrderReceipt.findFirst({
-    where: {
-      code: {
-        startsWith: prefix,
-      },
-    },
-    orderBy: {
-      code: 'desc',
-    },
+    where: { code: { startsWith: prefix } },
+    orderBy: { code: 'desc' },
   });
 
   let nextNumber = 1;
   if (latest) {
-    const lastSequence = parseInt(latest.code.slice(-4), 10); // ✅ ใช้ slice แทน split
-    nextNumber = lastSequence + 1;
+    const lastSequence = parseInt(latest.code.split('-').pop(), 10);
+    nextNumber = (isNaN(lastSequence) ? 0 : lastSequence) + 1;
   }
-
   const running = String(nextNumber).padStart(4, '0');
-  return `${prefix}-${running}`;
+  return `${prefix}-${running}`; // RC-022508-0001
 };
 
+// ---- Create Receipt (transaction + retry on code collision) ----
 const createPurchaseOrderReceipt = async (req, res) => {
   try {
-    const { purchaseOrderId, note, supplierTaxInvoiceNumber, supplierTaxInvoiceDate } = req.body;
-    const branchId = req.user.branchId;
-    const receivedById = req.user.employeeId;
-    if (!purchaseOrderId) {
-      return res.status(400).json({ error: 'กรุณาระบุใบสั่งซื้อ' });
+    const purchaseOrderId = Number(req.body.purchaseOrderId);
+    const note = req.body.note || null;
+    const supplierTaxInvoiceNumber = req.body.supplierTaxInvoiceNumber || null;
+    const supplierTaxInvoiceDate = req.body.supplierTaxInvoiceDate || null;
+
+    const branchId = Number(req.user?.branchId);
+    const receivedById = Number(req.user?.employeeId);
+
+    if (!purchaseOrderId || !branchId || !receivedById) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบ (purchaseOrderId/branchId/employeeId)' });
     }
 
-    let created = null;
-    let retryCount = 0;
+    // Ensure PO exists and belongs to this branch
+    const po = await prisma.purchaseOrder.findUnique({
+      where: { id: purchaseOrderId },
+      select: {
+        id: true,
+        branchId: true,
+        code: true,
+        supplier: { select: { name: true } },
+        items: { select: { productId: true, costPrice: true } },
+      },
+    });
+    if (!po || Number(po.branchId) !== branchId) {
+      return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อในสาขานี้' });
+    }
+
     const maxRetries = 5;
+    let created = null;
 
-    while (!created && retryCount < maxRetries) {
-      const code = await generateReceiptCode(branchId);
-
-      const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
-
-      try {
-        created = await prisma.purchaseOrderReceipt.create({
-          data: {
-            note,
-            receivedById,
-            code,
-            supplierTaxInvoiceNumber,
-            supplierTaxInvoiceDate: taxDate,
-            branch: { connect: { id: branchId } },
-            purchaseOrder: { connect: { id: parseInt(purchaseOrderId, 10) } },
-          },
-          include: {
-            purchaseOrder: {
-              select: {
-                code: true,
-                supplier: { select: { name: true } },
-                items: true,
+    await prisma.$transaction(async (tx) => {
+      // retry code generation on unique collision
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const code = await generateReceiptCode(branchId);
+        try {
+          const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
+          created = await tx.purchaseOrderReceipt.create({
+            data: {
+              note,
+              receivedById,
+              code,
+              supplierTaxInvoiceNumber,
+              supplierTaxInvoiceDate: taxDate,
+              branch: { connect: { id: branchId } },
+              purchaseOrder: { connect: { id: purchaseOrderId } },
+            },
+            include: {
+              purchaseOrder: {
+                select: {
+                  id: true,
+                  code: true,
+                  supplier: { select: { name: true } },
+                  items: { select: { productId: true, costPrice: true } },
+                },
               },
             },
-          },
-        });
-      } catch (err) {
-        if (err.code === 'P2002' && err.meta?.target?.includes('code')) {
-          retryCount++;
-          console.warn(`🔁 Duplicate receipt code retrying... (${retryCount})`);
-        } else {
+          });
+          break; // success
+        } catch (err) {
+          if (err?.code === 'P2002' && String(err?.meta?.target).includes('code') && attempt < maxRetries - 1) {
+            continue; // try next sequence
+          }
           throw err;
         }
       }
-    }
 
-    if (!created) {
-      return res.status(500).json({ error: 'ไม่สามารถสร้างรหัสใบรับสินค้าแบบไม่ซ้ำได้ กรุณาลองใหม่' });
-    }
+      if (!created) throw new Error('สร้างรหัสใบรับสินค้าแบบไม่ซ้ำไม่สำเร็จ');
 
-    for (const item of created.purchaseOrder.items) {
-      await prisma.branchPrice.upsert({
-        where: {
-          productId_branchId: {
-            productId: item.productId,
-            branchId,
-          },
-        },
-        update: {
-          costPrice: item.costPrice,
-        },
-        create: {
-          productId: item.productId,
-          branchId,
-          costPrice: item.costPrice,
-        },
-      });
-    }
+      // Upsert branch prices for each item in PO (keep costPrice up-to-date)
+      for (const it of po.items) {
+        await tx.branchPrice.upsert({
+          where: { productId_branchId: { productId: it.productId, branchId } },
+          update: { costPrice: it.costPrice },
+          create: { productId: it.productId, branchId, costPrice: it.costPrice },
+        });
+      }
+    });
 
-    res.status(201).json(created);
+    return res.status(201).json(created);
   } catch (error) {
     console.error('❌ [createPurchaseOrderReceipt] error:', error);
-    res.status(500).json({ error: 'สร้างใบรับสินค้าไม่สำเร็จ' });
+    return res.status(500).json({ error: 'สร้างใบรับสินค้าไม่สำเร็จ' });
   }
 };
 
-
+// ---- List Receipts ----
 const getAllPurchaseOrderReceipts = async (req, res) => {
   try {
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where: { branchId },
       include: {
-        purchaseOrder: {
-          select: {
-            code: true,
-            supplier: { select: { name: true } },
-          },
-        },
+        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
       },
+      orderBy: { receivedAt: 'desc' },
     });
 
-    res.json(receipts);
+    return res.json(receipts);
   } catch (error) {
     console.error('❌ [getAllPurchaseOrderReceipts] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าได้' });
+    return res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าได้' });
   }
 };
 
+// ---- Get Receipt by ID (with supplier debitAmount) ----
 const getPurchaseOrderReceiptById = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const branchId = req.user.branchId;
-    if (!id) {
-      return res.status(400).json({ error: 'Missing or invalid receipt ID' });
-    }
+    const branchId = Number(req.user?.branchId);
+    if (!id) return res.status(400).json({ error: 'Missing or invalid receipt ID' });
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const receipt = await prisma.purchaseOrderReceipt.findFirst({
       where: { id, branchId },
@@ -149,18 +154,9 @@ const getPurchaseOrderReceiptById = async (req, res) => {
             purchaseOrderItem: {
               select: {
                 product: {
-                  // ✅ CORRECTED: Access 'unit' through the 'template' relation
                   select: {
                     name: true,
-                    template: {
-                      select: {
-                        unit: {
-                          select: {
-                            name: true,
-                          },
-                        },
-                      },
-                    },
+                    template: { select: { unit: { select: { name: true } } } },
                   },
                 },
               },
@@ -184,108 +180,97 @@ const getPurchaseOrderReceiptById = async (req, res) => {
       },
     });
 
-    if (!receipt) {
-      return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
-    }
+    if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
+    if (!receipt.purchaseOrder?.id) return res.status(400).json({ error: 'ไม่พบข้อมูลใบสั่งซื้อของใบรับนี้' });
 
-    if (!receipt.purchaseOrder || !receipt.purchaseOrder.id) {
-      return res.status(400).json({ error: 'ไม่พบข้อมูลใบสั่งซื้อที่เชื่อมโยงกับใบรับนี้' });
-    }
+    // Sum total paid across all receipts of the same PO
+    const allReceiptIds = (
+      await prisma.purchaseOrderReceipt.findMany({
+        where: { purchaseOrderId: receipt.purchaseOrder.id },
+        select: { id: true },
+      })
+    ).map((r) => r.id);
 
-    // --- CORRECTED LOGIC TO CALCULATE TOTAL PAID FOR THE ENTIRE PO ---
-
-    // 1. ค้นหา ID ของใบรับสินค้า (Receipts) ทั้งหมดที่อยู่ในใบสั่งซื้อ (PO) เดียวกัน
-    const allReceiptsForPO = await prisma.purchaseOrderReceipt.findMany({
-      where: { purchaseOrderId: receipt.purchaseOrder.id },
-      select: { id: true }
-    });
-    const receiptIds = allReceiptsForPO.map(r => r.id);
-
-    let totalPaid = 0;
-    // 2. ถ้ามีใบรับสินค้า, ให้ค้นหาการจ่ายเงินที่เชื่อมโยงกับใบรับเหล่านั้น
-    if (receiptIds.length > 0) {
-      // ✅ ใช้ชื่อ Model ที่ถูกต้อง: 'supplierPaymentReceipt'
-      const paymentLinks = await prisma.supplierPaymentReceipt.findMany({
-        where: {
-          receiptId: {
-            in: receiptIds,
-          },
-        },
+    let totalPaid = new Prisma.Decimal(0);
+    if (allReceiptIds.length) {
+      const links = await prisma.supplierPaymentReceipt.findMany({
+        where: { receiptId: { in: allReceiptIds } },
         select: { amountPaid: true },
       });
-
-      // 3. คำนวณยอดรวมที่จ่ายแล้ว
-      totalPaid = paymentLinks.reduce((sum, p) => sum + p.amountPaid, 0);
+      totalPaid = links.reduce((sum, r) => sum.plus(r.amountPaid), new Prisma.Decimal(0));
     }
 
-    // We need to re-format the response to be easily usable on the frontend
-    const formattedReceipt = {
+    const formatted = {
       ...receipt,
-      items: receipt.items.map(item => ({
+      items: receipt.items.map((item) => ({
         id: item.id,
         quantity: item.quantity,
         productName: item.purchaseOrderItem.product.name,
-        // Safely access the unit name
         unitName: item.purchaseOrderItem.product.template?.unit?.name || 'N/A',
       })),
     };
 
+    const supplierOut = { ...receipt.purchaseOrder.supplier };
+    if (NORMALIZE_DECIMAL_TO_NUMBER) {
+      for (const k of ['creditLimit', 'creditBalance']) {
+        if (supplierOut[k]?.toNumber) supplierOut[k] = supplierOut[k].toNumber();
+      }
+    }
+
     const response = {
-      ...formattedReceipt,
+      ...formatted,
       purchaseOrder: {
-        ...receipt.purchaseOrder,
+        ...formatted.purchaseOrder,
         supplier: {
-          ...receipt.purchaseOrder.supplier,
-          debitAmount: totalPaid, // ✅ ยอดนี้คือยอดที่จ่ายทั้งหมดของ PO ใบนี้
+          ...supplierOut,
+          debitAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalPaid) : totalPaid,
         },
       },
     };
 
     res.set('Cache-Control', 'no-store');
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     console.error('❌ [getPurchaseOrderReceiptById] error:', error);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลใบรับสินค้าได้' });
+    return res.status(500).json({ error: 'เกิดข้อผิดพลาด ไม่สามารถดึงข้อมูลใบรับสินค้าได้' });
   }
 };
 
-
+// ---- Get Purchase Order (with received qty) ----
 const getPurchaseOrderDetailById = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const purchaseOrder = await prisma.purchaseOrder.findFirst({
       where: { id, branchId },
       include: {
         supplier: true,
-        items: {
-          include: {
-            product: true,
-            receiptItems: true,
-          },
-        },
+        items: { include: { product: true, receiptItems: true } },
       },
     });
 
     if (!purchaseOrder) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อนี้' });
 
-    const itemsWithReceived = purchaseOrder.items.map(item => {
+    const itemsWithReceived = purchaseOrder.items.map((item) => {
       const receivedQuantity = item.receiptItems?.reduce((sum, r) => sum + r.quantity, 0) || 0;
       return { ...item, receivedQuantity };
     });
 
-    res.json({ ...purchaseOrder, items: itemsWithReceived });
+    return res.json({ ...purchaseOrder, items: itemsWithReceived });
   } catch (error) {
     console.error('❌ [getPurchaseOrderDetailById] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลใบสั่งซื้อได้' });
+    return res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลใบสั่งซื้อได้' });
   }
 };
 
+// ---- Mark single receipt as completed ----
 const markReceiptAsCompleted = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const found = await prisma.purchaseOrderReceipt.findFirst({ where: { id, branchId } });
     if (!found) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
@@ -295,60 +280,61 @@ const markReceiptAsCompleted = async (req, res) => {
       data: { statusReceipt: 'COMPLETED' },
     });
 
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error('❌ [markReceiptAsCompleted] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถอัปเดตสถานะใบรับสินค้าได้' });
+    return res.status(500).json({ error: 'ไม่สามารถอัปเดตสถานะใบรับสินค้าได้' });
   }
 };
 
+// ---- Update note ----
 const updatePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const found = await prisma.purchaseOrderReceipt.findFirst({ where: { id, branchId } });
     if (!found) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
 
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
-      data: { note: req.body.note },
+      data: { note: req.body.note || null },
       include: {
-        purchaseOrder: {
-          select: {
-            code: true,
-            supplier: { select: { name: true } },
-          },
-        },
+        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
       },
     });
 
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
     console.error('❌ [updatePurchaseOrderReceipt] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถแก้ไขใบรับสินค้าได้' });
+    return res.status(500).json({ error: 'ไม่สามารถแก้ไขใบรับสินค้าได้' });
   }
 };
 
+// ---- Delete receipt ----
 const deletePurchaseOrderReceipt = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const found = await prisma.purchaseOrderReceipt.findFirst({ where: { id, branchId } });
     if (!found) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้' });
 
     await prisma.purchaseOrderReceipt.delete({ where: { id } });
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     console.error('❌ [deletePurchaseOrderReceipt] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถลบใบรับสินค้าได้' });
+    return res.status(500).json({ error: 'ไม่สามารถลบใบรับสินค้าได้' });
   }
 };
 
+// ---- Barcode summaries ----
 const getReceiptBarcodeSummaries = async (req, res) => {
   try {
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where: { branchId },
@@ -361,18 +347,12 @@ const getReceiptBarcodeSummaries = async (req, res) => {
         items: {
           include: {
             stockItems: true,
-            purchaseOrderItem: {
-              select: { product: { select: { name: true } } },
-            },
+            purchaseOrderItem: { select: { product: { select: { name: true } } } },
           },
         },
-        purchaseOrder: {
-          select: {
-            code: true,
-            supplier: { select: { name: true } },
-          },
-        },
+        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
       },
+      orderBy: { receivedAt: 'desc' },
     });
 
     const summaries = receipts.map((receipt) => {
@@ -387,61 +367,51 @@ const getReceiptBarcodeSummaries = async (req, res) => {
         orderCode: receipt.purchaseOrder?.code || '-',
         totalItems: total,
         barcodeGenerated: generated,
-        status: receipt.statusReceipt, // ✅ ส่ง status ไป frontend
+        status: receipt.statusReceipt,
       };
     });
 
     res.set('Cache-Control', 'no-store');
-    res.json(summaries);
+    return res.json(summaries);
   } catch (error) {
     console.error('❌ [getReceiptBarcodeSummaries] error:', error);
-    res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลใบรับสินค้าสำหรับพิมพ์บาร์โค้ดได้' });
+    return res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลใบรับสินค้าสำหรับพิมพ์บาร์โค้ดได้' });
   }
 };
 
+// ---- Auto finalize when all SNs generated ----
 const finalizePurchaseOrderReceiptIfNeeded = async (receiptId) => {
   const receipt = await prisma.purchaseOrderReceipt.findUnique({
     where: { id: receiptId },
-    include: {
-      items: {
-        include: {
-          stockItems: true,
-          purchaseOrderItem: true,
-        },
-      },
-    },
+    include: { items: { include: { stockItems: true, purchaseOrderItem: true } } },
   });
-
   if (!receipt) return;
 
   const totalQuantity = receipt.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalSN = receipt.items.reduce((sum, item) => sum + item.stockItems.length, 0);
-
   if (totalSN < totalQuantity) return;
 
   await prisma.purchaseOrderReceipt.update({
     where: { id: receiptId },
-    data: { status: 'COMPLETED' },
+    data: { statusReceipt: 'COMPLETED' }, // ✅ use statusReceipt
   });
 };
 
 const finalizeReceiptController = async (req, res) => {
   try {
-    const { id } = req.params;
-    await finalizePurchaseOrderReceiptIfNeeded(Number(id));
-    res.status(200).json({ success: true });
+    const id = Number(req.params.id);
+    await finalizePurchaseOrderReceiptIfNeeded(id);
+    return res.status(200).json({ success: true });
   } catch (err) {
     console.error('❌ finalizeReceiptController error:', err);
-    res.status(500).json({ success: false, error: 'Failed to finalize receipt.' });
+    return res.status(500).json({ success: false, error: 'Failed to finalize receipt.' });
   }
 };
 
-
+// ---- Mark as printed (completed) ----
 const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   try {
-    console.log('req.params.id : ', req.params.id)
-    const id = parseInt(req.params.id);
-
+    const id = Number(req.params.id);
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
       data: { statusReceipt: ReceiptStatus.COMPLETED },
@@ -453,31 +423,26 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   }
 };
 
+// ---- Receipts ready to pay (Decimal-safe) ----
 const getReceiptsReadyToPay = async (req, res) => {
   try {
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
     const { startDate, endDate, limit } = req.query;
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     const dateFilter = {};
     if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) dateFilter.lte = new Date(endDate);
+    if (endDate) dateFilter.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
 
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where: {
         branchId,
         statusReceipt: 'COMPLETED',
-        statusPayment: {
-          not: 'PAID',
-        },
+        statusPayment: { not: 'PAID' },
         receivedAt: Object.keys(dateFilter).length ? dateFilter : undefined,
       },
       include: {
-        items: {
-          select: {
-            quantity: true,
-            costPrice: true,
-          },
-        },
+        items: { select: { quantity: true, costPrice: true } },
         purchaseOrder: {
           select: {
             id: true,
@@ -496,37 +461,57 @@ const getReceiptsReadyToPay = async (req, res) => {
         },
       },
       orderBy: { receivedAt: 'asc' },
-      take: limit ? parseInt(limit) : undefined,
+      take: limit ? Number(limit) : undefined,
     });
 
-    const results = receipts
-      .map((receipt) => {
+    const results = await Promise.all(
+      receipts.map(async (receipt) => {
         const totalAmount = receipt.items.reduce(
-          (sum, item) => sum + item.quantity * item.costPrice,
-          0
+          (sum, it) => sum.plus(D(it.costPrice).times(it.quantity)),
+          new Prisma.Decimal(0)
         );
 
-        const supplier = receipt.purchaseOrder.supplier;
-        const paidAmount = receipt.paidAmount || 0; // Renamed from totalPaid to paidAmount
-        const remainingAmount = totalAmount - paidAmount; // Use paidAmount here
+        const paidAgg = await prisma.supplierPaymentReceipt.aggregate({
+          _sum: { amountPaid: true },
+          where: { receiptId: receipt.id },
+        });
+        const paidAmount = paidAgg._sum.amountPaid || new Prisma.Decimal(0);
+        const remainingAmount = totalAmount.minus(paidAmount);
 
-        return {
+        const supplier = { ...receipt.purchaseOrder.supplier };
+        if (NORMALIZE_DECIMAL_TO_NUMBER) {
+          for (const k of ['creditLimit', 'creditBalance']) {
+            if (supplier[k]?.toNumber) supplier[k] = supplier[k].toNumber();
+          }
+        }
+
+        const out = {
           id: receipt.id,
           code: receipt.code,
           orderCode: receipt.purchaseOrder.code,
           supplier,
           totalAmount,
-          paidAmount, // Now sending as paidAmount
+          paidAmount,
           remainingAmount,
           receivedDate: receipt.receivedAt,
         };
+        if (NORMALIZE_DECIMAL_TO_NUMBER) {
+          out.totalAmount = toNum(out.totalAmount);
+          out.paidAmount = toNum(out.paidAmount);
+          out.remainingAmount = toNum(out.remainingAmount);
+        }
+        return out;
       })
-      .filter((r) => r.remainingAmount > 0); // ✅ Changed filter condition
+    );
 
-    return res.json(results);
+    const filtered = results.filter((r) =>
+      NORMALIZE_DECIMAL_TO_NUMBER ? r.remainingAmount > 0 : r.remainingAmount.greaterThan(0)
+    );
+
+    return res.json(filtered);
   } catch (error) {
     console.error('❌ [getReceiptsReadyToPay] error:', error);
-    res.status(500).json({ error: 'Failed to load outstanding receipts.' });
+    return res.status(500).json({ error: 'Failed to load outstanding receipts.' });
   }
 };
 

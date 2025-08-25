@@ -1,166 +1,175 @@
 // controllers/customerDepositController.js
 
-const prisma = require('../lib/prisma');
+const { prisma, Prisma } = require('../lib/prisma');
 
+
+// --- Helpers & Flags ---
+const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
+const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+const isMoneyLike = (v) =>
+  (typeof v === 'number' && !isNaN(v)) ||
+  (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
+const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
+
+// ✅ ใช้สำหรับ normalize ข้อมูลเงินมัดจำ (customerDeposit)
+const normalizeDeposit = (dep) => {
+  if (!NORMALIZE_DECIMAL_TO_NUMBER || !dep) return dep;
+  const out = { ...dep };
+  for (const k of ['cashAmount', 'transferAmount', 'cardAmount', 'usedAmount', 'totalAmount']) {
+    if (k in out && out[k] != null) out[k] = toNum(out[k]);
+  }
+  return out;
+};
+
+// ✅ ใช้สำหรับ normalize ข้อมูลทางการเงินของลูกค้า (customerProfile)
+const normalizeCustomerMoney = (cust) => {
+  if (!NORMALIZE_DECIMAL_TO_NUMBER || !cust) return cust;
+  const out = { ...cust };
+  for (const k of ['creditLimit', 'creditBalance']) {
+    if (k in out && out[k] != null) out[k] = toNum(out[k]);
+  }
+  return out;
+};
+
+// Create a new customer deposit (ACTIVE)
 const createCustomerDeposit = async (req, res) => {
   try {
     const { cashAmount = 0, transferAmount = 0, cardAmount = 0, note, customerId } = req.body;
-    const totalAmount = parseFloat(cashAmount) + parseFloat(transferAmount) + parseFloat(cardAmount);
-    console.log('createCustomerDeposit : ', req.body);
+    const employeeId = req.user?.employeeId; // EmployeeProfile.id
+    const branchId = Number(req.user?.branchId);
 
-    if (!customerId || totalAmount <= 0) {
-      return res.status(400).json({ message: 'ข้อมูลไม่ครบหรือยอดรวมต้องมากกว่า 0' });
+    if (!customerId || !employeeId || !branchId) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบ (customerId/employeeId/branchId)' });
     }
 
-    const employeeId = req.user.id;
-    const branchId = req.user.branchId;
+    // Validate inputs
+    if (![cashAmount, transferAmount, cardAmount].every(isMoneyLike)) {
+      return res.status(400).json({
+        message: 'รูปแบบจำนวนเงินไม่ถูกต้อง (ต้องเป็นเลข และทศนิยมไม่เกิน 2 ตำแหน่ง)',
+      });
+    }
+
+    const cash = D(cashAmount);
+    const trf = D(transferAmount);
+    const card = D(cardAmount);
+    const total = cash.plus(trf).plus(card);
+    if (total.lessThanOrEqualTo(0)) {
+      return res.status(400).json({ message: 'ยอดรวมต้องมากกว่า 0' });
+    }
 
     const deposit = await prisma.customerDeposit.create({
       data: {
-        cashAmount,
-        transferAmount,
-        cardAmount,
-        totalAmount,
+        cashAmount: cash,
+        transferAmount: trf,
+        cardAmount: card,
+        totalAmount: total,
         note,
         customerId,
-        createdBy: employeeId.toString(),
+        createdBy: employeeId,
         branchId,
         status: 'ACTIVE',
       },
-      include: {
-        customer: {
-          select: {
-            name: true,
-            phone: true,
-          },
-        },
-      },
+      include: { customer: { select: { name: true, phone: true } } },
     });
 
-    res.status(201).json(deposit);
+    return res
+      .status(201)
+      .json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit);
   } catch (err) {
     console.error('❌ createCustomerDeposit error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกเงินมัดจำ' });
   }
 };
 
-
+// List ACTIVE deposits of branch
 const getAllCustomerDeposits = async (req, res) => {
   try {
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
+
     const deposits = await prisma.customerDeposit.findMany({
-      where: {
-        branchId,
-        status: 'ACTIVE',
-      },
+      where: { branchId, status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
-      include: {
-        customer: {
-          select: {
-            name: true,
-            phone: true,
-          },
-        },
-      },
+      include: { customer: { select: { name: true, phone: true } } },
     });
-    res.json(deposits);
+
+    const out = NORMALIZE_DECIMAL_TO_NUMBER ? deposits.map(normalizeDeposit) : deposits;
+    res.json(out);
   } catch (err) {
     console.error('❌ getAllCustomerDeposits error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูล' });
   }
 };
 
+// Get single ACTIVE deposit by id (branch scoped)
 const getCustomerDepositById = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ message: 'ID ไม่ถูกต้อง' });
-    }
-
-    const branchId = req.user.branchId;
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: 'ID ไม่ถูกต้อง' });
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
     const deposit = await prisma.customerDeposit.findFirst({
-      where: {
-        id,
-        branchId,
-        status: 'ACTIVE',
-      },
-      include: {
-        customer: {
-          select: {
-            name: true,
-            phone: true,
-          },
-        },
-      },
+      where: { id, branchId, status: 'ACTIVE' },
+      include: { customer: { select: { name: true, phone: true } } },
     });
 
-    if (!deposit) {
-      return res.status(404).json({ message: 'ไม่พบข้อมูลมัดจำ' });
-    }
+    if (!deposit) return res.status(404).json({ message: 'ไม่พบข้อมูลมัดจำ' });
 
-    res.json(deposit);
+    res.json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit);
   } catch (error) {
     console.error('getCustomerDepositById error:', error);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลมัดจำ' });
   }
 };
 
+// Find customer by phone and return deposits
 const getCustomerAndDepositByPhone = async (req, res) => {
   try {
     const rawPhone = req.params.phone;
-    const phone = rawPhone?.replace(/\D/g, '').trim(); // Normalize เบอร์โทร
-    const branchId = req.user.branchId;
+    const phone = rawPhone?.replace(/\D/g, '').trim();
+    const branchId = Number(req.user?.branchId);
 
-    if (!phone) {
-      return res.status(400).json({ message: 'กรุณาระบุเบอร์โทร' });
-    }
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+    if (!phone) return res.status(400).json({ message: 'กรุณาระบุเบอร์โทร' });
 
     const customer = await prisma.customerProfile.findFirst({
       where: { phone },
       include: {
         user: true,
         customerDeposit: {
-          where: {
-            branchId,
-            status: 'ACTIVE',
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
+          where: { branchId, status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });
 
-    if (!customer) {
-      return res.status(404).json({ message: 'ไม่พบลูกค้า' });
-    }
-
-    if (customer.customerDeposit.length === 0) {
-      console.warn(`[ไม่มีมัดจำ] ลูกค้า ${customer.name} (${phone}) มีโปรไฟล์แต่ยังไม่มีมัดจำในสาขา ${branchId}`);
-    }
+    if (!customer) return res.status(404).json({ message: 'ไม่พบลูกค้า' });
 
     const totalDeposit = customer.customerDeposit.reduce(
-      (sum, item) =>
-        sum + item.cashAmount + item.transferAmount + item.cardAmount,
-      0
+      (sum, d) => sum.plus(d.cashAmount).plus(d.transferAmount).plus(d.cardAmount),
+      new Prisma.Decimal(0),
     );
 
+    const customerOut = normalizeCustomerMoney({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.user?.email || '',
+      type: customer.type,
+      companyName: customer.companyName,
+      address: customer.address,
+      taxId: customer.taxId,
+      creditLimit: customer.creditLimit,
+      creditBalance: customer.creditBalance,
+    });
+
     return res.json({
-      customer: {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        email: customer.user?.email || '',
-        type: customer.type,
-        companyName: customer.companyName,
-        address: customer.address,
-        taxId: customer.taxId,
-        creditLimit: customer.creditLimit,
-        creditBalance: customer.creditBalance,
-      },
-      totalDeposit,
-      deposits: customer.customerDeposit,
+      customer: customerOut,
+      totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
+      deposits: NORMALIZE_DECIMAL_TO_NUMBER
+        ? customer.customerDeposit.map(normalizeDeposit)
+        : customer.customerDeposit,
     });
   } catch (err) {
     console.error('[getCustomerAndDepositByPhone] ❌', err);
@@ -168,21 +177,17 @@ const getCustomerAndDepositByPhone = async (req, res) => {
   }
 };
 
-
+// Search customers by name/company and return first match + deposits
 const getCustomerAndDepositByName = async (req, res) => {
   try {
-    console.log('========== Controller Triggered =========');
-    console.log('getCustomerAndDepositByName req.query', req.query);
     let { q } = req.query;
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
 
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
     if (!q || typeof q !== 'string' || q.trim() === '') {
-      console.log('[getCustomerAndDepositByName] ❌ Invalid query param `q`');
       return res.status(400).json({ error: 'กรุณาระบุคำค้นหาที่ถูกต้อง' });
     }
     q = q.trim();
-    console.log('[getCustomerAndDepositByName] q =', q);
-    console.log('[getCustomerAndDepositByName] branchId =', branchId);
 
     const customers = await prisma.customerProfile.findMany({
       where: {
@@ -194,140 +199,99 @@ const getCustomerAndDepositByName = async (req, res) => {
       take: 10,
       include: {
         user: true,
-        customerDeposit: {
-          where: {
-            branchId,
-            status: 'ACTIVE',
-          },
-          orderBy: { createdAt: 'desc' },
-        },
+        customerDeposit: { where: { branchId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' } },
       },
     });
 
-    console.log('[getCustomerAndDepositByName] Raw customers found:', customers.length);
+    if (!customers.length) return res.status(404).json({ error: 'ไม่พบลูกค้า' });
 
-    const result = customers.map((c) => {
-      const totalDeposit = c.customerDeposit?.reduce(
-        (sum, d) =>
-          sum + d.cashAmount + d.transferAmount + d.cardAmount,
-        0
-      ) || 0;
+    const c = customers[0];
+    const totalDeposit =
+      c.customerDeposit?.reduce(
+        (sum, d) => sum.plus(d.cashAmount).plus(d.transferAmount).plus(d.cardAmount),
+        new Prisma.Decimal(0),
+      ) || new Prisma.Decimal(0);
 
-      return {
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        email: c.user?.email || '',
-        type: c.type || '',
-        companyName: c.companyName || '',
-        taxId: c.taxId || '',
-        address: c.address || '',
-        totalDeposit,
-        deposits: c.customerDeposit,
-      };
+    const customerOut = normalizeCustomerMoney({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.user?.email || '',
+      type: c.type || '',
+      companyName: c.companyName || '',
+      taxId: c.taxId || '',
+      address: c.address || '',
+      creditLimit: c.creditLimit,
+      creditBalance: c.creditBalance,
     });
 
-    console.log(`[getCustomerAndDepositByName] ✅ พบลูกค้า ${result.length} คน`);
-
-   
-    if (result.length > 0) {
-      const first = result[0];
-      return res.json({
-        customer: {
-          id: first.id,
-          name: first.name,
-          phone: first.phone,
-          email: first.email,
-          type: first.type,
-          companyName: first.companyName || '',
-          taxId: first.taxId || '',
-          address: first.address || '',
-        },
-        totalDeposit: first.totalDeposit,
-        deposits: first.deposits,
-      });
-    } else {
-      return res.status(404).json({ error: 'ไม่พบลูกค้า' });
-    }
+    return res.json({
+      customer: customerOut,
+      totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
+      deposits: NORMALIZE_DECIMAL_TO_NUMBER
+        ? c.customerDeposit.map(normalizeDeposit)
+        : c.customerDeposit,
+    });
   } catch (err) {
     console.error('[getCustomerAndDepositByName] ❌', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
   }
 };
 
-
+// Update deposit values or cancel (soft delete)
 const updateCustomerDeposit = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const branchId = req.user.branchId;
+    const id = parseInt(req.params.id, 10);
+    const branchId = Number(req.user?.branchId);
 
     const existing = await prisma.customerDeposit.findFirst({
-      where: {
-        id,
-        branchId,
-        status: 'ACTIVE',
-      },
+      where: { id, branchId, status: 'ACTIVE' },
     });
-    if (!existing) {
-      return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการแก้ไข' });
-    }
+    if (!existing) return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการแก้ไข' });
 
-    // เช็คว่าเป็น Soft Delete หรือไม่ (cancel)
+    // Soft cancel
     if (req.body.status === 'CANCELLED') {
       const cancelled = await prisma.customerDeposit.update({
         where: { id },
         data: { status: 'CANCELLED' },
       });
-      return res.json(cancelled);
+      return res.json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(cancelled) : cancelled);
     }
 
-    const {
-      cashAmount = 0,
-      transferAmount = 0,
-      cardAmount = 0,
-      note,
-    } = req.body;
-    const totalAmount = parseFloat(cashAmount) + parseFloat(transferAmount) + parseFloat(cardAmount);
+    const { cashAmount = 0, transferAmount = 0, cardAmount = 0, note } = req.body;
+    if (![cashAmount, transferAmount, cardAmount].every(isMoneyLike)) {
+      return res.status(400).json({ message: 'รูปแบบจำนวนเงินไม่ถูกต้อง' });
+    }
+
+    const cash = D(cashAmount);
+    const trf = D(transferAmount);
+    const card = D(cardAmount);
+    const total = cash.plus(trf).plus(card);
 
     const updated = await prisma.customerDeposit.update({
       where: { id },
-      data: {
-        cashAmount,
-        transferAmount,
-        cardAmount,
-        totalAmount,
-        note,
-      },
+      data: { cashAmount: cash, transferAmount: trf, cardAmount: card, totalAmount: total, note },
     });
 
-    res.json(updated);
+    res.json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(updated) : updated);
   } catch (err) {
     console.error('❌ updateCustomerDeposit error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการแก้ไขข้อมูล' });
   }
 };
 
+// Soft cancel explicitly
 const deleteCustomerDeposit = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const branchId = req.user.branchId;
+    const id = parseInt(req.params.id, 10);
+    const branchId = Number(req.user?.branchId);
 
     const existing = await prisma.customerDeposit.findFirst({
-      where: {
-        id,
-        branchId,
-        status: 'ACTIVE',
-      },
+      where: { id, branchId, status: 'ACTIVE' },
     });
-    if (!existing) {
-      return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการลบ' });
-    }
+    if (!existing) return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการลบ' });
 
-    await prisma.customerDeposit.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
-    });
-
+    await prisma.customerDeposit.update({ where: { id }, data: { status: 'CANCELLED' } });
     res.json({ message: 'ยกเลิกรายการเรียบร้อยแล้ว' });
   } catch (err) {
     console.error('❌ deleteCustomerDeposit error:', err);
@@ -335,38 +299,49 @@ const deleteCustomerDeposit = async (req, res) => {
   }
 };
 
+// Use a portion of deposit, with logging, status update when fully used
 const useCustomerDeposit = async (req, res) => {
   try {
     const { depositId, amountUsed, saleId } = req.body;
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
 
     if (!depositId || !amountUsed || !saleId) {
       return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
     }
-
-    const deposit = await prisma.customerDeposit.findFirst({
-      where: {
-        id: depositId,
-        branchId,
-        status: 'ACTIVE',
-      },
-    });
-
-    if (!deposit) {
-      return res.status(404).json({ message: 'ไม่พบรายการมัดจำ' });
+    if (!isMoneyLike(amountUsed) || Number(amountUsed) <= 0) {
+      return res.status(400).json({ message: 'จำนวนเงินที่ใช้ไม่ถูกต้อง' });
     }
 
-    if (deposit.totalAmount < amountUsed) {
+    const deposit = await prisma.customerDeposit.findFirst({
+      where: { id: Number(depositId), branchId, status: 'ACTIVE' },
+    });
+    if (!deposit) return res.status(404).json({ message: 'ไม่พบรายการมัดจำ' });
+
+    const already = deposit.usedAmount || new Prisma.Decimal(0);
+    const remain = deposit.totalAmount.minus(already);
+    const useAmt = D(amountUsed);
+
+    if (remain.lessThan(useAmt)) {
       return res.status(400).json({ message: 'ยอดมัดจำไม่พอสำหรับการใช้งาน' });
     }
 
-    await prisma.customerDeposit.update({
-      where: { id: depositId },
-      data: {
-        status: 'USED',
-        usedAmount: amountUsed,
-        usedSaleId: saleId,
-      },
+    await prisma.$transaction(async (tx) => {
+      // 1) Log usage
+      await tx.depositUsage.create({
+        data: { customerDepositId: deposit.id, saleId: Number(saleId), amountUsed: useAmt },
+      });
+      // 2) Update running used amount
+      const updated = await tx.customerDeposit.update({
+        where: { id: deposit.id },
+        data: { usedAmount: already.plus(useAmt), usedSaleId: Number(saleId) },
+      });
+      // 3) Set status to USED only when fully consumed
+      const newStatus = updated.usedAmount.greaterThanOrEqualTo(updated.totalAmount)
+        ? 'USED'
+        : 'ACTIVE';
+      if (newStatus !== deposit.status) {
+        await tx.customerDeposit.update({ where: { id: deposit.id }, data: { status: newStatus } });
+      }
     });
 
     return res.json({ message: 'ใช้มัดจำสำเร็จ' });

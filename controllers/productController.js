@@ -1,6 +1,6 @@
 // ✅ server/controllers/productController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma, Prisma } = require('../lib/prisma');
+const { v2: cloudinary } = require('cloudinary');
 
 
 const getAllProducts = async (req, res) => {
@@ -41,7 +41,7 @@ const getAllProducts = async (req, res) => {
       model: p.model ?? null,
       description: p.description,
       productTemplate: p.template?.name ?? '-',
-      imageUrl: p.productImages?.[0]?.secure_url ?? null,
+      imageUrl: (p.productImages && p.productImages[0] ? p.productImages[0].secure_url : null),
     }));
 
     res.json(mapped);
@@ -60,8 +60,8 @@ const getProductsForPos = async (req, res) => {
     searchText = "",
   } = req.query;
 
-  const branchId = req.user?.branchId;
-  if (!branchId) return res.status(400).json({ error: "branchId is required" });
+  const branchId = Number(req.user?.branchId);
+  if (!branchId) return res.status(401).json({ error: "unauthorized" });
 
   try {
     const products = await prisma.product.findMany({
@@ -108,11 +108,7 @@ const getProductsForPos = async (req, res) => {
         spec: true,
         sold: true,
         quantity: true,        
-        branchPrice: {
-          where: {
-            branchId,
-          },
-          select: {
+        branchPrice: { where: { branchId: Number(branchId), isActive: true }, select: {
             costPrice: true,
             priceRetail: true,
             priceWholesale: true,
@@ -121,8 +117,7 @@ const getProductsForPos = async (req, res) => {
             isActive: true
           },
         },
-        stockItems: {
-          where: { status: 'IN_STOCK' },
+        stockItems: { where: { status: 'IN_STOCK', branchId: Number(branchId) },
           select: { id: true },
         },
         productImages: {
@@ -194,22 +189,21 @@ const getProductsForOnline = async (req, res) => {
     searchText = "",
   } = req.query;
 
-  const branchId = req.user?.branchId ?? (req.query.branchId ? Number(req.query.branchId) : null);
-  if (!branchId) return res.status(400).json({ error: "branchId is required" });
+  const branchId = Number(req.user?.branchId ?? req.query.branchId);
+  if (!branchId) return res.status(401).json({ error: "unauthorized" });
 
   try {
     const products = await prisma.product.findMany({
       where: {
         active: true,
         branchPrice: {
-          some: {
-            isActive: true,
-            branchId,
+          some: { isActive: true, branchId: Number(branchId),
           },
         },
         ...(searchText && {
           OR: [
             { name: { contains: searchText, mode: "insensitive" } },
+            { model: { contains: searchText, mode: "insensitive" } },
             { description: { contains: searchText, mode: "insensitive" } },
             { template: { name: { contains: searchText, mode: "insensitive" } } },
           ],
@@ -242,9 +236,7 @@ const getProductsForOnline = async (req, res) => {
         sold: true,
         quantity: true,        
         branchPrice: {
-          where: {
-            isActive: true,
-            branchId,
+          where: { isActive: true, branchId: Number(branchId),
           },
           select: {
             costPrice: true,
@@ -524,10 +516,9 @@ const getProductOnlineById = async (req, res) => {
             isActive: true,
             branchId,
           },
-          select: { costPrice: true },
+          select: { costPrice: true, priceOnline: true },
         },
-        stockItems: {
-          where: { status: 'IN_STOCK' },
+        stockItems: { where: { status: 'IN_STOCK', branchId },
           select: { id: true },
         },
         productImages: {
@@ -570,9 +561,9 @@ const getProductOnlineById = async (req, res) => {
       spec: product.spec,
       sold: product.sold,
       quantity: product.quantity,      
-      price: product.branchPrice[0]?.price ?? 0,
+      price: product.branchPrice[0]?.priceOnline ?? 0,
       isReady: product.stockItems?.length > 0,
-      imageUrl: product.productImages?.[0]?.secure_url || null,
+      imageUrl: (product.productImages && product.productImages[0] ? product.productImages[0].secure_url : null),
       productImages: product.productImages || [],
       category: product.template?.productProfile?.productType?.category?.name || null,
       productType: product.template?.productProfile?.productType?.name || null,
@@ -589,7 +580,7 @@ const getProductOnlineById = async (req, res) => {
 
 const createProduct = async (req, res) => {
   const data = req.body;
-  const branchId = req.user?.branchId;
+  const branchId = Number(req.user?.branchId);
 
   if (!branchId) {
     return res.status(400).json({ error: 'Missing branchId' });
@@ -678,7 +669,7 @@ const updateProduct = async (req, res) => {
         where: {
           productId_branchId: {
             productId: id,
-            branchId: branchId,
+            branchId: Number(branchId),
           },
         },
         update: {
@@ -801,3 +792,7 @@ module.exports = {
   getProductsForPos,
   
 };
+
+
+
+

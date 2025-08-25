@@ -1,223 +1,188 @@
 // controllers/paymentController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma, Prisma } = require('../lib/prisma');
 
-const generatePaymentCode = async (branchId) => {
+// Helpers & flags for Decimal-safe arithmetic
+const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
+const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+const isMoneyLike = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
+const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
+
+// ✅ สร้างรหัสการชำระเงินใหม่ (ป้องกันชนกันด้วย attempt)
+const generatePaymentCode = async (branchId, attempt = 0) => {
   const now = new Date();
-  const year = String(now.getFullYear()).slice(-2); // "25"
-  const month = String(now.getMonth() + 1).padStart(2, '0'); // "06"
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
   const branchCode = String(branchId).padStart(2, '0');
-  const prefix = `PMT-${branchCode}${year}${month}`; // เช่น "PMT-022506"
+  const prefix = `PMT-${branchCode}${year}${month}`; // e.g., PMT-022506
 
-  const existing = await prisma.payment.findMany({
-    where: {
-      code: {
-        startsWith: prefix,
-      },
-    },
-    select: {
-      code: true,
-    },
-    orderBy: {
-      code: 'desc',
-    },
-    take: 1,
+  const last = await prisma.payment.findFirst({
+    where: { code: { startsWith: `${prefix}-` } },
+    select: { code: true },
+    orderBy: { code: 'desc' },
   });
 
-  let nextNumber = 1;
-  if (existing.length > 0) {
-    const lastCode = existing[0].code;
-    const lastNumber = parseInt(lastCode.split('-').pop());
-    if (!isNaN(lastNumber)) {
-      nextNumber = lastNumber + 1;
-    }
-  }
-
-  return `${prefix}${String(nextNumber).padStart(3, '0')}`; // เช่น "PMT-022506-001"
+  const next = last ? (parseInt(last.code.split('-').pop(), 10) + 1 + attempt) : (1 + attempt);
+  return `${prefix}-${String(next).padStart(3, '0')}`; // e.g., PMT-022506-001
 };
 
+// 1) createPayments → บันทึกการชำระเงินใหม่
 const createPayments = async (req, res) => {
   try {
-    const body = req.body;
-    const branchId = req.user?.branchId;
-    const employeeId = req.user?.employeeId;
-
-    const { saleId, note, combinedDocumentCode, paymentItems } = body;
+    const branchId = Number(req.user?.branchId);
+    const employeeId = Number(req.user?.employeeId);
+    const { saleId, note, combinedDocumentCode, paymentItems } = req.body;
 
     if (!saleId || !Array.isArray(paymentItems) || paymentItems.length === 0) {
       return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน saleId หรือรายการชำระเงินหายไป' });
     }
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
-    const code = await generatePaymentCode(branchId);
-
-
-    // ✅ ตรวจสอบและจัดการ DEPOSIT ก่อนสร้าง payment
-    for (const item of paymentItems) {
-      if (item.paymentMethod === 'DEPOSIT') {
-        const { customerDepositId, amount } = item;
-        if (!customerDepositId) {
-          return res.status(400).json({ message: 'ต้องระบุ customerDepositId สำหรับการชำระแบบ DEPOSIT' });
-        }
-
-        const deposit = await prisma.customerDeposit.findUnique({
-          where: { id: customerDepositId },
-          include: { depositUsage: true },
-        });
-
-        if (!deposit || deposit.status !== 'ACTIVE') {
-          return res.status(404).json({ message: 'ไม่พบยอดเงินมัดจำที่ใช้งานได้' });
-        }
-
-        const usedAmount = deposit.depositUsage.reduce((sum, u) => sum + u.amountUsed, 0);
-        const available = deposit.totalAmount - usedAmount;
-
-        if (parseFloat(amount) > available) {
-          return res.status(400).json({ message: 'ยอดเงินมัดจำไม่เพียงพอ' });
-        }
-
-        // ✅ สร้าง DepositUsage
-        await prisma.depositUsage.create({
-          data: {
-            customerDepositId,
-            saleId,
-            amountUsed: parseFloat(amount),
-          },
-        });
-
-        console.log(`✅ ใช้มัดจำ ${amount} บาท จาก customerDepositId=${customerDepositId}`);
+    for (const it of paymentItems) {
+      if (!isMoneyLike(it.amount) || Number(it.amount) <= 0) {
+        return res.status(400).json({ message: 'จำนวนเงินไม่ถูกต้อง' });
       }
     }
 
-    const created = await prisma.payment.create({
-      data: {
-        code,
-        receivedAt: new Date(),
-        note: note || null,
-        combinedDocumentCode: combinedDocumentCode || null,
-
-        sale: { connect: { id: Number(saleId) } },
-        employeeProfile: employeeId ? { connect: { id: employeeId } } : undefined,
-        branch: branchId ? { connect: { id: branchId } } : undefined,
-
-        items: {
-          create: paymentItems.map((item) => ({
-            paymentMethod: item.paymentMethod,
-            amount: parseFloat(item.amount || 0),
-            note: item.note || null,
-            slipImage: item.slipImage || null,
-            cardRef: item.cardRef || null,
-            govImage: item.govImage || null,
-          })),
-        },
-      },
-    });
-
-    // ✅ ตรวจสอบยอดรวมและอัปเดตสถานะ paid ใน Sale ถ้าชำระครบ
-    const totalPaid = paymentItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
-    const sale = await prisma.sale.findUnique({ where: { id: Number(saleId) } });
-
-    if (sale && totalPaid >= sale.totalAmount) {
-      await prisma.sale.update({
-        where: { id: Number(saleId) },
-        data: { paid: true, paidAt: new Date() },
-      });
+    // Ensure sale belongs to current branch
+    const sale = await prisma.sale.findUnique({ where: { id: Number(saleId) }, select: { branchId: true } });
+    if (!sale || Number(sale.branchId) !== branchId) {
+      return res.status(404).json({ message: 'ไม่พบใบขายในสาขานี้' });
     }
 
-    return res.status(201).json({ message: 'บันทึกข้อมูลการชำระเงินแล้ว', paymentId: created.id });
+    let createdPayment;
+
+    await prisma.$transaction(async (tx) => {
+      // Pre-validate DEPOSIT availability
+      for (const item of paymentItems) {
+        if (item.paymentMethod === 'DEPOSIT') {
+          const depId = Number(item.customerDepositId);
+          if (!depId) throw Object.assign(new Error('ต้องระบุ customerDepositId สำหรับการชำระแบบ DEPOSIT'), { status: 400 });
+          const dep = await tx.customerDeposit.findUnique({ where: { id: depId }, include: { depositUsage: true } });
+          if (!dep || dep.status !== 'ACTIVE' || Number(dep.branchId) !== branchId) {
+            throw Object.assign(new Error('ไม่พบยอดเงินมัดจำที่ใช้งานได้'), { status: 404 });
+          }
+          const used = (dep.usedAmount ?? (dep.depositUsage?.reduce((s,u)=> s.plus(u.amountUsed), new Prisma.Decimal(0)) || new Prisma.Decimal(0)));
+          const available = dep.totalAmount.minus(used);
+          const need = D(item.amount);
+          if (available.lessThan(need)) {
+            throw Object.assign(new Error('ยอดเงินมัดจำไม่เพียงพอ'), { status: 400 });
+          }
+        }
+      }
+
+      // Create payment with retry on code collision
+      let payment;
+      for (let attempt = 0; attempt <= 3; attempt++) {
+        const code = await generatePaymentCode(branchId, attempt);
+        try {
+          payment = await tx.payment.create({
+            data: {
+              code,
+              receivedAt: new Date(),
+              note: note || null,
+              combinedDocumentCode: combinedDocumentCode || null,
+              saleId: Number(saleId),
+              employeeProfileId: employeeId || null,
+              branchId,
+              items: {
+                create: paymentItems.map((it) => ({
+                  paymentMethod: it.paymentMethod,
+                  amount: D(it.amount || 0),
+                  note: it.note || null,
+                  slipImage: it.slipImage || null,
+                  cardRef: it.cardRef || null,
+                  govImage: it.govImage || null,
+                })),
+              },
+            },
+            include: { items: true },
+          });
+          break;
+        } catch (e) {
+          if (e?.code === 'P2002' && /code/.test(String(e?.meta?.target)) && attempt < 3) continue;
+          throw e;
+        }
+      }
+
+      // Log deposit usage and update deposit status when DEPOSIT is used
+      for (const src of paymentItems) {
+        if (src.paymentMethod === 'DEPOSIT') {
+          const depId = Number(src.customerDepositId);
+          const amt = D(src.amount || 0);
+          await tx.depositUsage.create({ data: { customerDepositId: depId, saleId: Number(saleId), amountUsed: amt } });
+          const dep = await tx.customerDeposit.update({ where: { id: depId }, data: { usedAmount: { increment: amt } } });
+          if (dep.usedAmount.greaterThanOrEqualTo ? dep.usedAmount.greaterThanOrEqualTo(dep.totalAmount) : toNum(dep.usedAmount) >= toNum(dep.totalAmount)) {
+            await tx.customerDeposit.update({ where: { id: depId }, data: { status: 'USED' } });
+          }
+        }
+      }
+
+      // Recompute paid status after creation
+      const agg = await tx.paymentItem.aggregate({ _sum: { amount: true }, where: { payment: { saleId: Number(saleId), isCancelled: false } } });
+      const sumPaid = agg._sum.amount || new Prisma.Decimal(0);
+      const saleRow = await tx.sale.findUnique({ where: { id: Number(saleId) }, select: { totalAmount: true } });
+      if (sumPaid.greaterThanOrEqualTo ? sumPaid.greaterThanOrEqualTo(saleRow.totalAmount) : toNum(sumPaid) >= toNum(saleRow.totalAmount)) {
+        await tx.sale.update({ where: { id: Number(saleId) }, data: { paid: true, paidAt: new Date() } });
+      }
+
+      createdPayment = payment;
+    });
+
+    return res.status(201).json({ message: 'บันทึกข้อมูลการชำระเงินแล้ว', paymentId: createdPayment.id });
   } catch (error) {
     console.error('❌ [createPayments] error:', error);
-    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
+    const status = error?.status || 500;
+    return res.status(status).json({ message: error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
   }
 };
 
+// 2) searchPrintablePayments → ค้นหาใบเสร็จสำหรับพิมพ์
 const searchPrintablePayments = async (req, res) => {
   try {
-    const branchId = req.user.branchId;
-    const { keyword, fromDate, toDate } = req.query; // รับ fromDate และ toDate มาจาก query
+    const branchId = Number(req.user?.branchId);
+    const { keyword, fromDate, toDate } = req.query;
+
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
+
+    const where = {
+      branchId,
+      ...(keyword ? {
+        OR: [
+          { sale: { customer: { name: { contains: String(keyword), mode: 'insensitive' } } } },
+          { sale: { customer: { phone: { contains: String(keyword), mode: 'insensitive' } } } },
+          { sale: { code: { contains: String(keyword), mode: 'insensitive' } } },
+          { sale: { customer: { companyName: { contains: String(keyword), mode: 'insensitive' } } } },
+        ],
+      } : {}),
+      ...(fromDate || toDate ? {
+        receivedAt: {
+          ...(fromDate ? { gte: new Date(fromDate) } : {}),
+          ...(toDate ? { lte: new Date(new Date(toDate).setHours(23,59,59,999)) } : {}),
+        },
+      } : {}),
+    };
 
     const payments = await prisma.payment.findMany({
-      where: {
-        branchId,
-        ...(keyword && {
-          OR: [
-            {
-              sale: {
-                customer: {
-                  name: {
-                    contains: keyword,
-                    mode: 'insensitive',
-                  },
-                },
-              },
-            },
-            {
-              sale: {
-                customer: {
-                  phone: {
-                    contains: keyword,
-                    mode: 'insensitive',
-                  },
-                },
-              },
-            },
-            {
-              sale: {
-                code: {
-                  contains: keyword,
-                  mode: 'insensitive',
-                },
-              },
-            },
-            {
-              sale: {
-                customer: {
-                  companyName: {
-                    contains: keyword,
-                    mode: 'insensitive',
-                  },
-                },
-              },
-            },
-          ],
-        }),
-
-        ...(fromDate && { receivedAt: { gte: new Date(fromDate) } }),
-        ...(toDate && { receivedAt: { lte: new Date(toDate) } }),
-      },
+      where,
       orderBy: { receivedAt: 'desc' },
       include: {
         items: true,
         sale: {
           include: {
-            branch: true, 
-            customer: true, 
-            items: {
-              include: {              
-                stockItem: {
-                  include: {
-                    product: {
-                      select: {
-                        name: true,
-                        model: true,
-                        template: true, 
-                      },
-                    },
-                  },
-                },
-              },
-            },
+            branch: true,
+            customer: true,
+            items: { include: { stockItem: { include: { product: { select: { name: true, model: true, template: true } } } } } },
           },
         },
         employeeProfile: true,
       },
     });
 
-    const result = payments.map((p) => ({
-      ...p,
-      amount: p.items.reduce((sum, item) => sum + item.amount, 0),
-    }));
+    const result = payments.map((p) => {
+      const total = p.items.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
+      return { ...p, amount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(total) : total };
+    });
 
-    console.log('payments : ', result);
     res.json(result);
   } catch (error) {
     console.error('❌ [searchPrintablePayments] error:', error);
@@ -225,32 +190,34 @@ const searchPrintablePayments = async (req, res) => {
   }
 };
 
-
-
+// 3) cancelPayment → ยกเลิกรายการชำระ
 const cancelPayment = async (req, res) => {
   try {
     const { paymentId, note } = req.body;
-    const branchId = req.user.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
+    const payment = await prisma.payment.findUnique({ where: { id: Number(paymentId) }, include: { items: true } });
 
-    if (!payment || payment.branchId !== branchId) {
+    if (!payment || Number(payment.branchId) !== branchId) {
       return res.status(404).json({ message: 'ไม่พบข้อมูลการชำระเงินในสาขานี้' });
     }
-
     if (payment.isCancelled) {
       return res.status(400).json({ message: 'รายการนี้ถูกยกเลิกแล้ว' });
     }
 
-    await prisma.payment.update({
-      where: { id: paymentId },
-      data: {
-        isCancelled: true,
-        cancelNote: note || null,
-        cancelledAt: new Date(),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({ where: { id: payment.id }, data: { isCancelled: true, cancelNote: note || null, cancelledAt: new Date() } });
+
+      // Recompute sale paid status after cancellation
+      const agg = await tx.paymentItem.aggregate({ _sum: { amount: true }, where: { payment: { saleId: payment.saleId, isCancelled: false } } });
+      const paid = agg._sum.amount || new Prisma.Decimal(0);
+      const saleRow = await tx.sale.findUnique({ where: { id: payment.saleId }, select: { totalAmount: true } });
+      const isPaid = paid.greaterThanOrEqualTo ? paid.greaterThanOrEqualTo(saleRow.totalAmount) : toNum(paid) >= toNum(saleRow.totalAmount);
+      if (!isPaid) {
+        await tx.sale.update({ where: { id: payment.saleId }, data: { paid: false, paidAt: null } });
+      }
+      // NOTE: ไม่ได้ย้อนยอดมัดจำกลับ เพราะ schema ไม่ได้ผูกรายการมัดจำกับ payment item เฉพาะเจาะจง
     });
 
     res.json({ message: 'ยกเลิกรายการชำระเงินเรียบร้อยแล้ว' });
@@ -265,4 +232,3 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
-

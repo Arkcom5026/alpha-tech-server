@@ -1,7 +1,10 @@
-// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services
-// ⚠️ WARNING: onDelete: Cascade has been added to ALL relations as requested.
-// This is a destructive action and can lead to unintended data loss.
-// Review carefully before deploying to production.
+// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services (Decimal-Ready)
+// ⚠️ NOTE:
+// 1) เปลี่ยนฟิลด์ "จำนวนเงิน" สำคัญจาก Float → Decimal ตามมาตรฐานบัญชี
+// 2) บังคับ BRANCH_SCOPE (branchId) ในเอกสารการเงินหลักบางจุด
+// 3) ลบฟิลด์ลอยที่ไม่ผูก FK (barcodeReceiptItemId) ออกจาก StockItem
+// 4) เพิ่มดัชนีที่จำเป็นต่อการ query จริง
+// 5) คง onDelete เดิมตามที่ระบุไว้ในสคีมาก่อนหน้า (ส่วนที่เป็นเอกสารบัญชี แนะนำให้ Restrict ในอนาคตถ้าต้องการ)
 
 generator client {
   provider = "prisma-client-js"
@@ -174,9 +177,9 @@ model CustomerProfile {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int          @unique
 
-  paymentTerms  Int?   @default(0) // เครดิตเทอม (วัน)
-  creditLimit   Float? @default(0) // วงเงินเครดิตสูงสุด
-  creditBalance Float? @default(0) // ยอดเครดิตคงเหลือที่ใช้ไป
+  paymentTerms  Int?     @default(0) // เครดิตเทอม (วัน)
+  creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal? @default(0) @db.Decimal(12, 2)
 
   orders   Order[]
   cart     Cart[]
@@ -194,14 +197,14 @@ model CustomerProfile {
 model CustomerDeposit {
   id Int @id @default(autoincrement())
 
-  cashAmount     Float   @default(0)
-  transferAmount Float   @default(0)
-  cardAmount     Float   @default(0)
-  usedAmount     Float   @default(0)
+  cashAmount     Decimal @default(0) @db.Decimal(12, 2)
+  transferAmount Decimal @default(0) @db.Decimal(12, 2)
+  cardAmount     Decimal @default(0) @db.Decimal(12, 2)
+  usedAmount     Decimal @default(0) @db.Decimal(12, 2)
   usedSaleId     Int?
   note           String? @db.Text
 
-  totalAmount Float
+  totalAmount Decimal @db.Decimal(12, 2)
 
   customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId Int?
@@ -211,13 +214,16 @@ model CustomerDeposit {
 
   status String @default("ACTIVE") // ✅ สำหรับ soft delete: ACTIVE หรือ CANCELLED
 
-  createdAt    DateTime       @default(now())
-  createdBy    String // employeeId หรือ userId
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime         @default(now())
+  // ⚠️ Transitional change: make createdBy nullable first to avoid destructive change
+  createdBy    Int?
+  createdByEmp EmployeeProfile? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt    DateTime         @updatedAt
   depositUsage DepositUsage[]
 
   @@index([customerId])
   @@index([branchId])
+  @@index([branchId, createdAt])
 }
 
 model DepositUsage {
@@ -228,7 +234,7 @@ model DepositUsage {
   sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
   saleId Int
 
-  amountUsed Float
+  amountUsed Decimal  @db.Decimal(12, 2)
   createdAt  DateTime @default(now())
 }
 
@@ -266,6 +272,7 @@ model EmployeeProfile {
   CombinedBillingDocument CombinedBillingDocument[]
   StockAuditSession       StockAuditSession[]
   StockAuditScanLog       StockAuditScanLog[]
+  CustomerDeposit         CustomerDeposit[]
 }
 
 model Branch {
@@ -407,11 +414,11 @@ model Product {
 model BranchPrice {
   id Int @id @default(autoincrement())
 
-  costPrice       Float // ราคาที่รับเข้าจริงจากแต่ละใบรับ (สำคัญ)
-  priceRetail     Int? // ราคาขายปลีก
-  priceWholesale  Int? // ราคาส่ง
-  priceTechnician Int? // ราคาช่าง
-  priceOnline     Int? // ราคาออนไลน์
+  costPrice       Decimal @db.Decimal(12, 2) // ราคาที่รับเข้าจริงต่อหน่วย
+  priceRetail     Int?
+  priceWholesale  Int?
+  priceTechnician Int?
+  priceOnline     Int?
 
   // 🆕 ฟิลด์เพิ่มเติม
   effectiveDate DateTime?
@@ -464,7 +471,7 @@ model StockItem {
   serialNumber String?
 
   qrCodeData   String?
-  costPrice    Float? // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก  
+  costPrice    Decimal?    @db.Decimal(12, 2) // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก
   receivedAt   DateTime    @default(now())
   warrantyDays Int?
   expiredAt    DateTime?
@@ -490,9 +497,8 @@ model StockItem {
   purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptItemId Int?
 
-  barcodeReceiptItem   BarcodeReceiptItem[]
-  barcodeReceiptItemId String?
-  saleItem             SaleItem?
+  barcodeReceiptItem BarcodeReceiptItem[]
+  saleItem           SaleItem?
 
   scannedAt              DateTime                 @default(now())
   createdAt              DateTime                 @default(now())
@@ -500,7 +506,9 @@ model StockItem {
   StockAuditSnapshotItem StockAuditSnapshotItem[]
   StockAuditScanLog      StockAuditScanLog[]
 
-  @@unique([serialNumber, productId]) // ✅ ซ้ำได้ถ้า productId เดียวกัน แม้ข้ามสาขา
+  @@unique([serialNumber, productId]) // ✅ SN เดียวกันอนุญาตได้เฉพาะคนละ productId
+  @@index([branchId, status, productId])
+  @@index([productId, status])
 }
 
 model Supplier {
@@ -510,27 +518,29 @@ model Supplier {
   phone         String?
   email         String?
   taxId         String?
-  taxBranchCode String?         @default("00000") // รหัสสาขาของผู้ขาย (00000 = สนง.ใหญ่)
+  taxBranchCode String?         @default("00000")
   address       String?
   province      String?
   postalCode    String?
   country       String?         @default("Thailand")
   paymentTerms  Int?            @default(0)
-  creditLimit   Float?          @default(0)
-  creditBalance Float?          @default(0)
+  creditLimit   Decimal?        @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal?        @default(0) @db.Decimal(12, 2)
   bankId        Int?
   accountNumber String?
   accountType   String?
   notes         String?
-  branchId      Int?
+  branchId      Int
   active        Boolean         @default(true)
   bank          Bank?           @relation(fields: [bankId], references: [id], onDelete: Cascade)
-  branch        Branch?         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   pos           PurchaseOrder[]
 
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   supplierPayment SupplierPayment[]
+
+  @@unique([branchId, name])
 }
 
 model Bank {
@@ -571,7 +581,7 @@ model PurchaseOrderItem {
   productId        Int
   quantity         Int
   receivedQuantity Int                        @default(0)
-  costPrice        Float
+  costPrice        Decimal                    @db.Decimal(12, 2)
   receipts         PurchaseOrderReceiptItem[]
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -587,18 +597,18 @@ model PurchaseOrderReceipt {
   code        String   @unique
   receivedAt  DateTime @default(now())
   note        String?
-  totalAmount Float?
-  paidAmount  Float?
+  totalAmount Decimal? @db.Decimal(12, 2)
+  paidAmount  Decimal? @db.Decimal(12, 2)
 
   supplierTaxInvoiceNumber String?
   supplierTaxInvoiceDate   DateTime?
-  vatRate                  Float?    @default(7) // อัตราภาษี ณ วันที่รับของ
+  vatRate                  Decimal?  @default(7) @db.Decimal(5, 2)
 
   statusReceipt ReceiptStatus @default(PENDING)
-  statusPayment PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
+  statusPayment PaymentStatus @default(UNPAID)
   receivedById  Int
   printed       Boolean       @default(false)
-  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade) // ✅ ความสัมพันธ์กับ Branch
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId      Int
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -609,6 +619,9 @@ model PurchaseOrderReceipt {
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
   SupplierPaymentReceipt SupplierPaymentReceipt[]
+
+  @@index([branchId, receivedAt])
+  @@index([purchaseOrderId])
 }
 
 model PurchaseOrderReceiptItem {
@@ -616,7 +629,7 @@ model PurchaseOrderReceiptItem {
   receiptId           Int
   purchaseOrderItemId Int
   quantity            Int
-  costPrice           Float
+  costPrice           Decimal              @db.Decimal(12, 2)
   receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Cascade)
   stockItems          StockItem[]
@@ -627,7 +640,7 @@ model PurchaseOrderReceiptItem {
 
 model Order {
   id              Int         @id @default(autoincrement())
-  cartTotal       Float
+  cartTotal       Decimal     @db.Decimal(12, 2)
   orderStatus     OrderStatus @default(NOT_PROCESS)
   stripePaymentId String
   status          String
@@ -677,7 +690,7 @@ model CartItem {
   productId       Int
   product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity        Int     @default(1)
-  priceAtThatTime Float
+  priceAtThatTime Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -707,13 +720,13 @@ model ServiceOrder {
 }
 
 model ServiceItem {
-  id           Int     @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   serviceId    Int
   productId    Int?
   serialNumber String?
   problem      String?
   solution     String?
-  cost         Float?
+  cost         Decimal? @db.Decimal(12, 2)
 
   service ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   product Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -771,11 +784,11 @@ model Sale {
   employeeId Int
   branchId   Int
 
-  totalBeforeDiscount Float
-  totalDiscount       Float
-  vat                 Float
-  vatRate             Float      @default(7)
-  totalAmount         Float
+  totalBeforeDiscount Decimal    @db.Decimal(12, 2)
+  totalDiscount       Decimal    @db.Decimal(12, 2)
+  vat                 Decimal    @db.Decimal(12, 2)
+  vatRate             Decimal    @default(7) @db.Decimal(5, 2)
+  totalAmount         Decimal    @db.Decimal(12, 2)
   note                String?
   status              SaleStatus @default(DRAFT)
   refCode             String?
@@ -783,11 +796,11 @@ model Sale {
   paid                Boolean    @default(false)
   paidAt              DateTime?
 
-  isCredit               Boolean               @default(false) // ลูกค้าเครดิตหรือไม่
-  dueDate                DateTime? // กำหนดชำระเงิน (30/45/60/90 วัน)
-  officialDocumentNumber String? // เลขหนังสือ/ใบสั่งจากหน่วยงาน
+  isCredit               Boolean               @default(false)
+  dueDate                DateTime?
+  officialDocumentNumber String?
   saleType               SaleType              @default(NORMAL)
-  finalizedAt            DateTime? // วันที่ราคาถูกเคาะเป็นทางการ
+  finalizedAt            DateTime?
   combinedDocumentId     Int?
   combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id], onDelete: Cascade)
 
@@ -816,11 +829,11 @@ model SaleItem {
   saleId      Int
   stockItemId Int @unique
 
-  basePrice      Float // ราคาก่อน VAT
-  vatAmount      Float // VAT 7% ของสินค้านี้
-  price          Float // ราคาขายต่อชิ้น (รวม VAT แล้ว)
-  discount       Float // ส่วนลดเฉพาะชิ้นนี้
-  refundedAmount Float   @default(0) // ยอดที่เคยคืนไปแล้วจากชิ้นนี้
+  basePrice      Decimal @db.Decimal(12, 2)
+  vatAmount      Decimal @db.Decimal(12, 2)
+  price          Decimal @db.Decimal(12, 2)
+  discount       Decimal @db.Decimal(12, 2)
+  refundedAmount Decimal @default(0) @db.Decimal(12, 2)
   remark         String?
 
   sale        Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -848,13 +861,16 @@ model Payment {
   employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
   employeeProfileId Int?
 
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  branchId Int?
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   items PaymentItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([saleId])
+  @@index([branchId, receivedAt])
 }
 
 model PaymentItem {
@@ -863,7 +879,7 @@ model PaymentItem {
   paymentId Int
 
   paymentMethod PaymentMethod
-  amount        Decimal       @db.Decimal(10, 2)
+  amount        Decimal       @db.Decimal(12, 2)
   note          String?
 
   slipImage String?
@@ -880,8 +896,8 @@ model CombinedSaleDocument {
   note           String?
   createdBy      Int
   branchId       Int
-  totalAmount    Float
-  finalAmount    Float
+  totalAmount    Decimal  @db.Decimal(12, 2)
+  finalAmount    Decimal  @db.Decimal(12, 2)
   adjustmentNote String?
 
   createdAt DateTime @default(now())
@@ -901,14 +917,14 @@ model SaleReturn {
   refundedByEmployeeId Int?
   branchId             Int
   reason               String?
-  totalRefund          Float
-  refundedAmount       Float      @default(0) // ✅ รวมยอดที่คืนแล้วจริง
-  deductedAmount       Float      @default(0) // ✅ รวมยอดที่หักไว้จากการคืน
-  isFullyRefunded      Boolean    @default(false) // ✅ คืนเงินครบแล้วหรือยัง
-  refundMethod         String // เช่น CASH, QR, CREDIT
-  returnType           ReturnType @default(REFUND) // ✅ ประเภทการคืน
+  totalRefund          Decimal    @db.Decimal(12, 2)
+  refundedAmount       Decimal    @default(0) @db.Decimal(12, 2)
+  deductedAmount       Decimal    @default(0) @db.Decimal(12, 2)
+  isFullyRefunded      Boolean    @default(false)
+  refundMethod         String
+  returnType           ReturnType @default(REFUND)
   note                 String?
-  status               String     @default("PENDING") // PENDING, REFUNDED, REJECTED
+  status               String     @default("PENDING")
 
   sale       Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
   employee   EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -926,9 +942,9 @@ model SaleReturnItem {
   saleReturnId Int
   saleItemId   Int
 
-  refundAmount Float // จำนวนเงินที่คืนให้ลูกค้า
-  reason       String? // เหตุผลการคืนสินค้า
-  reasonCode   String? // รหัสเหตุผล เช่น DEFECT, CHANGE_MIND
+  refundAmount Decimal @db.Decimal(12, 2)
+  reason       String?
+  reasonCode   String?
 
   saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
   saleItem   SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
@@ -940,8 +956,8 @@ model SaleReturnItem {
 model RefundTransaction {
   id                   Int      @id @default(autoincrement())
   saleReturnId         Int
-  amount               Float
-  deducted             Float    @default(0)
+  amount               Decimal  @db.Decimal(12, 2)
+  deducted             Decimal  @default(0) @db.Decimal(12, 2)
   method               String
   note                 String?
   refundedAt           DateTime @default(now())
@@ -959,16 +975,16 @@ model SupplierPayment {
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierId Int
 
-  debitAmount  Float?
-  creditAmount Float?
-  amount       Float?
+  debitAmount  Decimal? @db.Decimal(12, 2)
+  creditAmount Decimal? @db.Decimal(12, 2)
+  amount       Decimal? @db.Decimal(12, 2)
 
   method String
   note   String?
 
   paymentRef      String?
   paymentProofUrl String?
-  statusPayment   PaymentStatus @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
+  statusPayment   PaymentStatus @default(UNPAID)
   sourceType      String?
   sourcePOId      Int?
 
@@ -981,10 +997,13 @@ model SupplierPayment {
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
 
-  supplierPaymentReceipts SupplierPaymentReceipt[] // 🟡 เปลี่ยนชื่อให้สื่อความหมายชัดเจนขึ้น
+  supplierPaymentReceipts SupplierPaymentReceipt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([branchId, paidAt])
+  @@index([supplierId])
 }
 
 model SupplierPaymentReceipt {
@@ -996,12 +1015,12 @@ model SupplierPaymentReceipt {
   receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   receiptId Int
 
-  amountPaid Float
+  amountPaid Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([paymentId, receiptId]) // ✅ ห้ามซ้ำในคู่เดียวกัน
+  @@unique([paymentId, receiptId])
 }
 
 model OrderOnline {
@@ -1017,7 +1036,7 @@ model OrderOnline {
   note          String?
   paymentNote   String?
   status        OrderOnlineStatus @default(PENDING)
-  statusPayment PaymentStatus     @default(UNPAID) // ✅ ใช้กับสถานะการชำระเงิน
+  statusPayment PaymentStatus     @default(UNPAID)
   paymentMethod String?
   trackingCode  String?
   source        OrderSource?
@@ -1041,11 +1060,11 @@ model OrderOnline {
 }
 
 model OrderOnlineItem {
-  id              Int     @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   orderId         Int
   productId       Int
   quantity        Int
-  priceAtPurchase Float?
+  priceAtPurchase Decimal? @db.Decimal(12, 2)
   note            String?
 
   order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1061,10 +1080,10 @@ model CombinedBillingDocument {
   customerId Int
   branchId   Int
 
-  totalBeforeVat Float?
-  vatAmount      Float?
-  totalAmount    Float?
-  status         String @default("ACTIVE") // ACTIVE | CANCELLED
+  totalBeforeVat Decimal? @db.Decimal(12, 2)
+  vatAmount      Decimal? @db.Decimal(12, 2)
+  totalAmount    Decimal? @db.Decimal(12, 2)
+  status         String   @default("ACTIVE") // ACTIVE | CANCELLED
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,8 +1098,8 @@ model StockAuditSession {
   id            Int       @id @default(autoincrement())
   branchId      Int
   employeeId    Int
-  mode          String    @default("READY_TO_SELL") // เผื่ออนาคตมีโหมดอื่น
-  status        String    @default("DRAFT") // DRAFT | CONFIRMED | CANCELLED
+  mode          String    @default("READY_TO_SELL")
+  status        String    @default("DRAFT")
   expectedCount Int       @default(0)
   scannedCount  Int       @default(0)
   startedAt     DateTime  @default(now())
@@ -1099,7 +1118,6 @@ model StockAuditSession {
   @@index([branchId, status])
   @@index([startedAt])
 }
-
 
 model StockAuditSnapshotItem {
   id             Int         @id @default(autoincrement())
@@ -1122,7 +1140,6 @@ model StockAuditSnapshotItem {
   @@index([auditSessionId, isScanned])
   @@index([barcode])
 }
-
 
 model StockAuditScanLog {
   id             Int      @id @default(autoincrement())
