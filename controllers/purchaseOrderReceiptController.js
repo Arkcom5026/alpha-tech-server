@@ -1,3 +1,9 @@
+// purchaseOrderReceiptController.js — patched to prevent interactive transaction timeout (P2028)
+// - Use longer transaction timeout
+// - Keep transaction SMALL: move non‑critical upserts out of tx
+// - Generate unique receipt code inside tx via the same client
+// - Be Decimal‑safe and BRANCH_SCOPE_ENFORCED as before
+
 const dayjs = require('dayjs');
 const { ReceiptStatus, Prisma } = require('@prisma/client');
 const { prisma } = require('../lib/prisma'); // ✅ singleton
@@ -7,19 +13,25 @@ const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
 
-// ---- Code generator (with monthly sequence) ----
-const generateReceiptCode = async (branchId) => {
+// ---- Code generator (monthly sequence; runs INSIDE a tx) ----
+/**
+ * Generate next running code like RC-<BR><YYMM>-0001 atomically inside the same client/tx.
+ * @param {number} branchId
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ */
+const generateReceiptCode = async (branchId, client) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
   const prefix = `RC-${paddedBranch}${now.format('YYMM')}`; // e.g., RC-022508
 
-  const latest = await prisma.purchaseOrderReceipt.findFirst({
+  const latest = await client.purchaseOrderReceipt.findFirst({
     where: { code: { startsWith: prefix } },
     orderBy: { code: 'desc' },
+    select: { code: true },
   });
 
   let nextNumber = 1;
-  if (latest) {
+  if (latest?.code) {
     const lastSequence = parseInt(latest.code.split('-').pop(), 10);
     nextNumber = (isNaN(lastSequence) ? 0 : lastSequence) + 1;
   }
@@ -27,7 +39,7 @@ const generateReceiptCode = async (branchId) => {
   return `${prefix}-${running}`; // RC-022508-0001
 };
 
-// ---- Create Receipt (transaction + retry on code collision) ----
+// ---- Create Receipt (small tx + retry on code collision) ----
 const createPurchaseOrderReceipt = async (req, res) => {
   try {
     const purchaseOrderId = Number(req.body.purchaseOrderId);
@@ -57,56 +69,67 @@ const createPurchaseOrderReceipt = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อในสาขานี้' });
     }
 
-    const maxRetries = 5;
+    // Keep the critical receipt creation very short inside tx
+    const maxRetries = 3;
     let created = null;
 
-    await prisma.$transaction(async (tx) => {
-      // retry code generation on unique collision
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const code = await generateReceiptCode(branchId);
-        try {
-          const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
-          created = await tx.purchaseOrderReceipt.create({
-            data: {
-              note,
-              receivedById,
-              code,
-              supplierTaxInvoiceNumber,
-              supplierTaxInvoiceDate: taxDate,
-              branch: { connect: { id: branchId } },
-              purchaseOrder: { connect: { id: purchaseOrderId } },
-            },
-            include: {
-              purchaseOrder: {
-                select: {
-                  id: true,
-                  code: true,
-                  supplier: { select: { name: true } },
-                  items: { select: { productId: true, costPrice: true } },
+    await prisma.$transaction(
+      async (tx) => {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          const code = await generateReceiptCode(branchId, tx);
+          try {
+            const taxDate = supplierTaxInvoiceDate ? new Date(supplierTaxInvoiceDate) : null;
+            created = await tx.purchaseOrderReceipt.create({
+              data: {
+                note,
+                receivedById,
+                code,
+                supplierTaxInvoiceNumber,
+                supplierTaxInvoiceDate: taxDate,
+                branch: { connect: { id: branchId } },
+                purchaseOrder: { connect: { id: purchaseOrderId } },
+              },
+              include: {
+                purchaseOrder: {
+                  select: {
+                    id: true,
+                    code: true,
+                    supplier: { select: { name: true } },
+                    items: { select: { productId: true, costPrice: true } },
+                  },
                 },
               },
-            },
-          });
-          break; // success
-        } catch (err) {
-          if (err?.code === 'P2002' && String(err?.meta?.target).includes('code') && attempt < maxRetries - 1) {
-            continue; // try next sequence
+            });
+            break; // success
+          } catch (err) {
+            // Unique code collision → retry a few times
+            if (err?.code === 'P2002' && String(err?.meta?.target).includes('code') && attempt < maxRetries - 1) {
+              continue;
+            }
+            throw err;
           }
-          throw err;
         }
-      }
 
-      if (!created) throw new Error('สร้างรหัสใบรับสินค้าแบบไม่ซ้ำไม่สำเร็จ');
+        if (!created) throw new Error('สร้างรหัสใบรับสินค้าแบบไม่ซ้ำไม่สำเร็จ');
+      },
+      { timeout: 20000, maxWait: 8000 } // ⏱️ extend interactive tx time budget
+    );
 
-      // Upsert branch prices for each item in PO (keep costPrice up-to-date)
-      for (const it of po.items) {
-        await tx.branchPrice.upsert({
+    // 💡 Non-critical work OUTSIDE the tx to avoid timeouts
+    // Upsert branch prices for each item in PO (keep costPrice up-to-date)
+    // Fire-and-wait (still awaited), but not inside the transaction
+    for (const it of po.items) {
+      try {
+        await prisma.branchPrice.upsert({
           where: { productId_branchId: { productId: it.productId, branchId } },
           update: { costPrice: it.costPrice },
           create: { productId: it.productId, branchId, costPrice: it.costPrice },
         });
+      } catch (e) {
+        // Log and proceed; not critical to block receipt creation
+        console.warn('[createPurchaseOrderReceipt] upsert branchPrice warning:', e?.message || e);
       }
-    });
+    }
 
     return res.status(201).json(created);
   } catch (error) {
