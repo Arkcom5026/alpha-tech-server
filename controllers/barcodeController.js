@@ -1,138 +1,129 @@
 // src/controllers/barcodeController.js
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
+const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
 
+// 👉 Helper
+const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+
+// POST /api/barcodes/generate-missing/:receiptId
+// สร้างบาร์โค้ดที่ขาดหายสำหรับใบรับสินค้าแบบอะตอมมิกและกันเลขชน (race-safe)
 const generateMissingBarcodes = async (req, res) => {
-  const { receiptId } = req.params;
-  const userBranchId = req.user?.branchId;
+  const receiptId = toInt(req.params?.receiptId);
+  const userBranchId = toInt(req.user?.branchId);
 
   if (!receiptId || !userBranchId) {
-    return res.status(400).json({ error: 'Missing receiptId or branchId' });
+    return res.status(400).json({ message: 'กรุณาระบุ receiptId และต้องมีสิทธิ์สาขา' });
   }
 
   try {
-    const receipt = await prisma.purchaseOrderReceipt.findUnique({
-      where: { id: Number(receiptId) },
-      include: {
-        purchaseOrder: {
-          include: { branch: true },
-        },
-        items: {
-          include: {
-            purchaseOrderItem: true,
-            barcodeReceiptItem: true,
+    const { createdCount, barcodes } = await prisma.$transaction(async (tx) => {
+      // 1) โหลดใบรับภายใต้สาขาของผู้ใช้ (ป้องกันข้ามสาขา)
+      const receipt = await tx.purchaseOrderReceipt.findFirst({
+        where: { id: receiptId, branchId: userBranchId },
+        include: {
+          items: {
+            include: {
+              purchaseOrderItem: true,
+              barcodeReceiptItem: true,
+            },
           },
-        },
-      },
-    });
-
-    if (!receipt) {
-      return res.status(404).json({ error: 'Receipt not found' });
-    }
-
-    if (receipt.purchaseOrder.branchId !== userBranchId) {
-      return res.status(403).json({ error: 'Permission denied for this receipt' });
-    }
-
-    const branchId = receipt.purchaseOrder.branchId;
-    const yearMonth = dayjs().format('YYMM');
-
-    let counter = await prisma.barcodeCounter.upsert({
-      where: {
-        branchId_yearMonth: {
-          branchId,
-          yearMonth,
-        },
-      },
-      update: {},
-      create: {
-        branchId,
-        yearMonth,
-        lastNumber: 0,
-      },
-    });
-
-    const newBarcodes = [];
-
-    for (const item of receipt.items) {
-      const existingCount = item.barcodeReceiptItem.length;
-      const missingCount = item.quantity - existingCount;
-
-      if (missingCount <= 0) continue;
-
-      for (let i = 0; i < missingCount; i++) {
-        counter.lastNumber += 1;
-        const padded = String(counter.lastNumber).padStart(4, '0');
-        const code = `${String(branchId).padStart(2, '0')}${yearMonth}${padded}`;
-
-        newBarcodes.push({
-          barcode: code,
-          branchId,
-          yearMonth,
-          runningNumber: counter.lastNumber,
-          status: 'READY',
-          printed: false,
-          purchaseOrderReceiptId: receipt.id,
-          receiptItemId: item.id,
-        });
-      }
-    }
-
-    if (newBarcodes.length > 0) {
-      await prisma.barcodeReceiptItem.createMany({ data: newBarcodes });
-      await prisma.barcodeCounter.update({
-        where: {
-          branchId_yearMonth: {
-            branchId,
-            yearMonth,
-          },
-        },
-        data: {
-          lastNumber: counter.lastNumber,
+          purchaseOrder: { select: { id: true, code: true } },
         },
       });
-    }
 
-    return res.status(200).json({
-      success: true,
-      createdCount: newBarcodes.length,
-      barcodes: newBarcodes,
-    });
+      if (!receipt) {
+        throw new Prisma.PrismaClientKnownRequestError('ไม่พบใบรับในสาขาของคุณ', { code: 'P2025', clientVersion: 'NA' });
+      }
+
+      // 2) คำนวณจำนวนที่ต้องสร้าง (sum ของ missing ในแต่ละรายการ)
+      const yearMonth = dayjs().format('YYMM');
+      const branchId = receipt.branchId;
+
+      const perItemMissing = receipt.items.map((it) => {
+        const qty = Number(it.quantity || 0);
+        const existing = Array.isArray(it.barcodeReceiptItem) ? it.barcodeReceiptItem.length : 0;
+        const missing = Math.max(0, qty - existing);
+        return { id: it.id, missing };
+      });
+
+      const totalMissing = perItemMissing.reduce((s, x) => s + x.missing, 0);
+      if (totalMissing === 0) {
+        return { createdCount: 0, barcodes: [] };
+      }
+
+      // 3) เตรียม counter (มีหรือไม่ก็ upsert) แล้วจองเลขแบบ increment ทีเดียวกัน race
+      await tx.barcodeCounter.upsert({
+        where: { branchId_yearMonth: { branchId, yearMonth } },
+        update: {},
+        create: { branchId, yearMonth, lastNumber: 0 },
+      });
+
+      const updatedCounter = await tx.barcodeCounter.update({
+        where: { branchId_yearMonth: { branchId, yearMonth } },
+        data: { lastNumber: { increment: totalMissing } },
+      });
+
+      const startNumber = updatedCounter.lastNumber - totalMissing + 1;
+
+      // 4) กระจายเลขที่ได้ไปตามรายการที่ขาด
+      const newBarcodes = [];
+      let running = startNumber;
+      for (const it of perItemMissing) {
+        for (let i = 0; i < it.missing; i++) {
+          const padded = String(running).padStart(4, '0');
+          const code = `${String(branchId).padStart(2, '0')}${yearMonth}${padded}`;
+          newBarcodes.push({
+            barcode: code,
+            branchId,
+            yearMonth,
+            runningNumber: running,
+            status: 'READY',
+            printed: false,
+            purchaseOrderReceiptId: receipt.id,
+            receiptItemId: it.id,
+          });
+          running += 1;
+        }
+      }
+
+      // 5) สร้างบาร์โค้ดทั้งหมดในชุดเดียว
+      if (newBarcodes.length > 0) {
+        await tx.barcodeReceiptItem.createMany({ data: newBarcodes, skipDuplicates: true });
+      }
+
+      return { createdCount: newBarcodes.length, barcodes: newBarcodes };
+    }, { timeout: 30000 });
+
+    return res.status(200).json({ success: true, createdCount, barcodes });
   } catch (error) {
     console.error('[generateMissingBarcodes] ❌', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ message: 'ไม่พบใบรับในสาขาของคุณ' });
+    }
+    return res.status(500).json({ message: 'ไม่สามารถสร้างบาร์โค้ดได้' });
   }
 };
 
+// GET /api/barcodes/by-receipt/:receiptId
 const getBarcodesByReceiptId = async (req, res) => {
-  const { receiptId } = req.params;
-  const branchId = req.user?.branchId;
+  const receiptId = toInt(req.params?.receiptId);
+  const branchId = toInt(req.user?.branchId);
 
   if (!receiptId || !branchId) {
-    return res.status(400).json({ error: 'Missing receiptId or branchId' });
+    return res.status(400).json({ message: 'กรุณาระบุ receiptId และต้องมีสิทธิ์สาขา' });
   }
 
   try {
     const barcodes = await prisma.barcodeReceiptItem.findMany({
-      where: {
-        purchaseOrderReceiptId: Number(receiptId),
-        branchId: Number(branchId),
-      },
+      where: { purchaseOrderReceiptId: receiptId, branchId },
       include: {
         stockItem: true,
         receiptItem: {
           include: {
             purchaseOrderItem: {
               include: {
-                product: {
-                  select: {
-                    name: true,
-                    spec: true,
-                  },
-                },
+                product: { select: { name: true, spec: true } },
               },
             },
           },
@@ -152,64 +143,42 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
     }));
 
-    return res.status(200).json({
-      success: true,
-      count: simplified.length,
-      barcodes: simplified,
-    });
+    return res.status(200).json({ success: true, count: simplified.length, barcodes: simplified });
   } catch (error) {
     console.error('[getBarcodesByReceiptId] ❌', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ message: 'ไม่สามารถดึงบาร์โค้ดได้' });
   }
 };
 
+// GET /api/barcodes/receipts-with-barcodes
 const getReceiptsWithBarcodes = async (req, res) => {
-  const branchId = req.user?.branchId;
+  const branchId = toInt(req.user?.branchId);
 
   if (!branchId) {
-    return res.status(400).json({ error: 'Missing branchId' });
+    return res.status(400).json({ message: 'ต้องมี branchId' });
   }
 
   try {
     const receipts = await prisma.purchaseOrderReceipt.findMany({
-      where: {
-        branchId: Number(branchId),
-        barcodeReceiptItem: {
-          some: {},
-        },
-      },
+      where: { branchId, barcodeReceiptItem: { some: {} } },
       include: {
         purchaseOrder: {
           select: {
             code: true,
-           
-            supplier: {
-              select: {
-                name: true,
-                creditLimit: true,
-                creditBalance: true,
-              },
-            },
+            supplier: { select: { name: true, creditLimit: true, creditBalance: true } },
           },
         },
-        barcodeReceiptItem: {
-          select: {
-            stockItemId: true,            
-          },
-        },
+        barcodeReceiptItem: { select: { stockItemId: true } },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
 
     const result = receipts
       .map((r) => {
         const supplier = r.purchaseOrder?.supplier;
-        const creditLimit = supplier?.creditLimit || 0;
-        const creditUsed = supplier?.creditUsed || 0;
-        const debitAmount = supplier?.debitAmount || 0;
-        const creditAvailable = creditLimit - creditUsed + debitAmount;
+        const creditLimit = Number(supplier?.creditLimit || 0);
+        const creditBalance = Number(supplier?.creditBalance || 0);
+        const creditRemaining = creditLimit - creditBalance; // ✅ กำหนดความหมายให้ชัดเจน
 
         const total = r.barcodeReceiptItem.length;
         const scanned = r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length;
@@ -223,41 +192,38 @@ const getReceiptsWithBarcodes = async (req, res) => {
           createdAt: r.createdAt,
           total,
           scanned,
-          creditAvailable,
-          debitAmount,
+          creditRemaining,
+          creditBalance,
         };
       })
-      .filter((r) => r.total > r.scanned); // ✅ แสดงเฉพาะรายการที่ยังยิงไม่ครบ
+      .filter((r) => r.total > r.scanned); // ✅ แสดงเฉพาะที่ยังยิงไม่ครบ
 
     res.json(result);
   } catch (err) {
     console.error('[getReceiptsWithBarcodes]', err);
-    res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
+    res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
   }
 };
 
+// PATCH /api/barcodes/mark-printed
 const markBarcodesAsPrinted = async (req, res) => {
-  const rawId = req.body?.purchaseOrderReceiptId;
-  const branchId = req.user?.branchId;
-  const purchaseOrderReceiptId = Number(rawId);
-  
-  if (!purchaseOrderReceiptId || !branchId || isNaN(purchaseOrderReceiptId)) {
-    return res.status(400).json({ error: 'Missing or invalid purchaseOrderReceiptId or branchId' });
+  const purchaseOrderReceiptId = toInt(req.body?.purchaseOrderReceiptId);
+  const branchId = toInt(req.user?.branchId);
+
+  if (!purchaseOrderReceiptId || !branchId) {
+    return res.status(400).json({ message: 'กรุณาระบุ purchaseOrderReceiptId และต้องมีสิทธิ์สาขา' });
   }
 
   try {
     const updated = await prisma.barcodeReceiptItem.updateMany({
-      where: {
-        purchaseOrderReceiptId: purchaseOrderReceiptId,
-        branchId: Number(branchId),
-      },
+      where: { purchaseOrderReceiptId, branchId },
       data: { printed: true },
     });
 
     return res.json({ success: true, updated: updated.count });
   } catch (err) {
     console.error('[markBarcodesAsPrinted] ❌', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ message: 'ไม่สามารถอัปเดตสถานะ printed ได้' });
   }
 };
 

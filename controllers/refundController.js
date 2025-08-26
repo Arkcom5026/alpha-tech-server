@@ -1,7 +1,9 @@
 // controllers/refundController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
+
+const D = (v) => (v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0));
+const toNum = (v) => (v && typeof v.toNumber === 'function' ? v.toNumber() : Number(v || 0));
 
 const generateRefundCode = async (branchId) => {
   const paddedBranch = String(branchId).padStart(2, '0');
@@ -25,27 +27,39 @@ const generateRefundCode = async (branchId) => {
 const updateRefundSummary = async (saleReturnId) => {
   const transactions = await prisma.refundTransaction.findMany({
     where: { saleReturnId },
-    select: { amount: true, deducted: true }
+    select: { amount: true, deducted: true },
   });
 
-  const refundedAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-  const deductedAmount = transactions.reduce((sum, t) => sum + t.deducted, 0);
-  const total = refundedAmount + deductedAmount;
+  const refundedAmountDec = transactions.reduce(
+    (sum, t) => sum.plus(D(t.amount)),
+    new Prisma.Decimal(0)
+  );
+  const deductedAmountDec = transactions.reduce(
+    (sum, t) => sum.plus(D(t.deducted)),
+    new Prisma.Decimal(0)
+  );
+  const totalDec = refundedAmountDec.plus(deductedAmountDec);
 
   const saleReturn = await prisma.saleReturn.findUnique({
     where: { id: saleReturnId },
     include: { items: true },
   });
 
-  const totalItemRefund = saleReturn.items.reduce((sum, item) => sum + item.refundAmount, 0);
-  const isFullyRefunded = total >= totalItemRefund;
+  if (!saleReturn) return;
+
+  const totalItemRefundDec = saleReturn.items.reduce(
+    (sum, item) => sum.plus(D(item.refundAmount)),
+    new Prisma.Decimal(0)
+  );
+
+  const isFullyRefunded = totalDec.gte(totalItemRefundDec);
   const status = isFullyRefunded ? 'REFUNDED' : 'PARTIAL';
 
   await prisma.saleReturn.update({
     where: { id: saleReturnId },
     data: {
-      refundedAmount,
-      deductedAmount,
+      refundedAmount: refundedAmountDec,
+      deductedAmount: deductedAmountDec,
       isFullyRefunded,
       status,
     },
@@ -55,18 +69,15 @@ const updateRefundSummary = async (saleReturnId) => {
 const createRefundTransaction = async (req, res) => {
   try {
     const { saleReturnId, amount, method, note, deducted } = req.body;
-    const branchId = req.user?.branchId;
-    const employeeId = req.user?.employeeId;
+    const branchId = Number(req.user?.branchId);
+    const employeeId = Number(req.user?.employeeId);
 
     if (!saleReturnId || !amount || !method) {
       return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
     }
 
     const saleReturn = await prisma.saleReturn.findFirst({
-      where: {
-        id: Number(saleReturnId),
-        branchId: branchId,
-      },
+      where: { id: Number(saleReturnId), branchId },
     });
 
     if (!saleReturn) {
@@ -76,12 +87,12 @@ const createRefundTransaction = async (req, res) => {
     const refund = await prisma.refundTransaction.create({
       data: {
         saleReturnId: saleReturn.id,
-        amount: parseFloat(amount),
-        deducted: parseFloat(deducted || 0),
+        amount: D(amount),
+        deducted: D(deducted || 0),
         method,
         note: note || '',
         refundedByEmployeeId: employeeId,
-        branchId: branchId,
+        branchId,
       },
     });
 
@@ -97,4 +108,5 @@ const createRefundTransaction = async (req, res) => {
 module.exports = {
   createRefundTransaction,
   generateRefundCode,
+  updateRefundSummary,
 };

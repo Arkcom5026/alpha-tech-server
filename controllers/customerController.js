@@ -180,7 +180,6 @@ const createCustomer = async (req, res) => {
 };
 
 
-
 // POS-side: staff updates any customer's profile (RBAC + branch scope)
 const updateCustomerProfile = async (req, res) => {
   try {
@@ -297,10 +296,6 @@ const updateCustomerProfile = async (req, res) => {
     return res.status(500).json({ message: 'Failed to update customer profile' });
   }
 };
-
-
-
-
 
 // Online-side: customer self-updates own profile (upsert + user.email update)
 const updateCustomerProfileOnline = async (req, res) => {

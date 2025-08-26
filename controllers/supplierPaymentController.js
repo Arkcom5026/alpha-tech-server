@@ -1,7 +1,6 @@
 // supplierPaymentController.js
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma, Prisma } = require('../lib/prisma');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,16 +31,16 @@ const createSupplierPayment = async (req, res) => {
     const {
       supplierId,
       paymentDate,
-      amount, // Total amount of this payment transaction
+      amount,
       method,
-      paymentType, // 'RECEIPT_BASED' for paying off receipts, 'ADVANCE' for advance payments
+      paymentType, // 'RECEIPT_BASED' | 'ADVANCE'
       note,
-      receipts: selectedReceiptsData, // This will be an array of { receiptId, amountPaid } from frontend
+      receipts: selectedReceiptsData,
     } = req.body;
 
     console.log('➡️ Incoming createSupplierPayment', req.body);
 
-    const branchId = req.user?.branchId || 1; // fallback for mock or test
+    const branchId = req.user?.branchId || 1;
     const employeeId = req.user?.employeeId;
 
     if (!employeeId) {
@@ -51,21 +50,23 @@ const createSupplierPayment = async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const supplier = await tx.supplier.findUnique({
         where: { id: supplierId },
-        select: { creditBalance: true },
+        select: { id: true, creditBalance: true, isSystem: true },
       });
 
       if (!supplier) throw new Error('Supplier not found.');
 
-      // --- FIX [1]: Check credit balance only when paying off debt (RECEIPT_BASED) ---
-      // For ADVANCE payments, this check is skipped.
+      if (supplier.isSystem) {
+        throw new Error('ไม่สามารถสร้างการชำระเงินให้กับซัพพลายเออร์ระบบได้');
+      }
+
       if (paymentType === 'RECEIPT_BASED') {
-        const creditOwed = supplier.creditBalance;
-        if (amount > creditOwed) {
+        const creditOwed = Number(supplier.creditBalance || 0);
+        if (Number(amount) > creditOwed + 0.0001) {
           throw new Error('ยอดชำระเกินกว่ายอดหนี้ที่มีอยู่ของ Supplier');
         }
         if (selectedReceiptsData && selectedReceiptsData.length > 0) {
-          const sumOfReceiptAmounts = selectedReceiptsData.reduce((sum, r) => sum + r.amountPaid, 0);
-          if (Math.abs(sumOfReceiptAmounts - amount) > 0.01) {
+          const sumOfReceiptAmounts = selectedReceiptsData.reduce((sum, r) => sum + Number(r.amountPaid || 0), 0);
+          if (Math.abs(sumOfReceiptAmounts - Number(amount)) > 0.01) {
             throw new Error('ยอดรวมใบรับของที่เลือกไม่ตรงกับจำนวนเงินที่ชำระ');
           }
         }
@@ -75,7 +76,7 @@ const createSupplierPayment = async (req, res) => {
         data: {
           code: await generateSupplierPaymentCode(tx, branchId),
           paidAt: new Date(paymentDate),
-          amount,
+          amount: Number(amount),
           method,
           paymentType,
           note,
@@ -87,30 +88,35 @@ const createSupplierPayment = async (req, res) => {
 
       console.log('✅ Created SupplierPayment with ID:', payment.id);
 
-      // This block for handling receipts will only run if it's a RECEIPT_BASED payment, which is correct.
-      if (paymentType === 'RECEIPT_BASED' && selectedReceiptsData && selectedReceiptsData.length > 0) {
+      if (paymentType === 'RECEIPT_BASED' && Array.isArray(selectedReceiptsData) && selectedReceiptsData.length > 0) {
         for (const selectedReceipt of selectedReceiptsData) {
           const { receiptId, amountPaid: requestedAmountPaid } = selectedReceipt;
 
-          const reReceipt = await tx.purchaseOrderReceipt.findUnique({
-            where: { id: receiptId },
-            select: { totalAmount: true, paidAmount: true, statusReceipt: true },
+          const reReceipt = await tx.purchaseOrderReceipt.findFirst({
+            where: { id: receiptId, branchId },
+            select: {
+              id: true,
+              totalAmount: true,
+              paidAmount: true,
+              statusReceipt: true,
+              purchaseOrder: { select: { supplierId: true } },
+            },
           });
 
           if (!reReceipt) {
-            console.warn(`Receipt with ID ${receiptId} not found. Skipping.`);
+            console.warn(`Receipt with ID ${receiptId} not found in this branch. Skipping.`);
             continue;
           }
 
-          const currentOutstanding = (reReceipt.totalAmount || 0) - (reReceipt.paidAmount || 0);
-          const actualAmountToPay = Math.min(requestedAmountPaid, currentOutstanding);
-
-          if (actualAmountToPay <= 0) {
-            console.warn(`Amount to pay for receipt ${receiptId} is zero or negative or fully paid. Skipping.`);
+          if (reReceipt.purchaseOrder?.supplierId !== supplierId) {
+            console.warn(`Receipt ${receiptId} does not belong to supplier ${supplierId}. Skipping.`);
             continue;
           }
 
-          if (!requestedAmountPaid || isNaN(requestedAmountPaid)) {
+          const currentOutstanding = Number(reReceipt.totalAmount || 0) - Number(reReceipt.paidAmount || 0);
+          const actualAmountToPay = Math.min(Number(requestedAmountPaid || 0), currentOutstanding);
+
+          if (!requestedAmountPaid || isNaN(Number(requestedAmountPaid)) || actualAmountToPay <= 0) {
             console.warn(`❌ Invalid amountPaid for receipt ${receiptId}. Skipping.`);
             continue;
           }
@@ -118,24 +124,23 @@ const createSupplierPayment = async (req, res) => {
           await tx.supplierPaymentReceipt.create({
             data: {
               paymentId: payment.id,
-              receiptId: receiptId,
+              receiptId: reReceipt.id,
               amountPaid: actualAmountToPay,
             },
           });
-          console.log(`✅ Created SupplierPaymentReceipt for receipt ${receiptId} with amountPaid: ${actualAmountToPay}`);
+          console.log(`✅ Linked payment to receipt ${receiptId} with amountPaid: ${actualAmountToPay}`);
 
-          const newPaidAmountForReceipt = (reReceipt.paidAmount || 0) + actualAmountToPay;
+          const newPaidAmountForReceipt = Number(reReceipt.paidAmount || 0) + actualAmountToPay;
           let newStatus = reReceipt.statusReceipt;
 
-          if (newPaidAmountForReceipt >= reReceipt.totalAmount) {
+          if (newPaidAmountForReceipt >= Number(reReceipt.totalAmount || 0) - 0.0001) {
             newStatus = 'PAID';
-          } else if (newPaidAmountForReceipt > 0 && newPaidAmountForReceipt < reReceipt.totalAmount) {
+          } else if (newPaidAmountForReceipt > 0) {
             newStatus = 'PARTIALLY_PAID';
           }
 
-          console.log(`✅ Updating receipt ${receiptId} statusReceipt to ${newStatus} and paidAmount to ${newPaidAmountForReceipt}`);
           await tx.purchaseOrderReceipt.update({
-            where: { id: receiptId },
+            where: { id: reReceipt.id },
             data: {
               statusPayment: newStatus,
               paidAmount: newPaidAmountForReceipt,
@@ -144,45 +149,36 @@ const createSupplierPayment = async (req, res) => {
         }
       }
 
-      // --- FIX [2]: Adjust credit balance based on paymentType ---
       if (paymentType === 'ADVANCE') {
-        // For ADVANCE payments, DECREMENT the credit balance (Supplier owes us)
         console.log(`🔻 Decreasing supplier ${supplierId} creditBalance by ${amount} (Advance payment)`);
         await tx.supplier.update({
           where: { id: supplierId },
-          data: {
-            creditBalance: { decrement: amount },
-          },
+          data: { creditBalance: { decrement: Number(amount) } },
         });
       } else {
-        // For RECEIPT_BASED payments, DECREMENT the credit balance as before.
         console.log(`🔻 Decreasing supplier ${supplierId} creditBalance by ${amount}`);
         await tx.supplier.update({
           where: { id: supplierId },
-          data: {
-            creditBalance: { decrement: amount },
-          },
+          data: { creditBalance: { decrement: Number(amount) } },
         });
       }
 
       return payment;
-    }, {
-      timeout: 15000
-    });
+    }, { timeout: 15000 });
 
     res.status(201).json(result);
   } catch (error) {
     console.error('❌ Error in createSupplierPayment:', error);
+    if (String(error.message || '').includes('ซัพพลายเออร์ระบบ')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 };
 
-
-
 const getAllSupplierPayments = async (req, res) => {
   try {
     const branchId = req.user.branchId;
-   
 
     const payments = await prisma.supplierPayment.findMany({
       where: { branchId },
@@ -192,7 +188,7 @@ const getAllSupplierPayments = async (req, res) => {
         employee: true,
         supplierPaymentReceipts: {
           include: {
-            receipt: true, // ✅ เปลี่ยนจาก purchaseOrderReceipt เป็น receipt ตาม schema Prisma ล่าสุด
+            receipt: true,
           },
         },
       },
@@ -204,7 +200,6 @@ const getAllSupplierPayments = async (req, res) => {
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลการชำระเงินได้' });
   }
 };
-
 
 const getSupplierPaymentsByPO = async (req, res) => {
   try {
@@ -260,7 +255,6 @@ const deleteSupplierPayment = async (req, res) => {
   }
 };
 
-
 const getAdvancePaymentsBySupplier = async (req, res) => {
   try {
     const { supplierId } = req.query;
@@ -272,7 +266,7 @@ const getAdvancePaymentsBySupplier = async (req, res) => {
     const payments = await prisma.supplierPayment.findMany({
       where: {
         supplierId: parseInt(supplierId),
-        paymentType: 'ADVANCE', // <-- ✅ **CRITICAL FIX**: Only fetch ADVANCE payments
+        paymentType: 'ADVANCE',
       },
       orderBy: { paidAt: 'desc' },
       select: {
@@ -298,7 +292,6 @@ const getAdvancePaymentsBySupplier = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
-
 
 const getSupplierPaymentsBySupplier = async (req, res) => {
   try {
@@ -340,6 +333,4 @@ module.exports = {
   deleteSupplierPayment,
   getAdvancePaymentsBySupplier,
   getSupplierPaymentsBySupplier,
-};;
-
-
+};

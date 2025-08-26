@@ -1,24 +1,44 @@
-// ✅ authController.js
+// ✅ authController.js — Prisma singleton, safer errors, consistent JWT payload
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
+const { prisma, Prisma } = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const generateToken = (user) => {
-  return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: '7d',
-  });
+const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim());
+const normalizeEmail = (s) => normalize(s).toLowerCase();
+
+const buildToken = (user, opts = {}) => {
+  const profile = user.customerProfile || user.employeeProfile || null;
+  const profileType = user.customerProfile ? 'customer' : user.employeeProfile ? 'employee' : null;
+  const payload = {
+    id: user.id,
+    role: user.role,
+    profileType,
+    profileId: profile?.id || null,
+    branchId: user.employeeProfile?.branchId || null,
+    employeeId: user.employeeProfile?.id || null,
+    ...opts,
+  };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
 const register = async (req, res) => {
-  const { email, password, name, phone } = req.body;
-  
   try {
+    const email = normalizeEmail(req.body?.email);
+    const password = normalize(req.body?.password);
+    const name = normalize(req.body?.name);
+    const phone = normalize(req.body?.phone);
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'กรุณาระบุอีเมลและรหัสผ่าน' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' });
+    }
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ message: 'มีบัญชีนี้อยู่แล้ว' });
+      return res.status(409).json({ message: 'มีบัญชีนี้อยู่แล้ว' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -41,27 +61,39 @@ const register = async (req, res) => {
       },
     });
 
-    const token = generateToken(newUser);
+    const token = buildToken(newUser);
 
-    res.status(201).json({
+    return res.status(201).json({
       token,
       role: newUser.role,
+      profileType: 'customer',
       profile: newUser.customerProfile,
     });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการสมัครสมาชิก' });
+    console.error('❌ Register error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return res.status(409).json({ message: 'ข้อมูลซ้ำ (unique constraint)' });
+    }
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการสมัครสมาชิก' });
   }
 };
 
 const login = async (req, res) => {
-  const { emailOrPhone, password } = req.body;
   try {
+    const emailOrPhone = normalize(req.body?.emailOrPhone);
+    const password = normalize(req.body?.password);
+    if (!emailOrPhone || !password) {
+      return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร และรหัสผ่าน' });
+    }
+
+    const emailCandidate = normalizeEmail(emailOrPhone);
+
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: emailOrPhone },
+          { email: emailCandidate },
           { customerProfile: { phone: emailOrPhone } },
+          // สามารถขยายให้รองรับ employeeProfile.phone ได้ในอนาคต
         ],
       },
       include: {
@@ -88,20 +120,9 @@ const login = async (req, res) => {
     const profile = user.customerProfile || user.employeeProfile;
     const profileType = user.customerProfile ? 'customer' : 'employee';
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-        profileType,
-        profileId: profile?.id || null,
-        branchId: user.employeeProfile?.branchId || null,
-        employeeId: user.employeeProfile?.id || null,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = buildToken(user);
 
-    res.json({
+    return res.json({
       token,
       role: user.role,
       profileType,
@@ -120,14 +141,15 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error('🔥 Login error:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
 
 const findUserByEmail = async (req, res) => {
-  const email = req.query.email;
-
   try {
+    const email = normalizeEmail(req.query?.email);
+    if (!email) return res.status(400).json({ message: 'กรุณาระบุอีเมล' });
+
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
@@ -147,7 +169,7 @@ const findUserByEmail = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ findUserByEmail error:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
 

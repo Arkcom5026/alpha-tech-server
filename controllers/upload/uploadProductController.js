@@ -1,23 +1,24 @@
-// ✅ server/controllers/upload/uploadProductController.js
+// ✅ server/controllers/upload/uploadProductController.js — Prisma singleton, safer errors, cover handling
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
+const { prisma, Prisma } = require('../../lib/prisma');
 const { v4: uuidv4 } = require('uuid');
 const streamifier = require('streamifier');
 const { cloudinary } = require('../../utils/cloudinary');
 
+// Helpers
+const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+
 const uploadAndSaveProductImages = async (req, res) => {
-  const productId = parseInt(req.params.id);
+  const productId = toInt(req.params.id);
   const file = req.file;
 
-  const captionsArray = Array.isArray(req.body.captions)
+  const captionsArray = Array.isArray(req.body?.captions)
     ? req.body.captions
-    : typeof req.body.captions === 'string'
-      ? [req.body.captions]
-      : [];
+    : typeof req.body?.captions === 'string'
+    ? [req.body.captions]
+    : [];
 
-  const coverIndex = parseInt(req.body.coverIndex);
+  const coverIndex = toInt(req.body?.coverIndex);
 
   console.log('🛠️ [UPLOAD] เริ่มอัปโหลดภาพ Product');
   console.log('📥 productId:', productId);
@@ -26,9 +27,13 @@ const uploadAndSaveProductImages = async (req, res) => {
   console.log('📥 coverIndex:', coverIndex);
 
   try {
-    if (!file || isNaN(productId)) {
-      return res.status(400).json({ error: 'ไม่พบ productId หรือไฟล์ภาพไม่ถูกต้อง' });
+    if (!file || !productId) {
+      return res.status(400).json({ message: 'ไม่พบ productId หรือไฟล์ภาพไม่ถูกต้อง' });
     }
+
+    // ✅ ตรวจว่ามีสินค้าอยู่จริง (กัน productId หลุด)
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+    if (!product) return res.status(404).json({ message: 'ไม่พบสินค้า' });
 
     const uniqueName = uuidv4();
     const folder = 'products';
@@ -53,39 +58,46 @@ const uploadAndSaveProductImages = async (req, res) => {
       streamifier.createReadStream(file.buffer).pipe(stream);
     });
 
-    const newImage = await prisma.productImage.create({
-      data: {
-        productId,
-        url: uploadResult.secure_url,
-        public_id: uploadResult.public_id,
-        secure_url: uploadResult.secure_url,
-        caption: captionsArray[0] || '',
-        isCover: coverIndex === 0,
-      },
+    // ✅ จัดการ cover ให้มีได้เพียงรูปเดียวต่อ product (อะตอมมิก)
+    const newImage = await prisma.$transaction(async (tx) => {
+      if (coverIndex === 0) {
+        await tx.productImage.updateMany({ where: { productId }, data: { isCover: false } });
+      }
+      const created = await tx.productImage.create({
+        data: {
+          productId,
+          url: uploadResult.secure_url,
+          public_id: uploadResult.public_id,
+          secure_url: uploadResult.secure_url,
+          caption: captionsArray[0] || '',
+          isCover: coverIndex === 0,
+        },
+      });
+      return created;
     });
 
     console.log('🧾 สร้างข้อมูลใน DB แล้ว:', newImage);
 
-    res.json({
+    return res.json({
       message: 'อัปโหลดและบันทึกภาพสำเร็จ',
       images: [newImage],
     });
   } catch (err) {
     console.error('❌ uploadAndSaveProductImages error:', err);
-    res.status(500).json({ error: 'Upload and Save failed' });
+    return res.status(500).json({ message: 'Upload and Save failed' });
   }
 };
 
 const uploadProductImagesOnly = async (req, res) => {
   const files = req.files;
 
-  const captionsArray = Array.isArray(req.body.captions)
+  const captionsArray = Array.isArray(req.body?.captions)
     ? req.body.captions
-    : typeof req.body.captions === 'string'
-      ? [req.body.captions]
-      : [];
+    : typeof req.body?.captions === 'string'
+    ? [req.body.captions]
+    : [];
 
-  const coverIndex = parseInt(req.body.coverIndex);
+  const coverIndex = toInt(req.body?.coverIndex);
 
   console.log('🛠️ [UPLOAD ONLY] เริ่มอัปโหลดภาพ Product (temp)');
   console.log('📥 จำนวนไฟล์:', files?.length);
@@ -94,7 +106,7 @@ const uploadProductImagesOnly = async (req, res) => {
 
   try {
     if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'ไม่พบไฟล์ภาพที่อัปโหลด' });
+      return res.status(400).json({ message: 'ไม่พบไฟล์ภาพที่อัปโหลด' });
     }
 
     const uploads = await Promise.all(
@@ -134,41 +146,38 @@ const uploadProductImagesOnly = async (req, res) => {
 
     console.log('🧾 อัปโหลดภาพสำเร็จ');
 
-    res.json({
+    return res.json({
       message: 'อัปโหลดภาพสำเร็จ',
       images: uploads,
     });
   } catch (err) {
     console.error('❌ uploadProductImagesOnly error:', err);
-    res.status(500).json({ error: 'Upload failed' });
+    return res.status(500).json({ message: 'Upload failed' });
   }
 };
 
 const deleteProductImage = async (req, res) => {
-  const productId = parseInt(req.params.id);
-  const { public_id } = req.body;
+  const productId = toInt(req.params.id);
+  const { public_id } = req.body || {};
 
   console.log('🗑️ [DELETE] เริ่มลบภาพ:', public_id);
 
   try {
-    if (!public_id || isNaN(productId)) {
-      return res.status(400).json({ error: 'ข้อมูลไม่ครบถ้วน' });
+    if (!public_id || !productId) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
     }
 
     await cloudinary.uploader.destroy(public_id);
 
     await prisma.productImage.deleteMany({
-      where: {
-        productId,
-        public_id,
-      },
+      where: { productId, public_id },
     });
 
     console.log('✅ ลบภาพสำเร็จจาก Cloudinary และฐานข้อมูล');
-    res.json({ message: 'ลบภาพสำเร็จ' });
+    return res.json({ message: 'ลบภาพสำเร็จ' });
   } catch (err) {
     console.error('❌ deleteProductImage error:', err);
-    res.status(500).json({ error: 'ลบภาพไม่สำเร็จ' });
+    return res.status(500).json({ message: 'ลบภาพไม่สำเร็จ' });
   }
 };
 

@@ -1,24 +1,21 @@
 // ✅ @filename: server/controllers/employeeController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+// Unified Prisma import (singleton)
+const { prisma, Prisma } = require('../lib/prisma');
 
+// --- helpers ---
+const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : parseInt(v, 10));
+const isStaffRole = (r) => new Set(['admin', 'manager', 'staff', 'employee']).has(String(r || '').toLowerCase());
+
+// GET /employees
 const getAllEmployees = async (req, res) => {
   try {
-    const branchId = req.user?.branchId;
-
-    if (!branchId) {
-      return res.status(400).json({ message: 'กรุณาระบุ branchId จาก token' });
-    }
+    const branchId = toInt(req.user?.branchId);
+    if (!branchId) return res.status(400).json({ message: 'กรุณาระบุ branchId จาก token' });
 
     const employees = await prisma.employeeProfile.findMany({
-      where: {
-        branchId: parseInt(branchId),
-      },
-      include: {
-        user: true,
-        position: true,
-        branch: true,
-      },
+      where: { branchId },
+      include: { user: true, position: true, branch: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
 
     res.json(employees);
@@ -28,83 +25,129 @@ const getAllEmployees = async (req, res) => {
   }
 };
 
+// GET /employees/:id
 const getEmployeesById = async (req, res) => {
   try {
-    const employee = await prisma.employeeProfile.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const id = toInt(req.params.id);
+    const branchId = toInt(req.user?.branchId);
+    if (!id) return res.status(400).json({ message: 'id ไม่ถูกต้อง' });
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
+
+    const employee = await prisma.employeeProfile.findFirst({
+      where: { id, branchId }, // BRANCH_SCOPE_ENFORCED
       include: { user: true, position: true, branch: true },
     });
+
+    if (!employee) return res.status(404).json({ message: 'ไม่พบพนักงานในสาขานี้' });
     res.json(employee);
   } catch (err) {
-    res.status(404).json({ message: 'ไม่พบพนักงาน' });
+    console.error('❌ getEmployeesById error:', err);
+    res.status(500).json({ message: 'ดึงข้อมูลพนักงานไม่สำเร็จ' });
   }
 };
 
+// POST /employees
 const createEmployees = async (req, res) => {
   try {
-    const { userId, name, phone, branchId, positionId } = req.body;
+    const actor = req.user || {};
+    if (!isStaffRole(actor.role)) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
+
+    const { userId, name, phone, positionId } = req.body;
+    let requestedBranchId = toInt(req.body?.branchId);
+
+    const MAIN_BRANCH_ID = toInt(process.env.MAIN_BRANCH_ID);
+    const isMainBranchAdmin = String(actor.role).toLowerCase() === 'employee' && actor.branchId === MAIN_BRANCH_ID;
+    const branchId = isMainBranchAdmin && requestedBranchId ? requestedBranchId : toInt(actor.branchId);
 
     if (!userId || !name || !branchId || !positionId) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
     }
 
-    console.log('📦 รับข้อมูลพนักงานใหม่:', { userId, name, phone, branchId, positionId });
-
-    if (isNaN(parsedUserId) || isNaN(parsedBranchId) || isNaN(parsedPositionId)) {
+    const parsedUserId = toInt(userId);
+    const parsedPositionId = toInt(positionId);
+    if (!parsedUserId || !parsedPositionId) {
       return res.status(400).json({ message: 'รหัสไม่ถูกต้อง' });
     }
 
-    await prisma.user.update({
-      where: { id: parsedUserId },
-      data: { role: 'employee' },
-    });
+    const newEmployee = await prisma.$transaction(async (tx) => {
+      // Promote user to employee role
+      await tx.user.update({ where: { id: parsedUserId }, data: { role: 'employee' } });
 
-    const newEmployee = await prisma.employeeProfile.create({
-      data: {
-        userId: Number(userId),
-        name,
-        phone,
-        branchId: Number(branchId),
-        positionId: Number(positionId),
-      },
-    });
+      // Create employee profile
+      return tx.employeeProfile.create({
+        data: {
+          userId: parsedUserId,
+          name,
+          phone: phone || null,
+          branchId,
+          positionId: parsedPositionId,
+        },
+      });
+    }, { timeout: 15000 });
 
     res.status(201).json(newEmployee);
   } catch (err) {
     console.error('❌ createEmployees error:', err);
-    res.status(400).json({ message: 'สร้างพนักงานไม่สำเร็จ', error: err.message });
+    const msg = err instanceof Error ? err.message : 'unknown error';
+    res.status(400).json({ message: 'สร้างพนักงานไม่สำเร็จ', error: msg });
   }
 };
 
+// PATCH /employees/:id
 const updateEmployees = async (req, res) => {
   try {
+    const id = toInt(req.params.id);
+    const actorBranchId = toInt(req.user?.branchId);
+    if (!id || !actorBranchId) return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
+
     const { name, phone, positionId } = req.body;
+
+    // Ensure employee belongs to actor's branch
+    const current = await prisma.employeeProfile.findFirst({ where: { id, branchId: actorBranchId } });
+    if (!current) return res.status(404).json({ message: 'ไม่พบพนักงานในสาขานี้' });
+
     const updated = await prisma.employeeProfile.update({
-      where: { id: parseInt(req.params.id) },
-      data: { name, phone, positionId: parseInt(positionId) },
+      where: { id },
+      data: {
+        name: name ?? current.name,
+        phone: phone ?? current.phone,
+        positionId: positionId !== undefined ? toInt(positionId) : current.positionId,
+      },
     });
+
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ message: 'แก้ไขพนักงานล้มเหลว', error: err.message });
+    console.error('❌ updateEmployees error:', err);
+    res.status(400).json({ message: 'แก้ไขพนักงานล้มเหลว', error: err?.message || String(err) });
   }
 };
 
+// DELETE /employees/:id
 const deleteEmployees = async (req, res) => {
   try {
-    await prisma.employeeProfile.delete({
-      where: { id: parseInt(req.params.id) },
-    });
+    const id = toInt(req.params.id);
+    const branchId = toInt(req.user?.branchId);
+    if (!id || !branchId) return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
+
+    const found = await prisma.employeeProfile.findFirst({ where: { id, branchId } });
+    if (!found) return res.status(404).json({ message: 'ไม่พบพนักงานในสาขานี้' });
+
+    await prisma.employeeProfile.delete({ where: { id } });
     res.status(204).end();
   } catch (err) {
-    res.status(400).json({ message: 'ลบพนักงานไม่สำเร็จ', error: err.message });
+    console.error('❌ deleteEmployees error:', err);
+    res.status(400).json({ message: 'ลบพนักงานไม่สำเร็จ', error: err?.message || String(err) });
   }
 };
 
+// GET /users?role=user
 const getUsersByRole = async (req, res) => {
   try {
+    const role = String(req.query?.role || 'user');
     const users = await prisma.user.findMany({
-      where: { role: 'user' },
+      where: { role },
       select: { id: true, email: true, name: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
     res.json(users);
   } catch (err) {
@@ -113,35 +156,36 @@ const getUsersByRole = async (req, res) => {
   }
 };
 
+// POST /employees/approve
 const approveEmployee = async (req, res) => {
-  const { userId, positionId, role, branchId, name, phone } = req.body;
-  const requestedBranchId = branchId;
-  console.log('📦 approveEmployee received data:',req.body )
-  
-
+  const { userId, positionId, role, branchId: requestedBranchId, name, phone } = req.body || {};
   try {
-    const MAIN_BRANCH_ID = parseInt(process.env.MAIN_BRANCH_ID, 10);
-    const isMainBranchAdmin =
-      req.user.role === 'employee' && req.user.branchId === MAIN_BRANCH_ID;
+    const actor = req.user || {};
+    if (!isStaffRole(actor.role)) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
 
-    const branchIdToUse = isMainBranchAdmin
-      ? requestedBranchId
-      : req.user.branchId;
+    const MAIN_BRANCH_ID = toInt(process.env.MAIN_BRANCH_ID);
+    const isMainBranchAdmin = String(actor.role).toLowerCase() === 'employee' && toInt(actor.branchId) === MAIN_BRANCH_ID;
+    const branchIdToUse = isMainBranchAdmin && toInt(requestedBranchId) ? toInt(requestedBranchId) : toInt(actor.branchId);
 
-    await prisma.employeeProfile.create({
-      data: {
-        userId: parseInt(userId, 10),
-        branchId: parseInt(branchIdToUse, 10),
-        positionId: parseInt(positionId, 10),
-        name,
-        phone,
-      },
-    });
+    const parsedUserId = toInt(userId);
+    const parsedPositionId = toInt(positionId);
+    if (!parsedUserId || !parsedPositionId || !branchIdToUse) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง' });
+    }
 
-    await prisma.user.update({
-      where: { id: parseInt(userId, 10) },
-      data: { role },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.employeeProfile.create({
+        data: {
+          userId: parsedUserId,
+          branchId: branchIdToUse,
+          positionId: parsedPositionId,
+          name,
+          phone: phone || null,
+        },
+      });
+
+      await tx.user.update({ where: { id: parsedUserId }, data: { role } });
+    }, { timeout: 15000 });
 
     res.json({ message: '✅ อนุมัติพนักงานเรียบร้อยแล้ว' });
   } catch (error) {
@@ -150,11 +194,10 @@ const approveEmployee = async (req, res) => {
   }
 };
 
+// GET /positions
 const getAllPositions = async (req, res) => {
   try {
-    const positions = await prisma.position.findMany({
-      orderBy: { name: 'asc' },
-    });
+    const positions = await prisma.position.findMany({ orderBy: { name: 'asc' } });
     res.json(positions);
   } catch (err) {
     console.error('❌ getAllPositions error:', err);

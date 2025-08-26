@@ -43,7 +43,6 @@ const normalizeSaleMoney = (sale) => {
   return sale;
 };
 
-
 const generateSaleCode = async (branchId, attempt = 0) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
@@ -335,8 +334,6 @@ const getSaleById = async (req, res) => {
   }
 };
 
-
-
 const getSalesByBranchId = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
@@ -410,7 +407,6 @@ const markSaleAsPaid = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดขณะเปลี่ยนสถานะสินค้า' });
   }
 };
-
 
 const searchPrintableSales = async (req, res) => {
   try {

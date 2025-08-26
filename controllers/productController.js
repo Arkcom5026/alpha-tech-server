@@ -179,7 +179,6 @@ const getProductsForPos = async (req, res) => {
   }
 };
 
-
 const getProductsForOnline = async (req, res) => {
   const {
     categoryId,
@@ -304,8 +303,6 @@ const getProductsForOnline = async (req, res) => {
   }
 };
 
-
-
 const getProductPosById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -423,7 +420,6 @@ const getProductDropdowns = async (req, res) => {
   }
 };
 
-
 const getProductDropdownsForOnline = async (req, res) => {
   try {
     const { categoryId, productTypeId, productProfileId } = req.query;
@@ -494,7 +490,6 @@ const getProductDropdownsForOnline = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
-
 
 const getProductOnlineById = async (req, res) => {
   try {

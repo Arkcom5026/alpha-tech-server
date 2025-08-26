@@ -512,6 +512,7 @@ model StockItem {
 }
 
 model Supplier {
+  isSystem      Boolean  @default(false) // ✅ สำหรับซัพพลายเออร์ระบบ (เช่น เริ่มต้นโปรแกรม)
   id            Int             @id @default(autoincrement())
   name          String
   contactPerson String?

@@ -2,15 +2,14 @@
 // ✅ มาตรฐานเดียวกับ branchPriceController / salesReportController
 // - ใช้ async arrow functions
 // - ตอบกลับด้วย res.status(...).json(...) และใช้คีย์ `message` เมื่อ error (ไม่มี `ok`)
-// - ใช้ PrismaClient ภายในไฟล์นี้
+// - ใช้ Prisma singleton จาก ../lib/prisma
 
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const { prisma } = require('../lib/prisma')
 
 // POST /api/stock-audit/ready/start
 const startReadyAudit = async (req, res) => {
   try {
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId)) {
       return res.status(401).json({ message: 'Unauthorized: missing user/branchId' })
     }
@@ -20,7 +19,7 @@ const startReadyAudit = async (req, res) => {
     // map employeeId ให้ตรงกับ FK (อ้างอิง EmployeeProfile)
     const employeeId = req.user?.employeeId ?? req.user?.profileId ?? null
 
-    // Guard: Prisma model ต้องพร้อมใช้งาน
+    // Guard: Prisma model ต้องพร้อมใช้งาน (กัน schema ไม่ครบ)
     if (!prisma.stockAuditSession || typeof prisma.stockAuditSession.findFirst !== 'function') {
       const models = Object.keys(prisma).filter((k) => typeof prisma[k]?.findMany === 'function')
       console.error('❌ [startReadyAudit] Prisma model "stockAuditSession" not found. Available models:', models)
@@ -94,7 +93,7 @@ const getOverview = async (req, res) => {
     })
     if (!s) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId) || s.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
@@ -124,7 +123,7 @@ const scanBarcode = async (req, res) => {
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
@@ -157,10 +156,11 @@ const scanBarcode = async (req, res) => {
       if (!snap) return { status: 422, reason: 'NOT_IN_EXPECTED_SET' }
       if (snap.isScanned) return { status: 409, reason: 'DUPLICATE_SCAN' }
 
-      await tx.stockAuditSnapshotItem.update({
-        where: { id: snap.id },
+      const updated = await tx.stockAuditSnapshotItem.updateMany({
+        where: { id: snap.id, isScanned: false },
         data: { isScanned: true, scannedAt: new Date() },
       })
+      if (updated.count !== 1) return { status: 409, reason: 'DUPLICATE_SCAN' }
 
       const stockItem = await tx.stockItem.findUnique({
         where: { id: snap.stockItemId },
@@ -215,7 +215,7 @@ const scanSn = async (req, res) => {
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
@@ -256,10 +256,11 @@ const scanSn = async (req, res) => {
       if (!snap) return { status: 422, reason: 'NOT_IN_EXPECTED_SET' }
       if (snap.isScanned) return { status: 409, reason: 'DUPLICATE_SCAN' }
 
-      await tx.stockAuditSnapshotItem.update({
-        where: { id: snap.id },
+      const updated = await tx.stockAuditSnapshotItem.updateMany({
+        where: { id: snap.id, isScanned: false },
         data: { isScanned: true, scannedAt: new Date() },
       })
+      if (updated.count !== 1) return { status: 409, reason: 'DUPLICATE_SCAN' }
 
       await tx.stockAuditScanLog.create({
         data: {
@@ -308,7 +309,7 @@ const confirmAudit = async (req, res) => {
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
@@ -360,7 +361,7 @@ const listAuditItems = async (req, res) => {
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
-    const branchId = req.user?.branchId
+    const branchId = Number(req.user?.branchId)
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
@@ -433,6 +434,4 @@ module.exports = {
   confirmAudit,
   listAuditItems,
 }
-
-
 
