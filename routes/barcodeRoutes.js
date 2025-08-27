@@ -1,30 +1,38 @@
-// src/routes/barcodeRoutes.js
-
+// server/routes/barcodeRoutes.js
 const express = require('express');
 const router = express.Router();
+
 
 const {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
   getReceiptsWithBarcodes,
   markBarcodesAsPrinted,
-} = require('../controllers/barcodeController');
+  searchReprintReceipts,
+  reprintBarcodes, // ✅ ต้องอยู่ใน require ด้วย
+} = require('../controllers/barcodeController'); // <- พาธจาก routes → controllers
 
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
-// ✅ สร้างบาร์โค้ดสำหรับ receipt ที่ยังไม่ถูก gen
-router.post('/generate-missing/:receiptId', generateMissingBarcodes);
+// ✅ สร้างบาร์โค้ดที่ขาด (ครั้งแรก)
+router.post('/generate-missing/:receiptId',  generateMissingBarcodes);
 
-// ✅ อัปเดตสถานะ printed ของบาร์โค้ด
-router.patch('/mark-printed', markBarcodesAsPrinted);
+// ✅ ดึงบาร์โค้ดตามใบรับ
+router.get('/by-receipt/:receiptId',  getBarcodesByReceiptId);
 
-// ✅ ดึงบาร์โค้ดทั้งหมดของ receipt หนึ่งใบ
-router.get('/by-receipt/:receiptId', getBarcodesByReceiptId);
-
-// ✅ ดึงรายการใบรับสินค้าที่มีบาร์โค้ด
+// ✅ ดึงรายการใบรับที่มีบาร์โค้ด (ไว้ทำลิสต์)
 router.get('/with-barcodes', getReceiptsWithBarcodes);
 
+// ✅ ค้นหาใบรับสำหรับพิมพ์ซ้ำ (เรียก BE ทุกครั้ง)
+// หมายเหตุ: ตอนนี้ชี้ไปที่ getReceiptsWithBarcodes ชั่วคราว
+// หากมี controller `searchReprintReceipts` แล้ว ให้เปลี่ยนเป็นฟังก์ชันนั้นแทน
+router.get('/reprint-search', searchReprintReceipts);
 
+// ✅ ตีธง printed หลังพิมพ์ครั้งแรก
+router.patch('/mark-printed',  markBarcodesAsPrinted);
+
+// ✅ พิมพ์ซ้ำ (ไม่สร้างใหม่/ไม่ mark เพิ่ม)
+router.patch('/reprint/:receiptId',  reprintBarcodes);
 
 module.exports = router;

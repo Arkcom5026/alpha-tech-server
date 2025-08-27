@@ -359,18 +359,23 @@ const getReceiptBarcodeSummaries = async (req, res) => {
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
+    // Support query filter ?printed=true/false (case-insensitive); undefined = no filter
+    const printedParam = typeof req.query?.printed === 'string' ? req.query.printed.toLowerCase() : undefined;
+    const printedFilter = printedParam === 'true' ? true : printedParam === 'false' ? false : undefined;
+
     const receipts = await prisma.purchaseOrderReceipt.findMany({
-      where: { branchId },
+      where: { branchId, printed: printedFilter },
       select: {
         id: true,
         code: true,
         supplierTaxInvoiceNumber: true,
         statusReceipt: true,
         receivedAt: true,
+        printed: true,
         items: {
-          include: {
-            stockItems: true,
-            purchaseOrderItem: { select: { product: { select: { name: true } } } },
+          select: {
+            quantity: true,
+            stockItems: { select: { id: true } }, // ใช้แค่นับ ไม่ต้องดึงทั้งหมด
           },
         },
         purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
@@ -391,6 +396,7 @@ const getReceiptBarcodeSummaries = async (req, res) => {
         totalItems: total,
         barcodeGenerated: generated,
         status: receipt.statusReceipt,
+        printed: !!receipt.printed,
       };
     });
 
@@ -437,7 +443,8 @@ const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
     const id = Number(req.params.id);
     const updated = await prisma.purchaseOrderReceipt.update({
       where: { id },
-      data: { statusReceipt: ReceiptStatus.COMPLETED },
+      data: { printed: true, printedAt: new Date() }, // ✅ mark printed only
+      select: { id: true, code: true, printed: true, printedAt: true },
     });
     return res.json({ success: true, receipt: updated });
   } catch (error) {

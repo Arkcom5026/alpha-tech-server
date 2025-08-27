@@ -143,6 +143,14 @@ enum CustomerType {
   GOVERNMENT // ✨ หน่วยงานราชการ
 }
 
+enum BarcodeStatus {
+  READY
+  SN_RECEIVED
+  USED
+  VOID
+}
+
+
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique // ✅ Optional, but must be unique if provided
@@ -755,7 +763,7 @@ model BarcodeReceiptItem {
 
   yearMonth     String // เช่น '2506'
   runningNumber Int // เช่น 1 → 0001
-  status        String // READY | SN_RECEIVED | USED | VOID
+  status        BarcodeStatus @default(READY)
 
   printed     Boolean    @default(false)
   stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
@@ -774,6 +782,7 @@ model BarcodeReceiptItem {
   updatedAt DateTime @updatedAt
 
   @@unique([branchId, yearMonth, runningNumber])
+  @@index([purchaseOrderReceiptId, branchId])
 }
 
 model Sale {
@@ -1157,3 +1166,6 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
+
+
+
