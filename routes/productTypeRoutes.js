@@ -10,13 +10,17 @@ const {
   getProductTypeDropdowns,
 } = require('../controllers/productTypeController');
 const { verifyToken } = require('../middlewares/verifyToken');
+router.use(verifyToken);
 
+// dropdown สำหรับ UI เลือกค่าอย่างรวดเร็ว
 router.get('/dropdowns', getProductTypeDropdowns);
-router.get('/', verifyToken, getAllProductType);
-router.get('/:id', verifyToken, getProductTypeById);
+
+// CRUD หลัก (ตามมาตรฐานโปรเจกต์)
+router.get('/',  getAllProductType);
+router.get('/:id',  getProductTypeById);
 router.post('/', createProductType);
-router.patch('/:id', updateProductType);
+router.patch('/:id',  updateProductType);
 router.delete('/:id', deleteProductType);
 
-
 module.exports = router;
+

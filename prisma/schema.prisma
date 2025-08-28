@@ -331,6 +331,7 @@ model Position {
   updatedAt DateTime @updatedAt
 }
 
+
 model Category {
   id     Int     @id @default(autoincrement())
   name   String  @unique
@@ -343,9 +344,14 @@ model Category {
 }
 
 model ProductType {
-  id     Int     @id @default(autoincrement())
-  name   String  @unique
-  active Boolean @default(true)
+  id             Int      @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String
+  active         Boolean  @default(true)
+
+  guideExamples String[] @default([])
+  pathCached    String?
 
   profiles ProductProfile[]
 
@@ -354,12 +360,22 @@ model ProductType {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  
+  @@unique([categoryId, slug])
+  @@unique([categoryId, normalizedName])
+  @@index([normalizedName])
 }
 
 model ProductProfile {
-  id          Int     @id @default(autoincrement())
-  name        String
-  description String?
+  id             Int     @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String
+  description    String?
+
+  guideExamples String[] @default([])
+  pathCached    String?
 
   productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
   productTypeId Int
@@ -369,15 +385,25 @@ model ProductProfile {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  
+  @@unique([productTypeId, slug])
+  @@unique([productTypeId, normalizedName])
+  @@index([normalizedName])
 }
 
 model ProductTemplate {
-  id       Int     @id @default(autoincrement())
-  name     String
-  warranty Int?
-  noSN     Boolean @default(false)
-  codeType String  @default("D")
-  active   Boolean @default(true)
+  id             Int     @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String
+  warranty       Int?
+  noSN           Boolean @default(false)
+  codeType       String  @default("D")
+  active         Boolean @default(true)
+
+  guideExamples String[] @default([])
+  pathCached    String?
 
   productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
   productProfileId Int
@@ -388,6 +414,11 @@ model ProductTemplate {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  
+  @@unique([productProfileId, slug])
+  @@unique([productProfileId, normalizedName])
+  @@index([normalizedName])
 }
 
 model Product {
@@ -1166,6 +1197,3 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
-
-
-

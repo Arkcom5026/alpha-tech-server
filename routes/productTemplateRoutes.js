@@ -16,7 +16,11 @@ router.use(verifyToken);
 router.get('/', getAllProductTemplates);
 router.get('/:id', getProductTemplateById);
 router.post('/', createProductTemplate);
-router.put('/:id', updateProductTemplate);
+router.patch('/:id', updateProductTemplate);
 router.delete('/:id', deleteProductTemplate);
 
 module.exports = router;
+
+// 📌 วิธีผูกใน server หลัก (ตัวอย่าง)
+// const productTemplateRoutes = require('./routes/productTemplateRoutes');
+// app.use('/api/product-templates', productTemplateRoutes);

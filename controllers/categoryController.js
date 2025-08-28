@@ -88,6 +88,18 @@ const deleteCategory = async (req, res) => {
     const id = toInt(req.params?.id);
     if (!id) return res.status(400).json({ message: 'id ไม่ถูกต้อง' });
 
+    // ป้องกันการลบแบบพาเอาลูกหาย (โดยเฉพาะถ้า relation ตั้ง onDelete: Cascade)
+    const usedByType = await prisma.productType.findFirst({
+      where: { categoryId: id },
+      select: { id: true, name: true },
+    });
+    if (usedByType) {
+      return res.status(409).json({
+        message: 'ลบไม่ได้ เพราะมีประเภทสินค้า (ProductType) อ้างอิงอยู่',
+        conflict: usedByType,
+      });
+    }
+
     await prisma.category.delete({ where: { id } });
     res.json({ message: 'ลบหมวดหมู่เรียบร้อยแล้ว' });
   } catch (error) {
@@ -124,3 +136,4 @@ module.exports = {
   deleteCategory,
   getCategoryDropdowns,
 };
+
