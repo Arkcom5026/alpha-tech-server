@@ -403,27 +403,6 @@ const searchReprintReceipts = async (req, res) => {
   }
 };
 
-// PATCH /api/barcodes/mark-printed
-const markBarcodesAsPrinted = async (req, res) => {
-  const purchaseOrderReceiptId = toInt(req.body?.purchaseOrderReceiptId);
-  const branchId = toInt(req.user?.branchId);
-
-  if (!Number.isInteger(purchaseOrderReceiptId) || !Number.isInteger(branchId)) {
-    return res.status(400).json({ message: 'กรุณาระบุ purchaseOrderReceiptId และต้องมีสิทธิ์สาขา' });
-  }
-
-  try {
-    const updated = await prisma.barcodeReceiptItem.updateMany({
-      where: { purchaseOrderReceiptId, branchId },
-      data: { printed: true },
-    });
-
-    return res.json({ success: true, updated: updated.count });
-  } catch (err) {
-    console.error('[markBarcodesAsPrinted] ❌', err);
-    return res.status(500).json({ message: 'ไม่สามารถอัปเดตสถานะ printed ได้' });
-  }
-};
 
 // PATCH /api/barcodes/reprint/:receiptId
 const reprintBarcodes = async (req, res) => {
@@ -606,8 +585,7 @@ const reprintBarcodes = async (req, res) => {
 module.exports = {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
-  getReceiptsWithBarcodes,
-  markBarcodesAsPrinted,
+  getReceiptsWithBarcodes,  
   reprintBarcodes,
   searchReprintReceipts,
 };

@@ -437,16 +437,34 @@ const finalizeReceiptController = async (req, res) => {
   }
 };
 
-// ---- Mark as printed (completed) ----
+// ---- Mark as printed (branch-scoped, no printedAt) ----
 const markPurchaseOrderReceiptAsPrinted = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const updated = await prisma.purchaseOrderReceipt.update({
-      where: { id },
-      data: { printed: true, printedAt: new Date() }, // ✅ mark printed only
-      select: { id: true, code: true, printed: true, printedAt: true },
+    const branchId = Number(req.user?.branchId);
+
+    if (!id || !branchId) {
+      return res.status(400).json({ message: 'ต้องระบุ id และต้องมีสิทธิ์สาขา (branchId) จาก token' });
+    }
+
+    // อัปเดตแบบ branch-scoped และไม่ใช้ printedAt ตาม schema จริง
+    const result = await prisma.purchaseOrderReceipt.updateMany({
+      where: { id, branchId },
+      data: { printed: true },
     });
-    return res.json({ success: true, receipt: updated });
+
+    if (result.count === 0) {
+      // ไม่พบเอกสารในสาขานี้หรืออัปเดตไม่ได้
+      return res.status(404).json({ message: 'ไม่พบใบรับของสำหรับสาขานี้ หรือถูกอัปเดตไปแล้ว' });
+    }
+
+    // ดึงข้อมูลยืนยันกลับ (select เฉพาะฟิลด์ที่มีจริง)
+    const receipt = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id, branchId },
+      select: { id: true, code: true, printed: true },
+    });
+
+    return res.json({ success: true, receipt });
   } catch (error) {
     console.error('❌ markPurchaseOrderReceiptAsPrinted error:', error);
     return res.status(500).json({ error: 'Failed to mark receipt as printed' });

@@ -6,8 +6,7 @@ const router = express.Router();
 const {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
-  getReceiptsWithBarcodes,
-  markBarcodesAsPrinted,
+  getReceiptsWithBarcodes,  
   searchReprintReceipts,
   reprintBarcodes, // ✅ ต้องอยู่ใน require ด้วย
 } = require('../controllers/barcodeController'); // <- พาธจาก routes → controllers
@@ -29,8 +28,6 @@ router.get('/with-barcodes', getReceiptsWithBarcodes);
 // หากมี controller `searchReprintReceipts` แล้ว ให้เปลี่ยนเป็นฟังก์ชันนั้นแทน
 router.get('/reprint-search', searchReprintReceipts);
 
-// ✅ ตีธง printed หลังพิมพ์ครั้งแรก
-router.patch('/mark-printed',  markBarcodesAsPrinted);
 
 // ✅ พิมพ์ซ้ำ (ไม่สร้างใหม่/ไม่ mark เพิ่ม)
 router.patch('/reprint/:receiptId',  reprintBarcodes);
