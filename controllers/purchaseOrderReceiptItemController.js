@@ -102,7 +102,6 @@ const getReceiptItemsByReceiptId = async (req, res) => {
       },
       orderBy: [{ id: 'asc' }],
     });
-
     return res.json(items);
   } catch (error) {
     console.error('❌ [getReceiptItemsByReceiptId] error:', error);
@@ -202,7 +201,7 @@ const updateReceiptItem = async (req, res) => {
 
       return upd;
     }, { timeout: 15000 });
-
+    console.log("--------------------------------------------------------------------------------------------------------------")
     return res.json(updated);
   } catch (error) {
     console.error('❌ [updateReceiptItem] error:', error);

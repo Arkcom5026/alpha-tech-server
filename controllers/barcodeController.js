@@ -293,6 +293,122 @@ const getBarcodesByReceiptId = async (req, res) => {
 };
 
 
+// ---- Mark single receipt as completed ----
+const markReceiptAsCompleted = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = Number(req.user?.branchId);
+
+    if (!id || !branchId) {
+      return res.status(400).json({ error: 'ต้องระบุ id และสิทธิ์สาขา' });
+    }
+
+    const exists = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id, branchId },
+      select: { id: true },
+    });
+    if (!exists) return res.status(404).json({ error: 'ไม่พบใบรับสินค้าสำหรับสาขานี้' });
+
+    const result = await prisma.purchaseOrderReceipt.updateMany({
+      where: { id, branchId },
+      data: { statusReceipt: 'COMPLETED' },
+    });
+
+    if (result.count === 0) {
+      return res.status(409).json({ error: 'อัปเดตไม่สำเร็จ (อาจถูกเปลี่ยนแปลงแล้ว)' });
+    }
+
+    const receipt = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id, branchId },
+      select: { id: true, code: true, statusReceipt: true },
+    });
+
+    return res.json({ success: true, receipt });
+  } catch (error) {
+    console.error('❌ [markReceiptAsCompleted] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถอัปเดตสถานะใบรับสินค้าได้' });
+  }
+};
+
+
+
+
+
+// ---- Mark barcodes as printed (PATCH /api/barcodes/mark-printed) ----
+// BRANCH_SCOPE_ENFORCED: ใช้ branchId จาก req.user เท่านั้น
+// รองรับ body หลายรูปแบบ: { purchaseOrderReceiptId } | { receiptId } | { id }
+const markBarcodesAsPrinted = async (req, res) => {
+  try {
+    // ---- debug logs ----
+    console.log('[markBarcodesAsPrinted] headers.ct', req.headers['content-type']);
+    console.log('[markBarcodesAsPrinted] req.user:', req.user);
+    console.log('[markBarcodesAsPrinted] typeof body =', typeof req.body, 'body =', req.body);
+    console.log('[markBarcodesAsPrinted] req.query =', req.query);
+
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ message: 'unauthorized: missing branchId' });
+
+    // ---- robust id extractor ----
+    const pickId = (src) => {
+      if (src == null) return undefined;
+      // primitive number or numeric string
+      if (typeof src === 'number' || (typeof src === 'string' && src.trim() !== '')) {
+        const n = Number(src);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+      if (typeof src !== 'object') return undefined;
+      const candidates = [
+        src.purchaseOrderReceiptId,
+        src.receiptId,
+        src.id,
+        src?.purchaseOrderReceipt?.id,
+        src?.payload?.id,
+        src?.data?.id,
+        src?.purchaseOrderReceiptId?.id,
+        src?.purchaseOrderReceiptId?.purchaseOrderReceiptId,
+      ];
+      for (const c of candidates) {
+        const n = Number(c);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+      return undefined;
+    };
+
+    let purchaseOrderReceiptId =
+      pickId(req.body) ?? pickId(req.query) ?? Number(req.get('x-receipt-id'));
+
+    if (!Number.isFinite(purchaseOrderReceiptId) || purchaseOrderReceiptId <= 0) {
+      console.warn('[markBarcodesAsPrinted] missing receipt id. keys(body)=',
+        typeof req.body === 'object' && req.body ? Object.keys(req.body) : '(primitive)',
+        'query=', req.query
+      );
+      return res.status(400).json({ message: 'ต้องระบุ purchaseOrderReceiptId (หรือ receiptId/id)' });
+    }
+
+    // one-shot & idempotent
+    const [itemsResult, receiptResult] = await prisma.$transaction([
+      prisma.barcodeReceiptItem.updateMany({
+        where: { branchId, purchaseOrderReceiptId, printed: false },
+        data: { printed: true },
+      }),
+      prisma.purchaseOrderReceipt.updateMany({
+        where: { id: purchaseOrderReceiptId, branchId },
+        data: { printed: true },
+      }),
+    ]);
+
+    console.log('[markBarcodesAsPrinted] updated items:', itemsResult.count, 'receipt updated:', receiptResult.count);
+
+    return res.json({ success: true, updated: itemsResult.count, receiptUpdated: receiptResult.count });
+  } catch (error) {
+    console.error('❌ [markBarcodesAsPrinted] error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถอัปเดตสถานะ printed ได้', error: error?.message });
+  }
+};
+
+
+
+
 
 
 // GET /api/barcodes/receipts-with-barcodes
@@ -588,6 +704,9 @@ module.exports = {
   getReceiptsWithBarcodes,  
   reprintBarcodes,
   searchReprintReceipts,
+  markReceiptAsCompleted,
+  markBarcodesAsPrinted,
+  
 };
 
 
