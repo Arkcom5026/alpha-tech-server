@@ -6,6 +6,21 @@ const { prisma, Prisma } = require('../lib/prisma');
 const D = (v) => (v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0));
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
 
+// ⚙️ pick only provided fields for partial update (avoid overwriting with 0)
+const pickPriceUpdate = (src = {}) => {
+  const out = {};
+  if (src.costPrice !== undefined) out.costPrice = D(src.costPrice);
+  if (src.priceRetail !== undefined || src.retailPrice !== undefined) out.priceRetail = D(src.retailPrice ?? src.priceRetail);
+  if (src.priceWholesale !== undefined || src.wholesalePrice !== undefined) out.priceWholesale = D(src.wholesalePrice ?? src.priceWholesale);
+  if (src.priceTechnician !== undefined || src.technicianPrice !== undefined) out.priceTechnician = D(src.technicianPrice ?? src.priceTechnician);
+  if (src.priceOnline !== undefined) out.priceOnline = D(src.priceOnline);
+  if (src.effectiveDate !== undefined) out.effectiveDate = src.effectiveDate ? new Date(src.effectiveDate) : null;
+  if (src.expiredDate !== undefined) out.expiredDate = src.expiredDate ? new Date(src.expiredDate) : null;
+  if (src.note !== undefined) out.note = src.note || null;
+  if (typeof src.isActive === 'boolean') out.isActive = src.isActive;
+  return out;
+};
+
 // GET /branch-prices/active/:productId
 const getActiveBranchPrice = async (req, res) => {
   try {
@@ -56,6 +71,10 @@ const upsertBranchPrice = async (req, res) => {
       expiredDate,
       note,
       isActive,
+      // aliases (accept FE variations)
+      retailPrice,
+      wholesalePrice,
+      technicianPrice,
     } = req.body || {};
 
     if (!branchId || !productId) {
@@ -66,29 +85,40 @@ const upsertBranchPrice = async (req, res) => {
     const eff = effectiveDate ? new Date(effectiveDate) : null;
     const exp = expiredDate ? new Date(expiredDate) : null;
 
+    // ⛔ validate date order
+    if (eff && exp && exp < eff) {
+      return res.status(400).json({ error: 'expiredDate ต้องไม่เร็วกว่าหรือก่อน effectiveDate' });
+    }
+
     const result = await prisma.branchPrice.upsert({
       where: {
         productId_branchId: { productId: pid, branchId },
       },
       update: {
-        costPrice: D(costPrice),
-        priceRetail: D(priceRetail),
-        priceWholesale: D(priceWholesale),
-        priceTechnician: D(priceTechnician),
-        priceOnline: D(priceOnline),
-        effectiveDate: eff,
-        expiredDate: exp,
-        note: note || null,
-        isActive: typeof isActive === 'boolean' ? isActive : true,
+        ...pickPriceUpdate({
+          costPrice,
+          priceRetail,
+          priceWholesale,
+          priceTechnician,
+          priceOnline,
+          effectiveDate,
+          expiredDate,
+          note,
+          isActive,
+          // aliases
+          retailPrice,
+          wholesalePrice,
+          technicianPrice,
+        }),
         updatedBy,
       },
       create: {
         productId: pid,
         branchId,
         costPrice: D(costPrice),
-        priceRetail: D(priceRetail),
-        priceWholesale: D(priceWholesale),
-        priceTechnician: D(priceTechnician),
+        priceRetail: D(retailPrice ?? priceRetail),
+        priceWholesale: D(wholesalePrice ?? priceWholesale),
+        priceTechnician: D(technicianPrice ?? priceTechnician),
         priceOnline: D(priceOnline),
         effectiveDate: eff,
         expiredDate: exp,
@@ -131,15 +161,16 @@ const getBranchPricesByBranch = async (req, res) => {
 const getAllProductsWithBranchPrice = async (req, res) => {
   try {
     const branchId = toInt(req.user?.branchId);
-    const { categoryId, productTypeId, productProfileId, templateId, searchText } = req.query || {};
+    const { categoryId, productTypeId, productProfileId, templateId, productTemplateId, searchText } = req.query || {};
 
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-    if (!searchText && !categoryId && !productTypeId && !productProfileId && !templateId) {
+    if (!searchText && !categoryId && !productTypeId && !productProfileId && !templateId && !productTemplateId) {
       return res.json([]);
     }
 
     const whereAND = [];
-    if (templateId) whereAND.push({ templateId: toInt(templateId) });
+    const templateParam = toInt(templateId ?? productTemplateId);
+    if (templateParam) whereAND.push({ templateId: templateParam });
     if (productProfileId) whereAND.push({ template: { productProfileId: toInt(productProfileId) } });
     if (productTypeId) whereAND.push({ template: { productProfile: { productTypeId: toInt(productTypeId) } } });
     if (categoryId) whereAND.push({ template: { productProfile: { productType: { categoryId: toInt(categoryId) } } } });
@@ -194,41 +225,42 @@ const updateMultipleBranchPrices = async (req, res) => {
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
     if (updates.length === 0) return res.status(400).json({ error: 'ไม่มีข้อมูลอัปเดต' });
 
-    const ops = updates.map((item) => {
-      const pid = toInt(item?.product?.id || item?.productId);
-      if (!pid) return null;
-      const eff = item?.effectiveDate ? new Date(item.effectiveDate) : null;
-      const exp = item?.expiredDate ? new Date(item.expiredDate) : null;
-      return prisma.branchPrice.upsert({
-        where: { productId_branchId: { productId: pid, branchId } },
-        update: {
-          costPrice: D(item.costPrice),
-          priceRetail: D(item.retailPrice ?? item.priceRetail),
-          priceWholesale: D(item.wholesalePrice ?? item.priceWholesale),
-          priceTechnician: D(item.technicianPrice ?? item.priceTechnician),
-          priceOnline: D(item.priceOnline),
-          effectiveDate: eff,
-          expiredDate: exp,
-          note: item.note || null,
-          isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
-          updatedBy,
-        },
-        create: {
-          productId: pid,
-          branchId,
-          costPrice: D(item.costPrice),
-          priceRetail: D(item.retailPrice ?? item.priceRetail),
-          priceWholesale: D(item.wholesalePrice ?? item.priceWholesale),
-          priceTechnician: D(item.technicianPrice ?? item.priceTechnician),
-          priceOnline: D(item.priceOnline),
-          effectiveDate: eff,
-          expiredDate: exp,
-          note: item.note || null,
-          isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
-          updatedBy,
-        },
-      });
-    }).filter(Boolean);
+    const ops = updates
+      .map((item) => {
+        const pid = toInt(item?.product?.id || item?.productId);
+        if (!pid) return null;
+
+        // validate date order if both provided
+        const eff = item?.effectiveDate ? new Date(item.effectiveDate) : undefined;
+        const exp = item?.expiredDate ? new Date(item.expiredDate) : undefined;
+        if (eff && exp && exp < eff) {
+          // skip invalid item; alternatively could throw
+          return null;
+        }
+
+        const patch = pickPriceUpdate(item);
+        patch.updatedBy = updatedBy;
+
+        return prisma.branchPrice.upsert({
+          where: { productId_branchId: { productId: pid, branchId } },
+          update: patch,
+          create: {
+            productId: pid,
+            branchId,
+            costPrice: D(item.costPrice),
+            priceRetail: D(item.retailPrice ?? item.priceRetail),
+            priceWholesale: D(item.wholesalePrice ?? item.priceWholesale),
+            priceTechnician: D(item.technicianPrice ?? item.priceTechnician),
+            priceOnline: D(item.priceOnline),
+            effectiveDate: item?.effectiveDate ? new Date(item.effectiveDate) : null,
+            expiredDate: item?.expiredDate ? new Date(item.expiredDate) : null,
+            note: item.note || null,
+            isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
+            updatedBy,
+          },
+        });
+      })
+      .filter(Boolean);
 
     await prisma.$transaction(ops, { timeout: 30000 });
 

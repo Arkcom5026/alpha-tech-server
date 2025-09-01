@@ -424,59 +424,59 @@ const getProductDropdownsForOnline = async (req, res) => {
   try {
     const { categoryId, productTypeId, productProfileId } = req.query;
 
-    const categories = await prisma.category.findMany();
+    // 🔢 Coerce to number when present (avoid NaN in Prisma where)
+    const catId = categoryId ? Number(categoryId) : undefined;
+    const typeId = productTypeId ? Number(productTypeId) : undefined;
+    const profileId = productProfileId ? Number(productProfileId) : undefined;
+
+    // 🧩 Online dropdowns should mirror POS rules: only active items + stable sorting
+    const categories = await prisma.category.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
 
     const productTypes = await prisma.productType.findMany({
-      where: categoryId ? { categoryId: Number(categoryId) } : undefined,
-      select: {
-        id: true,
-        name: true,
-        categoryId: true,
+      where: {
+        active: true,
+        ...(catId ? { categoryId: catId } : {}),
       },
+      select: { id: true, name: true, categoryId: true },
+      orderBy: { name: 'asc' },
     });
 
     const productProfiles = await prisma.productProfile.findMany({
-      where: productTypeId ? { productTypeId: Number(productTypeId) } : undefined,
+      where: {
+        active: true,
+        ...(typeId ? { productTypeId: typeId } : {}),
+      },
       include: {
         productType: {
-          select: {
-            id: true,
-            name: true,
-            categoryId: true,
-          },
+          select: { id: true, name: true, categoryId: true },
         },
       },
+      orderBy: { name: 'asc' },
     });
 
     const templates = await prisma.productTemplate.findMany({
       where: {
-        ...(productProfileId && { productProfileId: Number(productProfileId) }),
-        ...(productTypeId && {
-          productProfile: {
-            productTypeId: Number(productTypeId),
-          },
-        }),
-        ...(categoryId && {
-          productProfile: {
-            productType: {
-              categoryId: Number(categoryId),
-            },
-          },
-        }),
+        active: true,
+        ...(profileId ? { productProfileId: profileId } : {}),
+        ...(typeId
+          ? { productProfile: { productTypeId: typeId } }
+          : {}),
+        ...(catId
+          ? { productProfile: { productType: { categoryId: catId } } }
+          : {}),
       },
       include: {
         productProfile: {
           include: {
-            productType: {
-              select: {
-                id: true,
-                name: true,
-                categoryId: true,
-              },
-            },
+            productType: { select: { id: true, name: true, categoryId: true } },
           },
         },
       },
+      orderBy: { name: 'asc' },
     });
 
     return res.json({
@@ -490,6 +490,7 @@ const getProductDropdownsForOnline = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
+
 
 const getProductOnlineById = async (req, res) => {
   try {

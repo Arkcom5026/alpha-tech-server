@@ -8,8 +8,6 @@ const {
   cancelPayment,
 } = require('../controllers/paymentController');
 const { verifyToken } = require('../middlewares/verifyToken');
-const { getSalesByBranchId } = require('../controllers/saleController');
-
 router.use(verifyToken);
 
 router.post('/', createPayments);

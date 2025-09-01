@@ -20,6 +20,7 @@ enum Role {
   customer
   employee
   admin
+  superadmin 
 }
 
 enum PurchaseOrderStatus {
@@ -323,19 +324,27 @@ model Branch {
 }
 
 model Position {
-  id        Int               @id @default(autoincrement())
-  name      String
-  employees EmployeeProfile[]
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  employees   EmployeeProfile[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([name])
 }
+
 
 
 model Category {
   id     Int     @id @default(autoincrement())
   name   String  @unique
   active Boolean @default(true)
+  isSystem Boolean @default(false)
 
   productTypes ProductType[]
 
@@ -1197,3 +1206,4 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
+
