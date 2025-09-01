@@ -4,7 +4,8 @@ const { prisma, Prisma } = require('../lib/prisma');
 
 // --- helpers ---
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : parseInt(v, 10));
-const isStaffRole = (r) => new Set(['admin', 'manager', 'staff', 'employee']).has(String(r || '').toLowerCase());
+// ⬇️ อนุญาต role เพิ่มเติม (superadmin/owner) และเขียนให้ยืดหยุ่นด้วย lowerCase
+const isStaffRole = (r) => new Set(['superadmin', 'owner', 'admin', 'manager', 'staff', 'employee']).has(String(r || '').toLowerCase());
 
 // GET /employees
 const getAllEmployees = async (req, res) => {
@@ -50,7 +51,7 @@ const getEmployeesById = async (req, res) => {
 const createEmployees = async (req, res) => {
   try {
     const actor = req.user || {};
-    if (!isStaffRole(actor.role)) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
+    if (!isStaffRole(actor.role) && !actor.isSuperAdmin) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
 
     const { userId, name, phone, positionId } = req.body;
     let requestedBranchId = toInt(req.body?.branchId);
@@ -156,12 +157,23 @@ const getUsersByRole = async (req, res) => {
   }
 };
 
-// POST /employees/approve
+// POST /employees/approve  (รองรับ /employees/approve-employee ด้วย)
+function buildForbiddenMessage(actor) {
+  return {
+    message: 'FORBIDDEN_ROLE',
+    detail: {
+      role: actor?.role ?? null,
+      isSuperAdmin: !!actor?.isSuperAdmin,
+    },
+  };
+}
+
 const approveEmployee = async (req, res) => {
   const { userId, positionId, role, branchId: requestedBranchId, name, phone } = req.body || {};
   try {
     const actor = req.user || {};
-    if (!isStaffRole(actor.role)) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
+    const canApprove = !!actor?.isSuperAdmin || isStaffRole(actor.role);
+    if (!canApprove) return res.status(403).json(buildForbiddenMessage(actor));
 
     const MAIN_BRANCH_ID = toInt(process.env.MAIN_BRANCH_ID);
     const isMainBranchAdmin = String(actor.role).toLowerCase() === 'employee' && toInt(actor.branchId) === MAIN_BRANCH_ID;
@@ -170,7 +182,7 @@ const approveEmployee = async (req, res) => {
     const parsedUserId = toInt(userId);
     const parsedPositionId = toInt(positionId);
     if (!parsedUserId || !parsedPositionId || !branchIdToUse) {
-      return res.status(400).json({ message: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง' });
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง', detail: { userId, positionId, branchIdToUse } });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -184,7 +196,9 @@ const approveEmployee = async (req, res) => {
         },
       });
 
-      await tx.user.update({ where: { id: parsedUserId }, data: { role } });
+      if (role) {
+        await tx.user.update({ where: { id: parsedUserId }, data: { role } });
+      }
     }, { timeout: 15000 });
 
     res.json({ message: '✅ อนุมัติพนักงานเรียบร้อยแล้ว' });
@@ -193,6 +207,9 @@ const approveEmployee = async (req, res) => {
     res.status(500).json({ message: 'ไม่สามารถอนุมัติพนักงานได้' });
   }
 };
+
+// alias ให้ router เก่าที่เรียก /employees/approve-employee สามารถใช้ร่วมกันได้
+const approveEmployeeAlias = approveEmployee;
 
 // GET /positions
 const getAllPositions = async (req, res) => {
@@ -213,5 +230,6 @@ module.exports = {
   deleteEmployees,
   getUsersByRole,
   approveEmployee,
+  approveEmployeeAlias, // ⬅️ ใช้กับ path /employees/approve-employee ได้
   getAllPositions,
 };
