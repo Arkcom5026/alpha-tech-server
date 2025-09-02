@@ -1,3 +1,5 @@
+/* eslint-env node */
+
 // controllers/positionController.js (no zod validation)
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -14,6 +16,7 @@ const normalize = (payload = {}) => {
     const d = out.description.trim();
     out.description = d.length ? d : null; // เก็บเป็น null ถ้าเป็นสตริงว่าง
   }
+  if (typeof out.role === 'string') out.role = out.role.trim().toLowerCase();
   return out;
 };
 
@@ -27,25 +30,32 @@ const isNameTaken = async (name, excludeId = null) => {
   return !!existing;
 };
 
+// role ที่อนุญาตให้ใช้กับตำแหน่ง (อย่าใช้ superadmin/customer ที่ระดับตำแหน่ง)
+const ALLOWED_POSITION_ROLES = new Set(['admin', 'employee']);
+const validateRole = (role) => (role == null ? true : ALLOWED_POSITION_ROLES.has(String(role).toLowerCase()));
+const normalizeRoleField = (row = {}) => ({
+  ...row,
+  role: row.role ?? row.defaultRole ?? row.systemRole ?? null,
+});
+
 // ===== Controllers =====
 const listPositions = async (req, res) => {
   try {
-    // query: search, active (true/false), page, limit
-    const { search = '', active, page = '1', limit = '20' } = req.query;
+    // query: q/search, active (true/false), page, limit
+    const q = (req.query.q ?? req.query.search ?? '').toString().trim();
+    const { active, page = '1', limit = '20' } = req.query;
 
     const where = {
       ...(active === 'true' ? { isActive: true } : {}),
       ...(active === 'false' ? { isActive: false } : {}),
-      ...(search
-        ? { name: { contains: String(search), mode: 'insensitive' } }
-        : {}),
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
     };
 
     const pageNum = Math.max(toInt(page, 1), 1);
     const take = Math.min(Math.max(toInt(limit, 20), 1), 100);
     const skip = (pageNum - 1) * take;
 
-    const [items, total] = await Promise.all([
+    const [itemsRaw, total] = await Promise.all([
       prisma.position.findMany({
         where,
         orderBy: [{ isActive: 'desc' }, { id: 'asc' }],
@@ -55,13 +65,15 @@ const listPositions = async (req, res) => {
       prisma.position.count({ where }),
     ]);
 
+    const items = itemsRaw.map(normalizeRoleField);
+
     return res.json({
       items,
       meta: {
         page: pageNum,
         limit: take,
         total,
-        pages: Math.ceil(total / take),
+        pages: Math.max(1, Math.ceil(total / take)),
       },
     });
   } catch (err) {
@@ -103,7 +115,7 @@ const getById = async (req, res) => {
     const item = await prisma.position.findUnique({ where: { id } });
     if (!item) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
 
-    return res.json(item);
+    return res.json(normalizeRoleField(item));
   } catch (err) {
     if (err instanceof Error) console.error('[getById] error:', err.message, err.stack);
     else console.error('[getById] unknown error:', err);
@@ -122,6 +134,11 @@ const createPosition = async (req, res) => {
     if (body.description != null && typeof body.description !== 'string') {
       return res.status(400).json({ error: 'รูปแบบคำอธิบายไม่ถูกต้อง' });
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'role')) {
+      if (!validateRole(body.role)) {
+        return res.status(400).json({ error: 'role ที่อนุญาตคือ admin หรือ employee เท่านั้น' });
+      }
+    }
 
     // ป้องกันชื่อซ้ำแบบล่วงหน้า
     if (await isNameTaken(body.name)) {
@@ -129,7 +146,7 @@ const createPosition = async (req, res) => {
     }
 
     const created = await prisma.position.create({ data: body });
-    return res.status(201).json(created);
+    return res.status(201).json(normalizeRoleField(created));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === 'P2002') {
@@ -166,6 +183,11 @@ const updatePosition = async (req, res) => {
         return res.status(400).json({ error: 'รูปแบบ isActive ต้องเป็น boolean' });
       }
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'role')) {
+      if (!validateRole(body.role)) {
+        return res.status(400).json({ error: 'role ที่อนุญาตคือ admin หรือ employee เท่านั้น' });
+      }
+    }
 
     // กัน name ซ้ำก่อนอัปเดต (หากผู้ใช้ส่ง name มา)
     if (body.name && (await isNameTaken(body.name, id))) {
@@ -173,7 +195,7 @@ const updatePosition = async (req, res) => {
     }
 
     const updated = await prisma.position.update({ where: { id }, data: body });
-    return res.json(updated);
+    return res.json(normalizeRoleField(updated));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === 'P2002') {
@@ -210,7 +232,7 @@ const toggleActive = async (req, res) => {
       data: { isActive: !existing.isActive },
     });
 
-    return res.json(updated);
+    return res.json(normalizeRoleField(updated));
   } catch (err) {
     if (err instanceof Error) console.error('[toggleActive] error:', err.message, err.stack);
     else console.error('[toggleActive] unknown error:', err);
@@ -252,7 +274,3 @@ module.exports = {
   toggleActive,
   hardDelete, // พิจารณาปิดใช้งานในโปรดักชัน
 };
-
-
-
-

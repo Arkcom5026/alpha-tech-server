@@ -20,7 +20,7 @@ enum Role {
   customer
   employee
   admin
-  superadmin 
+  superadmin
 }
 
 enum PurchaseOrderStatus {
@@ -151,7 +151,6 @@ enum BarcodeStatus {
   VOID
 }
 
-
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique // ✅ Optional, but must be unique if provided
@@ -172,7 +171,7 @@ model User {
 }
 
 model CustomerProfile {
-  id          Int          @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   name        String?
   picture     String?
   companyName String?
@@ -182,9 +181,13 @@ model CustomerProfile {
   postalCode  String?
   phone       String?
   taxId       String?
-  type        CustomerType @default(INDIVIDUAL)
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      Int          @unique
+
+  // 🆕 Administrative unit linkage (มาตรฐานไทย 2/4/6 หลัก)
+  subdistrictCode String?
+  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+  type            CustomerType @default(INDIVIDUAL)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int          @unique
 
   paymentTerms  Int?     @default(0) // เครดิตเทอม (วัน)
   creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
@@ -296,6 +299,10 @@ model Branch {
   longitude Float?
   taxId     String?
 
+  // 🆕 Administrative unit linkage (มาตรฐานไทย 2/4/6 หลัก)
+  subdistrictCode String?
+  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+
   branchPrices BranchPrice[]
 
   employees EmployeeProfile[]
@@ -321,29 +328,64 @@ model Branch {
   updatedAt               DateTime                  @updatedAt
   CombinedBillingDocument CombinedBillingDocument[]
   StockAuditSession       StockAuditSession[]
+
+  @@index([subdistrictCode])
+}
+
+// 🆕 Administrative Units (มาตรฐานรหัสไทย)
+model Province {
+  /// รหัสจังหวัด 2 หลัก (เช่น "10")
+  code      String     @id
+  nameTh    String
+  /// กลาง / เหนือ / อีสาน / ตะวันออก / ตะวันตก / ใต้
+  region    String
+  districts District[]
+}
+
+model District {
+  /// รหัสอำเภอ 4 หลัก (จว 2 + อำเภอ 2)
+  code         String        @id
+  nameTh       String
+  provinceCode String
+  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  subdistricts Subdistrict[]
+
+  @@index([provinceCode])
+}
+
+model Subdistrict {
+  /// รหัสตำบล 6 หลัก (จว2 + อำเภอ2 + ตำบล2)
+  code            String            @id
+  nameTh          String
+  districtCode    String
+  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+  postcode        String?
+  branches        Branch[]
+  CustomerProfile CustomerProfile[]
+
+  @@index([districtCode])
+  @@index([postcode])
 }
 
 model Position {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
   description String?
-  isActive    Boolean   @default(true)
+  isActive    Boolean @default(true)
 
-  employees   EmployeeProfile[]
+  employees EmployeeProfile[]
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive])
   @@index([name])
 }
 
-
-
 model Category {
-  id     Int     @id @default(autoincrement())
-  name   String  @unique
-  active Boolean @default(true)
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  active   Boolean @default(true)
   isSystem Boolean @default(false)
 
   productTypes ProductType[]
@@ -353,11 +395,11 @@ model Category {
 }
 
 model ProductType {
-  id             Int      @id @default(autoincrement())
+  id             Int     @id @default(autoincrement())
   name           String
   slug           String
   normalizedName String
-  active         Boolean  @default(true)
+  active         Boolean @default(true)
 
   guideExamples String[] @default([])
   pathCached    String?
@@ -370,7 +412,6 @@ model ProductType {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  
   @@unique([categoryId, slug])
   @@unique([categoryId, normalizedName])
   @@index([normalizedName])
@@ -395,7 +436,6 @@ model ProductProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  
   @@unique([productTypeId, slug])
   @@unique([productTypeId, normalizedName])
   @@index([normalizedName])
@@ -424,7 +464,6 @@ model ProductTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  
   @@unique([productProfileId, slug])
   @@unique([productProfileId, normalizedName])
   @@index([normalizedName])
@@ -560,7 +599,7 @@ model StockItem {
 }
 
 model Supplier {
-  isSystem      Boolean  @default(false) // ✅ สำหรับซัพพลายเออร์ระบบ (เช่น เริ่มต้นโปรแกรม)
+  isSystem      Boolean         @default(false) // ✅ สำหรับซัพพลายเออร์ระบบ (เช่น เริ่มต้นโปรแกรม)
   id            Int             @id @default(autoincrement())
   name          String
   contactPerson String?
@@ -1206,4 +1245,3 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
-

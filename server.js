@@ -41,7 +41,8 @@ const salesReportRoutes = require('./routes/salesReportRoutes');
 const uploadSlipRoutes = require('./routes/uploadSlipRoutes');
 const stockAuditRoutes = require('./routes/stockAuditRoutes');
 const positionRoutes = require('./routes/positionRoutes');
-
+const addressRoutes = require('./routes/addressRoutes');
+const locationsRoutes = require('./routes/locationsRoutes');
 
 // ✅ Middlewares
 app.use(express.json());
@@ -127,6 +128,11 @@ app.use('/api/upload-slips', uploadSlipRoutes);
 app.use('/api/stock-audit', stockAuditRoutes);
 
 app.use('/api/positions', positionRoutes);
+
+app.use('/api/address', addressRoutes);
+
+app.use('/api/locations', locationsRoutes);
+
 
 // ✅ Error handler
 app.use((err, req, res, next) => {
