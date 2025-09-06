@@ -1,11 +1,3 @@
-// ✅ FINALIZED Prisma Schema — ระบบ Online + POS + Purchasing + Services (Decimal-Ready)
-// ⚠️ NOTE:
-// 1) เปลี่ยนฟิลด์ "จำนวนเงิน" สำคัญจาก Float → Decimal ตามมาตรฐานบัญชี
-// 2) บังคับ BRANCH_SCOPE (branchId) ในเอกสารการเงินหลักบางจุด
-// 3) ลบฟิลด์ลอยที่ไม่ผูก FK (barcodeReceiptItemId) ออกจาก StockItem
-// 4) เพิ่มดัชนีที่จำเป็นต่อการ query จริง
-// 5) คง onDelete เดิมตามที่ระบุไว้ในสคีมาก่อนหน้า (ส่วนที่เป็นเอกสารบัญชี แนะนำให้ Restrict ในอนาคตถ้าต้องการ)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -288,18 +280,12 @@ model EmployeeProfile {
 }
 
 model Branch {
-  id        Int     @id @default(autoincrement())
-  name      String
-  address   String
-  phone     String?
-  province  String?
-  district  String?
-  region    String? // เช่น ภาคกลาง ภาคเหนือ
-  latitude  Float?
-  longitude Float?
-  taxId     String?
+  id              Int      @id @default(autoincrement())
+  name            String
+  address         String
+  phone           String?
 
-  // 🆕 Administrative unit linkage (มาตรฐานไทย 2/4/6 หลัก)
+  // Single source of truth for administrative address: 6-digit subdistrict code
   subdistrictCode String?
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
 
@@ -1245,3 +1231,8 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
+
+
+
+
+    
