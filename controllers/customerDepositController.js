@@ -1,9 +1,9 @@
-// controllers/customerDepositController.js
+/* eslint-env node */
+// controllers/customerDepositController.js (updated)
 
 const { prisma, Prisma } = require('../lib/prisma');
 
-
-// --- Helpers & Flags ---
+// --- Decimal & money helpers ---
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const isMoneyLike = (v) =>
@@ -11,7 +11,7 @@ const isMoneyLike = (v) =>
   (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
 
-// ✅ ใช้สำหรับ normalize ข้อมูลเงินมัดจำ (customerDeposit)
+// ✅ normalize deposit numeric fields
 const normalizeDeposit = (dep) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !dep) return dep;
   const out = { ...dep };
@@ -21,7 +21,7 @@ const normalizeDeposit = (dep) => {
   return out;
 };
 
-// ✅ ใช้สำหรับ normalize ข้อมูลทางการเงินของลูกค้า (customerProfile)
+// ✅ normalize customer numeric fields
 const normalizeCustomerMoney = (cust) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !cust) return cust;
   const out = { ...cust };
@@ -31,6 +31,37 @@ const normalizeCustomerMoney = (cust) => {
   return out;
 };
 
+// --- Phone & address helpers (SSoT: User.loginId, subdistrictCode) ---
+const normalizePhone = (raw = '') => String(raw).replace(/\D/g, '').replace(/^66/, '0').slice(-10);
+const isValidPhone = (s = '') => /^\d{10}$/.test(s);
+
+const buildCustomerAddress = (profile) => {
+  const parts = [];
+  if (profile?.addressDetail) parts.push(profile.addressDetail);
+  const sd = profile?.subdistrict;
+  const d = sd?.district;
+  const pv = d?.province;
+  if (sd?.nameTh) parts.push(sd.nameTh);
+  if (d?.nameTh) parts.push(d.nameTh);
+  if (pv?.nameTh) parts.push(pv.nameTh);
+  const postcode = sd?.postcode || null;
+  if (postcode) parts.push(postcode);
+  return parts.filter(Boolean).join(' ');
+};
+
+// Project deposit to stable shape for FE (customer: { name, phone })
+const projectDeposit = (dep) => {
+  const base = NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(dep) : dep;
+  return {
+    ...base,
+    customer: {
+      name: dep?.customer?.name || '',
+      phone: dep?.customer?.user?.loginId || null,
+    },
+  };
+};
+
+// ─────────────────────────────────────────────────────────────
 // Create a new customer deposit (ACTIVE)
 const createCustomerDeposit = async (req, res) => {
   try {
@@ -42,7 +73,6 @@ const createCustomerDeposit = async (req, res) => {
       return res.status(400).json({ message: 'ข้อมูลไม่ครบ (customerId/employeeId/branchId)' });
     }
 
-    // Validate inputs
     if (![cashAmount, transferAmount, cardAmount].every(isMoneyLike)) {
       return res.status(400).json({
         message: 'รูปแบบจำนวนเงินไม่ถูกต้อง (ต้องเป็นเลข และทศนิยมไม่เกิน 2 ตำแหน่ง)',
@@ -69,12 +99,10 @@ const createCustomerDeposit = async (req, res) => {
         branchId,
         status: 'ACTIVE',
       },
-      include: { customer: { select: { name: true, phone: true } } },
+      include: { customer: { include: { user: true } } },
     });
 
-    return res
-      .status(201)
-      .json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit);
+    return res.status(201).json(projectDeposit(deposit));
   } catch (err) {
     console.error('❌ createCustomerDeposit error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการบันทึกเงินมัดจำ' });
@@ -90,11 +118,10 @@ const getAllCustomerDeposits = async (req, res) => {
     const deposits = await prisma.customerDeposit.findMany({
       where: { branchId, status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
-      include: { customer: { select: { name: true, phone: true } } },
+      include: { customer: { include: { user: true } } },
     });
 
-    const out = NORMALIZE_DECIMAL_TO_NUMBER ? deposits.map(normalizeDeposit) : deposits;
-    res.json(out);
+    res.json(deposits.map(projectDeposit));
   } catch (err) {
     console.error('❌ getAllCustomerDeposits error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูล' });
@@ -111,12 +138,12 @@ const getCustomerDepositById = async (req, res) => {
 
     const deposit = await prisma.customerDeposit.findFirst({
       where: { id, branchId, status: 'ACTIVE' },
-      include: { customer: { select: { name: true, phone: true } } },
+      include: { customer: { include: { user: true } } },
     });
 
     if (!deposit) return res.status(404).json({ message: 'ไม่พบข้อมูลมัดจำ' });
 
-    res.json(NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit);
+    res.json(projectDeposit(deposit));
   } catch (error) {
     console.error('getCustomerDepositById error:', error);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลมัดจำ' });
@@ -126,17 +153,18 @@ const getCustomerDepositById = async (req, res) => {
 // Find customer by phone and return deposits
 const getCustomerAndDepositByPhone = async (req, res) => {
   try {
-    const rawPhone = req.params.phone;
-    const phone = rawPhone?.replace(/\D/g, '').trim();
+    const rawPhone = req.params.phone || '';
+    const phone = normalizePhone(rawPhone);
     const branchId = Number(req.user?.branchId);
 
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-    if (!phone) return res.status(400).json({ message: 'กรุณาระบุเบอร์โทร' });
+    if (!isValidPhone(phone)) return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรให้ถูกต้อง (10 หลัก)' });
 
     const customer = await prisma.customerProfile.findFirst({
-      where: { phone },
+      where: { user: { loginId: phone } },
       include: {
         user: true,
+        subdistrict: { include: { district: { include: { province: true } } } },
         customerDeposit: {
           where: { branchId, status: 'ACTIVE' },
           orderBy: { createdAt: 'desc' },
@@ -154,14 +182,16 @@ const getCustomerAndDepositByPhone = async (req, res) => {
     const customerOut = normalizeCustomerMoney({
       id: customer.id,
       name: customer.name,
-      phone: customer.phone,
+      phone: customer.user?.loginId || null,
       email: customer.user?.email || '',
       type: customer.type,
       companyName: customer.companyName,
-      address: customer.address,
       taxId: customer.taxId,
       creditLimit: customer.creditLimit,
       creditBalance: customer.creditBalance,
+      subdistrictCode: customer.subdistrictCode || null,
+      addressDetail: customer.addressDetail || null,
+      customerAddress: buildCustomerAddress(customer),
     });
 
     return res.json({
@@ -199,6 +229,7 @@ const getCustomerAndDepositByName = async (req, res) => {
       take: 10,
       include: {
         user: true,
+        subdistrict: { include: { district: { include: { province: true } } } },
         customerDeposit: { where: { branchId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' } },
       },
     });
@@ -215,14 +246,16 @@ const getCustomerAndDepositByName = async (req, res) => {
     const customerOut = normalizeCustomerMoney({
       id: c.id,
       name: c.name,
-      phone: c.phone,
+      phone: c.user?.loginId || null,
       email: c.user?.email || '',
       type: c.type || '',
       companyName: c.companyName || '',
       taxId: c.taxId || '',
-      address: c.address || '',
       creditLimit: c.creditLimit,
       creditBalance: c.creditBalance,
+      subdistrictCode: c.subdistrictCode || null,
+      addressDetail: c.addressDetail || null,
+      customerAddress: buildCustomerAddress(c),
     });
 
     return res.json({
@@ -361,3 +394,4 @@ module.exports = {
   useCustomerDeposit,
   getCustomerAndDepositByName,
 };
+

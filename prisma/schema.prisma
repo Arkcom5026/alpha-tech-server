@@ -145,13 +145,13 @@ enum BarcodeStatus {
 
 model User {
   id          Int       @id @default(autoincrement())
-  email       String?   @unique // ✅ Optional, but must be unique if provided
-  loginId     String?   @unique // ✅ For phone number login
+  email       String?   @unique
+  loginId     String?   @unique
   password    String
   role        Role
   enabled     Boolean   @default(true)
   lastLoginAt DateTime?
-  loginType   LoginType @default(PHONE) // ✅ Track source of registration
+  loginType   LoginType @default(PHONE)
 
   customerProfile CustomerProfile?
   employeeProfile EmployeeProfile?
@@ -162,26 +162,24 @@ model User {
   cart        Cart[]
 }
 
+
 model CustomerProfile {
   id          Int     @id @default(autoincrement())
   name        String?
   picture     String?
   companyName String?
-  address     String?
-  district    String?
-  province    String?
-  postalCode  String?
-  phone       String?
   taxId       String?
 
   // 🆕 Administrative unit linkage (มาตรฐานไทย 2/4/6 หลัก)
-  subdistrictCode String?
+  // ✅ Single Source of Truth: ใช้ subdistrictCode เป็นหลัก (NOT NULL migration ถัดไป)
+  subdistrictCode String? @db.Char(6)
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
-  type            CustomerType @default(INDIVIDUAL)
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          Int          @unique
 
-  paymentTerms  Int?     @default(0) // เครดิตเทอม (วัน)
+  type   CustomerType @default(INDIVIDUAL)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int          @unique
+
+  paymentTerms  Int?     @default(0)
   creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
   creditBalance Decimal? @default(0) @db.Decimal(12, 2)
 
@@ -196,7 +194,12 @@ model CustomerProfile {
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   CombinedBillingDocument CombinedBillingDocument[]
+
+  @@index([subdistrictCode])
+  // 🔎 FE ใช้ "customerAddress" ที่ประกอบจาก backend: [บ้านเลขที่] [subdistrict.nameTh] [district.nameTh] [province.nameTh] [postcode]
 }
+
+
 
 model CustomerDeposit {
   id Int @id @default(autoincrement())
@@ -1231,8 +1234,3 @@ model StockAuditScanLog {
   @@index([auditSessionId, scannedAt])
   @@index([barcode])
 }
-
-
-
-
-    

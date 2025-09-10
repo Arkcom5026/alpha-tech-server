@@ -46,6 +46,11 @@ const addressController = {
       if (!sd) return res.status(404).json({ message: 'ไม่พบรหัสตำบล (subdistrictCode) นี้' });
 
       const result = {
+        // codes for FE auto-fill
+        provinceCode: sd.district?.provinceCode,
+        districtCode: sd.district?.code,
+        subdistrictCode: sd.code,
+        // names for display
         subdistrictName: sd.nameTh,
         districtName: sd.district?.nameTh,
         provinceName: sd.district?.province?.nameTh,
@@ -168,6 +173,58 @@ const addressController = {
       return sendKnownPrismaError(res, err, 'เกิดข้อผิดพลาดในการรวมที่อยู่');
     }
   },
+
+  // -----------------------------------------------------------
+  // Lists for FE (province/district/subdistrict)
+  // GET /api/address/provinces  → [{ code, nameTh }]
+  listProvinces: async (req, res) => {
+    try {
+      const items = await prisma.province.findMany({
+        select: { code: true, nameTh: true },
+        orderBy: { nameTh: 'asc' },
+      });
+      return res.json(items);
+    } catch (err) {
+      console.error('❌ [address.listProvinces] error:', err);
+      return sendKnownPrismaError(res, err, 'เกิดข้อผิดพลาดในการดึงจังหวัด');
+    }
+  },
+
+  // GET /api/address/districts?provinceCode=XX  → [{ code, nameTh }]
+  listDistricts: async (req, res) => {
+    try {
+      const provinceCode = trimOrUndefined(req.query?.provinceCode);
+      if (!provinceCode) return res.status(400).json({ message: 'provinceCode is required' });
+
+      const items = await prisma.district.findMany({
+        where: { provinceCode: String(provinceCode) },
+        select: { code: true, nameTh: true },
+        orderBy: { nameTh: 'asc' },
+      });
+      return res.json(items);
+    } catch (err) {
+      console.error('❌ [address.listDistricts] error:', err);
+      return sendKnownPrismaError(res, err, 'เกิดข้อผิดพลาดในการดึงอำเภอ');
+    }
+  },
+
+  // GET /api/address/subdistricts?districtCode=XXXX  → [{ code, nameTh, postcode }]
+  listSubdistricts: async (req, res) => {
+    try {
+      const districtCode = trimOrUndefined(req.query?.districtCode);
+      if (!districtCode) return res.status(400).json({ message: 'districtCode is required' });
+
+      const items = await prisma.subdistrict.findMany({
+        where: { districtCode: String(districtCode) },
+        select: { code: true, nameTh: true, postcode: true },
+        orderBy: { nameTh: 'asc' },
+      });
+      return res.json(items);
+    } catch (err) {
+      console.error('❌ [address.listSubdistricts] error:', err);
+      return sendKnownPrismaError(res, err, 'เกิดข้อผิดพลาดในการดึงตำบล');
+    }
+  },
 };
 
 module.exports.addressController = addressController;
@@ -178,6 +235,11 @@ module.exports.addressController = addressController;
 // const { addressController } = require('../controllers/addressController');
 // const router = express.Router();
 // router.use(verifyToken);
+// // lookup lists
+// router.get('/provinces', addressController.listProvinces);
+// router.get('/districts', addressController.listDistricts);
+// router.get('/subdistricts', addressController.listSubdistricts);
+// // utilities
 // router.get('/resolve', addressController.resolve);
 // router.get('/validate', addressController.validate);
 // router.get('/postcode', addressController.postcode);

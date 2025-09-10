@@ -80,27 +80,50 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const emailOrPhone = normalize(req.body?.emailOrPhone);
+    // รองรับทั้ง emailOrPhone และ identifier เพื่อไม่ให้ FE เดิมพัง
+    const identifier = normalize(req.body?.emailOrPhone ?? req.body?.identifier);
     const password = normalize(req.body?.password);
-    if (!emailOrPhone || !password) {
-      return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร และรหัสผ่าน' });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร หรือไอดี และรหัสผ่าน' });
     }
 
-    const emailCandidate = normalizeEmail(emailOrPhone);
+    // helpers ภายในฟังก์ชัน (หลีกเลี่ยง regex เพื่อความปลอดภัยของแพตช์)
+    const looksLikeEmail = (v) => String(v || '').indexOf('@') > 0;
+    const onlyDigits = (v) => String(v || '').split('').filter((c) => c >= '0' && c <= '9').join('');
+    const toE164TH = (digits) => {
+      if (!digits) return '';
+      if (digits.startsWith('0') && digits.length === 10) return `+66${digits.slice(1)}`;
+      if (digits.startsWith('66') && digits.length === 11) return `+${digits}`;
+      if (digits.startsWith('+')) return digits;
+      return digits;
+    };
+
+    const OR = [];
+
+    if (looksLikeEmail(identifier)) {
+      OR.push({ email: { equals: normalizeEmail(identifier), mode: 'insensitive' } });
+    } else {
+      // ลองทั้ง loginId และเบอร์โทรในโปรไฟล์
+      OR.push({ loginId: { equals: identifier, mode: 'insensitive' } });
+
+      const digits = onlyDigits(identifier);
+      const e164 = toE164TH(digits);
+
+      if (digits) OR.push({ loginId: { equals: digits } });
+      if (e164 && e164 !== digits) OR.push({ loginId: { equals: e164 } });
+
+      // ความสัมพันธ์แบบ to-one ต้องใช้ is
+      if (digits) OR.push({ customerProfile: { is: { phone: digits } } });
+      if (e164 && e164 !== digits) OR.push({ customerProfile: { is: { phone: e164 } } });
+      if (digits) OR.push({ employeeProfile: { is: { phone: digits } } });
+      if (e164 && e164 !== digits) OR.push({ employeeProfile: { is: { phone: e164 } } });
+    }
 
     const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: emailCandidate },
-          { customerProfile: { phone: emailOrPhone } },
-          // สามารถขยายให้รองรับ employeeProfile.phone ได้ในอนาคต
-        ],
-      },
+      where: { OR },
       include: {
         customerProfile: true,
-        employeeProfile: {
-          include: { branch: true, position: true },
-        },
+        employeeProfile: { include: { branch: true, position: true } },
       },
     });
 
@@ -109,7 +132,7 @@ const login = async (req, res) => {
     }
 
     if (!user.enabled) {
-      return res.status(401).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
+      return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -117,8 +140,18 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
     }
 
-    const profile = user.customerProfile || user.employeeProfile;
-    const profileType = user.customerProfile ? 'customer' : 'employee';
+    // ถ้าเป็นพนักงาน/แอดมิน ตรวจสถานะโปรไฟล์พนักงาน (ถ้ามี)
+    if (user.role !== 'customer' && user.employeeProfile) {
+      if (user.employeeProfile.active === false) {
+        return res.status(403).json({ message: 'พนักงานถูกปิดใช้งาน' });
+      }
+      if (user.employeeProfile.approved === false) {
+        return res.status(403).json({ message: 'พนักงานยังไม่ผ่านการอนุมัติ' });
+      }
+    }
+
+    const profile = user.customerProfile || user.employeeProfile || null;
+    const profileType = user.customerProfile ? 'customer' : user.employeeProfile ? 'employee' : null;
 
     const token = buildToken(user);
 
@@ -132,11 +165,7 @@ const login = async (req, res) => {
         phone: profile?.phone || '',
         branch: user.employeeProfile?.branch || null,
         position: user.employeeProfile?.position || null,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        },
+        user: { id: user.id, email: user.email, role: user.role },
       },
     });
   } catch (error) {
@@ -178,3 +207,5 @@ module.exports = {
   login,
   findUserByEmail,
 };
+
+
