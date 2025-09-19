@@ -1,3 +1,4 @@
+
 //  @filename: server.js
 
 const express = require('express');
@@ -43,13 +44,24 @@ const stockAuditRoutes = require('./routes/stockAuditRoutes');
 const positionRoutes = require('./routes/positionRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 const locationsRoutes = require('./routes/locationsRoutes');
+const receiptSimpleRoutes = require('./routes/receiptSimpleRoutes');
+const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
+
+// Optional load for SIMPLE routes (safe if file doesn't exist yet)
+let simpleStockRoutes = null;
+try {
+  simpleStockRoutes = require('./routes/simpleStockRoutes');
+} catch (e) {
+  console.warn('SIMPLE routes not loaded:', e.message);
+}
 
 // ✅ Middlewares
 app.use(express.json());
 const allowedOrigins = [
   'http://localhost:5173',
   'https://alpha-tech-client.vercel.app',
-  'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app'
+  'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
+  'https://saduaksabuy.com'
 ];
 
 app.use(cors({
@@ -62,9 +74,13 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key'],
+  credentials: true,
+  maxAge: 86400
 }));
+
+// Handle CORS preflight for all routes (important for custom headers like X-Idempotency-Key)
+app.options('*', cors());
 
 app.use(morgan('dev'));
 
@@ -76,7 +92,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes); 
 app.use('/api/categories', categoryRoutes);
-app.use('/api/customers', customerRoutes);  
+app.use('/api/customers', customerRoutes);
 app.use('/api/customer-deposits', customerDepositRoutes);    
 
 
@@ -85,7 +101,6 @@ app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 
 app.use('/api/products', productRoutes);
-         
 app.use('/api/products', uploadProductRoutes);
           
 app.use('/api/purchase-orders', purchaseOrderRoutes);              
@@ -103,6 +118,7 @@ app.use('/api/sale-returns', saleReturnRoutes);
 app.use('/api/refunds', refundRoutes);
 
 app.use('/api/payments', paymentRoutes); 
+
 app.use('/api/supplier-payments',supplierPaymentRoutes);
 
 app.use('/api/banks', bankRoutes);
@@ -119,12 +135,12 @@ app.use('/api/purchase-reports',purchaseReportRoutes);
 
 app.use('/api/input-tax-reports', inputTaxReportRoutes);
 
-
 app.use('/api/combined-billing', combinedBillingRoutes);
 
 app.use('/api/sales-reports', salesReportRoutes);
 
 app.use('/api/upload-slips', uploadSlipRoutes);
+
 app.use('/api/stock-audit', stockAuditRoutes);
 
 app.use('/api/positions', positionRoutes);
@@ -132,6 +148,17 @@ app.use('/api/positions', positionRoutes);
 app.use('/api/address', addressRoutes);
 
 app.use('/api/locations', locationsRoutes);
+
+
+app.use('/api/receipts/simple', receiptSimpleRoutes);
+app.use('/api/po-receipts/simple', purchaseOrderReceiptSimpleRoutes);
+
+
+
+// Mount SIMPLE routes if available
+if (simpleStockRoutes) {
+  app.use('/api/simple', simpleStockRoutes);
+}
 
 
 // ✅ Error handler
@@ -149,5 +176,17 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -200,8 +200,7 @@ const updateReceiptItem = async (req, res) => {
       });
 
       return upd;
-    }, { timeout: 15000 });
-    console.log("--------------------------------------------------------------------------------------------------------------")
+    }, { timeout: 15000 });    
     return res.json(updated);
   } catch (error) {
     console.error('❌ [updateReceiptItem] error:', error);

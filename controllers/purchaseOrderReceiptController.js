@@ -1,28 +1,15 @@
-// purchaseOrderReceiptController.js — patched to prevent interactive transaction timeout (P2028)
-// - Use longer transaction timeout
-// - Keep transaction SMALL: move non‑critical upserts out of tx
-// - Generate unique receipt code inside tx via the same client
-// - Be Decimal‑safe and BRANCH_SCOPE_ENFORCED as before
-
 const dayjs = require('dayjs');
 const { ReceiptStatus, Prisma } = require('@prisma/client');
-const { prisma } = require('../lib/prisma'); // ✅ singleton
+const { prisma } = require('../lib/prisma');
 
-// ---- Helpers (Decimal-safe) ----
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
 
-// ---- Code generator (monthly sequence; runs INSIDE a tx) ----
-/**
- * Generate next running code like RC-<BR><YYMM>-0001 atomically inside the same client/tx.
- * @param {number} branchId
- * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
- */
 const generateReceiptCode = async (branchId, client) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
-  const prefix = `RC-${paddedBranch}${now.format('YYMM')}`; // e.g., RC-022508
+  const prefix = `RC-${paddedBranch}${now.format('YYMM')}`;
 
   const latest = await client.purchaseOrderReceipt.findFirst({
     where: { code: { startsWith: prefix } },
@@ -36,8 +23,9 @@ const generateReceiptCode = async (branchId, client) => {
     nextNumber = (isNaN(lastSequence) ? 0 : lastSequence) + 1;
   }
   const running = String(nextNumber).padStart(4, '0');
-  return `${prefix}-${running}`; // RC-022508-0001
+  return `${prefix}-${running}`;
 };
+
 
 // ---- Create Receipt (small tx + retry on code collision) ----
 const createPurchaseOrderReceipt = async (req, res) => {
@@ -46,15 +34,15 @@ const createPurchaseOrderReceipt = async (req, res) => {
     const note = req.body.note || null;
     const supplierTaxInvoiceNumber = req.body.supplierTaxInvoiceNumber || null;
     const supplierTaxInvoiceDate = req.body.supplierTaxInvoiceDate || null;
+    const receivedAt = req.body.receivedAt ? new Date(req.body.receivedAt) : new Date();
 
     const branchId = Number(req.user?.branchId);
-    const receivedById = Number(req.user?.employeeId);
+    const employeeId = Number(req.user?.employeeId);
 
-    if (!purchaseOrderId || !branchId || !receivedById) {
+    if (!purchaseOrderId || !branchId || !employeeId) {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบ (purchaseOrderId/branchId/employeeId)' });
     }
 
-    // Ensure PO exists and belongs to this branch
     const po = await prisma.purchaseOrder.findUnique({
       where: { id: purchaseOrderId },
       select: {
@@ -69,7 +57,6 @@ const createPurchaseOrderReceipt = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อในสาขานี้' });
     }
 
-    // Keep the critical receipt creation very short inside tx
     const maxRetries = 3;
     let created = null;
 
@@ -82,12 +69,13 @@ const createPurchaseOrderReceipt = async (req, res) => {
             created = await tx.purchaseOrderReceipt.create({
               data: {
                 note,
-                receivedById,
                 code,
                 supplierTaxInvoiceNumber,
                 supplierTaxInvoiceDate: taxDate,
+                receivedAt, // ✅ บันทึกวันที่รับจริง
                 branch: { connect: { id: branchId } },
                 purchaseOrder: { connect: { id: purchaseOrderId } },
+                receivedBy: { connect: { id: employeeId } }, // ✅ ใช้ relation แทน receivedById
               },
               include: {
                 purchaseOrder: {
@@ -100,9 +88,8 @@ const createPurchaseOrderReceipt = async (req, res) => {
                 },
               },
             });
-            break; // success
+            break;
           } catch (err) {
-            // Unique code collision → retry a few times
             if (err?.code === 'P2002' && String(err?.meta?.target).includes('code') && attempt < maxRetries - 1) {
               continue;
             }
@@ -112,12 +99,9 @@ const createPurchaseOrderReceipt = async (req, res) => {
 
         if (!created) throw new Error('สร้างรหัสใบรับสินค้าแบบไม่ซ้ำไม่สำเร็จ');
       },
-      { timeout: 20000, maxWait: 8000 } // ⏱️ extend interactive tx time budget
+      { timeout: 20000, maxWait: 8000 }
     );
 
-    // 💡 Non-critical work OUTSIDE the tx to avoid timeouts
-    // Upsert branch prices for each item in PO (keep costPrice up-to-date)
-    // Fire-and-wait (still awaited), but not inside the transaction
     for (const it of po.items) {
       try {
         await prisma.branchPrice.upsert({
@@ -126,7 +110,6 @@ const createPurchaseOrderReceipt = async (req, res) => {
           create: { productId: it.productId, branchId, costPrice: it.costPrice },
         });
       } catch (e) {
-        // Log and proceed; not critical to block receipt creation
         console.warn('[createPurchaseOrderReceipt] upsert branchPrice warning:', e?.message || e);
       }
     }
@@ -137,6 +120,7 @@ const createPurchaseOrderReceipt = async (req, res) => {
     return res.status(500).json({ error: 'สร้างใบรับสินค้าไม่สำเร็จ' });
   }
 };
+
 
 // ---- List Receipts ---- แสดงรายการใบตรวจรับรอยิงบาร์โค้ด (พร้อม Supplier และตัวกรอง printed)
 const getAllPurchaseOrderReceipts = async (req, res) => {
@@ -569,6 +553,274 @@ const getReceiptsReadyToPay = async (req, res) => {
   }
 };
 
+// ---- QUICK Receipt (source='QUICK') ----
+// payload: { note?, supplierId?, items: [{ productId, quantity, costPrice }], flags?: { autoGenerateBarcodes?, printLot? } }
+const createQuickReceipt = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId);
+    const receivedById = Number(req.user?.employeeId);
+    if (!branchId || !receivedById) return res.status(401).json({ error: 'unauthorized' });
+
+    const { note, supplierId, items = [], flags = {} } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'ต้องระบุ items อย่างน้อย 1 รายการ' });
+
+    // Validate items minimally
+    for (const it of items) {
+      if (!it?.productId) return res.status(400).json({ error: 'รายการต้องมี productId' });
+      if (it?.quantity == null) return res.status(400).json({ error: 'รายการต้องมี quantity' });
+      if (it?.costPrice == null) return res.status(400).json({ error: 'รายการต้องมี costPrice' });
+    }
+
+    // Tx: create receipt + items with code auto sequence
+    const created = await prisma.$transaction(async (tx) => {
+      const code = await generateReceiptCode(branchId, tx);
+      const receipt = await tx.purchaseOrderReceipt.create({
+        data: {
+          code,
+          note: note || null,
+          receivedById,
+          branch: { connect: { id: branchId } },
+          supplier: supplierId ? { connect: { id: Number(supplierId) } } : undefined,
+          source: 'QUICK',
+          items: {
+            create: items.map((it) => ({
+              product: { connect: { id: Number(it.productId) } },
+              quantity: new Prisma.Decimal(String(it.quantity)),
+              costPrice: new Prisma.Decimal(String(it.costPrice)),
+            })),
+          },
+        },
+        include: {
+          items: { select: { id: true, productId: true, quantity: true, costPrice: true } },
+        },
+      });
+      return receipt;
+    }, { timeout: 20000, maxWait: 8000 });
+
+    return res.status(201).json({ success: true, data: created, flags });
+  } catch (error) {
+    console.error('❌ [createQuickReceipt] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถสร้าง QUICK receipt ได้' });
+  }
+};
+
+// ---- Helper: load receipt with product mode per item ----
+const loadReceiptWithModes = async (id, branchId) => {
+  return prisma.purchaseOrderReceipt.findFirst({
+    where: { id, branchId },
+    include: {
+      items: {
+        include: {
+          product: { select: { id: true, mode: true } },
+          purchaseOrderItem: { select: { product: { select: { id: true, mode: true } } } },
+        },
+      },
+    },
+  });
+};
+
+// ---- Barcode generation (id param) ----
+const generateReceiptBarcodes = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = Number(req.user?.branchId);
+    if (!id || !branchId) return res.status(400).json({ error: 'ข้อมูลไม่ครบ' });
+
+    const receipt = await loadReceiptWithModes(id, branchId);
+    if (!receipt) return res.status(404).json({ error: 'ไม่พบเอกสารในสาขานี้' });
+
+    const now = dayjs();
+    const yearMonth = now.format('YYMM');
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Ensure counter exists per (branchId, yearMonth)
+      await tx.barcodeCounter.upsert({
+        where: { branchId_yearMonth: { branchId, yearMonth } },
+        update: {},
+        create: { branchId, yearMonth, lastNumber: 0 },
+      });
+
+      const createdBarcodes = [];
+      for (const it of receipt.items) {
+        const mode = it.product?.mode || it.purchaseOrderItem?.product?.mode || 'STRUCTURED';
+        if (mode === 'SIMPLE') {
+          // LOT: 1 code per item
+          const counter = await tx.barcodeCounter.update({
+            where: { branchId_yearMonth: { branchId, yearMonth } },
+            data: { lastNumber: { increment: 1 } },
+            select: { lastNumber: true },
+          });
+          const running = String(counter.lastNumber).padStart(6, '0');
+          const barcode = `${branchId}${yearMonth}${running}`;
+          const b = await tx.barcodeReceiptItem.create({
+            data: {
+              barcode,
+              yearMonth,
+              runningNumber: counter.lastNumber,
+              status: 'READY',
+              kind: 'LOT',
+              branchId,
+              purchaseOrderReceiptId: receipt.id,
+              receiptItemId: it.id,
+            },
+          });
+          createdBarcodes.push(b);
+        } else {
+          // STRUCTURED: N codes = quantity
+          const qty = Number(it.quantity);
+          for (let i = 0; i < qty; i++) {
+            const counter = await tx.barcodeCounter.update({
+              where: { branchId_yearMonth: { branchId, yearMonth } },
+              data: { lastNumber: { increment: 1 } },
+              select: { lastNumber: true },
+            });
+            const running = String(counter.lastNumber).padStart(6, '0');
+            const barcode = `${branchId}${yearMonth}${running}`;
+            const b = await tx.barcodeReceiptItem.create({
+              data: {
+                barcode,
+                yearMonth,
+                runningNumber: counter.lastNumber,
+                status: 'READY',
+                kind: 'SN',
+                branchId,
+                purchaseOrderReceiptId: receipt.id,
+                receiptItemId: it.id,
+              },
+            });
+            createdBarcodes.push(b);
+          }
+        }
+      }
+      return createdBarcodes;
+    }, { timeout: 20000, maxWait: 8000 });
+
+    return res.json({ success: true, count: result.length });
+  } catch (error) {
+    console.error('❌ [generateReceiptBarcodes] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถสร้างบาร์โค้ดได้' });
+  }
+};
+
+// ---- Print (mark printed and return payload) ----
+const printReceipt = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = Number(req.user?.branchId);
+    if (!id || !branchId) return res.status(400).json({ error: 'ข้อมูลไม่ครบ' });
+
+    await prisma.purchaseOrderReceipt.updateMany({ where: { id, branchId }, data: { printed: true } });
+
+    // Load printable barcodes
+    const barcodes = await prisma.barcodeReceiptItem.findMany({
+      where: { purchaseOrderReceiptId: id, branchId },
+      select: { barcode: true, kind: true, receiptItemId: true },
+      orderBy: { runningNumber: 'asc' },
+    });
+
+    return res.json({ success: true, barcodes });
+  } catch (error) {
+    console.error('❌ [printReceipt] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถพิมพ์บาร์โค้ดได้' });
+  }
+};
+
+// ---- Commit (auto-generate if missing; SIMPLE→StockBalance, STRUCTURED→StockItem) ----
+const commitReceipt = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const branchId = Number(req.user?.branchId);
+    if (!id || !branchId) return res.status(400).json({ error: 'ข้อมูลไม่ครบ' });
+
+    // Ensure barcodes exist; if not, generate
+    const existing = await prisma.barcodeReceiptItem.count({ where: { purchaseOrderReceiptId: id, branchId } });
+    if (existing === 0) {
+      await generateReceiptBarcodes({ params: { id }, user: { branchId } }, { status: () => ({ json: () => null }) });
+    }
+
+    // Commit stock effects inside tx
+    const result = await prisma.$transaction(async (tx) => {
+      const receipt = await tx.purchaseOrderReceipt.findFirst({
+        where: { id, branchId },
+        include: {
+          items: {
+            include: {
+              product: true,
+              purchaseOrderItem: { include: { product: true } },
+              barcodeReceiptItem: true,
+            },
+          },
+        },
+      });
+      if (!receipt) throw new Error('ไม่พบเอกสารในสาขานี้');
+
+      for (const it of receipt.items) {
+        const product = it.product || it.purchaseOrderItem?.product;
+        if (!product) throw new Error('ไม่พบข้อมูลสินค้าในรายการรับ');
+        const mode = product.mode || 'STRUCTURED';
+
+        if (mode === 'SIMPLE') {
+          // 1) Create SimpleLot (one per item) and link barcode kind LOT
+          const lot = await tx.simpleLot.create({
+            data: {
+              branchId,
+              productId: product.id,
+              qtyInitial: it.quantity,
+              status: 'ACTIVE',
+              receiptItem: { connect: { id: it.id } },
+            },
+          });
+
+          await tx.stockBalance.upsert({
+            where: { productId_branchId: { productId: product.id, branchId } },
+            update: { quantity: { increment: it.quantity } },
+            create: { productId: product.id, branchId, quantity: it.quantity },
+          });
+
+          // Link LOT barcode(s) to this simpleLot
+          await tx.barcodeReceiptItem.updateMany({
+            where: { receiptItemId: it.id, kind: 'LOT', branchId },
+            data: { simpleLotId: lot.id },
+          });
+        } else {
+          // STRUCTURED: create N StockItem and attach SN barcodes
+          const qty = Number(it.quantity);
+          const snList = await tx.barcodeReceiptItem.findMany({
+            where: { receiptItemId: it.id, kind: 'SN', branchId },
+            orderBy: { runningNumber: 'asc' },
+            select: { id: true, barcode: true },
+          });
+          if (snList.length < qty) throw new Error('จำนวน SN ไม่พอสำหรับ commit');
+
+          for (let i = 0; i < qty; i++) {
+            const sn = snList[i];
+            const stockItem = await tx.stockItem.create({
+              data: {
+                branchId,
+                productId: product.id,
+                status: 'IN_STOCK',
+                serialNumber: sn.barcode,
+                purchaseOrderReceiptItemId: it.id,
+              },
+              select: { id: true },
+            });
+            await tx.barcodeReceiptItem.update({ where: { id: sn.id }, data: { stockItemId: stockItem.id } });
+          }
+        }
+      }
+
+      // Mark receipt completed & ready to sell
+      await tx.purchaseOrderReceipt.update({ where: { id }, data: { statusReceipt: 'COMPLETED' } });
+      return { id };
+    }, { timeout: 30000, maxWait: 8000 });
+
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('❌ [commitReceipt] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถ commit ใบรับสินค้าได้' });
+  }
+};
+
 module.exports = {
   createPurchaseOrderReceipt,
   getAllPurchaseOrderReceipts,
@@ -581,4 +833,9 @@ module.exports = {
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
   getReceiptsReadyToPay,
+  createQuickReceipt,
+  generateReceiptBarcodes,
+  printReceipt,
+  commitReceipt,
 };
+

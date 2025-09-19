@@ -1,7 +1,8 @@
-
 // controllers/branchController.js — Prisma singleton, safer errors, map to *existing schema* (province/district strings + subdistrict relation). No lat/lng from FE.
 
 const { prisma, Prisma } = require('../lib/prisma');
+const featurePresets = require('../constants/branchFeaturePresets');
+const presets = require('../constants/branchFeaturePresets');
 
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
 const getStr = (v) => (v === null || v === undefined ? '' : String(v).trim());
@@ -14,6 +15,9 @@ function normalizeBranchBody(body = {}) {
     address: getStr(body.address),
     phone: getStr(body.phone),
     subdistrictCode: getStr(body.subdistrictCode) || getStr(body.subdistrict_id) || getStr(body.subdistrictId) || getStr(body.subdistrict),
+    // enums/flags (optional)
+    businessType: getStr(body.businessType).toUpperCase() || undefined,
+    features: (body.features && typeof body.features === 'object') ? body.features : undefined,
     // ให้ DB ใช้ default(true) ถ้าไม่ส่งมา
     RBACEnabled: (typeof body.RBACEnabled === 'boolean') ? body.RBACEnabled : undefined,
   };
@@ -29,6 +33,15 @@ function buildPartialUpdate(body = {}) {
   if (has('address')) data.address = n.address;
   if (has('phone')) data.phone = n.phone || null;
   if (has('RBACEnabled')) data.RBACEnabled = n.RBACEnabled;
+
+  // businessType (enum)
+  if (has('businessType')) {
+    if (n.businessType) data.businessType = n.businessType;
+  }
+  // features (Json)
+  if (has('features')) {
+    data.features = (n.features !== undefined) ? n.features : Prisma.JsonNull;
+  }
 
   // subdistrict relation (connect by unique `code` if provided)
   if (has('subdistrictCode', 'subdistrict_id', 'subdistrictId', 'subdistrict')) {
@@ -121,12 +134,19 @@ const createBranch = async (req, res) => {
     if (!n.name) return res.status(400).json({ error: 'กรุณากรอกชื่อสาขา' });
     if (!n.address) return res.status(400).json({ error: 'กรุณากรอกที่อยู่สาขา' });
 
+    // ถ้า businessType มี แต่ features ไม่ส่งมา → ใช้ preset
+    if (n.businessType && !n.features) {
+      const preset = presets[n.businessType];
+      if (preset) n.features = preset;
+    }
+
     const data = compact({
       name: n.name,
       address: n.address,
       phone: n.phone || null,
       RBACEnabled: n.RBACEnabled,
-      // relation only (single source of truth)
+      businessType: n.businessType,
+      features: n.features,
       subdistrict: n.subdistrictCode ? { connect: { code: n.subdistrictCode } } : undefined,
     });
 
@@ -170,11 +190,21 @@ const updateBranch = async (req, res) => {
     const id = toInt(req.params?.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const data = buildPartialUpdate(req.body || {});
+    // Auto-apply feature preset when businessType changed and features not provided
+    const body = req.body || {};
+    if (Object.prototype.hasOwnProperty.call(body, 'businessType') && !Object.prototype.hasOwnProperty.call(body, 'features')) {
+      const bt = getStr(body.businessType).toUpperCase();
+      const preset = featurePresets[bt];
+      if (preset) {
+        body.features = preset;
+      }
+    }
+
+    const data = buildPartialUpdate(body);
     if (!Object.keys(data).length) return res.status(400).json({ error: 'ไม่มีข้อมูลสำหรับอัปเดต' });
 
-    const updated = await prisma.branch.update({ where: { id }, data });
-    return res.json(updated);
+    const updated = await prisma.branch.update({ where: { id }, data, include: ADDRESS_INCLUDE });
+    return res.json(hydrateBranchAddress(updated));
   } catch (err) {
     console.error('❌ [updateBranch] error:', err);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
@@ -214,4 +244,3 @@ module.exports = {
   updateBranch,
   deleteBranch,
 };
-

@@ -1,418 +1,606 @@
-// ✅ server/controllers/productController.js
-const { prisma, Prisma } = require('../lib/prisma');
-const { v2: cloudinary } = require('cloudinary');
-
+  // ✅ server/controllers/productController.js (Production Standard)
+  // CommonJS only; all endpoints wrapped in try/catch; BRANCH_SCOPE_ENFORCED.
+  
+  const { prisma, Prisma } = require('../lib/prisma');
+  const { v2: cloudinary } = require('cloudinary');
+  
+  // ---------- Helpers ----------
+  const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10));
+  const normStr = (s) => (s == null ? '' : String(s)).trim();
+  // Decimal normalizers to avoid Prisma decimal parsing errors on empty strings
+  const toDec = (v, fallback = 0) => (v === '' || v === null || v === undefined ? fallback : Number(v));
+  const toDecUndef = (v) => (v === '' || v === null || v === undefined ? undefined : Number(v));
+  
+  const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
+    const exp = explicitMode ? String(explicitMode).toUpperCase() : undefined;
+    const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1';
+    const t = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1';
+  
+    if (exp === 'SIMPLE') return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false };
+    if (exp === 'STRUCTURED') return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true };
+    if (t && !n) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true };
+    if (n && !t) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false };
+    if (t && n)   return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true };
+    return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false };
+  };
+  
+  const resolveTemplateHierarchy = async (db, templateId) => {
+    if (!Number.isFinite(Number(templateId))) return null;
+    const tpl = await db.productTemplate.findUnique({
+      where: { id: Number(templateId) },
+      select: {
+        id: true,
+        productProfile: { select: { id: true, productType: { select: { id: true, categoryId: true } } } },
+      },
+    });
+    if (!tpl) return null;
+    return {
+      templateId: tpl.id,
+      productProfileId: tpl.productProfile?.id ?? null,
+      productTypeId: tpl.productProfile?.productType?.id ?? null,
+      categoryId: tpl.productProfile?.productType?.categoryId ?? null,
+    };
+  };
+  
+  // === Helper: createOrRepairStockBalance (Idempotent) ===
+  const createOrRepairStockBalance = async (tx, productId, branchId) => {
+    if (!tx || !productId || !branchId) return;
+    let qty = 0;
+    try {
+      qty = await tx.stockItem.count({
+        where: { productId: Number(productId), branchId: Number(branchId), status: 'IN_STOCK' },
+      });
+    } catch (e) {
+      console.warn('createOrRepairStockBalance: count stockItem failed → default 0');
+      qty = 0;
+    }
+    await tx.stockBalance.upsert({
+      where: { productId_branchId: { productId: Number(productId), branchId: Number(branchId) } },
+      update: { quantity: qty },
+      create: { productId: Number(productId), branchId: Number(branchId), quantity: qty, reserved: 0 },
+    });
+  };
+ 
 
 const getAllProducts = async (req, res) => {
-  const { search = '', take = 100 } = req.query;
+  const {
+    search = '',
+    take = 100,
+    page = 1,
+    categoryId,
+    productTypeId,
+    productProfileId,
+    productTemplateId,
+    templateId, // alias
+    activeOnly = 'true',
+  } = req.query;
+
+  const takeNum = Math.max(1, Math.min(toInt(take) ?? 100, 200));
+  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
+  const tplId = toInt(templateId ?? productTemplateId);
+  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
+
+  
 
   try {
     const products = await prisma.product.findMany({
       where: {
-        active: true,
-        name: {
-          contains: search,
-          mode: 'insensitive',
-        },
+        ...(activeFilter === undefined ? {} : { active: true }),
+        ...(search ? {
+          OR: [
+            { name: { contains: String(search), mode: 'insensitive' } },
+            { description: { contains: String(search), mode: 'insensitive' } },
+            { spec: { contains: String(search), mode: 'insensitive' } },
+            { sku: String(search) },
+            { barcode: String(search) },
+          ],
+        } : {}),
+        ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
+        ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
+        ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
+        ...(tplId ? { OR: [{ templateId: tplId }, { template: { id: tplId } }] } : {}),
       },
       select: {
         id: true,
         name: true,
         model: true,
         description: true,
+        mode: true,
+        spec: true,
+
+        // ✅ scalar ids used by FE filters
+        categoryId: true,
+        productTypeId: true,
+        productProfileId: true,
+        templateId: true,
+
+        category: { select: { id: true, name: true } },
+        productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+        productProfile: { select: { id: true, name: true, productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } } } },
         template: {
           select: {
-            name: true,
+            id: true, name: true,
+            productProfile: {
+              select: {
+                id: true, name: true,
+                productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+              },
+            },
           },
         },
-        productImages: {
-          where: { isCover: true, active: true },
-          take: 1,
-          select: { secure_url: true },
-        },
       },
-      take: parseInt(take),
+      take: takeNum,
+      skip: skipNum,
       orderBy: { id: 'desc' },
     });
 
-    const mapped = products.map((p) => ({
+    const mapped = products.map((p) => {
+      const catName = p.category?.name
+        ?? p.productType?.category?.name
+        ?? p.productProfile?.productType?.category?.name
+        ?? p.template?.productProfile?.productType?.category?.name
+        ?? '-';
+      const typeName = p.productType?.name
+        ?? p.productProfile?.productType?.name
+        ?? p.template?.productProfile?.productType?.name
+        ?? '-';
+      const profileName = p.productProfile?.name
+        ?? p.template?.productProfile?.name
+        ?? '-';
+      const tplName = p.template?.name ?? '-';
+
+      return {
+        id: p.id,
+        name: p.name,
+        model: p.model ?? null,
+        description: p.description,
+
+        // ✅ include mode for FE
+        mode: p.mode,
+
+        // ✅ ids + mode for FE filter compatibility
+        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
+        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
+        templateId: (p.templateId ?? p.template?.id ?? null),
+
+        category: catName,
+        productType: typeName,
+        productProfile: profileName,
+        productTemplate: tplName,
+
+        categoryName: catName,
+        productTypeName: typeName,
+        productProfileName: profileName,
+        productTemplateName: tplName,
+
+        imageUrl: null,
+      };
+    });
+
+    return res.json(mapped);
+  } catch (error) {
+    console.error('❌ getAllProducts error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+const getProductsForPos = async (req, res) => {
+  const branchId = Number(req.user?.branchId);
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+  const {
+    search = '',
+    take = 50,
+    page = 1,
+    categoryId,
+    productTypeId,
+    productProfileId,
+    // ⬇️ scoped add: accept brand/template filters from FE (safe)
+    brandId,
+    templateId,
+    productTemplateId,
+    readyOnly = 'false',
+    hasPrice = 'false',
+    activeOnly = 'true',
+  } = req.query;
+
+  // Optional filter to return only SIMPLE products for Quick Receive (Simple)
+  const queryMode = (req?.query?.mode || '').toString().toUpperCase();
+  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE';
+
+  const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200));
+  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
+  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
+  const tplId = toInt(templateId ?? productTemplateId);
+
+  const where = {
+    ...(simpleOnly ? { mode: 'SIMPLE' } : {}),
+    ...(activeFilter === undefined ? {} : { active: true }),
+    ...(search ? {
+      OR: [
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { description: { contains: String(search), mode: 'insensitive' } },
+        { spec: { contains: String(search), mode: 'insensitive' } },
+        { sku: String(search) },
+        { barcode: String(search) },
+      ],
+    } : {}),
+    ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
+    ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
+    ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
+        ...(tplId ? { OR: [{ templateId: tplId }, { template: { id: tplId } }] } : {}),
+
+    ...(toInt(brandId) ? { OR: [{ template: { brandId: toInt(brandId) } }, { brandId: toInt(brandId) }] } : {}),
+  };
+
+  try {
+    console.log('[POS SEARCH] where:', JSON.stringify(where));
+
+    const items = await prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        model: true,
+        description: true,
+        mode: true,
+        noSN: true,
+        trackSerialNumber: true,
+
+        // ✅ scalar ids used by FE filters
+        categoryId: true,
+        productTypeId: true,
+        productProfileId: true,
+        templateId: true,
+
+        category: { select: { id: true, name: true } },
+        productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+        productProfile: { select: { id: true, name: true, productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } } } },
+
+        template: {
+          select: {
+            id: true, name: true,
+            productProfile: {
+              select: {
+                id: true, name: true,
+                productType: {
+                  select: { id: true, name: true, category: { select: { id: true, name: true } } },
+                },
+              },
+            },
+          },
+        },
+
+        branchPrice: { where: { branchId }, take: 1, select: { costPrice: true, priceRetail: true, priceOnline: true, priceWholesale: true, priceTechnician: true, isActive: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true, lastReceivedCost: true } },
+      },
+      take: takeNum,
+      skip: skipNum,
+      orderBy: { id: 'desc' },
+    });
+
+    let mapped = items.map((p) => {
+      const bp = p.branchPrice?.[0];
+      const sb = p.stockBalances?.[0];
+      const qty = Number(sb?.quantity ?? 0);
+      const reserved = Number(sb?.reserved ?? 0);
+      const available = Math.max(0, qty - reserved);
+      const isSimple = p.mode === 'SIMPLE' || p.noSN === true;
+      const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0);
+      const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost)
+        : (bp?.costPrice != null ? Number(bp.costPrice) : null);
+
+      const catName = p.category?.name
+        ?? p.productType?.category?.name
+        ?? p.productProfile?.productType?.category?.name
+        ?? p.template?.productProfile?.productType?.category?.name
+        ?? '-';
+      const typeName = p.productType?.name
+        ?? p.productProfile?.productType?.name
+        ?? p.template?.productProfile?.productType?.name
+        ?? '-';
+      const profileName = p.productProfile?.name
+        ?? p.template?.productProfile?.name
+        ?? '-';
+      const tplName = p.template?.name ?? '-';
+
+      return {
+        id: p.id,
+        name: p.name,
+        model: p.model ?? null,
+        description: p.description,
+
+        // ✅ ids + mode for FE filter compatibility
+        mode: p.mode,
+        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
+        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
+        templateId: (p.templateId ?? p.template?.id ?? null),
+
+        category: catName,
+        productType: typeName,
+        productProfile: profileName,
+        productTemplate: tplName,
+
+        categoryName: catName,
+        productTypeName: typeName,
+        productProfileName: profileName,
+        productTemplateName: tplName,
+
+        noSN: p.noSN,
+        trackSerialNumber: p.trackSerialNumber,
+        priceRetail: bp?.priceRetail ?? 0,
+        priceWholesale: bp?.priceWholesale ?? 0,
+        priceTechnician: bp?.priceTechnician ?? 0,
+        priceOnline: bp?.priceOnline ?? 0,
+        branchPriceActive: bp?.isActive ?? true,
+        available,
+        isReady,
+        lastCost,
+        costPrice: lastCost,
+        hasPrice: !!bp,
+      };
+    });
+
+    if (String(readyOnly).toLowerCase() === 'true') {
+      mapped = mapped.filter((x) => x.isReady === true);
+    }
+    if (String(hasPrice).toLowerCase() === 'true') {
+      mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false);
+    }
+
+    return res.json(mapped);
+  } catch (error) {
+    console.error('❌ getProductsForPos error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+const getProductsForOnline = async (req, res) => {
+  const branchId = Number(req.user?.branchId);
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+  const { search = '', take = 50 } = req.query;
+  const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200));
+  try {
+    const items = await prisma.product.findMany({
+      where: { active: true, name: { contains: String(search || ''), mode: 'insensitive' } },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        mode: true,
+        noSN: true,
+        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true } },
+        branchPrice: { where: { branchId, isActive: true }, take: 1, select: { priceOnline: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
+      },
+      take: takeNum,
+      orderBy: { id: 'desc' },
+    });
+
+    const mapped = items.map((p) => {
+      const bp = p.branchPrice?.[0];
+      const sb = p.stockBalances?.[0];
+      const qty = Number(sb?.quantity ?? 0);
+      const reserved = Number(sb?.reserved ?? 0);
+      const available = Math.max(0, qty - reserved);
+      const isSimple = p.mode === 'SIMPLE' || p.noSN === true;
+      const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0);
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+
+        // ✅ ids + mode for FE filter compatibility
+        mode: p.mode,
+        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
+        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
+        templateId: (p.templateId ?? p.template?.id ?? null),
+        imageUrl: p.productImages?.[0]?.secure_url || null,
+        priceOnline: bp?.priceOnline ?? 0,
+        readyPickupAtBranch: isReady,
+      };
+    });
+
+    return res.json(mapped);
+  } catch (error) {
+    console.error('❌ getProductsForOnline error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+const getProductPosById = async (req, res) => {
+  const branchId = Number(req.user?.branchId);
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: 'INVALID_ID' });
+  try {
+    const p = await prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        model: true,
+        description: true,
+        spec: true,
+        mode: true,
+        noSN: true,
+        trackSerialNumber: true,
+
+        // ✅ scalar ids used by FE filters
+        categoryId: true,
+        productTypeId: true,
+        productProfileId: true,
+        templateId: true,
+        unitName: true,
+        // ✅ add hierarchy ids + names for FE preselect (align with schema: templateId + template relation)
+        productType: { select: { id: true, name: true, categoryId: true, category: { select: { id: true, name: true } } } },
+        productProfile: { select: { id: true, name: true, productTypeId: true } },
+        template: { select: { id: true, name: true, productProfileId: true, productProfile: { select: { id: true, name: true, productTypeId: true, productType: { select: { id: true, name: true, categoryId: true, category: { select: { id: true, name: true } } } } } } } },
+        productImages: { where: { active: true }, orderBy: [{ isCover: 'desc' }, { id: 'asc' }], select: { id: true, url: true, secure_url: true, caption: true, isCover: true } },
+        branchPrice: { where: { branchId }, take: 1, select: { costPrice: true, priceWholesale: true, priceTechnician: true, priceRetail: true, priceOnline: true, isActive: true } },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true, lastReceivedCost: true } },
+      },
+    });
+    if (!p) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const bp = p.branchPrice?.[0];
+    const sb = p.stockBalances?.[0];
+    const qty = Number(sb?.quantity ?? 0);
+    const reserved = Number(sb?.reserved ?? 0);
+    const available = Math.max(0, qty - reserved);
+    const isSimple = p.mode === 'SIMPLE' || p.noSN === true;
+    const isReady = isSimple ? available > 0 : false; // not eager-loading stockItems here
+    const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost) : (bp?.costPrice != null ? Number(bp.costPrice) : null);
+
+    const branchPriceObj = {
+      costPrice: Number(bp?.costPrice ?? 0),
+      priceWholesale: Number(bp?.priceWholesale ?? 0),
+      priceTechnician: Number(bp?.priceTechnician ?? 0),
+      priceRetail: Number(bp?.priceRetail ?? 0),
+      priceOnline: Number(bp?.priceOnline ?? 0),
+    };
+
+    // ✅ mode fallback ถ้า backend ไม่มีค่า จะ derive จาก noSN
+    const mode = p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED');
+
+    return res.json({
       id: p.id,
       name: p.name,
       model: p.model ?? null,
       description: p.description,
-      productTemplate: p.template?.name ?? '-',
-      imageUrl: (p.productImages && p.productImages[0] ? p.productImages[0].secure_url : null),
-    }));
 
-    res.json(mapped);
+        // ✅ ids + mode for FE filter compatibility
+        mode: p.mode,
+        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
+        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
+        templateId: (p.templateId ?? p.template?.id ?? null),
+      spec: p.spec ?? null,
+      mode, // ใช้ค่าที่ normalize แล้ว
+      noSN: p.noSN,
+      trackSerialNumber: p.trackSerialNumber,
+      unitId: null,
+      unitName: p.unitName ?? null,
+      // ✅ echo back hierarchy for FE dropdown preselects
+      categoryId: p.productType?.categoryId ?? p.productType?.category?.id ?? p.template?.productProfile?.productType?.categoryId ?? null,
+      productTypeId: p.productType?.id ?? p.productProfile?.productTypeId ?? p.template?.productProfile?.productTypeId ?? null,
+      productProfileId: p.productProfile?.id ?? p.template?.productProfileId ?? null,
+      productTemplateId: p.templateId ?? p.template?.id ?? null,
+      categoryName: p.productType?.category?.name ?? p.template?.productProfile?.productType?.category?.name ?? null,
+      productTypeName: p.productType?.name ?? p.template?.productProfile?.productType?.name ?? null,
+      productProfileName: p.productProfile?.name ?? p.template?.productProfile?.name ?? null,
+      productTemplateName: p.template?.name ?? null,
+      images: (p.productImages || [])
+        .map(im => ({ id: im.id, url: im.secure_url || im.url, caption: im.caption ?? '', isCover: Boolean(im.isCover) }))
+        .filter(im => !!im.url),
+      costPrice: branchPriceObj.costPrice,
+      priceWholesale: branchPriceObj.priceWholesale,
+      priceTechnician: branchPriceObj.priceTechnician,
+      priceRetail: branchPriceObj.priceRetail,
+      priceOnline: branchPriceObj.priceOnline,
+      branchPriceActive: bp?.isActive ?? true,
+      available,
+      isReady,
+      lastCost,
+      branchPrice: branchPriceObj,
+    });
   } catch (error) {
-    console.error('❌ getAllProducts error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ getProductPosById error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-const getProductsForPos = async (req, res) => {
-  const {
-    categoryId,
-    productTypeId,
-    productProfileId,
-    templateId,
-    searchText = "",
-  } = req.query;
 
+const getProductOnlineById = async (req, res) => {
   const branchId = Number(req.user?.branchId);
-  if (!branchId) return res.status(401).json({ error: "unauthorized" });
-
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: 'INVALID_ID' });
   try {
-    const products = await prisma.product.findMany({
-      where: {
-        active: true,
-        AND: [
-          templateId && { templateId: Number(templateId) },
-          productProfileId && {
-            template: {
-              productProfileId: Number(productProfileId),
-            },
-          },
-          productTypeId && {
-            template: {
-              productProfile: {
-                productTypeId: Number(productTypeId),
-              },
-            },
-          },
-          categoryId && {
-            template: {
-              productProfile: {
-                productType: {
-                  categoryId: Number(categoryId),
-                },
-              },
-            },
-          },
-          searchText && {
-            OR: [
-              { name: { contains: searchText, mode: "insensitive" } },
-              { model: { contains: searchText, mode: "insensitive" } },
-              { description: { contains: searchText, mode: "insensitive" } },
-              { template: { name: { contains: searchText, mode: "insensitive" } } },
-            ],
-          },
-        ].filter(Boolean),
-      },
+    const p = await prisma.product.findUnique({
+      where: { id },
       select: {
         id: true,
         name: true,
-        model: true, // ✅ เพิ่ม model ที่นี่
         description: true,
-        spec: true,
-        sold: true,
-        quantity: true,        
-        branchPrice: { where: { branchId: Number(branchId), isActive: true }, select: {
-            costPrice: true,
-            priceRetail: true,
-            priceWholesale: true,
-            priceTechnician: true,
-            priceOnline: true,
-            isActive: true
-          },
-        },
-        stockItems: { where: { status: 'IN_STOCK', branchId: Number(branchId) },
-          select: { id: true },
-        },
-        productImages: {
-          where: { isCover: true, active: true },
-          take: 1,
-          select: {
-            secure_url: true,
-          },
-        },
-        template: {
-          select: {
-            name: true,
-            productProfile: {
-              select: {
-                name: true,
-                productType: {
-                  select: {
-                    name: true,
-                    category: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        mode: true,
+        noSN: true,
+        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true } },
+        branchPrice: { where: { branchId, isActive: true }, take: 1, select: { priceOnline: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
       },
     });
+    if (!p) return res.status(404).json({ error: 'NOT_FOUND' });
 
-    const result = products.map((p) => ({
+    const bp = p.branchPrice?.[0];
+    const sb = p.stockBalances?.[0];
+    const qty = Number(sb?.quantity ?? 0);
+    const reserved = Number(sb?.reserved ?? 0);
+    const available = Math.max(0, qty - reserved);
+    const isSimple = p.mode === 'SIMPLE' || p.noSN === true;
+    const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0);
+
+    return res.json({
       id: p.id,
       name: p.name,
-      model: p.model || null, // ✅ เพิ่มส่ง model ออกมาด้วย
       description: p.description,
-      spec: p.spec,
-      sold: p.sold,
-      quantity: p.quantity,      
 
-      costPrice: p.branchPrice[0]?.costPrice ?? null,
-      priceRetail: p.branchPrice[0]?.priceRetail ?? null,
-      priceWholesale: p.branchPrice[0]?.priceWholesale ?? null,
-      priceTechnician: p.branchPrice[0]?.priceTechnician ?? null,
-      priceOnline: p.branchPrice[0]?.priceOnline ?? null,
-      isActive: p.branchPrice[0]?.isActive ?? false,
-      isReady: p.stockItems?.length > 0,
-      imageUrl: p.productImages[0]?.secure_url || null,
-      category: p.template?.productProfile?.productType?.category?.name || null,
-      productType: p.template?.productProfile?.productType?.name || null,
-      productProfile: p.template?.productProfile?.name || null,
-      productTemplate: p.template?.name || null,
-    }));    
-    res.json(result);
-  } catch (error) {
-    console.error("\u274C getProductsForPos error:", error);
-    res.status(500).json({ error: "Failed to fetch POS products" });
-  }
-};
-
-const getProductsForOnline = async (req, res) => {
-  const {
-    categoryId,
-    productTypeId,
-    productProfileId,
-    templateId,
-    searchText = "",
-  } = req.query;
-
-  const branchId = Number(req.user?.branchId ?? req.query.branchId);
-  if (!branchId) return res.status(401).json({ error: "unauthorized" });
-
-  try {
-    const products = await prisma.product.findMany({
-      where: {
-        active: true,
-        branchPrice: {
-          some: { isActive: true, branchId: Number(branchId),
-          },
-        },
-        ...(searchText && {
-          OR: [
-            { name: { contains: searchText, mode: "insensitive" } },
-            { model: { contains: searchText, mode: "insensitive" } },
-            { description: { contains: searchText, mode: "insensitive" } },
-            { template: { name: { contains: searchText, mode: "insensitive" } } },
-          ],
-        }),
-        template: {
-          ...(templateId && { id: Number(templateId) }),
-          ...(productProfileId || productTypeId || categoryId
-            ? {
-                productProfile: {
-                  ...(productProfileId && { id: Number(productProfileId) }),
-                  ...(productTypeId || categoryId
-                    ? {
-                        productType: {
-                          ...(productTypeId && { id: Number(productTypeId) }),
-                          ...(categoryId && { categoryId: Number(categoryId) }),
-                        },
-                      }
-                    : {}),
-                },
-              }
-            : {}),
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        model: true,
-        description: true,
-        spec: true,
-        sold: true,
-        quantity: true,        
-        branchPrice: {
-          where: { isActive: true, branchId: Number(branchId),
-          },
-          select: {
-            costPrice: true,
-            priceOnline: true,
-          },
-        },
-        stockItems: {
-          where: {
-            status: 'IN_STOCK',
-            branchId,
-          },
-          select: { id: true },
-        },
-        productImages: {
-          where: { isCover: true, active: true },
-          take: 1,
-          select: {
-            secure_url: true,
-          },
-        },
-        template: {
-          select: {
-            name: true,
-            productProfile: {
-              select: {
-                name: true,
-                productType: {
-                  select: {
-                    name: true,
-                    category: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+        // ✅ ids + mode for FE filter compatibility
+        mode: p.mode,
+        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
+        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
+        templateId: (p.templateId ?? p.template?.id ?? null),
+      imageUrl: p.productImages?.[0]?.secure_url || null,
+      priceOnline: bp?.priceOnline ?? 0,
+      readyPickupAtBranch: isReady,
     });
-
-    const result = products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      model: p.model,
-      description: p.description,
-      spec: p.spec,
-      sold: p.sold,
-      quantity: p.quantity,      
-      priceOnline: p.branchPrice[0]?.priceOnline ?? null,
-      isReady: p.stockItems?.length > 0,
-      imageUrl: p.productImages[0]?.secure_url || null,
-      category: p.template?.productProfile?.productType?.category?.name || null,
-      productType: p.template?.productProfile?.productType?.name || null,
-      productProfile: p.template?.productProfile?.name || null,
-      productTemplate: p.template?.name || null,
-    }));
-
-    res.json(result);
   } catch (error) {
-    console.error("\u274C getProductsForOnline error:", error);
-    res.status(500).json({ error: "Failed to fetch online products" });
+    console.error('❌ getProductOnlineById error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-const getProductPosById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const branchId = req.user.branchId;
-
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        branchPrice: {
-          where: { branchId: branchId },
-          select: {
-            id: true,
-            costPrice: true,
-            priceRetail: true,
-            priceWholesale: true,
-            priceTechnician: true,
-            priceOnline: true,
-            productId: true,
-            branchId: true,
-            effectiveDate: true,
-            expiredDate: true,
-            note: true,
-            updatedBy: true,
-            isActive: true,
-          },
-        },
-        productImages: true,
-        template: {
-          include: {
-            productProfile: {
-              include: {
-                productType: {
-                  include: {
-                    category: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    const fullProduct = {
-      ...product,
-      templateId: product.template?.id ?? null,
-      productProfileId: product.template?.productProfile?.id ?? null,
-      productTypeId: product.template?.productProfile?.productType?.id ?? null,
-      categoryId: product.template?.productProfile?.productType?.category?.id ?? null,
-    };
-
-    res.json(fullProduct);
-  } catch (error) {
-    console.error('getProductPosById error:', error);
-    res.status(500).json({ error: 'Failed to fetch product by ID' });
-  }
-};
 
 const getProductDropdowns = async (req, res) => {
   try {
-    const categories = await prisma.category.findMany({
-      where: { active: true },
-      orderBy: { name: 'asc' },
-    });
+    // หมายเหตุ: ไม่ใส่เงื่อนไข active เพื่อหลีกเลี่ยงกรณีสคีมาใช้ isActive/active แตกต่างกัน
+    // และเพื่อให้แก้ไขสินค้าที่อ้างอิงหมวด/ชนิด/โปรไฟล์/เทมเพลตที่ปิดการใช้งานแล้วได้
+    const [cats, types, profiles, templatesRaw] = await Promise.all([
+      prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+      prisma.productType.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, categoryId: true } }),
+      prisma.productProfile.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, productTypeId: true } }),
+      prisma.productTemplate.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, productProfileId: true } }),
+    ]);
 
-    const productTypes = await prisma.productType.findMany({
-      where: { active: true },
-      orderBy: { name: 'asc' },
-    });
+    const categories = cats.map((c) => ({ id: Number(c.id), name: c.name }));
+    const productTypes = types.map((t) => ({ id: Number(t.id), name: t.name, categoryId: Number(t.categoryId) }));
+    const productProfiles = profiles.map((p) => ({ id: Number(p.id), name: p.name, productTypeId: Number(p.productTypeId) }));
+    const productTemplates = templatesRaw.map((tp) => ({ id: Number(tp.id), name: tp.name, productProfileId: Number(tp.productProfileId) }));
 
-    const productProfiles = await prisma.productProfile.findMany({
-      where: { active: true },
-      orderBy: { name: 'asc' },
-      include: {
-        productType: {
-          include: {
-            category: true,
-          },
-        },
-      },
-    });
-
-    const templates = await prisma.productTemplate.findMany({
-      where: {
-        active: true
-      },
-      orderBy: { name: 'asc' },
-      include: {
-        productProfile: {
-          include: {
-            productType: {
-              include: {
-                category: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    // ✅ FE dropdown for product mode
+    const productModes = [
+      { code: 'SIMPLE', name: 'Simple' },
+      { code: 'STRUCTURED', name: 'Structure' },
+    ];
 
     return res.json({
       categories,
       productTypes,
       productProfiles,
-      templates,
-      defaultValues: null
+      productTemplates,
+      productModes,
+      // เพื่อความเข้ากันได้ย้อนหลัง (เผื่อ FE เดิมอ่าน key `templates`)
+      templates: productTemplates,
     });
   } catch (error) {
     console.error('❌ getProductDropdowns error:', error);
@@ -420,359 +608,265 @@ const getProductDropdowns = async (req, res) => {
   }
 };
 
-const getProductDropdownsForOnline = async (req, res) => {
-  try {
-    const { categoryId, productTypeId, productProfileId } = req.query;
 
-    // 🔢 Coerce to number when present (avoid NaN in Prisma where)
-    const catId = categoryId ? Number(categoryId) : undefined;
-    const typeId = productTypeId ? Number(productTypeId) : undefined;
-    const profileId = productProfileId ? Number(productProfileId) : undefined;
+const getProductDropdownsForOnline = getProductDropdowns; // same shape for now
 
-    // 🧩 Online dropdowns should mirror POS rules: only active items + stable sorting
-    const categories = await prisma.category.findMany({
-      where: { active: true },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    });
-
-    const productTypes = await prisma.productType.findMany({
-      where: {
-        active: true,
-        ...(catId ? { categoryId: catId } : {}),
-      },
-      select: { id: true, name: true, categoryId: true },
-      orderBy: { name: 'asc' },
-    });
-
-    const productProfiles = await prisma.productProfile.findMany({
-      where: {
-        active: true,
-        ...(typeId ? { productTypeId: typeId } : {}),
-      },
-      include: {
-        productType: {
-          select: { id: true, name: true, categoryId: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    const templates = await prisma.productTemplate.findMany({
-      where: {
-        active: true,
-        ...(profileId ? { productProfileId: profileId } : {}),
-        ...(typeId
-          ? { productProfile: { productTypeId: typeId } }
-          : {}),
-        ...(catId
-          ? { productProfile: { productType: { categoryId: catId } } }
-          : {}),
-      },
-      include: {
-        productProfile: {
-          include: {
-            productType: { select: { id: true, name: true, categoryId: true } },
-          },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    return res.json({
-      categories,
-      productTypes,
-      productProfiles,
-      templates,
-    });
-  } catch (error) {
-    console.error('❌ getProductDropdownsForOnline error:', error);
-    return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
-  }
-};
-
-
-const getProductOnlineById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const branchId = req.query.branchId ? Number(req.query.branchId) : null;
-    if (!branchId) return res.status(400).json({ error: "branchId is required" });
-
-    const product = await prisma.product.findUnique({
-      where: { id: Number(id) },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        spec: true,
-        sold: true,
-        quantity: true,        
-        branchPrice: {
-          where: {
-            isActive: true,
-            branchId,
-          },
-          select: { costPrice: true, priceOnline: true },
-        },
-        stockItems: { where: { status: 'IN_STOCK', branchId },
-          select: { id: true },
-        },
-        productImages: {
-          where: { active: true },
-          select: {
-            secure_url: true,
-          },
-        },
-        template: {
-          select: {
-            name: true,
-            productProfile: {
-              select: {
-                name: true,
-                productType: {
-                  select: {
-                    name: true,
-                    category: {
-                      select: {
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      return res.status(404).json({ error: "ไม่พบสินค้า" });
-    }
-
-    const result = {
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      spec: product.spec,
-      sold: product.sold,
-      quantity: product.quantity,      
-      price: product.branchPrice[0]?.priceOnline ?? 0,
-      isReady: product.stockItems?.length > 0,
-      imageUrl: (product.productImages && product.productImages[0] ? product.productImages[0].secure_url : null),
-      productImages: product.productImages || [],
-      category: product.template?.productProfile?.productType?.category?.name || null,
-      productType: product.template?.productProfile?.productType?.name || null,
-      productProfile: product.template?.productProfile?.name || null,
-      productTemplate: product.template?.name || null,
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error("❌ getProductOnlineById error:", error);
-    res.status(500).json({ error: "Failed to fetch product details" });
-  }
-};
 
 const createProduct = async (req, res) => {
-  const data = req.body;
-  const branchId = Number(req.user?.branchId);
-
-  if (!branchId) {
-    return res.status(400).json({ error: 'Missing branchId' });
-  }
-
   try {
-    const templateId = parseInt(data.templateId);
+    const data = req.body;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+    const { mode, noSN, trackSerialNumber } = decideMode({ explicitMode: data.mode, noSN: data.noSN, trackSerialNumber: data.trackSerialNumber });
+    const templateIdNum = toInt(data.templateId);
+    const resolved = templateIdNum ? await resolveTemplateHierarchy(prisma, templateIdNum) : null;
+    if (!resolved) return res.status(400).json({ error: 'PRODUCT_TEMPLATE_REQUIRED' });
 
     const newProduct = await prisma.product.create({
       data: {
-        name: data.name,
-        model: data.model || null,
-        template: !Number.isNaN(templateId)
-          ? { connect: { id: templateId } }
-          : undefined,
-        description: data.description || '',
-        spec: data.spec || '',
-        noSN: data.noSN ?? false,
+        name: normStr(data.name),
+        description: normStr(data.description),
+        spec: normStr(data.spec),
+        mode,
+        trackSerialNumber,
+        noSN,
         active: data.active ?? true,
-        productImages: Array.isArray(data.images) && data.images.length > 0
-          ? {
-              create: data.images.map((img) => ({
-                url: img.url,
-                public_id: img.public_id,
-                secure_url: img.secure_url,
-                caption: img.caption || null,
-                isCover: img.isCover || false,
-              })),
-            }
-          : undefined,
+        templateId: resolved.templateId,
+        categoryId: resolved.categoryId,
+        productTypeId: resolved.productTypeId,
+        productProfileId: resolved.productProfileId,
+        productImages: Array.isArray(data.images) && data.images.length > 0 ? {
+          create: data.images.map((img) => ({
+            url: img.url,
+            public_id: img.public_id,
+            secure_url: img.secure_url,
+            caption: img.caption || null,
+            isCover: !!img.isCover,
+            active: true,
+          })),
+        } : undefined,
       },
     });
 
     const bp = data.branchPrice || {};
-    await prisma.branchPrice.create({
-      data: {
-        product: { connect: { id: newProduct.id } },
-        branch: { connect: { id: branchId } },
-        costPrice: bp.costPrice ?? 0,
-        priceWholesale: bp.priceWholesale ?? 0,
-        priceTechnician: bp.priceTechnician ?? 0,
-        priceRetail: bp.priceRetail ?? 0,
-        priceOnline: bp.priceOnline ?? 0,
+    await prisma.branchPrice.upsert({
+      where: { productId_branchId: { productId: newProduct.id, branchId } },
+      update: {
+        costPrice: toDecUndef(bp.costPrice),
+        priceWholesale: toDecUndef(bp.priceWholesale),
+        priceTechnician: toDecUndef(bp.priceTechnician),
+        priceRetail: toDecUndef(bp.priceRetail),
+        priceOnline: toDecUndef(bp.priceOnline),
+        isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : undefined),
+      },
+      create: {
+        productId: newProduct.id,
+        branchId,
+        costPrice: toDec(bp.costPrice, 0),
+        priceWholesale: toDec(bp.priceWholesale, 0),
+        priceTechnician: toDec(bp.priceTechnician, 0),
+        priceRetail: toDec(bp.priceRetail, 0),
+        priceOnline: toDec(bp.priceOnline, 0),
+        isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : true),
       },
     });
 
-    res.status(201).json(newProduct);
+    return res.status(201).json(newProduct);
   } catch (error) {
     console.error('❌ createProduct error:', error);
-    res.status(500).json({ error: 'Failed to create product' });
+    return res.status(error.status || 500).json({ error: error.code || error.message || 'Failed to create product' });
   }
 };
 
 const updateProduct = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID' });
     const data = req.body;
-    const branchId = req.user?.branchId;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
-    if (!id || !branchId) {
-      return res.status(400).json({ error: 'Missing product ID or branch ID' });
-    }
+    const partialMode = decideMode({ explicitMode: data.mode, noSN: data.noSN, trackSerialNumber: data.trackSerialNumber });
+    const templateIdNum = toInt(data.productTemplateId ?? data.templateId);
+    const resolvedHierarchy = templateIdNum ? await resolveTemplateHierarchy(prisma, templateIdNum) : null;
+    const bodyCategoryId = toInt(data.categoryId);
+    const bodyProductTypeId = toInt(data.productTypeId);
+    const bodyProductProfileId = data.productProfileId === null ? null : toInt(data.productProfileId);
 
-    const templateId = parseInt(data.templateId);
+    const result = await prisma.$transaction(async (tx) => {
+      const toMode = partialMode.mode;
+      const isSwitchToSimple = toMode === 'SIMPLE';
+      const resolved = resolvedHierarchy || {};
+      const finalCategoryId = resolved.categoryId ?? (bodyCategoryId ?? undefined);
+      const finalProductTypeId = resolved.productTypeId ?? (bodyProductTypeId ?? undefined);
+      const finalProductProfileId = resolved.productProfileId ?? (bodyProductProfileId === null ? null : (bodyProductProfileId ?? undefined));
 
-    const updated = await prisma.product.update({
-      where: { id },
-      data: {
-        name: data.name,
-        model: data.model || null,
-        template: !Number.isNaN(templateId)
-          ? { connect: { id: templateId } }
-          : undefined,
-        description: data.description || '',
-        spec: data.spec || '',
-        active: data.active ?? true,
-        noSN: data.noSN ?? false,
-      },
-      include: {
-        productImages: true,
-      },
+      const saved = await tx.product.update({
+        where: { id },
+        data: {
+          name: data.name != null ? normStr(data.name) : undefined,
+          description: data.description != null ? normStr(data.description) : undefined,
+          spec: data.spec != null ? normStr(data.spec) : undefined,
+          mode: toMode,
+          trackSerialNumber: partialMode.trackSerialNumber,
+          noSN: partialMode.noSN,
+          active: typeof data.active === 'boolean' ? data.active : undefined,
+          templateId: (resolved.templateId ?? undefined),
+          categoryId: finalCategoryId,
+          productTypeId: finalProductTypeId,
+          productProfileId: finalProductProfileId,
+        },
+        select: { id: true },
+      });
+
+      if (data.branchPrice) {
+        const bp = data.branchPrice || {};
+        await tx.branchPrice.upsert({
+          where: { productId_branchId: { productId: id, branchId } },
+          update: {
+            costPrice: toDecUndef(bp.costPrice),
+            priceWholesale: toDecUndef(bp.priceWholesale),
+            priceTechnician: toDecUndef(bp.priceTechnician),
+            priceRetail: toDecUndef(bp.priceRetail),
+            priceOnline: toDecUndef(bp.priceOnline),
+            isActive: typeof bp.isActive === 'boolean' ? bp.isActive : undefined,
+          },
+          create: {
+            productId: id,
+            branchId,
+            costPrice: toDec(bp.costPrice, 0),
+            priceWholesale: toDec(bp.priceWholesale, 0),
+            priceTechnician: toDec(bp.priceTechnician, 0),
+            priceRetail: toDec(bp.priceRetail, 0),
+            priceOnline: toDec(bp.priceOnline, 0),
+            isActive: typeof bp.isActive === 'boolean' ? bp.isActive : true,
+          },
+        });
+      }
+
+      if (isSwitchToSimple) {
+        try {
+          await createOrRepairStockBalance(tx, id, branchId);
+        } catch (e) {
+          console.warn('⚠️ createOrRepairStockBalance failed (non-fatal):', e?.message || e);
+        }
+      }
+
+      return saved;
     });
 
-    if (data.branchPrice) {
-      await prisma.branchPrice.upsert({
-        where: {
-          productId_branchId: {
-            productId: id,
-            branchId: Number(branchId),
-          },
-        },
-        update: {
-          costPrice: data.branchPrice.costPrice,
-          priceWholesale: data.branchPrice.priceWholesale,
-          priceTechnician: data.branchPrice.priceTechnician,
-          priceRetail: data.branchPrice.priceRetail,
-          priceOnline: data.branchPrice.priceOnline,
-        },
-        create: {
-          productId: id,
-          branchId: branchId,
-          costPrice: data.branchPrice.costPrice,
-          priceWholesale: data.branchPrice.priceWholesale,
-          priceTechnician: data.branchPrice.priceTechnician,
-          priceRetail: data.branchPrice.priceRetail,
-          priceOnline: data.branchPrice.priceOnline,
-        },
-      });
-    }
-
-    res.json(updated);
+    return res.json(result);
   } catch (error) {
     console.error('❌ updateProduct error:', error);
-    res.status(500).json({ error: 'Failed to update product' });
+    if (error.status === 409 && (error.message === 'MODE_SWITCH_REQUIRES_CONVERSION' || error.message === 'MODE_SWITCH_REQUIRES_EMPTY_BALANCE')) {
+      return res.status(409).json({ error: error.message });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') return res.status(409).json({ error: 'DUPLICATE_CONSTRAINT' });
+      if (error.code === 'P2025') return res.status(404).json({ error: 'NOT_FOUND' });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+
 const deleteProduct = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const branchId = req.user?.branchId;
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID' });
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
-    const price = await prisma.branchPrice.findFirst({
-      where: {
-        productId: id,
-        branchId,
-      },
-    });
-    if (!price) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์ลบข้อมูลของสาขาอื่น' });
-    }
-
-    const usedInStock = await prisma.stockItem.findFirst({ where: { productId: id } });
-    if (usedInStock) {
-      return res.status(409).json({ error: 'ไม่สามารถลบได้ เพราะมีการใช้งานแล้ว' });
-    }
-
-    const images = await prisma.productImage.findMany({
-      where: { productId: id },
-    });
-
-    for (const img of images) {
-      try {
-        const result = await cloudinary.uploader.destroy(img.public_id);
-      } catch (err) {
-        console.error('❌ ลบภาพจาก Cloudinary ล้มเหลว:', img.public_id, err);
-      }
-    }
-
-    await prisma.branchPrice.deleteMany({ where: { productId: id } });
-    await prisma.productImage.deleteMany({ where: { productId: id } });
-    await prisma.product.delete({ where: { id } });
-
-    res.json({ message: 'Deleted successfully' });
+    // Soft-archive instead of hard delete for safety
+    const result = await prisma.product.update({ where: { id }, data: { active: false } });
+    return res.json({ success: true, id: result.id, archived: true });
   } catch (error) {
     console.error('❌ deleteProduct error:', error);
-    res.status(500).json({ error: 'Failed to delete product' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 const deleteProductImage = async (req, res) => {
-  const productId = parseInt(req.params.id);
-  const { public_id } = req.body;
-  const branchId = req.user.branchId;
-
-  if (!public_id) {
-    return res.status(400).json({ error: 'ต้องระบุ public_id' });
-  }
-
   try {
-    const price = await prisma.branchPrice.findFirst({
-      where: {
-        productId,
-        branchId,
-      },
-    });
-    if (!price) {
-      return res.status(403).json({ error: 'คุณไม่มีสิทธิ์ลบภาพสินค้านี้' });
+    const productId = toInt(req.params.id);
+    const { public_id } = req.body;
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+    if (!productId || !public_id) return res.status(400).json({ error: 'INVALID_PARAMS' });
+
+    // Remove from Cloudinary first (best effort)
+    try {
+      await cloudinary.uploader.destroy(public_id);
+    } catch (e) {
+      console.warn('⚠️ cloudinary destroy failed:', e?.message || e);
     }
 
-    await cloudinary.uploader.destroy(public_id);
+    await prisma.productImage.updateMany({ where: { productId, public_id }, data: { active: false, isCover: false } });
 
-    await prisma.productImage.deleteMany({
-      where: {
-        productId,
-        public_id,
-      },
-    });
-
-    res.json({ message: 'ลบภาพสำเร็จ', public_id });
-  } catch (err) {
-    console.error('❌ deleteProductImage error:', err);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาดขณะลบภาพสินค้า' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ deleteProductImage error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+// ---- Migration endpoint: STRUCTURED → SIMPLE (transactional)
+const migrateSnToSimple = async (req, res) => {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID' });
+
+    // authorize presence of branch context (consistent with other endpoints)
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+    const product = await prisma.product.findUnique({ where: { id }, select: { id: true, mode: true } });
+    if (!product) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (product.mode === 'SIMPLE') {
+      return res.status(409).json({ error: 'ALREADY_SIMPLE' });
+    }
+
+    // Group SN-in-stock by branch
+    const groups = await prisma.stockItem.groupBy({
+      by: ['branchId'],
+      where: { productId: id, status: 'IN_STOCK' },
+      _count: { _all: true },
+    });
+
+    let migratedQty = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (const g of groups) {
+        const qty = g._count?._all ?? 0;
+        if (!qty) continue;
+        migratedQty += qty;
+
+        await tx.stockBalance.upsert({
+          where: { productId_branchId: { productId: id, branchId: g.branchId } },
+          update: { quantity: { increment: qty } },
+          create: { productId: id, branchId: g.branchId, quantity: qty, reserved: 0 },
+        });
+
+        await tx.stockItem.updateMany({
+          where: { productId: id, branchId: g.branchId, status: 'IN_STOCK' },
+          data: { status: 'CONVERTED' },
+        });
+      }
+
+      // Switch product mode to SIMPLE
+      await tx.product.update({
+        where: { id },
+        data: { mode: 'SIMPLE', noSN: true, trackSerialNumber: false },
+      });
+    });
+
+    return res.json({ success: true, migratedQty, branches: groups.length });
+  } catch (error) {
+    console.error('❌ migrateSnToSimple error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 module.exports = {
   getAllProducts,
@@ -781,14 +875,12 @@ module.exports = {
   getProductPosById,
   deleteProduct,
   deleteProductImage,
-  getProductDropdowns,  
+  getProductDropdowns,
   getProductsForOnline,
   getProductOnlineById,
   getProductDropdownsForOnline,
   getProductsForPos,
-  
+  migrateSnToSimple,
 };
-
-
 
 

@@ -1,6 +1,7 @@
 // productProfileController.js — Guards: normalize + unique-by-parent (productTypeId), safer P2002 detail
 
 const { prisma } = require('../lib/prisma');
+const MAX_LIMIT = 100;
 
 // ---------- helpers ----------
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
@@ -57,6 +58,9 @@ const createProductProfile = async (req, res) => {
 
     if (!name || !toInt(productTypeId)) {
       return res.status(400).json({ error: 'ต้องระบุ name และ productTypeId ที่ถูกต้อง' });
+    }
+    if (String(name).trim().length > 80) {
+      return res.status(400).json({ error: 'ชื่อยาวเกินไป (สูงสุด 80 ตัวอักษร)' });
     }
 
     const productTypeIdInt = toInt(productTypeId);
@@ -124,23 +128,33 @@ const createProductProfile = async (req, res) => {
 // ✅ GET /product-profiles — list (q, categoryId, productTypeId)
 const getAllProductProfiles = async (req, res) => {
   try {
-    const { q, categoryId, productTypeId } = req.query || {};
+    const { q, categoryId, productTypeId, includeInactive, page: pageQ, limit: limitQ } = req.query || {};
+
+    const pageRaw = Number(pageQ);
+    const limitRaw = Number(limitQ);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 20;
 
     const where = omitUndefined({
       ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
-      ...(toInt(productTypeId) ? { productTypeId: Number(productTypeId) } : {}),
-      ...(toInt(categoryId) ? { productType: { categoryId: Number(categoryId) } } : {}),
+      ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
+      ...(toInt(categoryId) ? { productType: { categoryId: toInt(categoryId) } } : {}),
+      ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
     });
 
-    const profiles = await prisma.productProfile.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: {
-        productType: { select: { id: true, name: true, categoryId: true } },
-      },
-    });
+    const [total, items] = await Promise.all([
+      prisma.productProfile.count({ where }),
+      prisma.productProfile.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { productType: { select: { id: true, name: true, categoryId: true } } },
+      }),
+    ]);
 
-    res.json(profiles);
+    res.set('Cache-Control', 'no-store');
+    res.json({ items, total, page, limit });
   } catch (err) {
     console.error('❌ [Fetch ProductProfiles] Error:', err);
     res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลได้' });
@@ -220,6 +234,7 @@ const updateProductProfile = async (req, res) => {
     let nameTrim, normalized, slug;
     if (name !== undefined) {
       if (String(name).trim() === '') return res.status(400).json({ error: 'ชื่อห้ามว่าง' });
+      if (String(name).trim().length > 80) return res.status(400).json({ error: 'ชื่อยาวเกินไป (สูงสุด 80 ตัวอักษร)' });
       nameTrim = String(name).trim();
       normalized = normalizeName(nameTrim);
       slug = slugify(nameTrim);
@@ -390,4 +405,6 @@ module.exports = {
   getProductProfileDropdowns,
   deleteProductProfile, // ไว้เพื่อความเข้ากันได้ ยกเลิกรถเรียกใช้ที่ routes แล้ว
 };
+
+
 

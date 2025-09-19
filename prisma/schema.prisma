@@ -1,1254 +1,1530 @@
-  generator client {
-    provider = "prisma-client-js"
-  }
-
-  datasource db {
-    provider  = "postgresql"
-    url       = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
-  }
-
-  enum Role {
-    customer
-    employee
-    admin
-    superadmin
-  }
-
-  enum PurchaseOrderStatus {
-    PENDING
-    PARTIALLY_RECEIVED
-    RECEIVED
-    PAID
-    COMPLETED
-    CANCELLED
-  }
-
-  enum OrderStatus {
-    NOT_PROCESS
-    PROCESSING
-    SHIPPED
-    DELIVERED
-    CANCELLED
-  }
-
-  enum StockStatus {
-    IN_STOCK
-    SOLD
-    RETURNED
-    DAMAGED
-    LOST
-    CLAIMED
-    USED
-    MISSING_PENDING_REVIEW
-  }
-
-  enum ServiceStatus {
-    RECEIVED
-    IN_PROGRESS
-    WAITING_PARTS
-    COMPLETED
-    CANCELLED
-  }
-
-  enum ReceiptStatus {
-    PENDING
-    COMPLETED
-    CANCELLED
-  }
-
-  enum PaymentStatus {
-    UNPAID
-    PARTIALLY_PAID
-    WAITING_APPROVAL
-    PAID
-    CANCELLED
-  }
-
-  enum PaymentSlipStatus {
-    NONE
-    WAITING_APPROVAL
-    APPROVED
-    REJECTED
-  }
-
-  enum LoginType {
-    PHONE
-    EMAIL
-    SOCIAL
-    ADMIN
-  }
-
-  enum PaymentMethod {
-    CASH
-    TRANSFER
-    QR
-    CREDIT
-    OTHER
-    DEPOSIT
-  }
-
-  enum SaleType {
-    NORMAL
-    GOVERNMENT
-    WHOLESALE
-  }
-
-  enum SaleStatus {
-    DRAFT // ยังไม่ได้ส่งของ
-    DELIVERED // ส่งของแล้วแต่ยังไม่ตกลงราคา
-    FINALIZED // เคาะราคาแล้ว พร้อมคำนวณภาษี
-    COMPLETED // รับเงินครบแล้ว
-    CANCELLED // ยกเลิก
-  }
-
-  enum ReturnType {
-    REFUND
-    CLAIM
-    EXCHANGE
-    CREDIT_NOTE
-    INTERNAL_USE
-    STOCK_ERROR
-  }
-
-  enum PaymentType {
-    ADVANCE
-    RECEIPT_BASED
-    CREDIT_NOTE
-  }
-
-  enum OrderOnlineStatus {
-    PENDING // สั่งซื้อเข้ามาแล้ว แต่ยังไม่ยืนยัน
-    CONFIRMED // ยืนยันคำสั่งซื้อแล้ว กำลังเตรียมของ
-    SHIPPED // ส่งของแล้ว
-    COMPLETED // จัดส่งสำเร็จ
-    CANCELLED // ยกเลิกคำสั่งซื้อ
-  }
-
-  enum OrderSource {
-    POS
-    ONLINE
-  }
-
-  enum CustomerType {
-    INDIVIDUAL // บุคคลทั่วไป
-    ORGANIZATION // หน่วยงาน / บริษัท
-    GOVERNMENT // ✨ หน่วยงานราชการ
-  }
-
-  enum BarcodeStatus {
-    READY
-    SN_RECEIVED
-    USED
-    VOID
-  }
-
-  model User {
-    id          Int       @id @default(autoincrement())
-    email       String?   @unique
-    loginId     String?   @unique
-    password    String
-    role        Role
-    enabled     Boolean   @default(true)
-    lastLoginAt DateTime?
-    loginType   LoginType @default(PHONE)
-
-    customerProfile CustomerProfile?
-    employeeProfile EmployeeProfile?
-
-    createdAt   DateTime      @default(now())
-    updatedAt   DateTime      @updatedAt
-    orderOnline OrderOnline[]
-    cart        Cart[]
-  }
-
-  model CustomerProfile {
-    id          Int     @id @default(autoincrement())
-    name        String?
-    picture     String?
-    companyName String?
-    taxId       String?
-
-    // 🆕 Administrative unit linkage (มาตรฐานไทย 2/4/6 หลัก)
-    // ✅ Single Source of Truth: ใช้ subdistrictCode เป็นหลัก (NOT NULL migration ถัดไป)
-    subdistrictCode String?      @db.Char(6)
-    subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
-
-    type   CustomerType @default(INDIVIDUAL)
-    user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId Int          @unique
-
-    paymentTerms  Int?     @default(0)
-    creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
-    creditBalance Decimal? @default(0) @db.Decimal(12, 2)
-
-    orders   Order[]
-    cart     Cart[]
-    services ServiceOrder[]
-
-    sale            Sale[]
-    orderOnline     OrderOnline[]
-    customerDeposit CustomerDeposit[]
-
-    createdAt               DateTime                  @default(now())
-    updatedAt               DateTime                  @updatedAt
-    CombinedBillingDocument CombinedBillingDocument[]
-    // 🔎 FE ใช้ "customerAddress" ที่ประกอบจาก backend: [บ้านเลขที่] [subdistrict.nameTh] [district.nameTh] [province.nameTh] [postcode]
-
-    @@index([subdistrictCode])
-  }
-
-  model CustomerDeposit {
-    id Int @id @default(autoincrement())
-
-    cashAmount     Decimal @default(0) @db.Decimal(12, 2)
-    transferAmount Decimal @default(0) @db.Decimal(12, 2)
-    cardAmount     Decimal @default(0) @db.Decimal(12, 2)
-    usedAmount     Decimal @default(0) @db.Decimal(12, 2)
-    usedSaleId     Int?
-    note           String? @db.Text
-
-    totalAmount Decimal @db.Decimal(12, 2)
-
-    customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    customerId Int?
-
-    branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int?
-
-    status String @default("ACTIVE") // ✅ สำหรับ soft delete: ACTIVE หรือ CANCELLED
-
-    createdAt    DateTime         @default(now())
-    // ⚠️ Transitional change: make createdBy nullable first to avoid destructive change
-    createdBy    Int?
-    createdByEmp EmployeeProfile? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-    updatedAt    DateTime         @updatedAt
-    depositUsage DepositUsage[]
-
-    @@index([customerId])
-    @@index([branchId])
-    @@index([branchId, createdAt])
-  }
-
-  model DepositUsage {
-    id                 Int      @id @default(autoincrement())
-    customerDepositId  Int
-    paymentId          Int?      // ✅ ทำเป็น optional ก่อน
-    saleId             Int?      // ✅ ถ้ามีเพิ่มไว้ก็ให้ optional ไปก่อน
-    amountUsed         Decimal   @db.Decimal(14, 2)
-    createdAt          DateTime  @default(now())
-
-    customerDeposit    CustomerDeposit @relation(fields: [customerDepositId], references: [id])
-    payment            Payment?        @relation(fields: [paymentId], references: [id])
-    sale               Sale?           @relation(fields: [saleId], references: [id])
-
-    @@index([paymentId])
-    @@index([customerDepositId])
-  }
-
-
-  model EmployeeProfile {
-    id    Int     @id @default(autoincrement())
-    name  String?
-    phone String?
-
-    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId Int  @unique
-
-    branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int?
-
-    position   Position? @relation(fields: [positionId], references: [id], onDelete: Cascade)
-    positionId Int?
-
-    confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
-
-    purchaseOrderCreated PurchaseOrder[]
-    assignedServices     ServiceOrder[]
-    approved             Boolean                @default(false)
-    active               Boolean                @default(true)
-    stockItem            StockItem[]
-    sale                 Sale[]
-    saleReturns          SaleReturn[] // ผู้สร้างใบคืนสินค้า
-    refundedReturns      SaleReturn[]           @relation("RefundedBy") // ผู้คืนเงินจริง
-    payment              Payment[]
-    combinedSaleDocument CombinedSaleDocument[]
-    refundTransaction    RefundTransaction[]
-    supplierPayment      SupplierPayment[]
-
-    createdAt               DateTime                  @default(now())
-    updatedAt               DateTime                  @updatedAt
-    CombinedBillingDocument CombinedBillingDocument[]
-    StockAuditSession       StockAuditSession[]
-    StockAuditScanLog       StockAuditScanLog[]
-    CustomerDeposit         CustomerDeposit[]
-  }
-
-  model Branch {
-    id      Int     @id @default(autoincrement())
-    name    String
-    address String
-    phone   String?
-
-    // Single source of truth for administrative address: 6-digit subdistrict code
-    subdistrictCode String?
-    subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
-
-    branchPrices BranchPrice[]
-
-    employees EmployeeProfile[]
-    stock     StockItem[]
-    suppliers Supplier[]
-    pos       PurchaseOrder[]
-    services  ServiceOrder[]
-
-    RBACEnabled          Boolean                @default(true)
-    purchaseOrderReceipt PurchaseOrderReceipt[]
-    barcodeCounter       BarcodeCounter[]
-    barcodeReceiptItem   BarcodeReceiptItem[]
-    sale                 Sale[]
-    saleReturn           SaleReturn[]
-    payment              Payment[]
-    combinedSaleDocument CombinedSaleDocument[]
-    refundTransaction    RefundTransaction[]
-    supplierPayment      SupplierPayment[]
-    customerDeposit      CustomerDeposit[]
-    orderOnline          OrderOnline[]
-
-    createdAt               DateTime                  @default(now())
-    updatedAt               DateTime                  @updatedAt
-    CombinedBillingDocument CombinedBillingDocument[]
-    StockAuditSession       StockAuditSession[]
-    PaymentCodeCounter      PaymentCodeCounter[]
-
-    @@index([subdistrictCode])
-  }
-
-  // 🆕 Administrative Units (มาตรฐานรหัสไทย)
-  model Province {
-    /// รหัสจังหวัด 2 หลัก (เช่น "10")
-    code      String     @id
-    nameTh    String
-    /// กลาง / เหนือ / อีสาน / ตะวันออก / ตะวันตก / ใต้
-    region    String
-    districts District[]
-  }
-
-  model District {
-    /// รหัสอำเภอ 4 หลัก (จว 2 + อำเภอ 2)
-    code         String        @id
-    nameTh       String
-    provinceCode String
-    province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
-    subdistricts Subdistrict[]
-
-    @@index([provinceCode])
-  }
-
-  model Subdistrict {
-    /// รหัสตำบล 6 หลัก (จว2 + อำเภอ2 + ตำบล2)
-    code            String            @id
-    nameTh          String
-    districtCode    String
-    district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
-    postcode        String?
-    branches        Branch[]
-    CustomerProfile CustomerProfile[]
-
-    @@index([districtCode])
-    @@index([postcode])
-  }
-
-  model Position {
-    id          Int     @id @default(autoincrement())
-    name        String  @unique
-    description String?
-    isActive    Boolean @default(true)
-
-    employees EmployeeProfile[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([isActive])
-    @@index([name])
-  }
-
-  model Category {
-    id       Int     @id @default(autoincrement())
-    name     String  @unique
-    active   Boolean @default(true)
-    isSystem Boolean @default(false)
-
-    productTypes ProductType[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model ProductType {
-    id             Int     @id @default(autoincrement())
-    name           String
-    slug           String
-    normalizedName String
-    active         Boolean @default(true)
-
-    guideExamples String[] @default([])
-    pathCached    String?
-
-    profiles ProductProfile[]
-
-    category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-    categoryId Int?
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([categoryId, slug])
-    @@unique([categoryId, normalizedName])
-    @@index([normalizedName])
-  }
-
-  model ProductProfile {
-    id             Int     @id @default(autoincrement())
-    name           String
-    slug           String
-    normalizedName String
-    description    String?
-
-    guideExamples String[] @default([])
-    pathCached    String?
-
-    productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
-    productTypeId Int
-
-    templates ProductTemplate[]
-
-    active    Boolean  @default(true)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([productTypeId, slug])
-    @@unique([productTypeId, normalizedName])
-    @@index([normalizedName])
-  }
-
-  model ProductTemplate {
-    id             Int     @id @default(autoincrement())
-    name           String
-    slug           String
-    normalizedName String
-    warranty       Int?
-    noSN           Boolean @default(false)
-    codeType       String  @default("D")
-    active         Boolean @default(true)
-
-    guideExamples String[] @default([])
-    pathCached    String?
-
-    productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
-    productProfileId Int
-
-    products Product[]
-    unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
-    unitId   Int?
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([productProfileId, slug])
-    @@unique([productProfileId, normalizedName])
-    @@index([normalizedName])
-  }
-
-  model Product {
-    id          Int     @id @default(autoincrement())
-    name        String?
-    model       String?
-    description String?
-
-    spec     String?
-    sold     Int     @default(0)
-    quantity Int?
-    noSN     Boolean @default(false)
-    active   Boolean @default(true)
-
-    template   ProductTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-    templateId Int
-
-    productImages      ProductImage[]
-    stockItems         StockItem[]
-    purchaseOrderItems PurchaseOrderItem[]
-    orderItems         ProductOnOrder[]
-    cartItems          CartItem[]
-    serviceItems       ServiceItem[]
-    branchPrice        BranchPrice[]
-    orderOnlineItem    OrderOnlineItem[]
-
-    createdAt              DateTime                 @default(now())
-    updatedAt              DateTime                 @updatedAt
-    StockAuditSnapshotItem StockAuditSnapshotItem[]
-  }
-
-  model BranchPrice {
-    id Int @id @default(autoincrement())
-
-    costPrice       Decimal @db.Decimal(12, 2) // ราคาที่รับเข้าจริงต่อหน่วย
-    priceRetail     Int?
-    priceWholesale  Int?
-    priceTechnician Int?
-    priceOnline     Int?
-
-    // 🆕 ฟิลด์เพิ่มเติม
-    effectiveDate DateTime?
-    expiredDate   DateTime?
-    note          String?
-    updatedBy     Int?
-    isActive      Boolean   @default(true)
-
-    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    productId Int
-
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([productId, branchId])
-  }
-
-  model ProductImage {
-    id         Int     @id @default(autoincrement())
-    public_id  String  @unique
-    url        String
-    secure_url String
-    active     Boolean @default(true)
-
-    caption String?
-    isCover Boolean?
-
-    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    productId Int
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model Unit {
-    id   Int    @id @default(autoincrement())
-    name String @unique
-
-    createdAt       DateTime          @default(now())
-    updatedAt       DateTime          @updatedAt
-    productTemplate ProductTemplate[]
-  }
-
-  model StockItem {
-    id           Int     @id @default(autoincrement())
-    barcode      String  @unique
-    serialNumber String?
-
-    qrCodeData   String?
-    costPrice    Decimal?    @db.Decimal(12, 2) // ราคาทุนต่อชิ้นขณะรับเข้าสต๊อก
-    receivedAt   DateTime    @default(now())
-    warrantyDays Int?
-    expiredAt    DateTime?
-    soldAt       DateTime?
-    status       StockStatus @default(IN_STOCK)
-    remark       String?
-    locationCode String? // ตำแหน่งจัดเก็บภายในคลัง เช่น A1, Shelf-3
-    source       String? // แหล่งที่มาของสินค้า เช่น PURCHASE_ORDER, CLAIM, GIFT
-    tag          String? // สำหรับป้ายกำกับพิเศษ เช่น PROMO2025
-    batchNumber  String? // หมายเลขลอตสินค้า
-    checkedBy    String? // ชื่อ/รหัสพนักงานที่ตรวจรับสินค้า
-    color        String? // สีของสินค้ารายชิ้น เช่น "ดำ", "ขาว"
-
-    scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id], onDelete: Cascade)
-    scannedByEmployeeId Int?
-
-    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    productId Int
-
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int
-
-    purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
-    purchaseOrderReceiptItemId Int?
-
-    barcodeReceiptItem BarcodeReceiptItem[]
-    saleItem           SaleItem?
-
-    scannedAt              DateTime                 @default(now())
-    createdAt              DateTime                 @default(now())
-    updatedAt              DateTime                 @updatedAt
-    StockAuditSnapshotItem StockAuditSnapshotItem[]
-    StockAuditScanLog      StockAuditScanLog[]
-
-    @@unique([serialNumber, productId]) // ✅ SN เดียวกันอนุญาตได้เฉพาะคนละ productId
-    @@index([branchId, status, productId])
-    @@index([productId, status])
-  }
-
-  model Supplier {
-    isSystem      Boolean         @default(false) // ✅ สำหรับซัพพลายเออร์ระบบ (เช่น เริ่มต้นโปรแกรม)
-    id            Int             @id @default(autoincrement())
-    name          String
-    contactPerson String?
-    phone         String?
-    email         String?
-    taxId         String?
-    taxBranchCode String?         @default("00000")
-    address       String?
-    province      String?
-    postalCode    String?
-    country       String?         @default("Thailand")
-    paymentTerms  Int?            @default(0)
-    creditLimit   Decimal?        @default(0) @db.Decimal(12, 2)
-    creditBalance Decimal?        @default(0) @db.Decimal(12, 2)
-    bankId        Int?
-    accountNumber String?
-    accountType   String?
-    notes         String?
-    branchId      Int
-    active        Boolean         @default(true)
-    bank          Bank?           @relation(fields: [bankId], references: [id], onDelete: Cascade)
-    branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    pos           PurchaseOrder[]
-
-    createdAt       DateTime          @default(now())
-    updatedAt       DateTime          @updatedAt
-    supplierPayment SupplierPayment[]
-
-    @@unique([branchId, name])
-  }
-
-  model Bank {
-    id        Int        @id @default(autoincrement())
-    name      String     @unique
-    supplier  Supplier[]
-    active    Boolean    @default(true)
-    createdAt DateTime   @default(now())
-    updatedAt DateTime   @updatedAt
-  }
-
-  model PurchaseOrder {
-    id     Int                 @id @default(autoincrement())
-    code   String              @unique
-    date   DateTime            @default(now())
-    note   String?
-    status PurchaseOrderStatus @default(PENDING)
-
-    supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-    supplierId Int
-
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int
-
-    employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-    employeeId Int
-
-    items    PurchaseOrderItem[]
-    receipts PurchaseOrderReceipt[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model PurchaseOrderItem {
-    id Int @id @default(autoincrement())
-
-    productId        Int
-    quantity         Int
-    receivedQuantity Int                        @default(0)
-    costPrice        Decimal                    @db.Decimal(12, 2)
-    receipts         PurchaseOrderReceiptItem[]
-
-    purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-    purchaseOrderId Int
-
-    product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model PurchaseOrderReceipt {
-    id          Int      @id @default(autoincrement())
-    code        String   @unique
-    receivedAt  DateTime @default(now())
-    note        String?
-    totalAmount Decimal? @db.Decimal(12, 2)
-    paidAmount  Decimal? @db.Decimal(12, 2)
-
-    supplierTaxInvoiceNumber String?
-    supplierTaxInvoiceDate   DateTime?
-    vatRate                  Decimal?  @default(7) @db.Decimal(5, 2)
-
-    statusReceipt ReceiptStatus @default(PENDING)
-    statusPayment PaymentStatus @default(UNPAID)
-    receivedById  Int
-    printed       Boolean       @default(false)
-    branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId      Int
-
-    purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-    purchaseOrderId Int
-
-    items                  PurchaseOrderReceiptItem[]
-    barcodeReceiptItem     BarcodeReceiptItem[]
-    createdAt              DateTime                   @default(now())
-    updatedAt              DateTime                   @updatedAt
-    SupplierPaymentReceipt SupplierPaymentReceipt[]
-
-    @@index([branchId, receivedAt])
-    @@index([purchaseOrderId])
-  }
-
-  model PurchaseOrderReceiptItem {
-    id                  Int                  @id @default(autoincrement())
-    receiptId           Int
-    purchaseOrderItemId Int
-    quantity            Int
-    costPrice           Decimal              @db.Decimal(12, 2)
-    receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-    purchaseOrderItem   PurchaseOrderItem    @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Cascade)
-    stockItems          StockItem[]
-    barcodeReceiptItem  BarcodeReceiptItem[]
-    createdAt           DateTime             @default(now())
-    updatedAt           DateTime             @updatedAt
-  }
-
-  model Order {
-    id              Int         @id @default(autoincrement())
-    cartTotal       Decimal     @db.Decimal(12, 2)
-    orderStatus     OrderStatus @default(NOT_PROCESS)
-    stripePaymentId String
-    status          String
-    amount          Int
-    currency        String
-
-    customerId Int?
-    customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    products   ProductOnOrder[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model ProductOnOrder {
-    id        Int @id @default(autoincrement())
-    productId Int
-    orderId   Int
-    count     Int
-
-    product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model Cart {
-    id Int @id @default(autoincrement())
-
-    userId Int // FK ไปที่ User (ลูกค้า)
-    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    cartItems CartItem[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
-    customerProfileId Int?
-  }
-
-  model CartItem {
-    id              Int     @id @default(autoincrement())
-    cartId          Int
-    cart            Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-    productId       Int
-    product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    quantity        Int     @default(1)
-    priceAtThatTime Decimal @db.Decimal(12, 2)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([cartId, productId])
-  }
-
-  model ServiceOrder {
-    id         Int  @id @default(autoincrement())
-    customerId Int?
-    branchId   Int?
-    employeeId Int?
-
-    receiveDate DateTime      @default(now())
-    status      ServiceStatus @default(RECEIVED)
-    description String?
-    note        String?
-
-    customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    branch   Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    employee EmployeeProfile? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-    items ServiceItem[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model ServiceItem {
-    id           Int      @id @default(autoincrement())
-    serviceId    Int
-    productId    Int?
-    serialNumber String?
-    problem      String?
-    solution     String?
-    cost         Decimal? @db.Decimal(12, 2)
-
-    service ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-    product Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model BarcodeCounter {
-    id         Int      @id @default(autoincrement())
-    branchId   Int
-    yearMonth  String // รูปแบบ: '2506' (ปี 2025 เดือน 06)
-    lastNumber Int
-    updatedAt  DateTime @updatedAt
-    createdAt  DateTime @default(now())
-
-    branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-    @@unique([branchId, yearMonth]) // ป้องกันซ้ำในระดับเดือน+สาขา
-  }
-
-  model BarcodeReceiptItem {
-    id      Int    @id @default(autoincrement())
-    barcode String @unique // เช่น 0225060001
-
-    yearMonth     String // เช่น '2506'
-    runningNumber Int // เช่น 1 → 0001
-    status        BarcodeStatus @default(READY)
-
-    printed     Boolean    @default(false)
-    stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-    stockItemId Int?
-
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int
-
-    purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
-    purchaseOrderReceiptId Int
-
-    receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
-    receiptItemId Int
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([branchId, yearMonth, runningNumber])
-    @@index([purchaseOrderReceiptId, branchId])
-  }
-
-  model Sale {
-    id   Int    @id @default(autoincrement())
-    code String @unique
-
-    soldAt     DateTime @default(now())
-    customerId Int?
-    employeeId Int
-    branchId   Int
-
-    totalBeforeDiscount Decimal    @db.Decimal(12, 2)
-    totalDiscount       Decimal    @db.Decimal(12, 2)
-    vat                 Decimal    @db.Decimal(12, 2)
-    vatRate             Decimal    @default(7) @db.Decimal(5, 2)
-    totalAmount         Decimal    @db.Decimal(12, 2)
-    note                String?
-    status              SaleStatus @default(DRAFT)
-    refCode             String?
-    isTaxInvoice        Boolean    @default(false)
-    paid                Boolean    @default(false)
-    paidAt              DateTime?
-
-    isCredit               Boolean               @default(false)
-    dueDate                DateTime?
-    officialDocumentNumber String?
-    saleType               SaleType              @default(NORMAL)
-    finalizedAt            DateTime?
-    combinedDocumentId     Int?
-    combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id], onDelete: Cascade)
-
-    customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    employee EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-    branch   Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    items    SaleItem[]
-    returns  SaleReturn[]
-
-    createdAt    DateTime       @default(now())
-    updatedAt    DateTime       @updatedAt
-    Payment      Payment[]
-    DepositUsage DepositUsage[]
-
-    combinedBillingId Int?
-    combinedBilling   CombinedBillingDocument? @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
-
-    @@index([combinedBillingId])
-    @@index([branchId, soldAt])
-    @@index([isCredit, dueDate])
-    @@index([combinedDocumentId])
-  }
-
-  model SaleItem {
-    id          Int @id @default(autoincrement())
-    saleId      Int
-    stockItemId Int @unique
-
-    basePrice      Decimal @db.Decimal(12, 2)
-    vatAmount      Decimal @db.Decimal(12, 2)
-    price          Decimal @db.Decimal(12, 2)
-    discount       Decimal @db.Decimal(12, 2)
-    refundedAmount Decimal @default(0) @db.Decimal(12, 2)
-    remark         String?
-
-    sale        Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
-    stockItem   StockItem        @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-    returnItems SaleReturnItem[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model Payment {
-    id     Int    @id @default(autoincrement())
-    code   String @unique
-    sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
-    saleId Int
-
-    receivedAt           DateTime @default(now())
-    note                 String?
-    combinedDocumentCode String?
-
-    isCancelled Boolean   @default(false)
-    cancelNote  String?
-    cancelledAt DateTime?
-
-    employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
-    employeeProfileId Int?
-
-    branchId Int
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-    items PaymentItem[]
-
-    createdAt    DateTime       @default(now())
-    updatedAt    DateTime       @updatedAt
-    DepositUsage DepositUsage[]
-
-    @@index([saleId])
-    @@index([branchId, receivedAt])
-  }
-
-  model PaymentItem {
-    id        Int     @id @default(autoincrement())
-    payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-    paymentId Int
-
-    paymentMethod PaymentMethod
-    amount        Decimal       @db.Decimal(12, 2)
-    note          String?
-
-    slipImage String?
-    cardRef   String?
-    govImage  String?
-
-    createdAt DateTime @default(now())
-  }
-
-  model CombinedSaleDocument {
-    id             Int      @id @default(autoincrement())
-    code           String   @unique
-    issueDate      DateTime @default(now())
-    note           String?
-    createdBy      Int
-    branchId       Int
-    totalAmount    Decimal  @db.Decimal(12, 2)
-    finalAmount    Decimal  @db.Decimal(12, 2)
-    adjustmentNote String?
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdByUser EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-    branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    sales         Sale[]          @relation("SalesCombined")
-  }
-
-  model SaleReturn {
-    id                   Int        @id @default(autoincrement())
-    code                 String     @unique
-    saleId               Int
-    returnedAt           DateTime   @default(now())
-    employeeId           Int
-    refundedByEmployeeId Int?
-    branchId             Int
-    reason               String?
-    totalRefund          Decimal    @db.Decimal(12, 2)
-    refundedAmount       Decimal    @default(0) @db.Decimal(12, 2)
-    deductedAmount       Decimal    @default(0) @db.Decimal(12, 2)
-    isFullyRefunded      Boolean    @default(false)
-    refundMethod         String
-    returnType           ReturnType @default(REFUND)
-    note                 String?
-    status               String     @default("PENDING")
-
-    sale       Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
-    employee   EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-    refundedBy EmployeeProfile? @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
-    branch     Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    items      SaleReturnItem[]
-
-    createdAt         DateTime            @default(now())
-    updatedAt         DateTime            @updatedAt
-    refundTransaction RefundTransaction[]
-  }
-
-  model SaleReturnItem {
-    id           Int @id @default(autoincrement())
-    saleReturnId Int
-    saleItemId   Int
-
-    refundAmount Decimal @db.Decimal(12, 2)
-    reason       String?
-    reasonCode   String?
-
-    saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
-    saleItem   SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-  }
-
-  model RefundTransaction {
-    id                   Int      @id @default(autoincrement())
-    saleReturnId         Int
-    amount               Decimal  @db.Decimal(12, 2)
-    deducted             Decimal  @default(0) @db.Decimal(12, 2)
-    method               String
-    note                 String?
-    refundedAt           DateTime @default(now())
-    refundedByEmployeeId Int
-    branchId             Int
-
-    saleReturn SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
-    refundedBy EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
-    branch     Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  }
-
-  model SupplierPayment {
-    id         Int      @id @default(autoincrement())
-    code       String?  @unique
-    supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-    supplierId Int
-
-    debitAmount  Decimal? @db.Decimal(12, 2)
-    creditAmount Decimal? @db.Decimal(12, 2)
-    amount       Decimal? @db.Decimal(12, 2)
-
-    method String
-    note   String?
-
-    paymentRef      String?
-    paymentProofUrl String?
-    statusPayment   PaymentStatus @default(UNPAID)
-    sourceType      String?
-    sourcePOId      Int?
-
-    paymentType PaymentType @default(RECEIPT_BASED)
-
-    paidAt     DateTime        @default(now())
-    employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-    employeeId Int
-
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    branchId Int
-
-    supplierPaymentReceipts SupplierPaymentReceipt[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([branchId, paidAt])
-    @@index([supplierId])
-  }
-
-  model SupplierPaymentReceipt {
-    id Int @id @default(autoincrement())
-
-    payment   SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-    paymentId Int
-
-    receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-    receiptId Int
-
-    amountPaid Decimal @db.Decimal(12, 2)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([paymentId, receiptId])
-  }
-
-  model OrderOnline {
-    id   Int    @id @default(autoincrement())
-    code String @unique
-
-    customerId Int?
-    customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-    branchId Int
-    branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-    note          String?
-    paymentNote   String?
-    status        OrderOnlineStatus @default(PENDING)
-    statusPayment PaymentStatus     @default(UNPAID)
-    paymentMethod String?
-    trackingCode  String?
-    source        OrderSource?
-    deliveryDate  DateTime?
-
-    confirmedByEmployeeId Int?
-    confirmedByEmployee   EmployeeProfile? @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id], onDelete: Cascade)
-
-    shippedAt    DateTime?
-    cancelReason String?
-
-    paymentSlipUrl String?
-
-    paymentSlipStatus PaymentSlipStatus @default(NONE)
-
-    items       OrderOnlineItem[]
-    createdAt   DateTime          @default(now())
-    User        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId      Int?
-    paymentDate DateTime?
-  }
-
-  model OrderOnlineItem {
-    id              Int      @id @default(autoincrement())
-    orderId         Int
-    productId       Int
-    quantity        Int
-    priceAtPurchase Decimal? @db.Decimal(12, 2)
-    note            String?
-
-    order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
-    product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  }
-
-  model CombinedBillingDocument {
-    id         Int      @id @default(autoincrement())
-    code       String   @unique
-    issueDate  DateTime @default(now())
-    note       String?
-    createdBy  Int
-    customerId Int
-    branchId   Int
-
-    totalBeforeVat Decimal? @db.Decimal(12, 2)
-    vatAmount      Decimal? @db.Decimal(12, 2)
-    totalAmount    Decimal? @db.Decimal(12, 2)
-    status         String   @default("ACTIVE") // ACTIVE | CANCELLED
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    employee EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-    customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-    branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    sales    Sale[]          @relation("CombinedBillingSales")
-  }
-
-  model StockAuditSession {
-    id            Int       @id @default(autoincrement())
-    branchId      Int
-    employeeId    Int
-    mode          String    @default("READY_TO_SELL")
-    status        String    @default("DRAFT")
-    expectedCount Int       @default(0)
-    scannedCount  Int       @default(0)
-    startedAt     DateTime  @default(now())
-    confirmedAt   DateTime?
-    cancelledAt   DateTime?
-    note          String?
-
-    branch        Branch                   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-    employee      EmployeeProfile          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-    snapshotItems StockAuditSnapshotItem[]
-    scanLogs      StockAuditScanLog[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([branchId, status])
-    @@index([startedAt])
-  }
-
-  model StockAuditSnapshotItem {
-    id             Int         @id @default(autoincrement())
-    auditSessionId Int
-    stockItemId    Int
-    productId      Int
-    barcode        String
-    expectedStatus StockStatus @default(IN_STOCK)
-    isScanned      Boolean     @default(false)
-    scannedAt      DateTime?
-
-    auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
-    stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-    product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([auditSessionId, stockItemId])
-    @@index([auditSessionId, isScanned])
-    @@index([barcode])
-  }
-
-  model StockAuditScanLog {
-    id             Int      @id @default(autoincrement())
-    auditSessionId Int
-    stockItemId    Int
-    barcode        String
-    scannedAt      DateTime @default(now())
-    byEmployeeId   Int
-
-    auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
-    stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-    employee     EmployeeProfile   @relation(fields: [byEmployeeId], references: [id], onDelete: Cascade)
-
-    @@index([auditSessionId, scannedAt])
-    @@index([barcode])
-  }
-
-  // ==== Counter for Payment Code (per-branch, per-day) ====
-  model PaymentCodeCounter {
-    id       Int    @id @default(autoincrement())
-    branchId Int
-    yyyymmdd String // e.g. "20250910" (YYYYMMDD in Asia/Bangkok)
-    lastNo   Int    @default(0)
-
-    // Keep referential integrity with branches
-    branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-    // Prevent collisions and enable fast upserts
-    @@unique([branchId, yyyymmdd])
-  }
+generator client {
+  provider = "prisma-client-js"
+  // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+  ADMIN
+  SUPERADMIN
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  PARTIALLY_RECEIVED
+  RECEIVED
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum StockStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+  CLAIMED
+  USED
+  MISSING_PENDING_REVIEW
+}
+
+enum ServiceStatus {
+  RECEIVED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum ReceiptStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  WAITING_APPROVAL
+  PAID
+  CANCELLED
+}
+
+enum PaymentSlipStatus {
+  NONE
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum LoginType {
+  PHONE
+  EMAIL
+  SOCIAL
+  ADMIN
+}
+
+enum RefundMethod {
+  CASH
+  TRANSFER
+  CARD
+  STORE_CREDIT
+  OTHER
+}
+
+enum SaleType {
+  NORMAL
+  GOVERNMENT
+  WHOLESALE
+}
+
+enum SaleStatus {
+  DRAFT
+  DELIVERED
+  FINALIZED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReturnType {
+  REFUND
+  CLAIM
+  EXCHANGE
+  CREDIT_NOTE
+  INTERNAL_USE
+  STOCK_ERROR
+}
+
+enum PaymentType {
+  ADVANCE
+  RECEIPT_BASED
+  CREDIT_NOTE
+}
+
+enum OrderOnlineStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderSource {
+  POS
+  ONLINE
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATION
+  GOVERNMENT
+}
+
+enum BarcodeStatus {
+  READY
+  SN_RECEIVED
+  USED
+  VOID
+}
+
+enum BusinessType {
+  GENERAL
+  IT
+  ELECTRONICS
+  CONSTRUCTION
+  GROCERY
+}
+
+enum ProductMode {
+  SIMPLE
+  STRUCTURED
+}
+
+enum StockMovementType {
+  RECEIVE
+  SALE
+  ADJUST
+  TRANSFER
+  RESERVE
+  UNRESERVE
+  RETURN
+  LOSS
+}
+
+enum ReceiptSource {
+  PO
+  QUICK
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  QR
+  E_WALLET
+  CHEQUE
+  OTHER
+}
+
+enum DepositStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+enum SaleReturnStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+enum CombinedBillingStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+enum BarcodeKind {
+  SN
+  LOT
+}
+
+enum StockAuditMode {
+  READY
+  FULL
+}
+
+enum StockAuditStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SimpleLotStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  email       String?   @unique
+  loginId     String?   @unique
+  password    String
+  role        Role
+  enabled     Boolean   @default(true)
+  lastLoginAt DateTime?
+  loginType   LoginType @default(PHONE)
+
+  customerProfile CustomerProfile?
+  employeeProfile EmployeeProfile?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  orderOnline OrderOnline[]
+  cart        Cart[]
+}
+
+model CustomerProfile {
+  id   Int     @id @default(autoincrement())
+  name String?
+
+  picture     String?
+  companyName String?
+  taxId       String?
+
+  subdistrictCode String?      @db.Char(6)
+  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+
+  type   CustomerType @default(INDIVIDUAL)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int          @unique
+
+  paymentTerms  Int?     @default(0)
+  creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal? @default(0) @db.Decimal(12, 2)
+
+  orders   Order[]
+  cart     Cart[]
+  services ServiceOrder[]
+
+  sale            Sale[]
+  orderOnline     OrderOnline[]
+  customerDeposit CustomerDeposit[]
+
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  combinedBillingDocument CombinedBillingDocument[]
+
+  @@index([subdistrictCode])
+}
+
+model CustomerDeposit {
+  id Int @id @default(autoincrement())
+
+  cashAmount     Decimal @default(0) @db.Decimal(12, 2)
+  transferAmount Decimal @default(0) @db.Decimal(12, 2)
+  cardAmount     Decimal @default(0) @db.Decimal(12, 2)
+  usedAmount     Decimal @default(0) @db.Decimal(12, 2)
+  usedSaleId     Int?
+  note           String? @db.Text
+
+  totalAmount Decimal @db.Decimal(12, 2)
+
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int?
+
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int?
+
+  status DepositStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  createdBy    Int?
+  createdByEmp EmployeeProfile? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt    DateTime         @updatedAt
+  depositUsage DepositUsage[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([branchId, createdAt])
+}
+
+model DepositUsage {
+  id                Int      @id @default(autoincrement())
+  customerDepositId Int
+  paymentId         Int?
+  saleId            Int?
+  amountUsed        Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+
+  customerDeposit CustomerDeposit @relation(fields: [customerDepositId], references: [id])
+  payment         Payment?        @relation(fields: [paymentId], references: [id])
+  sale            Sale?           @relation(fields: [saleId], references: [id])
+
+  @@index([paymentId])
+  @@index([customerDepositId])
+}
+
+model EmployeeProfile {
+  id    Int     @id @default(autoincrement())
+  name  String?
+  phone String?
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
+
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int?
+
+  position   Position? @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionId Int?
+
+  confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
+
+  purchaseOrderCreated PurchaseOrder[]
+  assignedServices     ServiceOrder[]
+  approved             Boolean         @default(false)
+  active               Boolean         @default(true)
+
+  stockItem            StockItem[]
+  sale                 Sale[]
+  saleReturns          SaleReturn[]
+  refundedReturns      SaleReturn[]           @relation("RefundedBy")
+  payment              Payment[]
+  combinedSaleDocument CombinedSaleDocument[]
+  refundTransaction    RefundTransaction[]
+  supplierPayment      SupplierPayment[]
+
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  combinedBillingDocument CombinedBillingDocument[]
+  stockAuditSession       StockAuditSession[]
+  stockAuditScanLog       StockAuditScanLog[]
+  customerDeposit         CustomerDeposit[]
+  PurchaseOrderReceipt    PurchaseOrderReceipt[]
+}
+
+model Branch {
+  id      Int     @id @default(autoincrement())
+  name    String
+  address String
+  phone   String?
+
+  subdistrictCode String?
+  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+
+  businessType BusinessType @default(GENERAL)
+  features     Json?
+
+  branchPrices BranchPrice[]
+
+  employees EmployeeProfile[]
+  stock     StockItem[]
+  suppliers Supplier[]
+  pos       PurchaseOrder[]
+  services  ServiceOrder[]
+
+  RBACEnabled          Boolean                @default(true)
+  purchaseOrderReceipt PurchaseOrderReceipt[]
+  barcodeCounter       BarcodeCounter[]
+  barcodeReceiptItem   BarcodeReceiptItem[]
+  sale                 Sale[]
+  saleReturn           SaleReturn[]
+  payment              Payment[]
+  combinedSaleDocument CombinedSaleDocument[]
+  refundTransaction    RefundTransaction[]
+  supplierPayment      SupplierPayment[]
+  customerDeposit      CustomerDeposit[]
+  orderOnline          OrderOnline[]
+
+  combinedBillingDocument CombinedBillingDocument[]
+  stockAuditSession       StockAuditSession[]
+  paymentCodeCounter      PaymentCodeCounter[]
+  stockMovement           StockMovement[]
+
+  simpleLots SimpleLot[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  stockBalances StockBalance[]
+
+  @@index([subdistrictCode])
+}
+
+model Province {
+  code   String @id
+  nameTh String
+
+  region    String
+  districts District[]
+}
+
+model District {
+  code         String        @id
+  nameTh       String
+  provinceCode String
+  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  subdistricts Subdistrict[]
+
+  @@index([provinceCode])
+}
+
+model Subdistrict {
+  code            String            @id
+  nameTh          String
+  districtCode    String
+  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+  postcode        String?
+  branches        Branch[]
+  CustomerProfile CustomerProfile[]
+
+  @@index([districtCode])
+  @@index([postcode])
+}
+
+model Position {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+
+  employees EmployeeProfile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+model Category {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  active   Boolean @default(true)
+  isSystem Boolean @default(false)
+
+  productTypes ProductType[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+}
+
+model ProductType {
+  id             Int     @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String?
+  active         Boolean @default(true)
+
+  guideExamples String[] @default([])
+  pathCached    String?
+
+  profiles ProductProfile[]
+
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+
+  @@unique([categoryId, slug])
+  @@unique([categoryId, normalizedName])
+  @@index([normalizedName])
+}
+
+model ProductProfile {
+  id             Int     @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String?
+  description    String?
+
+  guideExamples String[] @default([])
+  pathCached    String?
+
+  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+  productTypeId Int
+
+  templates ProductTemplate[]
+
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+
+  @@unique([productTypeId, slug])
+  @@unique([productTypeId, normalizedName])
+  @@index([normalizedName])
+}
+
+model ProductTemplate {
+  id             Int     @id @default(autoincrement())
+  name           String
+  slug           String
+  normalizedName String
+  warranty       Int?
+  noSN           Boolean @default(false)
+  codeType       String  @default("D")
+  active         Boolean @default(true)
+
+  guideExamples String[] @default([])
+  pathCached    String?
+
+  applicableBusinessTypes BusinessType[] @default([])
+
+  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
+  productProfileId Int
+
+  products Product[]
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unitId   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productProfileId, slug])
+  @@unique([productProfileId, normalizedName])
+  @@index([normalizedName])
+}
+
+model Product {
+  id             Int     @id @default(autoincrement())
+  name           String?
+  slug           String?
+  normalizedName String?
+  description    String?
+  model          String?
+
+  sku               String?     @unique
+  barcode           String?     @unique
+  unitName          String?
+  spec              String?
+  sold              Int         @default(0)
+  quantity          Int? // DEPRECATED
+  noSN              Boolean     @default(false)
+  active            Boolean     @default(true)
+  allowNegative     Boolean     @default(false)
+  mode              ProductMode @default(STRUCTURED)
+  attributes        Json?
+  trackSerialNumber Boolean     @default(false)
+
+  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateId Int?
+
+  category         Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId       Int?
+  productType      ProductType?    @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
+  productTypeId    Int?
+  productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  productProfileId Int?
+
+  productImages      ProductImage[]
+  stockItems         StockItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  orderItems         ProductOnOrder[]
+  cartItems          CartItem[]
+  serviceItems       ServiceItem[]
+  branchPrice        BranchPrice[]
+  orderOnlineItem    OrderOnlineItem[]
+
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  stockAuditSnapshotItem   StockAuditSnapshotItem[]
+  stockMovement            StockMovement[]
+  saleItemSimple           SaleItemSimple[]
+  simpleLots               SimpleLot[]
+  stockBalances            StockBalance[]
+  PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
+
+  @@index([mode, active])
+  @@index([templateId])
+  @@index([categoryId])
+  @@index([productTypeId])
+  @@index([productProfileId])
+  @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
+}
+
+model BranchPrice {
+  id Int @id @default(autoincrement())
+
+  costPrice       Decimal @db.Decimal(12, 2)
+  priceRetail     Int?
+  priceWholesale  Int?
+  priceTechnician Int?
+  priceOnline     Int?
+
+  effectiveDate DateTime?
+  expiredDate   DateTime?
+  note          String?
+  updatedBy     Int?
+  isActive      Boolean   @default(true)
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+}
+
+/// Branch-level quantity สำหรับสินค้า SIMPLE (no SN)
+model StockBalance {
+  id Int @id @default(autoincrement())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  quantity Decimal @default(0) @db.Decimal(12, 2)
+  reserved Decimal @default(0) @db.Decimal(12, 2)
+
+  avgCost          Decimal? @db.Decimal(12, 2)
+  lastReceivedCost Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+}
+
+model StockMovement {
+  id        Int               @id @default(autoincrement())
+  productId Int
+  branchId  Int
+  qty       Decimal           @db.Decimal(12, 2)
+  type      StockMovementType
+
+  refType String?
+  refId   Int?
+  note    String?
+
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  simpleLotId Int?
+  simpleLots  SimpleLot? @relation(fields: [simpleLotId], references: [id], onDelete: SetNull)
+
+  @@index([branchId, createdAt])
+  @@index([productId, createdAt])
+  @@index([branchId, type, createdAt])
+  @@index([productId, branchId, createdAt])
+}
+
+model ProductImage {
+  id         Int     @id @default(autoincrement())
+  public_id  String  @unique
+  url        String
+  secure_url String
+  active     Boolean @default(true)
+
+  caption String?
+  isCover Boolean?
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  productTemplate ProductTemplate[]
+}
+
+model StockItem {
+  id           Int     @id @default(autoincrement())
+  barcode      String  @unique
+  serialNumber String?
+
+  qrCodeData   String?
+  costPrice    Decimal?    @db.Decimal(12, 2)
+  receivedAt   DateTime    @default(now())
+  warrantyDays Int?
+  expiredAt    DateTime?
+  soldAt       DateTime?
+  status       StockStatus @default(IN_STOCK)
+  remark       String?
+  locationCode String?
+  source       String?
+  tag          String?
+  batchNumber  String?
+  checkedBy    String?
+  color        String?
+
+  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id], onDelete: Cascade)
+  scannedByEmployeeId Int?
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
+  purchaseOrderReceiptItemId Int?
+
+  barcodeReceiptItem BarcodeReceiptItem[]
+  saleItem           SaleItem?
+
+  scannedAt              DateTime                 @default(now())
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  stockAuditSnapshotItem StockAuditSnapshotItem[]
+  stockAuditScanLog      StockAuditScanLog[]
+
+  @@unique([serialNumber, productId])
+  @@index([branchId, status, productId])
+  @@index([productId, status])
+}
+
+
+    
+
+//----------------------------------------------------------------------------- 2
+
+
+
+
+model Supplier {
+  isSystem      Boolean         @default(false)
+  id            Int             @id @default(autoincrement())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  taxId         String?
+  taxBranchCode String?         @default("00000")
+  address       String?
+  province      String?
+  postalCode    String?
+  country       String?         @default("Thailand")
+  paymentTerms  Int?            @default(0)
+  creditLimit   Decimal?        @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal?        @default(0) @db.Decimal(12, 2)
+  bankId        Int?
+  accountNumber String?
+  accountType   String?
+  notes         String?
+  branchId      Int
+  active        Boolean         @default(true)
+  bank          Bank?           @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  pos           PurchaseOrder[]
+
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  supplierPayment      SupplierPayment[]
+  PurchaseOrderReceipt PurchaseOrderReceipt[]
+
+  @@unique([branchId, name])
+}
+
+model Bank {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  supplier  Supplier[]
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model PurchaseOrder {
+  id     Int                 @id @default(autoincrement())
+  code   String              @unique
+  date   DateTime            @default(now())
+  note   String?
+  status PurchaseOrderStatus @default(PENDING)
+
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId Int
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId Int
+
+  items    PurchaseOrderItem[]
+  receipts PurchaseOrderReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseOrderItem {
+  id Int @id @default(autoincrement())
+
+  productId        Int
+  quantity         Int
+  receivedQuantity Int                        @default(0)
+  costPrice        Decimal                    @db.Decimal(12, 2)
+  receipts         PurchaseOrderReceiptItem[]
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId Int
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseOrderReceipt {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  receivedAt  DateTime @default(now())
+  note        String?
+  totalAmount Decimal? @db.Decimal(12, 2)
+  paidAmount  Decimal? @db.Decimal(12, 2)
+
+  supplierTaxInvoiceNumber String?
+  supplierTaxInvoiceDate   DateTime?
+  vatRate                  Decimal?  @default(7) @db.Decimal(5, 2)
+
+  statusReceipt ReceiptStatus @default(PENDING)
+  statusPayment PaymentStatus @default(UNPAID)
+
+  receivedById Int
+  // Link to EmployeeProfile for audit trail
+  receivedBy   EmployeeProfile @relation(fields: [receivedById], references: [id], onDelete: Cascade)
+
+  printed  Boolean @default(false)
+  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  // Optional supplier at receipt level (supports QUICK or PO-less receipts)
+  supplierId Int?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  purchaseOrderId Int?
+
+  source ReceiptSource @default(PO)
+
+  items                  PurchaseOrderReceiptItem[]
+  barcodeReceiptItem     BarcodeReceiptItem[]
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  supplierPaymentReceipt SupplierPaymentReceipt[]
+
+  @@index([branchId, receivedAt])
+  @@index([purchaseOrderId])
+  // Improve query performance by channel/time
+  @@index([source, receivedAt])
+}
+
+model PurchaseOrderReceiptItem {
+  id        Int @id @default(autoincrement())
+  receiptId Int
+
+  // Optional for QUICK receipts (no PO)
+  purchaseOrderItemId Int?
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+
+  // Direct product link for QUICK
+  productId Int?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // Decimal quantity to support SIMPLE mode
+  quantity  Decimal @db.Decimal(12, 2)
+  costPrice Decimal @db.Decimal(12, 2)
+
+  receipt            PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  stockItems         StockItem[]
+  barcodeReceiptItem BarcodeReceiptItem[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  simpleLots         SimpleLot[]
+
+  @@index([receiptId])
+  @@index([productId])
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  cartTotal       Decimal     @db.Decimal(12, 2)
+  orderStatus     OrderStatus @default(PENDING)
+  stripePaymentId String
+  status          String
+  amount          Int
+  currency        String
+
+  customerId Int?
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  products   ProductOnOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductOnOrder {
+  id        Int @id @default(autoincrement())
+  productId Int
+  orderId   Int
+  count     Int
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cart {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  customerProfileId Int?
+}
+
+model CartItem {
+  id              Int     @id @default(autoincrement())
+  cartId          Int
+  cart            Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId       Int
+  product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity        Int     @default(1)
+  priceAtThatTime Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+model ServiceOrder {
+  id         Int  @id @default(autoincrement())
+  customerId Int?
+  branchId   Int?
+  employeeId Int?
+
+  receiveDate DateTime      @default(now())
+  status      ServiceStatus @default(RECEIVED)
+  description String?
+  note        String?
+
+  customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branch   Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employee EmployeeProfile? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  items ServiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceItem {
+  id           Int      @id @default(autoincrement())
+  serviceId    Int
+  productId    Int?
+  serialNumber String?
+  problem      String?
+  solution     String?
+  cost         Decimal? @db.Decimal(12, 2)
+
+  service ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  product Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BarcodeCounter {
+  id         Int      @id @default(autoincrement())
+  branchId   Int
+  yearMonth  String
+  lastNumber Int
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, yearMonth])
+}
+
+model BarcodeReceiptItem {
+  id      Int    @id @default(autoincrement())
+  barcode String @unique
+
+  yearMonth     String
+  runningNumber Int
+  status        BarcodeStatus @default(READY)
+
+  printed     Boolean    @default(false)
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  stockItemId Int?
+
+  // Support LOT codes for SIMPLE via SimpleLot relation
+  kind        BarcodeKind @default(SN) // enum has SN | LOT in real schema
+  simpleLotId Int?
+  simpleLot   SimpleLot?  @relation(fields: [simpleLotId], references: [id], onDelete: SetNull)
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderReceiptId Int
+
+  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+  receiptItemId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, yearMonth, runningNumber])
+  @@index([purchaseOrderReceiptId, branchId])
+}
+
+model Sale {
+  id   Int    @id @default(autoincrement())
+  code String @unique
+
+  soldAt     DateTime @default(now())
+  customerId Int?
+  employeeId Int
+  branchId   Int
+
+  totalBeforeDiscount Decimal    @db.Decimal(12, 2)
+  totalDiscount       Decimal    @db.Decimal(12, 2)
+  vat                 Decimal    @db.Decimal(12, 2)
+  vatRate             Decimal    @default(7) @db.Decimal(5, 2)
+  totalAmount         Decimal    @db.Decimal(12, 2)
+  note                String?
+  status              SaleStatus @default(DRAFT)
+  refCode             String?
+  isTaxInvoice        Boolean    @default(false)
+  paid                Boolean    @default(false)
+  paidAt              DateTime?
+
+  isCredit               Boolean               @default(false)
+  dueDate                DateTime?
+  officialDocumentNumber String?
+  saleType               SaleType              @default(NORMAL)
+  finalizedAt            DateTime?
+  combinedDocumentId     Int?
+  combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id], onDelete: Cascade)
+
+  customer    CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  employee    EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch      Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  items       SaleItem[]
+  simpleItems SaleItemSimple[]
+  returns     SaleReturn[]
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  Payment      Payment[]
+  DepositUsage DepositUsage[]
+
+  combinedBillingId    Int?
+  combinedBilling      CombinedBillingDocument? @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
+  SaleReturnItemSimple SaleReturnItemSimple[]
+
+  @@index([combinedBillingId])
+  @@index([branchId, soldAt])
+  @@index([isCredit, dueDate])
+  @@index([combinedDocumentId])
+}
+
+model SaleItem {
+  id          Int @id @default(autoincrement())
+  saleId      Int
+  stockItemId Int @unique
+
+  basePrice      Decimal @db.Decimal(12, 2)
+  vatAmount      Decimal @db.Decimal(12, 2)
+  price          Decimal @db.Decimal(12, 2)
+  discount       Decimal @db.Decimal(12, 2)
+  refundedAmount Decimal @default(0) @db.Decimal(12, 2)
+  remark         String?
+
+  sale        Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  stockItem   StockItem        @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  returnItems SaleReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// SIMPLE Sale Item (ไม่ใช้ SN)
+model SaleItemSimple {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  quantity  Decimal @db.Decimal(12, 2)
+
+  basePrice Decimal @db.Decimal(12, 2)
+  discount  Decimal @db.Decimal(12, 2)
+  price     Decimal @db.Decimal(12, 2)
+  vatAmount Decimal @db.Decimal(12, 2)
+  remark    String?
+
+  unitCost Decimal? @db.Decimal(12, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  simpleLotId Int?
+  simpleLots  SimpleLot? @relation(fields: [simpleLotId], references: [id], onDelete: SetNull)
+
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  SaleReturnItemSimple SaleReturnItemSimple[]
+
+  @@index([saleId])
+  @@index([productId])
+  @@index([simpleLotId])
+}
+
+model Payment {
+  id     Int    @id @default(autoincrement())
+  code   String @unique
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId Int
+
+  receivedAt           DateTime @default(now())
+  note                 String?
+  combinedDocumentCode String?
+
+  isCancelled Boolean   @default(false)
+  cancelNote  String?
+  cancelledAt DateTime?
+
+  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  employeeProfileId Int?
+
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  items PaymentItem[]
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  DepositUsage DepositUsage[]
+
+  @@index([saleId])
+  @@index([branchId, receivedAt])
+}
+
+model PaymentItem {
+  id        Int     @id @default(autoincrement())
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId Int
+
+  paymentMethod PaymentMethod
+  amount        Decimal       @db.Decimal(12, 2)
+  note          String?
+
+  slipImage String?
+  cardRef   String?
+  govImage  String?
+
+  createdAt DateTime @default(now())
+}
+
+model CombinedSaleDocument {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique
+  issueDate      DateTime @default(now())
+  note           String?
+  createdBy      Int
+  branchId       Int
+  totalAmount    Decimal  @db.Decimal(12, 2)
+  finalAmount    Decimal  @db.Decimal(12, 2)
+  adjustmentNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdByUser EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  sales         Sale[]          @relation("SalesCombined")
+}
+
+model SaleReturn {
+  id                   Int              @id @default(autoincrement())
+  code                 String           @unique
+  saleId               Int
+  returnedAt           DateTime         @default(now())
+  employeeId           Int
+  refundedByEmployeeId Int?
+  branchId             Int
+  reason               String?
+  totalRefund          Decimal          @db.Decimal(12, 2)
+  refundedAmount       Decimal          @default(0) @db.Decimal(12, 2)
+  deductedAmount       Decimal          @default(0) @db.Decimal(12, 2)
+  isFullyRefunded      Boolean          @default(false)
+  refundMethod         RefundMethod
+  returnType           ReturnType       @default(REFUND)
+  note                 String?
+  status               SaleReturnStatus @default(PENDING)
+
+  sale       Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  employee   EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  refundedBy EmployeeProfile? @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
+  branch     Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  items      SaleReturnItem[]
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  refundTransaction RefundTransaction[]
+}
+
+model SaleReturnItem {
+  id           Int @id @default(autoincrement())
+  saleReturnId Int
+  saleItemId   Int
+
+  refundAmount Decimal @db.Decimal(12, 2)
+  reason       String?
+  reasonCode   String?
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RefundTransaction {
+  id                   Int          @id @default(autoincrement())
+  saleReturnId         Int
+  amount               Decimal      @db.Decimal(12, 2)
+  deducted             Decimal      @default(0) @db.Decimal(12, 2)
+  method               RefundMethod
+  note                 String?
+  refundedAt           DateTime     @default(now())
+  refundedByEmployeeId Int
+  branchId             Int
+
+  saleReturn SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  refundedBy EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id], onDelete: Cascade)
+  branch     Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+}
+
+model SupplierPayment {
+  id         Int      @id @default(autoincrement())
+  code       String?  @unique
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId Int
+
+  debitAmount  Decimal? @db.Decimal(12, 2)
+  creditAmount Decimal? @db.Decimal(12, 2)
+  amount       Decimal? @db.Decimal(12, 2)
+
+  method PaymentMethod
+  note   String?
+
+  paymentRef      String?
+  paymentProofUrl String?
+  statusPayment   PaymentStatus @default(UNPAID)
+  sourceType      String?
+  sourcePOId      Int?
+
+  paymentType PaymentType @default(RECEIPT_BASED)
+
+  paidAt     DateTime        @default(now())
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId Int
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  supplierPaymentReceipts SupplierPaymentReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, paidAt])
+  @@index([supplierId])
+}
+
+model SupplierPaymentReceipt {
+  id Int @id @default(autoincrement())
+
+  payment   SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId Int
+
+  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId Int
+
+  amountPaid Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([paymentId, receiptId])
+}
+
+model OrderOnline {
+  id   Int    @id @default(autoincrement())
+  code String @unique
+
+  customerId Int?
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  note          String?
+  paymentNote   String?
+  status        OrderOnlineStatus @default(PENDING)
+  statusPayment PaymentStatus     @default(UNPAID)
+  paymentMethod PaymentMethod?
+  trackingCode  String?
+  source        OrderSource?
+  deliveryDate  DateTime?
+
+  confirmedByEmployeeId Int?
+  confirmedByEmployee   EmployeeProfile? @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id], onDelete: Cascade)
+
+  shippedAt    DateTime?
+  cancelReason String?
+
+  paymentSlipUrl String?
+
+  paymentSlipStatus PaymentSlipStatus @default(NONE)
+
+  items       OrderOnlineItem[]
+  createdAt   DateTime          @default(now())
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int?
+  paymentDate DateTime?
+}
+
+model OrderOnlineItem {
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  quantity        Int
+  priceAtPurchase Decimal? @db.Decimal(12, 2)
+  note            String?
+
+  order   OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model CombinedBillingDocument {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  issueDate  DateTime @default(now())
+  note       String?
+  createdBy  Int
+  customerId Int
+  branchId   Int
+
+  totalBeforeVat Decimal?              @db.Decimal(12, 2)
+  vatAmount      Decimal?              @db.Decimal(12, 2)
+  totalAmount    Decimal?              @db.Decimal(12, 2)
+  status         CombinedBillingStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee EmployeeProfile @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  sales    Sale[]          @relation("CombinedBillingSales")
+}
+
+model StockAuditSession {
+  id            Int              @id @default(autoincrement())
+  branchId      Int
+  employeeId    Int
+  mode          StockAuditMode   @default(READY)
+  status        StockAuditStatus @default(DRAFT)
+  expectedCount Int              @default(0)
+  scannedCount  Int              @default(0)
+  startedAt     DateTime         @default(now())
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  note          String?
+
+  branch        Branch                   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employee      EmployeeProfile          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  snapshotItems StockAuditSnapshotItem[]
+  scanLogs      StockAuditScanLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, status])
+  @@index([startedAt])
+}
+
+model StockAuditSnapshotItem {
+  id             Int         @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  productId      Int
+  barcode        String
+  expectedStatus StockStatus @default(IN_STOCK)
+  isScanned      Boolean     @default(false)
+  scannedAt      DateTime?
+
+  auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([auditSessionId, stockItemId])
+  @@index([auditSessionId, isScanned])
+  @@index([barcode])
+}
+
+model StockAuditScanLog {
+  id             Int      @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  barcode        String
+  scannedAt      DateTime @default(now())
+  byEmployeeId   Int
+
+  auditSession StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  employee     EmployeeProfile   @relation(fields: [byEmployeeId], references: [id], onDelete: Cascade)
+
+  @@index([auditSessionId, scannedAt])
+  @@index([barcode])
+}
+
+model PaymentCodeCounter {
+  id       Int    @id @default(autoincrement())
+  branchId Int
+  yyyymmdd String
+  lastNo   Int    @default(0)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, yyyymmdd])
+}
+
+model SimpleLot {
+  id            Int             @id @default(autoincrement())
+  branchId      Int
+  productId     Int
+  receiptItemId Int?
+  barcode       String          @unique // SL-<branch><YYMM>-####
+  qtyInitial    Decimal         @db.Decimal(12, 2)
+  qtyRemaining  Decimal         @db.Decimal(12, 2)
+  unitCost      Decimal         @db.Decimal(12, 2)
+  receivedAt    DateTime        @default(now())
+  status        SimpleLotStatus @default(ACTIVE)
+  printCount    Int             @default(0)
+  lastPrintedAt DateTime?
+
+  branch      Branch                    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product     Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  receiptItem PurchaseOrderReceiptItem? @relation(fields: [receiptItemId], references: [id], onDelete: SetNull)
+
+  stockMovements     StockMovement[]
+  saleItemsSimple    SaleItemSimple[]
+  BarcodeReceiptItem BarcodeReceiptItem[]
+
+  @@index([branchId, productId, receivedAt])
+  @@index([branchId, status]) // <— เพิ่มบรรทัดนี้
+}
+
+model SaleReturnItemSimple {
+  id               Int     @id @default(autoincrement())
+  saleReturnId     Int
+  saleItemSimpleId Int
+  refundAmount     Decimal @db.Decimal(12, 2)
+  reason           String?
+  reasonCode       String?
+
+  saleReturn     Sale           @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItemSimple SaleItemSimple @relation(fields: [saleItemSimpleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+

@@ -1,6 +1,7 @@
 // productTemplateController.js — Guards: normalize + unique-by-parent (productProfileId), archive/restore, safer P2002
 
 const { prisma } = require('../lib/prisma');
+const MAX_LIMIT = 100;
 
 // ---------- helpers ----------
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
@@ -55,15 +56,23 @@ async function findDuplicateTemplate({ productProfileId, normalizedName, slug })
   });
 }
 
+
+
 // ✅ GET /product-templates — list (คงรูปแบบเดิม)
 const getAllProductTemplates = async (req, res) => {
   try {
-    const { q, productProfileId, productTypeId, categoryId } = req.query || {};
+    const { q, productProfileId, productTypeId, categoryId, includeInactive, page: pageQ, limit: limitQ } = req.query || {};
+
+    const pageRaw = Number(pageQ);
+    const limitRaw = Number(limitQ);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 20;
 
     const where = omitUndefined({
       ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
       ...(toInt(productTypeId) ? { productProfile: { productTypeId: toInt(productTypeId) } } : {}),
       ...(toInt(categoryId) ? { productProfile: { productType: { categoryId: toInt(categoryId) } } } : {}),
+      ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
       ...(q
         ? {
             OR: [
@@ -74,16 +83,21 @@ const getAllProductTemplates = async (req, res) => {
         : {}),
     });
 
-    const templates = await prisma.productTemplate.findMany({
-      where,
-      include: {
-        productProfile: { include: { productType: { include: { category: true } } } },
-        unit: true,
-      },
-      orderBy: [{ id: 'desc' }],
-    });
+    const [total, items] = await Promise.all([
+      prisma.productTemplate.count({ where }),
+      prisma.productTemplate.findMany({
+        where,
+        include: {
+          productProfile: { include: { productType: { include: { category: true } } } },
+          unit: true,
+        },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
 
-    const mapped = templates.map((t) => ({
+    const mapped = items.map((t) => ({
       id: t.id,
       name: t.name,
       unitId: t.unitId,
@@ -94,7 +108,8 @@ const getAllProductTemplates = async (req, res) => {
       categoryId: t.productProfile?.productType?.category?.id,
     }));
 
-    res.json(mapped);
+    res.set('Cache-Control', 'no-store');
+    res.json({ items: mapped, total, page, limit });
   } catch (error) {
     console.error('❌ getAllProductTemplates error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -135,6 +150,8 @@ const createProductTemplate = async (req, res) => {
 
     const nameTrim = String(name).trim();
     if (!nameTrim) return res.status(400).json({ error: 'ชื่อห้ามว่าง' });
+    if (nameTrim.length > 80) return res.status(400).json({ error: 'ชื่อยาวเกินไป (สูงสุด 80 ตัวอักษร)' });
+
     const normalized = normalizeName(nameTrim);
     const slug = slugify(nameTrim);
 
@@ -241,6 +258,7 @@ const updateProductTemplate = async (req, res) => {
     let nameTrim, normalized, slug;
     if (name !== undefined) {
       if (String(name).trim() === '') return res.status(400).json({ error: 'ชื่อห้ามว่าง' });
+      if (String(name).trim().length > 80) return res.status(400).json({ error: 'ชื่อยาวเกินไป (สูงสุด 80 ตัวอักษร)' });
       nameTrim = String(name).trim();
       normalized = normalizeName(nameTrim);
       slug = slugify(nameTrim);
@@ -409,20 +427,44 @@ const deleteProductTemplate = async (req, res) => {
 // ✅ DROPDOWNS — return only active=true (optional filter by productProfileId/productTypeId/categoryId)
 const getProductTemplateDropdowns = async (req, res) => {
   try {
-    const { productProfileId, productTypeId, categoryId } = req.query || {};
+    // scoped update: เพิ่ม field ที่จำเป็นต่อ FE และตัวกรอง/limit โดยไม่กระทบ logic อื่น
+    const { productProfileId, productTypeId, categoryId, q, includeInactive, limit: limitQ } = req.query || {};
+
+    const limitRaw = Number(limitQ);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 100;
+
     const where = omitUndefined({
-      active: true,
+      ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
       ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
       ...(toInt(productTypeId) ? { productProfile: { productTypeId: toInt(productTypeId) } } : {}),
       ...(toInt(categoryId) ? { productProfile: { productType: { categoryId: toInt(categoryId) } } } : {}),
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: String(q), mode: 'insensitive' } },
+              { productProfile: { name: { contains: String(q), mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
     });
 
-    const templates = await prisma.productTemplate.findMany({
+    const rows = await prisma.productTemplate.findMany({
       where,
-      select: { id: true, name: true },
+      include: { productProfile: { include: { productType: { include: { category: true } } } } },
       orderBy: { name: 'asc' },
+      take: limit,
     });
 
+    // backwards-compatible: เพิ่ม field เพิ่มเติมแบบ additive
+    const templates = rows.map((t) => ({
+      id: t.id,
+      name: t.name,
+      productProfileId: t.productProfileId,
+      productTypeId: t.productProfile?.productType?.id,
+      categoryId: t.productProfile?.productType?.category?.id,
+    }));
+
+    res.set('Cache-Control', 'no-store');
     res.json(templates);
   } catch (error) {
     console.error('❌ [Dropdown ProductTemplate] Error:', error);
@@ -440,3 +482,12 @@ module.exports = {
   getProductTemplateDropdowns,
   deleteProductTemplate, // ไว้เพื่อความเข้ากันได้ ถึงแม้ routes จะไม่ใช้แล้ว
 };
+
+
+
+
+
+
+
+
+

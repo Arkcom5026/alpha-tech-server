@@ -1,3 +1,5 @@
+// saleController.js
+
 const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
 

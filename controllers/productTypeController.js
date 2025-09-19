@@ -1,7 +1,8 @@
 // controllers/productTypeController.js
 // Guards: slug-based unique-by-parent (categoryId), safer P2002 detail
 
-const { prisma } = require('../lib/prisma');
+const { prisma, Prisma } = require('../lib/prisma');
+const MAX_LIMIT = 100;
 
 // ---------- helpers ----------
 const toInt = (v) =>
@@ -45,18 +46,31 @@ async function findDuplicateType({ categoryId, slug }) {
 // ✅ GET: list
 const getAllProductType = async (req, res) => {
   try {
-    const { q, categoryId } = req.query || {};
+    const { q, categoryId, includeInactive, page: pageQ, limit: limitQ } = req.query || {};
+    const pageRaw = Number(pageQ);
+    const limitRaw = Number(limitQ);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 20;
+
     const where = omitUndefined({
       ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
       ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
+      ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
     });
 
-    const productTypes = await prisma.productType.findMany({
-      where,
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
-      include: { category: true },
-    });
-    res.json(productTypes);
+    const [total, items] = await Promise.all([
+      prisma.productType.count({ where }),
+      prisma.productType.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { category: true },
+      }),
+    ]);
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ items, total, page, limit });
   } catch (err) {
     console.error('❌ GET ProductTypes Failed:', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -107,6 +121,7 @@ const createProductType = async (req, res) => {
     const normalized = normalizeName(nameTrim);
     const slug = slugify(nameTrim);
 
+    // Pre-check to return conflict detail (UX ดีกว่า)
     const dupe = await findDuplicateType({ categoryId: categoryIdInt, slug });
     if (dupe) {
       return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม', conflict: dupe });
@@ -120,6 +135,10 @@ const createProductType = async (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     console.error('❌ CREATE ProductType Failed:', err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // Race condition guard: unique (categoryId, slug)
+      return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม (unique constraint)' });
+    }
     return res.status(500).json({ error: 'ไม่สามารถเพิ่มประเภทสินค้าได้' });
   }
 };
@@ -177,6 +196,9 @@ const updateProductType = async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error('❌ UPDATE ProductType Failed:', err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม (unique constraint)' });
+    }
     return res.status(500).json({ error: 'ไม่สามารถแก้ไขประเภทสินค้าได้' });
   }
 };
@@ -261,4 +283,6 @@ module.exports = {
   restoreProductType,
   getProductTypeDropdowns,
 };
+
+
 

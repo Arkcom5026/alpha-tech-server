@@ -1,3 +1,4 @@
+
 // controllers/purchaseOrderController.js
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -40,14 +41,12 @@ const createPurchaseOrder = async (req, res) => {
     if (!branchId || !employeeId) {
       return res.status(401).json({ error: 'Unauthorized: Missing branchId/employeeId' });
     }
-    if (!supplierId || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'ข้อมูลไม่ครบ (supplierId/items)' });
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'ต้องมีรายการสินค้าอย่างน้อย 1 รายการ' });
     }
     for (const it of items) {
       if (!it?.productId || !it?.quantity || !isMoneyLike(it?.costPrice)) {
-        return res
-          .status(400)
-          .json({ error: 'รายการสินค้าไม่ถูกต้อง (productId/quantity/costPrice)' });
+        return res.status(400).json({ error: 'รายการสินค้าไม่ถูกต้อง (productId/quantity/costPrice)' });
       }
     }
 
@@ -59,7 +58,7 @@ const createPurchaseOrder = async (req, res) => {
           const po = await tx.purchaseOrder.create({
             data: {
               code,
-              supplier: { connect: { id: Number(supplierId) } },
+              ...(supplierId ? { supplier: { connect: { id: Number(supplierId) } } } : {}),
               branch: { connect: { id: branchId } },
               employee: { connect: { id: employeeId } },
               note: note || null,
@@ -73,21 +72,13 @@ const createPurchaseOrder = async (req, res) => {
               },
             },
           });
-
-          // update costPrice per-branch
           for (const item of items) {
             await tx.branchPrice.upsert({
               where: { productId_branchId: { productId: Number(item.productId), branchId } },
               update: { costPrice: D(item.costPrice) },
-              create: {
-                productId: Number(item.productId),
-                branchId,
-                costPrice: D(item.costPrice),
-                isActive: true,
-              },
+              create: { productId: Number(item.productId), branchId, costPrice: D(item.costPrice), isActive: true },
             });
           }
-
           return po;
         });
         break;
@@ -97,18 +88,14 @@ const createPurchaseOrder = async (req, res) => {
       }
     }
 
-    if (!createdPO) {
-      return res
-        .status(500)
-        .json({ error: 'ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้ กรุณาลองใหม่' });
-    }
-
+    if (!createdPO) return res.status(500).json({ error: 'ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้ กรุณาลองใหม่' });
     res.status(201).json(createdPO);
   } catch (err) {
     console.error('❌ createPurchaseOrder error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // UPDATE STATUS (with branch check)
 const updatePurchaseOrderStatus = async (req, res) => {
@@ -122,9 +109,12 @@ const updatePurchaseOrderStatus = async (req, res) => {
     const po = await prisma.purchaseOrder.findFirst({ where: { id, branchId } });
     if (!po) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อในสาขานี้' });
 
+    const VALID = ['PENDING','PARTIALLY_RECEIVED','RECEIVED','PAID','COMPLETED','CANCELLED'];
+    const nextStatus = VALID.includes(String(req.body?.status)) ? String(req.body.status) : 'COMPLETED';
+
     const updated = await prisma.purchaseOrder.update({
       where: { id },
-      data: { status: 'COMPLETED' },
+      data: { status: nextStatus },
     });
     res.json({ success: true, updated });
   } catch (err) {
@@ -132,6 +122,7 @@ const updatePurchaseOrderStatus = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // LIST (filter by branch, status, search)
 const getAllPurchaseOrders = async (req, res) => {
@@ -162,7 +153,8 @@ const getAllPurchaseOrders = async (req, res) => {
             OR: [
               { code: { contains: String(search), mode: 'insensitive' } },
               { note: { contains: String(search), mode: 'insensitive' } },
-              { supplier: { name: { contains: String(search), mode: 'insensitive' } } },
+              // ✅ Prisma relation filter สำหรับ 1:1 ต้องใช้ is:{ ... }
+              { supplier: { is: { name: { contains: String(search), mode: 'insensitive' } } } },
             ],
           }
         : {}),
@@ -172,7 +164,18 @@ const getAllPurchaseOrders = async (req, res) => {
       where,
       include: {
         supplier: true,
-        items: { include: { product: { select: { name: true } } } },
+        items: {
+          include: {
+            product: {
+              include: {
+                
+                
+                
+                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -183,6 +186,7 @@ const getAllPurchaseOrders = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // ELIGIBLE FOR PAYMENT
 const getEligiblePurchaseOrders = async (req, res) => {
@@ -255,17 +259,44 @@ const getPurchaseOrderById = async (req, res) => {
       where: { id, branchId },
       include: {
         supplier: true,
-        items: { include: { product: { include: { template: true } } } },
+        items: {
+          include: {
+            product: {
+              include: {
+                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
+              },
+            },
+          },
+        },
       },
     });
 
     if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
-    res.json(po);
+
+    // ส่ง alias ให้ FE เผื่อบางชั้นไม่ได้ include
+    const normalized = {
+      ...po,
+      items: po.items.map((it) => {
+        const p = it.product || {};
+        return {
+          ...it,
+          categoryName: p.template?.productProfile?.productType?.category?.name ?? null,
+          productTypeName: p.template?.productProfile?.productType?.name ?? null,
+          productProfileName: p.template?.productProfile?.name ?? null,
+          productTemplateName: p.template?.name ?? null,
+          productModel: p.model ?? p.template?.model ?? null,
+          productName: p.name ?? p.template?.name ?? null,
+        };
+      }),
+    };
+
+    res.json(normalized);
   } catch (err) {
     console.error('❌ getPurchaseOrderById error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // UPDATE (items rewritten) + upsert branchPrice — all in one transaction
 const updatePurchaseOrder = async (req, res) => {
@@ -358,10 +389,11 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
 
     if (!branchId || !employeeId)
       return res.status(401).json({ message: 'Unauthorized: Missing branchId/employeeId' });
-    if (!supplierId || items.length === 0)
-      return res.status(400).json({ message: 'ข้อมูลไม่ครบ (supplierId/items)' });
+    // ✅ ไม่บังคับ supplierId
+    if (items.length === 0)
+      return res.status(400).json({ message: 'ต้องมีรายการสินค้าอย่างน้อย 1 รายการ' });
 
-    // ✅ Validate items (strict)
+    // Validate items
     for (const it of items) {
       const qty = Number(it?.quantity);
       const cost = it?.costPrice;
@@ -370,7 +402,7 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
       }
     }
 
-    // ✅ Validate advance payments shape
+    // Validate advance payments
     for (const ap of advancePaymentsUsed) {
       if (!ap?.paymentId || !isMoneyLike(ap?.amount) || Number(ap.amount) <= 0) {
         return res.status(400).json({ message: 'ข้อมูลเงินล่วงหน้าไม่ถูกต้อง (paymentId, amount>0)' });
@@ -386,7 +418,8 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
             data: {
               code,
               employeeId,
-              supplierId: Number(supplierId),
+              // ✅ optional supplierId
+              supplierId: supplierId ? Number(supplierId) : null,
               branchId,
               date: orderDate ? new Date(orderDate) : new Date(),
               note: note || null,
@@ -401,21 +434,16 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
             },
           });
 
-          // Upsert latest costPrice per-branch
+          // upsert branch price
           for (const item of items) {
             await tx.branchPrice.upsert({
               where: { productId_branchId: { productId: Number(item.productId), branchId } },
               update: { costPrice: D(item.costPrice) },
-              create: {
-                productId: Number(item.productId),
-                branchId,
-                costPrice: D(item.costPrice),
-                isActive: true,
-              },
+              create: { productId: Number(item.productId), branchId, costPrice: D(item.costPrice), isActive: true },
             });
           }
 
-          // Link supplier advance payments (no overdraw validation here to avoid schema coupling)
+          // link advance payments
           if (advancePaymentsUsed.length > 0) {
             await tx.supplierPaymentPO.createMany({
               data: advancePaymentsUsed.map((entry) => ({
@@ -425,10 +453,8 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
               })),
             });
           }
-
           return created.id;
         });
-
         createdPOId = poId;
       } catch (err) {
         if (err?.code === 'P2002' && err?.meta?.target?.includes('code')) continue;
@@ -440,10 +466,24 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
       return res.status(500).json({ message: 'ไม่สามารถสร้างรหัส PO ที่ไม่ซ้ำได้ กรุณาลองใหม่' });
     }
 
-    // ✅ Return with include
+    // ✅ include โยงครบสำหรับ FE
     const out = await prisma.purchaseOrder.findUnique({
       where: { id: createdPOId },
-      include: { supplier: true, items: true },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: {
+              include: {
+                
+                
+                
+                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
+              },
+            },
+          },
+        },
+      },
     });
 
     return res.status(201).json(out);
@@ -452,6 +492,7 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
 
 
 module.exports = {

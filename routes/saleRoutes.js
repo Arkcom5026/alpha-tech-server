@@ -1,7 +1,13 @@
 const express = require("express");
 const router = express.Router();
 
-const { createSale, getAllSales, getSaleById, markSaleAsPaid, getAllSalesReturn, searchPrintableSales } = require("../controllers/saleController");
+const { createSale,
+    getAllSales,
+    getSaleById,
+    markSaleAsPaid,
+    getAllSalesReturn,
+    searchPrintableSales
+} = require("../controllers/saleController");
 
 
 const { verifyToken } = require('../middlewares/verifyToken');

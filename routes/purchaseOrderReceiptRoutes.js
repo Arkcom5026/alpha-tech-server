@@ -1,26 +1,32 @@
+// purchaseOrderReceiptRoutes.js
+
 const express = require('express');
 const router = express.Router();
 
-
-const { 
-  createPurchaseOrderReceipt, 
-  getAllPurchaseOrderReceipts, 
-  getPurchaseOrderReceiptById, 
-  updatePurchaseOrderReceipt, 
+const {
+  createPurchaseOrderReceipt,
+  getAllPurchaseOrderReceipts,
+  getPurchaseOrderReceiptById,
+  updatePurchaseOrderReceipt,
   deletePurchaseOrderReceipt,
   getReceiptBarcodeSummaries,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
   getReceiptsReadyToPay,
-  
+  // NEW endpoints (QUICK + barcode + commit)
+  createQuickReceipt,
+  generateReceiptBarcodes,
+  printReceipt,
+  commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
+
 
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
-
-// 📥 POST - สร้างใบรับสินค้าใหม่
+// 📥 POST - สร้างใบรับสินค้าใหม่ (PO)
 router.post('/', createPurchaseOrderReceipt);
+
 
 // 📄 GET - รายการใบรับสินค้าทั้งหมด (ตามสาขา)
 router.get('/', getAllPurchaseOrderReceipts);
@@ -42,9 +48,19 @@ router.delete('/:id', deletePurchaseOrderReceipt);
 
 // ✅ PATCH - ตรวจสอบและปรับสถานะใบรับสินค้า + ตัดเครดิต
 router.patch('/:id/finalize', finalizeReceiptController);
-
 router.patch('/:id/printed', markPurchaseOrderReceiptAsPrinted);
 
+// ---------- NEW: QUICK + Barcode + Commit ----------
+// QUICK create (scoped under this router's base path)
+router.post('/quick-receipts', createQuickReceipt);
 
+// Generate barcodes (LOT for SIMPLE, SN for STRUCTURED)
+router.post('/:id/generate-barcodes', generateReceiptBarcodes);
+
+// Mark printed and return printable payload
+router.post('/:id/print', printReceipt);
+
+// Commit stock effects (auto-generate if missing)
+router.post('/:id/commit', commitReceipt);
 
 module.exports = router;
