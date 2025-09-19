@@ -36,6 +36,12 @@ router.get('/ready-to-pay', getReceiptsReadyToPay);
 
 // 📦 GET - ใบรับสินค้าพร้อมสรุปสถานะ SN (สำหรับพิมพ์บาร์โค้ด)
 router.get('/with-barcode-status', getReceiptBarcodeSummaries);
+// aliases for backward compatibility
+router.get('/summaries', getReceiptBarcodeSummaries);
+router.get('/receipt-barcode-summaries', getReceiptBarcodeSummaries);
+
+// QUICK create (static; keep before '/:id' routes to avoid conflict)
+router.post('/quick-receipts', createQuickReceipt);
 
 // 🔍 GET - ดูรายละเอียดใบรับสินค้า
 router.get('/:id', getPurchaseOrderReceiptById);
@@ -46,14 +52,14 @@ router.put('/:id', updatePurchaseOrderReceipt);
 // 🗑️ DELETE - ลบใบรับสินค้า
 router.delete('/:id', deletePurchaseOrderReceipt);
 
-// ✅ PATCH - ตรวจสอบและปรับสถานะใบรับสินค้า + ตัดเครดิต
+// ✅ FINALIZE (idempotent): รองรับทั้ง POST และ PATCH เพื่อความเข้ากันได้ย้อนหลัง
+router.post('/:id/finalize', finalizeReceiptController);
 router.patch('/:id/finalize', finalizeReceiptController);
+
+// 🖨️ Mark printed
 router.patch('/:id/printed', markPurchaseOrderReceiptAsPrinted);
 
 // ---------- NEW: QUICK + Barcode + Commit ----------
-// QUICK create (scoped under this router's base path)
-router.post('/quick-receipts', createQuickReceipt);
-
 // Generate barcodes (LOT for SIMPLE, SN for STRUCTURED)
 router.post('/:id/generate-barcodes', generateReceiptBarcodes);
 
@@ -64,3 +70,7 @@ router.post('/:id/print', printReceipt);
 router.post('/:id/commit', commitReceipt);
 
 module.exports = router;
+
+
+
+

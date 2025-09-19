@@ -1,3 +1,5 @@
+// purchaseOrderReceiptController.js
+
 const dayjs = require('dayjs');
 const { ReceiptStatus, Prisma } = require('@prisma/client');
 const { prisma } = require('../lib/prisma');
@@ -5,6 +7,42 @@ const { prisma } = require('../lib/prisma');
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Helpers for Step 4 (Finalize logic)
+// ────────────────────────────────────────────────────────────────────────────────
+const isLotRow = (row) => row?.kind === 'LOT' || row?.simpleLotId != null;
+const isSnRow = (row) => row?.kind === 'SN' || !row?.simpleLotId;
+
+async function getReceiptPendingCounts(client, receiptId) {
+  const rows = await client.barcodeReceiptItem.findMany({
+    where: { receiptItem: { receiptId } },
+    select: { id: true, kind: true, status: true, stockItemId: true, simpleLotId: true },
+  });
+  let pendingSN = 0;
+  let pendingLOT = 0;
+  for (const r of rows) {
+    if (isLotRow(r)) {
+      if ((r.status || null) !== 'SN_RECEIVED') pendingLOT += 1;
+    } else {
+      if (r.stockItemId == null) pendingSN += 1;
+    }
+  }
+  return { pendingSN, pendingLOT, total: rows.length };
+}
+
+async function computePoStatus(client, purchaseOrderId) {
+  const rows = await client.barcodeReceiptItem.findMany({
+    where: { receiptItem: { receipt: { purchaseOrderId } } },
+    select: { kind: true, status: true, stockItemId: true, simpleLotId: true },
+  });
+  if (rows.length === 0) return 'PENDING';
+  const total = rows.length;
+  const done = rows.filter((r) => (isLotRow(r) ? r.status === 'SN_RECEIVED' : r.stockItemId != null)).length;
+  if (done === 0) return 'PENDING';
+  if (done < total) return 'PARTIALLY_RECEIVED';
+  return 'COMPLETED';
+}
 
 const generateReceiptCode = async (branchId, client) => {
   const paddedBranch = String(branchId).padStart(2, '0');
@@ -157,7 +195,7 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
     }));
 
     console.log('[getAllPurchaseOrderReceipts] (unprinted only) count:', items.length);
-    return res.json({ items });
+    return res.json(items);
   } catch (error) {
     console.error('❌ [getAllPurchaseOrderReceipts] error:', error);
     return res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าได้' });
@@ -402,25 +440,72 @@ const getReceiptBarcodeSummaries = async (req, res) => {
 const finalizePurchaseOrderReceiptIfNeeded = async (receiptId) => {
   const receipt = await prisma.purchaseOrderReceipt.findUnique({
     where: { id: receiptId },
-    include: { items: { include: { stockItems: true, purchaseOrderItem: true } } },
+    select: { id: true, purchaseOrderId: true },
   });
   if (!receipt) return;
 
-  const totalQuantity = receipt.items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalSN = receipt.items.reduce((sum, item) => sum + item.stockItems.length, 0);
-  if (totalSN < totalQuantity) return;
+  // ใช้สถานะจาก barcodeReceiptItem ทั้ง SN & LOT
+  const pending = await getReceiptPendingCounts(prisma, receiptId);
+  if ((pending.pendingSN + pending.pendingLOT) > 0) return;
 
-  await prisma.purchaseOrderReceipt.update({
-    where: { id: receiptId },
-    data: { statusReceipt: 'COMPLETED' }, // ✅ use statusReceipt
+  // ปิดใบ + อัปเดตสถานะ PO ภายใน tx เดียว
+  await prisma.$transaction(async (tx) => {
+    await tx.purchaseOrderReceipt.update({
+      where: { id: receiptId },
+      data: { statusReceipt: 'COMPLETED' },
+    });
+    try {
+      const poStatus = await computePoStatus(tx, receipt.purchaseOrderId);
+      await tx.purchaseOrder.update({ where: { id: receipt.purchaseOrderId }, data: { status: poStatus } });
+    } catch (e) {
+      console.warn('[finalizeReceiptIfNeeded] update PO status skipped:', e?.code || e?.message);
+    }
   });
 };
 
 const finalizeReceiptController = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await finalizePurchaseOrderReceiptIfNeeded(id);
-    return res.status(200).json({ success: true });
+    const branchId = Number(req.user?.branchId);
+    if (!id || !branchId) return res.status(400).json({ error: 'Missing id or branch' });
+
+    const receipt = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id, branchId },
+      select: { id: true, statusReceipt: true, purchaseOrderId: true },
+    });
+    if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้ในสาขา' });
+
+    const pending = await getReceiptPendingCounts(prisma, id);
+    if ((pending.pendingSN + pending.pendingLOT) > 0) {
+      return res.status(409).json({
+        error: 'ยังมีรายการค้าง (SN/LOT) ไม่ครบ',
+        pendingSN: pending.pendingSN,
+        pendingLOT: pending.pendingLOT,
+      });
+    }
+
+    // Idempotent
+    if (String(receipt.statusReceipt || '').toUpperCase() === 'COMPLETED') {
+      const poStatusNow = await computePoStatus(prisma, receipt.purchaseOrderId);
+      return res.status(200).json({ success: true, alreadyCompleted: true, poStatus: poStatusNow });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const upd = await tx.purchaseOrderReceipt.update({
+        where: { id },
+        data: { statusReceipt: 'COMPLETED' },
+      });
+      let poStatus = 'PENDING';
+      try {
+        poStatus = await computePoStatus(tx, receipt.purchaseOrderId);
+        await tx.purchaseOrder.update({ where: { id: receipt.purchaseOrderId }, data: { status: poStatus } });
+      } catch (e) {
+        console.warn('[finalizeReceipt] purchaseOrder.status not updated:', e?.code || e?.message);
+      }
+      return { upd, poStatus };
+    });
+
+    return res.status(200).json({ success: true, poStatus: result.poStatus });
   } catch (err) {
     console.error('❌ finalizeReceiptController error:', err);
     return res.status(500).json({ success: false, error: 'Failed to finalize receipt.' });
@@ -821,21 +906,58 @@ const commitReceipt = async (req, res) => {
   }
 };
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Summaries for FE list page (to avoid 501 on /summaries)
+// ────────────────────────────────────────────────────────────────────────────────
+const getReceiptSummaries = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+    const receipts = await prisma.purchaseOrderReceipt.findMany({
+      where: { branchId },
+      select: { id: true, printed: true },
+    });
+    const total = receipts.length;
+    const printed = receipts.filter((r) => !!r.printed).length;
+    const notPrinted = total - printed;
+
+    return res.json({ total, printed, notPrinted });
+  } catch (e) {
+    console.error('❌ [getReceiptSummaries] error:', e);
+    return res.status(500).json({ error: 'Failed to load receipt summaries' });
+  }
+};
+
+// alias to match routes helper
+const getAllReceipts = getAllPurchaseOrderReceipts;
+
 module.exports = {
   createPurchaseOrderReceipt,
+  // list (aliases for routes)
   getAllPurchaseOrderReceipts,
+  getAllReceipts,
+  getReceiptSummaries,
+
   getPurchaseOrderReceiptById,
   getPurchaseOrderDetailById,  
   updatePurchaseOrderReceipt,
   deletePurchaseOrderReceipt,
+
+  // printing / barcodes
   getReceiptBarcodeSummaries,
   finalizePurchaseOrderReceiptIfNeeded,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
   getReceiptsReadyToPay,
+
+  // quick flow
   createQuickReceipt,
   generateReceiptBarcodes,
   printReceipt,
   commitReceipt,
 };
+
+
+
 

@@ -19,8 +19,18 @@ const generateMissingBarcodes = async (req, res) => {
   }
 
   try {
-    const { createdCount, barcodes } = await _generateMissingBarcodesForReceipt(receiptId, userBranchId);
-    return res.status(200).json({ success: true, createdCount, barcodes });
+    // ✅ รองรับ dryRun + lotLabelPerLot
+    const rawDry = (req.body?.dryRun ?? req.query?.dryRun ?? 'false');
+    const dryRun = String(rawDry).toLowerCase() === '1' || String(rawDry).toLowerCase() === 'true';
+    const lotLabelPerLot = Math.max(1, Number(req.body?.lotLabelPerLot ?? req.query?.lotLabelPerLot ?? 1));
+
+    const result = await _generateMissingBarcodesForReceipt(receiptId, userBranchId, { dryRun, lotLabelPerLot });
+
+    if (dryRun) {
+      return res.status(200).json({ success: true, dryRun: true, plan: result.plan, totalToCreate: result.totalToCreate });
+    }
+
+    return res.status(200).json({ success: true, createdCount: result.createdCount, barcodes: result.barcodes });
   } catch (error) {
     console.error('[generateMissingBarcodes] ❌', error);
     if (error?.status === 404 || error?.message === 'NOT_FOUND_RECEIPT') {
@@ -34,16 +44,24 @@ const generateMissingBarcodes = async (req, res) => {
 };
 
 // 🔒 Internal: ใช้ซ้ำได้ทั้งจาก endpoint และจากจุด auto-generate
-async function _generateMissingBarcodesForReceipt(receiptId, userBranchId) {
+async function _generateMissingBarcodesForReceipt(receiptId, userBranchId, opts = {}) {
+  const { dryRun = false, lotLabelPerLot = 1 } = opts;
   return prisma.$transaction(async (tx) => {
-    // 1) โหลดใบรับภายใต้สาขาของผู้ใช้ (ป้องกันข้ามสาขา)
+    // 1) โหลดใบรับภายใต้สาขาของผู้ใช้ + โหมดสินค้า
     const receipt = await tx.purchaseOrderReceipt.findFirst({
       where: { id: receiptId, branchId: userBranchId },
       include: {
         items: {
           include: {
-            purchaseOrderItem: true,
-            barcodeReceiptItem: true,
+            purchaseOrderItem: {
+              select: {
+                id: true,
+                productId: true,
+                product: { select: { id: true, mode: true } },
+              },
+            },
+            product: { select: { id: true, mode: true } }, // สำรองสำหรับ QUICK/PO-less
+            barcodeReceiptItem: { select: { id: true, kind: true, stockItemId: true, simpleLotId: true } },
           },
         },
         purchaseOrder: { select: { id: true, code: true } },
@@ -56,23 +74,44 @@ async function _generateMissingBarcodesForReceipt(receiptId, userBranchId) {
       throw notFoundErr;
     }
 
-    // 2) คำนวณจำนวนที่ต้องสร้าง (sum ของ missing ในแต่ละรายการ)
     const yearMonth = dayjs().format('YYMM');
     const branchId = receipt.branchId;
 
-    const perItemMissing = receipt.items.map((it) => {
+    // 2) สร้างแผนแบบแยกโหมด
+    const plansSN = []; // [{ receiptItemId, count }]
+    const plansLOT = []; // [{ receiptItemId, count: 1, lotLabelPerLot }]
+
+    for (const it of receipt.items) {
       const qty = Number(it.quantity || 0);
       const existing = Array.isArray(it.barcodeReceiptItem) ? it.barcodeReceiptItem.length : 0;
-      const missing = Math.max(0, qty - existing);
-      return { id: it.id, missing };
-    });
+      const existingSN = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'SN' || x.stockItemId).length;
+      const existingLOT = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'LOT' || x.simpleLotId).length;
 
-    const totalMissing = perItemMissing.reduce((s, x) => s + x.missing, 0);
-    if (totalMissing === 0) {
+      const mode = it.purchaseOrderItem?.product?.mode || it.product?.mode || null;
+
+      if (mode === 'STRUCTURED') {
+        const missing = Math.max(0, qty - existingSN);
+        if (missing > 0) plansSN.push({ receiptItemId: it.id, count: missing });
+      } else if (mode === 'SIMPLE') {
+        const missing = existingLOT > 0 ? 0 : 1; // 1 lot = 1 barcode แถวเดียว
+        if (missing > 0) plansLOT.push({ receiptItemId: it.id, count: 1, lotLabelPerLot });
+      } else {
+        // ไม่ทราบโหมด → ไม่สร้างอะไร ปลอดภัยสุด
+        // console.warn('[gen-missing] unknown mode for receiptItem', it.id);
+      }
+    }
+
+    const totalToCreate = plansSN.reduce((s, p) => s + p.count, 0) + plansLOT.reduce((s, p) => s + p.count, 0);
+
+    if (dryRun) {
+      return { totalToCreate, plan: { SN: plansSN, LOT: plansLOT } };
+    }
+
+    if (totalToCreate === 0) {
       return { createdCount: 0, barcodes: [] };
     }
 
-    // 3) เตรียม counter (มีหรือไม่ก็ upsert) แล้วจองเลขแบบ increment ทีเดียวกัน race
+    // 3) เตรียม counter และจองเลขรวดเดียว (race-safe)
     await tx.barcodeCounter.upsert({
       where: { branchId_yearMonth: { branchId, yearMonth } },
       update: {},
@@ -81,45 +120,51 @@ async function _generateMissingBarcodesForReceipt(receiptId, userBranchId) {
 
     const updatedCounter = await tx.barcodeCounter.update({
       where: { branchId_yearMonth: { branchId, yearMonth } },
-      data: { lastNumber: { increment: totalMissing } },
+      data: { lastNumber: { increment: totalToCreate } },
     });
 
     const endNumber = updatedCounter.lastNumber;
-    const startNumber = endNumber - totalMissing + 1;
+    const startNumber = endNumber - totalToCreate + 1;
 
-    // 4.1) Guard: จำกัดเลขวิ่ง 4 หลัก/เดือน (0001–9999) และ rollback ถ้าเกินโควต้า
+    // Guard โควต้า/เดือน (0001–9999)
     if (endNumber > 9999) {
       await tx.barcodeCounter.update({
         where: { branchId_yearMonth: { branchId, yearMonth } },
-        data: { lastNumber: { decrement: totalMissing } },
+        data: { lastNumber: { decrement: totalToCreate } },
       });
       const overflowErr = new Error('COUNTER_OVERFLOW');
       overflowErr.status = 400;
       throw overflowErr;
     }
 
-    // 4) กระจายเลขที่ได้ไปตามรายการที่ขาด
+    // 4) สร้างชุดบาร์โค้ดตามแผน (เลขเดียวกัน ใช้ต่อเนื่อง SN/LOT)
     const newBarcodes = [];
     let running = startNumber;
-    for (const it of perItemMissing) {
-      for (let i = 0; i < it.missing; i++) {
-        const padded = String(running).padStart(4, '0');
-        const code = `${String(branchId).padStart(3, '0')}${yearMonth}${padded}`;
-        newBarcodes.push({
-          barcode: code,
-          branchId,
-          yearMonth,
-          runningNumber: running,
-          status: 'READY',
-          printed: false,
-          purchaseOrderReceiptId: receipt.id,
-          receiptItemId: it.id,
-        });
-        running += 1;
-      }
+
+    const pushNew = (receiptItemId, kind) => {
+      const padded = String(running).padStart(4, '0');
+      const code = `${String(branchId).padStart(3, '0')}${yearMonth}${padded}`;
+      newBarcodes.push({
+        barcode: code,
+        branchId,
+        yearMonth,
+        runningNumber: running,
+        status: 'READY',
+        printed: false,
+        kind, // 'SN' | 'LOT'
+        purchaseOrderReceiptId: receipt.id,
+        receiptItemId,
+      });
+      running += 1;
+    };
+
+    for (const plan of plansSN) {
+      for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'SN');
+    }
+    for (const plan of plansLOT) {
+      for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'LOT');
     }
 
-    // 5) สร้างบาร์โค้ดทั้งหมดในชุดเดียว
     if (newBarcodes.length > 0) {
       await tx.barcodeReceiptItem.createMany({ data: newBarcodes, skipDuplicates: true });
     }
@@ -138,6 +183,20 @@ const getBarcodesByReceiptId = async (req, res) => {
   }
 
   try {
+    // 🔎 Optional filters for scan page
+    const kindParam = String(req.query?.kind || '').toUpperCase();
+    const kindFilter = kindParam === 'SN' || kindParam === 'LOT' ? kindParam : undefined;
+    const onlyUnscanned = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnscanned || '0').toLowerCase());
+    const onlyUnactivated = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnactivated || '0').toLowerCase());
+
+    // Always ensure barcodes exist first (auto-generate only if the receipt has zero BRI at all)
+    const totalExisting = await prisma.barcodeReceiptItem.count({
+      where: { purchaseOrderReceiptId: receiptId, branchId },
+    });
+    if (totalExisting === 0) {
+      await _generateMissingBarcodesForReceipt(receiptId, branchId, { dryRun: false, lotLabelPerLot: 1 });
+    }
+
     const includeTree = {
       stockItem: {
         select: {
@@ -151,6 +210,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
       receiptItem: {
         select: {
+          quantity: true,
           purchaseOrderItem: {
             select: {
               productId: true,
@@ -163,22 +223,21 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
     };
 
-    let rows = await prisma.barcodeReceiptItem.findMany({
-      where: { purchaseOrderReceiptId: receiptId, branchId },
+    const whereClause = {
+      purchaseOrderReceiptId: receiptId,
+      branchId,
+      ...(kindFilter ? { kind: kindFilter } : {}),
+      ...(onlyUnscanned ? { stockItemId: null } : {}),
+      ...(onlyUnactivated && kindFilter === 'LOT'
+        ? { OR: [{ status: null }, { status: { not: 'SN_RECEIVED' } }] }
+        : {}),
+    };
+
+    const rows = await prisma.barcodeReceiptItem.findMany({
+      where: whereClause,
       include: includeTree,
       orderBy: { id: 'asc' },
     });
-
-    if (!rows.length) {
-      const { createdCount } = await _generateMissingBarcodesForReceipt(receiptId, branchId);
-      if (createdCount > 0) {
-        rows = await prisma.barcodeReceiptItem.findMany({
-          where: { purchaseOrderReceiptId: receiptId, branchId },
-          include: includeTree,
-          orderBy: { id: 'asc' },
-        });
-      }
-    }
 
     const idSet = new Set();
     for (const b of rows) {
@@ -230,7 +289,6 @@ const getBarcodesByReceiptId = async (req, res) => {
     const briIds = Array.from(new Set(rows.map((r) => r.id).filter(Boolean)));
     const recItemIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
     let siByBRI = new Map();
-    let siByReceiptItem = new Map();
     if (briIds.length || recItemIds.length) {
       const briLinks = await prisma.barcodeReceiptItem.findMany({
         where: { id: { in: briIds }, branchId, stockItemId: { not: null } },
@@ -241,9 +299,6 @@ const getBarcodesByReceiptId = async (req, res) => {
           .map((x) => [x.id, x.stockItem])
           .filter(([k, v]) => k != null && v != null)
       );
-      // Note: siByReceiptItem is left empty as a secondary fallback; primary mapping is via BRI -> StockItem.
-      // siByBRI built above via briLinks
-      // siByReceiptItem left empty in this patch; optional secondary fallback
     }
 
     const barcodes = rows.map((b) => {
@@ -261,24 +316,32 @@ const getBarcodesByReceiptId = async (req, res) => {
       const p = pStock ?? pPO ?? pFromId ?? pFromPOChain;
 
       const baseName = p?.name ?? null;
-
       const productName = baseName && p?.model ? `${baseName} (${p.model})` : baseName;
       const productSpec = p?.spec ?? null;
 
-      const siFallback = b.stockItemId
-        ? null
-        : siByBRI.get(b.id) || (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
+      const siFallback = b.stockItemId ? null : siByBRI.get(b.id) || null;
       const stockItemId = b.stockItemId ?? siFallback?.id ?? null;
       const serialNumber = b.stockItem?.serialNumber ?? siFallback?.serialNumber ?? null;
+
+      const kind = b.kind ?? (b.stockItemId ? 'SN' : (b.simpleLotId ? 'LOT' : null));
+
+      // 👉 Suggest number of duplicate labels for LOT (print convenience)
+      const qtyLabelsSuggested = kind === 'LOT' ? Number(b.receiptItem?.quantity || 1) : 1;
 
       return {
         id: b.id,
         barcode: b.barcode,
+        printed: !!b.printed,
+        kind,
+        status: b.status || null,
         stockItemId,
+        simpleLotId: b.simpleLotId ?? null,
+        receiptItemId: b.receiptItemId ?? null,
         serialNumber,
         productId: p?.id ?? b.stockItem?.productId ?? b.receiptItem?.purchaseOrderItem?.productId ?? null,
         productName,
         productSpec,
+        qtyLabelsSuggested,
       };
     });
 
@@ -412,6 +475,8 @@ const markBarcodesAsPrinted = async (req, res) => {
 
 
 // GET /api/barcodes/receipts-with-barcodes
+// รายการใบรับที่ "รอพิมพ์บาร์โค้ด" ให้สะท้อน SIMPLE/STRUCTURED อย่างถูกต้อง
+// Criteria: มีบาร์โค้ดแล้วแต่ยังไม่ printed อย่างน้อย 1 รายการ
 const getReceiptsWithBarcodes = async (req, res) => {
   const branchId = toInt(req.user?.branchId);
 
@@ -421,7 +486,7 @@ const getReceiptsWithBarcodes = async (req, res) => {
 
   try {
     const receipts = await prisma.purchaseOrderReceipt.findMany({
-      where: { branchId, barcodeReceiptItem: { some: {} } },
+      where: { branchId, barcodeReceiptItem: { some: { printed: false } } },
       include: {
         purchaseOrder: {
           select: {
@@ -429,20 +494,29 @@ const getReceiptsWithBarcodes = async (req, res) => {
             supplier: { select: { name: true, creditLimit: true, creditBalance: true } },
           },
         },
-        barcodeReceiptItem: { select: { stockItemId: true } },
+        // ดึงเฉพาะฟิลด์ที่ต้องใช้สรุปคิว
+        barcodeReceiptItem: { select: { id: true, printed: true, kind: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
-    const result = receipts
+    const rows = receipts
       .map((r) => {
         const supplier = r.purchaseOrder?.supplier;
         const creditLimit = Number(supplier?.creditLimit || 0);
         const creditBalance = Number(supplier?.creditBalance || 0);
-        const creditRemaining = creditLimit - creditBalance; // ✅ กำหนดความหมายให้ชัดเจน
+        const creditRemaining = creditLimit - creditBalance;
 
-        const total = r.barcodeReceiptItem.length;
-        const scanned = r.barcodeReceiptItem.filter((i) => i.stockItemId !== null).length;
+        const total = r.barcodeReceiptItem.length; // รวมทุก kind
+        const printed = r.barcodeReceiptItem.filter((i) => i.printed).length;
+        const pending = total - printed;
+
+        // แยกตาม kind เพื่อช่วย UI/Debug
+        const totalSN = r.barcodeReceiptItem.filter((i) => i.kind === 'SN').length;
+        const totalLOT = r.barcodeReceiptItem.filter((i) => i.kind === 'LOT').length;
+        const printedSN = r.barcodeReceiptItem.filter((i) => i.printed && i.kind === 'SN').length;
+        const printedLOT = r.barcodeReceiptItem.filter((i) => i.printed && i.kind === 'LOT').length;
 
         return {
           id: r.id,
@@ -451,19 +525,27 @@ const getReceiptsWithBarcodes = async (req, res) => {
           purchaseOrderCode: r.purchaseOrder?.code || '-',
           supplier: supplier?.name || '-',
           createdAt: r.createdAt,
+          // ตัวเลขหลักที่หน้า UI ใช้
           total,
-          scanned,
+          printed,       // ✅ นับจาก printed จริง (ครอบคลุม SIMPLE/STRUCTURED)
+          pending,       // ✅ ที่ยังไม่พิมพ์
+          // รักษา compatibility: เดิมใช้ชื่อ scanned → แม็ปไปที่ printed
+          scanned: printed,
+          // ข้อมูลเสริม (optional)
+          totalSN,
+          totalLOT,
+          printedSN,
+          printedLOT,
           creditRemaining,
           creditBalance,
         };
       })
-      .filter((r) => r.total > r.scanned); // ✅ แสดงเฉพาะที่ยังยิงไม่ครบ
+      .filter((r) => r.pending > 0);
 
-
-    res.json(result);
+    return res.json(rows);
   } catch (err) {
     console.error('[getReceiptsWithBarcodes]', err);
-    res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบรับสินค้าที่มีบาร์โค้ดได้' });
+    return res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบรับที่รอพิมพ์ได้' });
   }
 };
 
@@ -698,6 +780,285 @@ const reprintBarcodes = async (req, res) => {
 };
 
 
+// ---- Audit endpoint: ตรวจสภาพบาร์โค้ดของใบรับ (อ่านอย่างเดียว) ----
+// GET /api/barcodes/receipt/:receiptId/audit?includeDetails=1
+const auditReceiptBarcodes = async (req, res) => {
+  try {
+    const receiptId = toInt(req.params?.receiptId);
+    const branchId = toInt(req.user?.branchId);
+    const includeDetails = String(req.query?.includeDetails || '0').toLowerCase() === '1' || String(req.query?.includeDetails || '').toLowerCase() === 'true';
+
+    if (!Number.isInteger(receiptId) || !Number.isInteger(branchId)) {
+      return res.status(400).json({ message: 'ต้องระบุ receiptId และต้องมีสิทธิ์สาขา' });
+    }
+
+    const receipt = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id: receiptId, branchId },
+      select: { id: true },
+    });
+    if (!receipt) {
+      return res.status(404).json({ message: 'ไม่พบใบรับในสาขาของคุณ' });
+    }
+
+    // 1) โหลดรายการ receipt items
+    const recItems = await prisma.purchaseOrderReceiptItem.findMany({
+      where: { purchaseOrderReceiptId: receiptId },
+      select: { id: true, quantity: true },
+    });
+    const recItemIds = recItems.map((x) => x.id);
+
+    // ถ้าไม่มีรายการ กลับ summary ว่าง
+    if (recItemIds.length === 0) {
+      return res.json({
+        receiptId,
+        summary: {
+          structured: { items: 0, stockItems: 0, barcodes: 0 },
+          simple: { items: 0, simpleLots: 0, barcodes: 0 },
+          mixedItems: 0,
+          unknownItems: 0,
+        },
+        anomalies: [],
+        details: includeDetails ? [] : undefined,
+      });
+    }
+
+    // 2) โหลดบาร์โค้ดของใบนี้ทั้งหมด
+    const bri = await prisma.barcodeReceiptItem.findMany({
+      where: { purchaseOrderReceiptId: receiptId, branchId },
+      select: { id: true, barcode: true, receiptItemId: true, stockItemId: true, simpleLotId: true },
+    });
+
+    // 3) โหลด StockItem/SimpleLot ผูกกับ receiptItems
+    const stockItems = await prisma.stockItem.findMany({
+      where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds } },
+      select: { id: true, purchaseOrderReceiptItemId: true },
+    });
+    const simpleLots = await prisma.simpleLot.findMany({
+      where: { branchId, receiptItemId: { in: recItemIds } },
+      select: { id: true, receiptItemId: true },
+    });
+
+    // 4) สร้างแผนที่นับต่อ receiptItem
+    const countMap = {
+      briByItem: new Map(),           // รวมจำนวนบาร์โค้ดต่อ item
+      briSNByItem: new Map(),         // บาร์โค้ดที่ผูก stockItemId
+      briLOTByItem: new Map(),        // บาร์โค้ดที่ผูก simpleLotId
+      siByItem: new Map(),            // stock items ต่อ item
+      slByItem: new Map(),            // simple lots ต่อ item
+      briSamplesByItem: new Map(),    // ตัวอย่าง barcode
+    };
+
+    const inc = (m, k, v = 1) => m.set(k, (m.get(k) || 0) + v);
+
+    for (const b of bri) {
+      const k = b.receiptItemId;
+      inc(countMap.briByItem, k, 1);
+      if (b.stockItemId) inc(countMap.briSNByItem, k, 1);
+      if (b.simpleLotId) inc(countMap.briLOTByItem, k, 1);
+      const arr = countMap.briSamplesByItem.get(k) || [];
+      if (arr.length < 5) arr.push(b.barcode);
+      countMap.briSamplesByItem.set(k, arr);
+    }
+
+    for (const s of stockItems) inc(countMap.siByItem, s.purchaseOrderReceiptItemId, 1);
+    for (const l of simpleLots) inc(countMap.slByItem, l.receiptItemId, 1);
+
+    // 5) สรุปผลต่อใบ + หา anomalies
+    let structuredItems = 0, structuredStock = 0, structuredBarcodes = 0;
+    let simpleItems = 0, simpleLotsCount = 0, simpleBarcodes = 0;
+    let mixedItems = 0, unknownItems = 0;
+
+    const anomalies = [];
+    const addAnomaly = (type, itemId, info) => {
+      let an = anomalies.find((a) => a.type === type);
+      if (!an) { an = { type, count: 0, examples: [] }; anomalies.push(an); }
+      an.count += 1;
+      if (an.examples.length < 10) an.examples.push({ receiptItemId: itemId, ...info });
+    };
+
+    const details = [];
+
+    for (const it of recItems) {
+      const id = it.id;
+      const si = countMap.siByItem.get(id) || 0;
+      const sl = countMap.slByItem.get(id) || 0;
+      const briTotal = countMap.briByItem.get(id) || 0;
+      const briSN = countMap.briSNByItem.get(id) || 0;
+      const briLOT = countMap.briLOTByItem.get(id) || 0;
+
+      const isStructured = si > 0 || briSN > 0; // มี stockItem หรือมีบาร์โค้ดที่ผูก stockItem
+      const isSimple = sl > 0 || (briLOT > 0 && !isStructured); // มี lot หรือมีบาร์โค้ดที่ผูก lot (และไม่ใช่ structured แล้ว)
+
+      if (isStructured && isSimple) mixedItems += 1;
+      if (!isStructured && !isSimple) unknownItems += 1;
+
+      if (isStructured) {
+        structuredItems += 1;
+        structuredStock += si;
+        structuredBarcodes += briTotal;
+        // ควรมีบาร์โค้ดเท่ากับจำนวนชิ้น
+        if (si > briTotal) addAnomaly('STRUCTURED_MISSING_SN_BARCODES', id, { stockItems: si, barcodes: briTotal, samples: countMap.briSamplesByItem.get(id) || [] });
+        if (briLOT > 0) addAnomaly('STRUCTURED_HAS_LOT_BARCODES', id, { lotBarcodes: briLOT });
+      }
+
+      if (isSimple) {
+        simpleItems += 1;
+        simpleLotsCount += sl;
+        simpleBarcodes += briTotal;
+        // ปกติ 1 lot → 1 barcode แถวเดียว (ก่อนคิด qtyLabels)
+        if (sl > 0 && briTotal === 0) addAnomaly('SIMPLE_MISSING_LOT_BARCODES', id, { simpleLots: sl });
+        if (sl > 0 && briTotal > sl) addAnomaly('SIMPLE_HAS_MULTIPLE_BARCODES', id, { simpleLots: sl, barcodes: briTotal, samples: countMap.briSamplesByItem.get(id) || [] });
+        if (briSN > 0) addAnomaly('SIMPLE_HAS_SN_BARCODES', id, { snBarcodes: briSN });
+      }
+
+      if (includeDetails) {
+        details.push({
+          receiptItemId: id,
+          quantity: Number(it.quantity || 0),
+          stockItems: si,
+          simpleLots: sl,
+          barcodesTotal: briTotal,
+          barcodesSN: briSN,
+          barcodesLOT: briLOT,
+          samples: countMap.briSamplesByItem.get(id) || [],
+          flags: {
+            isStructured,
+            isSimple,
+            mixed: isStructured && isSimple,
+            unknown: !isStructured && !isSimple,
+          },
+        });
+      }
+    }
+
+    const payload = {
+      receiptId,
+      summary: {
+        structured: { items: structuredItems, stockItems: structuredStock, barcodes: structuredBarcodes },
+        simple: { items: simpleItems, simpleLots: simpleLotsCount, barcodes: simpleBarcodes },
+        mixedItems,
+        unknownItems,
+      },
+      anomalies,
+      details: includeDetails ? details : undefined,
+    };
+
+    return res.json(payload);
+  } catch (error) {
+    console.error('[auditReceiptBarcodes] ❌', error);
+    return res.status(500).json({ message: 'ไม่สามารถตรวจสอบสถานะบาร์โค้ดได้' });
+  }
+};
+
+
+// GET /api/barcodes/receipts-ready-to-scan-sn
+// รายการใบรับที่มี SN และยังมี SN ที่ไม่ได้ยิงเข้าสต๊อก (stockItemId=null)
+const getReceiptsReadyToScanSN = async (req, res) => {
+  try {
+    const branchId = toInt(req.user?.branchId);
+    if (!Number.isInteger(branchId)) {
+      return res.status(400).json({ message: 'ต้องมี branchId' });
+    }
+
+    const receipts = await prisma.purchaseOrderReceipt.findMany({
+      where: {
+        branchId,
+        // ต้องมี SN อย่างน้อย 1 แถว (รองรับข้อมูลเก่าที่ kind อาจว่าง โดยดู stockItemId ด้วย)
+        barcodeReceiptItem: { some: { OR: [{ kind: 'SN' }, { stockItemId: { not: null } }] } },
+      },
+      include: {
+        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
+        barcodeReceiptItem: { select: { kind: true, stockItemId: true, simpleLotId: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+
+    const rows = receipts
+      .map((r) => {
+        const isSN = (i) => (i.kind === 'SN') || (i.stockItemId != null && !i.simpleLotId);
+        const totalSN = r.barcodeReceiptItem.filter(isSN).length;
+        const scannedSN = r.barcodeReceiptItem.filter((i) => isSN(i) && i.stockItemId != null).length;
+        const pendingSN = Math.max(0, totalSN - scannedSN);
+        return {
+          id: r.id,
+          code: r.code,
+          purchaseOrderCode: r.purchaseOrder?.code || '-',
+          supplier: r.purchaseOrder?.supplier?.name || '-',
+          createdAt: r.createdAt,
+          totalSN,
+          scannedSN,
+          pendingSN,
+        };
+      })
+      .filter((r) => r.pendingSN > 0);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('[getReceiptsReadyToScanSN] ❌', err);
+    return res.status(500).json({ message: 'ไม่สามารถโหลดรายการที่พร้อมยิง SN ได้' });
+  }
+};
+
+// GET /api/barcodes/receipts-ready-to-scan (รวม SN/LOT)
+// ดึงใบที่ยังมี SN ค้างยิง หรือ LOT ที่ยังไม่ ACTIVATE
+const getReceiptsReadyToScan = async (req, res) => {
+  try {
+    const branchId = toInt(req.user?.branchId);
+    if (!Number.isInteger(branchId)) {
+      return res.status(400).json({ message: 'ต้องมี branchId' });
+    }
+
+    const receipts = await prisma.purchaseOrderReceipt.findMany({
+      where: { branchId, barcodeReceiptItem: { some: {} } },
+      include: {
+        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
+        barcodeReceiptItem: { select: { kind: true, stockItemId: true, simpleLotId: true, status: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+
+    const rows = receipts
+      .map((r) => {
+        const items = r.barcodeReceiptItem || [];
+        const isSN = (i) => (i.kind === 'SN') || (i.stockItemId != null && !i.simpleLotId);
+        const isLOT = (i) => (i.kind === 'LOT') || (i.simpleLotId != null);
+
+        const totalSN = items.filter(isSN).length;
+        const scannedSN = items.filter((i) => isSN(i) && i.stockItemId != null).length;
+        const pendingSN = Math.max(0, totalSN - scannedSN);
+
+        const totalLOT = items.filter(isLOT).length;
+        const activatedLOT = items.filter((i) => isLOT(i) && i.status === 'SN_RECEIVED').length;
+        const pendingLOT = Math.max(0, totalLOT - activatedLOT);
+
+        const pendingTotal = pendingSN + pendingLOT;
+
+        return {
+          id: r.id,
+          code: r.code,
+          purchaseOrderCode: r.purchaseOrder?.code || '-',
+          supplier: r.purchaseOrder?.supplier?.name || '-',
+          createdAt: r.createdAt,
+          totalSN,
+          scannedSN,
+          pendingSN,
+          totalLOT,
+          activatedLOT,
+          pendingLOT,
+          pendingTotal,
+        };
+      })
+      .filter((r) => r.pendingTotal > 0);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('[getReceiptsReadyToScan] ❌', err);
+    return res.status(500).json({ message: 'ไม่สามารถโหลดรายการใบที่พร้อมยิง/เปิดล็อตได้' });
+  }
+};
+
 module.exports = {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
@@ -706,8 +1067,11 @@ module.exports = {
   searchReprintReceipts,
   markReceiptAsCompleted,
   markBarcodesAsPrinted,
-  
-};
+  auditReceiptBarcodes,
+  getReceiptsReadyToScanSN,
+  getReceiptsReadyToScan,
+  };
+
 
 
 

@@ -210,7 +210,10 @@ const markStockItemsAsSold = async (req, res) => {
   }
 };
 
-// POST /stock-items/receive  { barcode: { barcode, serialNumber?, keepSN? } }
+// POST /stock-items/receive-sn  { barcode: { barcode, serialNumber? } }
+// หมายเหตุ: รองรับทั้ง SN (STRUCTURED) และ LOT (SIMPLE)
+// - SN: สร้าง/ผูก StockItem(IN_STOCK) ต่อชิ้น + อัปเดตเครดิตตามต้นทุน/ชิ้น
+// - LOT: เปลี่ยนสถานะบาร์โค้ดล็อตเป็น SN_RECEIVED (พร้อมขายสำหรับ LOT) + อัปเดตเครดิตรวมตามจำนวนรับ
 const receiveStockItem = async (req, res) => {
   try {
     const branchIdFromUser = toInt(req.user?.branchId);
@@ -244,7 +247,6 @@ const receiveStockItem = async (req, res) => {
     });
 
     if (!barcodeItem) return res.status(404).json({ error: 'Barcode not found.' });
-    if (barcodeItem.stockItemId) return res.status(400).json({ error: 'This barcode has already been received.' });
 
     const product = barcodeItem.receiptItem?.purchaseOrderItem?.product;
     const purchaseOrder = barcodeItem.receiptItem?.purchaseOrderItem?.purchaseOrder;
@@ -256,6 +258,59 @@ const receiveStockItem = async (req, res) => {
     if (!branchId || branchId !== branchIdFromUser) {
       return res.status(403).json({ error: 'คุณไม่มีสิทธิ์รับสินค้าของสาขาอื่น' });
     }
+
+    const isLOT = (barcodeItem.kind === 'LOT') || (barcodeItem.simpleLotId != null);
+    const isSN = !isLOT; // บาร์โค้ดที่ไม่ใช่ LOT ถือเป็น SN
+
+    // LOT: activate lot (ไม่สร้าง StockItem รายชิ้น)
+    if (isLOT) {
+      if (barcodeItem.status === 'SN_RECEIVED') {
+        return res.status(200).json({ message: 'LOT already scanned', lot: { barcode: barcodeItem.barcode, receiptItemId: barcodeItem.receiptItemId, quantity: toInt(barcodeItem.receiptItem?.quantity) || 0 } });
+      }
+
+      const qty = toInt(barcodeItem.receiptItem?.quantity) || 0;
+      const unitCost = D(barcodeItem.receiptItem?.costPrice || 0);
+      const totalCostDec = unitCost.times(qty || 1);
+
+      const result = await prisma.$transaction(async (tx) => {
+        // เปลี่ยนสถานะล็อตเป็น ACTVATED
+        const updatedBRI = await tx.barcodeReceiptItem.update({
+          where: { barcode: String(barcode) },
+          data: { status: 'SN_RECEIVED' },
+        });
+
+        // 2) อัปเดตสต๊อกคงเหลือ (StockBalance) ตามจำนวนในใบรับ
+        await tx.stockBalance.upsert({
+          where: { productId_branchId: { productId: product.id, branchId } },
+          update: { quantity: { increment: qty } },
+          create: { productId: product.id, branchId, quantity: qty, reserved: 0 },
+        });
+
+        // 3) เพิ่มเครดิตซัพพลายเออร์ (ถ้าไม่ใช่ system)
+        const isSystemSupplier = Boolean(purchaseOrder?.supplier?.isSystem);
+        if (!isSystemSupplier && totalCostDec.gt(0)) {
+          await tx.supplier.update({
+            where: { id: purchaseOrder.supplierId },
+            data: { creditBalance: D(purchaseOrder.supplier.creditBalance || 0).plus(totalCostDec) },
+          });
+        }
+
+        return { updatedBRI };
+      }, { timeout: 20000 });
+
+      return res.status(200).json({
+        message: '✅ LOT scanned and ready to sell.',
+        lot: {
+          barcode: barcodeItem.barcode,
+          receiptItemId: barcodeItem.receiptItemId,
+          quantity: qty,
+        },
+        result,
+      });
+    }
+
+    // SN: ตรวจซ้ำ + สร้าง StockItem รายชิ้น
+    if (barcodeItem.stockItemId) return res.status(200).json({ message: 'Item already received', stockItemId: barcodeItem.stockItemId });
 
     // กัน barcode ซ้ำใน stockItem อีกชั้น
     const dup = await prisma.stockItem.findUnique({ where: { barcode: String(barcode) } });
@@ -277,7 +332,14 @@ const receiveStockItem = async (req, res) => {
 
       await tx.barcodeReceiptItem.update({ where: { barcode: String(barcode) }, data: { stockItemId: created.id } });
 
-      // เพิ่มเครดิตเจ้าหนี้ เฉพาะ supplier ที่ไม่ใช่ระบบ (isSystem=false)
+      // อัปเดต StockBalance +1 สำหรับ SN
+      await tx.stockBalance.upsert({
+        where: { productId_branchId: { productId: product.id, branchId } },
+        update: { quantity: { increment: 1 } },
+        create: { productId: product.id, branchId, quantity: 1, reserved: 0 },
+      });
+
+      // เพิ่มเครดิตเจ้าหนี้ต่อชิ้น
       const isSystemSupplier = Boolean(purchaseOrder?.supplier?.isSystem);
       const totalCostDec = D(barcodeItem.receiptItem?.costPrice || 0).times(1);
       if (!isSystemSupplier && totalCostDec.gt(0)) {
@@ -435,3 +497,7 @@ module.exports = {
   updateSerialNumber,
   getAvailableStockItemsByProduct,
 };
+
+
+
+
