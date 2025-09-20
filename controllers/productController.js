@@ -13,6 +13,7 @@
   const toDec = (v, fallback = 0) => (v === '' || v === null || v === undefined ? fallback : Number(v));
   const toDecUndef = (v) => (v === '' || v === null || v === undefined ? undefined : Number(v));
   
+  
   const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
     const exp = explicitMode ? String(explicitMode).toUpperCase() : undefined;
     const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1';
@@ -26,6 +27,7 @@
     return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false };
   };
   
+
   const resolveTemplateHierarchy = async (db, templateId) => {
     if (!Number.isFinite(Number(templateId))) return null;
     const tpl = await db.productTemplate.findUnique({
@@ -43,8 +45,8 @@
       categoryId: tpl.productProfile?.productType?.categoryId ?? null,
     };
   };
-  
-  // === Helper: createOrRepairStockBalance (Idempotent) ===
+    
+
   const createOrRepairStockBalance = async (tx, productId, branchId) => {
     if (!tx || !productId || !branchId) return;
     let qty = 0;
@@ -365,36 +367,43 @@ const getProductsForPos = async (req, res) => {
 
 
 const getProductsForOnline = async (req, res) => {
-  // ✅ Public endpoint: allow branchId from token or query
-  const branchIdFromUser = Number(req.user?.branchId);
-  const branchIdFromQuery = toInt(req.query.branchId);
-  const branchId = branchIdFromUser || branchIdFromQuery;
+  const branchId = Number(req.user?.branchId) || toInt(req.query.branchId);
   if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' });
 
-  // ✅ FE contract: accept both `search` and `searchText`, plus cascading ids
   const {
     search: q1 = '',
     searchText: q2 = '',
     take = 50,
+    size,
     page = 1,
     categoryId,
     productTypeId,
     productProfileId,
     productTemplateId,
     templateId,
+    brandId,
     activeOnly = 'true',
+    readyOnly = 'false',
+    hasPrice = 'false',
   } = req.query;
 
+  const queryMode = (req?.query?.mode || '').toString().toUpperCase();
+  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE';
+
   const search = normStr(q1 || q2);
-  const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200));
+  const takeNum = Math.max(1, Math.min((toInt(size) ?? toInt(take) ?? 50), 200));
   const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
   const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
   const tplId = toInt(templateId ?? productTemplateId);
 
   try {
-    const where = {
-      ...(activeFilter === undefined ? {} : { active: true }),
-      ...(search ? {
+    const whereAND = [];
+
+    if (activeFilter !== undefined) whereAND.push({ active: true });
+    if (simpleOnly) whereAND.push({ mode: 'SIMPLE' });
+
+    if (search) {
+      whereAND.push({
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
@@ -402,12 +411,64 @@ const getProductsForOnline = async (req, res) => {
           { sku: search },
           { barcode: search },
         ],
-      } : {}),
-      ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
-      ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
-      ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
-      ...(tplId ? { OR: [{ templateId: tplId }, { template: { id: tplId } }] } : {}),
-    };
+      });
+    }
+
+    const catId  = toInt(categoryId);
+    const typeId = toInt(productTypeId);
+    const profId = toInt(productProfileId);
+    const tmplId = tplId;
+    const brId   = toInt(brandId);
+
+    if (catId) {
+      whereAND.push({
+        OR: [
+          { categoryId: catId },
+          { productType: { category: { id: catId } } },
+          { productProfile: { productType: { category: { id: catId } } } },
+          { template: { productProfile: { productType: { category: { id: catId } } } } },
+        ],
+      });
+    }
+
+    if (typeId) {
+      whereAND.push({
+        OR: [
+          { productTypeId: typeId },
+          { productProfile: { productType: { id: typeId } } },
+          { template: { productProfile: { productType: { id: typeId } } } },
+        ],
+      });
+    }
+
+    if (profId) {
+      whereAND.push({
+        OR: [
+          { productProfileId: profId },
+          { template: { productProfile: { id: profId } } },
+        ],
+      });
+    }
+
+    if (tmplId) {
+      whereAND.push({
+        OR: [
+          { templateId: tmplId },
+          { template: { id: tmplId } },
+        ],
+      });
+    }
+
+    if (brId) {
+      whereAND.push({
+        OR: [
+          { brandId: brId },
+          { template: { brandId: brId } },
+        ],
+      });
+    }
+
+    const where = whereAND.length ? { AND: whereAND } : {};
 
     const items = await prisma.product.findMany({
       where,
@@ -417,18 +478,27 @@ const getProductsForOnline = async (req, res) => {
         description: true,
         mode: true,
         noSN: true,
-        // ids for FE cascade
         categoryId: true,
         productTypeId: true,
         productProfileId: true,
         templateId: true,
-        // minimal relations to derive names if needed in the future
-        productType: { select: { id: true, category: { select: { id: true } } } },
-        productProfile: { select: { id: true, productType: { select: { id: true, category: { select: { id: true } } } } } },
-        template: { select: { id: true, productProfile: { select: { id: true, productType: { select: { id: true, category: { select: { id: true } } } } } } } },
+        category:      { select: { id: true, name: true } },
+        productType:   { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+        productProfile:{ select: { id: true, name: true, productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } } } },
+        template: {
+          select: {
+            id: true, name: true,
+            productProfile: {
+              select: {
+                id: true, name: true,
+                productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+              },
+            },
+          },
+        },
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true } },
-        branchPrice: { where: { branchId, isActive: true }, take: 1, select: { priceOnline: true } },
-        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        branchPrice:   { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
+        stockItems:    { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
         stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
       },
       take: takeNum,
@@ -436,30 +506,53 @@ const getProductsForOnline = async (req, res) => {
       orderBy: { id: 'desc' },
     });
 
-    const mapped = items.map((p) => {
+    let mapped = items.map((p) => {
       const bp = p.branchPrice?.[0];
       const sb = p.stockBalances?.[0];
       const qty = Number(sb?.quantity ?? 0);
       const reserved = Number(sb?.reserved ?? 0);
       const available = Math.max(0, qty - reserved);
       const isSimple = p.mode === 'SIMPLE' || p.noSN === true;
-      const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0);
+      const isReady  = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0);
+
       return {
         id: p.id,
         name: p.name,
         description: p.description,
-        // ids for FE filter compatibility
         mode: p.mode,
-        categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
-        productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
-        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
-        templateId: (p.templateId ?? p.template?.id ?? null),
-        productTemplateId: (p.templateId ?? p.template?.id ?? null),
+        categoryId:       (p.categoryId       ?? p.productType?.category?.id                 ?? null),
+        productTypeId:    (p.productTypeId    ?? p.productProfile?.productType?.id           ?? null),
+        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id              ?? null),
+        templateId:       (p.templateId       ?? p.template?.id                              ?? null),
+        productTemplateId:(p.templateId       ?? p.template?.id                              ?? null),
         imageUrl: p.productImages?.[0]?.secure_url || null,
-        priceOnline: bp?.priceOnline ?? 0,
+        priceOnline: Number(bp?.priceOnline ?? 0),
         readyPickupAtBranch: isReady,
+        isReady,
+        category:        p.category?.name
+                        ?? p.productType?.category?.name
+                        ?? p.productProfile?.productType?.category?.name
+                        ?? p.template?.productProfile?.productType?.category?.name
+                        ?? undefined,
+        productType:     p.productType?.name
+                        ?? p.productProfile?.productType?.name
+                        ?? p.template?.productProfile?.productType?.name
+                        ?? undefined,
+        productProfile:  p.productProfile?.name
+                        ?? p.template?.productProfile?.name
+                        ?? undefined,
+        productTemplate: p.template?.name ?? undefined,
+        hasPrice: !!bp,
+        branchPriceActive: bp?.isActive ?? true,
       };
     });
+
+    if (String(readyOnly).toLowerCase() === 'true') {
+      mapped = mapped.filter((x) => x.isReady === true);
+    }
+    if (String(hasPrice).toLowerCase() === 'true') {
+      mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false);
+    }
 
     return res.json(mapped);
   } catch (error) {
@@ -734,6 +827,7 @@ const createProduct = async (req, res) => {
   }
 };
 
+
 const updateProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id);
@@ -842,6 +936,7 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+
 const deleteProductImage = async (req, res) => {
   try {
     const productId = toInt(req.params.id);
@@ -866,7 +961,7 @@ const deleteProductImage = async (req, res) => {
   }
 };
 
-// ---- Migration endpoint: STRUCTURED → SIMPLE (transactional)
+
 const migrateSnToSimple = async (req, res) => {
   try {
     const id = toInt(req.params.id);
