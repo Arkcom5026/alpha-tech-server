@@ -1,3 +1,5 @@
+
+
   // ✅ server/controllers/productController.js (Production Standard)
   // CommonJS only; all endpoints wrapped in try/catch; BRANCH_SCOPE_ENFORCED.
   
@@ -163,6 +165,7 @@ const getAllProducts = async (req, res) => {
         productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
         productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
         templateId: (p.templateId ?? p.template?.id ?? null),
+        productTemplateId: (p.templateId ?? p.template?.id ?? null),
 
         category: catName,
         productType: typeName,
@@ -319,6 +322,7 @@ const getProductsForPos = async (req, res) => {
         productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
         productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
         templateId: (p.templateId ?? p.template?.id ?? null),
+        productTemplateId: (p.templateId ?? p.template?.id ?? null),
 
         category: catName,
         productType: typeName,
@@ -361,25 +365,74 @@ const getProductsForPos = async (req, res) => {
 
 
 const getProductsForOnline = async (req, res) => {
-  const branchId = Number(req.user?.branchId);
-  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-  const { search = '', take = 50 } = req.query;
+  // ✅ Public endpoint: allow branchId from token or query
+  const branchIdFromUser = Number(req.user?.branchId);
+  const branchIdFromQuery = toInt(req.query.branchId);
+  const branchId = branchIdFromUser || branchIdFromQuery;
+  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' });
+
+  // ✅ FE contract: accept both `search` and `searchText`, plus cascading ids
+  const {
+    search: q1 = '',
+    searchText: q2 = '',
+    take = 50,
+    page = 1,
+    categoryId,
+    productTypeId,
+    productProfileId,
+    productTemplateId,
+    templateId,
+    activeOnly = 'true',
+  } = req.query;
+
+  const search = normStr(q1 || q2);
   const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200));
+  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
+  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
+  const tplId = toInt(templateId ?? productTemplateId);
+
   try {
+    const where = {
+      ...(activeFilter === undefined ? {} : { active: true }),
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { spec: { contains: search, mode: 'insensitive' } },
+          { sku: search },
+          { barcode: search },
+        ],
+      } : {}),
+      ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
+      ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
+      ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
+      ...(tplId ? { OR: [{ templateId: tplId }, { template: { id: tplId } }] } : {}),
+    };
+
     const items = await prisma.product.findMany({
-      where: { active: true, name: { contains: String(search || ''), mode: 'insensitive' } },
+      where,
       select: {
         id: true,
         name: true,
         description: true,
         mode: true,
         noSN: true,
+        // ids for FE cascade
+        categoryId: true,
+        productTypeId: true,
+        productProfileId: true,
+        templateId: true,
+        // minimal relations to derive names if needed in the future
+        productType: { select: { id: true, category: { select: { id: true } } } },
+        productProfile: { select: { id: true, productType: { select: { id: true, category: { select: { id: true } } } } } },
+        template: { select: { id: true, productProfile: { select: { id: true, productType: { select: { id: true, category: { select: { id: true } } } } } } } },
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true } },
         branchPrice: { where: { branchId, isActive: true }, take: 1, select: { priceOnline: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
         stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
       },
       take: takeNum,
+      skip: skipNum,
       orderBy: { id: 'desc' },
     });
 
@@ -395,13 +448,13 @@ const getProductsForOnline = async (req, res) => {
         id: p.id,
         name: p.name,
         description: p.description,
-
-        // ✅ ids + mode for FE filter compatibility
+        // ids for FE filter compatibility
         mode: p.mode,
         categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
         productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
         productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
         templateId: (p.templateId ?? p.template?.id ?? null),
+        productTemplateId: (p.templateId ?? p.template?.id ?? null),
         imageUrl: p.productImages?.[0]?.secure_url || null,
         priceOnline: bp?.priceOnline ?? 0,
         readyPickupAtBranch: isReady,
@@ -483,6 +536,7 @@ const getProductPosById = async (req, res) => {
         productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
         productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
         templateId: (p.templateId ?? p.template?.id ?? null),
+        productTemplateId: (p.templateId ?? p.template?.id ?? null),
       spec: p.spec ?? null,
       mode, // ใช้ค่าที่ normalize แล้ว
       noSN: p.noSN,
@@ -520,8 +574,11 @@ const getProductPosById = async (req, res) => {
 
 
 const getProductOnlineById = async (req, res) => {
-  const branchId = Number(req.user?.branchId);
-  if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+  // ✅ Public endpoint: allow branchId from token or query
+  const branchIdFromUser = Number(req.user?.branchId);
+  const branchIdFromQuery = toInt(req.query.branchId);
+  const branchId = branchIdFromUser || branchIdFromQuery;
+  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' });
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: 'INVALID_ID' });
   try {
@@ -560,6 +617,7 @@ const getProductOnlineById = async (req, res) => {
         productTypeId: (p.productTypeId ?? p.productProfile?.productType?.id ?? null),
         productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
         templateId: (p.templateId ?? p.template?.id ?? null),
+        productTemplateId: (p.templateId ?? p.template?.id ?? null),
       imageUrl: p.productImages?.[0]?.secure_url || null,
       priceOnline: bp?.priceOnline ?? 0,
       readyPickupAtBranch: isReady,
@@ -607,9 +665,6 @@ const getProductDropdowns = async (req, res) => {
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' });
   }
 };
-
-
-const getProductDropdownsForOnline = getProductDropdowns; // same shape for now
 
 
 const createProduct = async (req, res) => {
@@ -877,10 +932,11 @@ module.exports = {
   deleteProductImage,
   getProductDropdowns,
   getProductsForOnline,
-  getProductOnlineById,
-  getProductDropdownsForOnline,
+  getProductOnlineById,  
   getProductsForPos,
   migrateSnToSimple,
 };
+
+
 
 

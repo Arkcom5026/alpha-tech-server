@@ -1,4 +1,4 @@
-// ✅ server/routes/productRoutes.js
+// ✅ server/routes/productRoutes.js (อัปเดต)
 const express = require('express');
 const router = express.Router();
 const {
@@ -8,10 +8,9 @@ const {
   updateProduct,
   deleteProduct,
   deleteProductImage,
-  getProductDropdowns,  
+  getProductDropdowns,
   getProductsForOnline,
   getProductOnlineById,
-  getProductDropdownsForOnline,
   getProductsForPos, // ✅ สำหรับ POS
 } = require('../controllers/productController');
 // Import migration endpoint
@@ -20,7 +19,7 @@ const { verifyToken } = require('../middlewares/verifyToken');
 
 // ✅ Public routes (ไม่ต้อง login)
 router.get("/online/search", getProductsForOnline); 
-router.get('/online/dropdowns', getProductDropdownsForOnline);
+router.get('/online/dropdowns', getProductDropdowns); // ✅ ใช้ getProductDropdowns เดียว
 router.get("/online/detail/:id", getProductOnlineById);
 router.get('/dropdowns', getProductDropdowns); // ✅ เปลี่ยนให้เป็น public
 
@@ -39,9 +38,4 @@ router.post('/pos/migrate-to-simple/:id', migrateSnToSimple); // POS-style alias
 router.delete('/:id', deleteProduct);
 router.delete('/:id/image', deleteProductImage);
 
-
 module.exports = router;
-
-
-
-
