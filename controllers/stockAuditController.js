@@ -27,7 +27,7 @@ const startReadyAudit = async (req, res) => {
     }
 
     const existing = await prisma.stockAuditSession.findFirst({
-      where: { branchId, mode: 'READY_TO_SELL', status: 'DRAFT' },
+      where: { branchId, mode: 'READY', status: 'DRAFT' },
       select: { id: true, expectedCount: true },
     })
     if (existing) {
@@ -45,7 +45,7 @@ const startReadyAudit = async (req, res) => {
         data: {
           branchId,
           employeeId, // ใช้ค่าที่ map จาก token
-          mode: 'READY_TO_SELL',
+          mode: 'READY',
           status: 'DRAFT',
           expectedCount,
           scannedCount: 0,
@@ -97,7 +97,7 @@ const getOverview = async (req, res) => {
     if (!Number.isFinite(branchId) || s.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
-    if (s.mode !== 'READY_TO_SELL') {
+    if (s.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
 
@@ -127,7 +127,7 @@ const scanBarcode = async (req, res) => {
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
-    if (session.mode !== 'READY_TO_SELL') {
+    if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
     if (session.status !== 'DRAFT') {
@@ -219,7 +219,7 @@ const scanSn = async (req, res) => {
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
-    if (session.mode !== 'READY_TO_SELL') {
+    if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
     if (session.status !== 'DRAFT') {
@@ -313,7 +313,7 @@ const confirmAudit = async (req, res) => {
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
-    if (session.mode !== 'READY_TO_SELL') {
+    if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
     if (session.status !== 'DRAFT') {
@@ -365,7 +365,7 @@ const listAuditItems = async (req, res) => {
     if (!Number.isFinite(branchId) || session.branchId !== branchId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
     }
-    if (session.mode !== 'READY_TO_SELL') {
+    if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
 
@@ -434,4 +434,7 @@ module.exports = {
   confirmAudit,
   listAuditItems,
 }
+
+
+
 

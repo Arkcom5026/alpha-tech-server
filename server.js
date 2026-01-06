@@ -46,6 +46,8 @@ const addressRoutes = require('./routes/addressRoutes');
 const locationsRoutes = require('./routes/locationsRoutes');
 const receiptSimpleRoutes = require('./routes/receiptSimpleRoutes');
 const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
+// Scoped: Quick Receive routes (Hybrid A) — minimal impact
+const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
 
 // Optional load for SIMPLE routes (safe if file doesn't exist yet)
 let simpleStockRoutes = null;
@@ -74,7 +76,7 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key', 'X-Finalize-Token'],
   credentials: true,
   maxAge: 86400
 }));
@@ -151,7 +153,11 @@ app.use('/api/locations', locationsRoutes);
 
 
 app.use('/api/receipts/simple', receiptSimpleRoutes);
+
 app.use('/api/po-receipts/simple', purchaseOrderReceiptSimpleRoutes);
+
+// Scoped mount: Quick Receive (Draft → Finalize)
+app.use('/api/quick-receipts', quickReceiptRoutes);
 
 
 
@@ -176,15 +182,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
 
 
 
