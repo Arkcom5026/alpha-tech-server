@@ -1,3 +1,5 @@
+
+
 // controllers/stockAuditController.js
 // ✅ มาตรฐานเดียวกับ branchPriceController / salesReportController
 // - ใช้ async arrow functions
@@ -27,7 +29,8 @@ const startReadyAudit = async (req, res) => {
     }
 
     const existing = await prisma.stockAuditSession.findFirst({
-      where: { branchId, mode: 'READY', status: 'DRAFT' },
+      where: { branchId, mode: 'READY', confirmedAt: null },
+
       select: { id: true, expectedCount: true },
     })
     if (existing) {
@@ -79,6 +82,11 @@ const startReadyAudit = async (req, res) => {
 // GET /api/stock-audit/:sessionId/overview
 const getOverview = async (req, res) => {
   try {
+    // ✅ ป้องกัน 304/ETag cache ทำให้ UI ค้างหลัง confirm (ข้อมูลธุรกรรมต้องสดเสมอ)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
     const sessionId = parseInt(req.params.sessionId, 10)
     if (!Number.isFinite(sessionId)) {
       return res.status(400).json({ message: 'sessionId ไม่ถูกต้อง' })
@@ -119,7 +127,8 @@ const scanBarcode = async (req, res) => {
 
     const session = await prisma.stockAuditSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, branchId: true, status: true, mode: true },
+      select: { id: true, branchId: true, status: true, mode: true, confirmedAt: true },
+
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
@@ -130,9 +139,15 @@ const scanBarcode = async (req, res) => {
     if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
-    if (session.status !== 'DRAFT') {
+    // ✅ กันการสแกนหลังถูกยืนยัน (อิง confirmedAt เป็นหลัก เพื่อลดความเสี่ยง enum mismatch)
+    if (session.confirmedAt) {
       return res.status(409).json({ message: 'รอบนี้ถูกปิดการสแกนแล้ว' })
     }
+    // fallback: ถ้ามีสถานะอื่นที่ไม่ใช่ DRAFT ก็ถือว่าปิดการสแกน
+    if (session.status && session.status !== 'DRAFT') {
+      return res.status(409).json({ message: 'รอบนี้ถูกปิดการสแกนแล้ว' })
+    }
+
 
     const barcodeRaw = req.body?.barcode ? String(req.body.barcode).trim() : ''
     if (!barcodeRaw) return res.status(400).json({ message: 'กรุณาระบุบาร์โค้ด' })
@@ -144,7 +159,7 @@ const scanBarcode = async (req, res) => {
       employeeId = emp?.id ?? null
     }
     if (!employeeId) {
-      return res.status(403).json({ message: 'ไม่พบข้อมูลพนักงานของผู้ใช้งาน (employeeProfile)'} )
+      return res.status(403).json({ message: 'ไม่พบข้อมูลพนักงานของผู้ใช้งาน (employeeProfile)' })
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -181,6 +196,7 @@ const scanBarcode = async (req, res) => {
         where: { id: sessionId },
         data: { scannedCount: { increment: 1 } },
       })
+      
 
       return { status: 200 }
     })
@@ -211,7 +227,7 @@ const scanSn = async (req, res) => {
 
     const session = await prisma.stockAuditSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, branchId: true, status: true, mode: true },
+      select: { id: true, branchId: true, status: true, mode: true, confirmedAt: true },
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
@@ -222,7 +238,12 @@ const scanSn = async (req, res) => {
     if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
-    if (session.status !== 'DRAFT') {
+    // ✅ กันการสแกนหลังถูกยืนยัน (อิง confirmedAt เป็นหลัก เพื่อลดความเสี่ยง enum mismatch)
+    if (session.confirmedAt) {
+      return res.status(409).json({ message: 'รอบนี้ถูกปิดการสแกนแล้ว' })
+    }
+    // fallback: ถ้ามีสถานะอื่นที่ไม่ใช่ DRAFT ก็ถือว่าปิดการสแกน
+    if (session.status && session.status !== 'DRAFT') {
       return res.status(409).json({ message: 'รอบนี้ถูกปิดการสแกนแล้ว' })
     }
 
@@ -295,8 +316,10 @@ const scanSn = async (req, res) => {
   }
 }
 
-// POST /api/stock-audit/:sessionId/confirm  { strategy?: 'MARK_PENDING' | 'MARK_LOST' }
-const confirmAudit = async (req, res) => {
+// POST /api/stock-audit/:sessionId/cancel  { reason? }
+// ✅ Soft-cancel: ปิดรอบแบบ "ยกเลิก" โดยไม่สรุปสูญหาย/ค้างตรวจ และไม่แก้ stockItem ใด ๆ
+// ✅ ใช้ confirmedAt เป็น single source of truth สำหรับ "ปิดการสแกน" (หลีกเลี่ยง enum mismatch)
+const cancelAudit = async (req, res) => {
   try {
     const sessionId = parseInt(req.params.sessionId, 10)
     if (!Number.isFinite(sessionId)) {
@@ -305,7 +328,7 @@ const confirmAudit = async (req, res) => {
 
     const session = await prisma.stockAuditSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, branchId: true, status: true, mode: true },
+      select: { id: true, branchId: true, status: true, mode: true, confirmedAt: true },
     })
     if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
 
@@ -316,7 +339,58 @@ const confirmAudit = async (req, res) => {
     if (session.mode !== 'READY') {
       return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
     }
-    if (session.status !== 'DRAFT') {
+    // ถ้าปิดรอบไปแล้ว ไม่ให้ยกเลิกซ้ำ
+    if (session.confirmedAt) {
+      return res.status(409).json({ message: 'รอบนี้ถูกปิดไปแล้ว' })
+    }
+    // fallback: ถ้ามีสถานะอื่นที่ไม่ใช่ DRAFT ก็ถือว่าปิดรอบแล้ว
+    if (session.status && session.status !== 'DRAFT') {
+      return res.status(409).json({ message: 'รอบนี้ถูกปิดไปแล้ว' })
+    }
+
+    // หมายเหตุ: reason เก็บได้ถ้ามี field รองรับในอนาคต (ตอนนี้ไม่เขียนลง DB เพื่อกัน Prisma validation error)
+    // const reason = req.body?.reason ? String(req.body.reason).trim() : ''
+
+    await prisma.stockAuditSession.update({
+      where: { id: sessionId },
+      // ✅ ปิดรอบด้วย confirmedAt เท่านั้น (ไม่แก้ status เพื่อลดความเสี่ยง enum mismatch)
+      data: { confirmedAt: new Date() },
+    })
+
+    return res.status(200).json({ ok: true, status: 'CANCELLED' })
+  } catch (error) {
+    console.error('❌ [cancelAudit] error:', error)
+    return res.status(500).json({ message: 'ยกเลิกรอบเช็คไม่สำเร็จ' })
+  }
+}
+
+// POST /api/stock-audit/:sessionId/confirm  { strategy?: 'MARK_PENDING' | 'MARK_LOST' }
+const confirmAudit = async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId, 10)
+    if (!Number.isFinite(sessionId)) {
+      return res.status(400).json({ message: 'sessionId ไม่ถูกต้อง' })
+    }
+
+    const session = await prisma.stockAuditSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, branchId: true, status: true, mode: true, confirmedAt: true },
+    })
+    if (!session) return res.status(404).json({ message: 'ไม่พบรอบเช็คสต๊อก' })
+
+    const branchId = Number(req.user?.branchId)
+    if (!Number.isFinite(branchId) || session.branchId !== branchId) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' })
+    }
+    if (session.mode !== 'READY') {
+      return res.status(400).json({ message: 'โหมดรอบตรวจไม่ถูกต้อง' })
+    }
+    // ✅ ใช้ confirmedAt เป็นตัวตัดสินหลัก เพื่อไม่ผูกกับค่า enum
+    if (session.confirmedAt) {
+      return res.status(409).json({ message: 'รอบนี้ถูกยืนยันไปแล้ว' })
+    }
+    // fallback: ถ้าสถานะไม่ใช่ DRAFT ก็ถือว่ายืนยันแล้ว/ปิดรอบแล้ว
+    if (session.status && session.status !== 'DRAFT') {
       return res.status(409).json({ message: 'รอบนี้ถูกยืนยันไปแล้ว' })
     }
 
@@ -336,7 +410,9 @@ const confirmAudit = async (req, res) => {
 
       await tx.stockAuditSession.update({
         where: { id: sessionId },
-        data: { status: 'CONFIRMED', confirmedAt: new Date() },
+        // ✅ ไม่ตั้งค่า status ด้วย string ที่อาจไม่อยู่ใน enum (กัน PrismaClientValidationError)
+        // ใช้ confirmedAt เป็น single source of truth สำหรับ “ยืนยันผลแล้ว”
+        data: { confirmedAt: new Date() },
       })
     })
 
@@ -350,6 +426,11 @@ const confirmAudit = async (req, res) => {
 // GET /api/stock-audit/:sessionId/items?scanned=0|1&q=&page=1&pageSize=50
 const listAuditItems = async (req, res) => {
   try {
+    // ✅ ป้องกัน 304/ETag cache ทำให้ UI ค้างหลัง confirm (ข้อมูลธุรกรรมต้องสดเสมอ)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
     const sessionId = parseInt(req.params.sessionId, 10)
     if (!Number.isFinite(sessionId)) {
       return res.status(400).json({ message: 'sessionId ไม่ถูกต้อง' })
@@ -382,13 +463,13 @@ const listAuditItems = async (req, res) => {
       ...(scanned === '1' ? { isScanned: true } : {}),
       ...(q
         ? {
-            OR: [
-              { barcode: { contains: q, mode: 'insensitive' } },
-              { stockItem: { serialNumber: { contains: q, mode: 'insensitive' } } },
-              { product: { name: { contains: q, mode: 'insensitive' } } },
-              { product: { model: { contains: q, mode: 'insensitive' } } },
-            ],
-          }
+          OR: [
+            { barcode: { contains: q, mode: 'insensitive' } },
+            { stockItem: { serialNumber: { contains: q, mode: 'insensitive' } } },
+            { product: { name: { contains: q, mode: 'insensitive' } } },
+            { product: { model: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
         : {}),
     }
 
@@ -431,10 +512,9 @@ module.exports = {
   getOverview,
   scanBarcode,
   scanSn,
+  cancelAudit,
   confirmAudit,
   listAuditItems,
 }
-
-
 
 
