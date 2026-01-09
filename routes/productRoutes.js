@@ -1,3 +1,5 @@
+
+
 // ✅ server/routes/productRoutes.js (อัปเดต)
 const express = require('express');
 const router = express.Router();
@@ -7,14 +9,12 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
-  deleteProductImage,
   getProductDropdowns,
   getProductsForOnline,
   getProductOnlineById,
   getProductsForPos, // ✅ สำหรับ POS
+  migrateSnToSimple, // ✅ SN→SIMPLE migration
 } = require('../controllers/productController');
-// Import migration endpoint
-const { migrateSnToSimple } = require('../controllers/productController');
 const { verifyToken } = require('../middlewares/verifyToken');
 
 // ✅ Public routes (ไม่ต้อง login)
@@ -36,6 +36,14 @@ router.patch('/:id', updateProduct); // alias for PATCH
 router.post('/:id/migrate-to-simple', migrateSnToSimple); // SN→SIMPLE migration
 router.post('/pos/migrate-to-simple/:id', migrateSnToSimple); // POS-style alias
 router.delete('/:id', deleteProduct);
-router.delete('/:id/image', deleteProductImage);
+
+// ✅ Image upload/delete routes (Cloudinary + DB)
+//    Mounted under /api/products via this productRoutes
+const uploadProductRoutes = require('./uploadProductRoutes');
+router.use('/', uploadProductRoutes);
 
 module.exports = router;
+
+
+
+

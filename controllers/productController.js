@@ -1,10 +1,10 @@
 
 
+
   // ✅ server/controllers/productController.js (Production Standard)
   // CommonJS only; all endpoints wrapped in try/catch; BRANCH_SCOPE_ENFORCED.
   
   const { prisma, Prisma } = require('../lib/prisma');
-  const { v2: cloudinary } = require('cloudinary');
   
   // ---------- Helpers ----------
   const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10));
@@ -1085,3 +1085,5 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 };
+
+

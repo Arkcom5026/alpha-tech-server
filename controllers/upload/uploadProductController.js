@@ -1,3 +1,5 @@
+
+
 // ✅ server/controllers/upload/uploadProductController.js — Prisma singleton, safer errors, cover handling
 
 const { prisma, Prisma } = require('../../lib/prisma');
@@ -10,12 +12,16 @@ const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Nu
 
 const uploadAndSaveProductImages = async (req, res) => {
   const productId = toInt(req.params.id);
-  const file = req.file;
+  // ✅ FE บางจุดอาจส่ง field ผิด (เช่น files แทน file) → รองรับแบบปลอดภัย (เลือกไฟล์แรก)
+  const file = req.file ?? (Array.isArray(req.files) && req.files[0] ? req.files[0] : undefined);
 
+  // ✅ รองรับทั้ง captions[] และ caption (กรณีอัปโหลดทีละรูป)
   const captionsArray = Array.isArray(req.body?.captions)
     ? req.body.captions
     : typeof req.body?.captions === 'string'
     ? [req.body.captions]
+    : typeof req.body?.caption === 'string'
+    ? [req.body.caption]
     : [];
 
   const coverIndex = toInt(req.body?.coverIndex);
@@ -28,7 +34,10 @@ const uploadAndSaveProductImages = async (req, res) => {
 
   try {
     if (!file || !productId) {
-      return res.status(400).json({ message: 'ไม่พบ productId หรือไฟล์ภาพไม่ถูกต้อง' });
+      return res.status(400).json({
+        message:
+          'ไม่พบ productId หรือไฟล์ภาพไม่ถูกต้อง (upload-full ต้องส่ง field = "file" แบบ multer.single หรือส่งเป็น "files" แล้วระบบจะหยิบไฟล์แรกให้)',
+      });
     }
 
     // ✅ ตรวจว่ามีสินค้าอยู่จริง (กัน productId หลุด)
@@ -91,10 +100,13 @@ const uploadAndSaveProductImages = async (req, res) => {
 const uploadProductImagesOnly = async (req, res) => {
   const files = req.files;
 
+  // ✅ รองรับทั้ง captions[] และ caption
   const captionsArray = Array.isArray(req.body?.captions)
     ? req.body.captions
     : typeof req.body?.captions === 'string'
     ? [req.body.captions]
+    : typeof req.body?.caption === 'string'
+    ? [req.body.caption]
     : [];
 
   const coverIndex = toInt(req.body?.coverIndex);
@@ -156,28 +168,119 @@ const uploadProductImagesOnly = async (req, res) => {
   }
 };
 
-const deleteProductImage = async (req, res) => {
+// ✅ ตั้งรูปนี้เป็น Cover (ต้องมีแค่ 1 รูปที่เป็น cover ต่อสินค้า)
+// PATCH /api/products/:id/images/:imageId/cover
+const setProductCoverImage = async (req, res) => {
   const productId = toInt(req.params.id);
-  const { public_id } = req.body || {};
-
-  console.log('🗑️ [DELETE] เริ่มลบภาพ:', public_id);
+  const imageId = toInt(req.params.imageId);
 
   try {
-    if (!public_id || !productId) {
-      return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
+    if (!productId || !imageId) {
+      return res.status(400).json({ message: 'Missing productId or imageId' });
     }
 
-    await cloudinary.uploader.destroy(public_id);
+    // ✅ ตรวจว่าสินค้ามีอยู่จริง
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+    if (!product) return res.status(404).json({ message: 'ไม่พบสินค้า' });
 
-    await prisma.productImage.deleteMany({
-      where: { productId, public_id },
+    // ✅ ตรวจว่ารูปนี้เป็นของสินค้านี้จริง และยัง active
+    const image = await prisma.productImage.findFirst({
+      where: { id: imageId, productId, active: true },
+      select: { id: true },
+    });
+    if (!image) return res.status(404).json({ message: 'ไม่พบรูปภาพของสินค้านี้' });
+
+    const images = await prisma.$transaction(async (tx) => {
+      // เคลียร์ cover เก่าทั้งหมด
+      await tx.productImage.updateMany({ where: { productId }, data: { isCover: false } });
+      // ตั้ง cover ใหม่
+      await tx.productImage.update({ where: { id: imageId }, data: { isCover: true } });
+
+      // ส่งรายการรูปที่ยัง active กลับไป (ไว้ให้ FE รีเฟรช UI)
+      const refreshed = await tx.productImage.findMany({
+        where: { productId, active: true },
+        orderBy: [{ isCover: 'desc' }, { createdAt: 'asc' }],
+        select: { id: true, url: true, caption: true, isCover: true, public_id: true },
+      });
+      return refreshed;
     });
 
-    console.log('✅ ลบภาพสำเร็จจาก Cloudinary และฐานข้อมูล');
-    return res.json({ message: 'ลบภาพสำเร็จ' });
+    return res.json({ message: 'ตั้งรูปหน้าปกสำเร็จ', images });
+  } catch (err) {
+    console.error('❌ setProductCoverImage error:', err);
+    return res.status(500).json({ message: 'Set cover failed' });
+  }
+};
+
+// ✅ ลบภาพสินค้า (soft delete ใน DB + ลบไฟล์บน Cloudinary)
+// รองรับ payload:
+// - { imageId: 452 } หรือ { id: 452 }
+// - { publicId: "products/..." } หรือ { public_id: "products/..." }
+const deleteProductImage = async (req, res) => {
+  const productId = toInt(req.params.id);
+
+  // ✅ รองรับ imageId ทั้งจาก params และ body
+  const imageId = toInt(req.params?.imageId ?? req.body?.imageId ?? req.body?.id);
+  const publicIdRaw = req.body?.publicId ?? req.body?.public_id;
+
+  try {
+    if (!productId) return res.status(400).json({ message: 'ไม่พบ productId' });
+
+    // ✅ หา record รูปจาก DB (กันส่ง id/int ไปเทียบกับ public_id)
+    const image = await prisma.productImage.findFirst({
+      where: {
+        productId,
+        ...(imageId ? { id: imageId } : {}),
+        ...(!imageId && typeof publicIdRaw === 'string' && publicIdRaw ? { public_id: publicIdRaw } : {}),
+      },
+      select: { id: true, public_id: true, isCover: true, active: true },
+    });
+
+    if (!image) return res.status(404).json({ message: 'ไม่พบรูปภาพ' });
+
+    // ✅ ลบที่ Cloudinary ก่อน (ถ้าพัง เราไม่ให้ DB เพี้ยน)
+    try {
+      if (image.public_id) {
+        await cloudinary.uploader.destroy(image.public_id, { resource_type: 'image' });
+      }
+    } catch (e) {
+      console.warn('⚠️ cloudinary destroy failed:', e?.message || e);
+      // ไม่ throw เพื่อให้ระบบยังไปต่อได้ (soft delete ใน DB)
+    }
+
+    // ✅ soft delete ใน DB + จัดการ cover
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.productImage.update({
+        where: { id: image.id },
+        data: { active: false, isCover: false },
+      });
+
+      // ถ้ารูปที่ลบเป็น cover → เลือก cover ใหม่ 1 รูปจากรูปที่ยัง active
+      if (image.isCover) {
+        const nextCover = await tx.productImage.findFirst({
+          where: { productId, active: true },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (nextCover) {
+          await tx.productImage.update({ where: { id: nextCover.id }, data: { isCover: true } });
+        }
+      }
+
+      // ส่งรายการรูปที่ยัง active กลับไป (ไว้ให้ FE รีเฟรช UI)
+      const images = await tx.productImage.findMany({
+        where: { productId, active: true },
+        orderBy: [{ isCover: 'desc' }, { createdAt: 'asc' }],
+        select: { id: true, url: true, caption: true, isCover: true, public_id: true },
+      });
+
+      return images;
+    });
+
+    return res.json({ message: 'ลบรูปภาพสำเร็จ', images: result });
   } catch (err) {
     console.error('❌ deleteProductImage error:', err);
-    return res.status(500).json({ message: 'ลบภาพไม่สำเร็จ' });
+    return res.status(500).json({ message: 'Delete image failed' });
   }
 };
 
@@ -185,4 +288,9 @@ module.exports = {
   uploadProductImagesOnly,
   uploadAndSaveProductImages,
   deleteProductImage,
+  setProductCoverImage,
 };
+
+
+
+
