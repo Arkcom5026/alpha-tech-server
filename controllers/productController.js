@@ -220,10 +220,14 @@ const getProductsForPos = async (req, res) => {
   const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
   const tplId = toInt(templateId ?? productTemplateId);
 
-  const where = {
-    ...(simpleOnly ? { mode: 'SIMPLE' } : {}),
-    ...(activeFilter === undefined ? {} : { active: true }),
-    ...(search ? {
+  // ✅ Build resilient filters (support legacy data where scalar ids may be null but relations exist)
+  const whereAND = [];
+
+  if (simpleOnly) whereAND.push({ mode: 'SIMPLE' });
+  if (activeFilter !== undefined) whereAND.push({ active: true });
+
+  if (search) {
+    whereAND.push({
       OR: [
         { name: { contains: String(search), mode: 'insensitive' } },
         { description: { contains: String(search), mode: 'insensitive' } },
@@ -231,14 +235,64 @@ const getProductsForPos = async (req, res) => {
         { sku: String(search) },
         { barcode: String(search) },
       ],
-    } : {}),
-    ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
-    ...(toInt(productTypeId) ? { productTypeId: toInt(productTypeId) } : {}),
-    ...(toInt(productProfileId) ? { productProfileId: toInt(productProfileId) } : {}),
-        ...(tplId ? { OR: [{ templateId: tplId }, { template: { id: tplId } }] } : {}),
+    });
+  }
 
-    ...(toInt(brandId) ? { OR: [{ template: { brandId: toInt(brandId) } }, { brandId: toInt(brandId) }] } : {}),
-  };
+  const catId = toInt(categoryId);
+  const typeId = toInt(productTypeId);
+  const profId = toInt(productProfileId);
+  const tmplId = tplId;
+  const brId = toInt(brandId);
+
+  if (catId) {
+    whereAND.push({
+      OR: [
+        { categoryId: catId },
+        { productType: { category: { id: catId } } },
+        { productProfile: { productType: { category: { id: catId } } } },
+        { template: { productProfile: { productType: { category: { id: catId } } } } },
+      ],
+    });
+  }
+
+  if (typeId) {
+    whereAND.push({
+      OR: [
+        { productTypeId: typeId },
+        { productProfile: { productType: { id: typeId } } },
+        { template: { productProfile: { productType: { id: typeId } } } },
+      ],
+    });
+  }
+
+  if (profId) {
+    whereAND.push({
+      OR: [
+        { productProfileId: profId },
+        { template: { productProfile: { id: profId } } },
+      ],
+    });
+  }
+
+  if (tmplId) {
+    whereAND.push({
+      OR: [
+        { templateId: tmplId },
+        { template: { id: tmplId } },
+      ],
+    });
+  }
+
+  if (brId) {
+    whereAND.push({
+      OR: [
+        { brandId: brId },
+        { template: { brandId: brId } },
+      ],
+    });
+  }
+
+  const where = whereAND.length ? { AND: whereAND } : {};
 
   try {
     console.log('[POS SEARCH] where:', JSON.stringify(where));
@@ -1031,7 +1085,3 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 };
-
-
-
-
