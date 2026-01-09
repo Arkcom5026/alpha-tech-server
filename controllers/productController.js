@@ -1,6 +1,4 @@
 
-
-
   // ✅ server/controllers/productController.js (Production Standard)
   // CommonJS only; all endpoints wrapped in try/catch; BRANCH_SCOPE_ENFORCED.
   
@@ -77,19 +75,27 @@ const getAllProducts = async (req, res) => {
     productTemplateId,
     templateId, // alias
     activeOnly = 'true',
+    includeInactive = '0', // ✅ 1 = include active=false
+
   } = req.query;
 
   const takeNum = Math.max(1, Math.min(toInt(take) ?? 100, 200));
   const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
   const tplId = toInt(templateId ?? productTemplateId);
-  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
+
+  // ✅ Active filter policy:
+  // - default: activeOnly=true (filter active=true)
+  // - includeInactive=1 OR activeOnly=false => include both active=true/false
+  const wantIncludeInactive = String(includeInactive) === '1' || String(includeInactive).toLowerCase() === 'true';
+  const wantActiveOnlyFalse = String(activeOnly).toLowerCase() === 'false';
+  const activeFilter = (wantIncludeInactive || wantActiveOnlyFalse) ? undefined : true;
 
   
 
   try {
     const products = await prisma.product.findMany({
       where: {
-        ...(activeFilter === undefined ? {} : { active: true }),
+        ...(activeFilter === undefined ? {} : { active: activeFilter }),
         ...(search ? {
           OR: [
             { name: { contains: String(search), mode: 'insensitive' } },
@@ -110,6 +116,7 @@ const getAllProducts = async (req, res) => {
         model: true,
         description: true,
         mode: true,
+        active: true,
         spec: true,
 
         // ✅ scalar ids used by FE filters
@@ -159,8 +166,9 @@ const getAllProducts = async (req, res) => {
         model: p.model ?? null,
         description: p.description,
 
-        // ✅ include mode for FE
+        // ✅ include mode + active for FE
         mode: p.mode,
+        active: (typeof p.active === 'boolean' ? p.active : true),
 
         // ✅ ids + mode for FE filter compatibility
         categoryId: (p.categoryId ?? p.productType?.category?.id ?? null),
@@ -209,7 +217,9 @@ const getProductsForPos = async (req, res) => {
     readyOnly = 'false',
     hasPrice = 'false',
     activeOnly = 'true',
+    includeInactive = '0', // ✅ 1 = include active=false
   } = req.query;
+
 
   // Optional filter to return only SIMPLE products for Quick Receive (Simple)
   const queryMode = (req?.query?.mode || '').toString().toUpperCase();
@@ -217,14 +227,19 @@ const getProductsForPos = async (req, res) => {
 
   const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200));
   const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0));
-  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true;
+  // ✅ Active filter policy (POS list):
+  // - default: activeOnly=true => active=true only
+  // - includeInactive=1 OR activeOnly=false => include both active=true/false
+  const wantIncludeInactive = String(includeInactive) === '1' || String(includeInactive).toLowerCase() === 'true';
+  const wantActiveOnlyFalse = String(activeOnly).toLowerCase() === 'false';
+  const activeFilter = (wantIncludeInactive || wantActiveOnlyFalse) ? undefined : true;
   const tplId = toInt(templateId ?? productTemplateId);
 
   // ✅ Build resilient filters (support legacy data where scalar ids may be null but relations exist)
   const whereAND = [];
 
   if (simpleOnly) whereAND.push({ mode: 'SIMPLE' });
-  if (activeFilter !== undefined) whereAND.push({ active: true });
+  if (activeFilter !== undefined) whereAND.push({ active: activeFilter });
 
   if (search) {
     whereAND.push({
@@ -301,6 +316,7 @@ const getProductsForPos = async (req, res) => {
       where,
       select: {
         id: true,
+        active: true,
         name: true,
         model: true,
         description: true,
@@ -368,6 +384,7 @@ const getProductsForPos = async (req, res) => {
 
       return {
         id: p.id,
+        active: (typeof p.active === 'boolean' ? p.active : true),
         name: p.name,
         model: p.model ?? null,
         description: p.description,
@@ -974,7 +991,7 @@ const updateProduct = async (req, res) => {
 };
 
 
-const deleteProduct = async (req, res) => {
+const disableProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'INVALID_ID' });
@@ -982,10 +999,44 @@ const deleteProduct = async (req, res) => {
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
     // Soft-archive instead of hard delete for safety
-    const result = await prisma.product.update({ where: { id }, data: { active: false } });
-    return res.json({ success: true, id: result.id, archived: true });
+    const result = await prisma.product.update({
+      where: { id },
+      data: { active: false },
+      select: { id: true, active: true },
+    });
+
+    return res.json({ success: true, id: result.id, active: result.active, disabled: true });
   } catch (error) {
-    console.error('❌ deleteProduct error:', error);
+    console.error('❌ disableProduct error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'NOT_FOUND' });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ✅ Legacy alias (soft-disable)
+const deleteProduct = disableProduct;
+
+const enableProduct = async (req, res) => {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID' });
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+    const result = await prisma.product.update({
+      where: { id },
+      data: { active: true },
+      select: { id: true, active: true },
+    });
+
+    return res.json({ success: true, id: result.id, active: result.active, enabled: true });
+  } catch (error) {
+    console.error('❌ enableProduct error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'NOT_FOUND' });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1077,13 +1128,21 @@ module.exports = {
   createProduct,
   updateProduct,
   getProductPosById,
-  deleteProduct,
+
+  // ✅ Active status (แทนการลบจริง)
+  disableProduct,
+  enableProduct,
+  deleteProduct, // legacy alias (soft-disable)
+
   deleteProductImage,
   getProductDropdowns,
   getProductsForOnline,
-  getProductOnlineById,  
+  getProductOnlineById,
   getProductsForPos,
   migrateSnToSimple,
 };
+
+
+
 
 

@@ -7,8 +7,9 @@ const {
   getAllProducts,
   getProductPosById,
   createProduct,
-  updateProduct,
-  deleteProduct,
+  updateProduct,  deleteProduct, // (legacy alias)
+  disableProduct,
+  enableProduct,
   getProductDropdowns,
   getProductsForOnline,
   getProductOnlineById,
@@ -35,7 +36,11 @@ router.put('/:id', updateProduct);
 router.patch('/:id', updateProduct); // alias for PATCH
 router.post('/:id/migrate-to-simple', migrateSnToSimple); // SN→SIMPLE migration
 router.post('/pos/migrate-to-simple/:id', migrateSnToSimple); // POS-style alias
-router.delete('/:id', deleteProduct);
+// ✅ Product Active (แทนการลบจริง)
+router.post('/:id/disable', disableProduct);
+router.post('/:id/enable', enableProduct);
+router.delete('/:id', disableProduct); // legacy alias (soft-disable)
+
 
 // ✅ Image upload/delete routes (Cloudinary + DB)
 //    Mounted under /api/products via this productRoutes
@@ -43,7 +48,6 @@ const uploadProductRoutes = require('./uploadProductRoutes');
 router.use('/', uploadProductRoutes);
 
 module.exports = router;
-
 
 
 
