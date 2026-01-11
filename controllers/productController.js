@@ -1,4 +1,5 @@
 
+
   // ✅ server/controllers/productController.js (Production Standard)
   // CommonJS only; all endpoints wrapped in try/catch; BRANCH_SCOPE_ENFORCED.
   
@@ -311,7 +312,6 @@ const getProductsForPos = async (req, res) => {
 
   try {
     console.log('[POS SEARCH] where:', JSON.stringify(where));
-
     const items = await prisma.product.findMany({
       where,
       select: {
@@ -357,7 +357,48 @@ const getProductsForPos = async (req, res) => {
       orderBy: { id: 'desc' },
     });
 
-    let mapped = items.map((p) => {
+    // ✅ Production-safe: Deduplicate by product.id
+    // บางกรณี Prisma/where OR หลายเส้นทางอาจทำให้ได้ object ซ้ำ (logical duplication)
+    // เราจะกันซ้ำที่ BE เพื่อไม่ให้ FE เห็นเป็นหลายแถว
+    const uniqueItems = (() => {
+      const map = new Map();
+      for (const p of items) {
+        const key = p?.id;
+        if (!key) continue;
+
+        const prev = map.get(key);
+        if (!prev) {
+          map.set(key, p);
+          continue;
+        }
+
+        const prevBp = prev.branchPrice?.[0];
+        const nextBp = p.branchPrice?.[0];
+        const prevSb = prev.stockBalances?.[0];
+        const nextSb = p.stockBalances?.[0];
+
+        const prevLast = prevSb?.lastReceivedCost != null ? Number(prevSb.lastReceivedCost) : (prevBp?.costPrice != null ? Number(prevBp.costPrice) : 0);
+        const nextLast = nextSb?.lastReceivedCost != null ? Number(nextSb.lastReceivedCost) : (nextBp?.costPrice != null ? Number(nextBp.costPrice) : 0);
+
+        const prevHasBp = !!prevBp;
+        const nextHasBp = !!nextBp;
+
+        // Prefer record that has branchPrice, and prefer one with a non-zero lastCost
+        if ((nextHasBp && !prevHasBp) || (Number(nextLast) > 0 && Number(prevLast) <= 0)) {
+          map.set(key, { ...prev, ...p });
+        } else {
+          // Keep prev, but merge missing relations defensively
+          map.set(key, { ...p, ...prev });
+        }
+      }
+      return Array.from(map.values());
+    })();
+
+    if (uniqueItems.length !== items.length) {
+      console.warn(`[POS SEARCH] deduped items: ${items.length} -> ${uniqueItems.length}`);
+    }
+
+    let mapped = uniqueItems.map((p) => {
       const bp = p.branchPrice?.[0];
       const sb = p.stockBalances?.[0];
       const qty = Number(sb?.quantity ?? 0);
@@ -1141,7 +1182,6 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 };
-
 
 
 
