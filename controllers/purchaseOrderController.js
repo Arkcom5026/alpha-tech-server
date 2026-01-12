@@ -402,11 +402,13 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
       }
     }
 
-    // Validate advance payments
-    for (const ap of advancePaymentsUsed) {
-      if (!ap?.paymentId || !isMoneyLike(ap?.amount) || Number(ap.amount) <= 0) {
-        return res.status(400).json({ message: 'ข้อมูลเงินล่วงหน้าไม่ถูกต้อง (paymentId, amount>0)' });
-      }
+    // ✅ Option A: ขั้นสร้าง PO (Create) ไม่รองรับการใช้/ผูกเงินล่วงหน้า (advancePaymentsUsed)
+    // ให้ไปทำในขั้นตอน “จ่ายเงิน/ตัดชำระ Supplier” แยกภายหลังแทน
+    if (Array.isArray(advancePaymentsUsed) && advancePaymentsUsed.length > 0) {
+      return res.status(400).json({
+        message:
+          'ขั้นสร้างใบสั่งซื้อ (PO) ไม่รองรับการใช้เงินล่วงหน้า (advancePaymentsUsed) — กรุณาสร้าง PO แบบปกติ และไปผูก/ตัดชำระเงินในขั้นตอนจ่ายเงิน Supplier ภายหลัง',
+      });
     }
 
     let createdPOId = null;
@@ -443,16 +445,6 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
             });
           }
 
-          // link advance payments
-          if (advancePaymentsUsed.length > 0) {
-            await tx.supplierPaymentPO.createMany({
-              data: advancePaymentsUsed.map((entry) => ({
-                paymentId: Number(entry.paymentId),
-                purchaseOrderId: created.id,
-                amountPaid: D(entry.amount || 0),
-              })),
-            });
-          }
           return created.id;
         });
         createdPOId = poId;
@@ -507,4 +499,7 @@ module.exports = {
   getPurchaseOrdersBySupplier,
   createPurchaseOrderWithAdvance,
 };
+
+
+
 
