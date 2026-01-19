@@ -702,23 +702,43 @@ const reprintBarcodes = async (req, res) => {
     }
 
     // 🔁 Build fallback maps for StockItem for reprint
+    // หมายเหตุ: ใน schema ของเรา StockItem ไม่มี field barcodeReceiptItemId (เป็น relation)
+    // ดังนั้นให้หา StockItem ผ่าน 2 เส้นทางที่ปลอดภัย:
+    // 1) barcodeReceiptItem.id -> barcodeReceiptItem.stockItem (เมื่อมี stockItemId)
+    // 2) purchaseOrderReceiptItemId (receiptItemId) -> stockItem (สำหรับข้อมูลเก่าหรือกรณี include ไม่ติด)
     const briIds2 = Array.from(new Set(items.map((r) => r.id).filter(Boolean)));
     const recItemIds2 = Array.from(new Set(items.map((r) => r.receiptItemId).filter(Boolean)));
+
     let siByBRI = new Map();
     let siByReceiptItem = new Map();
-    if (briIds2.length || recItemIds2.length) {
-      const stockItems2 = await prisma.stockItem.findMany({
-        where: {
-          branchId,
-          OR: [
-            briIds2.length ? { barcodeReceiptItemId: { in: briIds2 } } : undefined,
-            recItemIds2.length ? { purchaseOrderReceiptItemId: { in: recItemIds2 } } : undefined,
-          ].filter(Boolean),
+
+    // (1) BRI -> StockItem
+    if (briIds2.length) {
+      const briLinks2 = await prisma.barcodeReceiptItem.findMany({
+        where: { id: { in: briIds2 }, branchId, stockItemId: { not: null } },
+        select: {
+          id: true,
+          stockItem: { select: { id: true, serialNumber: true } },
         },
-        select: { id: true, serialNumber: true, barcodeReceiptItemId: true, purchaseOrderReceiptItemId: true },
       });
-      siByBRI = new Map(stockItems2.map((s) => [s.barcodeReceiptItemId, s]));
-      siByReceiptItem = new Map(stockItems2.map((s) => [s.purchaseOrderReceiptItemId, s]));
+      siByBRI = new Map(
+        briLinks2
+          .map((x) => [x.id, x.stockItem])
+          .filter(([k, v]) => k != null && v != null)
+      );
+    }
+
+    // (2) ReceiptItem -> StockItem (ผ่าน purchaseOrderReceiptItemId)
+    if (recItemIds2.length) {
+      const stockItemsByRecItem = await prisma.stockItem.findMany({
+        where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds2 } },
+        select: { id: true, serialNumber: true, purchaseOrderReceiptItemId: true },
+      });
+      siByReceiptItem = new Map(
+        stockItemsByRecItem
+          .map((s) => [s.purchaseOrderReceiptItemId, s])
+          .filter(([k, v]) => k != null && v != null)
+      );
     }
 
     const barcodes = items.map((b) => {
@@ -1071,6 +1091,14 @@ module.exports = {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   };
+
+
+
+
+
+
+
+
 
 
 
