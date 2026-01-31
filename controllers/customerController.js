@@ -104,7 +104,7 @@ const getCustomerByUserId = async (req, res) => {
   try {
     const userId = req.user?.id;
     const role = req.user?.role;
-    if (role !== 'customer') return res.status(403).json({ message: 'Forbidden' });
+    if (role !== 'CUSTOMER') return res.status(403).json({ message: 'Forbidden' });
 
     const customer = await prisma.customerProfile.findUnique({
       where: { userId },
@@ -163,7 +163,7 @@ const createCustomer = async (req, res) => {
           email: email || null,
           loginId: normalizedPhone,
           password: hashedPassword,
-          role: 'customer',
+          role: 'CUSTOMER',
           loginType: 'PHONE',
         },
       });
@@ -175,6 +175,7 @@ const createCustomer = async (req, res) => {
           type: type || 'INDIVIDUAL',
           companyName: companyName || null,
           taxId: taxId || null,
+          addressDetail: typeof addressDetail === 'string' ? addressDetail.trim() : null,
           ...(subdistrictCode ? { subdistrict: { connect: { code: subdistrictCode } } } : {}),
         },
         include: { user: true, subdistrict: { include: { district: { include: { province: true } } } } },
@@ -210,7 +211,7 @@ const updateCustomerProfile = async (req, res) => {
     const role = userCtx.role || '';
     const branchId = toInt(userCtx.branchId);
     if (!userCtx.id) return res.status(401).json({ message: 'Unauthorized' });
-    if (!['superadmin','admin','employee'].includes(role)) return res.status(403).json({ message: 'Forbidden' });
+    if (!['SUPERADMIN','ADMIN','EMPLOYEE'].includes(role)) return res.status(403).json({ message: 'Forbidden' });
 
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ message: 'รหัสลูกค้าไม่ถูกต้อง' });
@@ -225,15 +226,17 @@ const updateCustomerProfile = async (req, res) => {
 
     const existing = await prisma.customerProfile.findUnique({ where: { id }, include: { user: true } });
     if (!existing) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
-    if (existing.branchId && branchId && existing.branchId !== branchId && role !== 'superadmin') {
+    if (existing.branchId && branchId && existing.branchId !== branchId && role !== 'SUPERADMIN') {
       return res.status(403).json({ message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าสาขาอื่น' });
     }
+    
 
     const profileData = Object.fromEntries(Object.entries({
       name: sanitize(name),
       type,
       companyName: sanitize(companyName),
       taxId: sanitize(taxId),
+      addressDetail: sanitize(addressDetail),
     }).filter(([_, v]) => v !== undefined));
 
     // ตรวจ postcode กับ subdistrictCode ถ้ามี
@@ -302,7 +305,7 @@ const updateCustomerProfile = async (req, res) => {
 const updateCustomerProfileOnline = async (req, res) => {
   try {
     const user = req.user;
-    if (!user || user.role !== 'customer') return res.status(403).json({ message: 'Forbidden' });
+    if (!user || user.role !== 'CUSTOMER')  return res.status(403).json({ message: 'Forbidden' });
 
     const { name, email, phone, type, companyName, taxId, subdistrictCode, addressDetail } = req.body ?? {};
     if (typeof type !== 'undefined') {
@@ -310,7 +313,7 @@ const updateCustomerProfileOnline = async (req, res) => {
       if (!ALLOWED.has(type)) return res.status(400).json({ message: 'ประเภทลูกค้าไม่ถูกต้อง' });
     }
 
-    const profileData = omitUndefined({ name, type, companyName, taxId });
+    const profileData = omitUndefined({ name, type, companyName, taxId, addressDetail });
 
     // ตรวจ postcode กับ subdistrictCode ถ้ามี
     const clientPostcode = (req.body?.postalCode ?? req.body?.postcode) ? String(req.body?.postalCode ?? req.body?.postcode) : undefined;
@@ -393,23 +396,4 @@ module.exports = {
   updateCustomerProfile,
   updateCustomerProfileOnline,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

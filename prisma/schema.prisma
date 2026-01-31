@@ -252,6 +252,7 @@ model CustomerProfile {
   picture     String?
   companyName String?
   taxId       String?
+  addressDetail String?
 
   subdistrictCode String?      @db.Char(6)
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
