@@ -80,14 +80,24 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    // รองรับทั้ง emailOrPhone และ identifier เพื่อไม่ให้ FE เดิมพัง
+    // ⏱️ Login timing (minimal disruption)
+    const t0 = Date.now();
+    const reqId = req?.id || req?.headers?.['x-request-id'] || null;
+    const timing = {
+      reqId,
+      totalMs: 0,
+      findUserMs: 0,
+      bcryptMs: 0,
+      signJwtMs: 0,
+    };
+
     const identifier = normalize(req.body?.emailOrPhone ?? req.body?.identifier);
     const password = normalize(req.body?.password);
     if (!identifier || !password) {
       return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร หรือไอดี และรหัสผ่าน' });
     }
 
-    // helpers ภายในฟังก์ชัน (หลีกเลี่ยง regex เพื่อความปลอดภัยของแพตช์)
+    // helpers ภายในฟังก์ชัน
     const looksLikeEmail = (v) => String(v || '').indexOf('@') > 0;
     const onlyDigits = (v) => String(v || '').split('').filter((c) => c >= '0' && c <= '9').join('');
     const toE164TH = (digits) => {
@@ -103,7 +113,6 @@ const login = async (req, res) => {
     if (looksLikeEmail(identifier)) {
       OR.push({ email: { equals: normalizeEmail(identifier), mode: 'insensitive' } });
     } else {
-      // ลองทั้ง loginId และเบอร์โทรในโปรไฟล์
       OR.push({ loginId: { equals: identifier, mode: 'insensitive' } });
 
       const digits = onlyDigits(identifier);
@@ -112,13 +121,13 @@ const login = async (req, res) => {
       if (digits) OR.push({ loginId: { equals: digits } });
       if (e164 && e164 !== digits) OR.push({ loginId: { equals: e164 } });
 
-      // ความสัมพันธ์แบบ to-one ต้องใช้ is
       if (digits) OR.push({ customerProfile: { is: { phone: digits } } });
       if (e164 && e164 !== digits) OR.push({ customerProfile: { is: { phone: e164 } } });
       if (digits) OR.push({ employeeProfile: { is: { phone: digits } } });
       if (e164 && e164 !== digits) OR.push({ employeeProfile: { is: { phone: e164 } } });
     }
 
+    const tFind0 = Date.now();
     const user = await prisma.user.findFirst({
       where: { OR },
       include: {
@@ -126,21 +135,17 @@ const login = async (req, res) => {
         employeeProfile: { include: { branch: true, position: true } },
       },
     });
+    timing.findUserMs = Date.now() - tFind0;
 
-    if (!user) {
-      return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้' });
-    }
+    if (!user) return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    if (!user.enabled) return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
 
-    if (!user.enabled) {
-      return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
-    }
-
+    const tBcrypt0 = Date.now();
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
-    }
+    timing.bcryptMs = Date.now() - tBcrypt0;
 
-    // ถ้าเป็นพนักงาน/แอดมิน ตรวจสถานะโปรไฟล์พนักงาน (ถ้ามี)
+    if (!isMatch) return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
+
     if (user.role !== 'customer' && user.employeeProfile) {
       if (user.employeeProfile.active === false) {
         return res.status(403).json({ message: 'พนักงานถูกปิดใช้งาน' });
@@ -153,7 +158,21 @@ const login = async (req, res) => {
     const profile = user.customerProfile || user.employeeProfile || null;
     const profileType = user.customerProfile ? 'customer' : user.employeeProfile ? 'employee' : null;
 
+    const tSign0 = Date.now();
     const token = buildToken(user);
+    timing.signJwtMs = Date.now() - tSign0;
+
+    timing.totalMs = Date.now() - t0;
+    console.log('[auth.login] timing', {
+      reqId: timing.reqId,
+      totalMs: timing.totalMs,
+      findUserMs: timing.findUserMs,
+      bcryptMs: timing.bcryptMs,
+      signJwtMs: timing.signJwtMs,
+      userRole: user?.role || null,
+      hasEmployeeProfile: !!user?.employeeProfile,
+      hasCustomerProfile: !!user?.customerProfile,
+    });
 
     return res.json({
       token,
@@ -169,10 +188,12 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('🔥 Login error:', error);
+    const reqId = req?.id || req?.headers?.['x-request-id'] || null;
+    console.error('🔥 Login error:', error, { reqId });
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
+
 
 const findUserByEmail = async (req, res) => {
   try {
@@ -207,5 +228,8 @@ module.exports = {
   login,
   findUserByEmail,
 };
+
+
+
 
 
