@@ -3,19 +3,55 @@
 const { prisma, Prisma } = require('../lib/prisma');
 // Prefer native/fast bcrypt when available (minimal disruption)
 let bcrypt;
+let bcryptProvider = 'unknown';
+
 try {
   // eslint-disable-next-line global-require
   bcrypt = require('@node-rs/bcrypt');
+  bcryptProvider = '@node-rs/bcrypt';
+  bcryptProvider = 'node-rs';
 } catch (e1) {
   try {
     // eslint-disable-next-line global-require
     bcrypt = require('bcrypt');
+    bcryptProvider = 'bcrypt';
+    bcryptProvider = 'bcrypt';
   } catch (e2) {
     // eslint-disable-next-line global-require
     bcrypt = require('bcryptjs');
+    bcryptProvider = 'bcryptjs';
+    bcryptProvider = 'bcryptjs';
   }
 }
 const jwt = require('jsonwebtoken');
+
+// Normalize bcrypt API across providers (minimal disruption)
+const bcryptHash = async (plain, rounds = 10) => {
+  if (typeof bcrypt?.hash === 'function') return bcrypt.hash(plain, rounds);
+  if (typeof bcrypt?.hashSync === 'function') return bcrypt.hashSync(plain, rounds);
+  throw new Error('bcrypt hash function not available');
+};
+
+const bcryptCompare = async (plain, hashed) => {
+  if (typeof bcrypt?.compare === 'function') return bcrypt.compare(plain, hashed);
+  if (typeof bcrypt?.verify === 'function') {
+    // @node-rs/bcrypt uses verify() (order may vary by version)
+    try {
+      return await bcrypt.verify(plain, hashed);
+    } catch (e) {
+      return await bcrypt.verify(hashed, plain);
+    }
+  }
+  throw new Error('bcrypt compare/verify function not available');
+};
+
+// One-time runtime visibility: confirm which bcrypt provider is actually used
+// eslint-disable-next-line no-console
+console.log('[auth] bcrypt provider:', bcryptProvider, {
+  hasCompare: typeof bcrypt?.compare === 'function',
+  hasVerify: typeof bcrypt?.verify === 'function',
+  hasHash: typeof bcrypt?.hash === 'function',
+});
 
 const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim());
 const normalizeEmail = (s) => normalize(s).toLowerCase();
@@ -54,7 +90,7 @@ const register = async (req, res) => {
       return res.status(409).json({ message: 'มีบัญชีนี้อยู่แล้ว' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcryptHash(password, 10);
 
     const newUser = await prisma.user.create({
       data: {
@@ -92,6 +128,12 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
+  // 🔐 bcrypt provider (log once per process)
+  if (!global.__bcryptProviderLogged) {
+    // eslint-disable-next-line no-console
+    console.log('[auth] bcrypt provider:', bcryptProvider);
+    global.__bcryptProviderLogged = true;
+  }
   // ⏱️ Login timing (minimal disruption)
   const t0 = Date.now();
   const reqId = req?.id || req?.headers?.['x-request-id'] || null;
@@ -227,7 +269,7 @@ const login = async (req, res) => {
     }
 
     const tBcrypt0 = Date.now();
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcryptCompare(password, user.password);
     timing.bcryptMs = Date.now() - tBcrypt0;
 
     if (!isMatch) {
