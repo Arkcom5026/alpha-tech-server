@@ -4,6 +4,7 @@ const router = express.Router();
 
 // ✅ แยก Controllers ชัดเจน
 const {
+  pingSimple,
   createSimpleReceipt,
   createSimpleSale,
   createSimpleAdjustment,
@@ -12,6 +13,12 @@ const {
 // ✅ ใช้ middleware เดียวกับไฟล์เดิม
 const { verifyToken } = require('../middlewares/verifyToken');
 router.use(verifyToken);
+
+// Healthcheck / smoke test (auth + branch scope + headers)
+router.get('/ping', pingSimple);
+
+// Health / Ping (ตรวจสอบ route + auth + branch scope)
+router.get('/ping', pingSimple);
 
 // รับเข้า (SIMPLE, แบบจำนวน ไม่ใช้ SN)
 router.post('/receipts', createSimpleReceipt);
@@ -23,3 +30,5 @@ router.post('/sales', createSimpleSale);
 router.post('/adjustments', createSimpleAdjustment);
 
 module.exports = router;
+
+

@@ -1,13 +1,27 @@
 
+
 //  @filename: server.js
 
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
+const crypto = require('crypto');
 
 dotenv.config();
 const app = express();
+
+// Trust proxy (Render / reverse proxy) — minimal & safe
+// Enables correct client IP, protocol, and secure cookies handling
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// Lightweight request id (useful for logs/support)
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  res.setHeader('X-Request-Id', req.id);
+  next();
+});
 const authRoutes = require('./routes/authRoutes'); 
 const productTypeRoutes = require('./routes/productTypeRoutes'); 
 const categoryRoutes = require('./routes/categoryRoutes'); 
@@ -58,7 +72,8 @@ try {
 }
 
 // ✅ Middlewares
-app.use(express.json());
+// JSON body limit (prevent accidental huge payloads)
+app.use(express.json({ limit: '2mb' }));
 const allowedOrigins = [
   'http://localhost:5173',
   'https://alpha-tech-client.vercel.app',
@@ -66,7 +81,7 @@ const allowedOrigins = [
   'https://saduaksabuy.com'
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     // allow Postman, curl (ไม่มี origin) และ origin ที่อยู่ใน allowedOrigins
     if (!origin || allowedOrigins.includes(origin)) {
@@ -78,13 +93,17 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key', 'X-Finalize-Token'],
   credentials: true,
-  maxAge: 86400
-}));
+  maxAge: 86400,
+};
+
+app.use(cors(corsOptions));
 
 // Handle CORS preflight for all routes (important for custom headers like X-Idempotency-Key)
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 
-app.use(morgan('dev'));
+// Include request id in logs (minimal)
+morgan.token('reqId', (req) => req.id);
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms - reqId=:reqId'));
 
 // ✅ เปิดใช้งาน route
 app.use('/api/auth', authRoutes);
@@ -162,19 +181,71 @@ app.use('/api/quick-receipts', quickReceiptRoutes);
 
 
 // Mount SIMPLE routes if available
+// Mount SIMPLE routes if available (baseline SIMPLE flow)
 if (simpleStockRoutes) {
   app.use('/api/simple', simpleStockRoutes);
+  console.log('✅ SIMPLE routes mounted at /api/simple');
+} else {
+  console.warn('⚠️ SIMPLE routes not mounted');
 }
 
 
-// ✅ Error handler
+// ✅ 404 handler (consistent JSON)
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: 'Not Found',
+    path: req.originalUrl,
+    reqId: req.id,
+  });
+});
+
+// ✅ Error handler (granular, no stack leak)
 app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  const status = err.status || err.statusCode || 500;
+
+  // CORS rejections
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      ok: false,
+      error: 'CORS Forbidden',
+      origin: req.headers.origin || null,
+      reqId: req.id,
+    });
+  }
+
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({
+      ok: false,
+      error: err.message || 'Bad Request',
+      reqId: req.id,
+    });
+  }
+
+  console.error('❌ Server Error:', {
+    reqId: req.id,
+    status,
+    message: err.message,
+    path: req.originalUrl,
+    method: req.method,
+  });
+
+  return res.status(500).json({
+    ok: false,
+    error: 'Internal Server Error',
+    reqId: req.id,
+  });
+
+
 });
 
 app.get('/', (req, res) => {
   res.send('Hello from alpha-tech-server!');
+});
+
+// Healthcheck (no auth) — for Render / uptime monitoring
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
 });
 
 // ✅ Start server
@@ -182,6 +253,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
 
 
 
