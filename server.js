@@ -75,17 +75,30 @@ try {
 app.use(express.json({ limit: '2mb' }));
 
 const allowedOrigins = [
+  // Local dev
   'http://localhost:5173',
-  'https://alpha-tech-client.vercel.app',
-  'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
+
+  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-  'https://www.saduaksabuy.com',
+
+  // Vercel (production + common preview patterns for this project)
+  'https://alpha-tech-client.vercel.app',
+  'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
+];
+
+// Allow common Vercel preview URLs for this project without opening to every vercel.app origin.
+// Examples:
+// - https://alpha-tech-client-xxxxx.vercel.app
+// - https://alpha-tech-client-git-branch-arkcoms-projects.vercel.app
+const allowedOriginRegexes = [
+  /^https:\/\/alpha-tech-client-[a-z0-9-]+\.vercel\.app$/i,
+  /^https:\/\/alpha-tech-client-git-[a-z0-9-]+-arkcoms-projects\.vercel\.app$/i,
 ];
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || allowedOriginRegexes.some((r) => r.test(origin))) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
