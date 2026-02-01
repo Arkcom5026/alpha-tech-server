@@ -79,6 +79,8 @@ const allowedOrigins = [
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
   'https://saduaksabuy.com',
+  'https://www.saduaksabuy.com',
+  'https://www.saduaksabuy.com',
 ];
 
 const corsOptions = {
@@ -206,3 +208,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+
+
