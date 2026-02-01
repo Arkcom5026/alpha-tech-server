@@ -1,7 +1,20 @@
 // ✅ authController.js — Prisma singleton, safer errors, consistent JWT payload
 
 const { prisma, Prisma } = require('../lib/prisma');
-const bcrypt = require('bcryptjs');
+// Prefer native/fast bcrypt when available (minimal disruption)
+let bcrypt;
+try {
+  // eslint-disable-next-line global-require
+  bcrypt = require('@node-rs/bcrypt');
+} catch (e1) {
+  try {
+    // eslint-disable-next-line global-require
+    bcrypt = require('bcrypt');
+  } catch (e2) {
+    // eslint-disable-next-line global-require
+    bcrypt = require('bcryptjs');
+  }
+}
 const jwt = require('jsonwebtoken');
 
 const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim());
