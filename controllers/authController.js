@@ -79,27 +79,32 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  try {
-    // ⏱️ Login timing (minimal disruption)
-    const t0 = Date.now();
-    const reqId = req?.id || req?.headers?.['x-request-id'] || null;
-    const timing = {
-      reqId,
-      totalMs: 0,
-      findUserMs: 0,
-      bcryptMs: 0,
-      signJwtMs: 0,
-    };
+  // ⏱️ Login timing (minimal disruption)
+  const t0 = Date.now();
+  const reqId = req?.id || req?.headers?.['x-request-id'] || null;
+  const timing = {
+    reqId,
+    totalMs: 0,
+    findUserMs: 0,
+    bcryptMs: 0,
+    signJwtMs: 0,
+  };
 
+  try {
     const identifier = normalize(req.body?.emailOrPhone ?? req.body?.identifier);
     const password = normalize(req.body?.password);
+
     if (!identifier || !password) {
       return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร หรือไอดี และรหัสผ่าน' });
     }
 
-    // helpers ภายในฟังก์ชัน
+    // helpers (อยู่ในฟังก์ชัน เพื่อไม่กระทบส่วนอื่น)
     const looksLikeEmail = (v) => String(v || '').indexOf('@') > 0;
-    const onlyDigits = (v) => String(v || '').split('').filter((c) => c >= '0' && c <= '9').join('');
+    const onlyDigits = (v) =>
+      String(v || '')
+        .split('')
+        .filter((c) => c >= '0' && c <= '9')
+        .join('');
     const toE164TH = (digits) => {
       if (!digits) return '';
       if (digits.startsWith('0') && digits.length === 10) return `+66${digits.slice(1)}`;
@@ -108,43 +113,123 @@ const login = async (req, res) => {
       return digits;
     };
 
-    const OR = [];
+    // ✅ ลด query หนัก: แยก lookup แบบ indexed ก่อน แล้วค่อย fallback ไปหาใน profile.phone
+    const tFind0 = Date.now();
+
+    const includeProfiles = {
+      customerProfile: true,
+      employeeProfile: { include: { branch: true, position: true } },
+    };
+
+    let user = null;
 
     if (looksLikeEmail(identifier)) {
-      OR.push({ email: { equals: normalizeEmail(identifier), mode: 'insensitive' } });
+      user = await prisma.user.findUnique({
+        where: { email: normalizeEmail(identifier) },
+        include: includeProfiles,
+      });
     } else {
-      OR.push({ loginId: { equals: identifier, mode: 'insensitive' } });
+      // 1) หาใน loginId ก่อน (คาดว่า index/unique)
+      user = await prisma.user.findFirst({
+        where: { loginId: identifier },
+        include: includeProfiles,
+      });
 
-      const digits = onlyDigits(identifier);
-      const e164 = toE164TH(digits);
+      // 2) ถ้ายังไม่เจอ ให้ลองแปลงเป็น digits / E164 แล้วค่อยหา loginId อีกที
+      if (!user) {
+        const digits = onlyDigits(identifier);
+        const e164 = toE164TH(digits);
 
-      if (digits) OR.push({ loginId: { equals: digits } });
-      if (e164 && e164 !== digits) OR.push({ loginId: { equals: e164 } });
+        if (digits) {
+          user = await prisma.user.findFirst({ where: { loginId: digits }, include: includeProfiles });
+        }
+        if (!user && e164 && e164 !== digits) {
+          user = await prisma.user.findFirst({ where: { loginId: e164 }, include: includeProfiles });
+        }
 
-      if (digits) OR.push({ customerProfile: { is: { phone: digits } } });
-      if (e164 && e164 !== digits) OR.push({ customerProfile: { is: { phone: e164 } } });
-      if (digits) OR.push({ employeeProfile: { is: { phone: digits } } });
-      if (e164 && e164 !== digits) OR.push({ employeeProfile: { is: { phone: e164 } } });
+        // 3) fallback: หาใน customerProfile.phone / employeeProfile.phone ก่อน แล้วค่อยดึง user ตาม userId
+        if (!user && (digits || e164)) {
+          const phoneCandidates = [digits, e164].filter(Boolean);
+
+          let foundUserId = null;
+
+          for (const p of phoneCandidates) {
+            const cp = await prisma.customerProfile.findFirst({
+              where: { phone: p },
+              select: { userId: true },
+            });
+            if (cp?.userId) {
+              foundUserId = cp.userId;
+              break;
+            }
+
+            const ep = await prisma.employeeProfile.findFirst({
+              where: { phone: p },
+              select: { userId: true },
+            });
+            if (ep?.userId) {
+              foundUserId = ep.userId;
+              break;
+            }
+          }
+
+          if (foundUserId) {
+            user = await prisma.user.findUnique({
+              where: { id: foundUserId },
+              include: includeProfiles,
+            });
+          }
+        }
+      }
     }
 
-    const tFind0 = Date.now();
-    const user = await prisma.user.findFirst({
-      where: { OR },
-      include: {
-        customerProfile: true,
-        employeeProfile: { include: { branch: true, position: true } },
-      },
-    });
     timing.findUserMs = Date.now() - tFind0;
 
-    if (!user) return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้' });
-    if (!user.enabled) return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
+    if (!user) {
+      timing.totalMs = Date.now() - t0;
+      // eslint-disable-next-line no-console
+      console.log('[auth.login] timing', {
+        reqId: timing.reqId,
+        totalMs: timing.totalMs,
+        findUserMs: timing.findUserMs,
+        bcryptMs: timing.bcryptMs,
+        signJwtMs: timing.signJwtMs,
+        note: 'user_not_found',
+      });
+      return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    }
+
+    if (!user.enabled) {
+      timing.totalMs = Date.now() - t0;
+      // eslint-disable-next-line no-console
+      console.log('[auth.login] timing', {
+        reqId: timing.reqId,
+        totalMs: timing.totalMs,
+        findUserMs: timing.findUserMs,
+        bcryptMs: timing.bcryptMs,
+        signJwtMs: timing.signJwtMs,
+        note: 'user_disabled',
+      });
+      return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
+    }
 
     const tBcrypt0 = Date.now();
     const isMatch = await bcrypt.compare(password, user.password);
     timing.bcryptMs = Date.now() - tBcrypt0;
 
-    if (!isMatch) return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
+    if (!isMatch) {
+      timing.totalMs = Date.now() - t0;
+      // eslint-disable-next-line no-console
+      console.log('[auth.login] timing', {
+        reqId: timing.reqId,
+        totalMs: timing.totalMs,
+        findUserMs: timing.findUserMs,
+        bcryptMs: timing.bcryptMs,
+        signJwtMs: timing.signJwtMs,
+        note: 'password_mismatch',
+      });
+      return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
+    }
 
     if (user.role !== 'customer' && user.employeeProfile) {
       if (user.employeeProfile.active === false) {
@@ -163,6 +248,7 @@ const login = async (req, res) => {
     timing.signJwtMs = Date.now() - tSign0;
 
     timing.totalMs = Date.now() - t0;
+    // eslint-disable-next-line no-console
     console.log('[auth.login] timing', {
       reqId: timing.reqId,
       totalMs: timing.totalMs,
@@ -188,8 +274,14 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    const reqId = req?.id || req?.headers?.['x-request-id'] || null;
-    console.error('🔥 Login error:', error, { reqId });
+    timing.totalMs = Date.now() - t0;
+    console.error('🔥 Login error:', error, {
+      reqId: timing.reqId,
+      totalMs: timing.totalMs,
+      findUserMs: timing.findUserMs,
+      bcryptMs: timing.bcryptMs,
+      signJwtMs: timing.signJwtMs,
+    });
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
