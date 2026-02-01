@@ -96,18 +96,51 @@ const allowedOriginRegexes = [
   /^https:\/\/alpha-tech-client-git-[a-z0-9-]+-arkcoms-projects\.vercel\.app$/i,
 ];
 
+const normalizeOrigin = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  // Normalize to avoid subtle mismatches (case, trailing slash)
+  return value.trim().replace(/\/$/, '').toLowerCase();
+};
+
+const isAllowedOrigin = (origin) => {
+  const o = normalizeOrigin(origin);
+  if (!o) return true; // allow non-browser / same-origin / server-to-server requests
+
+  const allowed = allowedOrigins.map(normalizeOrigin);
+  if (allowed.includes(o)) return true;
+
+  // Regex checks use the raw origin (without trailing slash) for safety
+  const raw = origin.trim().replace(/\/$/, '');
+  return allowedOriginRegexes.some((r) => r.test(raw));
+};
+
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || allowedOriginRegexes.some((r) => r.test(origin))) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Optional escape hatch for emergency/debug (keep OFF by default)
+    if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
+
+    if (isAllowedOrigin(origin)) return callback(null, true);
+
+    // IMPORTANT: do not throw here; throwing can surface as a browser "Network Error"
+    // when the response lacks CORS headers.
+    return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key', 'X-Finalize-Token'],
-  credentials: true,
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Idempotency-Key',
+    'X-Finalize-Token',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+  ],
+  exposedHeaders: ['X-Request-Id'],
+  // Most flows use Authorization header; cookies are optional.
+  // Turn on only when you truly need cookies across origins.
+  credentials: process.env.CORS_CREDENTIALS === 'true',
   maxAge: 86400,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
@@ -221,6 +254,9 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+
+
 
 
 
