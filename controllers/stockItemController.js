@@ -1,3 +1,6 @@
+
+
+
 // ✅ StockItemController.js — จัดการ SN/Barcode และรายการสินค้าเข้าสต๊อก (มาตรฐาน Prisma singleton + Branch scope + Decimal-safe)
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -187,6 +190,9 @@ const updateStockItemStatus = async (req, res) => {
 };
 
 // POST /stock-items/mark-sold  { stockItemIds: number[] }
+// ✅ Production hardening:
+// - อัปเดตได้เฉพาะรายการที่อยู่ในสาขาเดียวกัน และต้องเป็น IN_STOCK เท่านั้น
+// - ถ้าอัปเดตไม่ครบ (มีบางรายการถูกขายไปแล้ว/ไม่พบ/ไม่ใช่ IN_STOCK) → ตอบ 409 พร้อมรายละเอียด
 const markStockItemsAsSold = async (req, res) => {
   try {
     const branchId = toInt(req.user?.branchId);
@@ -196,12 +202,59 @@ const markStockItemsAsSold = async (req, res) => {
     if (!Array.isArray(stockItemIds) || stockItemIds.length === 0) {
       return res.status(400).json({ message: 'stockItemIds ต้องเป็น array' });
     }
-    const ids = stockItemIds.map((x) => Number(x)).filter(Number.isFinite);
 
+    // normalize + unique
+    const ids = [...new Set(stockItemIds.map((x) => Number(x)).filter(Number.isFinite))];
+    if (ids.length === 0) {
+      return res.status(400).json({ message: 'stockItemIds ไม่ถูกต้อง' });
+    }
+
+    // ✅ ตรวจสอบก่อน: ต้องอยู่ในสาขา + ต้องเป็น IN_STOCK
+    const existing = await prisma.stockItem.findMany({
+      where: { id: { in: ids }, branchId },
+      select: { id: true, status: true },
+    });
+
+    const existingMap = new Map(existing.map((x) => [x.id, x]));
+    const notFoundIds = ids.filter((id) => !existingMap.has(id));
+    const notInStock = existing.filter((x) => x.status !== 'IN_STOCK');
+
+    if (notFoundIds.length > 0 || notInStock.length > 0) {
+      return res.status(409).json({
+        code: 'STOCK_ITEMS_NOT_SELLABLE',
+        message: 'อัปเดตสถานะเป็น SOLD ไม่ครบ: มีบางรายการไม่อยู่ในสาขา/ไม่พบ หรือสถานะไม่ใช่ IN_STOCK',
+        notFoundIds,
+        notSellable: notInStock.map((x) => ({ id: x.id, status: x.status })),
+      });
+    }
+
+    // ✅ ทำงานแบบ transactional เพื่อให้ตอบผลลัพธ์ consistent
+    const now = new Date();
     const updated = await prisma.stockItem.updateMany({
       where: { id: { in: ids }, branchId, status: 'IN_STOCK' },
-      data: { status: 'SOLD', soldAt: new Date() },
+      data: { status: 'SOLD', soldAt: now },
     });
+
+    // guard: ถ้ามี race condition (มีคนขายตัดหน้า) จะทำให้ count ไม่ครบ
+    if (updated.count !== ids.length) {
+      // re-check หลัง update เพื่อบอกเหตุผล
+      const after = await prisma.stockItem.findMany({
+        where: { id: { in: ids }, branchId },
+        select: { id: true, status: true },
+      });
+      const afterMap = new Map(after.map((x) => [x.id, x.status]));
+      const failed = ids
+        .filter((id) => afterMap.get(id) !== 'SOLD')
+        .map((id) => ({ id, status: afterMap.get(id) || 'NOT_FOUND' }));
+
+      return res.status(409).json({
+        code: 'STOCK_ITEMS_SOLD_PARTIAL',
+        message: 'อัปเดตสถานะเป็น SOLD ไม่ครบ (อาจมีการขายซ้ำ/สถานะเปลี่ยนระหว่างทำรายการ)',
+        updatedCount: updated.count,
+        expectedCount: ids.length,
+        failed,
+      });
+    }
 
     return res.status(200).json({ count: updated.count });
   } catch (err) {
@@ -273,7 +326,7 @@ const receiveStockItem = async (req, res) => {
       const totalCostDec = unitCost.times(qty || 1);
 
       const result = await prisma.$transaction(async (tx) => {
-        // เปลี่ยนสถานะล็อตเป็น ACTVATED
+        // เปลี่ยนสถานะล็อตเป็น SN_RECEIVED (พร้อมขายสำหรับ LOT)
         const updatedBRI = await tx.barcodeReceiptItem.update({
           where: { barcode: String(barcode) },
           data: { status: 'SN_RECEIVED' },
@@ -359,20 +412,64 @@ const receiveStockItem = async (req, res) => {
   }
 };
 
-// GET /stock-items/search?query=...  (ค้นหาเฉพาะสาขาปัจจุบัน สถานะ IN_STOCK)
+// GET /stock-items/search?query=...
+// - ค้นหาในสาขาปัจจุบัน
+// - รองรับการแจ้งเตือน "ขายแล้ว/ไม่พร้อมขาย" แบบชัดเจน:
+//   * ถ้า query เป็น barcode/SN แบบ exact แล้วเจอ แต่ status != IN_STOCK → ตอบ 409 พร้อม status
+//   * ถ้าไม่เจอเลย → ตอบ 404
+//   * ถ้าเป็นการค้นหาชื่อ/รุ่น → คืนเฉพาะ IN_STOCK ตามเดิม
 const searchStockItem = async (req, res) => {
   try {
-    const query = (req.query.query || req.query.barcode || '').toString();
+    const query = (req.query.query || req.query.barcode || '').toString().trim();
     const branchId = toInt(req.user?.branchId);
     if (!query || !branchId) return res.status(400).json({ error: 'Missing query or branchId' });
 
+    // ✅ 1) Exact match (barcode / serialNumber) แบบไม่กรอง status เพื่อแยกเคส SOLD ได้
+    const exact = await prisma.stockItem.findFirst({
+      where: {
+        branchId,
+        OR: [
+          { barcode: { equals: query } },
+          { serialNumber: { equals: query } },
+        ],
+      },
+      include: { product: true },
+    });
+
+    if (exact) {
+      if (exact.status !== 'IN_STOCK') {
+        return res.status(409).json({
+          code: 'BARCODE_NOT_SELLABLE',
+          status: exact.status,
+          message: `สินค้านี้ไม่พร้อมขาย (สถานะ: ${exact.status})`,
+        });
+      }
+
+      // exact พร้อมขาย → คืนเป็น array 1 ตัว (คงรูปแบบเดิมให้ FE)
+      const bp = await prisma.branchPrice.findFirst({
+        where: { branchId, productId: exact.productId },
+        select: { productId: true, priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true },
+      });
+
+      return res.json([
+        {
+          ...exact,
+          prices: {
+            retail: toNum(bp?.priceRetail),
+            wholesale: toNum(bp?.priceWholesale),
+            technician: toNum(bp?.priceTechnician),
+            online: toNum(bp?.priceOnline),
+          },
+        },
+      ]);
+    }
+
+    // ✅ 2) ไม่ใช่ exact barcode/SN → ค้นหาแบบเดิม (เฉพาะ IN_STOCK)
     const stockItems = await prisma.stockItem.findMany({
       where: {
         status: 'IN_STOCK',
         branchId,
         OR: [
-          { barcode: { equals: query } },
-          { serialNumber: { equals: query } },
           { product: { name: { contains: query, mode: 'insensitive' } } },
           { product: { model: { contains: query, mode: 'insensitive' } } },
         ],
@@ -381,6 +478,10 @@ const searchStockItem = async (req, res) => {
       orderBy: { id: 'asc' },
       take: 20,
     });
+
+    if (!stockItems || stockItems.length === 0) {
+      return res.status(404).json({ code: 'BARCODE_NOT_FOUND', message: 'ไม่พบบาร์โค้ด/สินค้าในระบบ' });
+    }
 
     // ดึง branchPrices ครั้งเดียวแบบ batch แล้วแมปกลับ
     const productIds = [...new Set(stockItems.map((i) => i.productId))];
@@ -420,7 +521,7 @@ const updateSerialNumber = async (req, res) => {
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
     if (!barcode) return res.status(400).json({ error: 'Missing barcode.' });
 
-    const stockItem = await prisma.stockItem.findUnique({ where: { barcode: String(barcode) } });
+    const stockItem = await prisma.stockItem.findFirst({ where: { barcode: String(barcode), branchId } });
     if (!stockItem) return res.status(404).json({ error: 'Stock item not found.' });
     if (stockItem.branchId !== branchId) return res.status(403).json({ error: 'ไม่มีสิทธิ์แก้ไขสินค้าของสาขาอื่น' });
 
@@ -497,6 +598,8 @@ module.exports = {
   updateSerialNumber,
   getAvailableStockItemsByProduct,
 };
+
+
 
 
 
