@@ -12,7 +12,7 @@ const {
   hardDelete,
 } = require('../controllers/positionController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 const requireAdmin = require('../middlewares/requireAdmin');
 
 // ✅ ทุก route ต้องผ่านการยืนยันตัวตนก่อน

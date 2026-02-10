@@ -16,7 +16,7 @@ const {
   getReceiptsReadyToScan,
 } = require('../controllers/barcodeController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ สร้างบาร์โค้ดที่ขาด (ครั้งแรก)

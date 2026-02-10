@@ -5,9 +5,7 @@ const router = express.Router();
 
 const {
   createProductProfile,
-  getAllProductProfiles,
-  getProfilesByCategory,
-  getProductProfileById,
+  getAllProductProfiles,  getProductProfileById,
   updateProductProfile,
   // deleteProductProfile, // ❌ เลิกใช้ hard delete
   archiveProductProfile,
@@ -15,14 +13,13 @@ const {
   getProductProfileDropdowns,
 } = require('../controllers/productProfileController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 const requireAdmin = require('../middlewares/requireAdmin');
 
 // ✅ ทุก route ต้องผ่านการยืนยันตัวตนก่อน
 router.use(verifyToken);
 
 // ⚠️ วางเส้นทางเฉพาะเจาะจงก่อน `/:id` เสมอ
-router.get('/category/:categoryId', getProfilesByCategory); // GET /api/product-profiles/category/:categoryId
 router.get('/dropdowns', getProductProfileDropdowns);       // GET /api/product-profiles/dropdowns (active only)
 
 // 🔎 อ่านข้อมูล (ผู้ใช้ที่ล็อกอินทุกคน)
@@ -40,5 +37,6 @@ module.exports = router;
 // 📌 วิธีผูกใน server หลัก (ตัวอย่าง)
 // const productProfileRoutes = require('./routes/productProfileRoutes');
 // app.use('/api/product-profiles', productProfileRoutes);
+
 
 

@@ -11,7 +11,7 @@ const {
 } = require('../controllers/simpleStockController');
 
 // ✅ ใช้ middleware เดียวกับไฟล์เดิม
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // Healthcheck / smoke test (auth + branch scope + headers)

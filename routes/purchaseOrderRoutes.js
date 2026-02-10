@@ -14,7 +14,7 @@ const {
   createPurchaseOrderWithAdvance,
   
 } = require('../controllers/purchaseOrderController');
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.get('/', getAllPurchaseOrders);

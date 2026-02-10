@@ -11,7 +11,7 @@ const {
   updateMultipleBranchPrices, // ✅ เพิ่ม controller สำหรับ bulk update
 } = require("../controllers/branchPriceController");
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 

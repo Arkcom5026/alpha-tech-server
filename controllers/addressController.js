@@ -231,7 +231,7 @@ module.exports.addressController = addressController;
 
 // --- Example wire-up (routes/addressRoutes.js) ---
 // const express = require('express');
-// const { verifyToken } = require('../middlewares/verifyToken');
+// const verifyToken = require('../middlewares/verifyToken');
 // const { addressController } = require('../controllers/addressController');
 // const router = express.Router();
 // router.use(verifyToken);

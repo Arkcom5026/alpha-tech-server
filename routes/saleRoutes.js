@@ -10,7 +10,7 @@ const { createSale,
 } = require("../controllers/saleController");
 
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ POST /api/sales

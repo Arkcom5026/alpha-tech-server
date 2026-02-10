@@ -9,7 +9,7 @@ const {
   getPOItemsByPOId,
   updateReceiptItem,
 } = require('../controllers/purchaseOrderReceiptItemController');
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 

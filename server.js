@@ -1,3 +1,4 @@
+
 //  @filename: server.js
 
 const express = require('express');
@@ -30,6 +31,7 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./routes/productTemplateRoutes');
 const productProfileRoutes = require('./routes/productProfileRoutes');
+const brandRoutes = require('./routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const productRoutes = require('./routes/productRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
@@ -159,9 +161,11 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/customer-deposits', customerDepositRoutes);
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes);
+app.use('/api/brands', brandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/products', uploadProductRoutes);
+// ❌ อย่ามา mount uploadProductRoutes ซ้ำระดับ app เพราะจะทำให้ public routes (เช่น /dropdowns) โดน verifyToken ทับ
+// uploadProductRoutes ถูกผูกไว้ภายใน productRoutes หลัง verifyToken แล้ว
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
@@ -255,6 +259,34 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 
 
 

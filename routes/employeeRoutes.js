@@ -14,16 +14,11 @@ const {
   getBranchDropdowns, // ⬅️ สำหรับตัวกรองสาขา (superadmin เท่านั้น)
 } = require('../controllers/employeeController');
 
-// ใช้ default export ของ verifyToken
-// รองรับได้ทั้ง default export, named export (verifyToken), หรือ ESM default
-const vt = require('../middlewares/verifyToken');
-const verifyToken = (typeof vt === 'function') ? vt : (vt && (vt.verifyToken || vt.default));
+// ✅ verifyToken: single export (CommonJS)
+const verifyToken = require('../middlewares/verifyToken');
 const requireAdmin = require('../middlewares/requireAdmin');
 
 // ต้องล็อกอินก่อนเสมอ
-if (typeof verifyToken !== 'function') {
-  throw new TypeError('verifyToken middleware is not a function. Please export a function or { verifyToken } from middlewares/verifyToken');
-}
 router.use(verifyToken);
 
 // หมวด Positions / Branches ที่เกี่ยวข้อง
@@ -48,5 +43,8 @@ router.put('/:id', updateEmployees);
 router.delete('/:id', deleteEmployees);
 
 module.exports = router;
+
+
+
 
 

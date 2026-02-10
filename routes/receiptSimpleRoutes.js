@@ -17,7 +17,8 @@ const {
 } = require("../controllers/receiptSimpleController");
 
 // 🔐 Auth middleware (align with saleRoutes.js)
-const { verifyToken } = require("../middlewares/verifyToken");
+const verifyToken = require('../middlewares/verifyToken')      // ✅ ได้ฟังก์ชัน
+
 router.use(verifyToken);
 
 // Preview calculation (no persistence)

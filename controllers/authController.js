@@ -96,7 +96,7 @@ const register = async (req, res) => {
       data: {
         email,
         password: hashedPassword,
-        role: 'customer',
+        role: 'CUSTOMER',
         enabled: true,
         customerProfile: {
           create: {
@@ -375,6 +375,8 @@ module.exports = {
   login,
   findUserByEmail,
 };
+
+
 
 
 

@@ -36,7 +36,7 @@ const {
   getAvailableStockItemsByProduct,
 } = require('../controllers/stockItemController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.post('/', addStockItemFromReceipt);

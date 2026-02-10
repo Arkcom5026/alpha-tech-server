@@ -10,7 +10,7 @@ const {
   deleteSupplier
 } = require('../controllers/supplierController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 

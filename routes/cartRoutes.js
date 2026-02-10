@@ -10,7 +10,7 @@ const {
   updateCartItem,
   getBranchPrices, // ✅ เพิ่มฟังก์ชันใหม่
 } = require('../controllers/cartController');
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 
 // ✅ ย้าย verifyToken ขึ้นบนสุด เพื่อให้ทุกคำสั่งผ่าน auth
 router.use(verifyToken);

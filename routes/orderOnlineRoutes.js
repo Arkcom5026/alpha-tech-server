@@ -18,7 +18,7 @@ const {
   getOrderOnlineSummary, // ✅ เพิ่มฟังก์ชันใหม่
 } = require("../controllers/orderOnlineController");
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // 🧾 ฝั่งลูกค้า

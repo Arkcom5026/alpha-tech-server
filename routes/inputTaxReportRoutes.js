@@ -7,7 +7,7 @@ const router = express.Router();
 const { getInputTaxReport } = require('../controllers/inputTaxReportController');
 
 // 2. นำเข้า Middleware สำหรับตรวจสอบสิทธิ์
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // 3. กำหนด Endpoint สำหรับรายงานภาษีซื้อ

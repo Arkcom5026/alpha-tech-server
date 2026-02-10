@@ -10,7 +10,7 @@ const {
   getSupplierPaymentsBySupplier,
 } = require('../controllers/supplierPaymentController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ สร้างรายการชำระเงินใหม่

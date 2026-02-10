@@ -18,7 +18,7 @@ const {
 } = require('../controllers/stockAuditController')
 
 // ใช้ middleware auth จริง
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // Ready-to-Sell Audit

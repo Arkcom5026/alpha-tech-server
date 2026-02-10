@@ -6,7 +6,7 @@ const {
     getPurchaseTaxReport 
 } = require('../controllers/TaxReportController.js');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.route('/sales-tax').get(getSalesTaxReport);

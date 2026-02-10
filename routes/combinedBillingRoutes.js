@@ -7,7 +7,7 @@ const {
   getCustomersWithPendingSales,
 } = require('../controllers/combinedBillingController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ ดึงรายการใบส่งของที่สามารถรวมบิลได้

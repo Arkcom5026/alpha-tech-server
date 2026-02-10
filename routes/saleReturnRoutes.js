@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { createSaleReturn, getAllSaleReturns, getSaleReturnById } = require("../controllers/saleReturnController");
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // ✅ POST /api/sale-returns/create

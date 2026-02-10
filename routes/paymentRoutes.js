@@ -7,7 +7,7 @@ const {
   searchPrintablePayments,
   cancelPayment,
 } = require('../controllers/paymentController');
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.post('/', createPayments);

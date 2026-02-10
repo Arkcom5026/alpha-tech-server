@@ -13,7 +13,7 @@ const {
   getCategoryDropdowns,
 } = require('../controllers/categoryController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 const requireAdmin = require('../middlewares/requireAdmin');
 
 // ✅ ทุก route ต้องผ่านการยืนยันตัวตนก่อน

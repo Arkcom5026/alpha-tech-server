@@ -21,7 +21,7 @@ const {
 } = require('../controllers/purchaseOrderReceiptController');
 
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // 📥 POST - สร้างใบรับสินค้าใหม่ (PO)

@@ -249,9 +249,9 @@ model CustomerProfile {
   id   Int     @id @default(autoincrement())
   name String?
 
-  picture     String?
-  companyName String?
-  taxId       String?
+  picture       String?
+  companyName   String?
+  taxId         String?
   addressDetail String?
 
   subdistrictCode String?      @db.Char(6)
@@ -483,7 +483,7 @@ model ProductType {
   guideExamples String[] @default([])
   pathCached    String?
 
-  profiles ProductProfile[]
+  // ProductProfile is no longer tied to ProductType (BestLine)
 
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId Int?
@@ -507,8 +507,8 @@ model ProductProfile {
   guideExamples String[] @default([])
   pathCached    String?
 
-  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
-  productTypeId Int
+  // ❌ BestLine: ProductProfile is a reusable group NOT tied to Category/ProductType
+  // (Products choose ProductProfile optionally)
 
   templates ProductTemplate[]
 
@@ -517,16 +517,18 @@ model ProductProfile {
   updatedAt DateTime  @updatedAt
   Product   Product[]
 
-  @@unique([productTypeId, slug])
-  @@unique([productTypeId, normalizedName])
+  // Global uniqueness (BestLine)
+  @@unique([slug])
+  @@unique([normalizedName])
   @@index([normalizedName])
+  @@index([active])
 }
 
 model ProductTemplate {
   id             Int     @id @default(autoincrement())
   name           String
   slug           String
-  normalizedName String
+  normalizedName String?
   warranty       Int?
   noSN           Boolean @default(false)
   codeType       String  @default("D")
@@ -537,8 +539,10 @@ model ProductTemplate {
 
   applicableBusinessTypes BusinessType[] @default([])
 
-  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
-  productProfileId Int
+  // ✅ BestLine: ProductTemplate is a reusable extension (NOT tied under Category/ProductType/ProductProfile)
+  // Optional link to ProductProfile for grouping/suggestions only
+  productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  productProfileId Int?
 
   products Product[]
   unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -547,35 +551,46 @@ model ProductTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([productProfileId, slug])
-  @@unique([productProfileId, normalizedName])
+  // Global uniqueness (BestLine)
+  @@unique([slug])
+  @@unique([normalizedName])
   @@index([normalizedName])
+  @@index([active])
+  @@index([productProfileId])
+}
+
+model Brand {
+  id             Int     @id @default(autoincrement())
+  name           String
+  normalizedName String
+  active         Boolean @default(true)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([normalizedName])
+  @@index([active])
+  @@index([name])
 }
 
 model Product {
-  id             Int     @id @default(autoincrement())
-  name           String?
-  slug           String?
-  normalizedName String?
-  description    String?
-  model          String?
+  id   Int    @id @default(autoincrement())
+  name String
 
-  sku               String?     @unique
-  barcode           String?     @unique
-  unitName          String?
-  spec              String?
-  sold              Int         @default(0)
-  quantity          Int? // DEPRECATED
-  noSN              Boolean     @default(false)
-  active            Boolean     @default(true)
-  allowNegative     Boolean     @default(false)
-  mode              ProductMode @default(STRUCTURED)
-  attributes        Json?
-  trackSerialNumber Boolean     @default(false)
+  // Core behavior (BestLine): every Product is sellable; barcode behavior is handled by downstream flow
+  // SIMPLE  -> LOT barcode (SimpleLot)
+  // STRUCTURED -> SN/piece barcode (StockItem)
+  mode ProductMode @default(STRUCTURED)
 
-  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  templateId Int?
+  // Legacy / compatibility flags (keep, but do not force in UX)
+  noSN              Boolean @default(false)
+  trackSerialNumber Boolean @default(false)
 
+  active Boolean @default(true)
+
+  // Optional helpers (do NOT require in UX)
   category         Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId       Int?
   productType      ProductType?    @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
@@ -583,6 +598,27 @@ model Product {
   productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
   productProfileId Int?
 
+  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateId Int?
+
+  // Brand (global) — optional during transition
+  brand   Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brandId Int?
+
+  // Product-level spec overrides (BestLine)
+  // - Use when Product is unique (no Template/Profile reuse)
+  // - If NULL -> fallback to Template (if selected)
+  warrantyDays Int?
+  codeType     String?
+
+  unit   Unit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  unitId Int?
+
+  // Flexible spec payload for unique products (do NOT force Template)
+  // Example: { attributes: {...}, notes: "..." }
+  productConfig Json?
+
+  // Relations
   productImages      ProductImage[]
   stockItems         StockItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -592,8 +628,6 @@ model Product {
   branchPrice        BranchPrice[]
   orderOnlineItem    OrderOnlineItem[]
 
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
   stockAuditSnapshotItem   StockAuditSnapshotItem[]
   stockMovement            StockMovement[]
   saleItemSimple           SaleItemSimple[]
@@ -601,11 +635,15 @@ model Product {
   stockBalances            StockBalance[]
   PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([mode, active])
   @@index([templateId])
   @@index([categoryId])
   @@index([productTypeId])
   @@index([productProfileId])
+  @@index([brandId])
   @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
 }
 
@@ -708,6 +746,7 @@ model Unit {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   productTemplate ProductTemplate[]
+  Product         Product[]
 }
 
 model StockItem {
@@ -756,13 +795,7 @@ model StockItem {
   @@index([productId, status])
 }
 
-
-    
-
 //----------------------------------------------------------------------------- 2
-
-
-
 
 model Supplier {
   isSystem      Boolean         @default(false)

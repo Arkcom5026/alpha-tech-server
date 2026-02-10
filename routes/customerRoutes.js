@@ -11,7 +11,7 @@ const {
   updateCustomerProfileOnline,
 } = require('../controllers/customerController');
 
-const { verifyToken } = require('../middlewares/verifyToken');
+const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.get('/by-phone/:phone', getCustomerByPhone);

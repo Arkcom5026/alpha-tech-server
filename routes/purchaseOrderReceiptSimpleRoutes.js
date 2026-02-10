@@ -1,28 +1,50 @@
-
-// ==============================================
-// server/routes/purchaseOrderReceiptSimpleRoutes.js
-// Express routes for PO‑tied Simple receipts (no SN)
-// Mount in app.js:
-//   app.use('/api/po-receipts/simple', require('./routes/purchaseOrderReceiptSimpleRoutes'))
-// ==============================================
-
-const express = require("express");
+// ✅ @filename: server/routes/employeeRoutes.js
+const express = require('express');
 const router = express.Router();
+const {
+  getAllEmployees,
+  getEmployeesById,
+  createEmployees,
+  updateEmployees,
+  deleteEmployees,
+  getUsersByRole,
+  approveEmployee,
+  getAllPositions,
+  updateUserRole, // ⬅️ เพิ่มฟังก์ชันเปลี่ยน Role
+  getBranchDropdowns, // ⬅️ สำหรับตัวกรองสาขา (superadmin เท่านั้น)
+} = require('../controllers/employeeController');
 
-// Controller (merged service + controller)
-const { create, preview } = require("../controllers/purchaseOrderReceiptSimpleController");
+// ✅ verifyToken: single export (CommonJS)
+const verifyToken = require('../middlewares/verifyToken');
+const requireAdmin = require('../middlewares/requireAdmin');
 
-// 🔐 Auth middleware (align with saleRoutes.js)
-const { verifyToken } = require("../middlewares/verifyToken");
+// ต้องล็อกอินก่อนเสมอ
 router.use(verifyToken);
 
-// Preview calculation (no persistence)
-// POST /api/po-receipts/simple/preview
-router.post("/preview", preview);
+// หมวด Positions / Branches ที่เกี่ยวข้อง
+router.get('/positions', getAllPositions);
+// dropdown สาขาสำหรับตัวกรอง (เฉพาะ superadmin)
+router.get('/branches/dropdowns', requireAdmin.superadmin, getBranchDropdowns);
 
-// Persist receipt (creates PO header + POR + inventory updates for Simple lines)
-// POST /api/po-receipts/simple
-router.post("/", create);
+// จัดการ Role (เฉพาะ Super Admin)
+router.patch('/roles/users/:userId/role', requireAdmin.superadmin, updateUserRole);
+
+// ค้นผู้ใช้ตาม role (วางก่อน dynamic :id เพื่อกันชนกัน)
+router.get('/users/by-role', getUsersByRole);
+
+// อนุมัติพนักงานใหม่
+router.post('/approve-employee', approveEmployee);
+
+// รายการพนักงานและ CRUD ทั่วไป
+router.get('/', getAllEmployees);
+router.get('/:id', getEmployeesById);
+router.post('/', createEmployees);
+router.put('/:id', updateEmployees);
+router.delete('/:id', deleteEmployees);
 
 module.exports = router;
+
+
+
+
 
