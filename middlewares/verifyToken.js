@@ -1,3 +1,4 @@
+
 // server/middlewares/verifyToken.js
 const jwt = require('jsonwebtoken');
 
@@ -8,21 +9,49 @@ const normalizeRole = (r) => {
 };
 
 const normalizeProfileType = (t) => {
+  // profileType may come as: "customer" | "employee" | "customer,employee" | ["customer","employee"]
+  // ✅ Priority: employee > customer
+  if (Array.isArray(t)) {
+    const arr = t
+      .map((x) => (x || '').toString().trim().toLowerCase())
+      .filter(Boolean);
+    if (arr.includes('employee')) return 'employee';
+    if (arr.includes('customer')) return 'customer';
+    return arr[0] || null;
+  }
+
   const v = (t || '').toString().trim().toLowerCase();
-  return v; // "customer" | "employee" | ...
+  if (!v) return null;
+
+  // comma-separated or space-separated values
+  const parts = v
+    .split(/[\s,]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  if (parts.includes('employee')) return 'employee';
+  if (parts.includes('customer')) return 'customer';
+  return parts[0] || null;
 };
 
-const deriveProfileTypeFromRole = (role, currentProfileType) => {
+const deriveProfileTypeFromRole = (role, currentProfileType, decoded) => {
   const r = normalizeRole(role);
   const pt = normalizeProfileType(currentProfileType);
 
-  // ✅ Role กลุ่มพนักงาน → ต้องเป็น employee context เสมอ
+  // ✅ Priority rule (P1): If user can be both customer + employee, always prefer employee context.
+  // 1) Role group that implies employee context
   if (['employee', 'admin', 'superadmin'].includes(r)) return 'employee';
 
-  // ลูกค้า
+  // 2) If token/profileType indicates employee (even if role is messy)
+  if (pt === 'employee') return 'employee';
+
+  // 3) If employeeId exists in token, prefer employee (acts as a strong signal)
+  if (decoded?.employeeId) return 'employee';
+
+  // Customer
   if (r === 'customer') return 'customer';
 
-  // fallback: ใช้ค่าที่มี ถ้าไม่รู้จัก
+  // fallback
   return pt || null;
 };
 
@@ -46,18 +75,31 @@ const verifyToken = (req, res, next) => {
     const decoded = jwt.verify(token, secret);
 
     const role = normalizeRole(decoded?.role);
-    const profileType = deriveProfileTypeFromRole(role, decoded?.profileType);
+    const profileType = deriveProfileTypeFromRole(role, decoded?.profileType, decoded);
 
     // ✅ canonical req.user
+    // NOTE: P1 allows a single User to be both Customer + Employee.
+    // Therefore we must keep IDs explicit and also provide a canonical "activeProfileId" based on the resolved context.
+    const customerProfileId = decoded?.profileId ?? null; // customer profile id (may exist even for employee users)
+    const employeeId = decoded?.employeeId ?? null; // employee profile id (employee context)
+    const activeProfileId = profileType === 'employee' ? employeeId : customerProfileId;
+
     req.user = {
       id: decoded?.id ?? null,
       role, // 'customer' | 'employee' | 'admin' | 'superadmin'
       profileType, // 'customer' | 'employee'
-      profileId: decoded?.profileId ?? null,
 
-      // branch/employee context (P1 สำคัญมาก)
+      // ✅ Canonical profile id for the CURRENT context (employee => employeeId, customer => customerProfileId)
+      // This prevents controllers from accidentally using customerProfileId while in employee context.
+      profileId: activeProfileId,
+      activeProfileId,
+
+      // ✅ Explicit IDs (recommended for new code)
+      customerProfileId,
+      employeeId,
+
+      // branch context (P1 สำคัญมาก)
       branchId: decoded?.branchId ?? null,
-      employeeId: decoded?.employeeId ?? null,
     };
 
     // guardrail: ถ้าเป็น employee context แต่ไม่มี branchId → แล้วแต่ระบบคุณ
@@ -71,3 +113,5 @@ const verifyToken = (req, res, next) => {
 };
 
 module.exports = verifyToken;
+
+
