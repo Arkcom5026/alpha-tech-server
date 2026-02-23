@@ -1,6 +1,8 @@
+
 // purchaseOrderReceiptItemController — Prisma singleton, branch-scope enforced, Decimal-safe
 
-const { prisma, Prisma } = require('../lib/prisma');
+const { Prisma } = require('@prisma/client');
+const { prisma } = require('../lib/prisma');
 
 const D = (v) => (v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0));
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : parseInt(v, 10));
@@ -215,3 +217,6 @@ module.exports = {
   getPOItemsByPOId,
   updateReceiptItem,
 };
+
+
+

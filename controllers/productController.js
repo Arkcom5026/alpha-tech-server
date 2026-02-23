@@ -1,7 +1,6 @@
 
 
 
-
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -152,8 +151,6 @@ const getAllProducts = async (req, res) => {
       whereAND.push({
         OR: [
           { name: { contains: String(search), mode: 'insensitive' } },
-          { sku: String(search) },
-          { barcode: String(search) },
         ],
       })
     }
@@ -256,8 +253,9 @@ const getAllProducts = async (req, res) => {
         productTemplateName: tplName,
 
         // ✅ Brand (optional)
+        // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
-        brandName: p.brand?.name ?? null,
+        brandName: (p.brand?.name ?? null),
 
         imageUrl: null,
       }
@@ -311,12 +309,10 @@ const getProductsForPos = async (req, res) => {
 
   if (search) {
     whereAND.push({
-      OR: [
-        { name: { contains: String(search), mode: 'insensitive' } },
-        { sku: String(search) },
-        { barcode: String(search) },
-      ],
-    })
+        OR: [
+          { name: { contains: String(search), mode: 'insensitive' } },
+        ],
+      })
   }
 
   const catId = toInt(categoryId)
@@ -458,8 +454,9 @@ const getProductsForPos = async (req, res) => {
         productTemplateName: tplName,
 
         // ✅ Brand (optional)
+        // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
-        brandName: p.brand?.name ?? null,
+        brandName: (p.brand?.name ?? null),
 
         noSN: p.noSN,
         trackSerialNumber: p.trackSerialNumber,
@@ -534,8 +531,6 @@ const getProductsForOnline = async (req, res) => {
       whereAND.push({
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
-          { sku: search },
-          { barcode: search },
         ],
       })
     }
@@ -765,8 +760,9 @@ const getProductPosById = async (req, res) => {
       productTemplateName: tplName,
 
       // ✅ Brand (optional)
+      // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
       brandId: p.brandId ?? p.brand?.id ?? null,
-      brandName: p.brand?.name ?? null,
+      brandName: (p.brand?.name ?? null),
 
       images: (p.productImages || [])
         .map((im) => ({ id: im.id, url: im.secure_url || im.url, caption: im.caption ?? '', isCover: Boolean(im.isCover) }))
@@ -1294,5 +1290,9 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
+
+
 
 

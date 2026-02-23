@@ -14,15 +14,20 @@ router.use(verifyToken);
 
 
 router.post('/', addReceiptItem);
-router.put('/update', updateReceiptItem); 
+router.put('/update', updateReceiptItem);
+router.patch('/update', updateReceiptItem);
 router.get('/by-receipt/:receiptId', getReceiptItemsByReceiptId);
-                                     
-            
+
 router.delete('/:id', deleteReceiptItem);
+// ✅ Legacy route (kept for backward compatibility)
 router.get('/:id/po-items', getPOItemsByPOId);
+// ✅ Preferred explicit route
+router.get('/po/:poId/items', getPOItemsByPOId);
 
 
 
 
 module.exports = router;
   
+
+

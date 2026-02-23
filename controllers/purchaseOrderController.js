@@ -1,8 +1,17 @@
 
 
 
+
+
+
+
+
+
+
+
 // controllers/purchaseOrderController.js
-const { prisma, Prisma } = require('../lib/prisma');
+const { Prisma } = require('@prisma/client');
+const { prisma } = require('../lib/prisma');
 
 // Helpers & Flags
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
@@ -31,6 +40,143 @@ const generatePurchaseOrderCode = async (branchId) => {
   }
 
   return `PO-${paddedBranch}${yymm}-${String(nextSequence).padStart(4, '0')}`;
+};
+
+// ────────────────────────────────────────────────────────────────────────────────
+// READ: List / Eligible / Detail / Supplier-scoped list (branch-scoped)
+// ────────────────────────────────────────────────────────────────────────────────
+const parseStatusCsv = (v) => {
+  if (!v) return [];
+  const list = Array.isArray(v) ? v : String(v).split(',');
+  return list.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+};
+
+const getAllPurchaseOrders = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+
+    const page = Math.max(1, Number(req.query?.page) || 1);
+    const pageSize = Math.min(200, Math.max(1, Number(req.query?.pageSize) || 50));
+    const search = (req.query?.search || '').toString().trim();
+    const statuses = parseStatusCsv(req.query?.status);
+
+    const where = {
+      branchId,
+      ...(statuses.length ? { status: { in: statuses } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { code: { contains: search, mode: 'insensitive' } },
+              { supplier: { is: { name: { contains: search, mode: 'insensitive' } } } },
+            ],
+          }
+        : {}),
+    };
+
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where,
+      include: {
+        supplier: true,
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return res.json(purchaseOrders);
+  } catch (err) {
+    console.error('❌ getAllPurchaseOrders error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const getEligiblePurchaseOrders = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: { branchId, status: { in: ['PENDING', 'PARTIALLY_RECEIVED'] } },
+      include: {
+        supplier: true,
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json(purchaseOrders);
+  } catch (err) {
+    console.error('❌ getEligiblePurchaseOrders error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const getPurchaseOrderById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid ID' });
+
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id, branchId },
+      include: {
+        supplier: true,
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+
+    if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
+
+    // ✅ alias แบบปลอดภัย (ไม่พังแม้ไม่ได้ include chain)
+    const normalized = {
+      ...po,
+      items: (po.items || []).map((it) => {
+        const p = it.product || {};
+        return {
+          ...it,
+          categoryName: null,
+          productTypeName: null,
+          productProfileName: null,
+          productTemplateName: null,
+          productModel: null,
+          productName: p.name ?? null,
+        };
+      }),
+    };
+
+    return res.json(normalized);
+  } catch (err) {
+    console.error('❌ getPurchaseOrderById error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const getPurchaseOrdersBySupplier = async (req, res) => {
+  try {
+    const supplierId = Number(req.params?.supplierId);
+    if (!supplierId) return res.status(400).json({ error: 'Invalid supplierId' });
+
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
+
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: { branchId, supplierId },
+      include: {
+        supplier: true,
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json(purchaseOrders);
+  } catch (err) {
+    console.error('❌ getPurchaseOrdersBySupplier error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 };
 
 // CREATE
@@ -103,199 +249,30 @@ const createPurchaseOrder = async (req, res) => {
 const updatePurchaseOrderStatus = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const status = String(req.body?.status || '').trim().toUpperCase();
+
     if (!id) return res.status(400).json({ error: 'Invalid ID' });
+    if (!status) return res.status(400).json({ error: 'INVALID_STATUS' });
 
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
 
-    const po = await prisma.purchaseOrder.findFirst({ where: { id, branchId } });
-    if (!po) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อในสาขานี้' });
-
-    const VALID = ['PENDING','PARTIALLY_RECEIVED','RECEIVED','PAID','COMPLETED','CANCELLED'];
-    const nextStatus = VALID.includes(String(req.body?.status)) ? String(req.body.status) : 'COMPLETED';
+    const exists = await prisma.purchaseOrder.findFirst({ where: { id, branchId } });
+    if (!exists) return res.status(404).json({ error: 'Purchase Order not found' });
 
     const updated = await prisma.purchaseOrder.update({
       where: { id },
-      data: { status: nextStatus },
+      data: { status },
+      include: {
+        supplier: true,
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
     });
-    res.json({ success: true, updated });
+
+    return res.json(updated);
   } catch (err) {
     console.error('❌ updatePurchaseOrderStatus error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-
-// LIST (filter by branch, status, search)
-const getAllPurchaseOrders = async (req, res) => {
-  try {
-    const branchId = Number(req.user?.branchId);
-    const { search = '', status = 'all' } = req.query;
-
-    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
-
-    const VALID_STATUSES = [
-      'PENDING',
-      'PARTIALLY_RECEIVED',
-      'RECEIVED',
-      'PAID',
-      'COMPLETED',
-      'CANCELLED',
-    ];
-    const parsedStatuses = String(status)
-      .split(',')
-      .map((s) => s.trim().toUpperCase())
-      .filter((s) => VALID_STATUSES.includes(s));
-
-    const where = {
-      branchId,
-      ...(parsedStatuses.length > 0 && status !== 'all' ? { status: { in: parsedStatuses } } : {}),
-      ...(search
-        ? {
-            OR: [
-              { code: { contains: String(search), mode: 'insensitive' } },
-              { note: { contains: String(search), mode: 'insensitive' } },
-              // ✅ Prisma relation filter สำหรับ 1:1 ต้องใช้ is:{ ... }
-              { supplier: { is: { name: { contains: String(search), mode: 'insensitive' } } } },
-            ],
-          }
-        : {}),
-    };
-
-    const purchaseOrders = await prisma.purchaseOrder.findMany({
-      where,
-      include: {
-        supplier: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                
-                
-                
-                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
-              },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(purchaseOrders);
-  } catch (err) {
-    console.error('❌ getAllPurchaseOrders error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-
-// ELIGIBLE FOR PAYMENT
-const getEligiblePurchaseOrders = async (req, res) => {
-  try {
-    const branchId = Number(req.user?.branchId);
-    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
-
-    const purchaseOrders = await prisma.purchaseOrder.findMany({
-      where: { branchId, paymentStatus: { in: ['UNPAID', 'PARTIALLY_PAID'] } },
-      include: { supplier: true },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(purchaseOrders);
-  } catch (err) {
-    console.error('❌ getEligiblePurchaseOrders error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-// BY SUPPLIER (only pending/partially_received) + Decimal-safe total
-const getPurchaseOrdersBySupplier = async (req, res) => {
-  try {
-    const rawSupplierId = req.query.supplierId;
-    if (!rawSupplierId || isNaN(Number(rawSupplierId))) {
-      return res.status(400).json({ error: 'Invalid supplierId' });
-    }
-
-    const supplierId = Number(rawSupplierId);
-    const branchId = Number(req.user?.branchId);
-    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
-
-    const purchaseOrders = await prisma.purchaseOrder.findMany({
-      where: { supplierId, branchId, status: { in: ['PENDING', 'PARTIALLY_RECEIVED'] } },
-      orderBy: { createdAt: 'desc' },
-      include: { items: true },
-    });
-
-    const result = purchaseOrders.map((po) => {
-      const total = po.items.reduce(
-        (sum, it) => sum.plus(D(it.costPrice).times(Number(it.quantity))),
-        new Prisma.Decimal(0)
-      );
-      return {
-        id: po.id,
-        code: po.code,
-        status: po.status,
-        createdAt: po.createdAt,
-        totalAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(total) : total,
-      };
-    });
-
-    res.json(result);
-  } catch (err) {
-    console.error('❌ getPurchaseOrdersBySupplier error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-// GET BY ID (scoped to branch)
-const getPurchaseOrderById = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid ID' });
-
-    const branchId = Number(req.user?.branchId);
-    if (!branchId) return res.status(401).json({ error: 'Unauthorized: Missing branchId' });
-
-    const po = await prisma.purchaseOrder.findFirst({
-      where: { id, branchId },
-      include: {
-        supplier: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
-
-    // ส่ง alias ให้ FE เผื่อบางชั้นไม่ได้ include
-    const normalized = {
-      ...po,
-      items: po.items.map((it) => {
-        const p = it.product || {};
-        return {
-          ...it,
-          categoryName: p.template?.productProfile?.productType?.category?.name ?? null,
-          productTypeName: p.template?.productProfile?.productType?.name ?? null,
-          productProfileName: p.template?.productProfile?.name ?? null,
-          productTemplateName: p.template?.name ?? null,
-          productModel: p.model ?? p.template?.model ?? null,
-          productName: p.name ?? p.template?.name ?? null,
-        };
-      }),
-    };
-
-    res.json(normalized);
-  } catch (err) {
-    console.error('❌ getPurchaseOrderById error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
@@ -467,14 +444,8 @@ const createPurchaseOrderWithAdvance = async (req, res) => {
         supplier: true,
         items: {
           include: {
-            product: {
-              include: {
-                
-                
-                
-                template: { include: { productProfile: { include: { productType: { include: { category: true } } } } } },
-              },
-            },
+            // ✅ safe include: กัน Prisma 500 ถ้า relation chain เปลี่ยน
+            product: { select: { id: true, name: true } },
           },
         },
       },
@@ -501,6 +472,10 @@ module.exports = {
   getPurchaseOrdersBySupplier,
   createPurchaseOrderWithAdvance,
 };
+
+
+
+
 
 
 

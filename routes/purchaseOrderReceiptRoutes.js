@@ -20,6 +20,12 @@ const {
   commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
 
+// ✅ Receipt items endpoints (bridge to REST-style routes)
+const {
+  updateReceiptItem,
+  getReceiptItemsByReceiptId,
+} = require('../controllers/purchaseOrderReceiptItemController');
+
 
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
@@ -46,6 +52,25 @@ router.post('/quick-receipts', createQuickReceipt);
 // 🔍 GET - ดูรายละเอียดใบรับสินค้า
 router.get('/:id', getPurchaseOrderReceiptById);
 
+// ✅ REST-style items (preferred) — keeps FE stable
+// List items of a receipt
+router.get('/:receiptId/items', (req, res) => {
+  // reuse existing controller which expects :receiptId in params
+  req.params.receiptId = req.params.receiptId;
+  return getReceiptItemsByReceiptId(req, res);
+});
+
+// Update a single receipt item (maps to legacy update body)
+router.patch('/:receiptId/items/:itemId', (req, res) => {
+  // Legacy controller expects { receiptId, purchaseOrderItemId } in body
+  req.body = {
+    ...(req.body || {}),
+    receiptId: Number(req.params.receiptId),
+    purchaseOrderItemId: Number(req.params.itemId),
+  };
+  return updateReceiptItem(req, res);
+});
+
 // ✏️ PUT - แก้ไขใบรับสินค้า
 router.put('/:id', updatePurchaseOrderReceipt);
 
@@ -70,6 +95,7 @@ router.post('/:id/print', printReceipt);
 router.post('/:id/commit', commitReceipt);
 
 module.exports = router;
+
 
 
 

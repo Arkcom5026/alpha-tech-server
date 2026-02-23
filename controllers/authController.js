@@ -1,3 +1,4 @@
+
 // ✅ authController.js — Prisma singleton, safer errors, consistent JWT payload
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -76,7 +77,7 @@ const register = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = normalize(req.body?.password);
     const name = normalize(req.body?.name);
-    const phone = normalize(req.body?.phone);
+    const phoneRaw = normalize(req.body?.phone);
 
     if (!email || !password) {
       return res.status(400).json({ message: 'กรุณาระบุอีเมลและรหัสผ่าน' });
@@ -85,9 +86,35 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' });
     }
 
+    // phone normalization (used for loginId only — CustomerProfile may not have phone field in current Prisma schema)
+    const onlyDigits = (v) =>
+      String(v || '')
+        .split('')
+        .filter((c) => c >= '0' && c <= '9')
+        .join('');
+    const toE164TH = (digits) => {
+      if (!digits) return '';
+      if (digits.startsWith('0') && digits.length === 10) return `+66${digits.slice(1)}`;
+      if (digits.startsWith('66') && digits.length === 11) return `+${digits}`;
+      if (digits.startsWith('+')) return digits;
+      return digits;
+    };
+
+    const phoneDigits = onlyDigits(phoneRaw);
+    const phoneE164 = toE164TH(phoneDigits);
+    const loginId = phoneE164 || phoneDigits || '';
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'มีบัญชีนี้อยู่แล้ว' });
+    }
+
+    // Optional: prevent duplicate loginId if phone is provided
+    if (loginId) {
+      const existingLoginId = await prisma.user.findFirst({ where: { loginId } });
+      if (existingLoginId) {
+        return res.status(409).json({ message: 'มีบัญชีที่ใช้เบอร์โทรนี้อยู่แล้ว' });
+      }
     }
 
     const hashedPassword = await bcryptHash(password, 10);
@@ -98,10 +125,12 @@ const register = async (req, res) => {
         password: hashedPassword,
         role: 'CUSTOMER',
         enabled: true,
+        ...(loginId ? { loginId } : {}),
         customerProfile: {
           create: {
             name,
-            phone,
+            // NOTE: Prisma schema currently does NOT include CustomerProfile.phone (per error: Unknown argument `phone`).
+            // Keep phone in User.loginId instead for lookup/login.
           },
         },
       },
@@ -375,6 +404,7 @@ module.exports = {
   login,
   findUserByEmail,
 };
+
 
 
 

@@ -46,11 +46,32 @@ if (typeof toggleBrand !== 'function') {
 // ใช้แค่ verifyToken พอ (employee/admin ใช้ได้)
 router.get('/dropdowns', verifyToken, listBrands)
 
-router.get('/', verifyToken, requireAdmin, listBrands)
+// ✅ READ (Brand เป็นข้อมูลกลาง → employee/admin/superadmin อ่านได้)
+const normalizeRole = (r) => String(r || '').trim().toLowerCase()
+const normalizeProfileType = (t) => String(t || '').trim().toLowerCase()
+
+const allowReadBrandsForEmployeeContext = (req, res, next) => {
+  const role = normalizeRole(req?.user?.role)
+  const profileType = normalizeProfileType(req?.user?.profileType)
+  const effectiveRole = normalizeRole(req?.user?.effectiveRole)
+  const effectiveProfileType = normalizeProfileType(req?.user?.effectiveProfileType)
+
+  const r = effectiveRole || role
+  const pt = effectiveProfileType || profileType
+
+  if (['employee', 'admin', 'superadmin'].includes(r)) return next()
+  if (pt === 'employee') return next()
+
+  return res.status(403).json({ error: 'FORBIDDEN' })
+}
+
+router.get('/', verifyToken, allowReadBrandsForEmployeeContext, listBrands)
 router.post('/', verifyToken, requireAdmin, createBrand)
 router.put('/:id', verifyToken, requireAdmin, updateBrand)
 router.patch('/:id/toggle', verifyToken, requireAdmin, toggleBrand)
 
 module.exports = router
+
+
 
 

@@ -1,7 +1,8 @@
+
 // purchaseOrderReceiptController.js
 
 const dayjs = require('dayjs');
-const { ReceiptStatus, Prisma } = require('@prisma/client');
+const { Prisma } = require('@prisma/client');
 const { prisma } = require('../lib/prisma');
 
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
@@ -224,7 +225,7 @@ const getPurchaseOrderReceiptById = async (req, res) => {
                 product: {
                   select: {
                     name: true,
-                    template: { select: { unit: { select: { name: true } } } },
+                    productTemplate: { select: { unit: { select: { name: true } } } },
                   },
                 },
               },
@@ -274,7 +275,7 @@ const getPurchaseOrderReceiptById = async (req, res) => {
         id: item.id,
         quantity: item.quantity,
         productName: item.purchaseOrderItem.product.name,
-        unitName: item.purchaseOrderItem.product.template?.unit?.name || 'N/A',
+        unitName: item.purchaseOrderItem.product.productTemplate?.unit?.name || 'N/A',
       })),
     };
 
@@ -304,6 +305,39 @@ const getPurchaseOrderReceiptById = async (req, res) => {
   }
 };
 
+// ---- Purchase Orders eligible for creating a receipt (for FE picker/table) ----
+const getEligiblePurchaseOrders = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
+    // ✅ Eligible = ยังไม่จบกระบวนการ และไม่ยกเลิก
+    // NOTE: หาก enum เปลี่ยนในอนาคต ให้ปรับชุดนี้เท่านั้น
+    const eligibleStatuses = ['PENDING', 'PARTIALLY_RECEIVED'];
+
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: {
+        branchId,
+        status: { in: eligibleStatuses },
+      },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        createdAt: true,
+        supplier: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json(purchaseOrders);
+  } catch (error) {
+    console.error('❌ [getEligiblePurchaseOrders] error:', error);
+    return res.status(500).json({ error: 'ไม่สามารถโหลดใบสั่งซื้อสำหรับสร้างใบรับสินค้าได้' });
+  }
+};
+
+
 // ---- Get Purchase Order (with received qty) ----
 const getPurchaseOrderDetailById = async (req, res) => {
   try {
@@ -322,7 +356,7 @@ const getPurchaseOrderDetailById = async (req, res) => {
     if (!purchaseOrder) return res.status(404).json({ error: 'ไม่พบใบสั่งซื้อนี้' });
 
     const itemsWithReceived = purchaseOrder.items.map((item) => {
-      const receivedQuantity = item.receiptItems?.reduce((sum, r) => sum + r.quantity, 0) || 0;
+      const receivedQuantity = item.receiptItems?.reduce((sum, r) => sum + toNum(r.quantity), 0) || 0;
       return { ...item, receivedQuantity };
     });
 
@@ -663,7 +697,7 @@ const createQuickReceipt = async (req, res) => {
         data: {
           code,
           note: note || null,
-          receivedById,
+          receivedBy: { connect: { id: receivedById } },
           branch: { connect: { id: branchId } },
           supplier: supplierId ? { connect: { id: Number(supplierId) } } : undefined,
           source: 'QUICK',
@@ -752,7 +786,7 @@ const generateReceiptBarcodes = async (req, res) => {
           createdBarcodes.push(b);
         } else {
           // STRUCTURED: N codes = quantity
-          const qty = Number(it.quantity);
+          const qty = toNum(it.quantity);
           for (let i = 0; i < qty; i++) {
             const counter = await tx.barcodeCounter.update({
               where: { branchId_yearMonth: { branchId, yearMonth } },
@@ -869,7 +903,7 @@ const commitReceipt = async (req, res) => {
           });
         } else {
           // STRUCTURED: create N StockItem and attach SN barcodes
-          const qty = Number(it.quantity);
+          const qty = toNum(it.quantity);
           const snList = await tx.barcodeReceiptItem.findMany({
             where: { receiptItemId: it.id, kind: 'SN', branchId },
             orderBy: { runningNumber: 'asc' },
@@ -933,6 +967,7 @@ const getReceiptSummaries = async (req, res) => {
 const getAllReceipts = getAllPurchaseOrderReceipts;
 
 module.exports = {
+  getEligiblePurchaseOrders,
   createPurchaseOrderReceipt,
   // list (aliases for routes)
   getAllPurchaseOrderReceipts,
@@ -957,6 +992,9 @@ module.exports = {
   printReceipt,
   commitReceipt,
 };
+
+
+
 
 
 
