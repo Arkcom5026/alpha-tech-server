@@ -238,7 +238,8 @@ const searchPrintablePayments = async (req, res) => {
             items: {
               include: {
                 stockItem: {
-                  include: { product: { select: { name: true, model: true, template: true } } },
+                  include: { product: { select: { name: true, template: true } } },
+
                 },
               },
             },
@@ -323,7 +324,9 @@ const cancelPayment = async (req, res) => {
       // 3) Recompute sale.paid
       const agg = await tx.paymentItem.aggregate({ _sum: { amount: true }, where: { payment: { saleId: payment.saleId, isCancelled: false } } });
       const paid = agg._sum.amount || new Prisma.Decimal(0);
-      const saleRow = await tx.sale.findUnique({ where: { id: payment.saleId }, select: { totalAmount: true } });
+      
+      const saleRow = await tx.sale.findUnique({ where: { id: payment.saleId }, select: { totalAmount: true, paidAt: true } });
+
       const isPaid = (paid.greaterThanOrEqualTo?.(saleRow.totalAmount)) || (toNum(paid) >= toNum(saleRow.totalAmount));
       await tx.sale.update({ where: { id: payment.saleId }, data: { paid: isPaid, paidAt: isPaid ? saleRow.paidAt || new Date() : null } });
     }, { timeout: 20000, maxWait: 20000 });
@@ -340,6 +343,10 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
+
+
+
+
 
 
 

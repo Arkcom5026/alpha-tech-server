@@ -1,12 +1,10 @@
+// src/controllers/barcodeController.js
 
 // 👉 Helper
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
 
-// src/controllers/barcodeController.js
-
 const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
-
 
 // POST /api/barcodes/generate-missing/:receiptId
 // สร้างบาร์โค้ดที่ขาดหายสำหรับใบรับสินค้าแบบอะตอมมิกและกันเลขชน (race-safe)
@@ -27,7 +25,12 @@ const generateMissingBarcodes = async (req, res) => {
     const result = await _generateMissingBarcodesForReceipt(receiptId, userBranchId, { dryRun, lotLabelPerLot });
 
     if (dryRun) {
-      return res.status(200).json({ success: true, dryRun: true, plan: result.plan, totalToCreate: result.totalToCreate });
+      return res.status(200).json({
+        success: true,
+        dryRun: true,
+        plan: result.plan,
+        totalToCreate: result.totalToCreate,
+      });
     }
 
     return res.status(200).json({ success: true, createdCount: result.createdCount, barcodes: result.barcodes });
@@ -46,131 +49,135 @@ const generateMissingBarcodes = async (req, res) => {
 // 🔒 Internal: ใช้ซ้ำได้ทั้งจาก endpoint และจากจุด auto-generate
 async function _generateMissingBarcodesForReceipt(receiptId, userBranchId, opts = {}) {
   const { dryRun = false, lotLabelPerLot = 1 } = opts;
-  return prisma.$transaction(async (tx) => {
-    // 1) โหลดใบรับภายใต้สาขาของผู้ใช้ + โหมดสินค้า
-    const receipt = await tx.purchaseOrderReceipt.findFirst({
-      where: { id: receiptId, branchId: userBranchId },
-      include: {
-        items: {
-          include: {
-            purchaseOrderItem: {
-              select: {
-                id: true,
-                productId: true,
-                product: { select: { id: true, mode: true } },
+
+  return prisma.$transaction(
+    async (tx) => {
+      // 1) โหลดใบรับภายใต้สาขาของผู้ใช้ + โหมดสินค้า
+      const receipt = await tx.purchaseOrderReceipt.findFirst({
+        where: { id: receiptId, branchId: userBranchId },
+        include: {
+          items: {
+            include: {
+              purchaseOrderItem: {
+                select: {
+                  id: true,
+                  productId: true,
+                  product: { select: { id: true, mode: true } },
+                },
               },
+              product: { select: { id: true, mode: true } }, // สำรองสำหรับ QUICK/PO-less
+              barcodeReceiptItem: { select: { id: true, kind: true, stockItemId: true, simpleLotId: true } },
             },
-            product: { select: { id: true, mode: true } }, // สำรองสำหรับ QUICK/PO-less
-            barcodeReceiptItem: { select: { id: true, kind: true, stockItemId: true, simpleLotId: true } },
           },
+          purchaseOrder: { select: { id: true, code: true } },
         },
-        purchaseOrder: { select: { id: true, code: true } },
-      },
-    });
+      });
 
-    if (!receipt) {
-      const notFoundErr = new Error('NOT_FOUND_RECEIPT');
-      notFoundErr.status = 404;
-      throw notFoundErr;
-    }
-
-    const yearMonth = dayjs().format('YYMM');
-    const branchId = receipt.branchId;
-
-    // 2) สร้างแผนแบบแยกโหมด
-    const plansSN = []; // [{ receiptItemId, count }]
-    const plansLOT = []; // [{ receiptItemId, count: 1, lotLabelPerLot }]
-
-    for (const it of receipt.items) {
-      const qty = Number(it.quantity || 0);
-      const existing = Array.isArray(it.barcodeReceiptItem) ? it.barcodeReceiptItem.length : 0;
-      const existingSN = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'SN' || x.stockItemId).length;
-      const existingLOT = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'LOT' || x.simpleLotId).length;
-
-      const mode = it.purchaseOrderItem?.product?.mode || it.product?.mode || null;
-
-      if (mode === 'STRUCTURED') {
-        const missing = Math.max(0, qty - existingSN);
-        if (missing > 0) plansSN.push({ receiptItemId: it.id, count: missing });
-      } else if (mode === 'SIMPLE') {
-        const missing = existingLOT > 0 ? 0 : 1; // 1 lot = 1 barcode แถวเดียว
-        if (missing > 0) plansLOT.push({ receiptItemId: it.id, count: 1, lotLabelPerLot });
-      } else {
-        // ไม่ทราบโหมด → ไม่สร้างอะไร ปลอดภัยสุด
-        // console.warn('[gen-missing] unknown mode for receiptItem', it.id);
+      if (!receipt) {
+        const notFoundErr = new Error('NOT_FOUND_RECEIPT');
+        notFoundErr.status = 404;
+        throw notFoundErr;
       }
-    }
 
-    const totalToCreate = plansSN.reduce((s, p) => s + p.count, 0) + plansLOT.reduce((s, p) => s + p.count, 0);
+      const yearMonth = dayjs().format('YYMM');
+      const branchId = receipt.branchId;
 
-    if (dryRun) {
-      return { totalToCreate, plan: { SN: plansSN, LOT: plansLOT } };
-    }
+      // 2) สร้างแผนแบบแยกโหมด
+      const plansSN = []; // [{ receiptItemId, count }]
+      const plansLOT = []; // [{ receiptItemId, count: 1, lotLabelPerLot }]
 
-    if (totalToCreate === 0) {
-      return { createdCount: 0, barcodes: [] };
-    }
+      for (const it of receipt.items) {
+        const qty = Number(it.quantity || 0);
+        const existingSN = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'SN' || x.stockItemId).length;
+        const existingLOT = (it.barcodeReceiptItem || []).filter((x) => x.kind === 'LOT' || x.simpleLotId).length;
 
-    // 3) เตรียม counter และจองเลขรวดเดียว (race-safe)
-    await tx.barcodeCounter.upsert({
-      where: { branchId_yearMonth: { branchId, yearMonth } },
-      update: {},
-      create: { branchId, yearMonth, lastNumber: 0 },
-    });
+        const mode = it.purchaseOrderItem?.product?.mode || it.product?.mode || null;
 
-    const updatedCounter = await tx.barcodeCounter.update({
-      where: { branchId_yearMonth: { branchId, yearMonth } },
-      data: { lastNumber: { increment: totalToCreate } },
-    });
+        if (mode === 'STRUCTURED') {
+          const missing = Math.max(0, qty - existingSN);
+          if (missing > 0) plansSN.push({ receiptItemId: it.id, count: missing });
+        } else if (mode === 'SIMPLE') {
+          const missing = existingLOT > 0 ? 0 : 1; // 1 lot = 1 barcode แถวเดียว
+          if (missing > 0) plansLOT.push({ receiptItemId: it.id, count: 1, lotLabelPerLot });
+        } else {
+          // ไม่ทราบโหมด → ไม่สร้างอะไร ปลอดภัยสุด
+        }
+      }
 
-    const endNumber = updatedCounter.lastNumber;
-    const startNumber = endNumber - totalToCreate + 1;
+      const totalToCreate =
+        plansSN.reduce((s, p) => s + p.count, 0) +
+        plansLOT.reduce((s, p) => s + p.count, 0);
 
-    // Guard โควต้า/เดือน (0001–9999)
-    if (endNumber > 9999) {
-      await tx.barcodeCounter.update({
+      if (dryRun) {
+        return { totalToCreate, plan: { SN: plansSN, LOT: plansLOT } };
+      }
+
+      if (totalToCreate === 0) {
+        return { createdCount: 0, barcodes: [] };
+      }
+
+      // 3) เตรียม counter และจองเลขรวดเดียว (race-safe)
+      await tx.barcodeCounter.upsert({
         where: { branchId_yearMonth: { branchId, yearMonth } },
-        data: { lastNumber: { decrement: totalToCreate } },
+        update: {},
+        create: { branchId, yearMonth, lastNumber: 0 },
       });
-      const overflowErr = new Error('COUNTER_OVERFLOW');
-      overflowErr.status = 400;
-      throw overflowErr;
-    }
 
-    // 4) สร้างชุดบาร์โค้ดตามแผน (เลขเดียวกัน ใช้ต่อเนื่อง SN/LOT)
-    const newBarcodes = [];
-    let running = startNumber;
-
-    const pushNew = (receiptItemId, kind) => {
-      const padded = String(running).padStart(4, '0');
-      const code = `${String(branchId).padStart(3, '0')}${yearMonth}${padded}`;
-      newBarcodes.push({
-        barcode: code,
-        branchId,
-        yearMonth,
-        runningNumber: running,
-        status: 'READY',
-        printed: false,
-        kind, // 'SN' | 'LOT'
-        purchaseOrderReceiptId: receipt.id,
-        receiptItemId,
+      const updatedCounter = await tx.barcodeCounter.update({
+        where: { branchId_yearMonth: { branchId, yearMonth } },
+        data: { lastNumber: { increment: totalToCreate } },
       });
-      running += 1;
-    };
 
-    for (const plan of plansSN) {
-      for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'SN');
-    }
-    for (const plan of plansLOT) {
-      for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'LOT');
-    }
+      const endNumber = updatedCounter.lastNumber;
+      const startNumber = endNumber - totalToCreate + 1;
 
-    if (newBarcodes.length > 0) {
-      await tx.barcodeReceiptItem.createMany({ data: newBarcodes, skipDuplicates: true });
-    }
+      // Guard โควต้า/เดือน (0001–9999)
+      if (endNumber > 9999) {
+        await tx.barcodeCounter.update({
+          where: { branchId_yearMonth: { branchId, yearMonth } },
+          data: { lastNumber: { decrement: totalToCreate } },
+        });
+        const overflowErr = new Error('COUNTER_OVERFLOW');
+        overflowErr.status = 400;
+        throw overflowErr;
+      }
 
-    return { createdCount: newBarcodes.length, barcodes: newBarcodes };
-  }, { timeout: 30000 });
+      // 4) สร้างชุดบาร์โค้ดตามแผน (เลขเดียวกัน ใช้ต่อเนื่อง SN/LOT)
+      const newBarcodes = [];
+      let running = startNumber;
+
+      const pushNew = (receiptItemId, kind) => {
+        const padded = String(running).padStart(4, '0');
+        const code = `${String(branchId).padStart(3, '0')}${yearMonth}${padded}`;
+        newBarcodes.push({
+          barcode: code,
+          branchId,
+          yearMonth,
+          runningNumber: running,
+          status: 'READY',
+          printed: false,
+          kind, // 'SN' | 'LOT'
+          purchaseOrderReceiptId: receipt.id,
+          receiptItemId,
+        });
+        running += 1;
+      };
+
+      for (const plan of plansSN) {
+        for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'SN');
+      }
+      for (const plan of plansLOT) {
+        for (let i = 0; i < plan.count; i++) pushNew(plan.receiptItemId, 'LOT');
+      }
+
+      if (newBarcodes.length > 0) {
+        await tx.barcodeReceiptItem.createMany({ data: newBarcodes, skipDuplicates: true });
+      }
+
+      return { createdCount: newBarcodes.length, barcodes: newBarcodes };
+    },
+    { timeout: 30000 }
+  );
 }
 
 // GET /api/barcodes/by-receipt/:receiptId ดึงข้อมูลแสดงในตาราง
@@ -189,7 +196,7 @@ const getBarcodesByReceiptId = async (req, res) => {
     const onlyUnscanned = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnscanned || '0').toLowerCase());
     const onlyUnactivated = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnactivated || '0').toLowerCase());
 
-    // Always ensure barcodes exist first (auto-generate only if the receipt has zero BRI at all)
+    // Ensure barcodes exist first (auto-generate only if the receipt has zero BRI at all)
     const totalExisting = await prisma.barcodeReceiptItem.count({
       where: { purchaseOrderReceiptId: receiptId, branchId },
     });
@@ -203,9 +210,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           id: true,
           serialNumber: true,
           productId: true,
-          product: {
-            select: { id: true, name: true, model: true, spec: true },
-          },
+          product: { select: { id: true, name: true } },
         },
       },
       receiptItem: {
@@ -214,9 +219,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           purchaseOrderItem: {
             select: {
               productId: true,
-              product: {
-                select: { id: true, name: true, model: true, spec: true },
-              },
+              product: { select: { id: true, name: true } },
             },
           },
         },
@@ -228,9 +231,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       branchId,
       ...(kindFilter ? { kind: kindFilter } : {}),
       ...(onlyUnscanned ? { stockItemId: null } : {}),
-      ...(onlyUnactivated && kindFilter === 'LOT'
-        ? { OR: [{ status: null }, { status: { not: 'SN_RECEIVED' } }] }
-        : {}),
+      ...(onlyUnactivated && kindFilter === 'LOT' ? { status: { not: 'SN_RECEIVED' } } : {}),
     };
 
     const rows = await prisma.barcodeReceiptItem.findMany({
@@ -239,6 +240,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
+    // ✅ ทำ product map
     const idSet = new Set();
     for (const b of rows) {
       const s = b.stockItem;
@@ -248,15 +250,18 @@ const getBarcodesByReceiptId = async (req, res) => {
       if (poi?.product?.id) idSet.add(poi.product.id);
       if (poi?.productId) idSet.add(poi.productId);
     }
+
     let productMap = new Map();
     if (idSet.size > 0) {
       const products = await prisma.product.findMany({
         where: { id: { in: Array.from(idSet) } },
-        select: { id: true, name: true, model: true, spec: true },
+        select: { id: true, name: true },
       });
       productMap = new Map(products.map((p) => [p.id, p]));
     }
 
+    // 🔁 Fallback เพิ่มเติม (ตามเส้นทางที่ระบุ) สำหรับพิมพ์ซ้ำ:
+    // BRI -> PurchaseOrderReceipt -> PurchaseOrder -> PurchaseOrderItem -> Product
     const receiptPO = await prisma.purchaseOrderReceipt.findFirst({
       where: { id: receiptId, branchId },
       select: { purchaseOrderId: true },
@@ -264,15 +269,12 @@ const getBarcodesByReceiptId = async (req, res) => {
 
     let poItemMap = new Map();
     let recToPoMap = new Map();
+    let recQtyMap = new Map();
 
     if (receiptPO?.purchaseOrderId) {
       const poItems = await prisma.purchaseOrderItem.findMany({
         where: { purchaseOrderId: receiptPO.purchaseOrderId },
-        select: {
-          id: true,
-          productId: true,
-          product: { select: { id: true, name: true, model: true, spec: true } },
-        },
+        select: { id: true, productId: true, product: { select: { id: true, name: true } } },
       });
       poItemMap = new Map(poItems.map((it) => [it.id, it]));
 
@@ -280,23 +282,51 @@ const getBarcodesByReceiptId = async (req, res) => {
       if (recIds.length) {
         const recItems = await prisma.purchaseOrderReceiptItem.findMany({
           where: { id: { in: recIds } },
-          select: { id: true, purchaseOrderItemId: true },
+          select: { id: true, purchaseOrderItemId: true, quantity: true },
         });
         recToPoMap = new Map(recItems.map((x) => [x.id, x.purchaseOrderItemId]));
+        recQtyMap = new Map(recItems.map((x) => [x.id, Number(x.quantity || 0)]));
+      }
+    } else {
+      const recIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
+      if (recIds.length) {
+        const recItems = await prisma.purchaseOrderReceiptItem.findMany({
+          where: { id: { in: recIds } },
+          select: { id: true, quantity: true },
+        });
+        recQtyMap = new Map(recItems.map((x) => [x.id, Number(x.quantity || 0)]));
       }
     }
 
-    const briIds = Array.from(new Set(rows.map((r) => r.id).filter(Boolean)));
-    const recItemIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
+    // 🔁 Build fallback maps for StockItem
+    const briIds2 = Array.from(new Set(rows.map((r) => r.id).filter(Boolean)));
+    const recItemIds2 = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
+
     let siByBRI = new Map();
-    if (briIds.length || recItemIds.length) {
-      const briLinks = await prisma.barcodeReceiptItem.findMany({
-        where: { id: { in: briIds }, branchId, stockItemId: { not: null } },
+    let siByReceiptItem = new Map();
+
+    // (1) BRI -> StockItem
+    if (briIds2.length) {
+      const briLinks2 = await prisma.barcodeReceiptItem.findMany({
+        where: { id: { in: briIds2 }, branchId, stockItemId: { not: null } },
         select: { id: true, stockItem: { select: { id: true, serialNumber: true } } },
       });
       siByBRI = new Map(
-        briLinks
+        briLinks2
           .map((x) => [x.id, x.stockItem])
+          .filter(([k, v]) => k != null && v != null)
+      );
+    }
+
+    // (2) ReceiptItem -> StockItem
+    if (recItemIds2.length) {
+      const stockItemsByRecItem = await prisma.stockItem.findMany({
+        where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds2 } },
+        select: { id: true, serialNumber: true, purchaseOrderReceiptItemId: true },
+      });
+      siByReceiptItem = new Map(
+        stockItemsByRecItem
+          .map((s) => [s.purchaseOrderReceiptItemId, s])
           .filter(([k, v]) => k != null && v != null)
       );
     }
@@ -304,7 +334,6 @@ const getBarcodesByReceiptId = async (req, res) => {
     const barcodes = rows.map((b) => {
       const pStock = b.stockItem?.product ?? null;
       const pPO = b.receiptItem?.purchaseOrderItem?.product ?? null;
-
       const pFromId =
         (b.stockItem?.productId && productMap.get(b.stockItem.productId)) ||
         (b.receiptItem?.purchaseOrderItem?.productId && productMap.get(b.receiptItem.purchaseOrderItem.productId)) ||
@@ -313,20 +342,25 @@ const getBarcodesByReceiptId = async (req, res) => {
       const poItemId = recToPoMap.get(b.receiptItemId);
       const poItem = poItemId ? poItemMap.get(poItemId) : null;
       const pFromPOChain = poItem?.product || (poItem?.productId ? productMap.get(poItem.productId) : null);
+
       const p = pStock ?? pPO ?? pFromId ?? pFromPOChain;
 
-      const baseName = p?.name ?? null;
-      const productName = baseName && p?.model ? `${baseName} (${p.model})` : baseName;
-      const productSpec = p?.spec ?? null;
+      const productName = p?.name ?? null;
+      const productSpec = null; // schema: no Product.spec
 
-      const siFallback = b.stockItemId ? null : siByBRI.get(b.id) || null;
+      // ✅ Fallback หา stockItem (id/SN)
+      const siFallback = b.stockItemId
+        ? null
+        : siByBRI.get(b.id) || (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
       const stockItemId = b.stockItemId ?? siFallback?.id ?? null;
       const serialNumber = b.stockItem?.serialNumber ?? siFallback?.serialNumber ?? null;
 
-      const kind = b.kind ?? (b.stockItemId ? 'SN' : (b.simpleLotId ? 'LOT' : null));
+      const kind = b.kind ?? (b.stockItemId ? 'SN' : b.simpleLotId ? 'LOT' : null);
 
       // 👉 Suggest number of duplicate labels for LOT (print convenience)
-      const qtyLabelsSuggested = kind === 'LOT' ? Number(b.receiptItem?.quantity || 1) : 1;
+      const qtyFromInclude = Number(b.receiptItem?.quantity || 0);
+      const qtyFromMap = b.receiptItemId ? recQtyMap.get(b.receiptItemId) || 0 : 0;
+      const qtyLabelsSuggested = kind === 'LOT' ? Math.max(1, qtyFromInclude || qtyFromMap || 1) : 1;
 
       return {
         id: b.id,
@@ -354,7 +388,6 @@ const getBarcodesByReceiptId = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถดึงบาร์โค้ดได้' });
   }
 };
-
 
 // ---- Mark single receipt as completed ----
 const markReceiptAsCompleted = async (req, res) => {
@@ -392,10 +425,6 @@ const markReceiptAsCompleted = async (req, res) => {
     return res.status(500).json({ error: 'ไม่สามารถอัปเดตสถานะใบรับสินค้าได้' });
   }
 };
-
-
-
-
 
 // ---- Mark barcodes as printed (PATCH /api/barcodes/mark-printed) ----
 // BRANCH_SCOPE_ENFORCED: ใช้ branchId จาก req.user เท่านั้น
@@ -437,13 +466,14 @@ const markBarcodesAsPrinted = async (req, res) => {
       return undefined;
     };
 
-    let purchaseOrderReceiptId =
-      pickId(req.body) ?? pickId(req.query) ?? Number(req.get('x-receipt-id'));
+    const purchaseOrderReceiptId = pickId(req.body) ?? pickId(req.query) ?? Number(req.get('x-receipt-id'));
 
     if (!Number.isFinite(purchaseOrderReceiptId) || purchaseOrderReceiptId <= 0) {
-      console.warn('[markBarcodesAsPrinted] missing receipt id. keys(body)=',
+      console.warn(
+        '[markBarcodesAsPrinted] missing receipt id. keys(body)=',
         typeof req.body === 'object' && req.body ? Object.keys(req.body) : '(primitive)',
-        'query=', req.query
+        'query=',
+        req.query
       );
       return res.status(400).json({ message: 'ต้องระบุ purchaseOrderReceiptId (หรือ receiptId/id)' });
     }
@@ -460,7 +490,12 @@ const markBarcodesAsPrinted = async (req, res) => {
       }),
     ]);
 
-    console.log('[markBarcodesAsPrinted] updated items:', itemsResult.count, 'receipt updated:', receiptResult.count);
+    console.log(
+      '[markBarcodesAsPrinted] updated items:',
+      itemsResult.count,
+      'receipt updated:',
+      receiptResult.count
+    );
 
     return res.json({ success: true, updated: itemsResult.count, receiptUpdated: receiptResult.count });
   } catch (error) {
@@ -468,11 +503,6 @@ const markBarcodesAsPrinted = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถอัปเดตสถานะ printed ได้', error: error?.message });
   }
 };
-
-
-
-
-
 
 // GET /api/barcodes/receipts-with-barcodes
 // รายการใบรับที่ "รอพิมพ์บาร์โค้ด" ให้สะท้อน SIMPLE/STRUCTURED อย่างถูกต้อง
@@ -525,10 +555,9 @@ const getReceiptsWithBarcodes = async (req, res) => {
           purchaseOrderCode: r.purchaseOrder?.code || '-',
           supplier: supplier?.name || '-',
           createdAt: r.createdAt,
-          // ตัวเลขหลักที่หน้า UI ใช้
           total,
-          printed,       // ✅ นับจาก printed จริง (ครอบคลุม SIMPLE/STRUCTURED)
-          pending,       // ✅ ที่ยังไม่พิมพ์
+          printed,
+          pending,
           // รักษา compatibility: เดิมใช้ชื่อ scanned → แม็ปไปที่ printed
           scanned: printed,
           // ข้อมูลเสริม (optional)
@@ -601,7 +630,6 @@ const searchReprintReceipts = async (req, res) => {
   }
 };
 
-
 // PATCH /api/barcodes/reprint/:receiptId
 const reprintBarcodes = async (req, res) => {
   const receiptId = toInt(req.params?.receiptId);
@@ -626,9 +654,7 @@ const reprintBarcodes = async (req, res) => {
           id: true,
           serialNumber: true,
           productId: true,
-          product: {
-            select: { id: true, name: true, model: true, spec: true },
-          },
+          product: { select: { id: true, name: true } },
         },
       },
       receiptItem: {
@@ -636,9 +662,7 @@ const reprintBarcodes = async (req, res) => {
           purchaseOrderItem: {
             select: {
               productId: true,
-              product: {
-                select: { id: true, name: true, model: true, spec: true },
-              },
+              product: { select: { id: true, name: true } },
             },
           },
         },
@@ -665,13 +689,12 @@ const reprintBarcodes = async (req, res) => {
     if (idSet.size > 0) {
       const products = await prisma.product.findMany({
         where: { id: { in: Array.from(idSet) } },
-        select: { id: true, name: true, model: true, spec: true },
+        select: { id: true, name: true },
       });
       productMap = new Map(products.map((p) => [p.id, p]));
     }
 
     // 🔁 Fallback เพิ่มเติม (ตามเส้นทางที่ระบุ) สำหรับพิมพ์ซ้ำ:
-    // BRI -> PurchaseOrderReceipt -> PurchaseOrder -> PurchaseOrderItem -> Product
     const receiptPO = await prisma.purchaseOrderReceipt.findFirst({
       where: { id: receiptId, branchId },
       select: { purchaseOrderId: true },
@@ -683,11 +706,7 @@ const reprintBarcodes = async (req, res) => {
     if (receiptPO?.purchaseOrderId) {
       const poItems = await prisma.purchaseOrderItem.findMany({
         where: { purchaseOrderId: receiptPO.purchaseOrderId },
-        select: {
-          id: true,
-          productId: true,
-          product: { select: { id: true, name: true, model: true, spec: true } },
-        },
+        select: { id: true, productId: true, product: { select: { id: true, name: true } } },
       });
       poItemMap = new Map(poItems.map((it) => [it.id, it]));
 
@@ -702,24 +721,16 @@ const reprintBarcodes = async (req, res) => {
     }
 
     // 🔁 Build fallback maps for StockItem for reprint
-    // หมายเหตุ: ใน schema ของเรา StockItem ไม่มี field barcodeReceiptItemId (เป็น relation)
-    // ดังนั้นให้หา StockItem ผ่าน 2 เส้นทางที่ปลอดภัย:
-    // 1) barcodeReceiptItem.id -> barcodeReceiptItem.stockItem (เมื่อมี stockItemId)
-    // 2) purchaseOrderReceiptItemId (receiptItemId) -> stockItem (สำหรับข้อมูลเก่าหรือกรณี include ไม่ติด)
     const briIds2 = Array.from(new Set(items.map((r) => r.id).filter(Boolean)));
     const recItemIds2 = Array.from(new Set(items.map((r) => r.receiptItemId).filter(Boolean)));
 
     let siByBRI = new Map();
     let siByReceiptItem = new Map();
 
-    // (1) BRI -> StockItem
     if (briIds2.length) {
       const briLinks2 = await prisma.barcodeReceiptItem.findMany({
         where: { id: { in: briIds2 }, branchId, stockItemId: { not: null } },
-        select: {
-          id: true,
-          stockItem: { select: { id: true, serialNumber: true } },
-        },
+        select: { id: true, stockItem: { select: { id: true, serialNumber: true } } },
       });
       siByBRI = new Map(
         briLinks2
@@ -728,7 +739,6 @@ const reprintBarcodes = async (req, res) => {
       );
     }
 
-    // (2) ReceiptItem -> StockItem (ผ่าน purchaseOrderReceiptItemId)
     if (recItemIds2.length) {
       const stockItemsByRecItem = await prisma.stockItem.findMany({
         where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds2 } },
@@ -754,11 +764,9 @@ const reprintBarcodes = async (req, res) => {
       const pFromPOChain = poItem?.product || (poItem?.productId ? productMap.get(poItem.productId) : null);
       const p = pStock ?? pPO ?? pFromId ?? pFromPOChain;
 
-      const baseName = p?.name ?? null;
-      const productName = baseName && p?.model ? `${baseName} (${p.model})` : baseName;
-      const productSpec = p?.spec ?? null;
+      const productName = p?.name ?? null;
+      const productSpec = null;
 
-      // ✅ Fallback หา stockItem (id/SN) สำหรับพิมพ์ซ้ำ
       const siFallback = b.stockItemId
         ? null
         : siByBRI.get(b.id) || (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
@@ -799,14 +807,15 @@ const reprintBarcodes = async (req, res) => {
   }
 };
 
-
 // ---- Audit endpoint: ตรวจสภาพบาร์โค้ดของใบรับ (อ่านอย่างเดียว) ----
 // GET /api/barcodes/receipt/:receiptId/audit?includeDetails=1
 const auditReceiptBarcodes = async (req, res) => {
   try {
     const receiptId = toInt(req.params?.receiptId);
     const branchId = toInt(req.user?.branchId);
-    const includeDetails = String(req.query?.includeDetails || '0').toLowerCase() === '1' || String(req.query?.includeDetails || '').toLowerCase() === 'true';
+    const includeDetails =
+      String(req.query?.includeDetails || '0').toLowerCase() === '1' ||
+      String(req.query?.includeDetails || '').toLowerCase() === 'true';
 
     if (!Number.isInteger(receiptId) || !Number.isInteger(branchId)) {
       return res.status(400).json({ message: 'ต้องระบุ receiptId และต้องมีสิทธิ์สาขา' });
@@ -827,7 +836,6 @@ const auditReceiptBarcodes = async (req, res) => {
     });
     const recItemIds = recItems.map((x) => x.id);
 
-    // ถ้าไม่มีรายการ กลับ summary ว่าง
     if (recItemIds.length === 0) {
       return res.json({
         receiptId,
@@ -860,12 +868,12 @@ const auditReceiptBarcodes = async (req, res) => {
 
     // 4) สร้างแผนที่นับต่อ receiptItem
     const countMap = {
-      briByItem: new Map(),           // รวมจำนวนบาร์โค้ดต่อ item
-      briSNByItem: new Map(),         // บาร์โค้ดที่ผูก stockItemId
-      briLOTByItem: new Map(),        // บาร์โค้ดที่ผูก simpleLotId
-      siByItem: new Map(),            // stock items ต่อ item
-      slByItem: new Map(),            // simple lots ต่อ item
-      briSamplesByItem: new Map(),    // ตัวอย่าง barcode
+      briByItem: new Map(),
+      briSNByItem: new Map(),
+      briLOTByItem: new Map(),
+      siByItem: new Map(),
+      slByItem: new Map(),
+      briSamplesByItem: new Map(),
     };
 
     const inc = (m, k, v = 1) => m.set(k, (m.get(k) || 0) + v);
@@ -884,14 +892,22 @@ const auditReceiptBarcodes = async (req, res) => {
     for (const l of simpleLots) inc(countMap.slByItem, l.receiptItemId, 1);
 
     // 5) สรุปผลต่อใบ + หา anomalies
-    let structuredItems = 0, structuredStock = 0, structuredBarcodes = 0;
-    let simpleItems = 0, simpleLotsCount = 0, simpleBarcodes = 0;
-    let mixedItems = 0, unknownItems = 0;
+    let structuredItems = 0,
+      structuredStock = 0,
+      structuredBarcodes = 0;
+    let simpleItems = 0,
+      simpleLotsCount = 0,
+      simpleBarcodes = 0;
+    let mixedItems = 0,
+      unknownItems = 0;
 
     const anomalies = [];
     const addAnomaly = (type, itemId, info) => {
       let an = anomalies.find((a) => a.type === type);
-      if (!an) { an = { type, count: 0, examples: [] }; anomalies.push(an); }
+      if (!an) {
+        an = { type, count: 0, examples: [] };
+        anomalies.push(an);
+      }
       an.count += 1;
       if (an.examples.length < 10) an.examples.push({ receiptItemId: itemId, ...info });
     };
@@ -906,8 +922,8 @@ const auditReceiptBarcodes = async (req, res) => {
       const briSN = countMap.briSNByItem.get(id) || 0;
       const briLOT = countMap.briLOTByItem.get(id) || 0;
 
-      const isStructured = si > 0 || briSN > 0; // มี stockItem หรือมีบาร์โค้ดที่ผูก stockItem
-      const isSimple = sl > 0 || (briLOT > 0 && !isStructured); // มี lot หรือมีบาร์โค้ดที่ผูก lot (และไม่ใช่ structured แล้ว)
+      const isStructured = si > 0 || briSN > 0;
+      const isSimple = sl > 0 || (briLOT > 0 && !isStructured);
 
       if (isStructured && isSimple) mixedItems += 1;
       if (!isStructured && !isSimple) unknownItems += 1;
@@ -916,8 +932,12 @@ const auditReceiptBarcodes = async (req, res) => {
         structuredItems += 1;
         structuredStock += si;
         structuredBarcodes += briTotal;
-        // ควรมีบาร์โค้ดเท่ากับจำนวนชิ้น
-        if (si > briTotal) addAnomaly('STRUCTURED_MISSING_SN_BARCODES', id, { stockItems: si, barcodes: briTotal, samples: countMap.briSamplesByItem.get(id) || [] });
+        if (si > briTotal)
+          addAnomaly('STRUCTURED_MISSING_SN_BARCODES', id, {
+            stockItems: si,
+            barcodes: briTotal,
+            samples: countMap.briSamplesByItem.get(id) || [],
+          });
         if (briLOT > 0) addAnomaly('STRUCTURED_HAS_LOT_BARCODES', id, { lotBarcodes: briLOT });
       }
 
@@ -925,9 +945,13 @@ const auditReceiptBarcodes = async (req, res) => {
         simpleItems += 1;
         simpleLotsCount += sl;
         simpleBarcodes += briTotal;
-        // ปกติ 1 lot → 1 barcode แถวเดียว (ก่อนคิด qtyLabels)
         if (sl > 0 && briTotal === 0) addAnomaly('SIMPLE_MISSING_LOT_BARCODES', id, { simpleLots: sl });
-        if (sl > 0 && briTotal > sl) addAnomaly('SIMPLE_HAS_MULTIPLE_BARCODES', id, { simpleLots: sl, barcodes: briTotal, samples: countMap.briSamplesByItem.get(id) || [] });
+        if (sl > 0 && briTotal > sl)
+          addAnomaly('SIMPLE_HAS_MULTIPLE_BARCODES', id, {
+            simpleLots: sl,
+            barcodes: briTotal,
+            samples: countMap.briSamplesByItem.get(id) || [],
+          });
         if (briSN > 0) addAnomaly('SIMPLE_HAS_SN_BARCODES', id, { snBarcodes: briSN });
       }
 
@@ -951,7 +975,7 @@ const auditReceiptBarcodes = async (req, res) => {
       }
     }
 
-    const payload = {
+    return res.json({
       receiptId,
       summary: {
         structured: { items: structuredItems, stockItems: structuredStock, barcodes: structuredBarcodes },
@@ -961,15 +985,12 @@ const auditReceiptBarcodes = async (req, res) => {
       },
       anomalies,
       details: includeDetails ? details : undefined,
-    };
-
-    return res.json(payload);
+    });
   } catch (error) {
     console.error('[auditReceiptBarcodes] ❌', error);
     return res.status(500).json({ message: 'ไม่สามารถตรวจสอบสถานะบาร์โค้ดได้' });
   }
 };
-
 
 // GET /api/barcodes/receipts-ready-to-scan-sn
 // รายการใบรับที่มี SN และยังมี SN ที่ไม่ได้ยิงเข้าสต๊อก (stockItemId=null)
@@ -983,7 +1004,6 @@ const getReceiptsReadyToScanSN = async (req, res) => {
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where: {
         branchId,
-        // ต้องมี SN อย่างน้อย 1 แถว (รองรับข้อมูลเก่าที่ kind อาจว่าง โดยดู stockItemId ด้วย)
         barcodeReceiptItem: { some: { OR: [{ kind: 'SN' }, { stockItemId: { not: null } }] } },
       },
       include: {
@@ -996,7 +1016,7 @@ const getReceiptsReadyToScanSN = async (req, res) => {
 
     const rows = receipts
       .map((r) => {
-        const isSN = (i) => (i.kind === 'SN') || (i.stockItemId != null && !i.simpleLotId);
+        const isSN = (i) => i.kind === 'SN' || (i.stockItemId != null && !i.simpleLotId);
         const totalSN = r.barcodeReceiptItem.filter(isSN).length;
         const scannedSN = r.barcodeReceiptItem.filter((i) => isSN(i) && i.stockItemId != null).length;
         const pendingSN = Math.max(0, totalSN - scannedSN);
@@ -1042,8 +1062,8 @@ const getReceiptsReadyToScan = async (req, res) => {
     const rows = receipts
       .map((r) => {
         const items = r.barcodeReceiptItem || [];
-        const isSN = (i) => (i.kind === 'SN') || (i.stockItemId != null && !i.simpleLotId);
-        const isLOT = (i) => (i.kind === 'LOT') || (i.simpleLotId != null);
+        const isSN = (i) => i.kind === 'SN' || (i.stockItemId != null && !i.simpleLotId);
+        const isLOT = (i) => i.kind === 'LOT' || i.simpleLotId != null;
 
         const totalSN = items.filter(isSN).length;
         const scannedSN = items.filter((i) => isSN(i) && i.stockItemId != null).length;
@@ -1082,7 +1102,7 @@ const getReceiptsReadyToScan = async (req, res) => {
 module.exports = {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
-  getReceiptsWithBarcodes,  
+  getReceiptsWithBarcodes,
   reprintBarcodes,
   searchReprintReceipts,
   markReceiptAsCompleted,
@@ -1090,17 +1110,4 @@ module.exports = {
   auditReceiptBarcodes,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
-  };
-
-
-
-
-
-
-
-
-
-
-
-
-
+};

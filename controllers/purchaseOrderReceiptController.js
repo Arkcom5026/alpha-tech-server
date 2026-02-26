@@ -1,4 +1,6 @@
 
+
+
 // purchaseOrderReceiptController.js
 
 const dayjs = require('dayjs');
@@ -82,8 +84,8 @@ const createPurchaseOrderReceipt = async (req, res) => {
       return res.status(400).json({ error: 'ข้อมูลไม่ครบ (purchaseOrderId/branchId/employeeId)' });
     }
 
-    const po = await prisma.purchaseOrder.findUnique({
-      where: { id: purchaseOrderId },
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id: purchaseOrderId, branchId },
       select: {
         id: true,
         branchId: true,
@@ -225,7 +227,8 @@ const getPurchaseOrderReceiptById = async (req, res) => {
                 product: {
                   select: {
                     name: true,
-                    productTemplate: { select: { unit: { select: { name: true } } } },
+                    unit: { select: { name: true } },
+                    template: { select: { unit: { select: { name: true } } } },
                   },
                 },
               },
@@ -275,7 +278,10 @@ const getPurchaseOrderReceiptById = async (req, res) => {
         id: item.id,
         quantity: item.quantity,
         productName: item.purchaseOrderItem.product.name,
-        unitName: item.purchaseOrderItem.product.productTemplate?.unit?.name || 'N/A',
+        unitName:
+          item.purchaseOrderItem.product.unit?.name ||
+          item.purchaseOrderItem.product.template?.unit?.name ||
+          'N/A',
       })),
     };
 
@@ -349,7 +355,21 @@ const getPurchaseOrderDetailById = async (req, res) => {
       where: { id, branchId },
       include: {
         supplier: true,
-        items: { include: { product: true, receiptItems: true } },
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                productType: true,
+                brand: true,
+                productProfile: true,
+                template: true,
+                unit: true,
+              },
+            },
+            receiptItems: true,
+          },
+        },
       },
     });
 
@@ -443,8 +463,8 @@ const getReceiptBarcodeSummaries = async (req, res) => {
     });
 
     const summaries = receipts.map((receipt) => {
-      const total = receipt.items.reduce((sum, item) => sum + item.quantity, 0);
-      const generated = receipt.items.reduce((sum, item) => sum + item.stockItems.length, 0);
+      const total = receipt.items.reduce((sum, item) => sum + toNum(item.quantity), 0);
+      const generated = receipt.items.reduce((sum, item) => sum + (item.stockItems?.length || 0), 0);
       
       
 
@@ -880,13 +900,23 @@ const commitReceipt = async (req, res) => {
 
         if (mode === 'SIMPLE') {
           // 1) Create SimpleLot (one per item) and link barcode kind LOT
+          const lotCodes = await tx.barcodeReceiptItem.findMany({
+            where: { receiptItemId: it.id, kind: 'LOT', branchId },
+            orderBy: { runningNumber: 'asc' },
+            select: { barcode: true },
+          });
+          if (!lotCodes.length) throw new Error('ไม่พบ LOT barcode สำหรับรายการนี้');
+
           const lot = await tx.simpleLot.create({
             data: {
               branchId,
               productId: product.id,
-              qtyInitial: it.quantity,
-              status: 'ACTIVE',
               receiptItem: { connect: { id: it.id } },
+              barcode: lotCodes[0].barcode,
+              qtyInitial: it.quantity,
+              qtyRemaining: it.quantity,
+              unitCost: it.costPrice,
+              status: 'ACTIVE',
             },
           });
 
@@ -992,7 +1022,6 @@ module.exports = {
   printReceipt,
   commitReceipt,
 };
-
 
 
 

@@ -9,6 +9,7 @@
 
 
 
+
 // controllers/purchaseOrderController.js
 const { Prisma } = require('@prisma/client');
 const { prisma } = require('../lib/prisma');
@@ -125,23 +126,59 @@ const getPurchaseOrderById = async (req, res) => {
       where: { id, branchId },
       include: {
         supplier: true,
-        items: { include: { product: { select: { id: true, name: true } } } },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                category: { select: { name: true } },
+                productType: { select: { name: true } },
+                brand: { select: { name: true } },
+                productProfile: { select: { name: true } },
+                template: {
+                  select: {
+                    name: true,
+                    unit: { select: { name: true } },
+                  },
+                },
+                unit: { select: { name: true } },
+              },
+            },
+            // ✅ Prisma schema จริงใช้ relation ชื่อ receipts (ไม่ใช่ receiptItems)
+            // ใช้แค่ quantity สำหรับคำนวณ receivedQuantity
+            receipts: { select: { id: true, quantity: true } },
+          },
+        },
       },
     });
 
     if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
 
-    // ✅ alias แบบปลอดภัย (ไม่พังแม้ไม่ได้ include chain)
+    // ✅ normalize ให้ FE ใช้คอลัมน์ได้ครบ + กันพังแบบ minimal disruption
     const normalized = {
       ...po,
       items: (po.items || []).map((it) => {
         const p = it.product || {};
+
+        // receivedQuantity = sum of receipt quantities
+        const receivedQuantity = (it.receipts || []).reduce((sum, r) => sum + toNum(r.quantity), 0);
+
         return {
           ...it,
-          categoryName: null,
-          productTypeName: null,
-          productProfileName: null,
-          productTemplateName: null,
+          // ✅ alias เผื่อ FE เดิมยังอ้าง receiptItems
+          receiptItems: it.receipts || [],
+          receivedQuantity,
+
+          // flatten names for table
+          categoryName: p.category?.name ?? null,
+          productTypeName: p.productType?.name ?? null,
+          brandName: p.brand?.name ?? null,
+          productProfileName: p.productProfile?.name ?? null,
+          productTemplateName: p.template?.name ?? null,
+          unitName: p.unit?.name ?? p.template?.unit?.name ?? null,
+
+          // keep legacy fields
           productModel: null,
           productName: p.name ?? null,
         };
@@ -472,6 +509,31 @@ module.exports = {
   getPurchaseOrdersBySupplier,
   createPurchaseOrderWithAdvance,
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,6 +1,7 @@
 
 
 
+
 // ✅ StockItemController.js — จัดการ SN/Barcode และรายการสินค้าเข้าสต๊อก (มาตรฐาน Prisma singleton + Branch scope + Decimal-safe)
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -424,6 +425,14 @@ const searchStockItem = async (req, res) => {
     const branchId = toInt(req.user?.branchId);
     if (!query || !branchId) return res.status(400).json({ error: 'Missing query or branchId' });
 
+    // ✅ หลีกเลี่ยง 304/ETag ใน endpoint ค้นหาบาร์โค้ด (ต้องการผลสดทุกครั้ง)
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+      'Surrogate-Control': 'no-store',
+    });
+
     // ✅ 1) Exact match (barcode / serialNumber) แบบไม่กรอง status เพื่อแยกเคส SOLD ได้
     const exact = await prisma.stockItem.findFirst({
       where: {
@@ -454,6 +463,7 @@ const searchStockItem = async (req, res) => {
       return res.json([
         {
           ...exact,
+          stockItemId: exact.id,
           prices: {
             retail: toNum(bp?.priceRetail),
             wholesale: toNum(bp?.priceWholesale),
@@ -464,14 +474,91 @@ const searchStockItem = async (req, res) => {
       ]);
     }
 
+    // ✅ 1.5) Exact match (LOT barcode) — สำหรับสินค้า SIMPLE
+    // - BarcodeReceiptItem.kind=LOT (หรือมี simpleLotId) และ status ต้องเป็น SN_RECEIVED (พร้อมขาย)
+    // - คืน payload รูปแบบ array 1 ตัว เพื่อให้ FE ใช้งานได้เหมือนเดิม (แต่มี kind/qtyRemaining เพิ่ม)
+    const lotBarcode = await prisma.barcodeReceiptItem.findUnique({
+      where: { barcode: String(query) },
+      include: {
+        simpleLot: true,
+        receiptItem: {
+          include: {
+            receipt: true,
+            product: true,
+            purchaseOrderItem: { include: { product: true } },
+          },
+        },
+      },
+    });
+
+    if (lotBarcode) {
+      // Branch scope
+      if (toInt(lotBarcode.branchId) !== branchId) {
+        return res.status(404).json({ code: 'BARCODE_NOT_FOUND', message: 'ไม่พบบาร์โค้ด/สินค้าในระบบ' });
+      }
+
+      const isLOT = lotBarcode.kind === 'LOT' || lotBarcode.simpleLotId != null;
+      if (isLOT) {
+        // ต้องสแกนรับเข้า (SN_RECEIVED) ก่อนถึงจะขายได้
+        if (lotBarcode.status !== 'SN_RECEIVED') {
+          return res.status(409).json({
+            code: 'BARCODE_NOT_SELLABLE',
+            status: lotBarcode.status,
+            message: `ล็อตนี้ยังไม่พร้อมขาย (สถานะ: ${lotBarcode.status})`,
+          });
+        }
+
+        const product = lotBarcode.receiptItem?.product || lotBarcode.receiptItem?.purchaseOrderItem?.product;
+        if (!product) {
+          return res.status(400).json({ code: 'LOT_PRODUCT_MISSING', message: 'ไม่พบข้อมูลสินค้าในบาร์โค้ดล็อต' });
+        }
+
+        const qtyRemaining = lotBarcode.simpleLot ? toNum(lotBarcode.simpleLot.qtyRemaining) : toNum(lotBarcode.receiptItem?.quantity);
+        if (!qtyRemaining || qtyRemaining <= 0) {
+          return res.status(409).json({
+            code: 'LOT_EMPTY',
+            message: 'ล็อตนี้ไม่มีจำนวนคงเหลือให้ขายแล้ว',
+          });
+        }
+
+        const bp = await prisma.branchPrice.findFirst({
+          where: { branchId, productId: product.id },
+          select: { productId: true, priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true },
+        });
+
+        return res.json([
+          {
+            kind: 'LOT',
+            stockItemId: null,
+            barcode: lotBarcode.barcode,
+            simpleLotId: lotBarcode.simpleLotId || lotBarcode.simpleLot?.id || null,
+            productId: product.id,
+            product,
+            qtyRemaining,
+            prices: {
+              retail: toNum(bp?.priceRetail),
+              wholesale: toNum(bp?.priceWholesale),
+              technician: toNum(bp?.priceTechnician),
+              online: toNum(bp?.priceOnline),
+            },
+          },
+        ]);
+      }
+    }
+
     // ✅ 2) ไม่ใช่ exact barcode/SN → ค้นหาแบบเดิม (เฉพาะ IN_STOCK)
+    // NOTE: schema ปัจจุบันของ AlphaTech (P1) ไม่มี product.code / product.barcode
+    // จึงค้นหาแบบ safe โดยใช้:
+    // - product.name (fuzzy)
+    // - stockItem.barcode / stockItem.serialNumber (contains) เผื่อกรณีพิมพ์มาไม่ครบ/มี prefix
     const stockItems = await prisma.stockItem.findMany({
       where: {
         status: 'IN_STOCK',
         branchId,
         OR: [
           { product: { name: { contains: query, mode: 'insensitive' } } },
-          { product: { model: { contains: query, mode: 'insensitive' } } },
+          { barcode: { contains: query } },
+          { serialNumber: { contains: query } },
         ],
       },
       include: { product: true },
@@ -495,6 +582,7 @@ const searchStockItem = async (req, res) => {
       const bp = priceMap.get(item.productId);
       return {
         ...item,
+        stockItemId: item.id,
         prices: {
           retail: toNum(bp?.priceRetail),
           wholesale: toNum(bp?.priceWholesale),
@@ -554,8 +642,11 @@ const getAvailableStockItemsByProduct = async (req, res) => {
     }
 
     const items = await prisma.stockItem.findMany({
-      where: { productId, branchId, status: 'IN_STOCK' },
-      orderBy: { receivedAt: 'asc' },
+      where: {
+        branchId,
+        productId,
+        status: 'IN_STOCK',
+      },
       select: {
         id: true,
         barcode: true,
@@ -566,10 +657,7 @@ const getAvailableStockItemsByProduct = async (req, res) => {
         product: {
           select: {
             name: true,
-            model: true,
-            brand: true,
-            code: true,
-            barcode: true,
+            brand: { select: { name: true } },
             productProfile: { select: { name: true } },
             productType: { select: { name: true } },
             category: { select: { name: true } },
@@ -577,6 +665,8 @@ const getAvailableStockItemsByProduct = async (req, res) => {
           },
         },
       },
+      orderBy: { id: 'asc' },
+      take: 200,
     });
 
     return res.json(items);
@@ -598,6 +688,8 @@ module.exports = {
   updateSerialNumber,
   getAvailableStockItemsByProduct,
 };
+
+
 
 
 
