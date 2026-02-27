@@ -1,3 +1,5 @@
+
+
 generator client {
   provider = "prisma-client-js"
   // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
@@ -467,7 +469,7 @@ model Category {
   isSystem Boolean @default(false)
 
   productTypes ProductType[]
-
+  
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   Product   Product[]
@@ -480,6 +482,8 @@ model ProductType {
   normalizedName String?
   active         Boolean @default(true)
 
+  typeBrands ProductTypeBrand[]
+
   guideExamples String[] @default([])
   pathCached    String?
 
@@ -487,6 +491,7 @@ model ProductType {
 
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId Int?
+
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -566,6 +571,7 @@ model Brand {
   active         Boolean @default(true)
 
   products Product[]
+  typeBrands ProductTypeBrand[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -574,6 +580,23 @@ model Brand {
   @@index([active])
   @@index([name])
 }
+
+
+model ProductTypeBrand {
+  id            Int      @id @default(autoincrement())
+  productTypeId Int
+  brandId       Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  productType ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+  brand       Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([productTypeId, brandId])
+  @@index([productTypeId])
+  @@index([brandId])
+}
+
 
 model Product {
   id   Int    @id @default(autoincrement())
@@ -646,6 +669,7 @@ model Product {
   @@index([brandId])
   @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
 }
+
 
 model BranchPrice {
   id Int @id @default(autoincrement())
@@ -1560,5 +1584,8 @@ model SaleReturnItemSimple {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+
+
 
 

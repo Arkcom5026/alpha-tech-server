@@ -60,6 +60,56 @@ exports.listBrands = async (req, res) => {
   }
 }
 
+// GET /brands/dropdowns?includeInactive=false&q=...&productTypeId=123
+// - For dropdown usage (no pagination)
+// - Returns array only (lighter payload)
+// - Assistive filter by productTypeId (auto-learn mapping)
+//   - If mapping exists for productTypeId → filter brands by mapping
+//   - If mapping does NOT exist yet → fallback to all brands (avoid blocking user)
+exports.listBrandDropdowns = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    const includeInactive = String(req.query.includeInactive || 'false') === 'true'
+    const productTypeId = toInt(req.query.productTypeId)
+
+    const whereBase = {
+      ...(includeInactive ? {} : { active: true }),
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+    }
+
+    let where = whereBase
+
+    // ✅ Assistive filter: only apply when mapping exists
+    if (productTypeId) {
+      const mapCount = await prisma.productTypeBrand.count({
+        where: { productTypeId: Number(productTypeId) },
+      })
+
+      if (mapCount > 0) {
+        // Requires Prisma back-relation: Brand.typeBrands -> ProductTypeBrand[]
+        where = {
+          ...whereBase,
+          typeBrands: {
+            some: { productTypeId: Number(productTypeId) },
+          },
+        }
+      }
+      // else fallback to whereBase (no filter)
+    }
+
+    const items = await prisma.brand.findMany({
+      where,
+      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      select: { id: true, name: true, active: true },
+    })
+
+    // Return array only (as contract for dropdown)
+    return res.json(items)
+  } catch (err) {
+    return sendError(res, err, 'เกิดข้อผิดพลาดในการดึงข้อมูลแบรนด์สำหรับ dropdown')
+  }
+}
+
 // POST /brands { name }
 exports.createBrand = async (req, res) => {
   try {
@@ -146,6 +196,9 @@ exports.toggleBrand = async (req, res) => {
     return sendError(res, err, 'ไม่สามารถเปลี่ยนสถานะแบรนด์ได้')
   }
 }
+
+
+
 
 
 

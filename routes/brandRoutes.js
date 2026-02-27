@@ -1,11 +1,15 @@
 
 
+
+
+
 // routes/brandRoutes.js
 const express = require('express')
 const router = express.Router()
 
 const {
   listBrands,
+  listBrandDropdowns,
   createBrand,
   updateBrand,
   toggleBrand,
@@ -39,12 +43,15 @@ if (typeof updateBrand !== 'function') {
 if (typeof toggleBrand !== 'function') {
   throw new Error('[brandRoutes] toggleBrand is not a function — check controllers/brandController export')
 }
+if (typeof listBrandDropdowns !== 'function') {
+  throw new Error('[brandRoutes] listBrandDropdowns is not a function — check controllers/brandController export')
+}
 
 // ✅ server.js mount แล้วที่: app.use('/api/brands', brandRoutes)
 
 // ===== Dropdowns (ใช้ใน Product Create / Filter)
 // ใช้แค่ verifyToken พอ (employee/admin ใช้ได้)
-router.get('/dropdowns', verifyToken, listBrands)
+router.get('/dropdowns', verifyToken, listBrandDropdowns)
 
 // ✅ READ (Brand เป็นข้อมูลกลาง → employee/admin/superadmin อ่านได้)
 const normalizeRole = (r) => String(r || '').trim().toLowerCase()
@@ -71,7 +78,5 @@ router.put('/:id', verifyToken, requireAdmin, updateBrand)
 router.patch('/:id/toggle', verifyToken, requireAdmin, toggleBrand)
 
 module.exports = router
-
-
 
 

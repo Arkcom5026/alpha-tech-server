@@ -1,6 +1,9 @@
 
 
 
+
+
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -23,6 +26,31 @@ const normStr = (s) => (s == null ? '' : String(s)).trim()
 const toDec = (v, fallback = 0) => (v === '' || v === null || v === undefined ? fallback : Number(v))
 const toDecUndef = (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
 
+// Auto-learn: create mapping Brand ↔ ProductType (idempotent)
+// - only when both ids are present
+// - non-fatal: must not break main product flow
+// - implementation: create + catch P2002 (avoid relying on compound key name)
+const autoLearnProductTypeBrand = async (db, productTypeId, brandId) => {
+  const ptId = toInt(productTypeId)
+  const brId = toInt(brandId)
+  if (!ptId || !brId) return
+
+  try {
+    await db.productTypeBrand.create({
+      data: {
+        productTypeId: ptId,
+        brandId: brId,
+      },
+    })
+  } catch (e) {
+    // P2002 = unique constraint (already learned) → ignore
+    if (e?.code === 'P2002') return
+
+    // other errors → log but do not break product flow
+    console.warn('⚠️ autoLearnProductTypeBrand failed (non-fatal):', e?.message || e)
+  }
+}
+
 const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
   const exp = explicitMode ? String(explicitMode).toUpperCase() : undefined
   const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
@@ -42,7 +70,7 @@ const assertTypeAndCategory = async ({ productTypeId, categoryId }, db = prisma)
     return { ok: false, error: 'PRODUCT_TYPE_REQUIRED' }
   }
 
-    const t = await db.productType.findUnique({
+  const t = await db.productType.findUnique({
     where: { id: Number(productTypeId) },
     select: { id: true, categoryId: true },
   })
@@ -63,7 +91,7 @@ const assertProfileMatchesType = async ({ productProfileId, productTypeId }, db 
   if (productProfileId === undefined) return { ok: true, productProfileId: undefined }
   if (productProfileId === null) return { ok: true, productProfileId: null }
 
-    const p = await db.productProfile.findUnique({
+  const p = await db.productProfile.findUnique({
     where: { id: Number(productProfileId) },
     select: { id: true },
   })
@@ -81,7 +109,7 @@ const assertTemplateMatchesType = async ({ templateId, productTypeId }, db = pri
   if (templateId === undefined) return { ok: true, templateId: undefined, productProfileIdFromTemplate: undefined }
   if (templateId === null) return { ok: true, templateId: null, productProfileIdFromTemplate: null }
 
-    const tpl = await db.productTemplate.findUnique({
+  const tpl = await db.productTemplate.findUnique({
     where: { id: Number(templateId) },
     select: { id: true, productProfileId: true },
   })
@@ -309,10 +337,10 @@ const getProductsForPos = async (req, res) => {
 
   if (search) {
     whereAND.push({
-        OR: [
-          { name: { contains: String(search), mode: 'insensitive' } },
-        ],
-      })
+      OR: [
+        { name: { contains: String(search), mode: 'insensitive' } },
+      ],
+    })
   }
 
   const catId = toInt(categoryId)
@@ -845,21 +873,23 @@ const getProductOnlineById = async (req, res) => {
 const getProductDropdowns = async (req, res) => {
   try {
     const includeInactive = String(req.query?.includeInactive ?? 'false').toLowerCase() === 'true'
-
-    const [cats, types, profiles, templatesRaw, brandsRaw] = await Promise.all([
+    const [cats, types, profiles, templatesRaw, brandsRaw, productTypeBrandsRaw] = await Promise.all([
       prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.productType.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, categoryId: true } }),
       prisma.productProfile.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-
       prisma.productTemplate.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, productProfileId: true } }),
-
+    
       // ✅ Brands are GLOBAL (ข้อมูลกลาง ใช้ทุกสาขา)
       prisma.brand.findMany({
-        where: {
-          ...(includeInactive ? {} : { active: true }),
-        },
+        where: includeInactive ? {} : { active: true },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, active: true },
+      }),
+    
+      // ✅ ProductTypeBrand mapping (GLOBAL)
+      prisma.productTypeBrand.findMany({
+        orderBy: [{ productTypeId: 'asc' }, { brandId: 'asc' }],
+        select: { productTypeId: true, brandId: true },
       }),
     ])
 
@@ -867,12 +897,16 @@ const getProductDropdowns = async (req, res) => {
     const productTypes = types.map((t) => ({ id: Number(t.id), name: t.name, categoryId: Number(t.categoryId) }))
     const productProfiles = profiles.map((p) => ({ id: Number(p.id), name: p.name }))
 
-        const productTemplates = templatesRaw.map((tp) => ({
+    const productTemplates = templatesRaw.map((tp) => ({
       id: Number(tp.id),
       name: tp.name,
       productProfileId: (tp.productProfileId == null ? null : Number(tp.productProfileId)),
     }))
     const brands = (brandsRaw || []).map((b) => ({ id: Number(b.id), name: b.name, active: !!b.active }))
+    const productTypeBrands = (productTypeBrandsRaw || []).map((x) => ({
+      productTypeId: Number(x.productTypeId),
+      brandId: Number(x.brandId),
+    }))
 
     const productModes = [
       { code: 'SIMPLE', name: 'Simple' },
@@ -885,6 +919,7 @@ const getProductDropdowns = async (req, res) => {
       productProfiles,
       productTemplates,
       brands,
+      productTypeBrands,
       productModes,
       templates: productTemplates,
     })
@@ -939,6 +974,7 @@ const createProduct = async (req, res) => {
         : (tplCheck.productProfileIdFromTemplate !== undefined ? tplCheck.productProfileIdFromTemplate : undefined)
     )
 
+
     const newProduct = await prisma.product.create({
       data: {
         name,
@@ -958,19 +994,23 @@ const createProduct = async (req, res) => {
 
         productImages: Array.isArray(data.images) && data.images.length > 0
           ? {
-              create: data.images.map((img) => ({
-                url: img.url,
-                public_id: img.public_id,
-                secure_url: img.secure_url,
-                caption: img.caption || null,
-                isCover: !!img.isCover,
-                active: true,
-              })),
-            }
+            create: data.images.map((img) => ({
+              url: img.url,
+              public_id: img.public_id,
+              secure_url: img.secure_url,
+              caption: img.caption || null,
+              isCover: !!img.isCover,
+              active: true,
+            })),
+          }
           : undefined,
       },
       select: { id: true },
     })
+
+    // ✅ auto-learn mapping (non-fatal)
+    await autoLearnProductTypeBrand(prisma, typeCheck.productTypeId, data.brandId)
+
 
     const bp = data.branchPrice || {}
     await prisma.branchPrice.upsert({
@@ -1017,16 +1057,16 @@ const updateProduct = async (req, res) => {
     const branchId = Number(req.user?.branchId)
     if (!branchId) return res.status(401).json({ error: 'unauthorized' })
 
-        // Only override mode/noSN/trackSerialNumber when client explicitly sends any of them
+    // Only override mode/noSN/trackSerialNumber when client explicitly sends any of them
     const shouldOverrideMode =
       data.mode !== undefined || data.noSN !== undefined || data.trackSerialNumber !== undefined
 
     const partialMode = shouldOverrideMode
       ? decideMode({
-          explicitMode: data.mode,
-          noSN: data.noSN,
-          trackSerialNumber: data.trackSerialNumber,
-        })
+        explicitMode: data.mode,
+        noSN: data.noSN,
+        trackSerialNumber: data.trackSerialNumber,
+      })
       : null
 
     const result = await prisma.$transaction(async (tx) => {
@@ -1043,7 +1083,7 @@ const updateProduct = async (req, res) => {
       // If not being changed, still validate incoming categoryId (if provided) matches existing type category.
       const effectiveTypeId = incomingTypeId ?? current.productTypeId
 
-            const typeCheck = await assertTypeAndCategory({
+      const typeCheck = await assertTypeAndCategory({
         productTypeId: effectiveTypeId,
         categoryId: (incomingCatId ?? undefined),
       }, tx)
@@ -1058,10 +1098,10 @@ const updateProduct = async (req, res) => {
         ? undefined
         : (incomingTemplateIdRaw === null ? null : toInt(incomingTemplateIdRaw))
 
-            const profCheck = await assertProfileMatchesType({ productProfileId: incomingProfileId, productTypeId: typeCheck.productTypeId }, tx)
+      const profCheck = await assertProfileMatchesType({ productProfileId: incomingProfileId, productTypeId: typeCheck.productTypeId }, tx)
       if (!profCheck.ok) throw Object.assign(new Error(profCheck.error), { status: 400, code: profCheck.error })
 
-            const tplCheck = await assertTemplateMatchesType({ templateId: incomingTemplateId, productTypeId: typeCheck.productTypeId }, tx)
+      const tplCheck = await assertTemplateMatchesType({ templateId: incomingTemplateId, productTypeId: typeCheck.productTypeId }, tx)
       if (!tplCheck.ok) throw Object.assign(new Error(tplCheck.error), { status: 400, code: tplCheck.error })
 
       // If template is provided and profile is not explicitly provided, auto-fill profile from template.
@@ -1075,10 +1115,10 @@ const updateProduct = async (req, res) => {
           name: data.name != null ? normStr(data.name) : undefined,
           ...(partialMode
             ? {
-                mode: partialMode.mode,
-                trackSerialNumber: partialMode.trackSerialNumber,
-                noSN: partialMode.noSN,
-              }
+              mode: partialMode.mode,
+              trackSerialNumber: partialMode.trackSerialNumber,
+              noSN: partialMode.noSN,
+            }
             : {}),
           active: typeof data.active === 'boolean' ? data.active : undefined,
 
@@ -1096,6 +1136,12 @@ const updateProduct = async (req, res) => {
         },
         select: { id: true },
       })
+
+      // ✅ auto-learn mapping inside transaction (atomic with product update)
+      // Learn only when brandId was explicitly provided and is not null/empty
+      if (data.brandId !== undefined && data.brandId !== null && data.brandId !== '') {
+        await autoLearnProductTypeBrand(tx, typeCheck.productTypeId, data.brandId)
+      }
 
       if (data.branchPrice) {
         const bp = data.branchPrice || {}
@@ -1290,6 +1336,10 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
+
+
 
 
 
