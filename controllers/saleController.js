@@ -1,3 +1,5 @@
+
+
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -113,6 +115,7 @@ const createSale = async (req, res) => {
     let isCreditSale = false;
     let paidStatus = false;
     let paidAtDate = null;
+    let soldAtDate = null;
     let dueDate = null;
     let customerSaleType = 'NORMAL';
 
@@ -135,7 +138,11 @@ const createSale = async (req, res) => {
       isCreditSale = true;
       saleStatus = CREDIT_SALE_STATUS; // Backward-compatible default: DRAFT
       paidStatus = false;
+      soldAtDate = null;
     } else {
+      // ขายสด: ถือว่ามีการขายเกิดขึ้นแล้ว → เซ็ต soldAt เสมอ (ช่วย sorting/printing)
+      soldAtDate = new Date();
+
       if (STRICT_COMPLETED_REQUIRES_PAYMENT && !ENABLE_PAYMENT_AUTOCREATE) {
         // ยังไม่สร้าง Payment อัตโนมัติ → ยังไม่ควร mark เป็น COMPLETED
         saleStatus = 'FINALIZED';
@@ -175,6 +182,7 @@ const createSale = async (req, res) => {
             data: {
               code,
               status: saleStatus,
+              soldAt: soldAtDate,
               isCredit: isCreditSale,
               paid: paidStatus,
               paidAt: paidAtDate,
@@ -323,7 +331,9 @@ const getSaleById = async (req, res) => {
     });
 
     if (!sale) return res.status(404).json({ error: 'Sale not found' });
-    if (sale.branchId !== req.user?.branchId) return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
+    if (Number(sale.branchId) !== Number(req.user?.branchId)) {
+      return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
+    }
 
     // Fetch payments separately (schema-safe)
     const payments = await prisma.payment.findMany({ where: { saleId: id }, include: { items: true }, orderBy: { receivedAt: 'asc' } });
@@ -472,6 +482,10 @@ module.exports = {
   searchPrintableSales,
 
 };
+
+
+
+
 
 
 

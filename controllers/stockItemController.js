@@ -2,8 +2,17 @@
 
 
 
+
+
+
+
+
+
 // ✅ StockItemController.js — จัดการ SN/Barcode และรายการสินค้าเข้าสต๊อก (มาตรฐาน Prisma singleton + Branch scope + Decimal-safe)
-const { prisma, Prisma } = require('../lib/prisma');
+// Prisma (defensive import: support both { prisma, Prisma } export or prisma-only export)
+const prismaModule = require('../lib/prisma');
+const prisma = prismaModule?.prisma || prismaModule;
+const { Prisma } = require('@prisma/client');
 
 // Helpers
 const D = (v) => (v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0));
@@ -274,11 +283,19 @@ const receiveStockItem = async (req, res) => {
     const { barcode: barcodeData } = req.body || {};
 
     if (!branchIdFromUser) return res.status(401).json({ error: 'unauthorized' });
-    if (!barcodeData || typeof barcodeData !== 'object') {
-      return res.status(400).json({ error: 'Invalid barcode payload.' });
-    }
 
-    const { barcode, serialNumber } = barcodeData;
+    // ✅ Accept both payload styles (Minimal Disruption):
+    // 1) { barcode: { barcode: '...', serialNumber?: '...' } }
+    // 2) { barcode: '...' }
+    const normalized =
+      barcodeData && typeof barcodeData === 'object'
+        ? { barcode: barcodeData.barcode, serialNumber: barcodeData.serialNumber }
+        : { barcode: barcodeData, serialNumber: undefined };
+
+    const { barcode, serialNumber } = normalized;
+    if (!barcode || typeof barcode !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid barcode.' });
+    }
     if (!barcode || typeof barcode !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid barcode.' });
     }
@@ -366,9 +383,11 @@ const receiveStockItem = async (req, res) => {
     // SN: ตรวจซ้ำ + สร้าง StockItem รายชิ้น
     if (barcodeItem.stockItemId) return res.status(200).json({ message: 'Item already received', stockItemId: barcodeItem.stockItemId });
 
-    // กัน barcode ซ้ำใน stockItem อีกชั้น
+    // กัน barcode ซ้ำใน stockItem อีกชั้น (idempotent-friendly)
     const dup = await prisma.stockItem.findUnique({ where: { barcode: String(barcode) } });
-    if (dup) return res.status(400).json({ error: 'This barcode already exists in stockItem.' });
+    if (dup) {
+      return res.status(200).json({ message: 'Item already received', stockItemId: dup.id });
+    }
 
     const newStockItem = await prisma.$transaction(async (tx) => {
       const created = await tx.stockItem.create({
@@ -688,6 +707,8 @@ module.exports = {
   updateSerialNumber,
   getAvailableStockItemsByProduct,
 };
+
+
 
 
 

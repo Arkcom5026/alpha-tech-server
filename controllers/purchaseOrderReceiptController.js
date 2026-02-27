@@ -1,6 +1,11 @@
 
 
 
+
+
+
+
+
 // purchaseOrderReceiptController.js
 
 const dayjs = require('dayjs');
@@ -491,12 +496,18 @@ const getReceiptBarcodeSummaries = async (req, res) => {
 };
 
 // ---- Auto finalize when all SNs generated ----
+// ✅ Helper: finalize receipt (idempotent + safe)
 const finalizePurchaseOrderReceiptIfNeeded = async (receiptId) => {
   const receipt = await prisma.purchaseOrderReceipt.findUnique({
     where: { id: receiptId },
-    select: { id: true, purchaseOrderId: true },
+    select: { id: true, purchaseOrderId: true, statusReceipt: true },
   });
   if (!receipt) return;
+
+  // ✅ idempotent guard — ถ้าจบแล้วไม่ต้องทำอะไร
+  if (String(receipt.statusReceipt || '').toUpperCase() === 'COMPLETED') {
+    return;
+  }
 
   // ใช้สถานะจาก barcodeReceiptItem ทั้ง SN & LOT
   const pending = await getReceiptPendingCounts(prisma, receiptId);
@@ -562,7 +573,7 @@ const finalizeReceiptController = async (req, res) => {
     return res.status(200).json({ success: true, poStatus: result.poStatus });
   } catch (err) {
     console.error('❌ finalizeReceiptController error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to finalize receipt.' });
+    return res.status(500).json({ message: 'Failed to finalize receipt.' });
   }
 };
 
@@ -1022,6 +1033,8 @@ module.exports = {
   printReceipt,
   commitReceipt,
 };
+
+
 
 
 

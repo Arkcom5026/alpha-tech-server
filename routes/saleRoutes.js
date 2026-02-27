@@ -1,3 +1,5 @@
+//server/routes/saleRoutes.js
+
 const express = require("express");
 const router = express.Router();
 
@@ -19,7 +21,7 @@ router.post("/", createSale);
 // ✅ GET /api/sales
 router.get("/", getAllSales);
 
-// ✅ GET /api/sales-ruturn
+// ✅ GET /api/sales-return
 router.get("/return", getAllSalesReturn);
 
 router.get('/printable-sales', searchPrintableSales);
@@ -30,7 +32,12 @@ router.get("/:id", getSaleById);
 
 router.post("/:id/mark-paid", markSaleAsPaid);
 
-router.post("/return", markSaleAsPaid);
+// 🚫 ห้ามใช้ /return สำหรับ mark-paid (กันยิงผิด intent ใน production)
+// หมายเหตุ: ถ้าจะทำ flow คืนสินค้า ให้สร้าง controller/route แยก เช่น POST /return (returnSale)
 
 
 module.exports = router;
+
+
+
+

@@ -1,3 +1,8 @@
+
+
+
+
+
 // ✅ stockItemRoutes.js — จัดการ Routing สำหรับ StockItem (SN / Barcode)
 
 const express = require('express');
@@ -55,5 +60,10 @@ router.post('/receive', normalizeReceivePayload, receiveStockItem);
 router.patch('/update-sn/:barcode', updateSerialNumber);
 
 module.exports = router;
+
+
+
+
+
 
 

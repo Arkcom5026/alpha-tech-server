@@ -1,3 +1,6 @@
+
+
+
 // src/controllers/barcodeController.js
 
 // 👉 Helper
@@ -209,6 +212,9 @@ const getBarcodesByReceiptId = async (req, res) => {
         select: {
           id: true,
           serialNumber: true,
+          status: true,
+          soldAt: true,
+          saleItem: { select: { id: true } },
           productId: true,
           product: { select: { id: true, name: true } },
         },
@@ -309,7 +315,18 @@ const getBarcodesByReceiptId = async (req, res) => {
     if (briIds2.length) {
       const briLinks2 = await prisma.barcodeReceiptItem.findMany({
         where: { id: { in: briIds2 }, branchId, stockItemId: { not: null } },
-        select: { id: true, stockItem: { select: { id: true, serialNumber: true } } },
+        select: {
+            id: true,
+            stockItem: {
+              select: {
+                id: true,
+                serialNumber: true,
+                status: true,
+                soldAt: true,
+                saleItem: { select: { id: true } },
+              },
+            },
+          },
       });
       siByBRI = new Map(
         briLinks2
@@ -322,7 +339,7 @@ const getBarcodesByReceiptId = async (req, res) => {
     if (recItemIds2.length) {
       const stockItemsByRecItem = await prisma.stockItem.findMany({
         where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds2 } },
-        select: { id: true, serialNumber: true, purchaseOrderReceiptItemId: true },
+        select: { id: true, serialNumber: true, status: true, soldAt: true, saleItem: { select: { id: true } }, purchaseOrderReceiptItemId: true },
       });
       siByReceiptItem = new Map(
         stockItemsByRecItem
@@ -355,6 +372,11 @@ const getBarcodesByReceiptId = async (req, res) => {
       const stockItemId = b.stockItemId ?? siFallback?.id ?? null;
       const serialNumber = b.stockItem?.serialNumber ?? siFallback?.serialNumber ?? null;
 
+      // ✅ Status source of truth: DB stockItem.status (direct) → fallback stockItem.status → null
+      const stockItemStatus = b.stockItem?.status ?? siFallback?.status ?? null;
+      const stockItemSoldAt = b.stockItem?.soldAt ?? siFallback?.soldAt ?? null;
+      const stockItemSaleItemId = b.stockItem?.saleItem?.id ?? siFallback?.saleItem?.id ?? null;
+
       const kind = b.kind ?? (b.stockItemId ? 'SN' : b.simpleLotId ? 'LOT' : null);
 
       // 👉 Suggest number of duplicate labels for LOT (print convenience)
@@ -368,6 +390,10 @@ const getBarcodesByReceiptId = async (req, res) => {
         printed: !!b.printed,
         kind,
         status: b.status || null,
+        // StockItem truth (for scan UI)
+        stockItemStatus,
+        stockItemSoldAt,
+        stockItemSaleItemId,
         stockItemId,
         simpleLotId: b.simpleLotId ?? null,
         receiptItemId: b.receiptItemId ?? null,
@@ -789,6 +815,10 @@ const reprintBarcodes = async (req, res) => {
         id: b.id,
         barcode: b.barcode,
         printed: !!b.printed,
+        // StockItem truth (for scan/reprint UI)
+        stockItemStatus: b.stockItem?.status ?? null,
+        stockItemSoldAt: b.stockItem?.soldAt ?? null,
+        stockItemSaleItemId: b.stockItem?.saleItem?.id ?? null,
         stockItemId,
         serialNumber,
         productId: p?.id ?? b.stockItem?.productId ?? b.receiptItem?.purchaseOrderItem?.productId ?? null,
@@ -1111,3 +1141,6 @@ module.exports = {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
 };
+
+
+
