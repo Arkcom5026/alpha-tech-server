@@ -1,3 +1,4 @@
+
 // routes/paymentRoutes.js
 const express = require('express');
 const router = express.Router();
@@ -15,3 +16,4 @@ router.get('/printable', searchPrintablePayments);     // ✅ แสดงรา
 router.post('/cancel', cancelPayment);                 // ✅ ยกเลิกรายการชำระเงิน
 
 module.exports = router;
+

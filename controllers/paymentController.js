@@ -1,3 +1,4 @@
+
 // controllers/paymentController.js
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -195,7 +196,8 @@ const searchPrintablePayments = async (req, res) => {
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
     const { keyword = '', fromDate, toDate, limit: limitRaw } = req.query;
-    const limit = Math.min(parseInt(limitRaw, 10) || 100, 500);
+    const limitParsed = parseInt(limitRaw, 10);
+    const limit = Math.min(Math.max(limitParsed || 100, 1), 500);
 
     const fromRange = fromDate ? toLocalRange(fromDate) : null;
     const toRange = toDate ? toLocalRange(toDate) : null;
@@ -203,26 +205,39 @@ const searchPrintablePayments = async (req, res) => {
     const where = {
       // ❌ ห้ามส่ง branchId จาก FE — ใช้ branchId จาก req.user เท่านั้น
       branchId,
-      isCancelled: false,    // ✅ ตัดการชำระที่ถูกยกเลิก
+      isCancelled: false, // ✅ ตัดการชำระที่ถูกยกเลิก
+
+      // ✅ keyword search (payment.code / combinedDocumentCode / sale.code / customer)
+      ...(keyword
+        ? {
+            OR: [
+              { code: { contains: keyword, mode: 'insensitive' } },
+              { combinedDocumentCode: { contains: keyword, mode: 'insensitive' } },
+              { note: { contains: keyword, mode: 'insensitive' } },
+              { sale: { is: { code: { contains: keyword, mode: 'insensitive' } } } },
+              { sale: { is: { customer: { name: { contains: keyword, mode: 'insensitive' } } } } },
+              { sale: { is: { customer: { companyName: { contains: keyword, mode: 'insensitive' } } } } },
+              // optional (if schema has customer.phone)
+              { sale: { is: { customer: { phone: { contains: keyword, mode: 'insensitive' } } } } },
+            ],
+          }
+        : {}),
+
       sale: {
         is: {
           status: { not: 'CANCELLED' },
           branchId, // ✅ ยืนยันว่า Sale อยู่สาขาเดียวกัน
-          ...(keyword ? {
-            OR: [
-              { code:        { contains: keyword, mode: 'insensitive' } },
-              { customer: {  name:        { contains: keyword, mode: 'insensitive' } } },
-              { customer: {  companyName: { contains: keyword, mode: 'insensitive' } } },
-            ],
-          } : {}),
         },
       },
-      ...(fromRange || toRange ? {
-        receivedAt: {
-          ...(fromRange ? { gte: fromRange.start } : {}),
-          ...(toRange ? { lte: toRange.end } : {}),
-        },
-      } : {}),
+
+      ...(fromRange || toRange
+        ? {
+            receivedAt: {
+              ...(fromRange ? { gte: fromRange.start } : {}),
+              ...(toRange ? { lte: toRange.end } : {}),
+            },
+          }
+        : {}),
     };
 
     const payments = await prisma.payment.findMany({
@@ -343,6 +358,7 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
+
 
 
 

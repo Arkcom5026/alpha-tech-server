@@ -1,3 +1,4 @@
+
 //server/routes/saleRoutes.js
 
 const express = require("express");
@@ -37,6 +38,9 @@ router.post("/:id/mark-paid", markSaleAsPaid);
 
 
 module.exports = router;
+
+
+
 
 
 

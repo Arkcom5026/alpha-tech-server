@@ -335,14 +335,33 @@ const getSaleById = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
-    // Fetch payments separately (schema-safe)
-    const payments = await prisma.payment.findMany({ where: { saleId: id }, include: { items: true }, orderBy: { receivedAt: 'asc' } });
+    // ✅ NEW: query flags (backward-compatible)
+    const includePayments = String(req.query?.includePayments ?? '1') !== '0';
+    const requestedPaymentId = req.query?.paymentId != null ? String(req.query.paymentId) : '';
+
+    let payments = [];
+    if (includePayments) {
+      payments = await prisma.payment.findMany({
+        where: { saleId: id },
+        include: { items: true },
+        orderBy: { receivedAt: 'asc' },
+      });
+
+      // ✅ optional: move requested payment to front (no shape change)
+      if (requestedPaymentId && Array.isArray(payments) && payments.length > 1) {
+        payments = payments.slice().sort((a, b) => {
+          const ax = String(a?.id) === requestedPaymentId ? -1 : 0;
+          const bx = String(b?.id) === requestedPaymentId ? -1 : 0;
+          return ax - bx;
+        });
+      }
+    }
 
     const response = normalizeSaleMoney({ ...sale, payments });
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     console.error('❌ [getSaleById] error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
