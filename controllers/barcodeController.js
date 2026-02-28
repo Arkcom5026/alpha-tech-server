@@ -1,7 +1,15 @@
 
 
 
-// src/controllers/barcodeController.js
+
+
+
+
+
+
+
+
+// server/controllers/barcodeController.js
 
 // 👉 Helper
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
@@ -199,6 +207,11 @@ const getBarcodesByReceiptId = async (req, res) => {
     const onlyUnscanned = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnscanned || '0').toLowerCase());
     const onlyUnactivated = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnactivated || '0').toLowerCase());
 
+    // ✅ includeFallback (default: false)
+    // - scan UI ต้องถือว่า "สแกนแล้ว" เฉพาะแถวที่มี stockItemId จริงเท่านั้น
+    // - fallback นี้อนุญาตเฉพาะงาน reprint/audit ที่ต้องแสดง serialNumber จาก receiptItem แบบ best-effort
+    const includeFallback = ['1', 'true', 'yes'].includes(String(req.query?.includeFallback || '0').toLowerCase());
+
     // ✅ Ensure barcodes exist first (auto-generate only if receipt has zero BRI at all)
     // ใช้ findFirst แทน count เพื่อลด latency
     const anyExisting = await prisma.barcodeReceiptItem.findFirst({
@@ -209,7 +222,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       await _generateMissingBarcodesForReceipt(receiptId, branchId, { dryRun: false, lotLabelPerLot: 1 });
     }
 
-    // ✅ Include เฉพาะสิ่งที่ UI ต้องใช้จริง ลด query/fallback chain
+    // ✅ ลด join หนัก: ไม่ include product ใน query หลัก (จะไป resolve ชื่อด้วย productMap ทีหลัง)
     const includeTree = {
       stockItem: {
         select: {
@@ -219,7 +232,6 @@ const getBarcodesByReceiptId = async (req, res) => {
           soldAt: true,
           saleItem: { select: { id: true } },
           productId: true,
-          product: { select: { id: true, name: true } },
         },
       },
       receiptItem: {
@@ -231,7 +243,6 @@ const getBarcodesByReceiptId = async (req, res) => {
             select: {
               id: true,
               productId: true,
-              product: { select: { id: true, name: true } },
             },
           },
         },
@@ -252,11 +263,27 @@ const getBarcodesByReceiptId = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
-    // ✅ Fallback (เฉพาะกรณี edge): ReceiptItem -> StockItem
-    // NOTE: ถ้า 1 receiptItem มีหลาย StockItem, map นี้จะเก็บตัวอย่างตัวแรกเท่านั้น (พอสำหรับแสดงในตาราง)
-    const recItemIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
+    // ✅ Resolve product names via batch map (faster than join)
+    const productIdSet = new Set();
+    for (const r of rows) {
+      if (r?.stockItem?.productId) productIdSet.add(r.stockItem.productId);
+      const pid = r?.receiptItem?.purchaseOrderItem?.productId;
+      if (pid) productIdSet.add(pid);
+    }
+    let productMap = new Map();
+    if (productIdSet.size) {
+      const products = await prisma.product.findMany({
+        where: { id: { in: Array.from(productIdSet) } },
+        select: { id: true, name: true },
+      });
+      productMap = new Map(products.map((p) => [p.id, p]));
+    }
+
+    // ✅ Fallback (optional): ReceiptItem -> StockItem
+    // ⚠️ ห้ามใช้กับ scan UI เพราะจะทำให้เหมือน "ยิง 1 แล้วเด้งครบ" (ghost link)
+    const recItemIds = includeFallback ? Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean))) : [];
     let siByReceiptItem = new Map();
-    if (recItemIds.length) {
+    if (includeFallback && recItemIds.length) {
       const stockItemsByRecItem = await prisma.stockItem.findMany({
         where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds } },
         select: {
@@ -266,6 +293,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           soldAt: true,
           saleItem: { select: { id: true } },
           purchaseOrderReceiptItemId: true,
+          productId: true,
         },
       });
       for (const s of stockItemsByRecItem) {
@@ -275,19 +303,23 @@ const getBarcodesByReceiptId = async (req, res) => {
       }
     }
 
+
     const barcodes = rows.map((b) => {
-      // ✅ Product source of truth: stockItem.product → PO item product
-      const pStock = b.stockItem?.product ?? null;
-      const pPO = b.receiptItem?.purchaseOrderItem?.product ?? null;
-      const p = pStock ?? pPO;
+      // ✅ Product source of truth: stockItem.productId → PO item productId
+      const pidStock = b.stockItem?.productId ?? null;
+      const pidPO = b.receiptItem?.purchaseOrderItem?.productId ?? null;
+      const pid = pidStock ?? pidPO;
+      const p = pid ? productMap.get(pid) : null;
 
       const productName = p?.name ?? null;
       const productSpec = null; // schema: no Product.spec
 
       // ✅ Fallback หา stockItem (id/SN/status) เมื่อ BRI ยังไม่ผูก stockItemId แต่มี stockItem อยู่แล้ว
+      // ✅ Scan truth: "สแกนแล้ว" ต้องมี b.stockItemId จริงเท่านั้น
+      // includeFallback=1 ใช้เฉพาะ reprint/audit (best-effort)
       const siFallback = b.stockItemId
         ? null
-        : b.stockItem ?? (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
+        : b.stockItem ?? (includeFallback && b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
 
       const stockItemId = b.stockItemId ?? siFallback?.id ?? null;
       const serialNumber = b.stockItem?.serialNumber ?? siFallback?.serialNumber ?? null;
@@ -317,11 +349,7 @@ const getBarcodesByReceiptId = async (req, res) => {
         simpleLotId: b.simpleLotId ?? null,
         receiptItemId: b.receiptItemId ?? null,
         serialNumber,
-        productId:
-          p?.id ??
-          b.stockItem?.productId ??
-          b.receiptItem?.purchaseOrderItem?.productId ??
-          null,
+        productId: pid ?? null,
         productName,
         productSpec,
         qtyLabelsSuggested,
@@ -335,6 +363,117 @@ const getBarcodesByReceiptId = async (req, res) => {
   } catch (error) {
     console.error('[getBarcodesByReceiptId] ❌', error);
     return res.status(500).json({ message: 'ไม่สามารถดึงบาร์โค้ดได้' });
+  }
+};
+
+// ✅ NEW: GET /api/barcodes/print-batch?ids=458,451
+// เร็วกว่าแบบยิงทีละใบ เพราะรวม query และ resolve productName แบบ batch
+const getBarcodesForPrintBatch = async (req, res) => {
+  const branchId = toInt(req.user?.branchId);
+  const raw = String(req.query?.ids || '').trim();
+
+  if (!Number.isInteger(branchId)) {
+    return res.status(400).json({ message: 'ต้องมีสิทธิ์สาขา' });
+  }
+  if (!raw) {
+    return res.status(400).json({ message: 'กรุณาระบุ ids เช่น ?ids=458,451' });
+  }
+
+  const ids = raw
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => Number(x))
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  if (!ids.length) {
+    return res.status(400).json({ message: 'ids ไม่ถูกต้อง' });
+  }
+
+  try {
+    // 1) Ensure barcodes exist for receipts that have none (bulk check first)
+    const existing = await prisma.barcodeReceiptItem.findMany({
+      where: { branchId, purchaseOrderReceiptId: { in: ids } },
+      select: { purchaseOrderReceiptId: true },
+      distinct: ['purchaseOrderReceiptId'],
+    });
+    const have = new Set(existing.map((x) => x.purchaseOrderReceiptId));
+    const missingIds = ids.filter((id) => !have.has(id));
+    for (const rid of missingIds) {
+      await _generateMissingBarcodesForReceipt(rid, branchId, { dryRun: false, lotLabelPerLot: 1 });
+    }
+
+    // 2) Pull minimal graph (NO product join)
+    const rows = await prisma.barcodeReceiptItem.findMany({
+      where: { branchId, purchaseOrderReceiptId: { in: ids } },
+      select: {
+        id: true,
+        barcode: true,
+        printed: true,
+        kind: true,
+        status: true,
+        purchaseOrderReceiptId: true,
+        receiptItemId: true,
+        simpleLotId: true,
+        stockItemId: true,
+        stockItem: { select: { productId: true } },
+        receiptItem: {
+          select: {
+            quantity: true,
+            purchaseOrderItem: { select: { productId: true } },
+          },
+        },
+      },
+      orderBy: [{ purchaseOrderReceiptId: 'asc' }, { id: 'asc' }],
+    });
+
+    // 3) Resolve productName via batch productMap
+    const productIdSet = new Set();
+    for (const r of rows) {
+      if (r?.stockItem?.productId) productIdSet.add(r.stockItem.productId);
+      const pid = r?.receiptItem?.purchaseOrderItem?.productId;
+      if (pid) productIdSet.add(pid);
+    }
+
+    let productMap = new Map();
+    if (productIdSet.size) {
+      const products = await prisma.product.findMany({
+        where: { id: { in: Array.from(productIdSet) } },
+        select: { id: true, name: true },
+      });
+      productMap = new Map(products.map((p) => [p.id, p]));
+    }
+
+    const out = rows.map((b) => {
+      const pidStock = b.stockItem?.productId ?? null;
+      const pidPO = b.receiptItem?.purchaseOrderItem?.productId ?? null;
+      const productId = pidStock ?? pidPO;
+      const productName = productId ? productMap.get(productId)?.name ?? null : null;
+
+      const kind = b.kind ?? (b.stockItemId ? 'SN' : b.simpleLotId ? 'LOT' : null);
+      const qty = Number(b.receiptItem?.quantity || 0);
+      const qtyLabelsSuggested = kind === 'LOT' ? Math.max(1, qty || 1) : 1;
+
+      return {
+        receiptId: b.purchaseOrderReceiptId,
+        id: b.id,
+        barcode: b.barcode,
+        printed: !!b.printed,
+        kind,
+        status: b.status || null,
+        productId: productId ?? null,
+        productName,
+        qtyLabelsSuggested,
+      };
+    });
+
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    return res.status(200).json({ success: true, count: out.length, barcodes: out });
+  } catch (error) {
+    console.error('[getBarcodesForPrintBatch] ❌', error);
+    return res.status(500).json({ message: 'ไม่สามารถดึงบาร์โค้ดสำหรับพิมพ์แบบ batch ได้' });
   }
 };
 
@@ -597,13 +736,13 @@ const reprintBarcodes = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบใบรับในสาขาของคุณ' });
     }
 
+    // ✅ ลด join หนัก: ไม่ include product ใน query หลัก
     const includeTree = {
       stockItem: {
         select: {
           id: true,
           serialNumber: true,
           productId: true,
-          product: { select: { id: true, name: true } },
         },
       },
       receiptItem: {
@@ -611,7 +750,6 @@ const reprintBarcodes = async (req, res) => {
           purchaseOrderItem: {
             select: {
               productId: true,
-              product: { select: { id: true, name: true } },
             },
           },
         },
@@ -624,14 +762,12 @@ const reprintBarcodes = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
-    // ✅ ทำ product map แบบเดียวกับด้านบน
+    // ✅ ทำ product map แบบเดียวกับด้านบน (batch fetch)
     const idSet = new Set();
     for (const b of items) {
       const s = b.stockItem;
       const poi = b.receiptItem?.purchaseOrderItem;
-      if (s?.product?.id) idSet.add(s.product.id);
       if (s?.productId) idSet.add(s.productId);
-      if (poi?.product?.id) idSet.add(poi.product.id);
       if (poi?.productId) idSet.add(poi.productId);
     }
     let productMap = new Map();
@@ -701,8 +837,8 @@ const reprintBarcodes = async (req, res) => {
     }
 
     const barcodes = items.map((b) => {
-      const pStock = b.stockItem?.product ?? null;
-      const pPO = b.receiptItem?.purchaseOrderItem?.product ?? null;
+      const pStock = null;
+      const pPO = null;
       const pFromId =
         (b.stockItem?.productId && productMap.get(b.stockItem.productId)) ||
         (b.receiptItem?.purchaseOrderItem?.productId && productMap.get(b.receiptItem.purchaseOrderItem.productId)) ||
@@ -1053,17 +1189,26 @@ const getReceiptsReadyToScan = async (req, res) => {
 };
 
 module.exports = {
+  // generate / list
   generateMissingBarcodes,
   getBarcodesByReceiptId,
+  getBarcodesForPrintBatch,
+
+  // print queue / reprint
   getReceiptsWithBarcodes,
   reprintBarcodes,
   searchReprintReceipts,
+
+  // status updates
   markReceiptAsCompleted,
   markBarcodesAsPrinted,
+
+  // audit / scan queues
   auditReceiptBarcodes,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
 };
+
 
 
 

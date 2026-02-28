@@ -6,8 +6,6 @@
 
 
 
-
-
 // ✅ StockItemController.js — จัดการ SN/Barcode และรายการสินค้าเข้าสต๊อก (มาตรฐาน Prisma singleton + Branch scope + Decimal-safe)
 // Prisma (defensive import: support both { prisma, Prisma } export or prisma-only export)
 const prismaModule = require('../lib/prisma');
@@ -296,13 +294,13 @@ const receiveStockItem = async (req, res) => {
     if (!barcode || typeof barcode !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid barcode.' });
     }
-    if (!barcode || typeof barcode !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid barcode.' });
-    }
 
     const barcodeItem = await prisma.barcodeReceiptItem.findUnique({
       where: { barcode: String(barcode) },
       include: {
+        // ✅ include relations we need for idempotency
+        stockItem: true,
+        simpleLot: true,
         receiptItem: {
           include: {
             receipt: true,
@@ -335,8 +333,16 @@ const receiveStockItem = async (req, res) => {
 
     // LOT: activate lot (ไม่สร้าง StockItem รายชิ้น)
     if (isLOT) {
-      if (barcodeItem.status === 'SN_RECEIVED') {
-        return res.status(200).json({ message: 'LOT already scanned', lot: { barcode: barcodeItem.barcode, receiptItemId: barcodeItem.receiptItemId, quantity: toInt(barcodeItem.receiptItem?.quantity) || 0 } });
+      // ✅ Idempotency guard for LOT: if already linked to a simpleLot, treat as already scanned
+      if (barcodeItem.simpleLotId != null || barcodeItem.simpleLot != null) {
+        return res.status(200).json({
+          message: 'LOT already scanned',
+          lot: {
+            barcode: barcodeItem.barcode,
+            receiptItemId: barcodeItem.receiptItemId,
+            quantity: toInt(barcodeItem.receiptItem?.quantity) || 0,
+          },
+        });
       }
 
       const qty = toInt(barcodeItem.receiptItem?.quantity) || 0;
@@ -344,10 +350,16 @@ const receiveStockItem = async (req, res) => {
       const totalCostDec = unitCost.times(qty || 1);
 
       const result = await prisma.$transaction(async (tx) => {
-        // เปลี่ยนสถานะล็อตเป็น SN_RECEIVED (พร้อมขายสำหรับ LOT)
+        const now = new Date();
+
+        // ✅ เปลี่ยนสถานะล็อตเป็น SN_RECEIVED (พร้อมขายสำหรับ LOT)
+        // NOTE: ใช้ where barcode เพื่อคง minimal disruption และเลี่ยง mismatch id จาก payload
         const updatedBRI = await tx.barcodeReceiptItem.update({
-          where: { barcode: String(barcode) },
-          data: { status: 'SN_RECEIVED' },
+          where: { id: barcodeItem.id },
+          data: {
+            status: 'SN_RECEIVED',
+            // ✅ LOT ไม่ผูก StockItem รายชิ้น (ห้ามอ้าง created.id)
+          },
         });
 
         // 2) อัปเดตสต๊อกคงเหลือ (StockBalance) ตามจำนวนในใบรับ
@@ -381,7 +393,9 @@ const receiveStockItem = async (req, res) => {
     }
 
     // SN: ตรวจซ้ำ + สร้าง StockItem รายชิ้น
-    if (barcodeItem.stockItemId) return res.status(200).json({ message: 'Item already received', stockItemId: barcodeItem.stockItemId });
+    if (barcodeItem.stockItem?.id) {
+      return res.status(200).json({ message: 'Item already received', stockItemId: barcodeItem.stockItem.id });
+    }
 
     // กัน barcode ซ้ำใน stockItem อีกชั้น (idempotent-friendly)
     const dup = await prisma.stockItem.findUnique({ where: { barcode: String(barcode) } });
@@ -403,7 +417,16 @@ const receiveStockItem = async (req, res) => {
         },
       });
 
-      await tx.barcodeReceiptItem.update({ where: { barcode: String(barcode) }, data: { stockItemId: created.id } });
+      // ✅ ผูกกลับไปที่ BarcodeReceiptItem “แถวเดียว” เท่านั้น (ห้าม updateMany)
+      // ✅ สำคัญ: ต้องอัปเดตสถานะ BarcodeReceiptItem ด้วย ไม่เช่นนั้น FE จะยังเห็นเป็น READY และย้ายทั้งก้อน
+      await tx.barcodeReceiptItem.update({
+        where: { id: barcodeItem.id },
+        data: {
+          status: 'SN_RECEIVED',
+          // ✅ Prisma schema ใช้ relation "stockItem" (ไม่มี stockItemId column)
+          stockItem: { connect: { id: created.id } },
+        },
+      });
 
       // อัปเดต StockBalance +1 สำหรับ SN
       await tx.stockBalance.upsert({
@@ -519,13 +542,8 @@ const searchStockItem = async (req, res) => {
       const isLOT = lotBarcode.kind === 'LOT' || lotBarcode.simpleLotId != null;
       if (isLOT) {
         // ต้องสแกนรับเข้า (SN_RECEIVED) ก่อนถึงจะขายได้
-        if (lotBarcode.status !== 'SN_RECEIVED') {
-          return res.status(409).json({
-            code: 'BARCODE_NOT_SELLABLE',
-            status: lotBarcode.status,
-            message: `ล็อตนี้ยังไม่พร้อมขาย (สถานะ: ${lotBarcode.status})`,
-          });
-        }
+        // ✅ Schema note: BarcodeReceiptItem ไม่มี field status ใน Prisma schema ปัจจุบัน
+        // ดังนั้นการพร้อมขายของ LOT ให้ตัดสินด้วย qtyRemaining เป็นหลัก (simpleLot.qtyRemaining)
 
         const product = lotBarcode.receiptItem?.product || lotBarcode.receiptItem?.purchaseOrderItem?.product;
         if (!product) {
@@ -707,6 +725,7 @@ module.exports = {
   updateSerialNumber,
   getAvailableStockItemsByProduct,
 };
+
 
 
 

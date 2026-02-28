@@ -4,6 +4,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -22,9 +23,20 @@ try {
 // ---------- Helpers ----------
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10))
 const normStr = (s) => (s == null ? '' : String(s)).trim()
-// Decimal normalizers to avoid Prisma decimal parsing errors on empty strings
-const toDec = (v, fallback = 0) => (v === '' || v === null || v === undefined ? fallback : Number(v))
-const toDecUndef = (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+// Decimal normalizers (production-safe)
+// - Prevent NaN from reaching Prisma/Postgres (will abort transaction)
+// - Accept numbers or numeric strings; trims and removes commas
+const toNumSafeUndef = (v) => {
+  if (v === '' || v === null || v === undefined) return undefined
+  const s = (typeof v === 'string') ? v.trim().replace(/,/g, '') : v
+  const n = Number(s)
+  return Number.isFinite(n) ? n : undefined
+}
+const toDec = (v, fallback = 0) => {
+  const n = toNumSafeUndef(v)
+  return n === undefined ? fallback : n
+}
+const toDecUndef = (v) => toNumSafeUndef(v)
 
 // Auto-learn: create mapping Brand ↔ ProductType (idempotent)
 // - only when both ids are present
@@ -52,15 +64,43 @@ const autoLearnProductTypeBrand = async (db, productTypeId, brandId) => {
 }
 
 const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
-  const exp = explicitMode ? String(explicitMode).toUpperCase() : undefined
+  // Presence-aware parsing (critical):
+  // - updateProduct may receive only `noSN` (boolean) or only `trackSerialNumber` from FE.
+  // - Some FE forms may send alias fields like `stockMode` with values: 'SN' | 'NOSN'.
+  // - If client explicitly sends `noSN: false` (meaning "มี SN"), we must NOT fallback to SIMPLE.
+
+  // normalize explicit enum / alias
+  const rawMode = (explicitMode === undefined || explicitMode === null) ? '' : String(explicitMode).trim()
+  const exp = rawMode ? rawMode.toUpperCase() : undefined
+
+  const hasNoSN = noSN !== undefined
+  const hasTrack = trackSerialNumber !== undefined
+
   const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
   const t = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1'
 
-  if (exp === 'SIMPLE') return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  if (exp === 'STRUCTURED') return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-  if (t && !n) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-  if (n && !t) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  if (t && n) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
+  // 1) Explicit enum / alias always wins
+  // Supported aliases from FE/UI:
+  // - 'SN' => STRUCTURED
+  // - 'NOSN' / 'NO_SN' / 'NO-SN' => SIMPLE
+  if (exp === 'SIMPLE' || exp === 'NOSN' || exp === 'NO_SN' || exp === 'NO-SN') {
+    return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
+  }
+  if (exp === 'STRUCTURED' || exp === 'SN') {
+    return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
+  }
+
+  // 2) If any stock flags are explicitly provided, infer from them (presence-aware)
+  if (hasNoSN || hasTrack) {
+    // Prefer STRUCTURED when any hint suggests serial tracking
+    if (t) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
+    if (hasNoSN && n === false) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
+
+    if (hasNoSN && n === true) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
+    if (hasTrack && t === false) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
+  }
+
+  // 3) Default (current baseline)
   return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
 }
 
@@ -954,7 +994,7 @@ const createProduct = async (req, res) => {
     if (!name) return res.status(400).json({ error: 'NAME_REQUIRED' })
 
     const { mode, noSN, trackSerialNumber } = decideMode({
-      explicitMode: data.mode,
+      explicitMode: (data.mode ?? data.stockMode ?? data.stockBehavior),
       noSN: data.noSN,
       trackSerialNumber: data.trackSerialNumber,
     })
@@ -1069,15 +1109,24 @@ const updateProduct = async (req, res) => {
 
     // Only override mode/noSN/trackSerialNumber when client explicitly sends any of them
     const shouldOverrideMode =
-      data.mode !== undefined || data.noSN !== undefined || data.trackSerialNumber !== undefined
+      data.mode !== undefined ||
+      data.stockMode !== undefined ||
+      data.stockBehavior !== undefined ||
+      data.noSN !== undefined ||
+      data.trackSerialNumber !== undefined
 
     const partialMode = shouldOverrideMode
       ? decideMode({
-        explicitMode: data.mode,
+        explicitMode: (data.mode ?? data.stockMode ?? data.stockBehavior),
         noSN: data.noSN,
         trackSerialNumber: data.trackSerialNumber,
       })
       : null
+
+    // ✅ non-fatal auto-learn MUST NOT run inside the main transaction
+    // because ANY failed SQL inside a Postgres transaction will abort the whole transaction (25P02)
+    // even if we catch the error in JS.
+    let learnLater = null
 
     const result = await prisma.$transaction(async (tx) => {
       const current = await tx.product.findUnique({
@@ -1147,10 +1196,10 @@ const updateProduct = async (req, res) => {
         select: { id: true },
       })
 
-      // ✅ auto-learn mapping inside transaction (atomic with product update)
-      // Learn only when brandId was explicitly provided and is not null/empty
+            // ✅ auto-learn mapping (NON-FATAL) — schedule after transaction
+      // IMPORTANT: Do NOT execute inside tx to avoid aborting the whole transaction on any error.
       if (data.brandId !== undefined && data.brandId !== null && data.brandId !== '') {
-        await autoLearnProductTypeBrand(tx, typeCheck.productTypeId, data.brandId)
+        learnLater = { productTypeId: typeCheck.productTypeId, brandId: data.brandId }
       }
 
       if (data.branchPrice) {
@@ -1188,6 +1237,15 @@ const updateProduct = async (req, res) => {
 
       return saved
     }, { timeout: 15000 })
+
+        // ✅ run auto-learn after transaction (non-fatal)
+    if (learnLater?.productTypeId && learnLater?.brandId) {
+      try {
+        await autoLearnProductTypeBrand(prisma, learnLater.productTypeId, learnLater.brandId)
+      } catch (e) {
+        console.warn('⚠️ autoLearnProductTypeBrand failed after tx (non-fatal):', e?.message || e)
+      }
+    }
 
     return res.json(result)
   } catch (error) {
@@ -1346,6 +1404,9 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
+
 
 
 
