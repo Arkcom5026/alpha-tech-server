@@ -367,6 +367,8 @@ model EmployeeProfile {
   stockAuditScanLog       StockAuditScanLog[]
   customerDeposit         CustomerDeposit[]
   PurchaseOrderReceipt    PurchaseOrderReceipt[]
+  inputTaxFilingBatches   InputTaxFilingBatch[]
+  salesTaxFilingBatches   SalesTaxFilingBatch[]
 }
 
 model Branch {
@@ -409,9 +411,11 @@ model Branch {
 
   simpleLots SimpleLot[]
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  stockBalances StockBalance[]
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  stockBalances         StockBalance[]
+  inputTaxFilingBatches InputTaxFilingBatch[]
+  salesTaxFilingBatches SalesTaxFilingBatch[]
 
   @@index([subdistrictCode])
 }
@@ -469,7 +473,7 @@ model Category {
   isSystem Boolean @default(false)
 
   productTypes ProductType[]
-  
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   Product   Product[]
@@ -491,7 +495,6 @@ model ProductType {
 
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId Int?
-
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -570,7 +573,7 @@ model Brand {
   normalizedName String
   active         Boolean @default(true)
 
-  products Product[]
+  products   Product[]
   typeBrands ProductTypeBrand[]
 
   createdAt DateTime @default(now())
@@ -580,7 +583,6 @@ model Brand {
   @@index([active])
   @@index([name])
 }
-
 
 model ProductTypeBrand {
   id            Int      @id @default(autoincrement())
@@ -596,7 +598,6 @@ model ProductTypeBrand {
   @@index([productTypeId])
   @@index([brandId])
 }
-
 
 model Product {
   id   Int    @id @default(autoincrement())
@@ -669,7 +670,6 @@ model Product {
   @@index([brandId])
   @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
 }
-
 
 model BranchPrice {
   id Int @id @default(autoincrement())
@@ -942,10 +942,118 @@ model PurchaseOrderReceipt {
   updatedAt              DateTime                   @updatedAt
   supplierPaymentReceipt SupplierPaymentReceipt[]
 
+  // ✅ Input Tax Filing (Batch) linkage (do NOT store filed status here; use batch items)
+  inputTaxFilingItems InputTaxFilingItem[]
+
   @@index([branchId, receivedAt])
   @@index([purchaseOrderId])
   // Improve query performance by channel/time
   @@index([source, receivedAt])
+}
+
+// =============================
+// Input Tax Filing (Batch)
+// =============================
+
+enum InputTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
+model InputTaxFilingBatch {
+  id       Int    @id @default(autoincrement())
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  // Filing period (Thai VAT filing is monthly)
+  month Int
+  year  Int
+
+  status InputTaxFilingStatus @default(DRAFT)
+  note   String?
+
+  // Who created this filing batch (audit)
+  createdById Int
+  createdBy   EmployeeProfile @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  items InputTaxFilingItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+// =============================
+// Sales Tax Filing (Batch)
+// =============================
+
+enum SalesTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
+model SalesTaxFilingBatch {
+  id Int @id @default(autoincrement())
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int
+
+  // Filing period (monthly)
+  month Int
+  year  Int
+
+  status SalesTaxFilingStatus @default(DRAFT)
+  note   String?
+
+  // Who created this filing batch (audit)
+  createdById Int
+  createdBy   EmployeeProfile @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  items SalesTaxFilingItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+model SalesTaxFilingItem {
+  id Int @id @default(autoincrement())
+
+  batch   SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId Int
+
+  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId Int
+
+  createdAt DateTime @default(now())
+
+  // Prevent duplicates inside the same batch
+  @@unique([batchId, saleId])
+  // Fast lookup: check whether a sale is already included in any batch
+  @@index([saleId])
+}
+
+model InputTaxFilingItem {
+  id Int @id @default(autoincrement())
+
+  batch   InputTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId Int
+
+  receipt                PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderReceiptId Int
+
+  createdAt DateTime @default(now())
+
+  // Prevent duplicates inside the same batch
+  @@unique([batchId, purchaseOrderReceiptId])
+  // Fast lookup: check whether a receipt is already included in any batch
+  @@index([purchaseOrderReceiptId])
 }
 
 model PurchaseOrderReceiptItem {
@@ -1162,6 +1270,7 @@ model Sale {
   combinedBillingId    Int?
   combinedBilling      CombinedBillingDocument? @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
   SaleReturnItemSimple SaleReturnItemSimple[]
+  salesTaxFilingItems  SalesTaxFilingItem[]
 
   @@index([combinedBillingId])
   @@index([branchId, soldAt])
@@ -1584,8 +1693,3 @@ model SaleReturnItemSimple {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
-
-
-
-

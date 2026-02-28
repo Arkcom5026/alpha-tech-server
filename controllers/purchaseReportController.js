@@ -1,4 +1,7 @@
+
+
 // src/controllers/purchaseReportController.js
+/* eslint-env node */
 
 // ✅ Use shared Prisma singleton and Decimal-safe math
 const { prisma, Prisma } = require('../lib/prisma');
@@ -24,9 +27,16 @@ const getPurchaseReport = async (req, res) => {
     }
 
     // ✅ 2) Filters
-    const { dateFrom, dateTo, supplierId, productId, status } = req.query || {};
+    const { dateFrom, dateTo, supplierId, productId, receiptStatus, paymentStatus } = req.query || {};
 
     // ✅ 3) Where clause (ReceiptItem เป็นตารางหลัก)
+    // ✅ 3) Where clause (ReceiptItem เป็นตารางหลัก)
+    // หมายเหตุ: ใบรับมีได้ 2 แบบ
+    // - PO: supplier อยู่ที่ receipt.purchaseOrder.supplier
+    // - QUICK: supplier อยู่ที่ receipt.supplier
+    // เราจึงต้องใช้ OR เพื่อรองรับทั้งสองแบบ และยังต้องตัด supplier ระบบ
+    const supplierIdInt = toInt(supplierId);
+
     const whereClause = {
       receipt: {
         branchId,
@@ -34,15 +44,29 @@ const getPurchaseReport = async (req, res) => {
           gte: dateFrom ? startOfDay(dateFrom) : undefined,
           lte: dateTo ? endOfDay(dateTo) : undefined,
         },
-        purchaseOrder: {
-          supplierId: toInt(supplierId),
-          status: status || undefined, // สถานะของ PO (ถ้า FE ส่งมา)
-          supplier: { isSystem: false }, // ❌ ตัดใบรับจาก supplier ระบบ
-        },
+        statusReceipt: receiptStatus && receiptStatus !== 'all' ? receiptStatus : undefined,
+        statusPayment: paymentStatus && paymentStatus !== 'all' ? paymentStatus : undefined,
+        OR: [
+          // PO receipts
+          {
+            purchaseOrder: {
+              supplier: {
+                isSystem: false,
+                id: supplierIdInt,
+              },
+            },
+          },
+          // QUICK receipts
+          {
+            supplier: {
+              isSystem: false,
+              id: supplierIdInt,
+            },
+          },
+        ],
       },
-      purchaseOrderItem: {
-        productId: toInt(productId),
-      },
+      // Product filter: รองรับ QUICK ที่ผูก productId ตรง
+      productId: toInt(productId),
     };
 
     // ✅ 4) Query
@@ -52,16 +76,26 @@ const getPurchaseReport = async (req, res) => {
         receipt: {
           include: {
             branch: true,
+            supplier: true,
             purchaseOrder: { include: { supplier: true } },
           },
         },
+        // PO path
         purchaseOrderItem: {
           include: {
             product: {
               include: {
+                unit: true,
                 template: { include: { unit: true } },
               },
             },
+          },
+        },
+        // QUICK path
+        product: {
+          include: {
+            unit: true,
+            template: { include: { unit: true } },
           },
         },
       },
@@ -73,16 +107,26 @@ const getPurchaseReport = async (req, res) => {
       const qtyDec = D(item.quantity);
       const costDec = D(item.costPrice);
       const totalDec = qtyDec.times(costDec);
+
+      const product = item.purchaseOrderItem?.product || item.product;
+      const unitName = product?.unit?.name || product?.template?.unit?.name || 'N/A';
+      const supplierName =
+        item.receipt.purchaseOrder?.supplier?.name ||
+        item.receipt.supplier?.name ||
+        'N/A';
+
       return {
         receiptId: item.receipt.id,
         receiptCode: item.receipt.code,
         receiptDate: item.receipt.receivedAt,
-        poCode: item.receipt.purchaseOrder.code,
-        supplierName: item.receipt.purchaseOrder.supplier.name,
+        receiptStatus: item.receipt.statusReceipt,
+        paymentStatus: item.receipt.statusPayment,
+        poCode: item.receipt.purchaseOrder?.code || null,
+        supplierName,
         branchName: item.receipt.branch.name,
-        productName: item.purchaseOrderItem.product.name,
+        productName: product?.name || 'N/A',
         quantity: Number(qtyDec),
-        unitName: item.purchaseOrderItem.product.template.unit?.name || 'N/A',
+        unitName,
         costPrice: Number(costDec),
         totalCost: Number(totalDec),
       };
@@ -110,9 +154,10 @@ const getPurchaseReport = async (req, res) => {
         branchId,
         dateFrom: dateFrom ? startOfDay(dateFrom) : null,
         dateTo: dateTo ? endOfDay(dateTo) : null,
-        supplierId: toInt(supplierId) || null,
+        supplierId: supplierIdInt || null,
         productId: toInt(productId) || null,
-        status: status || null,
+        receiptStatus: receiptStatus || null,
+        paymentStatus: paymentStatus || null,
       },
     });
   } catch (error) {
@@ -125,3 +170,11 @@ const getPurchaseReport = async (req, res) => {
 };
 
 module.exports = { getPurchaseReport };
+
+
+
+
+
+
+
+

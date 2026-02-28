@@ -296,6 +296,8 @@ const getAllProducts = async (req, res) => {
   }
 }
 
+
+
 // =====================================================
 // GET: /api/products/pos/search
 // =====================================================
@@ -304,7 +306,9 @@ const getProductsForPos = async (req, res) => {
   if (!branchId) return res.status(401).json({ error: 'unauthorized' })
 
   const {
-    search = '',
+    // NOTE: FE sends `searchText`, legacy may send `search`
+    search: qSearch = '',
+    searchText: qSearchText = '',
     take = 50,
     page = 1,
     categoryId,
@@ -318,6 +322,9 @@ const getProductsForPos = async (req, res) => {
     activeOnly = 'true',
     includeInactive = '0',
   } = req.query
+
+  // ✅ support both `search` and `searchText`
+  const search = String(qSearch || qSearchText || '').trim()
 
   const queryMode = (req?.query?.mode || '').toString().toUpperCase()
   const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'
@@ -516,6 +523,9 @@ const getProductsForPos = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
+
+
+
 
 // =====================================================
 // GET: /api/products/online
