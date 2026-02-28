@@ -199,14 +199,17 @@ const getBarcodesByReceiptId = async (req, res) => {
     const onlyUnscanned = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnscanned || '0').toLowerCase());
     const onlyUnactivated = ['1', 'true', 'yes'].includes(String(req.query?.onlyUnactivated || '0').toLowerCase());
 
-    // Ensure barcodes exist first (auto-generate only if the receipt has zero BRI at all)
-    const totalExisting = await prisma.barcodeReceiptItem.count({
+    // ✅ Ensure barcodes exist first (auto-generate only if receipt has zero BRI at all)
+    // ใช้ findFirst แทน count เพื่อลด latency
+    const anyExisting = await prisma.barcodeReceiptItem.findFirst({
       where: { purchaseOrderReceiptId: receiptId, branchId },
+      select: { id: true },
     });
-    if (totalExisting === 0) {
+    if (!anyExisting) {
       await _generateMissingBarcodesForReceipt(receiptId, branchId, { dryRun: false, lotLabelPerLot: 1 });
     }
 
+    // ✅ Include เฉพาะสิ่งที่ UI ต้องใช้จริง ลด query/fallback chain
     const includeTree = {
       stockItem: {
         select: {
@@ -221,9 +224,12 @@ const getBarcodesByReceiptId = async (req, res) => {
       },
       receiptItem: {
         select: {
+          id: true,
           quantity: true,
+          purchaseOrderItemId: true,
           purchaseOrderItem: {
             select: {
+              id: true,
               productId: true,
               product: { select: { id: true, name: true } },
             },
@@ -246,129 +252,43 @@ const getBarcodesByReceiptId = async (req, res) => {
       orderBy: { id: 'asc' },
     });
 
-    // ✅ ทำ product map
-    const idSet = new Set();
-    for (const b of rows) {
-      const s = b.stockItem;
-      const poi = b.receiptItem?.purchaseOrderItem;
-      if (s?.product?.id) idSet.add(s.product.id);
-      if (s?.productId) idSet.add(s.productId);
-      if (poi?.product?.id) idSet.add(poi.product.id);
-      if (poi?.productId) idSet.add(poi.productId);
-    }
-
-    let productMap = new Map();
-    if (idSet.size > 0) {
-      const products = await prisma.product.findMany({
-        where: { id: { in: Array.from(idSet) } },
-        select: { id: true, name: true },
-      });
-      productMap = new Map(products.map((p) => [p.id, p]));
-    }
-
-    // 🔁 Fallback เพิ่มเติม (ตามเส้นทางที่ระบุ) สำหรับพิมพ์ซ้ำ:
-    // BRI -> PurchaseOrderReceipt -> PurchaseOrder -> PurchaseOrderItem -> Product
-    const receiptPO = await prisma.purchaseOrderReceipt.findFirst({
-      where: { id: receiptId, branchId },
-      select: { purchaseOrderId: true },
-    });
-
-    let poItemMap = new Map();
-    let recToPoMap = new Map();
-    let recQtyMap = new Map();
-
-    if (receiptPO?.purchaseOrderId) {
-      const poItems = await prisma.purchaseOrderItem.findMany({
-        where: { purchaseOrderId: receiptPO.purchaseOrderId },
-        select: { id: true, productId: true, product: { select: { id: true, name: true } } },
-      });
-      poItemMap = new Map(poItems.map((it) => [it.id, it]));
-
-      const recIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
-      if (recIds.length) {
-        const recItems = await prisma.purchaseOrderReceiptItem.findMany({
-          where: { id: { in: recIds } },
-          select: { id: true, purchaseOrderItemId: true, quantity: true },
-        });
-        recToPoMap = new Map(recItems.map((x) => [x.id, x.purchaseOrderItemId]));
-        recQtyMap = new Map(recItems.map((x) => [x.id, Number(x.quantity || 0)]));
-      }
-    } else {
-      const recIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
-      if (recIds.length) {
-        const recItems = await prisma.purchaseOrderReceiptItem.findMany({
-          where: { id: { in: recIds } },
-          select: { id: true, quantity: true },
-        });
-        recQtyMap = new Map(recItems.map((x) => [x.id, Number(x.quantity || 0)]));
-      }
-    }
-
-    // 🔁 Build fallback maps for StockItem
-    const briIds2 = Array.from(new Set(rows.map((r) => r.id).filter(Boolean)));
-    const recItemIds2 = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
-
-    let siByBRI = new Map();
+    // ✅ Fallback (เฉพาะกรณี edge): ReceiptItem -> StockItem
+    // NOTE: ถ้า 1 receiptItem มีหลาย StockItem, map นี้จะเก็บตัวอย่างตัวแรกเท่านั้น (พอสำหรับแสดงในตาราง)
+    const recItemIds = Array.from(new Set(rows.map((r) => r.receiptItemId).filter(Boolean)));
     let siByReceiptItem = new Map();
-
-    // (1) BRI -> StockItem
-    if (briIds2.length) {
-      const briLinks2 = await prisma.barcodeReceiptItem.findMany({
-        where: { id: { in: briIds2 }, branchId, stockItemId: { not: null } },
-        select: {
-            id: true,
-            stockItem: {
-              select: {
-                id: true,
-                serialNumber: true,
-                status: true,
-                soldAt: true,
-                saleItem: { select: { id: true } },
-              },
-            },
-          },
-      });
-      siByBRI = new Map(
-        briLinks2
-          .map((x) => [x.id, x.stockItem])
-          .filter(([k, v]) => k != null && v != null)
-      );
-    }
-
-    // (2) ReceiptItem -> StockItem
-    if (recItemIds2.length) {
+    if (recItemIds.length) {
       const stockItemsByRecItem = await prisma.stockItem.findMany({
-        where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds2 } },
-        select: { id: true, serialNumber: true, status: true, soldAt: true, saleItem: { select: { id: true } }, purchaseOrderReceiptItemId: true },
+        where: { branchId, purchaseOrderReceiptItemId: { in: recItemIds } },
+        select: {
+          id: true,
+          serialNumber: true,
+          status: true,
+          soldAt: true,
+          saleItem: { select: { id: true } },
+          purchaseOrderReceiptItemId: true,
+        },
       });
-      siByReceiptItem = new Map(
-        stockItemsByRecItem
-          .map((s) => [s.purchaseOrderReceiptItemId, s])
-          .filter(([k, v]) => k != null && v != null)
-      );
+      for (const s of stockItemsByRecItem) {
+        if (s?.purchaseOrderReceiptItemId != null && !siByReceiptItem.has(s.purchaseOrderReceiptItemId)) {
+          siByReceiptItem.set(s.purchaseOrderReceiptItemId, s);
+        }
+      }
     }
 
     const barcodes = rows.map((b) => {
+      // ✅ Product source of truth: stockItem.product → PO item product
       const pStock = b.stockItem?.product ?? null;
       const pPO = b.receiptItem?.purchaseOrderItem?.product ?? null;
-      const pFromId =
-        (b.stockItem?.productId && productMap.get(b.stockItem.productId)) ||
-        (b.receiptItem?.purchaseOrderItem?.productId && productMap.get(b.receiptItem.purchaseOrderItem.productId)) ||
-        null;
-
-      const poItemId = recToPoMap.get(b.receiptItemId);
-      const poItem = poItemId ? poItemMap.get(poItemId) : null;
-      const pFromPOChain = poItem?.product || (poItem?.productId ? productMap.get(poItem.productId) : null);
-
-      const p = pStock ?? pPO ?? pFromId ?? pFromPOChain;
+      const p = pStock ?? pPO;
 
       const productName = p?.name ?? null;
       const productSpec = null; // schema: no Product.spec
 
-      // ✅ Fallback หา stockItem (id/SN)
+      // ✅ Fallback หา stockItem (id/SN/status) เมื่อ BRI ยังไม่ผูก stockItemId แต่มี stockItem อยู่แล้ว
       const siFallback = b.stockItemId
         ? null
-        : siByBRI.get(b.id) || (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
+        : b.stockItem ?? (b.receiptItemId ? siByReceiptItem.get(b.receiptItemId) : null);
+
       const stockItemId = b.stockItemId ?? siFallback?.id ?? null;
       const serialNumber = b.stockItem?.serialNumber ?? siFallback?.serialNumber ?? null;
 
@@ -380,9 +300,8 @@ const getBarcodesByReceiptId = async (req, res) => {
       const kind = b.kind ?? (b.stockItemId ? 'SN' : b.simpleLotId ? 'LOT' : null);
 
       // 👉 Suggest number of duplicate labels for LOT (print convenience)
-      const qtyFromInclude = Number(b.receiptItem?.quantity || 0);
-      const qtyFromMap = b.receiptItemId ? recQtyMap.get(b.receiptItemId) || 0 : 0;
-      const qtyLabelsSuggested = kind === 'LOT' ? Math.max(1, qtyFromInclude || qtyFromMap || 1) : 1;
+      const qty = Number(b.receiptItem?.quantity || 0);
+      const qtyLabelsSuggested = kind === 'LOT' ? Math.max(1, qty || 1) : 1;
 
       return {
         id: b.id,
@@ -398,7 +317,11 @@ const getBarcodesByReceiptId = async (req, res) => {
         simpleLotId: b.simpleLotId ?? null,
         receiptItemId: b.receiptItemId ?? null,
         serialNumber,
-        productId: p?.id ?? b.stockItem?.productId ?? b.receiptItem?.purchaseOrderItem?.productId ?? null,
+        productId:
+          p?.id ??
+          b.stockItem?.productId ??
+          b.receiptItem?.purchaseOrderItem?.productId ??
+          null,
         productName,
         productSpec,
         qtyLabelsSuggested,
@@ -1141,6 +1064,9 @@ module.exports = {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
 };
+
+
+
 
 
 
