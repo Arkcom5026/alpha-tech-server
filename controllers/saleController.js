@@ -1,5 +1,9 @@
 
 
+
+
+ 
+
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -78,6 +82,14 @@ const createSale = async (req, res) => {
       note,
       items, // [{ stockItemId, price, discount, basePrice, vatAmount, remark }]
       mode = 'CASH',
+
+      // ✅ Backward-compatible extra fields (FE may send or omit)
+      // - Credit sale: tax invoice must be false (sale-time)
+      isTaxInvoice: isTaxInvoiceFromClient,
+      // - Credit + หน่วยงาน: PRINT (default) | NO_PRINT
+      deliveryNoteMode,
+      // - Optional override; still validated by customer type below
+      saleType: saleTypeFromClient,
     } = req.body;
 
     const branchId = req.user?.branchId;
@@ -88,6 +100,11 @@ const createSale = async (req, res) => {
     }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'ต้องมีรายการสินค้าอย่างน้อยหนึ่งรายการ' });
+    }
+
+    // ✅ Guardrail: เครดิตต้องมีลูกค้า (debtor) เสมอ
+    if (mode === 'CREDIT' && !customerId) {
+      return res.status(400).json({ error: 'การขายแบบเครดิตต้องเลือกชื่อลูกค้าก่อน' });
     }
 
     // Validate money fields (accept number or string)
@@ -115,9 +132,12 @@ const createSale = async (req, res) => {
     let isCreditSale = false;
     let paidStatus = false;
     let paidAtDate = null;
-    let soldAtDate = null;
+    let soldAtDate = new Date();
     let dueDate = null;
     let customerSaleType = 'NORMAL';
+
+    // ✅ tax invoice policy (sale-time): credit sale cannot issue tax invoice
+    const isTaxInvoiceEffective = mode === 'CREDIT' ? false : !!isTaxInvoiceFromClient;
 
     if (customerId) {
       const customerProfile = await prisma.customerProfile.findUnique({
@@ -138,7 +158,8 @@ const createSale = async (req, res) => {
       isCreditSale = true;
       saleStatus = CREDIT_SALE_STATUS; // Backward-compatible default: DRAFT
       paidStatus = false;
-      soldAtDate = null;
+      // ✅ Prisma schema requires soldAt (non-null). For credit sales, use creation time as soldAt.
+      soldAtDate = soldAtDate || new Date();
     } else {
       // ขายสด: ถือว่ามีการขายเกิดขึ้นแล้ว → เซ็ต soldAt เสมอ (ช่วย sorting/printing)
       soldAtDate = new Date();
@@ -187,16 +208,29 @@ const createSale = async (req, res) => {
               paid: paidStatus,
               paidAt: paidAtDate,
               dueDate,
-              customerId,
-              employeeId,
-              branchId,
+              // ✅ Prisma CreateInput: use relation connect (customerId scalar is not accepted here)
+              customer: customerId ? { connect: { id: customerId } } : undefined,
+              // ✅ Prisma relation required: connect employee profile (instead of raw employeeId)
+              employee: { connect: { id: employeeId } },
+              // ✅ Prisma relation required: connect branch (instead of raw branchId)
+              branch: { connect: { id: branchId } },
               totalBeforeDiscount: D(totalBeforeDiscount),
               totalDiscount: D(totalDiscount),
               vat: D(vat),
               vatRate: D(vatRate),
               totalAmount: D(totalAmount),
               note,
-              saleType: customerSaleType,
+              // ✅ allow client to suggest saleType (still bounded by derived customerSaleType)
+              saleType: saleTypeFromClient || customerSaleType,
+
+              // ✅ Credit sale-time: never issue tax invoice
+              isTaxInvoice: isTaxInvoiceEffective,
+
+              // ✅ CREDIT + หน่วยงาน: เอกสารได้แค่ ใบส่งของ หรือไม่พิมพ์
+              // - PRINT (default) -> DN-<sale.code>
+              // - NO_PRINT -> null
+              officialDocumentNumber:
+                isCreditSale && String(deliveryNoteMode || 'PRINT') === 'PRINT' ? `DN-${code}` : null,
               items: {
                 create: items.map((item) => ({
                   stockItemId: item.stockItemId,
@@ -274,41 +308,30 @@ const createSale = async (req, res) => {
 
 const getAllSales = async (req, res) => {
   try {
-    const branchId = req.user?.branchId;
-    const sales = await prisma.sale.findMany({
-      where: { branchId: Number(branchId) },
-      orderBy: { soldAt: 'desc' },
-      include: { items: true },
-    });
-    const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
-    return res.json(normalized);
-  } catch (error) {
-    console.error('❌ [getAllSales] Error:', error);
-    return res.status(500).json({ error: 'ไม่สามารถดึงรายการขายได้' });
-  }
-};
-
-const getAllSalesReturn = async (req, res) => {
-  try {
-    const branchId = req.user?.branchId;
-
+    const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
+    const limitRaw = req.query?.limit;
+    const limitParsed = parseInt(limitRaw, 10);
+    const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 200, 1), 500);
+
     const sales = await prisma.sale.findMany({
-      where: { branchId: Number(branchId) },
-      orderBy: { soldAt: 'desc' },
+      where: {
+        branchId,
+        status: { not: 'CANCELLED' },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
       include: {
         customer: true,
-        items: {
-          include: { stockItem: { include: { product: true } } },
-        },
+        employee: true,
       },
     });
 
     const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
     return res.json(normalized);
   } catch (error) {
-    console.error('❌ [getAllSalesReturn] Error:', error);
+    console.error('❌ [getAllSales] Error:', error);
     return res.status(500).json({ error: 'ไม่สามารถดึงรายการขายได้' });
   }
 };
@@ -399,12 +422,22 @@ const getSalesByBranchId = async (req, res) => {
 
 const markSaleAsPaid = async (req, res) => {
   const saleId = parseInt(req.params.id, 10);
-  const { branchId } = req.user;
+  const branchId = Number(req.user?.branchId);
+
+  if (!saleId || Number.isNaN(saleId)) {
+    return res.status(400).json({ message: 'Sale ID ไม่ถูกต้อง' });
+  }
+  if (!branchId || Number.isNaN(branchId)) {
+    return res.status(401).json({ message: 'unauthorized' });
+  }
 
   try {
-    const sale = await prisma.sale.findUnique({ where: { id: saleId }, include: { items: true } });
+    const sale = await prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { items: true },
+    });
 
-    if (!sale || sale.branchId !== branchId) {
+    if (!sale || Number(sale.branchId) !== branchId) {
       return res.status(404).json({ message: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
@@ -413,83 +446,232 @@ const markSaleAsPaid = async (req, res) => {
       _sum: { amount: true },
       where: { payment: { saleId, isCancelled: false } },
     });
+
     const paidSum = agg._sum.amount || new Prisma.Decimal(0);
 
-    const isFullyPaid = paidSum.greaterThanOrEqualTo ? paidSum.greaterThanOrEqualTo(sale.totalAmount) : toNum(paidSum) >= toNum(sale.totalAmount);
+    const isFullyPaid =
+      typeof paidSum?.greaterThanOrEqualTo === 'function'
+        ? paidSum.greaterThanOrEqualTo(sale.totalAmount)
+        : toNum(paidSum) >= toNum(sale.totalAmount);
 
+    // ✅ idempotent: ถ้าปิดบิลแล้ว และยอดครบแล้ว ให้ตอบ ok
     if (sale.paid && isFullyPaid) {
-      return res.status(200).json({ success: true }); // idempotent
+      return res.status(200).json({ success: true });
     }
 
     if (!isFullyPaid) {
       return res.status(409).json({ message: 'ยอดชำระยังไม่ครบ ไม่สามารถปิดบิลได้' });
     }
 
+    // ✅ เมื่อรับเงินครบ: mark paid + finalize status
     await prisma.$transaction(async (tx) => {
-      await tx.sale.update({ where: { id: saleId }, data: { paid: true, paidAt: new Date() } });
-      for (const it of sale.items) {
-        await tx.stockItem.update({ where: { id: it.stockItemId }, data: { status: 'SOLD', soldAt: new Date() } });
+      await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          paid: true,
+          paidAt: new Date(),
+          // ✅ credit sale อาจยังไม่มี soldAt (ตั้งไว้ตอนรับเงินครบ)
+          soldAt: sale.soldAt || new Date(),
+          // ✅ ปิดงานให้ชัดเจน
+          status: 'COMPLETED',
+          // ❗ ไม่แตะ isTaxInvoice ที่นี่ (กติกาคุณคือออกใบกำกับภายหลังเป็น feature แยก)
+        },
+      });
+
+      // ✅ minimal-disruption: สินค้าควรถูก mark SOLD ตั้งแต่ createSale แล้ว
+      // แต่กัน edge case: ถ้ายังมีชิ้นไหนหลุดเป็น IN_STOCK ให้ปิดให้เรียบร้อย
+      const stockItemIds = (sale.items || []).map((it) => it.stockItemId).filter(Boolean);
+      if (stockItemIds.length > 0) {
+        await tx.stockItem.updateMany({
+          where: { id: { in: stockItemIds }, status: { not: 'SOLD' } },
+          data: { status: 'SOLD', soldAt: new Date() },
+        });
       }
     });
 
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('❌ [markSaleAsPaid]', error);
-    return res.status(500).json({ message: 'เกิดข้อผิดพลาดขณะเปลี่ยนสถานะสินค้า' });
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดขณะปิดบิล' });
   }
 };
 
+// --- Helpers (date range; TH timezone default) ---
+const toLocalRange = (dateStr, tz = '+07:00') => {
+  if (!dateStr) return null;
+  const start = new Date(`${dateStr}T00:00:00.000${tz}`);
+  const end = new Date(`${dateStr}T23:59:59.999${tz}`);
+  return { start, end };
+};
+
+
+
+
+// ✅ Printable Sales (ย้อนหลัง) = “เห็นใบขายทั้งหมด”
+// - ใช้ช่วงวันที่จาก sale.createdAt (ไม่ใช่ receivedAt / soldAt)
+// - สรุปยอดชำระจาก PaymentItem ของ Payment ที่ isCancelled=false
+// - ส่ง payload สำหรับ list (เบา + ชัด)
 const searchPrintableSales = async (req, res) => {
   try {
-    const branchId = req.user?.branchId;
-    const { keyword, fromDate, toDate, limit } = req.query;
-
-    const whereClause = {
-      branchId,
-      status: { not: 'CANCELLED' },
-    };
-
-    if (keyword) {
-      whereClause.OR = [
-        { customer: { is: { name: { contains: keyword, mode: 'insensitive' } } } },
-        { customer: { is: { phone: { contains: keyword, mode: 'insensitive' } } } },
-        { code: { contains: keyword, mode: 'insensitive' } },
-      ];
-    }
-
-    if (fromDate || toDate) {
-      whereClause.soldAt = {};
-      if (fromDate) whereClause.soldAt.gte = new Date(fromDate);
-      if (toDate) {
-        const endDate = new Date(toDate);
-        endDate.setDate(endDate.getDate() + 1);
-        whereClause.soldAt.lte = endDate;
-      }
-    }
-
+    const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
-    whereClause.branchId = Number(branchId);
+    const { keyword = '', fromDate, toDate, limit: limitRaw, onlyUnpaid, onlyPaid } = req.query;
+
+    // ✅ optional filter: only unpaid (Delivery Note list)
+    const onlyUnpaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyUnpaid ?? '').toLowerCase());
+
+    // ✅ optional filter: only paid (PrintBill list)
+    // "paid" here means: has at least 1 non-cancelled payment item (paidAmount > 0)
+    const onlyPaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyPaid ?? '').toLowerCase());
+
+    // 🔒 Guard: if both flags are sent, prefer deterministic intersection behavior
+    // (paidAmount > 0 AND balanceAmount > 0)
+    const bothFlags = onlyPaidBool && onlyUnpaidBool;
+
+    const limitParsed = parseInt(limitRaw, 10);
+    const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 100, 1), 500);
+
+    const fromRange = fromDate ? toLocalRange(String(fromDate)) : null;
+    const toRange = toDate ? toLocalRange(String(toDate)) : null;
+
+    const where = {
+      branchId,
+      status: { not: 'CANCELLED' },
+      ...(keyword
+        ? {
+            OR: [
+              { code: { contains: String(keyword), mode: 'insensitive' } },
+              { note: { contains: String(keyword), mode: 'insensitive' } },
+              { customer: { is: { name: { contains: String(keyword), mode: 'insensitive' } } } },
+              { customer: { is: { companyName: { contains: String(keyword), mode: 'insensitive' } } } },
+              { customer: { is: { phone: { contains: String(keyword), mode: 'insensitive' } } } },
+            ],
+          }
+        : {}),
+      ...(fromRange || toRange
+        ? {
+            createdAt: {
+              ...(fromRange ? { gte: fromRange.start } : {}),
+              ...(toRange ? { lte: toRange.end } : {}),
+            },
+          }
+        : {}),
+    };
 
     const sales = await prisma.sale.findMany({
-      where: whereClause,
-      orderBy: { soldAt: 'desc' },
-      ...(limit ? { take: parseInt(limit, 10) } : {}),
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
       include: {
-        branch: true,
         customer: true,
         employee: true,
-        items: { include: { stockItem: { include: { product: true } } } },
       },
     });
 
-    const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
-    res.json(normalized);
+    // Fetch payments separately (schema-safe: Sale model may not expose `payments` relation)
+    const saleIds = sales.map((s) => s.id);
+
+    const payments = saleIds.length
+      ? await prisma.payment.findMany({
+          where: {
+            saleId: { in: saleIds },
+            isCancelled: false,
+          },
+          orderBy: { receivedAt: 'desc' },
+          select: {
+            saleId: true,
+            receivedAt: true,
+            items: { select: { amount: true } },
+          },
+        })
+      : [];
+
+    // Build { saleId -> { paidAmount, lastPaidAt } }
+    const paymentAgg = new Map();
+    for (const p of payments) {
+      const sid = p.saleId;
+      const prev = paymentAgg.get(sid) || { paidAmount: 0, lastPaidAt: null };
+      const itemSum = (Array.isArray(p.items) ? p.items : []).reduce((ss, it) => {
+        const amt = it?.amount != null ? toNum(it.amount) : 0;
+        return ss + amt;
+      }, 0);
+
+      const nextPaid = prev.paidAmount + itemSum;
+      const nextLast = !prev.lastPaidAt
+        ? p.receivedAt || null
+        : p.receivedAt && new Date(p.receivedAt) > new Date(prev.lastPaidAt)
+          ? p.receivedAt
+          : prev.lastPaidAt;
+
+      paymentAgg.set(sid, { paidAmount: nextPaid, lastPaidAt: nextLast });
+    }
+
+    const rowsAll = sales.map((s) => {
+      const totalAmount = s.totalAmount != null ? toNum(s.totalAmount) : 0;
+
+      const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null };
+      const paidAmount = agg.paidAmount || 0;
+
+      const balanceAmount = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
+      const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
+
+      const lastPaidAt = agg.lastPaidAt || null;
+
+      return {
+        id: s.id,
+        code: s.code,
+        createdAt: s.createdAt,
+        soldAt: s.soldAt || null, // เผื่อใช้แสดง/ตรวจสอบ แต่ไม่ใช้เป็น filter
+        totalAmount: Number(totalAmount.toFixed(2)),
+        paidAmount: Number(paidAmount.toFixed(2)),
+        balanceAmount,
+                // legacy flag (kept for backward compatibility)
+        paid: !!(s.paid || paidEnough),
+
+        // ✅ explicit semantic flags (production clarity)
+        hasPayment: paidAmount > 0,
+        isFullyPaid: paidEnough,
+        isPartiallyPaid: paidAmount > 0 && paidAmount < totalAmount,
+        lastPaidAt,
+        customerName: s.customer?.name || '-',
+        companyName: s.customer?.companyName || '-',
+        customerPhone: s.customer?.phone || '-',
+        employeeName: s.employee?.name || '-',
+        status: s.status,
+        isCredit: !!s.isCredit,
+      };
+    });
+
+    let rows = rowsAll;
+
+    // Apply filters deterministically
+    if (bothFlags) {
+      rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0 && (r?.balanceAmount ?? 0) > 0);
+    } else {
+      if (onlyUnpaidBool) rows = rows.filter((r) => (r?.balanceAmount ?? 0) > 0);
+      if (onlyPaidBool) rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0);
+    }
+    if (onlyUnpaidBool) rows = rows.filter((r) => (r?.balanceAmount ?? 0) > 0);
+    if (onlyPaidBool) rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0);
+
+    return res.json(rows);
   } catch (error) {
     console.error('❌ [searchPrintableSales] error:', error);
-    res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบส่งของได้' });
+    return res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบขายย้อนหลังได้' });
   }
 };
+
+
+
+
+
+
+
+
+
+// ✅ Backward-compat alias (some routes may still import getAllSalesReturn)
+const getAllSalesReturn = getAllSales;
 
 module.exports = {
   createSale,
@@ -499,8 +681,14 @@ module.exports = {
   markSaleAsPaid,
   getAllSalesReturn,
   searchPrintableSales,
-
 };
+
+
+
+
+
+
+
 
 
 

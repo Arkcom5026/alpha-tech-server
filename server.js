@@ -1,4 +1,5 @@
 
+
 //  @filename: server.js
 
 const express = require('express');
@@ -171,6 +172,9 @@ app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
+// ✅ Sales (new canonical path)
+app.use('/api/sales', saleRoutes);
+// ✅ Backward-compat (old path)
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
 app.use('/api/refunds', refundRoutes);
@@ -262,31 +266,6 @@ app.listen(PORT, '0.0.0.0', () => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
 
 
 
