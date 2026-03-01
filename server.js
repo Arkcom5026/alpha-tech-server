@@ -1,5 +1,19 @@
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //  @filename: server.js
 
 const express = require('express');
@@ -65,6 +79,7 @@ const locationsRoutes = require('./routes/locationsRoutes');
 const receiptSimpleRoutes = require('./routes/receiptSimpleRoutes');
 const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
 const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
+const stockRoutes = require('./routes/stockRoutes');
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -191,6 +206,7 @@ app.use('/api/combined-billing', combinedBillingRoutes);
 app.use('/api/sales-reports', salesReportRoutes);
 app.use('/api/upload-slips', uploadSlipRoutes);
 app.use('/api/stock-audit', stockAuditRoutes);
+app.use('/api/stock/dashboard', stockRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/address', addressRoutes);
 app.use('/api/locations', locationsRoutes);
@@ -262,10 +278,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-
-
-
 
 
 
