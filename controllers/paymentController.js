@@ -1,4 +1,5 @@
 
+
 // controllers/paymentController.js
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -76,6 +77,74 @@ const nextPaymentCode = async (tx, branchId) => {
   }
   if (counter == null) throw new Error('GEN_CODE_FAILED');
   return buildLegacyPaymentCode({ branchId, counter });
+};
+
+// ✅ Recalc Sale paidAmount + statusPayment (AR baseline)
+const recalcSalePaymentStatus = async (tx, saleId) => {
+  // Production-grade notes:
+  // - paidAt should reflect the moment the Sale became fully paid (use latest non-cancelled payment.receivedAt)
+  // - statusPayment is the canonical field (paid boolean is backward-compat only)
+  const sale = await tx.sale.findUnique({
+    where: { id: Number(saleId) },
+    select: { id: true, totalAmount: true, status: true },
+  });
+  if (!sale) throw Object.assign(new Error('ไม่พบใบขาย'), { status: 404 });
+
+  // CANCELLED → lock as CANCELLED and zero-out paid flags
+  if (sale.status === 'CANCELLED') {
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        paid: false,
+        paidAt: null,
+        statusPayment: 'CANCELLED',
+        paidAmount: new Prisma.Decimal(0),
+      },
+    });
+    return { statusPayment: 'CANCELLED', paidAmount: new Prisma.Decimal(0), isPaid: false };
+  }
+
+  const agg = await tx.paymentItem.aggregate({
+    _sum: { amount: true },
+    where: { payment: { saleId: sale.id, isCancelled: false } },
+  });
+
+  const sumPaid = agg._sum.amount || new Prisma.Decimal(0);
+  const total = sale.totalAmount || new Prisma.Decimal(0);
+
+  const nPaid = toNum(sumPaid);
+  const nTotal = toNum(total);
+
+  // ✅ Edge: if total is 0 (shouldn't happen for normal sales), consider it paid to avoid negative/NaN outstanding
+  const paidEnough = nTotal <= 0 ? true : (sumPaid.greaterThanOrEqualTo?.(total)) || (nPaid >= nTotal);
+  const hasSomePayment = nPaid > 0;
+
+  let statusPayment = 'UNPAID';
+  if (paidEnough) statusPayment = 'PAID';
+  else if (hasSomePayment) statusPayment = 'PARTIALLY_PAID';
+
+  // ✅ paidAt = latest receivedAt among non-cancelled payments (only when fully paid)
+  let paidAt = null;
+  if (paidEnough) {
+    const lastPay = await tx.payment.findFirst({
+      where: { saleId: sale.id, isCancelled: false },
+      orderBy: { receivedAt: 'desc' },
+      select: { receivedAt: true },
+    });
+    paidAt = lastPay?.receivedAt || new Date();
+  }
+
+  await tx.sale.update({
+    where: { id: sale.id },
+    data: {
+      paid: paidEnough,
+      paidAt,
+      statusPayment,
+      paidAmount: sumPaid,
+    },
+  });
+
+  return { statusPayment, paidAmount: sumPaid, isPaid: paidEnough };
 };
 
 // 1) createPayments → บันทึกการชำระเงินใหม่
@@ -165,11 +234,8 @@ const createPayments = async (req, res) => {
         }
       }
 
-      // 6) Recompute paid flag
-      const agg = await tx.paymentItem.aggregate({ _sum: { amount: true }, where: { payment: { saleId: Number(saleId), isCancelled: false } } });
-      const sumPaid = agg._sum.amount || new Prisma.Decimal(0);
-      const paidEnough = (sumPaid.greaterThanOrEqualTo?.(sale.totalAmount)) || (toNum(sumPaid) >= toNum(sale.totalAmount));
-      await tx.sale.update({ where: { id: sale.id }, data: { paid: paidEnough, paidAt: paidEnough ? new Date() : null } });
+      // 6) Recompute Sale AR fields (paidAmount + statusPayment + paid flags)
+      await recalcSalePaymentStatus(tx, sale.id);
 
       return { paymentId: payment.id, code };
     }, { timeout: 20000, maxWait: 20000 });
@@ -298,53 +364,71 @@ const cancelPayment = async (req, res) => {
       return res.status(400).json({ message: 'รายการนี้ถูกยกเลิกแล้ว' });
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1) Mark payment cancelled
-      await tx.payment.update({ where: { id: payment.id }, data: { isCancelled: true, cancelNote: note || null, cancelledAt: new Date() } });
+    await prisma.$transaction(
+      async (tx) => {
+        // 1) Mark payment cancelled
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            isCancelled: true,
+            cancelNote: note || null,
+            cancelledAt: new Date(),
+          },
+        });
 
-      // 2) Rollback deposit usage for this payment
-      if (tx.depositUsage && typeof tx.depositUsage.findMany === 'function') {
-        const usages = await tx.depositUsage.findMany({ where: { paymentId: payment.id } });
-        for (const u of usages) {
-          await tx.customerDeposit.update({
-            where: { id: u.customerDepositId },
-            data: { usedAmount: { decrement: u.amountUsed } },
-          });
-          // reopen deposit if now not fully used
-          const dep = await tx.customerDeposit.findUnique({ where: { id: u.customerDepositId }, select: { usedAmount: true, totalAmount: true } });
-          const used = Number(dep?.usedAmount || 0);
-          const total = Number(dep?.totalAmount || 0);
-          if (used < total) {
-            await tx.customerDeposit.update({ where: { id: u.customerDepositId }, data: { status: 'ACTIVE' } });
-          }
-        }
-      } else {
-        // Fallback: use payment.items if schema still has customerDepositId on items
-        for (const it of payment.items) {
-          if (it.paymentMethod === 'DEPOSIT' && it.customerDepositId) {
+        // 2) Rollback deposit usage for this payment
+        if (tx.depositUsage && typeof tx.depositUsage.findMany === 'function') {
+          const usages = await tx.depositUsage.findMany({ where: { paymentId: payment.id } });
+          for (const u of usages) {
             await tx.customerDeposit.update({
-              where: { id: it.customerDepositId },
-              data: { usedAmount: { decrement: it.amount } },
+              where: { id: u.customerDepositId },
+              data: { usedAmount: { decrement: u.amountUsed } },
             });
-            const dep = await tx.customerDeposit.findUnique({ where: { id: it.customerDepositId }, select: { usedAmount: true, totalAmount: true } });
+
+            // reopen deposit if now not fully used
+            const dep = await tx.customerDeposit.findUnique({
+              where: { id: u.customerDepositId },
+              select: { usedAmount: true, totalAmount: true },
+            });
             const used = Number(dep?.usedAmount || 0);
             const total = Number(dep?.totalAmount || 0);
             if (used < total) {
-              await tx.customerDeposit.update({ where: { id: it.customerDepositId }, data: { status: 'ACTIVE' } });
+              await tx.customerDeposit.update({
+                where: { id: u.customerDepositId },
+                data: { status: 'ACTIVE' },
+              });
+            }
+          }
+        } else {
+          // Fallback: use payment.items if schema still has customerDepositId on items
+          for (const it of payment.items) {
+            if (it.paymentMethod === 'DEPOSIT' && it.customerDepositId) {
+              await tx.customerDeposit.update({
+                where: { id: it.customerDepositId },
+                data: { usedAmount: { decrement: it.amount } },
+              });
+
+              const dep = await tx.customerDeposit.findUnique({
+                where: { id: it.customerDepositId },
+                select: { usedAmount: true, totalAmount: true },
+              });
+              const used = Number(dep?.usedAmount || 0);
+              const total = Number(dep?.totalAmount || 0);
+              if (used < total) {
+                await tx.customerDeposit.update({
+                  where: { id: it.customerDepositId },
+                  data: { status: 'ACTIVE' },
+                });
+              }
             }
           }
         }
-      }
 
-      // 3) Recompute sale.paid
-      const agg = await tx.paymentItem.aggregate({ _sum: { amount: true }, where: { payment: { saleId: payment.saleId, isCancelled: false } } });
-      const paid = agg._sum.amount || new Prisma.Decimal(0);
-      
-      const saleRow = await tx.sale.findUnique({ where: { id: payment.saleId }, select: { totalAmount: true, paidAt: true } });
-
-      const isPaid = (paid.greaterThanOrEqualTo?.(saleRow.totalAmount)) || (toNum(paid) >= toNum(saleRow.totalAmount));
-      await tx.sale.update({ where: { id: payment.saleId }, data: { paid: isPaid, paidAt: isPaid ? saleRow.paidAt || new Date() : null } });
-    }, { timeout: 20000, maxWait: 20000 });
+        // 3) Recompute Sale AR fields (paidAmount + statusPayment + paid flags)
+        await recalcSalePaymentStatus(tx, payment.saleId);
+      },
+      { timeout: 20000, maxWait: 20000 }
+    );
 
     res.json({ message: 'ยกเลิกรายการชำระเงินเรียบร้อยแล้ว' });
   } catch (error) {
@@ -358,11 +442,3 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
-
-
-
-
-
-
-
-

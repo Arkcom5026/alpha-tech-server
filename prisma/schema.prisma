@@ -1,5 +1,6 @@
 
 
+
 generator client {
   provider = "prisma-client-js"
   // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
@@ -1247,6 +1248,10 @@ model Sale {
   paid                Boolean    @default(false)
   paidAt              DateTime?
 
+  // ✅ AR (Accounts Receivable) baseline: status + paid amount for partial payments
+  statusPayment         PaymentStatus @default(UNPAID)
+  paidAmount            Decimal       @default(0) @db.Decimal(12, 2)
+
   isCredit               Boolean               @default(false)
   dueDate                DateTime?
   officialDocumentNumber String?
@@ -1274,6 +1279,8 @@ model Sale {
 
   @@index([combinedBillingId])
   @@index([branchId, soldAt])
+  @@index([branchId, statusPayment, soldAt])
+  @@index([branchId, statusPayment, dueDate])
   @@index([isCredit, dueDate])
   @@index([combinedDocumentId])
 }
@@ -1693,3 +1700,6 @@ model SaleReturnItemSimple {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+
+

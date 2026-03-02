@@ -2,6 +2,7 @@
 
 
 
+
  
 
 // saleController.js
@@ -35,12 +36,12 @@ const normalizePayment = (payment) => {
 
 const normalizeSaleMoney = (sale) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !sale) return sale;
-  const moneyKeys = ['totalBeforeDiscount','totalDiscount','vat','vatRate','totalAmount'];
+  const moneyKeys = ['totalBeforeDiscount', 'totalDiscount', 'vat', 'vatRate', 'totalAmount', 'paidAmount'];
   for (const k of moneyKeys) if (k in sale && sale[k] != null) sale[k] = toNum(sale[k]);
   if (Array.isArray(sale.items)) {
     sale.items = sale.items.map((it) => {
       const cloned = { ...it };
-      for (const k of ['basePrice','vatAmount','price','discount','refundedAmount'])
+      for (const k of ['basePrice', 'vatAmount', 'price', 'discount', 'refundedAmount'])
         if (k in cloned && cloned[k] != null) cloned[k] = toNum(cloned[k]);
       return cloned;
     });
@@ -132,6 +133,9 @@ const createSale = async (req, res) => {
     let isCreditSale = false;
     let paidStatus = false;
     let paidAtDate = null;
+    // ✅ NEW AR baseline fields (Prisma: Sale.statusPayment, Sale.paidAmount)
+    let statusPayment = 'UNPAID';
+    let paidAmountDecimal = D(0);
     let soldAtDate = new Date();
     let dueDate = null;
     let customerSaleType = 'NORMAL';
@@ -158,6 +162,8 @@ const createSale = async (req, res) => {
       isCreditSale = true;
       saleStatus = CREDIT_SALE_STATUS; // Backward-compatible default: DRAFT
       paidStatus = false;
+      statusPayment = 'UNPAID';
+      paidAmountDecimal = D(0);
       // ✅ Prisma schema requires soldAt (non-null). For credit sales, use creation time as soldAt.
       soldAtDate = soldAtDate || new Date();
     } else {
@@ -169,10 +175,14 @@ const createSale = async (req, res) => {
         saleStatus = 'FINALIZED';
         paidStatus = false;
         paidAtDate = null;
+        statusPayment = 'UNPAID';
+        paidAmountDecimal = D(0);
       } else {
         saleStatus = 'COMPLETED';
         paidStatus = true;
         paidAtDate = new Date();
+        statusPayment = 'PAID';
+        paidAmountDecimal = D(totalAmount);
       }
     }
 
@@ -219,6 +229,9 @@ const createSale = async (req, res) => {
               vat: D(vat),
               vatRate: D(vatRate),
               totalAmount: D(totalAmount),
+              // ✅ AR baseline: canonical paid status (prefer statusPayment; keep paid boolean for backward compat)
+              statusPayment,
+              paidAmount: paidAmountDecimal,
               note,
               // ✅ allow client to suggest saleType (still bounded by derived customerSaleType)
               saleType: saleTypeFromClient || customerSaleType,
@@ -474,6 +487,9 @@ const markSaleAsPaid = async (req, res) => {
           soldAt: sale.soldAt || new Date(),
           // ✅ ปิดงานให้ชัดเจน
           status: 'COMPLETED',
+          // ✅ NEW AR baseline fields
+          statusPayment: 'PAID',
+          paidAmount: paidSum,
           // ❗ ไม่แตะ isTaxInvoice ที่นี่ (กติกาคุณคือออกใบกำกับภายหลังเป็น feature แยก)
         },
       });
@@ -610,13 +626,16 @@ const searchPrintableSales = async (req, res) => {
     const rowsAll = sales.map((s) => {
       const totalAmount = s.totalAmount != null ? toNum(s.totalAmount) : 0;
 
+      // ✅ Prefer stored paidAmount if present (new schema), fallback to aggregated payments (backward compat)
+      const storedPaidAmount = s?.paidAmount != null ? toNum(s.paidAmount) : null;
+
       const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null };
-      const paidAmount = agg.paidAmount || 0;
+      const paidAmount = storedPaidAmount != null ? storedPaidAmount : agg.paidAmount || 0;
 
       const balanceAmount = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
       const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
 
-      const lastPaidAt = agg.lastPaidAt || null;
+      const lastPaidAt = (storedPaidAmount != null ? null : agg.lastPaidAt) || null;
 
       return {
         id: s.id,
@@ -682,6 +701,8 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
+
 
 
 

@@ -5,6 +5,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -1259,53 +1260,79 @@ const updateProduct = async (req, res) => {
   }
 }
 
-const disableProduct = async (req, res) => {
-  try {
-    const id = toInt(req.params.id)
-    if (!id) return res.status(400).json({ error: 'INVALID_ID' })
-
-    const branchId = Number(req.user?.branchId)
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
-
-    const result = await prisma.product.update({
-      where: { id },
-      data: { active: false },
-      select: { id: true, active: true },
-    })
-
-    return res.json({ success: true, id: result.id, active: result.active, disabled: true })
-  } catch (error) {
-    console.error('❌ disableProduct error:', error)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return res.status(404).json({ error: 'NOT_FOUND' })
-    }
-    return res.status(500).json({ error: 'Internal server error' })
-  }
+// =====================================================
+// POST/PATCH: /api/products/:id/disable (legacy)
+// POST/PATCH: /api/products/:id/enable  (legacy)
+// ❌ Policy: Product เป็น GLOBAL master data → ห้ามปิด/เปิดจาก POS/ระบบทั่วไป
+// - ป้องกันการปิดเองง่าย ๆ ที่กระทบทุกสาขา
+// - หากต้องการ “ลบจริง” ให้ใช้ DELETE /api/products/:id (SUPERADMIN only)
+// =====================================================
+const disableProduct = async (_req, res) => {
+  return res.status(403).json({ ok: false, error: 'FEATURE_DISABLED', message: 'Product เป็นข้อมูลกลาง ไม่อนุญาตให้ปิดใช้งาน' })
 }
 
-const deleteProduct = disableProduct
+const enableProduct = async (_req, res) => {
+  return res.status(403).json({ ok: false, error: 'FEATURE_DISABLED', message: 'Product เป็นข้อมูลกลาง ไม่อนุญาตให้เปิดใช้งาน' })
+}
 
-const enableProduct = async (req, res) => {
+// =====================================================
+// DELETE: /api/products/:id
+// ✅ Policy: ลบถาวรได้เฉพาะ SUPERADMIN เท่านั้น
+// - Production guard: บล็อกการลบถ้ามีการใช้งานแล้ว (เช่น มี StockItem)
+// - หากมี FK อื่น ๆ อ้างอิงอยู่ จะคืน 409 (P2003)
+// =====================================================
+const deleteProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id)
-    if (!id) return res.status(400).json({ error: 'INVALID_ID' })
+    if (!id) return res.status(400).json({ ok: false, error: 'INVALID_ID' })
 
-    const branchId = Number(req.user?.branchId)
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
-
-    const result = await prisma.product.update({
-      where: { id },
-      data: { active: true },
-      select: { id: true, active: true },
-    })
-
-    return res.json({ success: true, id: result.id, active: result.active, enabled: true })
-  } catch (error) {
-    console.error('❌ enableProduct error:', error)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return res.status(404).json({ error: 'NOT_FOUND' })
+    const role = String(req.user?.role || '').toUpperCase()
+    if (role !== 'SUPERADMIN') {
+      return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'อนุญาตเฉพาะ SUPERADMIN เท่านั้น' })
     }
-    return res.status(500).json({ error: 'Internal server error' })
+
+    // ✅ Hard guard: ถ้ามี StockItem แล้ว → ห้ามลบ (รักษาประวัติ + กันลบข้อมูลที่ใช้งานจริง)
+    const stockItemCount = await prisma.stockItem.count({ where: { productId: id } })
+    if (stockItemCount > 0) {
+      return res.status(409).json({
+        ok: false,
+        error: 'PRODUCT_IN_USE',
+        reason: 'STOCK_ITEM_EXISTS',
+        message: 'ไม่สามารถลบสินค้าได้ เพราะมีประวัติ StockItem อ้างอิงอยู่แล้ว',
+        stockItemCount,
+      })
+    }
+
+    // ✅ Delete in transaction (safe order): children → parent
+    await prisma.$transaction(async (tx) => {
+      // NOTE: models below are already used elsewhere in this controller (safe to reference)
+      await tx.branchPrice.deleteMany({ where: { productId: id } })
+      await tx.stockBalance.deleteMany({ where: { productId: id } })
+      await tx.productImage.deleteMany({ where: { productId: id } })
+
+      // finally delete product
+      await tx.product.delete({ where: { id } })
+    }, { timeout: 15000 })
+
+    return res.json({ ok: true, success: true, id })
+  } catch (error) {
+    console.error('❌ deleteProduct error:', error)
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') return res.status(404).json({ ok: false, error: 'NOT_FOUND' })
+
+      // FK constraint → still referenced somewhere (sales, purchase, etc.)
+      if (error.code === 'P2003') {
+        return res.status(409).json({
+          ok: false,
+          error: 'PRODUCT_IN_USE',
+          reason: 'FK_CONSTRAINT',
+          message: 'ไม่สามารถลบสินค้าได้ เพราะยังมีข้อมูลอื่นอ้างอิงอยู่',
+        })
+      }
+    }
+
+    return res.status(500).json({ ok: false, error: 'Internal server error' })
   }
 }
 
@@ -1404,6 +1431,7 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
 
 
 

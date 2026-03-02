@@ -1,79 +1,49 @@
-// server/routes/productRoutes.js
-const express = require('express')
-const router = express.Router()
 
-const {
-  getAllProducts,
-  getProductPosById,
-  createProduct,
-  updateProduct,
-  disableProduct,
-  enableProduct,
-  getProductDropdowns,
-  getProductsForOnline,
-  getProductOnlineById,
-  getProductsForPos,
-  migrateSnToSimple,
-} = require('../controllers/productController')
+// ============================================================
+// 📁 FILE: routes/financeRoutes.js
+// ✅ Align routes with FE financeApi.js (AR + Customer Credit)
+// Base mount: app.use('/api/finance', financeRoutes)
+// ============================================================
 
-const verifyToken = require('../middlewares/verifyToken')
+const express = require('express');
+const router = express.Router();
 
-// ✅ Public routes (ไม่ต้อง login)
-router.get('/online/search', getProductsForOnline)
-router.get('/online/dropdowns', getProductDropdowns)
-router.get('/online/detail/:id', getProductOnlineById)
+const financeController = require('../controllers/financeController');
 
-// ✅ POS dropdowns (ต้อง login) — อนุโลม SUPERADMIN แบบ read-only เฉพาะเส้นนี้
-// หมายเหตุ: ยังยึด branch scope จาก JWT (req.user.branchId) เสมอ
-const allowDropdownsForSuperAdminOrEmployee = (req, res, next) => {
-  try {
-    const user = req.user || {}
-
-    // ต้องมี branchId เสมอ (branch-scope)
-    if (!user.branchId) {
-      return res.status(401).json({ message: 'unauthorized' })
-    }
-
-    // อนุโลมเฉพาะ SUPERADMIN (แม้ profileType จะเป็น customer)
-    if (user.role === 'SUPERADMIN') {
-      return next()
-    }
-
-    // ผู้ใช้งาน POS ปกติ (employee/admin) ให้ผ่านตามเดิม
-    if (user.profileType === 'employee' || user.role === 'ADMIN' || user.role === 'EMPLOYEE') {
-      return next()
-    }
-
-    return res.status(401).json({ message: 'unauthorized' })
-  } catch (_err) {
-    return res.status(401).json({ message: 'unauthorized' })
-  }
-}
-
-router.get('/dropdowns', verifyToken, allowDropdownsForSuperAdminOrEmployee, getProductDropdowns)
+// ✅ Auth / Scope (Single Source of Truth)
+// จากโครงสร้างจริงของโปรเจกต์นี้ (อ้างอิง productRoutes.js) ใช้ verifyToken เป็น middleware กลาง
+const verifyToken = require('../middlewares/verifyToken');
 
 // ✅ Protected routes (ต้อง login)
-router.use(verifyToken)
+router.use(verifyToken);
 
-router.get('/', getAllProducts)
-router.get('/lookup', getProductsForPos)
-router.get('/pos/search', getProductsForPos)
-router.get('/:id', getProductPosById)
+// ------------------------------
+// Accounts Receivable (AR)
+// ------------------------------
+// GET /api/finance/ar/summary
+router.get('/ar/summary', financeController.getAccountsReceivableSummary);
+// GET /api/finance/ar
+router.get('/ar', financeController.getAccountsReceivableRows);
 
-router.post('/', createProduct)
-router.put('/:id', updateProduct)
-router.patch('/:id', updateProduct)
+// ------------------------------
+// Customer Credit
+// ------------------------------
+// GET /api/finance/customer-credit/summary
+router.get('/customer-credit/summary', financeController.getCustomerCreditSummary);
+// GET /api/finance/customer-credit
+router.get('/customer-credit', financeController.getCustomerCreditRows);
 
-router.post('/:id/migrate-to-simple', migrateSnToSimple)
-router.post('/pos/migrate-to-simple/:id', migrateSnToSimple)
+// Optional drill-in (future)
+// GET /api/finance/customer-credit/:customerId
+router.get(
+  '/customer-credit/:customerId',
+  financeController.getCustomerCreditByCustomerId
+);
 
-router.post('/:id/disable', disableProduct)
-router.post('/:id/enable', enableProduct)
-router.delete('/:id', disableProduct)
+// Health
+router.get('/ping', financeController.pingFinance);
 
-// upload routes
-const uploadProductRoutes = require('./uploadProductRoutes')
-router.use('/', uploadProductRoutes)
+module.exports = router;
 
-module.exports = router
+
 
