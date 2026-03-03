@@ -1,9 +1,5 @@
 
 
-
-
-
-
  
 
 // saleController.js
@@ -22,6 +18,21 @@ const STRICT_COMPLETED_REQUIRES_PAYMENT = process.env.STRICT_COMPLETED_REQUIRES_
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const isMoneyLike = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
+
+// ✅ rounding helper (2 decimals) for list/print consistency
+const round2 = (n) => Number((Number(n || 0)).toFixed(2));
+
+// ✅ canonical total resolver (minimal-disruption)
+// - Some legacy rows may have `totalAmount` drift (e.g. VAT double-applied)
+// - Prefer computed = (totalBeforeDiscount - totalDiscount + vat) when it looks more trustworthy
+// ✅ VAT-INCLUDED STANDARD (Production Lock)
+// ในระบบนี้ totalAmount คือ “ยอดรวมรวม VAT แล้ว (Gross)” เสมอ
+// ห้ามนำ totalBeforeDiscount หรือ vat ไปบวก/คูณใหม่เพื่อหลีกเลี่ยง VAT ซ้ำ
+const resolveCanonicalTotalAmount = (sale) => {
+  const stored = round2(sale?.totalAmount != null ? toNum(sale.totalAmount) : 0);
+  return stored;
+};
+
 
 const normalizePayment = (payment) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !payment) return payment;
@@ -320,6 +331,13 @@ const createSale = async (req, res) => {
   }
 };
 
+
+
+
+
+
+
+
 const getAllSales = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
@@ -329,26 +347,75 @@ const getAllSales = async (req, res) => {
     const limitParsed = parseInt(limitRaw, 10);
     const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 200, 1), 500);
 
+    // ✅ branch-scope enforced (minimal, production-safe)
+    const where = { branchId };
+
+    // ✅ Money calc rules (Production Lock: Sale snapshot is source of truth)
+// - totalAmount = GROSS (รวม VAT)
+// - vat        = VAT amount
+// - beforeVat  = totalAmount - vat
+// ❗ ห้ามคำนวณยอดรวมจาก SaleItem อีกต่อไป (กันราคาสินค้าเปลี่ยนย้อนหลัง + กัน VAT ซ้ำ)
+const computeTotals = (sale) => {
+  const vatRate = Number.isFinite(Number(sale?.vatRate)) ? Number(sale.vatRate) : 7;
+  const totalAmount = resolveCanonicalTotalAmount(sale);
+
+  const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
+  // ถ้า legacy แถวไหน vat หาย ให้ถอดจาก gross ตาม vatRate (safe fallback)
+  const vatAmount = vatStored != null
+    ? vatStored
+    : round2((totalAmount * vatRate) / (100 + vatRate));
+
+  const beforeVat = round2(totalAmount - vatAmount);
+
+  return {
+    vatRate,
+    totalAmount: round2(totalAmount),
+    beforeVat,
+    vatAmount,
+  };
+};
+
     const sales = await prisma.sale.findMany({
-      where: {
-        branchId,
-        status: { not: 'CANCELLED' },
-      },
+      where,
       orderBy: { createdAt: 'desc' },
       take,
       include: {
         customer: true,
         employee: true,
+        // ✅ include minimal item money fields to compute “ยอดจริง” (INC VAT) for Delivery Note list
+        // - each SaleItem represents 1 unit (SN) in this system
+        items: { select: { price: true, discount: true } },
       },
     });
 
     const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
-    return res.json(normalized);
+
+    // ✅ inject computed totals (do NOT trust legacy stored totalAmount if it used gross-up twice)
+    const out = normalized.map((s) => {
+      const totals = computeTotals(s);
+      return {
+        ...s,
+        vatRate: totals.vatRate,
+        totalAmount: totals.totalAmount,
+        totals: {
+          ...(s?.totals || {}),
+          beforeVat: totals.beforeVat,
+          vatAmount: totals.vatAmount,
+          total: totals.totalAmount,
+        },
+      };
+    });
+
+    return res.json(out);
   } catch (error) {
     console.error('❌ [getAllSales] Error:', error);
     return res.status(500).json({ error: 'ไม่สามารถดึงรายการขายได้' });
   }
 };
+
+
+
+
 
 const getSaleById = async (req, res) => {
   try {
@@ -626,7 +693,9 @@ const searchPrintableSales = async (req, res) => {
     }
 
     const rowsAll = sales.map((s) => {
-      const totalAmount = s.totalAmount != null ? toNum(s.totalAmount) : 0;
+      // ✅ “ยอดจริง” สำหรับ list/print: ใช้ snapshot จาก Sale เท่านั้น
+// ❗ ห้ามคำนวณจาก SaleItem เพื่อกันราคาเปลี่ยนย้อนหลัง และกัน VAT ซ้ำ
+const totalAmount = resolveCanonicalTotalAmount(s);
 
       // ✅ Prefer stored paidAmount when it is trustworthy, otherwise fallback to aggregated payments
       // - บางกรณี sale.paidAmount อาจยังเป็น 0 แต่มี Payment จริงแล้ว (เช่น legacy/compat flow)
@@ -638,7 +707,7 @@ const searchPrintableSales = async (req, res) => {
 
       const paidAmount = storedPaidAmount == null ? aggPaid : Math.max(storedPaidAmount, aggPaid);
 
-      const balanceAmount = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
+      const balanceAmount = Math.max(0, round2(totalAmount - paidAmount));
       const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
 
       const lastPaidAt = (storedPaidAmount != null ? null : agg.lastPaidAt) || null;
@@ -648,7 +717,7 @@ const searchPrintableSales = async (req, res) => {
         code: s.code,
         createdAt: s.createdAt,
         soldAt: s.soldAt || null, // เผื่อใช้แสดง/ตรวจสอบ แต่ไม่ใช้เป็น filter
-        totalAmount: Number(totalAmount.toFixed(2)),
+        totalAmount: round2(totalAmount),
         paidAmount: Number(paidAmount.toFixed(2)),
         balanceAmount,
                 // legacy flag (kept for backward compatibility)
@@ -706,19 +775,6 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

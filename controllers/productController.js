@@ -5,6 +5,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -201,12 +202,12 @@ const createOrRepairStockBalance = async (tx, productId, branchId) => {
 // ---------- Safe counts for "delete-check" (production-grade) ----------
 // NOTE:
 // - Prisma client will throw if a model name is missing.
-// - We guard by checking the method existence first.
-// - If a count fails, we return null (unknown) and do NOT allow hard delete.
+// - Missing model in this Prisma schema means "not applicable" → treat as 0 (safe for delete-check).
+// - If a count fails unexpectedly, we return null (unknown) and do NOT allow hard delete.
 const safeCount = async (db, modelName, where) => {
   try {
     const m = db?.[modelName]
-    if (!m || typeof m.count !== 'function') return null
+    if (!m || typeof m.count !== 'function') return 0
     const n = await m.count({ where })
     return Number.isFinite(Number(n)) ? Number(n) : null
   } catch (e) {
