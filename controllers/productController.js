@@ -2,10 +2,6 @@
 
 
 
-
-
-
-
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -666,6 +662,11 @@ const getProductsForOnline = async (req, res) => {
         productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
         productProfile: { select: { id: true, name: true } },
         template: { select: { id: true, name: true, productProfile: { select: { id: true, name: true } } } },
+
+        // ✅ Brand (optional) — Online UX needs brand label
+        brandId: true,
+        brand: { select: { id: true, name: true, active: true } },
+
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -697,13 +698,22 @@ const getProductsForOnline = async (req, res) => {
         templateId: (p.templateId ?? p.template?.id ?? null),
         productTemplateId: (p.templateId ?? p.template?.id ?? null),
         imageUrl,
+
+        // ✅ Pricing semantics (Executive-grade): keep `priceOnline` for backward-compat (number)
+        // but also expose `priceOnlineEffective` for UI to avoid showing 0 when branch price is inactive.
         priceOnline: Number(bp?.priceOnline ?? 0),
+        priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
         readyPickupAtBranch: isReady,
         isReady,
         category: p.productType?.category?.name ?? p.category?.name ?? undefined,
         productType: p.productType?.name ?? undefined,
         productProfile: p.productProfile?.name ?? p.template?.productProfile?.name ?? undefined,
         productTemplate: p.template?.name ?? undefined,
+
+        // ✅ Brand (optional)
+        brandId: p.brandId ?? p.brand?.id ?? null,
+        brandName: (p.brand?.name ?? null),
+
         hasPrice: !!bp,
         branchPriceActive: bp?.isActive ?? true,
       }
@@ -881,6 +891,11 @@ const getProductOnlineById = async (req, res) => {
         name: true,
         mode: true,
         noSN: true,
+
+        // ✅ Brand (optional)
+        brandId: true,
+        brand: { select: { id: true, name: true, active: true } },
+
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -904,8 +919,16 @@ const getProductOnlineById = async (req, res) => {
       id: p.id,
       name: p.name,
       mode: p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED'),
+
+      // ✅ Brand (optional)
+      brandId: p.brandId ?? p.brand?.id ?? null,
+      brandName: (p.brand?.name ?? null),
+
       imageUrl,
+
+      // ✅ Pricing semantics (Executive-grade)
       priceOnline: Number(bp?.priceOnline ?? 0),
+      priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
       readyPickupAtBranch: isReady,
       isReady,
       hasPrice: !!bp,
@@ -1431,6 +1454,8 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
 
 
 
