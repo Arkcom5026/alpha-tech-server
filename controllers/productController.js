@@ -1190,12 +1190,20 @@ const createProduct = async (req, res) => {
   }
 }
 
-// =====================================================
-// PUT/PATCH: /api/products/:id
-// - Enforce new hierarchy: productTypeId required when changing
-// - Category derived from type; if categoryId passed must match type
-// - Brand/Profile/Template optional and can be cleared
-// =====================================================
+
+
+
+// ✅ Robust optional int parser for patch payloads
+// - undefined => undefined (not provided)
+// - '' => undefined (treat empty string from <select> as not provided)
+// - null => null (explicitly clear)
+const toIntOpt = (v) => {
+  if (v === undefined) return undefined
+  if (v === '') return undefined
+  if (v === null) return null
+  return toInt(v)
+}
+
 const updateProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id)
@@ -1233,8 +1241,8 @@ const updateProduct = async (req, res) => {
       })
       if (!current) throw Object.assign(new Error('NOT_FOUND'), { status: 404, code: 'NOT_FOUND' })
 
-      const incomingTypeId = (data.productTypeId === undefined) ? undefined : toInt(data.productTypeId)
-      const incomingCatId = (data.categoryId === undefined) ? undefined : toInt(data.categoryId)
+      const incomingTypeId = toIntOpt(data.productTypeId)
+      const incomingCatId = toIntOpt(data.categoryId)
 
       // If productTypeId is being changed, validate against category.
       // If not being changed, still validate incoming categoryId (if provided) matches existing type category.
@@ -1246,14 +1254,10 @@ const updateProduct = async (req, res) => {
       }, tx)
       if (!typeCheck.ok) throw Object.assign(new Error(typeCheck.error), { status: 400, code: typeCheck.error })
 
-      const incomingProfileId = (data.productProfileId === undefined)
-        ? undefined
-        : (data.productProfileId === null ? null : toInt(data.productProfileId))
+      const incomingProfileId = toIntOpt(data.productProfileId)
 
       const incomingTemplateIdRaw = (data.templateId ?? data.productTemplateId)
-      const incomingTemplateId = (incomingTemplateIdRaw === undefined)
-        ? undefined
-        : (incomingTemplateIdRaw === null ? null : toInt(incomingTemplateIdRaw))
+      const incomingTemplateId = toIntOpt(incomingTemplateIdRaw)
 
       const profCheck = await assertProfileMatchesType({ productProfileId: incomingProfileId, productTypeId: typeCheck.productTypeId }, tx)
       if (!profCheck.ok) throw Object.assign(new Error(profCheck.error), { status: 400, code: profCheck.error })
@@ -1284,9 +1288,7 @@ const updateProduct = async (req, res) => {
           categoryId: (incomingTypeId !== undefined ? typeCheck.categoryId : undefined),
 
           // optional extensions
-          brandId: (data.brandId === undefined || data.brandId === '')
-            ? undefined
-            : (data.brandId === null ? null : toInt(data.brandId)),
+          brandId: toIntOpt(data.brandId),
 
           productProfileId: finalProfileId,
           templateId: tplCheck.templateId,
@@ -1297,7 +1299,7 @@ const updateProduct = async (req, res) => {
             // ✅ auto-learn mapping (NON-FATAL) — schedule after transaction
       // IMPORTANT: Do NOT execute inside tx to avoid aborting the whole transaction on any error.
       if (data.brandId !== undefined && data.brandId !== null && data.brandId !== '') {
-        learnLater = { productTypeId: typeCheck.productTypeId, brandId: data.brandId }
+        learnLater = { productTypeId: typeCheck.productTypeId, brandId: toInt(data.brandId) }
       }
 
       if (data.branchPrice) {
@@ -1356,6 +1358,7 @@ const updateProduct = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
+
 
 // =====================================================
 // POST/PATCH: /api/products/:id/disable (legacy)
