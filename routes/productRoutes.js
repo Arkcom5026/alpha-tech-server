@@ -1,3 +1,9 @@
+
+
+
+
+
+
 // ============================================================
 // 📁 FILE: routes/productRoutes.js
 // ✅ Production-grade routing with clear public vs protected scopes
@@ -48,7 +54,13 @@ router.patch('/:id', productController.updateProduct)
 router.post('/:id/disable', productController.disableProduct)
 router.post('/:id/enable', productController.enableProduct)
 
-// Delete (SUPERADMIN only)
+// ✅ SuperAdmin destructive actions (production-grade)
+// - delete-check: ตรวจสอบว่าลบจริงได้ไหม (usage counts)
+// - archive: ซ่อน/ปิดสินค้าแบบไม่ทำลายประวัติ (active=false)
+router.get('/:id/delete-check', productController.getProductDeleteCheck)
+router.patch('/:id/archive', productController.archiveProduct)
+
+// Delete (SUPERADMIN only) — hard delete (allowed only when no usage)
 router.delete('/:id', productController.deleteProduct)
 
 // --- Images (optional) ---
@@ -90,3 +102,8 @@ if (productPriceController) {
 }
 
 module.exports = router
+
+
+
+
+

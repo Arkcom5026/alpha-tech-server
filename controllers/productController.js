@@ -2,6 +2,9 @@
 
 
 
+
+
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -163,10 +166,15 @@ const assertTemplateMatchesType = async ({ templateId, productTypeId }, db = pri
 
 const createOrRepairStockBalance = async (tx, productId, branchId) => {
   if (!tx || !productId || !branchId) return
+
   let qty = 0
   try {
     qty = await tx.stockItem.count({
-      where: { productId: Number(productId), branchId: Number(branchId), status: 'IN_STOCK' },
+      where: {
+        productId: Number(productId),
+        branchId: Number(branchId),
+        status: 'IN_STOCK',
+      },
     })
   } catch (_e) {
     console.warn('createOrRepairStockBalance: count stockItem failed → default 0')
@@ -174,10 +182,76 @@ const createOrRepairStockBalance = async (tx, productId, branchId) => {
   }
 
   await tx.stockBalance.upsert({
-    where: { productId_branchId: { productId: Number(productId), branchId: Number(branchId) } },
+    where: {
+      productId_branchId: {
+        productId: Number(productId),
+        branchId: Number(branchId),
+      },
+    },
     update: { quantity: qty },
-    create: { productId: Number(productId), branchId: Number(branchId), quantity: qty, reserved: 0 },
+    create: {
+      productId: Number(productId),
+      branchId: Number(branchId),
+      quantity: qty,
+      reserved: 0,
+    },
   })
+}
+
+// ---------- Safe counts for "delete-check" (production-grade) ----------
+// NOTE:
+// - Prisma client will throw if a model name is missing.
+// - We guard by checking the method existence first.
+// - If a count fails, we return null (unknown) and do NOT allow hard delete.
+const safeCount = async (db, modelName, where) => {
+  try {
+    const m = db?.[modelName]
+    if (!m || typeof m.count !== 'function') return null
+    const n = await m.count({ where })
+    return Number.isFinite(Number(n)) ? Number(n) : null
+  } catch (e) {
+    console.warn(`⚠️ safeCount failed for ${String(modelName)} (non-fatal):`, e?.message || e)
+    return null
+  }
+}
+
+const computeProductUsageCounts = async (db, productId) => {
+  const id = Number(productId)
+  if (!Number.isFinite(id)) return { ok: false, error: 'INVALID_ID' }
+
+  // "Hard" usage signals (transactions / stock / ordering)
+  const counts = {
+    stockItems: await safeCount(db, 'stockItem', { productId: id }),
+    purchaseOrderItems: await safeCount(db, 'purchaseOrderItem', { productId: id }),
+    purchaseOrderReceiptItems: await safeCount(db, 'purchaseOrderReceiptItem', { productId: id }),
+    saleItemSimple: await safeCount(db, 'saleItemSimple', { productId: id }),
+    orderOnlineItems: await safeCount(db, 'orderOnlineItem', { productId: id }),
+
+    // "Soft" usage signals (still referenced in system)
+    cartItems: await safeCount(db, 'cartItem', { productId: id }),
+    productOnOrders: await safeCount(db, 'productOnOrder', { productId: id }),
+    stockMovements: await safeCount(db, 'stockMovement', { productId: id }),
+    simpleLots: await safeCount(db, 'simpleLot', { productId: id }),
+
+    // meta/config attachments
+    branchPrices: await safeCount(db, 'branchPrice', { productId: id }),
+    stockBalances: await safeCount(db, 'stockBalance', { productId: id }),
+    productImages: await safeCount(db, 'productImage', { productId: id }),
+  }
+
+  // If any count is null (unknown), we treat as "in use" to prevent destructive delete.
+  const hasUnknown = Object.values(counts).some((v) => v === null)
+  const hasUsage = Object.values(counts).some((v) => typeof v === 'number' && v > 0)
+  const canHardDelete = !hasUnknown && !hasUsage
+
+  return {
+    ok: true,
+    productId: id,
+    canHardDelete,
+    hasUnknown,
+    hasUsage,
+    counts,
+  }
 }
 
 // =====================================================
@@ -1299,10 +1373,87 @@ const enableProduct = async (_req, res) => {
 }
 
 // =====================================================
+// GET: /api/products/:id/delete-check
+// ✅ SUPERADMIN-only helper: ตรวจสอบว่า product นี้มีประวัติ/ถูกอ้างอิงแล้วหรือยัง
+// - ใช้เป็นเงื่อนไขก่อน "ลบจริง" (hard delete)
+// - Production rule: ถ้านับไม่ได้ (unknown) → ห้ามลบ (กันข้อมูลพัง)
+// =====================================================
+const getProductDeleteCheck = async (req, res) => {
+  try {
+    const id = toInt(req.params.id)
+    if (!id) return res.status(400).json({ ok: false, error: 'INVALID_ID' })
+
+    const role = String(req.user?.role || '').toUpperCase()
+    if (role !== 'SUPERADMIN') {
+      return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'อนุญาตเฉพาะ SUPERADMIN เท่านั้น' })
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { id: true, name: true, active: true },
+    })
+    if (!product) return res.status(404).json({ ok: false, error: 'NOT_FOUND' })
+
+    const usage = await computeProductUsageCounts(prisma, id)
+    if (!usage.ok) return res.status(400).json({ ok: false, error: usage.error || 'ERROR' })
+
+    const reason = usage.canHardDelete
+      ? 'NO_USAGE'
+      : (usage.hasUnknown ? 'USAGE_UNKNOWN' : 'USED_IN_SYSTEM')
+
+    return res.json({
+      ok: true,
+      product: {
+        id: product.id,
+        name: product.name,
+        active: (typeof product.active === 'boolean' ? product.active : true),
+      },
+      canHardDelete: usage.canHardDelete,
+      reason,
+      counts: usage.counts,
+    })
+  } catch (error) {
+    console.error('❌ getProductDeleteCheck error:', error)
+    return res.status(500).json({ ok: false, error: 'Internal server error' })
+  }
+}
+
+// =====================================================
+// PATCH: /api/products/:id/archive
+// ✅ SUPERADMIN-only: Soft-delete (archive) โดยใช้ Product.active=false
+// - ใช้แทน hard delete เมื่อมีประวัติการใช้แล้ว
+// =====================================================
+const archiveProduct = async (req, res) => {
+  try {
+    const id = toInt(req.params.id)
+    if (!id) return res.status(400).json({ ok: false, error: 'INVALID_ID' })
+
+    const role = String(req.user?.role || '').toUpperCase()
+    if (role !== 'SUPERADMIN') {
+      return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'อนุญาตเฉพาะ SUPERADMIN เท่านั้น' })
+    }
+
+    const updated = await prisma.product.update({
+      where: { id },
+      data: { active: false },
+      select: { id: true, name: true, active: true },
+    })
+
+    return res.json({ ok: true, success: true, product: updated })
+  } catch (error) {
+    console.error('❌ archiveProduct error:', error)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') return res.status(404).json({ ok: false, error: 'NOT_FOUND' })
+    }
+    return res.status(500).json({ ok: false, error: 'Internal server error' })
+  }
+}
+
+// =====================================================
 // DELETE: /api/products/:id
 // ✅ Policy: ลบถาวรได้เฉพาะ SUPERADMIN เท่านั้น
-// - Production guard: บล็อกการลบถ้ามีการใช้งานแล้ว (เช่น มี StockItem)
-// - หากมี FK อื่น ๆ อ้างอิงอยู่ จะคืน 409 (P2003)
+// - Production guard: บล็อกการลบถ้ามีการใช้งานแล้ว (มีประวัติอ้างอิง)
+// - หากนับ usage ไม่ได้ (unknown) → ห้ามลบ
 // =====================================================
 const deleteProduct = async (req, res) => {
   try {
@@ -1314,15 +1465,21 @@ const deleteProduct = async (req, res) => {
       return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'อนุญาตเฉพาะ SUPERADMIN เท่านั้น' })
     }
 
-    // ✅ Hard guard: ถ้ามี StockItem แล้ว → ห้ามลบ (รักษาประวัติ + กันลบข้อมูลที่ใช้งานจริง)
-    const stockItemCount = await prisma.stockItem.count({ where: { productId: id } })
-    if (stockItemCount > 0) {
+        // ✅ Production guard: ห้าม hard delete ถ้ามีประวัติการใช้งาน (หรือมี unknown)
+    const usage = await computeProductUsageCounts(prisma, id)
+    if (!usage.ok) {
+      return res.status(400).json({ ok: false, error: usage.error || 'ERROR' })
+    }
+
+    if (!usage.canHardDelete) {
       return res.status(409).json({
         ok: false,
         error: 'PRODUCT_IN_USE',
-        reason: 'STOCK_ITEM_EXISTS',
-        message: 'ไม่สามารถลบสินค้าได้ เพราะมีประวัติ StockItem อ้างอิงอยู่แล้ว',
-        stockItemCount,
+        reason: usage.hasUnknown ? 'USAGE_UNKNOWN' : 'USED_IN_SYSTEM',
+        message: usage.hasUnknown
+          ? 'ไม่สามารถลบสินค้าได้ในตอนนี้ เพราะระบบตรวจสอบประวัติการใช้งานได้ไม่ครบ (เพื่อความปลอดภัย)'
+          : 'ไม่สามารถลบสินค้าได้ เพราะมีประวัติการใช้งาน/อ้างอิงอยู่แล้ว',
+        counts: usage.counts,
       })
     }
 
@@ -1445,6 +1602,10 @@ module.exports = {
 
   disableProduct,
   enableProduct,
+
+  // ✅ SuperAdmin tools
+  getProductDeleteCheck,
+  archiveProduct,
   deleteProduct,
 
   deleteProductImage,
@@ -1454,14 +1615,6 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
-
-
-
-
-
-
-
-
 
 
 
