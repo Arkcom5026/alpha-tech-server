@@ -4,6 +4,7 @@
 
 
 
+
 // ============================================================
 // 📁 FILE: routes/productRoutes.js
 // ✅ Production-grade routing with clear public vs protected scopes
@@ -60,6 +61,10 @@ router.post('/:id/enable', productController.enableProduct)
 router.get('/:id/delete-check', productController.getProductDeleteCheck)
 router.patch('/:id/archive', productController.archiveProduct)
 
+// ✅ Alias: FE legacy/detail uses GET /api/products/:id?v=full
+// - Reuse POS detail handler (branch scope enforced by controller)
+router.get('/:id', productController.getProductPosById)
+
 // Delete (SUPERADMIN only) — hard delete (allowed only when no usage)
 router.delete('/:id', productController.deleteProduct)
 
@@ -102,6 +107,7 @@ if (productPriceController) {
 }
 
 module.exports = router
+
 
 
 
