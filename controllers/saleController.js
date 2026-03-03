@@ -3,6 +3,7 @@
 
 
 
+
  
 
 // saleController.js
@@ -538,7 +539,8 @@ const searchPrintableSales = async (req, res) => {
     const onlyUnpaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyUnpaid ?? '').toLowerCase());
 
     // ✅ optional filter: only paid (PrintBill list)
-    // "paid" here means: has at least 1 non-cancelled payment item (paidAmount > 0)
+    // "paid" here should mean: ปิดบิลแล้ว / ชำระครบแล้ว (ไม่ใช่แค่มีเงินเข้าบางส่วน)
+    // - ใช้ isFullyPaid เป็นหลัก เพื่อกันเคส partial payment หลุดเข้าหน้า "พิมพ์ใบเสร็จย้อนหลัง"
     const onlyPaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyPaid ?? '').toLowerCase());
 
     // 🔒 Guard: if both flags are sent, prefer deterministic intersection behavior
@@ -626,11 +628,15 @@ const searchPrintableSales = async (req, res) => {
     const rowsAll = sales.map((s) => {
       const totalAmount = s.totalAmount != null ? toNum(s.totalAmount) : 0;
 
-      // ✅ Prefer stored paidAmount if present (new schema), fallback to aggregated payments (backward compat)
+      // ✅ Prefer stored paidAmount when it is trustworthy, otherwise fallback to aggregated payments
+      // - บางกรณี sale.paidAmount อาจยังเป็น 0 แต่มี Payment จริงแล้ว (เช่น legacy/compat flow)
+      // - เพื่อความปลอดภัย ให้ใช้ค่าที่มากกว่าเสมอ (ไม่ทำให้ยอดหาย)
       const storedPaidAmount = s?.paidAmount != null ? toNum(s.paidAmount) : null;
 
       const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null };
-      const paidAmount = storedPaidAmount != null ? storedPaidAmount : agg.paidAmount || 0;
+      const aggPaid = agg.paidAmount || 0;
+
+      const paidAmount = storedPaidAmount == null ? aggPaid : Math.max(storedPaidAmount, aggPaid);
 
       const balanceAmount = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
       const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
@@ -666,13 +672,12 @@ const searchPrintableSales = async (req, res) => {
 
     // Apply filters deterministically
     if (bothFlags) {
+      // paidAmount > 0 AND balanceAmount > 0
       rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0 && (r?.balanceAmount ?? 0) > 0);
     } else {
       if (onlyUnpaidBool) rows = rows.filter((r) => (r?.balanceAmount ?? 0) > 0);
-      if (onlyPaidBool) rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0);
+      if (onlyPaidBool) rows = rows.filter((r) => !!r?.isFullyPaid);
     }
-    if (onlyUnpaidBool) rows = rows.filter((r) => (r?.balanceAmount ?? 0) > 0);
-    if (onlyPaidBool) rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0);
 
     return res.json(rows);
   } catch (error) {
@@ -701,6 +706,7 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
 
 
 
