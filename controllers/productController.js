@@ -2,10 +2,6 @@
 
 
 
-
-
-
-
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -808,6 +804,268 @@ const getProductsForOnline = async (req, res) => {
   }
 }
 
+
+
+
+// =====================================================
+// GET: /api/products/ready-to-sell
+// - Branch scope enforced via req.user.branchId
+// - Returns unified SUMMARY list:
+//   - STRUCTURED: aggregated by productId (qty = count of StockItem IN_STOCK)
+//   - SIMPLE: StockBalance available > 0
+// =====================================================
+const getReadyToSell = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId)
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
+
+    const q = normStr(req.query?.q || req.query?.search || req.query?.searchText)
+    const mode = String(req.query?.mode || 'ALL').toUpperCase()
+
+    const page = Math.max(1, toInt(req.query?.page) ?? 1)
+    const pageSizeRaw = toInt(req.query?.pageSize) ?? 25
+    const pageSize = Math.max(1, Math.min(pageSizeRaw, 100))
+
+    const wantStructured = mode === 'ALL' || mode === 'STRUCTURED'
+    const wantSimple = mode === 'ALL' || mode === 'SIMPLE'
+
+    // ---------- STRUCTURED SUMMARY ----------
+    let structuredItems = []
+
+    if (wantStructured) {
+      try {
+        const grouped = await prisma.stockItem.groupBy({
+          by: ['productId'],
+          where: {
+            branchId,
+            status: 'IN_STOCK',
+            ...(q
+              ? {
+                  product: {
+                    is: { name: { contains: q, mode: 'insensitive' } },
+                  },
+                }
+              : {}),
+          },
+          _count: { _all: true },
+          _max: { receivedAt: true, createdAt: true },
+        })
+
+        const productIds = grouped.map((g) => g.productId)
+
+        const products = await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: {
+            id: true,
+            name: true,
+            brandId: true,
+            brand: { select: { id: true, name: true } },
+          },
+        })
+
+        const productMap = new Map(products.map((p) => [p.id, p]))
+
+        structuredItems = grouped.map((g) => {
+          const p = productMap.get(g.productId)
+          return {
+            kind: 'STRUCTURED',
+            productId: g.productId,
+            productName: p?.name ?? null,
+            brandId: p?.brandId ?? p?.brand?.id ?? null,
+            brandName: p?.brand?.name ?? null,
+            qty: g._count._all,
+            receivedAt: g._max.receivedAt ?? g._max.createdAt ?? null,
+            hasDetails: true,
+          }
+        })
+      } catch (e) {
+        console.error('❌ structured summary failed:', e)
+        structuredItems = []
+      }
+    }
+
+    // ---------- SIMPLE SUMMARY ----------
+    let simpleItems = []
+
+    if (wantSimple) {
+      try {
+        const raw = await prisma.stockBalance.findMany({
+          where: {
+            branchId,
+            product: {
+              is: {
+                OR: [{ mode: 'SIMPLE' }, { noSN: true }],
+                ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+              },
+            },
+          },
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            reserved: true,
+            updatedAt: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                brandId: true,
+                brand: { select: { id: true, name: true } },
+              },
+            },
+          },
+        })
+
+        simpleItems = raw
+          .map((r) => {
+            const qty = Number(r.quantity ?? 0)
+            const reserved = Number(r.reserved ?? 0)
+            const available = Math.max(0, qty - reserved)
+
+            return {
+              kind: 'SIMPLE',
+              productId: r.productId,
+              productName: r.product?.name ?? null,
+              brandId: r.product?.brandId ?? r.product?.brand?.id ?? null,
+              brandName: r.product?.brand?.name ?? null,
+              qty: available,
+              receivedAt: r.updatedAt ?? null,
+              status: 'IN_STOCK',
+              hasDetails: false,
+            }
+          })
+          .filter((x) => x.qty > 0)
+      } catch (e) {
+        console.warn('⚠️ stockBalance summary failed:', e?.message || e)
+        simpleItems = []
+      }
+    }
+
+    // ---------- MERGE + PAGINATE ----------
+    const merged = [...structuredItems, ...simpleItems].sort((a, b) => {
+      const ta = a?.receivedAt ? new Date(a.receivedAt).getTime() : 0
+      const tb = b?.receivedAt ? new Date(b.receivedAt).getTime() : 0
+      return tb - ta
+    })
+
+    const total = merged.length
+
+    const start = Math.max(0, (page - 1) * pageSize)
+    const end = start + pageSize
+
+    return res.json({
+      items: merged.slice(start, end),
+      total,
+      page,
+      pageSize,
+    })
+  } catch (error) {
+    console.error('❌ getReadyToSell error:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+// =====================================================
+// GET: /api/products/ready-to-sell/structured/:productId
+// - Returns all StockItem rows (IN_STOCK) for the product in current branch
+// - Used by "รายละเอียด" page
+// =====================================================
+const getReadyToSellStructuredDetails = async (req, res) => {
+  try {
+    const branchId = Number(req.user?.branchId)
+    const productId = Number(req.params.productId)
+
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
+    if (!productId) return res.status(400).json({ error: 'invalid productId' })
+
+    const q = normStr(req.query?.q || '')
+
+    const items = await prisma.stockItem.findMany({
+      where: {
+        branchId,
+        productId,
+        status: 'IN_STOCK',
+        ...(q
+          ? {
+              OR: [
+                { barcode: { contains: q, mode: 'insensitive' } },
+                { serialNumber: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        serialNumber: true,
+        barcode: true,
+        createdAt: true,
+        receivedAt: true,
+        status: true,
+
+        // ✅ include product meta for header (readability-first)
+        product: {
+          select: {
+            id: true,
+            name: true,
+
+            // ✅ flexible product spec (BestLine) — keep SKU/Model in productConfig (no hard fields)
+            productConfig: true,
+
+            // ✅ optional extensions (safe)
+            brand: { select: { id: true, name: true } },
+            category: { select: { id: true, name: true } },
+            productType: { select: { id: true, name: true } },
+
+            // ✅ branch-specific price (if exists)
+            branchPrice: {
+              where: { branchId },
+              select: {
+                costPrice: true,
+                priceRetail: true,
+                priceWholesale: true,
+                priceTechnician: true,
+                priceOnline: true,
+                isActive: true,
+                updatedAt: true,
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+    })
+
+    return res.json({
+      items,
+      total: items.length,
+    })
+  } catch (error) {
+    console.error('❌ getReadyToSellStructuredDetails error:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
 // =====================================================
 // GET: /api/products/pos/:id
 // =====================================================
@@ -1604,6 +1862,10 @@ module.exports = {
   updateProduct,
   getProductPosById,
 
+  // ✅ Ready-to-sell (POS stock)
+  getReadyToSell,
+  getReadyToSellStructuredDetails,
+
   disableProduct,
   enableProduct,
 
@@ -1619,6 +1881,8 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
 
 
 

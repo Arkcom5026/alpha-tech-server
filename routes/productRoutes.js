@@ -3,8 +3,6 @@
 
 
 
-
-
 // ============================================================
 // 📁 FILE: routes/productRoutes.js
 // ✅ Production-grade routing with clear public vs protected scopes
@@ -45,6 +43,50 @@ router.get('/dropdowns', productController.getProductDropdowns)
 // --- POS search / detail ---
 router.get('/pos/search', productController.getProductsForPos)
 router.get('/pos/:id', productController.getProductPosById)
+
+// --- Ready-to-sell (branch-scoped) ---
+// IMPORTANT: must be declared BEFORE any '/:id' route, otherwise 'ready-to-sell' will be treated as an id
+// Final path:
+//   GET /api/products/ready-to-sell?branchId=2&mode=ALL&page=1&pageSize=25&sort=receivedAt_desc
+if (typeof productController.getReadyToSell === 'function') {
+  router.get(
+    '/ready-to-sell',
+    (req, _res, next) => {
+      try {
+        // ✅ Best-effort trace (DEV only)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[route] GET /api/products/ready-to-sell', {
+            reqId: req?.id || req?.reqId || req?.headers?.['x-request-id'] || null,
+            userId: req?.user?.id || null,
+            branchId: req?.query?.branchId || null,
+            mode: req?.query?.mode || null,
+            page: req?.query?.page || null,
+            pageSize: req?.query?.pageSize || null,
+            sort: req?.query?.sort || null,
+          })
+        }
+      } catch (_e) {
+        // ignore
+      }
+      next()
+    },
+    productController.getReadyToSell
+  )
+} else {
+  // ✅ Soft guard: clear 501 instead of being swallowed by '/:id'
+  router.get('/ready-to-sell', (_req, res) => res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL' }))
+}
+
+
+// --- Ready-to-sell (STRUCTURED details) ---
+// IMPORTANT: must be declared BEFORE any '/:id' route, otherwise it may be swallowed.
+// Final path:
+//   GET /api/products/ready-to-sell/structured/:productId?q=
+if (typeof productController.getReadyToSellStructuredDetails === 'function') {
+  router.get('/ready-to-sell/structured/:productId', productController.getReadyToSellStructuredDetails)
+} else {
+  router.get('/ready-to-sell/structured/:productId', (_req, res) => res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL_DETAILS' }))
+}
 
 // --- Admin list / CRUD ---
 router.get('/', productController.getAllProducts)
@@ -107,6 +149,8 @@ if (productPriceController) {
 }
 
 module.exports = router
+
+
 
 
 
