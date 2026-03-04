@@ -2,6 +2,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -34,6 +35,47 @@ const toDec = (v, fallback = 0) => {
   return n === undefined ? fallback : n
 }
 const toDecUndef = (v) => toNumSafeUndef(v)
+
+// ✅ Normalize BranchPrice payload (support nested + flat)
+// - preferred: data.branchPrice
+// - fallback: flat fields on root payload
+// - returns null when no price fields are provided
+const pickBranchPricePayload = (data = {}) => {
+  const d = (data && typeof data === 'object') ? data : {}
+  const bp = (d.branchPrice && typeof d.branchPrice === 'object') ? d.branchPrice : {}
+
+  const hasNested = (
+    bp.costPrice !== undefined ||
+    bp.priceWholesale !== undefined ||
+    bp.priceTechnician !== undefined ||
+    bp.priceRetail !== undefined ||
+    bp.priceOnline !== undefined ||
+    bp.isActive !== undefined
+  )
+
+  if (hasNested) return bp
+
+  const flat = {
+    costPrice: d.costPrice,
+    priceWholesale: d.priceWholesale,
+    priceTechnician: d.priceTechnician,
+    priceRetail: d.priceRetail,
+    priceOnline: d.priceOnline,
+    // allow a couple of aliases without breaking old FE
+    isActive: (d.branchPriceActive ?? d.isActive),
+  }
+
+  const hasFlat = (
+    flat.costPrice !== undefined ||
+    flat.priceWholesale !== undefined ||
+    flat.priceTechnician !== undefined ||
+    flat.priceRetail !== undefined ||
+    flat.priceOnline !== undefined ||
+    flat.isActive !== undefined
+  )
+
+  return hasFlat ? flat : null
+}
 
 // Auto-learn: create mapping Brand ↔ ProductType (idempotent)
 // - only when both ids are present
@@ -250,6 +292,8 @@ const computeProductUsageCounts = async (db, productId) => {
     counts,
   }
 }
+
+
 
 // =====================================================
 // GET: /api/products (admin list)
@@ -1418,29 +1462,32 @@ const createProduct = async (req, res) => {
     // ✅ auto-learn mapping (non-fatal)
     await autoLearnProductTypeBrand(prisma, typeCheck.productTypeId, data.brandId)
 
+    const bp = pickBranchPricePayload(data)
 
-    const bp = data.branchPrice || {}
-    await prisma.branchPrice.upsert({
-      where: { productId_branchId: { productId: newProduct.id, branchId } },
-      update: {
-        costPrice: toDecUndef(bp.costPrice),
-        priceWholesale: toDecUndef(bp.priceWholesale),
-        priceTechnician: toDecUndef(bp.priceTechnician),
-        priceRetail: toDecUndef(bp.priceRetail),
-        priceOnline: toDecUndef(bp.priceOnline),
-        isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : undefined),
-      },
-      create: {
-        productId: newProduct.id,
-        branchId,
-        costPrice: toDec(bp.costPrice, 0),
-        priceWholesale: toDec(bp.priceWholesale, 0),
-        priceTechnician: toDec(bp.priceTechnician, 0),
-        priceRetail: toDec(bp.priceRetail, 0),
-        priceOnline: toDec(bp.priceOnline, 0),
-        isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : true),
-      },
-    })
+    // ✅ ถ้ามีข้อมูลราคา (nested/flat) ค่อย upsert
+    if (bp) {
+      await prisma.branchPrice.upsert({
+        where: { productId_branchId: { productId: newProduct.id, branchId } },
+        update: {
+          costPrice: toDecUndef(bp.costPrice),
+          priceWholesale: toDecUndef(bp.priceWholesale),
+          priceTechnician: toDecUndef(bp.priceTechnician),
+          priceRetail: toDecUndef(bp.priceRetail),
+          priceOnline: toDecUndef(bp.priceOnline),
+          isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : undefined),
+        },
+        create: {
+          productId: newProduct.id,
+          branchId,
+          costPrice: toDec(bp.costPrice, 0),
+          priceWholesale: toDec(bp.priceWholesale, 0),
+          priceTechnician: toDec(bp.priceTechnician, 0),
+          priceRetail: toDec(bp.priceRetail, 0),
+          priceOnline: toDec(bp.priceOnline, 0),
+          isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : true),
+        },
+      })
+    }
 
     return res.status(201).json({ id: newProduct.id })
   } catch (error) {
@@ -1561,8 +1608,8 @@ const updateProduct = async (req, res) => {
         learnLater = { productTypeId: typeCheck.productTypeId, brandId: toInt(data.brandId) }
       }
 
-      if (data.branchPrice) {
-        const bp = data.branchPrice || {}
+      const bp = pickBranchPricePayload(data)
+      if (bp) {
         await tx.branchPrice.upsert({
           where: { productId_branchId: { productId: id, branchId } },
           update: {
