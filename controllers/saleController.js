@@ -1,5 +1,6 @@
 
 
+
  
 
 // saleController.js
@@ -304,9 +305,22 @@ const createSale = async (req, res) => {
     }
 
     const sale = await prisma.sale.findUnique({
-      where: { id: createdSale.id },
+      where: { id },
       include: {
-        branch: true,
+        // ✅ include branch fields needed for document header
+        // NOTE: if you see Prisma error "Unknown field 'taxId'", it means Branch model is missing the field.
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+            address: true,
+            phone: true,
+            taxId: true,
+            branchCode: true,
+            isHeadOffice: true,
+          },
+        },
         customer: true,
         employee: true,
         items: { include: { stockItem: { include: { product: true } } } },
@@ -417,6 +431,7 @@ const computeTotals = (sale) => {
 
 
 
+
 const getSaleById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -438,6 +453,7 @@ const getSaleById = async (req, res) => {
     if (Number(sale.branchId) !== Number(req.user?.branchId)) {
       return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
+
 
     // ✅ NEW: query flags (backward-compatible)
     const includePayments = String(req.query?.includePayments ?? '1') !== '0';
@@ -468,6 +484,11 @@ const getSaleById = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
+
+
 
 const getSalesByBranchId = async (req, res) => {
   try {
@@ -693,9 +714,66 @@ const searchPrintableSales = async (req, res) => {
     }
 
     const rowsAll = sales.map((s) => {
-      // ✅ “ยอดจริง” สำหรับ list/print: ใช้ snapshot จาก Sale เท่านั้น
-// ❗ ห้ามคำนวณจาก SaleItem เพื่อกันราคาเปลี่ยนย้อนหลัง และกัน VAT ซ้ำ
-const totalAmount = resolveCanonicalTotalAmount(s);
+      // ✅ “ยอดจริง” สำหรับ list/print: ยึด snapshot จาก Sale (ห้ามคำนวณจาก SaleItem เพื่อกันราคาเปลี่ยนย้อนหลัง)
+      // แต่ในโปรเจกต์นี้ field บางตัวมีนิยามสลับกันระหว่าง endpoint (EX-VAT vs VAT-INCLUDED)
+      // เราจึง normalize ให้ได้ “GROSS (รวม VAT แล้ว)” ที่สอดคล้องกับใบส่งของพิมพ์จริง
+      const resolveCanonicalGross = (sale) => {
+        const toN = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+        const r2 = (n) => {
+          const x = Number(n);
+          if (!Number.isFinite(x)) return 0;
+          return Math.round(x * 100) / 100;
+        };
+
+        const vatRate = (() => {
+          const n = toN(sale?.vatRate);
+          return n != null && n > 0 ? n : 7;
+        })();
+
+        // 1) totalBeforeDiscount ในระบบนี้ = GROSS (VAT-INCLUDED) (ถ้ามีให้เชื่อก่อน)
+        const gross1 = toN(sale?.totalBeforeDiscount);
+        if (gross1 != null) return r2(gross1);
+
+        // 2) ลองจาก field “gross/grand total” อื่น ๆ
+        const grossCandidates = [
+          sale?.grandTotal,
+          sale?.totalWithVat,
+          sale?.totalInclVat,
+          sale?.totalAmountGross,
+          sale?.totalFinal,
+          sale?.amountTotal,
+          sale?.total,
+        ];
+        for (const c of grossCandidates) {
+          const n = toN(c);
+          if (n != null) return r2(n);
+        }
+
+        // 3) fallback: ใช้ totalAmount + vat ตาม heuristics กันนิยามสลับ (EX vs GROSS)
+        const totalAmount = toN(sale?.totalAmount);
+        const vat = toN(sale?.vat ?? sale?.vatAmount ?? sale?.taxAmount ?? sale?.vatTotal);
+
+        if (totalAmount != null && vat != null && totalAmount > 0 && vat > 0) {
+          // ถ้า totalAmount เป็น GROSS จริง -> VAT ที่ถูกต้องควรใกล้ totalAmount * r/(100+r)
+          const expectedVatFromGross = r2((totalAmount * vatRate) / (100 + vatRate));
+          if (Math.abs(expectedVatFromGross - vat) <= 0.05) return r2(totalAmount);
+
+          // ถ้า totalAmount เป็น BEFORE-VAT -> VAT ควรใกล้ totalAmount * r/100 และ gross = totalAmount + vat
+          const expectedVatFromBefore = r2((totalAmount * vatRate) / 100);
+          if (Math.abs(expectedVatFromBefore - vat) <= 0.05) return r2(totalAmount + vat);
+
+          // default: อย่างน้อยอย่าให้ gross กลายเป็น gross+vat ซ้ำ
+          return r2(Math.max(totalAmount, totalAmount + vat));
+        }
+
+        if (totalAmount != null) return r2(totalAmount);
+        return 0;
+      };
+
+      const totalAmount = resolveCanonicalGross(s);
 
       // ✅ Prefer stored paidAmount when it is trustworthy, otherwise fallback to aggregated payments
       // - บางกรณี sale.paidAmount อาจยังเป็น 0 แต่มี Payment จริงแล้ว (เช่น legacy/compat flow)
@@ -763,6 +841,7 @@ const totalAmount = resolveCanonicalTotalAmount(s);
 
 
 
+
 // ✅ Backward-compat alias (some routes may still import getAllSalesReturn)
 const getAllSalesReturn = getAllSales;
 
@@ -775,6 +854,7 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
 
 
 

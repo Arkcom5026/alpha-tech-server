@@ -378,6 +378,11 @@ model Branch {
   address String
   phone   String?
 
+  taxId       String? @db.VarChar(13)
+  branchCode  String? @db.VarChar(5)
+  isHeadOffice Boolean @default(false)
+
+
   subdistrictCode String?
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
 
