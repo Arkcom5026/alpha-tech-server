@@ -2,13 +2,6 @@
 
 
 
-
-
-
-
-
-
-
 // server/controllers/barcodeController.js
 
 // 👉 Helper
@@ -159,7 +152,7 @@ async function _generateMissingBarcodesForReceipt(receiptId, userBranchId, opts 
 
       const pushNew = (receiptItemId, kind) => {
         const padded = String(running).padStart(4, '0');
-        const code = `${String(branchId).padStart(3, '0')}${yearMonth}${padded}`;
+        const code = `${String(branchId)}${yearMonth}${padded}`;
         newBarcodes.push({
           barcode: code,
           branchId,
@@ -480,7 +473,8 @@ const getBarcodesForPrintBatch = async (req, res) => {
 // ---- Mark single receipt as completed ----
 const markReceiptAsCompleted = async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    // ✅ support both /receipts/:receiptId/complete (canonical) and legacy /receipts/:id/complete
+    const id = toInt(req.params?.receiptId ?? req.params?.id);
     const branchId = Number(req.user?.branchId);
 
     if (!id || !branchId) {
@@ -519,11 +513,19 @@ const markReceiptAsCompleted = async (req, res) => {
 // รองรับ body หลายรูปแบบ: { purchaseOrderReceiptId } | { receiptId } | { id }
 const markBarcodesAsPrinted = async (req, res) => {
   try {
-    // ---- debug logs ----
-    console.log('[markBarcodesAsPrinted] headers.ct', req.headers['content-type']);
-    console.log('[markBarcodesAsPrinted] req.user:', req.user);
-    console.log('[markBarcodesAsPrinted] typeof body =', typeof req.body, 'body =', req.body);
-    console.log('[markBarcodesAsPrinted] req.query =', req.query);
+    // ✅ keep logs in DEV only (no noisy console in production path)
+    const devLog = (...args) => {
+      try {
+        if (process.env.NODE_ENV !== 'production') console.log(...args);
+      } catch (_) {
+        // ignore
+      }
+    };
+
+    devLog('[markBarcodesAsPrinted] headers.ct', req.headers['content-type']);
+    devLog('[markBarcodesAsPrinted] req.user:', req.user);
+    devLog('[markBarcodesAsPrinted] typeof body =', typeof req.body, 'body =', req.body);
+    devLog('[markBarcodesAsPrinted] req.query =', req.query);
 
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ message: 'unauthorized: missing branchId' });
@@ -578,7 +580,7 @@ const markBarcodesAsPrinted = async (req, res) => {
       }),
     ]);
 
-    console.log(
+    devLog(
       '[markBarcodesAsPrinted] updated items:',
       itemsResult.count,
       'receipt updated:',
@@ -676,31 +678,100 @@ const searchReprintReceipts = async (req, res) => {
 
   const mode = String(req.query?.mode || 'RC').toUpperCase();
   const q = String(req.query?.query || '').trim();
+  const supplierKeyword = String(req.query?.supplierKeyword || '').trim();
   const printedFlag = String(req.query?.printed ?? 'true').toLowerCase() === 'true';
 
-  if (!q) {
-    return res.json([]); // ไม่มีคำค้น → คืน array ว่าง
+  // ✅ limit clamp (production-grade)
+  const rawLimit = Number(req.query?.limit ?? 50);
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 50) : 50;
+
+  // ไม่มีคำค้นเลย → คืน array ว่าง
+  if (!q && !supplierKeyword) {
+    return res.json([]);
   }
 
   try {
     const where = {
       branchId,
+      // NOTE: รักษาพฤติกรรมเดิมเพื่อไม่กระทบ flow ที่ใช้งานอยู่
+      // - printed=true  → ต้องมี barcode ที่ printed=true อย่างน้อย 1
+      // - printed=false → มี barcode อะไรก็ได้ (some:{})
       barcodeReceiptItem: printedFlag ? { some: { printed: true } } : { some: {} },
     };
 
+    const qFilter = q ? { contains: q, mode: 'insensitive' } : null;
+    const supFilter = supplierKeyword ? { contains: supplierKeyword, mode: 'insensitive' } : null;
+
     if (mode === 'RC') {
-      where.code = { contains: q, mode: 'insensitive' };
+      if (qFilter) where.code = qFilter;
+      if (supFilter) {
+        where.purchaseOrder = {
+          is: {
+            supplier: {
+              is: { name: supFilter },
+            },
+          },
+        };
+      }
     } else if (mode === 'PO') {
-      where.purchaseOrder = { is: { code: { contains: q, mode: 'insensitive' } } };
+      where.purchaseOrder = {
+        is: {
+          ...(qFilter ? { code: qFilter } : {}),
+          ...(supFilter
+            ? {
+                supplier: {
+                  is: { name: supFilter },
+                },
+              }
+            : {}),
+        },
+      };
+    } else if (mode === 'SUP') {
+      // ค้น supplier อย่างเดียว (เหมาะกับ supplier name search)
+      where.purchaseOrder = {
+        is: {
+          supplier: {
+            is: { name: supFilter || qFilter || { contains: '', mode: 'insensitive' } },
+          },
+        },
+      };
+    } else if (mode === 'ALL') {
+      // ERP-style: ค้นรวม (RC/PO/Supplier) แต่ยังคง branch scope + printed filter
+      const or = [];
+      if (qFilter) {
+        or.push({ code: qFilter });
+        or.push({ purchaseOrder: { is: { code: qFilter } } });
+      }
+      if (supFilter) {
+        or.push({ purchaseOrder: { is: { supplier: { is: { name: supFilter } } } } });
+      }
+      if (or.length > 0) where.OR = or;
+    } else {
+      // fallback: ถ้า mode ไม่รู้จัก ให้ถือว่าเป็น RC
+      if (qFilter) where.code = qFilter;
+      if (supFilter) {
+        where.purchaseOrder = {
+          is: {
+            supplier: {
+              is: { name: supFilter },
+            },
+          },
+        };
+      }
     }
 
     const receipts = await prisma.purchaseOrderReceipt.findMany({
       where,
       include: {
-        purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
+        purchaseOrder: {
+          select: {
+            code: true,
+            supplier: { select: { name: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: limit,
     });
 
     const rows = receipts.map((r) => ({
@@ -717,6 +788,8 @@ const searchReprintReceipts = async (req, res) => {
     return res.status(500).json({ message: 'ค้นหาใบรับสำหรับพิมพ์ซ้ำล้มเหลว' });
   }
 };
+
+
 
 // PATCH /api/barcodes/reprint/:receiptId
 const reprintBarcodes = async (req, res) => {
@@ -1208,6 +1281,15 @@ module.exports = {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
 };
+
+
+
+
+
+
+
+
+
 
 
 

@@ -4,8 +4,6 @@
 
 
 
-
-
 // purchaseOrderReceiptController.js
 
 const dayjs = require('dayjs');
@@ -171,6 +169,14 @@ const createPurchaseOrderReceipt = async (req, res) => {
 // ---- List Receipts ---- แสดงรายการใบตรวจรับรอยิงบาร์โค้ด (พร้อม Supplier และตัวกรอง printed)
 const getAllPurchaseOrderReceipts = async (req, res) => {
   try {
+    // ✅ Hard-disable caching for list endpoints (prevents 304 + empty body issues)
+    // POS/ERP list APIs must always return a fresh payload.
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    // Force a unique ETag per request to avoid conditional 304 responses in some proxies/browsers
+    // (minimal disruption: route-level only; no global app setting changes)
+    res.set('ETag', `W/"${Date.now()}"`);
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
@@ -202,7 +208,14 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
       printed: r.printed,
     }));
 
-    console.log('[getAllPurchaseOrderReceipts] (unprinted only) count:', items.length);
+    // ✅ keep logs in DEV only
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[getAllPurchaseOrderReceipts] (unprinted only) count:', items.length);
+      }
+    } catch (_) {
+      // ignore
+    }
     return res.json(items);
   } catch (error) {
     console.error('❌ [getAllPurchaseOrderReceipts] error:', error);
@@ -1033,6 +1046,8 @@ module.exports = {
   printReceipt,
   commitReceipt,
 };
+
+
 
 
 

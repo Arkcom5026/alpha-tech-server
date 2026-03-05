@@ -1,3 +1,5 @@
+
+
 // server/routes/barcodeRoutes.js
 const express = require('express');
 const router = express.Router();
@@ -6,6 +8,7 @@ const router = express.Router();
 const {
   generateMissingBarcodes,
   getBarcodesByReceiptId,
+  getBarcodesForPrintBatch,
   getReceiptsWithBarcodes,
   searchReprintReceipts,
   reprintBarcodes,
@@ -27,6 +30,9 @@ router.get('/by-receipt/:receiptId', getBarcodesByReceiptId);
 
 // 🔎 ตรวจสุขภาพบาร์โค้ดของใบรับ (อ่านอย่างเดียว)
 router.get('/receipt/:receiptId/audit', auditReceiptBarcodes);
+
+// ✅ ดึงบาร์โค้ดสำหรับพิมพ์หลายใบแบบ batch (เร็ว/ลด N+1)
+router.get('/print-batch', getBarcodesForPrintBatch);
 
 // ✅ ดึงรายการใบรับที่มีบาร์โค้ด (ไว้ทำลิสต์)
 router.get('/with-barcodes', getReceiptsWithBarcodes);
@@ -51,6 +57,9 @@ router.patch('/mark-printed', markBarcodesAsPrinted);
 router.patch('/reprint/:receiptId', reprintBarcodes);
 
 // ✅ ปิดงานใบรับ (complete) — แยก endpoint ชัดเจน
+// canonical route
+router.patch('/receipts/:receiptId/complete', markReceiptAsCompleted);
+// backward‑compatible alias (FE เก่าอาจยังใช้ :id)
 router.patch('/receipts/:id/complete', markReceiptAsCompleted);
 
 module.exports = router;
