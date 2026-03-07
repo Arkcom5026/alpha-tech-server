@@ -5,6 +5,7 @@
 
 
 
+
 //  @filename: server.js
 
 const express = require('express');
@@ -72,6 +73,7 @@ const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptS
 const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const financeRoutes = require('./routes/financeRoutes');
+const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -167,6 +169,7 @@ app.use('/api/units', unitRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/customer-deposits', customerDepositRoutes);
+app.use('/api/customer-receipts', customerReceiptRoutes);
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/brands', brandRoutes);

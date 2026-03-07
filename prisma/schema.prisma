@@ -1,6 +1,4 @@
 
-
-
 generator client {
   provider = "prisma-client-js"
   // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
@@ -180,6 +178,7 @@ enum PaymentMethod {
   CASH
   TRANSFER
   CARD
+  DEPOSIT
   QR
   E_WALLET
   CHEQUE
@@ -229,6 +228,12 @@ enum SimpleLotStatus {
   CLOSED
 }
 
+enum CustomerReceiptStatus {
+  ACTIVE
+  FULLY_ALLOCATED
+  CANCELLED
+}
+
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique
@@ -272,13 +277,15 @@ model CustomerProfile {
   cart     Cart[]
   services ServiceOrder[]
 
-  sale            Sale[]
-  orderOnline     OrderOnline[]
-  customerDeposit CustomerDeposit[]
+  sales            Sale[]
+  orderOnlines     OrderOnline[]
+  customerDeposits CustomerDeposit[]
+  customerReceipts CustomerReceipt[]
 
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  combinedBillingDocument CombinedBillingDocument[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  combinedBillingDocuments CombinedBillingDocument[]
 
   @@index([subdistrictCode])
 }
@@ -352,14 +359,17 @@ model EmployeeProfile {
   approved             Boolean         @default(false)
   active               Boolean         @default(true)
 
-  stockItem            StockItem[]
-  sale                 Sale[]
-  saleReturns          SaleReturn[]
-  refundedReturns      SaleReturn[]           @relation("RefundedBy")
-  payment              Payment[]
-  combinedSaleDocument CombinedSaleDocument[]
-  refundTransaction    RefundTransaction[]
-  supplierPayment      SupplierPayment[]
+  stockItem                         StockItem[]
+  sale                              Sale[]
+  saleReturns                       SaleReturn[]
+  refundedReturns                   SaleReturn[]                @relation("RefundedBy")
+  payment                           Payment[]
+  combinedSaleDocument              CombinedSaleDocument[]
+  refundTransaction                 RefundTransaction[]
+  supplierPayment                   SupplierPayment[]
+  createdCustomerReceipts           CustomerReceipt[]           @relation("CustomerReceiptCreatedBy")
+  cancelledCustomerReceipts         CustomerReceipt[]           @relation("CustomerReceiptCancelledBy")
+  createdCustomerReceiptAllocations CustomerReceiptAllocation[] @relation("CustomerReceiptAllocationCreatedBy")
 
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
@@ -378,10 +388,9 @@ model Branch {
   address String
   phone   String?
 
-  taxId       String? @db.VarChar(13)
-  branchCode  String? @db.VarChar(5)
+  taxId        String? @db.VarChar(13)
+  branchCode   String? @db.VarChar(5)
   isHeadOffice Boolean @default(false)
-
 
   subdistrictCode String?
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
@@ -408,6 +417,7 @@ model Branch {
   refundTransaction    RefundTransaction[]
   supplierPayment      SupplierPayment[]
   customerDeposit      CustomerDeposit[]
+  customerReceipts     CustomerReceipt[]
   orderOnline          OrderOnline[]
 
   combinedBillingDocument CombinedBillingDocument[]
@@ -1254,8 +1264,8 @@ model Sale {
   paidAt              DateTime?
 
   // ✅ AR (Accounts Receivable) baseline: status + paid amount for partial payments
-  statusPayment         PaymentStatus @default(UNPAID)
-  paidAmount            Decimal       @default(0) @db.Decimal(12, 2)
+  statusPayment PaymentStatus @default(UNPAID)
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
 
   isCredit               Boolean               @default(false)
   dueDate                DateTime?
@@ -1265,22 +1275,23 @@ model Sale {
   combinedDocumentId     Int?
   combinedDocument       CombinedSaleDocument? @relation("SalesCombined", fields: [combinedDocumentId], references: [id], onDelete: Cascade)
 
-  customer    CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  employee    EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  branch      Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  items       SaleItem[]
-  simpleItems SaleItemSimple[]
-  returns     SaleReturn[]
+  customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  employee EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch   Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  Payment      Payment[]
-  DepositUsage DepositUsage[]
+  items         SaleItem[]
+  simpleItems   SaleItemSimple[]
+  returns       SaleReturn[]
+  payments      Payment[]
+  depositUsages DepositUsage[]
 
-  combinedBillingId    Int?
-  combinedBilling      CombinedBillingDocument? @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
-  SaleReturnItemSimple SaleReturnItemSimple[]
-  salesTaxFilingItems  SalesTaxFilingItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  combinedBillingId          Int?
+  combinedBilling            CombinedBillingDocument?    @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id], onDelete: Cascade)
+  salesTaxFilingItems        SalesTaxFilingItem[]
+  customerReceiptAllocations CustomerReceiptAllocation[]
 
   @@index([combinedBillingId])
   @@index([branchId, soldAt])
@@ -1362,9 +1373,9 @@ model Payment {
 
   items PaymentItem[]
 
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  DepositUsage DepositUsage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  depositUsages DepositUsage[]
 
   @@index([saleId])
   @@index([branchId, receivedAt])
@@ -1406,22 +1417,23 @@ model CombinedSaleDocument {
 }
 
 model SaleReturn {
-  id                   Int              @id @default(autoincrement())
-  code                 String           @unique
-  saleId               Int
-  returnedAt           DateTime         @default(now())
-  employeeId           Int
-  refundedByEmployeeId Int?
-  branchId             Int
-  reason               String?
-  totalRefund          Decimal          @db.Decimal(12, 2)
-  refundedAmount       Decimal          @default(0) @db.Decimal(12, 2)
-  deductedAmount       Decimal          @default(0) @db.Decimal(12, 2)
-  isFullyRefunded      Boolean          @default(false)
-  refundMethod         RefundMethod
-  returnType           ReturnType       @default(REFUND)
-  note                 String?
-  status               SaleReturnStatus @default(PENDING)
+  id                    Int                    @id @default(autoincrement())
+  code                  String                 @unique
+  saleId                Int
+  returnedAt            DateTime               @default(now())
+  employeeId            Int
+  refundedByEmployeeId  Int?
+  branchId              Int
+  reason                String?
+  totalRefund           Decimal                @db.Decimal(12, 2)
+  refundedAmount        Decimal                @default(0) @db.Decimal(12, 2)
+  deductedAmount        Decimal                @default(0) @db.Decimal(12, 2)
+  isFullyRefunded       Boolean                @default(false)
+  refundMethod          RefundMethod
+  returnType            ReturnType             @default(REFUND)
+  note                  String?
+  status                SaleReturnStatus       @default(PENDING)
+  saleReturnItemSimples SaleReturnItemSimple[]
 
   sale       Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
   employee   EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -1699,12 +1711,78 @@ model SaleReturnItemSimple {
   reason           String?
   reasonCode       String?
 
-  saleReturn     Sale           @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleReturn     SaleReturn     @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
   saleItemSimple SaleItemSimple @relation(fields: [saleItemSimpleId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model CustomerReceipt {
+  id   Int    @id @default(autoincrement())
+  code String @unique
+
+  branchId   Int
+  customerId Int
+
+  receivedAt DateTime @default(now())
+
+  totalAmount     Decimal @db.Decimal(12, 2)
+  allocatedAmount Decimal @default(0) @db.Decimal(12, 2)
+  remainingAmount Decimal @db.Decimal(12, 2)
+
+  paymentMethod PaymentMethod
+  referenceNo   String?
+  note          String?
+  status        CustomerReceiptStatus @default(ACTIVE)
+
+  createdByEmployeeProfileId   Int?
+  cancelledByEmployeeProfileId Int?
+  cancelledAt                  DateTime?
+  cancelReason                 String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch                     Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer                   CustomerProfile  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdByEmployeeProfile   EmployeeProfile? @relation("CustomerReceiptCreatedBy", fields: [createdByEmployeeProfileId], references: [id], onDelete: SetNull)
+  cancelledByEmployeeProfile EmployeeProfile? @relation("CustomerReceiptCancelledBy", fields: [cancelledByEmployeeProfileId], references: [id], onDelete: SetNull)
+
+  allocations CustomerReceiptAllocation[]
+
+  @@index([branchId, receivedAt])
+  @@index([customerId, receivedAt])
+  @@index([status])
+  @@map("CustomerReceipts")
+}
+
+model CustomerReceiptAllocation {
+  id Int @id @default(autoincrement())
+
+  receiptId Int
+  saleId    Int
+
+  amount Decimal @db.Decimal(12, 2)
+  note   String?
+
+  allocatedAt DateTime @default(now())
+
+  createdByEmployeeProfileId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  receipt                  CustomerReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  sale                     Sale             @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  createdByEmployeeProfile EmployeeProfile? @relation("CustomerReceiptAllocationCreatedBy", fields: [createdByEmployeeProfileId], references: [id], onDelete: SetNull)
+
+  @@index([receiptId, allocatedAt])
+  @@index([saleId, allocatedAt])
+  @@index([createdByEmployeeProfileId])
+  @@map("CustomerReceiptAllocations")
+}
+
 
 
 
