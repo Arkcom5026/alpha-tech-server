@@ -177,12 +177,79 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
     // Force a unique ETag per request to avoid conditional 304 responses in some proxies/browsers
     // (minimal disruption: route-level only; no global app setting changes)
     res.set('ETag', `W/"${Date.now()}"`);
+
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
 
-    // ใช้เฉพาะคิว "ยังไม่ได้พิมพ์" เท่านั้น (unprinted queue)
+    // รองรับ query ?printed=true/false สำหรับสลับโหมด ยังไม่ได้พิมพ์ / พิมพ์ซ้ำ
+    // - printed=false => คิวรอพิมพ์
+    // - printed=true  => คิวพิมพ์ซ้ำ
+    // - ไม่ส่งค่า      => แสดงทั้งหมด
+    const printedParam = typeof req.query?.printed === 'string' ? req.query.printed.toLowerCase() : undefined;
+    const printedFilter = printedParam === 'true' ? true : printedParam === 'false' ? false : undefined;
+
+    // ✅ รองรับค้นหาเฉพาะรายการที่ต้องการในโหมดพิมพ์ซ้ำ
+    // q         = ค้นด้วย RC/PO code
+    // supplier  = ค้นด้วยชื่อ supplier (free text)
+    // supplierId= กรองด้วย supplier id จาก dropdown
+    const qRaw = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    const supplierRaw = typeof req.query?.supplier === 'string' ? req.query.supplier.trim() : '';
+    const supplierIdRaw = req.query?.supplierId;
+    const supplierId = supplierIdRaw === undefined || supplierIdRaw === null || supplierIdRaw === ''
+      ? undefined
+      : Number(supplierIdRaw);
+
+    const andWhere = [{ branchId }];
+
+    if (typeof printedFilter === 'boolean') {
+      andWhere.push({ printed: printedFilter });
+    }
+
+    if (qRaw) {
+      andWhere.push({
+        OR: [
+          { code: { contains: qRaw, mode: 'insensitive' } },
+          {
+            purchaseOrder: {
+              is: {
+                code: { contains: qRaw, mode: 'insensitive' },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    if (supplierRaw) {
+      andWhere.push({
+        purchaseOrder: {
+          is: {
+            supplier: {
+              is: {
+                name: { contains: supplierRaw, mode: 'insensitive' },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (Number.isFinite(supplierId)) {
+      andWhere.push({
+        purchaseOrder: {
+          is: {
+            supplier: {
+              is: {
+                id: supplierId,
+              },
+            },
+          },
+        },
+      });
+    }
+
     const receipts = await prisma.purchaseOrderReceipt.findMany({
-      where: { branchId, printed: false },
+      where: { AND: andWhere },
       select: {
         id: true,
         code: true,
@@ -191,7 +258,7 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
         purchaseOrder: {
           select: {
             code: true,
-            supplier: { select: { name: true } },
+            supplier: { select: { id: true, name: true } },
           },
         },
       },
@@ -203,6 +270,7 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
       id: r.id,
       receiptCode: r.code,
       poCode: r.purchaseOrder?.code || '-',
+      supplierId: r.purchaseOrder?.supplier?.id || null,
       supplierName: r.purchaseOrder?.supplier?.name || '-',
       receivedAt: r.receivedAt,
       printed: r.printed,
@@ -211,19 +279,24 @@ const getAllPurchaseOrderReceipts = async (req, res) => {
     // ✅ keep logs in DEV only
     try {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[getAllPurchaseOrderReceipts] (unprinted only) count:', items.length);
+        console.log('[getAllPurchaseOrderReceipts] filters:', {
+          printedFilter,
+          qRaw,
+          supplierRaw,
+          supplierId,
+          count: items.length,
+        });
       }
     } catch (_) {
       // ignore
     }
+
     return res.json(items);
   } catch (error) {
     console.error('❌ [getAllPurchaseOrderReceipts] error:', error);
     return res.status(500).json({ error: 'ไม่สามารถโหลดรายการใบรับสินค้าได้' });
   }
 };
-
-
 
 // ---- Get Receipt by ID (with supplier debitAmount) ----
 const getPurchaseOrderReceiptById = async (req, res) => {
@@ -1046,11 +1119,6 @@ module.exports = {
   printReceipt,
   commitReceipt,
 };
-
-
-
-
-
 
 
 
