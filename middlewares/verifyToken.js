@@ -1,11 +1,22 @@
 
+
 // server/middlewares/verifyToken.js
+
 const jwt = require('jsonwebtoken');
 
 const normalizeRole = (r) => {
   const v = (r || '').toString().trim().toLowerCase();
-  if (v === 'supperadmin') return 'superadmin';
-  return v;
+
+  // normalize common typos
+  const fixed = v === 'supperadmin' ? 'superadmin' : v;
+
+  // return CANONICAL UPPERCASE role to match controllers / Prisma enum
+  if (fixed === 'superadmin') return 'SUPERADMIN';
+  if (fixed === 'admin') return 'ADMIN';
+  if (fixed === 'employee') return 'EMPLOYEE';
+  if (fixed === 'customer') return 'CUSTOMER';
+
+  return fixed.toUpperCase();
 };
 
 const normalizeProfileType = (t) => {
@@ -35,17 +46,18 @@ const normalizeProfileType = (t) => {
 };
 
 const deriveProfileTypeFromRole = (role, currentProfileType, decoded) => {
-  const r = normalizeRole(role);
+  const r = (role || '').toString().toLowerCase();
   const pt = normalizeProfileType(currentProfileType);
 
   // ✅ Priority rule (P1): If user can be both customer + employee, always prefer employee context.
+
   // 1) Role group that implies employee context
   if (['employee', 'admin', 'superadmin'].includes(r)) return 'employee';
 
   // 2) If token/profileType indicates employee (even if role is messy)
   if (pt === 'employee') return 'employee';
 
-  // 3) If employeeId exists in token, prefer employee (acts as a strong signal)
+  // 3) If employeeId exists in token, prefer employee
   if (decoded?.employeeId) return 'employee';
 
   // Customer
@@ -113,5 +125,6 @@ const verifyToken = (req, res, next) => {
 };
 
 module.exports = verifyToken;
+
 
 

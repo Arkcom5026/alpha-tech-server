@@ -1,3 +1,4 @@
+
 // customerController.js — aligned with CartController style (Prisma import, helpers, transactions)
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -227,7 +228,7 @@ const createCustomer = async (req, res) => {
           companyName: companyName || null,
           taxId: taxId || null,
           addressDetail: typeof addressDetail === 'string' ? addressDetail.trim() : null,
-          ...(subdistrictCode ? { subdistrict: { connect: { code: subdistrictCode } } } : {}),
+          ...(subdistrictCode ? { subdistrictCode } : {}),
         },
         include: { user: true, subdistrict: { include: { district: { include: { province: true } } } } },
       });
@@ -323,11 +324,9 @@ const updateCustomerProfile = async (req, res) => {
         where: { id },
         data: {
           ...profileData,
-          ...(subdistrictCode
-            ? { subdistrict: { connect: { code: subdistrictCode } } }
-            : subdistrictCode === null
-              ? { subdistrict: { disconnect: true } }
-              : {}),
+          ...(subdistrictCode !== undefined
+            ? { subdistrictCode: subdistrictCode || null }
+            : {}),
         },
       });
 
@@ -415,11 +414,9 @@ const updateCustomerProfileOnline = async (req, res) => {
           data: {
             ...profileData,
             ...emailPatch,
-            ...(subdistrictCode
-              ? { subdistrict: { connect: { code: subdistrictCode } } }
-              : subdistrictCode === null
-                ? { subdistrict: { disconnect: true } }
-                : {}),
+            ...(subdistrictCode !== undefined
+              ? { subdistrictCode: subdistrictCode || null }
+              : {}),
           },
         });
       } else {
@@ -428,7 +425,7 @@ const updateCustomerProfileOnline = async (req, res) => {
             userId: user.id,
             ...profileData,
             ...emailPatch,
-            ...(subdistrictCode ? { subdistrict: { connect: { code: subdistrictCode } } } : {}),
+            ...(subdistrictCode ? { subdistrictCode } : {}),
           },
         });
       }
@@ -477,6 +474,7 @@ module.exports = {
   updateCustomerProfile,
   updateCustomerProfileOnline,
 };
+
 
 
 

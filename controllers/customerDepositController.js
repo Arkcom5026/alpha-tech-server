@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 /* eslint-env node */
 // controllers/customerDepositController.js (updated)
 
@@ -18,6 +25,9 @@ const normalizeDeposit = (dep) => {
   for (const k of ['cashAmount', 'transferAmount', 'cardAmount', 'usedAmount', 'totalAmount']) {
     if (k in out && out[k] != null) out[k] = toNum(out[k]);
   }
+  const total = out.totalAmount != null ? Number(out.totalAmount) : 0;
+  const used = out.usedAmount != null ? Number(out.usedAmount) : 0;
+  out.remainingAmount = Number((total - used).toFixed(2));
   return out;
 };
 
@@ -60,6 +70,36 @@ const projectDeposit = (dep) => {
     },
   };
 };
+
+const getDepositRemainingDecimal = (dep) => {
+  const total = dep?.totalAmount ?? 0;
+  const used = dep?.usedAmount ?? 0;
+  return new Prisma.Decimal(total).minus(new Prisma.Decimal(used));
+};
+
+const sumDeposits = (deps = []) =>
+  deps.reduce((sum, d) => sum.plus(getDepositRemainingDecimal(d)), new Prisma.Decimal(0));
+
+const projectCustomerSummary = (customer) => {
+  const totalDeposit = sumDeposits(customer?.customerDeposits || []);
+  return {
+    id: customer.id,
+    name: customer.name || '',
+    phone: customer.user?.loginId || null,
+    email: customer.user?.email || '',
+    type: customer.type || '',
+    companyName: customer.companyName || '',
+    taxId: customer.taxId || '',
+    creditLimit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(customer.creditLimit || 0) : customer.creditLimit,
+    creditBalance: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(customer.creditBalance || 0) : customer.creditBalance,
+    subdistrictCode: customer.subdistrictCode || null,
+    addressDetail: customer.addressDetail || null,
+    customerAddress: buildCustomerAddress(customer),
+    totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
+    depositCount: Array.isArray(customer.customerDeposits) ? customer.customerDeposits.length : 0,
+  };
+};
+
 
 // ─────────────────────────────────────────────────────────────
 // Create a new customer deposit (ACTIVE)
@@ -165,19 +205,16 @@ const getCustomerAndDepositByPhone = async (req, res) => {
       include: {
         user: true,
         subdistrict: { include: { district: { include: { province: true } } } },
-        customerDeposit: {
+        customerDeposits: {
           where: { branchId, status: 'ACTIVE' },
           orderBy: { createdAt: 'desc' },
-        },
+        }
       },
     });
 
     if (!customer) return res.status(404).json({ message: 'ไม่พบลูกค้า' });
 
-    const totalDeposit = customer.customerDeposit.reduce(
-      (sum, d) => sum.plus(d.cashAmount).plus(d.transferAmount).plus(d.cardAmount),
-      new Prisma.Decimal(0),
-    );
+    const totalDeposit = sumDeposits(customer.customerDeposits);
 
     const customerOut = normalizeCustomerMoney({
       id: customer.id,
@@ -198,8 +235,8 @@ const getCustomerAndDepositByPhone = async (req, res) => {
       customer: customerOut,
       totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
       deposits: NORMALIZE_DECIMAL_TO_NUMBER
-        ? customer.customerDeposit.map(normalizeDeposit)
-        : customer.customerDeposit,
+        ? customer.customerDeposits.map(normalizeDeposit)
+        : customer.customerDeposits,
     });
   } catch (err) {
     console.error('[getCustomerAndDepositByPhone] ❌', err);
@@ -207,7 +244,7 @@ const getCustomerAndDepositByPhone = async (req, res) => {
   }
 };
 
-// Search customers by name/company and return first match + deposits
+// Search customers by name/company and return multiple matches for FE selection
 const getCustomerAndDepositByName = async (req, res) => {
   try {
     let { q } = req.query;
@@ -227,47 +264,77 @@ const getCustomerAndDepositByName = async (req, res) => {
         ],
       },
       take: 10,
+      orderBy: [{ companyName: 'asc' }, { name: 'asc' }, { id: 'asc' }],
       include: {
         user: true,
         subdistrict: { include: { district: { include: { province: true } } } },
-        customerDeposit: { where: { branchId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' } },
+        customerDeposits: { where: { branchId, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' } },
       },
     });
 
     if (!customers.length) return res.status(404).json({ error: 'ไม่พบลูกค้า' });
 
-    const c = customers[0];
-    const totalDeposit =
-      c.customerDeposit?.reduce(
-        (sum, d) => sum.plus(d.cashAmount).plus(d.transferAmount).plus(d.cardAmount),
-        new Prisma.Decimal(0),
-      ) || new Prisma.Decimal(0);
+    return res.json({
+      query: q,
+      count: customers.length,
+      results: customers.map(projectCustomerSummary),
+    });
+  } catch (err) {
+    console.error('[getCustomerAndDepositByName] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
+  }
+};
+
+// Get single customer + deposits by customerId (branch scoped)
+const getCustomerAndDepositByCustomerId = async (req, res) => {
+  try {
+    const customerId = parseInt(req.params.customerId, 10);
+    const branchId = Number(req.user?.branchId);
+
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+    if (isNaN(customerId)) return res.status(400).json({ error: 'customerId ไม่ถูกต้อง' });
+
+    const customer = await prisma.customerProfile.findFirst({
+      where: { id: customerId },
+      include: {
+        user: true,
+        subdistrict: { include: { district: { include: { province: true } } } },
+        customerDeposits: {
+          where: { branchId, status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!customer) return res.status(404).json({ message: 'ไม่พบลูกค้า' });
+
+    const totalDeposit = sumDeposits(customer.customerDeposits);
 
     const customerOut = normalizeCustomerMoney({
-      id: c.id,
-      name: c.name,
-      phone: c.user?.loginId || null,
-      email: c.user?.email || '',
-      type: c.type || '',
-      companyName: c.companyName || '',
-      taxId: c.taxId || '',
-      creditLimit: c.creditLimit,
-      creditBalance: c.creditBalance,
-      subdistrictCode: c.subdistrictCode || null,
-      addressDetail: c.addressDetail || null,
-      customerAddress: buildCustomerAddress(c),
+      id: customer.id,
+      name: customer.name,
+      phone: customer.user?.loginId || null,
+      email: customer.user?.email || '',
+      type: customer.type,
+      companyName: customer.companyName,
+      taxId: customer.taxId,
+      creditLimit: customer.creditLimit,
+      creditBalance: customer.creditBalance,
+      subdistrictCode: customer.subdistrictCode || null,
+      addressDetail: customer.addressDetail || null,
+      customerAddress: buildCustomerAddress(customer),
     });
 
     return res.json({
       customer: customerOut,
       totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
       deposits: NORMALIZE_DECIMAL_TO_NUMBER
-        ? c.customerDeposit.map(normalizeDeposit)
-        : c.customerDeposit,
+        ? customer.customerDeposits.map(normalizeDeposit)
+        : customer.customerDeposits,
     });
   } catch (err) {
-    console.error('[getCustomerAndDepositByName] ❌', err);
-    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาชื่อลูกค้าและเงินมัดจำ' });
+    console.error('[getCustomerAndDepositByCustomerId] ❌', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูลลูกค้าและเงินมัดจำ' });
   }
 };
 
@@ -350,6 +417,14 @@ const useCustomerDeposit = async (req, res) => {
     });
     if (!deposit) return res.status(404).json({ message: 'ไม่พบรายการมัดจำ' });
 
+    const sale = await prisma.sale.findFirst({
+      where: { id: Number(saleId), branchId },
+      select: { id: true, branchId: true },
+    });
+    if (!sale) {
+      return res.status(404).json({ message: 'ไม่พบรายการขายในสาขาปัจจุบัน' });
+    }
+
     const already = deposit.usedAmount || new Prisma.Decimal(0);
     const remain = deposit.totalAmount.minus(already);
     const useAmt = D(amountUsed);
@@ -358,26 +433,46 @@ const useCustomerDeposit = async (req, res) => {
       return res.status(400).json({ message: 'ยอดมัดจำไม่พอสำหรับการใช้งาน' });
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1) Log usage
+    const result = await prisma.$transaction(async (tx) => {
       await tx.depositUsage.create({
         data: { customerDepositId: deposit.id, saleId: Number(saleId), amountUsed: useAmt },
       });
-      // 2) Update running used amount
+
       const updated = await tx.customerDeposit.update({
         where: { id: deposit.id },
         data: { usedAmount: already.plus(useAmt), usedSaleId: Number(saleId) },
       });
-      // 3) Set status to USED only when fully consumed
-      const newStatus = updated.usedAmount.greaterThanOrEqualTo(updated.totalAmount)
-        ? 'USED'
-        : 'ACTIVE';
-      if (newStatus !== deposit.status) {
-        await tx.customerDeposit.update({ where: { id: deposit.id }, data: { status: newStatus } });
+
+      const remainingAmount = updated.totalAmount.minus(updated.usedAmount);
+      const newStatus = remainingAmount.lessThanOrEqualTo(0) ? 'USED' : 'ACTIVE';
+
+      let finalDeposit = updated;
+      if (newStatus !== updated.status) {
+        finalDeposit = await tx.customerDeposit.update({
+          where: { id: deposit.id },
+          data: { status: newStatus },
+        });
       }
+
+      return {
+        depositId: finalDeposit.id,
+        usedAmount: finalDeposit.usedAmount,
+        totalAmount: finalDeposit.totalAmount,
+        remainingAmount: finalDeposit.totalAmount.minus(finalDeposit.usedAmount),
+        status: finalDeposit.status,
+        saleId: Number(saleId),
+      };
     });
 
-    return res.json({ message: 'ใช้มัดจำสำเร็จ' });
+    return res.json({
+      message: 'ใช้มัดจำสำเร็จ',
+      depositId: result.depositId,
+      saleId: result.saleId,
+      usedAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(result.usedAmount) : result.usedAmount,
+      totalAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(result.totalAmount) : result.totalAmount,
+      remainingAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(result.remainingAmount) : result.remainingAmount,
+      status: result.status,
+    });
   } catch (err) {
     console.error('❌ useCustomerDeposit error:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการใช้เงินมัดจำ' });
@@ -391,7 +486,12 @@ module.exports = {
   updateCustomerDeposit,
   deleteCustomerDeposit,
   getCustomerAndDepositByPhone,
+  getCustomerAndDepositByCustomerId,
   useCustomerDeposit,
   getCustomerAndDepositByName,
 };
+
+
+
+
 

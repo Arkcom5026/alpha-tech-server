@@ -1,3 +1,5 @@
+
+
 // customerDepositRoutes.js (อัปเดตตามแนวทางใหม่ - ใช้เฉพาะ endpoint ที่จำเป็น)
 
 const express = require('express');
@@ -12,6 +14,7 @@ const {
   deleteCustomerDeposit,
   getCustomerAndDepositByPhone,
   getCustomerAndDepositByName,
+  getCustomerAndDepositByCustomerId,
   useCustomerDeposit,
 } = require('../controllers/customerDepositController');
 
@@ -23,9 +26,14 @@ router.post('/', createCustomerDeposit);
 // ✅ Read All
 router.get('/', getAllCustomerDeposits);
 
-// ✅ ดึงข้อมูลลูกค้า + ยอดเงินมัดจำ ด้วยชื่อ
+// ✅ ดึงรายการลูกค้าตามชื่อ/ชื่อหน่วยงาน เพื่อให้ผู้ใช้เลือกก่อน
 router.get('/by-name', getCustomerAndDepositByName);
 
+// ✅ ดึงข้อมูลลูกค้า 1 รายการ + ยอดเงินมัดจำ หลังผู้ใช้เลือกจากผลค้นหา
+router.get('/by-customer/:customerId', getCustomerAndDepositByCustomerId);
+
+// ✅ ดึงข้อมูลลูกค้า + ยอดเงินมัดจำ (ใช้ใน DepositPage)
+router.get('/by-phone/:phone', getCustomerAndDepositByPhone);
 
 // ✅ Read One
 router.get('/:id', getCustomerDepositById);
@@ -36,12 +44,10 @@ router.put('/:id', updateCustomerDeposit);
 // ✅ Delete
 router.delete('/:id', deleteCustomerDeposit);
 
-// ✅ ดึงข้อมูลลูกค้า + ยอดเงินมัดจำ (ใช้ใน DepositPage)
-router.get('/by-phone/:phone', getCustomerAndDepositByPhone);
-
-
-
 // ✅ ใช้ยอดเงินมัดจำในการขาย
 router.post('/use', useCustomerDeposit);
 
 module.exports = router;
+
+
+
