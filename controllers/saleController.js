@@ -1,6 +1,7 @@
 
 
 
+
  
 
 // saleController.js
@@ -304,17 +305,19 @@ const createSale = async (req, res) => {
       }
     }
 
+    if (!createdSale?.id) {
+      return res.status(500).json({ error: 'ไม่สามารถสร้างรายการขายได้' });
+    }
+
     const sale = await prisma.sale.findUnique({
-      where: { id },
+      where: { id: createdSale.id },
       include: {
         // ✅ include branch fields needed for document header
         // NOTE: if you see Prisma error "Unknown field 'taxId'", it means Branch model is missing the field.
         branch: {
           select: {
             id: true,
-            name: true,
-            companyName: true,
-            address: true,
+            name: true,            address: true,
             phone: true,
             taxId: true,
             branchCode: true,
@@ -512,7 +515,7 @@ const getSalesByBranchId = async (req, res) => {
       totalAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(sale.totalAmount) : sale.totalAmount,
       createdAt: sale.createdAt,
       customerName: sale.customer?.name || '-',
-      customerPhone: sale.customer?.phone || '-',
+      customerPhone: '-',
     }));
 
     return res.json(mapped);
@@ -650,8 +653,7 @@ const searchPrintableSales = async (req, res) => {
               { code: { contains: String(keyword), mode: 'insensitive' } },
               { note: { contains: String(keyword), mode: 'insensitive' } },
               { customer: { is: { name: { contains: String(keyword), mode: 'insensitive' } } } },
-              { customer: { is: { companyName: { contains: String(keyword), mode: 'insensitive' } } } },
-              { customer: { is: { phone: { contains: String(keyword), mode: 'insensitive' } } } },
+              { customer: { is: { companyName: { contains: String(keyword), mode: 'insensitive' } } } },            
             ],
           }
         : {}),
@@ -808,7 +810,7 @@ const searchPrintableSales = async (req, res) => {
         lastPaidAt,
         customerName: s.customer?.name || '-',
         companyName: s.customer?.companyName || '-',
-        customerPhone: s.customer?.phone || '-',
+        customerPhone: '-',
         employeeName: s.employee?.name || '-',
         status: s.status,
         isCredit: !!s.isCredit,
@@ -854,10 +856,6 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
-
-
-
-
 
 
 
