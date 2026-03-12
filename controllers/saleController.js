@@ -85,6 +85,11 @@ const generateSaleCode = async (branchId, attempt = 0) => {
   return `${prefix}-${running}`;
 };
 
+
+
+
+
+
 const createSale = async (req, res) => {
   try {
     const {
@@ -142,6 +147,70 @@ const createSale = async (req, res) => {
       }
     }
 
+    // ✅ Canonical money snapshot (VAT-included pricing)
+    // totalBeforeDiscount = gross before discount
+    // totalAmount         = gross after discount (must NOT add VAT again)
+    const round2 = (value) => Number((Number(value || 0)).toFixed(2));
+    const moneyTolerance = 0.01;
+
+    const clientTotalBeforeDiscount = round2(totalBeforeDiscount);
+    const clientTotalDiscount = round2(totalDiscount);
+    const clientVatRate = round2(vatRate);
+    const clientTotalAmount = round2(totalAmount);
+    const clientVat = round2(vat);
+
+    const computedItemsGross = round2(items.reduce((sum, item) => sum + Number(item.price || 0), 0));
+    const computedItemDiscount = round2(items.reduce((sum, item) => sum + Number(item.discount || 0), 0));
+    const computedBaseBeforeDiscount = round2(items.reduce((sum, item) => sum + Number(item.basePrice || 0), 0));
+
+    // Prefer FE summary when it matches item gross; otherwise fall back to item sum.
+    const canonicalTotalBeforeDiscount =
+      Math.abs(clientTotalBeforeDiscount - computedItemsGross) <= moneyTolerance
+        ? clientTotalBeforeDiscount
+        : computedItemsGross;
+
+    const canonicalTotalDiscount =
+      Math.abs(clientTotalDiscount - computedItemDiscount) <= moneyTolerance
+        ? clientTotalDiscount
+        : computedItemDiscount;
+
+    const canonicalTotalAmount = round2(Math.max(0, canonicalTotalBeforeDiscount - canonicalTotalDiscount));
+    const effectiveVatRate = clientVatRate > 0 ? clientVatRate : 7;
+    const vatDivider = round2(100 + effectiveVatRate);
+    const canonicalVat = vatDivider > 0
+      ? round2((canonicalTotalAmount * effectiveVatRate) / vatDivider)
+      : 0;
+
+    if (Math.abs(clientTotalAmount - canonicalTotalAmount) > moneyTolerance) {
+      return res.status(400).json({
+        error: 'ยอดรวมสุทธิไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่อีกครั้ง',
+        detail: {
+          clientTotalAmount,
+          canonicalTotalAmount,
+          canonicalTotalBeforeDiscount,
+          canonicalTotalDiscount,
+        },
+      });
+    }
+
+    if (Math.abs(clientVat - canonicalVat) > moneyTolerance) {
+      return res.status(400).json({
+        error: 'ข้อมูลภาษีมูลค่าเพิ่มไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่อีกครั้ง',
+        detail: {
+          clientVat,
+          canonicalVat,
+          canonicalTotalAmount,
+          vatRate: effectiveVatRate,
+        },
+      });
+    }
+
+    if (computedBaseBeforeDiscount > 0 && computedBaseBeforeDiscount - canonicalTotalBeforeDiscount > moneyTolerance) {
+      return res.status(400).json({
+        error: 'ข้อมูลราคาสินค้าไม่สอดคล้องกัน กรุณาตรวจสอบรายการสินค้าอีกครั้ง',
+      });
+    }
+
     // Determine sale meta
     let saleStatus;
     let isCreditSale = false;
@@ -196,7 +265,7 @@ const createSale = async (req, res) => {
         paidStatus = true;
         paidAtDate = new Date();
         statusPayment = 'PAID';
-        paidAmountDecimal = D(totalAmount);
+        paidAmountDecimal = D(canonicalTotalAmount);
       }
     }
 
@@ -238,11 +307,11 @@ const createSale = async (req, res) => {
               employee: { connect: { id: employeeId } },
               // ✅ Prisma relation required: connect branch (instead of raw branchId)
               branch: { connect: { id: branchId } },
-              totalBeforeDiscount: D(totalBeforeDiscount),
-              totalDiscount: D(totalDiscount),
-              vat: D(vat),
-              vatRate: D(vatRate),
-              totalAmount: D(totalAmount),
+              totalBeforeDiscount: D(canonicalTotalBeforeDiscount),
+              totalDiscount: D(canonicalTotalDiscount),
+              vat: D(canonicalVat),
+              vatRate: D(effectiveVatRate),
+              totalAmount: D(canonicalTotalAmount),
               // ✅ AR baseline: canonical paid status (prefer statusPayment; keep paid boolean for backward compat)
               statusPayment,
               paidAmount: paidAmountDecimal,
@@ -288,7 +357,7 @@ const createSale = async (req, res) => {
                 branchId,
                 employeeProfileId: employeeId,
                 receivedAt: new Date(),
-                items: { create: [{ paymentMethod: 'CASH', amount: D(totalAmount) }] },
+                items: { create: [{ paymentMethod: 'CASH', amount: D(canonicalTotalAmount) }] },
               },
               include: { items: true },
             });
@@ -355,6 +424,11 @@ const createSale = async (req, res) => {
 
 
 
+
+
+
+
+
 const getAllSales = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
@@ -364,33 +438,39 @@ const getAllSales = async (req, res) => {
     const limitParsed = parseInt(limitRaw, 10);
     const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 200, 1), 500);
 
-    // ✅ branch-scope enforced (minimal, production-safe)
+    // ✅ branch scope
     const where = { branchId };
 
-    // ✅ Money calc rules (Production Lock: Sale snapshot is source of truth)
-// - totalAmount = GROSS (รวม VAT)
-// - vat        = VAT amount
-// - beforeVat  = totalAmount - vat
-// ❗ ห้ามคำนวณยอดรวมจาก SaleItem อีกต่อไป (กันราคาสินค้าเปลี่ยนย้อนหลัง + กัน VAT ซ้ำ)
-const computeTotals = (sale) => {
-  const vatRate = Number.isFinite(Number(sale?.vatRate)) ? Number(sale.vatRate) : 7;
-  const totalAmount = resolveCanonicalTotalAmount(sale);
+    // ✅ Canonical money rule (VAT-included system)
+    // totalAmount = final price after discount (VAT already included)
+    // vat         = VAT portion inside totalAmount
+    // beforeVat   = totalAmount - vat
+    const computeTotals = (sale) => {
+      const vatRate = Number.isFinite(Number(sale?.vatRate)) ? Number(sale.vatRate) : 7;
 
-  const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
-  // ถ้า legacy แถวไหน vat หาย ให้ถอดจาก gross ตาม vatRate (safe fallback)
-  const vatAmount = vatStored != null
-    ? vatStored
-    : round2((totalAmount * vatRate) / (100 + vatRate));
+      const totalAmount = resolveCanonicalTotalAmount(sale);
+      const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
+      const vatAmount = vatStored != null
+        ? vatStored
+        : round2((totalAmount * vatRate) / (100 + vatRate));
 
-  const beforeVat = round2(totalAmount - vatAmount);
+      const beforeVat = round2(totalAmount - vatAmount);
+      const totalBeforeDiscount = round2(
+        sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0
+      );
+      const totalDiscount = round2(
+        sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0
+      );
 
-  return {
-    vatRate,
-    totalAmount: round2(totalAmount),
-    beforeVat,
-    vatAmount,
-  };
-};
+      return {
+        vatRate,
+        totalBeforeDiscount,
+        totalDiscount,
+        totalAmount: round2(totalAmount),
+        beforeVat,
+        vatAmount,
+      };
+    };
 
     const sales = await prisma.sale.findMany({
       where,
@@ -399,23 +479,24 @@ const computeTotals = (sale) => {
       include: {
         customer: true,
         employee: true,
-        // ✅ include minimal item money fields to compute “ยอดจริง” (INC VAT) for Delivery Note list
-        // - each SaleItem represents 1 unit (SN) in this system
-        items: { select: { price: true, discount: true } },
       },
     });
 
-    const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
+    const normalized = NORMALIZE_DECIMAL_TO_NUMBER
+      ? sales.map((s) => normalizeSaleMoney(s))
+      : sales;
 
-    // ✅ inject computed totals (do NOT trust legacy stored totalAmount if it used gross-up twice)
     const out = normalized.map((s) => {
       const totals = computeTotals(s);
+
       return {
         ...s,
         vatRate: totals.vatRate,
         totalAmount: totals.totalAmount,
         totals: {
           ...(s?.totals || {}),
+          totalBeforeDiscount: totals.totalBeforeDiscount,
+          totalDiscount: totals.totalDiscount,
           beforeVat: totals.beforeVat,
           vatAmount: totals.vatAmount,
           total: totals.totalAmount,
@@ -457,7 +538,6 @@ const getSaleById = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
-
     // ✅ NEW: query flags (backward-compatible)
     const includePayments = String(req.query?.includePayments ?? '1') !== '0';
     const requestedPaymentId = req.query?.paymentId != null ? String(req.query.paymentId) : '';
@@ -480,13 +560,42 @@ const getSaleById = async (req, res) => {
       }
     }
 
-    const response = normalizeSaleMoney({ ...sale, payments });
+    const normalized = normalizeSaleMoney({ ...sale, payments });
+
+    // ✅ Canonical totals for detail endpoint
+    // totalAmount = final amount after discount, VAT included already
+    // vat         = VAT portion inside totalAmount
+    // totalBeforeDiscount = gross before discount
+    const totalAmount = resolveCanonicalTotalAmount(sale);
+    const vatRate = round2(sale?.vatRate != null ? toNum(sale.vatRate) : 7);
+    const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
+    const vatAmount = vatStored != null
+      ? vatStored
+      : round2((totalAmount * vatRate) / (100 + vatRate));
+    const beforeVat = round2(totalAmount - vatAmount);
+    const totalBeforeDiscount = round2(sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0);
+    const totalDiscount = round2(sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0);
+
+    const response = {
+      ...normalized,
+      totals: {
+        totalBeforeDiscount,
+        totalDiscount,
+        beforeVat,
+        vatAmount,
+        totalAmount: round2(totalAmount),
+        vatRate,
+      },
+    };
+
     return res.json(response);
   } catch (error) {
     console.error('❌ [getSaleById] error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
 
 
 
@@ -525,6 +634,10 @@ const getSalesByBranchId = async (req, res) => {
   }
 };
 
+
+
+
+
 const markSaleAsPaid = async (req, res) => {
   const saleId = parseInt(req.params.id, 10);
   const branchId = Number(req.user?.branchId);
@@ -546,6 +659,11 @@ const markSaleAsPaid = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
+    // ✅ Canonical sale total (VAT-included already)
+    // totalAmount is the final amount to be paid and must never be grossed-up with VAT again.
+    const canonicalTotalAmount = resolveCanonicalTotalAmount(sale);
+    const canonicalTotalDecimal = D(canonicalTotalAmount);
+
     // รวมยอดชำระจาก PaymentItem (ไม่รวมที่ถูกยกเลิก)
     const agg = await prisma.paymentItem.aggregate({
       _sum: { amount: true },
@@ -556,8 +674,8 @@ const markSaleAsPaid = async (req, res) => {
 
     const isFullyPaid =
       typeof paidSum?.greaterThanOrEqualTo === 'function'
-        ? paidSum.greaterThanOrEqualTo(sale.totalAmount)
-        : toNum(paidSum) >= toNum(sale.totalAmount);
+        ? paidSum.greaterThanOrEqualTo(canonicalTotalDecimal)
+        : toNum(paidSum) >= canonicalTotalAmount;
 
     // ✅ idempotent: ถ้าปิดบิลแล้ว และยอดครบแล้ว ให้ตอบ ok
     if (sale.paid && isFullyPaid) {
@@ -565,7 +683,14 @@ const markSaleAsPaid = async (req, res) => {
     }
 
     if (!isFullyPaid) {
-      return res.status(409).json({ message: 'ยอดชำระยังไม่ครบ ไม่สามารถปิดบิลได้' });
+      return res.status(409).json({
+        message: 'ยอดชำระยังไม่ครบ ไม่สามารถปิดบิลได้',
+        detail: {
+          totalAmount: canonicalTotalAmount,
+          paidAmount: round2(toNum(paidSum)),
+          balanceAmount: round2(Math.max(0, canonicalTotalAmount - toNum(paidSum))),
+        },
+      });
     }
 
     // ✅ เมื่อรับเงินครบ: mark paid + finalize status
@@ -611,6 +736,8 @@ const toLocalRange = (dateStr, tz = '+07:00') => {
   const end = new Date(`${dateStr}T23:59:59.999${tz}`);
   return { start, end };
 };
+
+
 
 
 
@@ -716,66 +843,13 @@ const searchPrintableSales = async (req, res) => {
     }
 
     const rowsAll = sales.map((s) => {
-      // ✅ “ยอดจริง” สำหรับ list/print: ยึด snapshot จาก Sale (ห้ามคำนวณจาก SaleItem เพื่อกันราคาเปลี่ยนย้อนหลัง)
-      // แต่ในโปรเจกต์นี้ field บางตัวมีนิยามสลับกันระหว่าง endpoint (EX-VAT vs VAT-INCLUDED)
-      // เราจึง normalize ให้ได้ “GROSS (รวม VAT แล้ว)” ที่สอดคล้องกับใบส่งของพิมพ์จริง
-      const resolveCanonicalGross = (sale) => {
-        const toN = (v) => {
-          const n = Number(v);
-          return Number.isFinite(n) ? n : null;
-        };
-        const r2 = (n) => {
-          const x = Number(n);
-          if (!Number.isFinite(x)) return 0;
-          return Math.round(x * 100) / 100;
-        };
-
-        const vatRate = (() => {
-          const n = toN(sale?.vatRate);
-          return n != null && n > 0 ? n : 7;
-        })();
-
-        // 1) totalBeforeDiscount ในระบบนี้ = GROSS (VAT-INCLUDED) (ถ้ามีให้เชื่อก่อน)
-        const gross1 = toN(sale?.totalBeforeDiscount);
-        if (gross1 != null) return r2(gross1);
-
-        // 2) ลองจาก field “gross/grand total” อื่น ๆ
-        const grossCandidates = [
-          sale?.grandTotal,
-          sale?.totalWithVat,
-          sale?.totalInclVat,
-          sale?.totalAmountGross,
-          sale?.totalFinal,
-          sale?.amountTotal,
-          sale?.total,
-        ];
-        for (const c of grossCandidates) {
-          const n = toN(c);
-          if (n != null) return r2(n);
-        }
-
-        // 3) fallback: ใช้ totalAmount + vat ตาม heuristics กันนิยามสลับ (EX vs GROSS)
-        const totalAmount = toN(sale?.totalAmount);
-        const vat = toN(sale?.vat ?? sale?.vatAmount ?? sale?.taxAmount ?? sale?.vatTotal);
-
-        if (totalAmount != null && vat != null && totalAmount > 0 && vat > 0) {
-          // ถ้า totalAmount เป็น GROSS จริง -> VAT ที่ถูกต้องควรใกล้ totalAmount * r/(100+r)
-          const expectedVatFromGross = r2((totalAmount * vatRate) / (100 + vatRate));
-          if (Math.abs(expectedVatFromGross - vat) <= 0.05) return r2(totalAmount);
-
-          // ถ้า totalAmount เป็น BEFORE-VAT -> VAT ควรใกล้ totalAmount * r/100 และ gross = totalAmount + vat
-          const expectedVatFromBefore = r2((totalAmount * vatRate) / 100);
-          if (Math.abs(expectedVatFromBefore - vat) <= 0.05) return r2(totalAmount + vat);
-
-          // default: อย่างน้อยอย่าให้ gross กลายเป็น gross+vat ซ้ำ
-          return r2(Math.max(totalAmount, totalAmount + vat));
-        }
-
-        if (totalAmount != null) return r2(totalAmount);
-        return 0;
-      };
-
-      const totalAmount = resolveCanonicalGross(s);
+      // ✅ Production lock:
+      // totalAmount = gross after discount (VAT included already)
+      // vat         = VAT portion inside totalAmount
+      // totalBeforeDiscount = gross before discount
+      // Therefore, printable/history list must use sale.totalAmount as the canonical sale total,
+      // and must NEVER gross-up with VAT again.
+      const totalAmount = resolveCanonicalTotalAmount(s);
 
       // ✅ Prefer stored paidAmount when it is trustworthy, otherwise fallback to aggregated payments
       // - บางกรณี sale.paidAmount อาจยังเป็น 0 แต่มี Payment จริงแล้ว (เช่น legacy/compat flow)
@@ -800,7 +874,7 @@ const searchPrintableSales = async (req, res) => {
         totalAmount: round2(totalAmount),
         paidAmount: Number(paidAmount.toFixed(2)),
         balanceAmount,
-                // legacy flag (kept for backward compatibility)
+        // legacy flag (kept for backward compatibility)
         paid: !!(s.paid || paidEnough),
 
         // ✅ explicit semantic flags (production clarity)
@@ -834,9 +908,6 @@ const searchPrintableSales = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบขายย้อนหลังได้' });
   }
 };
-
-
-
 
 
 
