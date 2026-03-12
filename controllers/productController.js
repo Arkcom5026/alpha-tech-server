@@ -3,6 +3,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -852,6 +853,9 @@ const getProductsForOnline = async (req, res) => {
 
 
 
+
+
+
 // =====================================================
 // GET: /api/products/ready-to-sell
 // - Branch scope enforced via req.user.branchId
@@ -879,21 +883,33 @@ const getReadyToSell = async (req, res) => {
 
     if (wantStructured) {
       try {
+        let structuredProductIds = []
+
+        // ✅ Avoid Prisma groupBy + relation filter ambiguity on createdAt
+        // Strategy:
+        // 1) Resolve productIds from Product first when q is present
+        // 2) groupBy StockItem using productId IN (...) only
+        if (q) {
+          const matchedProducts = await prisma.product.findMany({
+            where: {
+              name: { contains: q, mode: 'insensitive' },
+            },
+            select: { id: true },
+          })
+
+          structuredProductIds = matchedProducts.map((p) => Number(p.id)).filter(Boolean)
+        }
+
         const grouped = await prisma.stockItem.groupBy({
           by: ['productId'],
           where: {
             branchId,
             status: 'IN_STOCK',
-            ...(q
-              ? {
-                  product: {
-                    is: { name: { contains: q, mode: 'insensitive' } },
-                  },
-                }
-              : {}),
+            ...(q ? { productId: { in: (structuredProductIds.length ? structuredProductIds : [-1]) } } : {}),
           },
           _count: { _all: true },
-          _max: { receivedAt: true, createdAt: true },
+          // ✅ Keep only receivedAt here to avoid ambiguous createdAt in generated SQL
+          _max: { receivedAt: true },
         })
 
         const productIds = grouped.map((g) => g.productId)
@@ -910,16 +926,51 @@ const getReadyToSell = async (req, res) => {
 
         const productMap = new Map(products.map((p) => [p.id, p]))
 
+        // ✅ Build displayCode for grouped STRUCTURED rows
+        // - qty = 1  => show actual StockItem.barcode if available
+        // - qty > 1  => show summary-safe label "หลายบาร์โค้ด"
+        const structuredBarcodeRows = productIds.length
+          ? await prisma.stockItem.findMany({
+              where: {
+                branchId,
+                status: 'IN_STOCK',
+                productId: { in: productIds },
+              },
+              select: {
+                productId: true,
+                barcode: true,
+                receivedAt: true,
+                createdAt: true,
+              },
+              orderBy: [
+                { receivedAt: 'desc' },
+                { createdAt: 'desc' },
+              ],
+            })
+          : []
+
+        const structuredPreviewMap = new Map()
+        for (const row of structuredBarcodeRows) {
+          if (!structuredPreviewMap.has(row.productId)) {
+            structuredPreviewMap.set(row.productId, row)
+          }
+        }
+
         structuredItems = grouped.map((g) => {
           const p = productMap.get(g.productId)
+          const preview = structuredPreviewMap.get(g.productId)
+          const qty = Number(g._count._all ?? 0)
+          const previewBarcode = normStr(preview?.barcode)
+
           return {
             kind: 'STRUCTURED',
             productId: g.productId,
             productName: p?.name ?? null,
             brandId: p?.brandId ?? p?.brand?.id ?? null,
             brandName: p?.brand?.name ?? null,
-            qty: g._count._all,
-            receivedAt: g._max.receivedAt ?? g._max.createdAt ?? null,
+            qty,
+            receivedAt: g._max.receivedAt ?? null,
+            displayCode: qty <= 1 ? (previewBarcode || '-') : 'หลายบาร์โค้ด',
             hasDetails: true,
           }
         })
@@ -1009,6 +1060,9 @@ const getReadyToSell = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
+
+
+
 
 
 
@@ -1929,6 +1983,11 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
+
+
+
+
+
 
 
 
