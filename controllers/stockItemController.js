@@ -1,11 +1,6 @@
 
 
 
-
-
-
-
-
 // ✅ StockItemController.js — จัดการ SN/Barcode และรายการสินค้าเข้าสต๊อก (มาตรฐาน Prisma singleton + Branch scope + Decimal-safe)
 // Prisma (defensive import: support both { prisma, Prisma } export or prisma-only export)
 const prismaModule = require('../lib/prisma');
@@ -62,7 +57,7 @@ const addStockItemFromReceipt = async (req, res) => {
     const created = await prisma.stockItem.create({
       data: {
         barcode: String(barcode),
-        serialNumber: serialNumber || String(barcode),
+        serialNumber: serialNumber ? String(serialNumber) : null,
         qrCodeData: qrCodeData || null,
         warrantyDays: toInt(warrantyDays) || null,
         expiredAt: expiredAt ? new Date(expiredAt) : null,
@@ -278,7 +273,7 @@ const markStockItemsAsSold = async (req, res) => {
 const receiveStockItem = async (req, res) => {
   try {
     const branchIdFromUser = toInt(req.user?.branchId);
-    const { barcode: barcodeData } = req.body || {};
+    const { barcode: barcodeData, keepSN } = req.body || {};
 
     if (!branchIdFromUser) return res.status(401).json({ error: 'unauthorized' });
 
@@ -291,12 +286,18 @@ const receiveStockItem = async (req, res) => {
         : { barcode: barcodeData, serialNumber: undefined };
 
     const { barcode, serialNumber } = normalized;
-    if (!barcode || typeof barcode !== 'string') {
+    const shouldKeepSN = keepSN === true;
+    const normalizedBarcode = String(barcode || '').trim();
+    const normalizedSerialNumber = String(serialNumber || '').trim();
+    if (!normalizedBarcode) {
       return res.status(400).json({ error: 'Missing or invalid barcode.' });
+    }
+    if (shouldKeepSN && !normalizedSerialNumber) {
+      return res.status(400).json({ error: 'SN is required when keepSN is true.' });
     }
 
     const barcodeItem = await prisma.barcodeReceiptItem.findUnique({
-      where: { barcode: String(barcode) },
+      where: { barcode: String(normalizedBarcode) },
       include: {
         // ✅ include relations we need for idempotency
         stockItem: true,
@@ -316,6 +317,19 @@ const receiveStockItem = async (req, res) => {
     });
 
     if (!barcodeItem) return res.status(404).json({ error: 'Barcode not found.' });
+
+    if (shouldKeepSN && normalizedSerialNumber) {
+      const duplicateSN = await prisma.stockItem.findFirst({
+        where: { serialNumber: normalizedSerialNumber },
+        select: { id: true, barcode: true, branchId: true },
+      });
+      if (duplicateSN) {
+        return res.status(409).json({
+          code: 'DUPLICATE_SERIAL_NUMBER',
+          message: 'SN นี้ถูกใช้ไปแล้วในระบบ',
+        });
+      }
+    }
 
     const product = barcodeItem.receiptItem?.purchaseOrderItem?.product;
     const purchaseOrder = barcodeItem.receiptItem?.purchaseOrderItem?.purchaseOrder;
@@ -406,8 +420,8 @@ const receiveStockItem = async (req, res) => {
     const newStockItem = await prisma.$transaction(async (tx) => {
       const created = await tx.stockItem.create({
         data: {
-          barcode: String(barcode),
-          serialNumber: serialNumber || String(barcode),
+          barcode: String(normalizedBarcode),
+          serialNumber: shouldKeepSN ? normalizedSerialNumber : null,
           status: 'IN_STOCK',
           receivedAt: new Date(),
           costPrice: D(barcodeItem.receiptItem?.costPrice || 0),
@@ -452,6 +466,156 @@ const receiveStockItem = async (req, res) => {
   } catch (error) {
     console.error('[receiveStockItem] ❌ Unexpected error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+// POST /stock-items/receive-all-no-sn
+// 🔐 รับสินค้าค้างรับทั้งหมดในครั้งเดียว (รองรับทั้ง SIMPLE และ STRUCTURED)
+// หมายเหตุ: ชื่อ route เดิมคงไว้เพื่อลดผลกระทบ แต่ logic ภายในรองรับทุกโหมดแล้ว
+const receiveAllPendingNoSN = async (req, res) => {
+  try {
+    const branchId = toInt(req.user?.branchId);
+    const receiptId = toInt(req.body?.receiptId);
+
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+    if (!receiptId) return res.status(400).json({ error: 'receiptId ไม่ถูกต้อง' });
+
+    const receipt = await prisma.purchaseOrderReceipt.findFirst({
+      where: { id: receiptId, branchId },
+      include: {
+        purchaseOrder: { include: { supplier: true } },
+        items: {
+          include: {
+            purchaseOrderItem: { include: { product: true } },
+            barcodeReceiptItem: {
+              include: {
+                stockItem: true,
+                simpleLot: true,
+              },
+              orderBy: { id: 'asc' },
+            },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    });
+
+    if (!receipt) return res.status(404).json({ error: 'ไม่พบใบรับสินค้านี้ในสาขา' });
+
+    const pendingEntries = [];
+
+    for (const item of receipt.items || []) {
+      for (const bri of item.barcodeReceiptItem || []) {
+        const product = item?.product || item?.purchaseOrderItem?.product;
+        const productMode = String(product?.mode || '').toUpperCase();
+        const alreadyReceived = Boolean(bri.stockItem?.id) || Boolean(bri.simpleLotId) || bri.status === 'SN_RECEIVED';
+
+        if (alreadyReceived) continue;
+
+        pendingEntries.push({
+          id: bri.id,
+          barcode: bri.barcode,
+          receiptItemId: bri.receiptItemId,
+          quantity: D(item.quantity || 0),
+          costPrice: D(item.costPrice || 0),
+          productId: product?.id,
+          productMode,
+        });
+      }
+    }
+
+    if (pendingEntries.length === 0) {
+      return res.status(200).json({
+        message: 'ไม่มีรายการค้างรับ',
+        receivedCount: 0,
+        receiptId,
+      });
+    }
+
+    const supplier = receipt.purchaseOrder?.supplier;
+    const supplierId = receipt.purchaseOrder?.supplierId;
+    const isSystemSupplier = Boolean(supplier?.isSystem);
+
+    const result = await prisma.$transaction(async (tx) => {
+      let receivedCount = 0;
+      let totalCreditIncrement = D(0);
+
+      for (const entry of pendingEntries) {
+        const unitCost = D(entry.costPrice || 0);
+
+        if (entry.productMode === 'STRUCTURED') {
+          const created = await tx.stockItem.create({
+            data: {
+              barcode: String(entry.barcode),
+              serialNumber: null,
+              status: 'IN_STOCK',
+              receivedAt: new Date(),
+              costPrice: unitCost,
+              product: { connect: { id: entry.productId } },
+              branch: { connect: { id: branchId } },
+              purchaseOrderReceiptItem: { connect: { id: entry.receiptItemId } },
+            },
+          });
+
+          await tx.barcodeReceiptItem.update({
+            where: { id: entry.id },
+            data: {
+              status: 'SN_RECEIVED',
+              stockItem: { connect: { id: created.id } },
+            },
+          });
+
+          await tx.stockBalance.upsert({
+            where: { productId_branchId: { productId: entry.productId, branchId } },
+            update: { quantity: { increment: 1 } },
+            create: { productId: entry.productId, branchId, quantity: 1, reserved: 0 },
+          });
+
+          totalCreditIncrement = totalCreditIncrement.plus(unitCost);
+          receivedCount += 1;
+          continue;
+        }
+
+        const qty = D(entry.quantity || 0);
+        const lineTotal = unitCost.times(qty);
+
+        await tx.barcodeReceiptItem.update({
+          where: { id: entry.id },
+          data: { status: 'SN_RECEIVED' },
+        });
+
+        await tx.stockBalance.upsert({
+          where: { productId_branchId: { productId: entry.productId, branchId } },
+          update: { quantity: { increment: qty } },
+          create: { productId: entry.productId, branchId, quantity: qty, reserved: 0 },
+        });
+
+        totalCreditIncrement = totalCreditIncrement.plus(lineTotal);
+        receivedCount += 1;
+      }
+
+      if (!isSystemSupplier && supplierId && totalCreditIncrement.gt(0)) {
+        await tx.supplier.update({
+          where: { id: supplierId },
+          data: {
+            creditBalance: D(supplier?.creditBalance || 0).plus(totalCreditIncrement),
+          },
+        });
+      }
+
+      return { receivedCount, totalCreditIncrement: totalCreditIncrement.toString() };
+    }, { timeout: 20000 });
+
+    return res.status(200).json({
+      message: 'รับสินค้าค้างรับทั้งหมดสำเร็จ',
+      receiptId,
+      receivedCount: result.receivedCount,
+      totalCreditIncrement: result.totalCreditIncrement,
+      barcodes: pendingEntries.map((x) => x.barcode),
+    });
+  } catch (error) {
+    console.error('[receiveAllPendingNoSN] ❌', error);
+    return res.status(500).json({ error: 'ไม่สามารถรับสินค้าค้างรับทั้งหมดได้' });
   }
 };
 
@@ -724,15 +888,8 @@ module.exports = {
   markStockItemsAsSold,
   updateSerialNumber,
   getAvailableStockItemsByProduct,
+  receiveAllPendingNoSN,
 };
-
-
-
-
-
-
-
-
 
 
 

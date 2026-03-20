@@ -2,7 +2,6 @@
 
 
 
-
 // ✅ stockItemRoutes.js — จัดการ Routing สำหรับ StockItem (SN / Barcode)
 
 const express = require('express');
@@ -39,6 +38,7 @@ const {
   receiveStockItem,
   updateSerialNumber,
   getAvailableStockItemsByProduct,
+  receiveAllPendingNoSN,
 } = require('../controllers/stockItemController');
 
 const verifyToken = require('../middlewares/verifyToken');
@@ -57,6 +57,9 @@ router.post('/by-receipt-ids', getStockItemsByReceiptIds);
 router.post('/receive-sn', normalizeReceivePayload, receiveStockItem);
 // alias เผื่อของเดิมบางส่วนเรียก /receive
 router.post('/receive', normalizeReceivePayload, receiveStockItem);
+
+// 🔐 รับสินค้าค้างรับทั้งหมด (เฉพาะ non-SN flow)
+router.post('/receive-all-no-sn', receiveAllPendingNoSN);
 router.patch('/update-sn/:barcode', updateSerialNumber);
 
 module.exports = router;
