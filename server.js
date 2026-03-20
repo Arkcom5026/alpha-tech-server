@@ -3,9 +3,6 @@
 
 
 
-
-
-
 //  @filename: server.js
 
 const express = require('express');
@@ -34,6 +31,7 @@ app.use((req, res, next) => {
 const authRoutes = require('./routes/authRoutes');
 const productTypeRoutes = require('./routes/productTypeRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const superAdminCategoryRoutes = require('./routes/superAdminCategoryRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./routes/productTemplateRoutes');
@@ -167,6 +165,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/superadmin/categories', superAdminCategoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/customer-deposits', customerDepositRoutes);
 app.use('/api/customer-receipts', customerReceiptRoutes);
@@ -274,6 +273,9 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+
+
 
 
 

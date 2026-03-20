@@ -2,6 +2,7 @@
 
 
 
+
  
 
 // saleController.js
@@ -139,9 +140,27 @@ const createSale = async (req, res) => {
       if (!item.stockItemId || typeof item.stockItemId !== 'number') {
         return res.status(400).json({ error: 'รายการสินค้าต้องมี stockItemId ที่ถูกต้องและเป็นตัวเลข' });
       }
-      const itemNumericFields = { price: item.price, discount: item.discount, basePrice: item.basePrice, vatAmount: item.vatAmount };
+
+      const itemNumericFields = {
+        price: item.price,
+        discount: item.discount,
+        basePrice: item.basePrice,
+        vatAmount: item.vatAmount,
+      };
+
       for (const [key, value] of Object.entries(itemNumericFields)) {
-        if (!isMoneyLike(value) || Number(value) < 0) {
+        if (!isMoneyLike(value)) {
+          return res.status(400).json({ error: `ข้อมูล ${key} ในรายการสินค้า (stockItemId: ${item.stockItemId}) ไม่ถูกต้อง` });
+        }
+
+        // ✅ VAT-included pricing baseline
+        // - basePrice = ราคาขายตั้งต้นก่อนส่วนลด/บวกเพิ่ม (รวม VAT แล้ว)
+        // - discount  = ส่วนลดสุทธิระดับรายการ
+        //              ค่าบวก  = ลดราคา
+        //              ค่าลบ   = บวกเพิ่มราคา (manual markup)
+        // - price     = ราคาสุทธิหลังปรับแล้ว (รวม VAT แล้ว)
+        // ดังนั้น discount อนุญาตให้ติดลบได้ แต่ field อื่นห้ามติดลบ
+        if (key !== 'discount' && Number(value) < 0) {
           return res.status(400).json({ error: `ข้อมูล ${key} ในรายการสินค้า (stockItemId: ${item.stockItemId}) ไม่ถูกต้อง หรือเป็นค่าติดลบ` });
         }
       }
@@ -149,8 +168,8 @@ const createSale = async (req, res) => {
 
     // ✅ Canonical money snapshot (VAT-included pricing)
     // totalBeforeDiscount = gross before discount
-    // totalAmount         = gross after discount (must NOT add VAT again)
-    const round2 = (value) => Number((Number(value || 0)).toFixed(2));
+    // totalAmount         = gross after discount (VAT already included)
+    // ระบบนี้ยึด “ราคารวม VAT แล้ว” เป็นมาตรฐานกลางเสมอ
     const moneyTolerance = 0.01;
 
     const clientTotalBeforeDiscount = round2(totalBeforeDiscount);
@@ -163,23 +182,43 @@ const createSale = async (req, res) => {
     const computedItemDiscount = round2(items.reduce((sum, item) => sum + Number(item.discount || 0), 0));
     const computedBaseBeforeDiscount = round2(items.reduce((sum, item) => sum + Number(item.basePrice || 0), 0));
 
-    // Prefer FE summary when it matches item gross; otherwise fall back to item sum.
+    // ✅ Canonical selection (VAT-included)
+    // - totalBeforeDiscount ต้องเทียบกับผลรวม basePrice
+    // - totalDiscount       ต้องเทียบกับผลรวม discount
+    // - totalAmount         ต้องเทียบกับผลรวม price (สุทธิหลังหักส่วนลดแล้ว และรวม VAT แล้ว)
     const canonicalTotalBeforeDiscount =
-      Math.abs(clientTotalBeforeDiscount - computedItemsGross) <= moneyTolerance
+      Math.abs(clientTotalBeforeDiscount - computedBaseBeforeDiscount) <= moneyTolerance
         ? clientTotalBeforeDiscount
-        : computedItemsGross;
+        : computedBaseBeforeDiscount;
 
     const canonicalTotalDiscount =
       Math.abs(clientTotalDiscount - computedItemDiscount) <= moneyTolerance
         ? clientTotalDiscount
         : computedItemDiscount;
 
-    const canonicalTotalAmount = round2(Math.max(0, canonicalTotalBeforeDiscount - canonicalTotalDiscount));
+    const canonicalTotalAmount =
+      Math.abs(clientTotalAmount - computedItemsGross) <= moneyTolerance
+        ? clientTotalAmount
+        : computedItemsGross;
+
     const effectiveVatRate = clientVatRate > 0 ? clientVatRate : 7;
-    const vatDivider = round2(100 + effectiveVatRate);
-    const canonicalVat = vatDivider > 0
-      ? round2((canonicalTotalAmount * effectiveVatRate) / vatDivider)
+    const canonicalVat = effectiveVatRate > 0
+      ? round2((canonicalTotalAmount * effectiveVatRate) / (100 + effectiveVatRate))
       : 0;
+
+    // ✅ Guardrail: totalAmount ต้องสอดคล้องกับ beforeDiscount - discount ด้วย
+    const derivedTotalAmount = round2(Math.max(0, canonicalTotalBeforeDiscount - canonicalTotalDiscount));
+    if (Math.abs(derivedTotalAmount - canonicalTotalAmount) > moneyTolerance) {
+      return res.status(400).json({
+        error: 'ยอดรวมสุทธิไม่สอดคล้องกับราคาก่อนลดและส่วนลด กรุณาตรวจสอบรายการสินค้าอีกครั้ง',
+        detail: {
+          canonicalTotalBeforeDiscount,
+          canonicalTotalDiscount,
+          canonicalTotalAmount,
+          derivedTotalAmount,
+        },
+      });
+    }
 
     if (Math.abs(clientTotalAmount - canonicalTotalAmount) > moneyTolerance) {
       return res.status(400).json({
@@ -205,9 +244,13 @@ const createSale = async (req, res) => {
       });
     }
 
-    if (computedBaseBeforeDiscount > 0 && computedBaseBeforeDiscount - canonicalTotalBeforeDiscount > moneyTolerance) {
+    if (computedBaseBeforeDiscount > 0 && Math.abs(computedBaseBeforeDiscount - canonicalTotalBeforeDiscount) > moneyTolerance) {
       return res.status(400).json({
         error: 'ข้อมูลราคาสินค้าไม่สอดคล้องกัน กรุณาตรวจสอบรายการสินค้าอีกครั้ง',
+        detail: {
+          computedBaseBeforeDiscount,
+          canonicalTotalBeforeDiscount,
+        },
       });
     }
 
@@ -927,6 +970,9 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
+
+
 
 
 
