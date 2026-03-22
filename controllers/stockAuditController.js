@@ -1,5 +1,6 @@
 
 
+
 // controllers/stockAuditController.js
 // ✅ มาตรฐานเดียวกับ branchPriceController / salesReportController
 // - ใช้ async arrow functions
@@ -466,8 +467,7 @@ const listAuditItems = async (req, res) => {
           OR: [
             { barcode: { contains: q, mode: 'insensitive' } },
             { stockItem: { serialNumber: { contains: q, mode: 'insensitive' } } },
-            { product: { name: { contains: q, mode: 'insensitive' } } },
-            { product: { model: { contains: q, mode: 'insensitive' } } },
+            { product: { name: { contains: q, mode: 'insensitive' } } },          
           ],
         }
         : {}),
@@ -481,7 +481,7 @@ const listAuditItems = async (req, res) => {
           barcode: true,
           isScanned: true,
           scannedAt: true,
-          product: { select: { id: true, name: true, model: true } },
+          product: { select: { id: true, name: true } },
           stockItem: { select: { serialNumber: true } },
         },
         orderBy: [{ isScanned: 'asc' }, { id: 'asc' }],
@@ -516,5 +516,7 @@ module.exports = {
   confirmAudit,
   listAuditItems,
 }
+
+
 
 
