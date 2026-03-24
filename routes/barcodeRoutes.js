@@ -1,5 +1,6 @@
 
 
+
 // server/routes/barcodeRoutes.js
 const express = require('express');
 const router = express.Router();
@@ -17,6 +18,7 @@ const {
   auditReceiptBarcodes,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
+  updateSerialNumber,
 } = require('../controllers/barcodeController');
 
 const verifyToken = require('../middlewares/verifyToken');
@@ -50,6 +52,9 @@ router.get('/receipts-ready-to-scan', getReceiptsReadyToScan);
 
 router.get('/reprint-search', searchReprintReceipts);
 
+// ✅ แก้ SN ของสินค้าที่รับเข้าแล้ว (เฉพาะ stock item ที่ยังไม่ SOLD)
+router.patch('/update-serial-number', updateSerialNumber);
+
 // ✅ ตีธง printed หลังพิมพ์ครั้งแรก
 router.patch('/mark-printed', markBarcodesAsPrinted);
 
@@ -63,6 +68,7 @@ router.patch('/receipts/:receiptId/complete', markReceiptAsCompleted);
 router.patch('/receipts/:id/complete', markReceiptAsCompleted);
 
 module.exports = router;
+
 
 
 

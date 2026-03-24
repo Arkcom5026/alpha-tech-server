@@ -1,6 +1,9 @@
 
 
 
+
+
+
 // controllers/stockAuditController.js
 // ✅ มาตรฐานเดียวกับ branchPriceController / salesReportController
 // - ใช้ async arrow functions
@@ -507,6 +510,45 @@ const listAuditItems = async (req, res) => {
   }
 }
 
+// GET /api/stock-audit/ready/active
+const getActiveReadySession = async (req, res) => {
+  try {
+    // ✅ active session ต้องสดเสมอ ห้าม browser/proxy cache
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
+    const branchId = Number(req.user?.branchId)
+    if (!Number.isFinite(branchId)) {
+      return res.status(401).json({ message: 'Unauthorized: missing branchId' })
+    }
+
+    const session = await prisma.stockAuditSession.findFirst({
+      where: {
+        branchId,
+        mode: 'READY',
+        confirmedAt: null,
+      },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        id: true,
+        expectedCount: true,
+        scannedCount: true,
+        startedAt: true,
+      },
+    })
+
+    if (!session) {
+      return res.status(200).json({ session: null })
+    }
+
+    return res.status(200).json({ session })
+  } catch (error) {
+    console.error('❌ [getActiveReadySession] error:', error)
+    return res.status(500).json({ message: 'ไม่สามารถดึง active session ได้' })
+  }
+}
+
 module.exports = {
   startReadyAudit,
   getOverview,
@@ -515,7 +557,17 @@ module.exports = {
   cancelAudit,
   confirmAudit,
   listAuditItems,
+  getActiveReadySession,
 }
+
+
+
+
+
+
+
+
+
 
 
 

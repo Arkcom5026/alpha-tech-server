@@ -1,10 +1,5 @@
 
 
-
-
-
- 
-
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -619,6 +614,20 @@ const getSaleById = async (req, res) => {
     const totalBeforeDiscount = round2(sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0);
     const totalDiscount = round2(sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0);
 
+    const receivedAmountRaw = Array.isArray(payments)
+      ? payments.reduce((sum, payment) => {
+          if (payment?.isCancelled) return sum;
+          const itemSum = Array.isArray(payment?.items)
+            ? payment.items.reduce((itemAcc, item) => itemAcc + Number(item?.amount || 0), 0)
+            : 0;
+          return sum + itemSum;
+        }, 0)
+      : 0;
+
+    const receivedAmount = round2(receivedAmountRaw);
+    const balanceAmount = round2(Math.max(0, totalAmount - receivedAmount));
+    const changeAmount = round2(Math.max(0, receivedAmount - totalAmount));
+
     const response = {
       ...normalized,
       totals: {
@@ -628,6 +637,15 @@ const getSaleById = async (req, res) => {
         vatAmount,
         totalAmount: round2(totalAmount),
         vatRate,
+      },
+      paymentSummary: {
+        totalAmount: round2(totalAmount),
+        receivedAmount,
+        balanceAmount,
+        changeAmount,
+        hasPayment: receivedAmount > 0,
+        isFullyPaid: receivedAmount >= round2(totalAmount),
+        isPartiallyPaid: receivedAmount > 0 && receivedAmount < round2(totalAmount),
       },
     };
 
@@ -970,6 +988,7 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
 
 
 

@@ -2,6 +2,9 @@
 
 
 
+
+
+
 // server/controllers/barcodeController.js
 
 // 👉 Helper
@@ -1261,6 +1264,70 @@ const getReceiptsReadyToScan = async (req, res) => {
   }
 };
 
+// PATCH /api/barcodes/update-serial-number
+// แก้ SN ของ stock item (ใช้ในหน้า ScanBarcodeListPage)
+const updateSerialNumber = async (req, res) => {
+  try {
+    const branchId = toInt(req.user?.branchId);
+    const { barcode, serialNumber } = req.body || {};
+
+    if (!branchId) return res.status(401).json({ message: 'unauthorized' });
+    if (!barcode || !serialNumber) {
+      return res.status(400).json({ message: 'barcode และ serialNumber จำเป็น' });
+    }
+
+    // หา BRI + stockItem
+    const bri = await prisma.barcodeReceiptItem.findFirst({
+      where: { barcode, branchId },
+      include: {
+        stockItem: true,
+      },
+    });
+
+    if (!bri) {
+      return res.status(404).json({ message: 'ไม่พบบาร์โค้ด' });
+    }
+
+    if (!bri.stockItemId) {
+      return res.status(400).json({ message: 'รายการนี้ยังไม่มี stock item' });
+    }
+
+    const stockItem = bri.stockItem;
+
+    // ❌ ห้ามแก้ถ้าขายแล้ว
+    if (
+      String(stockItem?.status || '').toUpperCase() === 'SOLD' ||
+      stockItem?.soldAt != null
+    ) {
+      return res.status(400).json({ message: 'สินค้าถูกขายแล้ว ไม่สามารถแก้ SN ได้' });
+    }
+
+    // ❌ กัน SN ซ้ำ
+    const exists = await prisma.stockItem.findFirst({
+      where: {
+        branchId,
+        serialNumber,
+        NOT: { id: stockItem.id },
+      },
+      select: { id: true },
+    });
+
+    if (exists) {
+      return res.status(400).json({ message: 'SN นี้มีอยู่แล้วในระบบ' });
+    }
+
+    const updated = await prisma.stockItem.update({
+      where: { id: stockItem.id },
+      data: { serialNumber },
+    });
+
+    return res.json({ success: true, stockItem: updated });
+  } catch (err) {
+    console.error('[updateSerialNumber] ❌', err);
+    return res.status(500).json({ message: 'แก้ SN ไม่สำเร็จ' });
+  }
+};
+
 module.exports = {
   // generate / list
   generateMissingBarcodes,
@@ -1280,20 +1347,6 @@ module.exports = {
   auditReceiptBarcodes,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
+  // existing exports above...
+  updateSerialNumber
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

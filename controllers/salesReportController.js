@@ -1,8 +1,6 @@
 
 
 
-
-
 // salesReportController.js — Prisma singleton, Decimal-safe, BRANCH_SCOPE_ENFORCED
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -131,7 +129,8 @@ const buildSalesWhere = ({ branchId, query = {} }) => {
   if (keyword) {
     where.OR = [
       { code: { contains: keyword, mode: 'insensitive' } },
-      { taxInvoiceNumber: { contains: keyword, mode: 'insensitive' } },
+      { customer: { is: { name: { contains: keyword, mode: 'insensitive' } } } },
+      { employee: { is: { name: { contains: keyword, mode: 'insensitive' } } } },
     ];
   }
 
@@ -370,7 +369,18 @@ const getSalesList = async (req, res) => {
         skip,
         take: pageSize,
         include: {
-          customer: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          employee: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           payments: {
             include: {
               items: true,
@@ -404,7 +414,7 @@ const getSalesList = async (req, res) => {
         saleNo: sale.taxInvoiceNumber || sale.code || `SALE-${sale.id}`,
         soldAt: sale.soldAt,
         customerName: sale.customer?.name || 'ลูกค้าทั่วไป',
-        employeeName: '-',
+        employeeName: sale.employee?.name || '-',
         paymentMethod:
           sale.payments?.flatMap((payment) => payment.items || [])?.[0]?.paymentMethod || 'CASH',
         status: sale.status || 'COMPLETED',
@@ -553,7 +563,24 @@ const getSalesDetail = async (req, res) => {
     const sale = await prisma.sale.findFirst({
       where: { id: saleId, branchId },
       include: {
-        customer: true,
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        employee: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        branch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -620,13 +647,13 @@ const getSalesDetail = async (req, res) => {
         id: 1,
         label: 'สร้างรายการขาย',
         at: sale.soldAt,
-        by: '-',
+        by: sale.employee?.name || '-',
       },
       ...payments.map((payment, index) => ({
         id: `payment-${payment.id}`,
         label: 'บันทึกการชำระเงิน',
         at: payment.paidAt,
-        by: '-',
+        by: sale.employee?.name || '-',
         sortIndex: index + 1,
       })),
     ];
@@ -637,12 +664,12 @@ const getSalesDetail = async (req, res) => {
         saleNo: sale.taxInvoiceNumber || sale.code || `SALE-${sale.id}`,
         soldAt: sale.soldAt,
         customerName: sale.customer?.name || 'ลูกค้าทั่วไป',
-        customerPhone: sale.customer?.phone || '-',
-        employeeName: '-',
+        customerPhone: '-',
+        employeeName: sale.employee?.name || '-',
         paymentMethod: payments[0]?.method || 'CASH',
         paymentStatus: sale.statusPayment || 'UNPAID',
         saleStatus: sale.status || 'COMPLETED',
-        branchName: '-',
+        branchName: sale.branch?.name || '-',
         note: sale.note || sale.remark || '',
         subtotal: toNum(sale.totalBeforeDiscount),
         discountAmount: toNum(sale.totalDiscount),
@@ -753,9 +780,6 @@ module.exports = {
   getSalesDetail,
   getSalesTaxReport,
 };
-
-
-
 
 
 

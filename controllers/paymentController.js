@@ -1,12 +1,33 @@
 
 
+
 // controllers/paymentController.js
 const { prisma, Prisma } = require('../lib/prisma');
 
 // Helpers & flags for Decimal-safe arithmetic
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
-const isMoneyLike = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
+const isMoneyLike = (v) =>
+  (typeof v === 'number' && !isNaN(v)) ||
+  (typeof v === 'string' && /^[0-9]+(\.[0-9]{1,2})?$/.test(v));
+
+const ALLOWED_PAYMENT_METHODS = new Set([
+  'CASH',
+  'TRANSFER',
+  'CARD',
+  'DEPOSIT',
+  'QR',
+  'E_WALLET',
+  'CHEQUE',
+  'OTHER',
+]);
+
+const normalizePaymentMethod = (value) => {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (raw === 'CREDIT') return 'CARD'; // backward-compat with old FE naming
+  return raw;
+};
 
 // === Fast, collision-safe payment code generator (counter-based, monthly reset, legacy format) ===
 // Legacy format: PMT-<bb><yy><mm><rrr>
@@ -151,7 +172,8 @@ const recalcSalePaymentStatus = async (tx, saleId) => {
 const createPayments = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
-    const employeeId = Number(req.user?.employeeId || req.user?.employeeProfileId);
+    const employeeIdRaw = req.user?.employeeId ?? req.user?.employeeProfileId;
+    const employeeId = employeeIdRaw ? Number(employeeIdRaw) : null;
     const { saleId, note, combinedDocumentCode, paymentItems, receivedAt } = req.body || {};
 
     if (!saleId || !Array.isArray(paymentItems) || paymentItems.length === 0) {
@@ -159,9 +181,19 @@ const createPayments = async (req, res) => {
     }
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
-    for (const it of paymentItems) {
+    const normalizedPaymentItems = paymentItems.map((it) => ({
+      ...it,
+      paymentMethod: normalizePaymentMethod(it.paymentMethod),
+    }));
+
+    for (const it of normalizedPaymentItems) {
       if (!isMoneyLike(it.amount) || Number(it.amount) <= 0) {
         return res.status(400).json({ message: 'จำนวนเงินไม่ถูกต้อง' });
+      }
+      if (!ALLOWED_PAYMENT_METHODS.has(it.paymentMethod)) {
+        return res.status(400).json({
+          message: `วิธีชำระเงินไม่ถูกต้อง: ${it.paymentMethod || '-'}`,
+        });
       }
     }
 
@@ -175,6 +207,9 @@ const createPayments = async (req, res) => {
 
       // 2) Parse receivedAt (default now, respect +07:00 ISO if provided)
       const receivedAtDate = receivedAt ? new Date(receivedAt) : new Date();
+      if (Number.isNaN(receivedAtDate.getTime())) {
+        throw Object.assign(new Error('วันที่รับชำระไม่ถูกต้อง'), { status: 400 });
+      }
 
       // 3) Generate code & create payment header + items (Counter-based, with duplicate retry)
       const code = await nextPaymentCode(tx, branchId);
@@ -188,7 +223,7 @@ const createPayments = async (req, res) => {
           employeeProfileId: employeeId || null,
           branchId,
           items: {
-            create: paymentItems.map((it) => ({
+            create: normalizedPaymentItems.map((it) => ({
               paymentMethod: it.paymentMethod,
               amount: D(it.amount || 0),
               note: it.note || null,
@@ -202,7 +237,7 @@ const createPayments = async (req, res) => {
       });
 
       // 5) Consume deposit atomically (from request items, schema has no FK on paymentItem)
-      for (const p of paymentItems) {
+      for (const p of normalizedPaymentItems) {
         if (p.paymentMethod === 'DEPOSIT' && p.customerDepositId) {
           const depId = Number(p.customerDepositId);
           const inc = Number(p.amount) || 0;
@@ -442,3 +477,4 @@ module.exports = {
   searchPrintablePayments,
   cancelPayment,
 };
+
