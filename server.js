@@ -3,6 +3,7 @@
 
 
 
+
 //  @filename: server.js
 
 const express = require('express');
@@ -72,6 +73,7 @@ const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
+const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -172,6 +174,7 @@ app.use('/api/customer-receipts', customerReceiptRoutes);
 app.use('/api/product-types', productTypeRoutes);
 app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/brands', brandRoutes);
+app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products', productRoutes);
 // ❌ อย่ามา mount uploadProductRoutes ซ้ำระดับ app เพราะจะทำให้ public routes (เช่น /dropdowns) โดน verifyToken ทับ
@@ -273,6 +276,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
 
 
 
