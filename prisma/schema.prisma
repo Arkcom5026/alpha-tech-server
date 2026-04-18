@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
   // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
@@ -244,8 +243,9 @@ model User {
   lastLoginAt DateTime?
   loginType   LoginType @default(PHONE)
 
-  customerProfile CustomerProfile?
-  employeeProfile EmployeeProfile?
+  customerProfile     CustomerProfile?
+  employeeProfile     EmployeeProfile?
+  passwordResetTokens PasswordResetToken[]
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -1783,6 +1783,22 @@ model CustomerReceiptAllocation {
   @@map("CustomerReceiptAllocations")
 }
 
+// =============================
+// 🔐 Password Reset Token
+// =============================
+model PasswordResetToken {
+  id Int @id @default(autoincrement())
 
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
 
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}

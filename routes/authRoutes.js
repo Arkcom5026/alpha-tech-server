@@ -43,7 +43,13 @@ router.get('/users/find', verifyToken, findUserByEmail);
 
 // ✅ NEW: verify current session
 const getMe = ensureFn('getMe');
+const forgotPassword = ensureFn('forgotPassword');
+const resetPassword = ensureFn('resetPassword');
 router.get('/me', verifyToken, getMe);
+
+// 🔁 Forgot / Reset Password
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
 

@@ -1,7 +1,10 @@
 
 
 
-// ✅ authController.js — Prisma singleton, safer errors, consistent JWT payload
+
+
+
+// ✅ authController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
 // Prefer native/fast bcrypt when available (minimal disruption)
@@ -27,6 +30,7 @@ try {
   }
 }
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Normalize bcrypt API across providers (minimal disruption)
 const bcryptHash = async (plain, rounds = 10) => {
@@ -58,6 +62,44 @@ console.log('[auth] bcrypt provider:', bcryptProvider, {
 
 const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim());
 const normalizeEmail = (s) => normalize(s).toLowerCase();
+
+const PASSWORD_RESET_TOKEN_EXPIRES_MINUTES = Number(process.env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES || 30);
+
+const sha256 = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
+const createPasswordResetToken = () => crypto.randomBytes(32).toString('hex');
+const getPasswordResetExpiresAt = () => new Date(Date.now() + PASSWORD_RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000);
+const getAppBaseUrl = (req) => {
+  const envBaseUrl = (process.env.APP_BASE_URL || process.env.CLIENT_URL || '').trim();
+  if (envBaseUrl) return envBaseUrl;
+
+  const originHeader = normalize(req?.headers?.origin);
+  if (originHeader) return originHeader;
+
+  const forwardedProto = normalize(req?.headers?.['x-forwarded-proto']);
+  const forwardedHost = normalize(req?.headers?.['x-forwarded-host']);
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  const protocol = normalize(req?.protocol);
+  const host = normalize(req?.get?.('host'));
+  if (protocol && host) {
+    return `${protocol}://${host}`;
+  }
+
+  return '';
+};
+
+const buildPasswordResetUrl = (req, rawToken) => {
+  const appBaseUrl = getAppBaseUrl(req);
+  if (!appBaseUrl) return '';
+  const base = appBaseUrl.endsWith('/') ? appBaseUrl.slice(0, -1) : appBaseUrl;
+  return `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
+};
+const sendPasswordResetEmail = async ({ toEmail, resetUrl }) => {
+  // TODO: wire to real mail service in next step
+  console.log('[auth.forgotPassword] reset email placeholder', { toEmail, resetUrl });
+};
 
 const buildToken = (user, opts = {}) => {
   const profile = user.customerProfile || user.employeeProfile || null;
@@ -402,6 +444,167 @@ const findUserByEmail = async (req, res) => {
 };
 
 // ✅ get current session (used by FE: verifySession)
+const forgotPassword = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+
+    if (!email) {
+      return res.status(400).json({ message: 'กรุณากรอกอีเมล' });
+    }
+
+    const genericSuccessMessage = 'หากข้อมูลของคุณมีอยู่ในระบบ เราได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่แล้ว';
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        enabled: true,
+      },
+    });
+
+    if (!user || !user.enabled) {
+      return res.json({ message: genericSuccessMessage });
+    }
+
+    const rawToken = createPasswordResetToken();
+    const tokenHash = sha256(rawToken);
+    const expiresAt = getPasswordResetExpiresAt();
+        const debugAppBaseUrl = getAppBaseUrl(req);
+    console.log('[auth.forgotPassword] base url debug', {
+      envAppBaseUrl: process.env.APP_BASE_URL || '',
+      envClientUrl: process.env.CLIENT_URL || '',
+      resolvedAppBaseUrl: debugAppBaseUrl,
+      requestOrigin: req?.headers?.origin || '',
+      forwardedProto: req?.headers?.['x-forwarded-proto'] || '',
+      forwardedHost: req?.headers?.['x-forwarded-host'] || '',
+      requestHost: req?.get?.('host') || '',
+      requestProtocol: req?.protocol || '',
+    });
+
+    const resetUrl = buildPasswordResetUrl(req, rawToken);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+
+      await tx.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+    });
+
+    try {
+      await sendPasswordResetEmail({
+        toEmail: user.email,
+        resetUrl,
+      });
+    } catch (mailError) {
+      console.error('❌ sendPasswordResetEmail error:', mailError);
+      return res.status(500).json({ message: 'ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้' });
+    }
+
+    return res.json({ message: genericSuccessMessage });
+  } catch (error) {
+    console.error('❌ forgotPassword error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถดำเนินการลืมรหัสผ่านได้' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const rawToken = normalize(req.body?.token);
+    const password = normalize(req.body?.password);
+    const confirmPassword = normalize(req.body?.confirmPassword);
+
+    if (!rawToken) {
+      return res.status(400).json({ message: 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือไม่ครบถ้วน' });
+    }
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ message: 'กรุณากรอกรหัสผ่านใหม่และยืนยันรหัสผ่าน' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'ยืนยันรหัสผ่านไม่ตรงกัน' });
+    }
+
+    const tokenHash = sha256(rawToken);
+
+    const resetRecord = await prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    if (!resetRecord || !resetRecord.user?.enabled) {
+      return res.status(400).json({ message: 'ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอรีเซ็ตรหัสผ่านใหม่อีกครั้ง' });
+    }
+
+    const hashedPassword = await bcryptHash(password, 10);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: resetRecord.user.id },
+        data: {
+          password: hashedPassword,
+        },
+      });
+
+      await tx.passwordResetToken.update({
+        where: { id: resetRecord.id },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: resetRecord.user.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+    });
+
+    return res.json({ message: 'ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว กรุณาเข้าสู่ระบบอีกครั้ง' });
+  } catch (error) {
+    console.error('❌ resetPassword error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถรีเซ็ตรหัสผ่านได้' });
+  }
+};
+
 const getMe = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -462,9 +665,12 @@ const getMe = async (req, res) => {
 module.exports = {
   register,
   login,
+  forgotPassword,
+  resetPassword,
   getMe,
   findUserByEmail,
 };
+
 
 
 
