@@ -4,7 +4,6 @@
 
 
 
-
 // ✅ authController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -15,18 +14,15 @@ let bcryptProvider = 'unknown';
 try {
   // eslint-disable-next-line global-require
   bcrypt = require('@node-rs/bcrypt');
-  bcryptProvider = '@node-rs/bcrypt';
   bcryptProvider = 'node-rs';
 } catch (e1) {
   try {
     // eslint-disable-next-line global-require
     bcrypt = require('bcrypt');
     bcryptProvider = 'bcrypt';
-    bcryptProvider = 'bcrypt';
   } catch (e2) {
     // eslint-disable-next-line global-require
     bcrypt = require('bcryptjs');
-    bcryptProvider = 'bcryptjs';
     bcryptProvider = 'bcryptjs';
   }
 }
@@ -54,13 +50,14 @@ const bcryptCompare = async (plain, hashed) => {
   throw new Error('bcrypt compare/verify function not available');
 };
 
-// One-time runtime visibility: confirm which bcrypt provider is actually used
-// eslint-disable-next-line no-console
-console.log('[auth] bcrypt provider:', bcryptProvider, {
-  hasCompare: typeof bcrypt?.compare === 'function',
-  hasVerify: typeof bcrypt?.verify === 'function',
-  hasHash: typeof bcrypt?.hash === 'function',
-});
+if (process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line no-console
+  console.log('[auth] bcrypt provider:', bcryptProvider, {
+    hasCompare: typeof bcrypt?.compare === 'function',
+    hasVerify: typeof bcrypt?.verify === 'function',
+    hasHash: typeof bcrypt?.hash === 'function',
+  });
+}
 
 const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim());
 const normalizeEmail = (s) => normalize(s).toLowerCase();
@@ -98,6 +95,7 @@ const buildPasswordResetUrl = (req, rawToken) => {
   const base = appBaseUrl.endsWith('/') ? appBaseUrl.slice(0, -1) : appBaseUrl;
   return `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
 };
+
 const sendPasswordResetEmail = async ({ toEmail, resetUrl }) => {
   if (!toEmail) {
     throw new Error('Recipient email is required for password reset');
@@ -115,8 +113,7 @@ const sendPasswordResetEmail = async ({ toEmail, resetUrl }) => {
     '',
     `ลิงก์นี้จะหมดอายุใน ${PASSWORD_RESET_TOKEN_EXPIRES_MINUTES} นาที`,
     'หากคุณไม่ได้เป็นผู้ส่งคำขอนี้ คุณสามารถละเว้นอีเมลฉบับนี้ได้',
-  ].join('
-');
+  ].join('\n');
 
   const html = `
     <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #0f172a; max-width: 560px; margin: 0 auto;">
@@ -513,7 +510,8 @@ const forgotPassword = async (req, res) => {
 
     const rawToken = createPasswordResetToken();
     const tokenHash = sha256(rawToken);
-    const expiresAt = getPasswordResetExpiresAt();    const resetUrl = buildPasswordResetUrl(req, rawToken);
+    const expiresAt = getPasswordResetExpiresAt();
+    const resetUrl = buildPasswordResetUrl(req, rawToken);
 
     await prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.updateMany({
@@ -665,8 +663,8 @@ const getMe = async (req, res) => {
     const profileType = user.customerProfile
       ? 'customer'
       : user.employeeProfile
-      ? 'employee'
-      : null;
+        ? 'employee'
+        : null;
 
     return res.json({
       role: user.role,
@@ -701,12 +699,6 @@ module.exports = {
   getMe,
   findUserByEmail,
 };
-
-
-
-
-
-
 
 
 
