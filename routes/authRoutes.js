@@ -1,7 +1,9 @@
 
 
 
-// ✅ routes/authRoutes.js (CommonJS)
+
+
+// ✅ routes/authRoutes.js 
 const express = require('express');
 const router = express.Router();
 
@@ -26,6 +28,9 @@ const resolveHandler = (key) => {
 
 const login = ensureFn('login');
 const register = ensureFn('register');
+const refreshSession = ensureFn('refreshSession');
+const logoutSession = ensureFn('logoutSession');
+const revokeSession = resolveHandler('revokeSession') || resolveHandler('logoutAllSessions') || resolveHandler('logoutAll');
 const findUserByEmail = resolveHandler('findUserByEmail');
 if (typeof findUserByEmail !== 'function') {
   throw new Error(`[authRoutes] authController.findUserByEmail must be a function (got ${typeof findUserByEmail})`);
@@ -34,14 +39,24 @@ if (typeof findUserByEmail !== 'function') {
 const verifyToken = require('../middlewares/verifyToken');
 
 
-// 🔐 Login & Register
+// 🔐 Login / Register / Session
 router.post('/login', login);
 router.post('/register', register);
+
+// Remember Me / session persistence hooks
+router.post('/refresh', refreshSession);
+router.post('/logout', logoutSession);
+
+
+
+if (typeof revokeSession === 'function') {
+  router.post('/logout-all', verifyToken, revokeSession);
+}
 
 // 🔍 Find user by email (for employee approval)
 router.get('/users/find', verifyToken, findUserByEmail);
 
-// ✅ NEW: verify current session
+// ✅ Current session / bootstrap auth
 const getMe = ensureFn('getMe');
 const forgotPassword = ensureFn('forgotPassword');
 const resetPassword = ensureFn('resetPassword');
@@ -52,6 +67,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
 module.exports = router;
+
 
 
 

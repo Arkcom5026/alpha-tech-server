@@ -2,8 +2,6 @@
 
 
 
-
-
 // ✅ authController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -63,9 +61,56 @@ const normalize = (s) => (s === undefined || s === null ? '' : String(s).trim())
 const normalizeEmail = (s) => normalize(s).toLowerCase();
 
 const PASSWORD_RESET_TOKEN_EXPIRES_MINUTES = Number(process.env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES || 30);
+const ACCESS_TOKEN_EXPIRES = String(process.env.ACCESS_TOKEN_EXPIRES || '15m');
+const REFRESH_TOKEN_EXPIRES_DEFAULT = String(process.env.REFRESH_TOKEN_EXPIRES_DEFAULT || '1d');
+const REFRESH_TOKEN_EXPIRES_REMEMBER_ME = String(process.env.REFRESH_TOKEN_EXPIRES_REMEMBER_ME || '30d');
+const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
+const REFRESH_TOKEN_SECRET = String(process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET || '');
 
 const sha256 = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 const createPasswordResetToken = () => crypto.randomBytes(32).toString('hex');
+const createRawRefreshToken = () => crypto.randomBytes(48).toString('hex');
+const parseRememberMe = (value) => value === true || value === 'true' || value === 1 || value === '1';
+const getRefreshTokenExpiresIn = (rememberMe = false) => (
+  rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER_ME : REFRESH_TOKEN_EXPIRES_DEFAULT
+);
+const getRefreshCookieOptions = (rememberMe = false) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const maxAgeSource = getRefreshTokenExpiresIn(rememberMe);
+  let maxAgeMs;
+
+  if (/^[0-9]+d$/.test(maxAgeSource)) {
+    maxAgeMs = Number(maxAgeSource.replace('d', '')) * 24 * 60 * 60 * 1000;
+  } else if (/^[0-9]+h$/.test(maxAgeSource)) {
+    maxAgeMs = Number(maxAgeSource.replace('h', '')) * 60 * 60 * 1000;
+  }
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/api/auth',
+    ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
+  };
+};
+const getRefreshTokenExpiresAt = (rememberMe = false) => {
+  const expiresIn = getRefreshTokenExpiresIn(rememberMe);
+
+  if (/^[0-9]+d$/.test(expiresIn)) {
+    return new Date(Date.now() + Number(expiresIn.replace('d', '')) * 24 * 60 * 60 * 1000);
+  }
+  if (/^[0-9]+h$/.test(expiresIn)) {
+    return new Date(Date.now() + Number(expiresIn.replace('h', '')) * 60 * 60 * 1000);
+  }
+
+  return new Date(Date.now() + 24 * 60 * 60 * 1000);
+};
+const getRequestIpAddress = (req) => {
+  const forwardedFor = normalize(req?.headers?.['x-forwarded-for']);
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return normalize(req?.ip || req?.socket?.remoteAddress || '');
+};
+const getRequestUserAgent = (req) => normalize(req?.headers?.['user-agent']);
 const getPasswordResetExpiresAt = () => new Date(Date.now() + PASSWORD_RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000);
 const getAppBaseUrl = (req) => {
   const envBaseUrl = (process.env.APP_BASE_URL || process.env.CLIENT_URL || '').trim();
@@ -154,7 +199,73 @@ const buildToken = (user, opts = {}) => {
     employeeId: user.employeeProfile?.id || null,
     ...opts,
   };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
+};
+
+const createRefreshTokenRecord = async ({ userId, rememberMe = false, req, tx = prisma }) => {
+  const rawToken = createRawRefreshToken();
+  const tokenHash = sha256(rawToken);
+  const expiresAt = getRefreshTokenExpiresAt(rememberMe);
+
+  const refreshToken = await tx.refreshToken.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+      userAgent: getRequestUserAgent(req) || null,
+      ipAddress: getRequestIpAddress(req) || null,
+    },
+  });
+
+  return {
+    rawToken,
+    tokenHash,
+    expiresAt,
+    rememberMe,
+    refreshToken,
+  };
+};
+
+const setRefreshTokenCookie = (res, refreshToken, rememberMe = false) => {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions(rememberMe));
+};
+
+const clearRefreshTokenCookie = (res) => {
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/api/auth',
+  });
+};
+
+const revokeRefreshTokenFamilyChain = async ({ tokenId, tx = prisma, revokedAt = new Date() }) => {
+  if (!tokenId) return;
+
+  const visited = new Set();
+  const queue = [tokenId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    if (!currentId || visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    const children = await tx.refreshToken.findMany({
+      where: { replacedByTokenId: currentId },
+      select: { id: true },
+    });
+
+    if (children.length > 0) {
+      queue.push(...children.map((item) => item.id));
+    }
+  }
+
+  if (visited.size > 0) {
+    await tx.refreshToken.updateMany({
+      where: { id: { in: Array.from(visited) } },
+      data: { revokedAt },
+    });
+  }
 };
 
 const register = async (req, res) => {
@@ -224,10 +335,11 @@ const register = async (req, res) => {
       },
     });
 
-    const token = buildToken(newUser);
+    const accessToken = buildToken(newUser);
 
     return res.status(201).json({
-      token,
+      token: accessToken,
+      accessToken,
       role: newUser.role,
       profileType: 'customer',
       profile: newUser.customerProfile,
@@ -262,6 +374,7 @@ const login = async (req, res) => {
   try {
     const identifier = normalize(req.body?.emailOrPhone ?? req.body?.identifier);
     const password = normalize(req.body?.password);
+    const rememberMe = parseRememberMe(req.body?.rememberMe);
 
     if (!identifier || !password) {
       return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร หรือไอดี และรหัสผ่าน' });
@@ -413,8 +526,16 @@ const login = async (req, res) => {
     const profileType = user.customerProfile ? 'customer' : user.employeeProfile ? 'employee' : null;
 
     const tSign0 = Date.now();
-    const token = buildToken(user);
+    const accessToken = buildToken(user);
     timing.signJwtMs = Date.now() - tSign0;
+
+    const refreshTokenRecord = await createRefreshTokenRecord({
+      userId: user.id,
+      rememberMe,
+      req,
+    });
+
+    setRefreshTokenCookie(res, refreshTokenRecord.rawToken, rememberMe);
 
     timing.totalMs = Date.now() - t0;
     // eslint-disable-next-line no-console
@@ -427,10 +548,12 @@ const login = async (req, res) => {
       userRole: user?.role || null,
       hasEmployeeProfile: !!user?.employeeProfile,
       hasCustomerProfile: !!user?.customerProfile,
+      rememberMe,
     });
 
     return res.json({
-      token,
+      token: accessToken,
+      accessToken,
       role: user.role,
       profileType,
       profile: {
@@ -440,6 +563,11 @@ const login = async (req, res) => {
         branch: user.employeeProfile?.branch || null,
         position: user.employeeProfile?.position || null,
         user: { id: user.id, email: user.email, role: user.role },
+      },
+      session: {
+        rememberMe,
+        accessTokenExpiresIn: ACCESS_TOKEN_EXPIRES,
+        refreshTokenExpiresIn: getRefreshTokenExpiresIn(rememberMe),
       },
     });
   } catch (error) {
@@ -634,6 +762,177 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const refreshSession = async (req, res) => {
+  try {
+    const rawRefreshToken = normalize(req.cookies?.[REFRESH_COOKIE_NAME]);
+
+    if (!rawRefreshToken) {
+      return res.status(401).json({ message: 'Refresh token not found' });
+    }
+
+    const tokenHash = sha256(rawRefreshToken);
+
+    const existingToken = await prisma.refreshToken.findFirst({
+      where: {
+        tokenHash,
+      },
+      include: {
+        user: {
+          include: {
+            customerProfile: true,
+            employeeProfile: {
+              include: {
+                branch: true,
+                position: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!existingToken) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    if (existingToken.revokedAt) {
+      await revokeRefreshTokenFamilyChain({ tokenId: existingToken.id });
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ message: 'Refresh token reuse detected. Please log in again.' });
+    }
+
+    if (existingToken.expiresAt <= new Date()) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ message: 'Session expired' });
+    }
+
+    const user = existingToken.user;
+
+    if (!user || !user.enabled) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ message: 'Session expired' });
+    }
+
+    if (user.role !== 'customer' && user.employeeProfile) {
+      if (user.employeeProfile.active === false || user.employeeProfile.approved === false) {
+        clearRefreshTokenCookie(res);
+        return res.status(403).json({ message: 'Session is no longer allowed' });
+      }
+    }
+
+    const rememberMe = existingToken.expiresAt.getTime() - existingToken.createdAt.getTime() > 24 * 60 * 60 * 1000;
+
+    const rotated = await prisma.$transaction(async (tx) => {
+      const newTokenRecord = await createRefreshTokenRecord({
+        userId: user.id,
+        rememberMe,
+        req,
+        tx,
+      });
+
+      await tx.refreshToken.update({
+        where: { id: existingToken.id },
+        data: {
+          revokedAt: new Date(),
+          replacedByTokenId: newTokenRecord.refreshToken.id,
+        },
+      });
+
+      return newTokenRecord;
+    });
+
+    const profile = user.customerProfile || user.employeeProfile || null;
+    const profileType = user.customerProfile
+      ? 'customer'
+      : user.employeeProfile
+        ? 'employee'
+        : null;
+
+    const accessToken = buildToken(user);
+    setRefreshTokenCookie(res, rotated.rawToken, rememberMe);
+
+    return res.json({
+      token: accessToken,
+      accessToken,
+      role: user.role,
+      profileType,
+      profile: {
+        id: profile?.id || null,
+        name: profile?.name || '',
+        phone: profile?.phone || '',
+        branch: user.employeeProfile?.branch || null,
+        position: user.employeeProfile?.position || null,
+        user: { id: user.id, email: user.email, role: user.role },
+      },
+      session: {
+        rememberMe,
+        accessTokenExpiresIn: ACCESS_TOKEN_EXPIRES,
+        refreshTokenExpiresIn: getRefreshTokenExpiresIn(rememberMe),
+      },
+    });
+  } catch (error) {
+    clearRefreshTokenCookie(res);
+    console.error('❌ refreshSession error:', error);
+    return res.status(401).json({ message: 'Unable to refresh session' });
+  }
+};
+
+const logoutSession = async (req, res) => {
+  try {
+    const rawRefreshToken = normalize(req.cookies?.[REFRESH_COOKIE_NAME]);
+
+    if (rawRefreshToken) {
+      const tokenHash = sha256(rawRefreshToken);
+      await prisma.refreshToken.updateMany({
+        where: {
+          tokenHash,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      });
+    }
+
+    clearRefreshTokenCookie(res);
+    return res.json({ message: 'ออกจากระบบเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('❌ logoutSession error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถออกจากระบบได้' });
+  }
+};
+
+const revokeSession = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    await prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    clearRefreshTokenCookie(res);
+    return res.json({ message: 'ออกจากระบบทุกอุปกรณ์เรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('❌ revokeSession error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถออกจากระบบทุกอุปกรณ์ได้' });
+  }
+};
+
 const getMe = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -694,11 +993,15 @@ const getMe = async (req, res) => {
 module.exports = {
   register,
   login,
+  refreshSession,
+  logoutSession,
+  revokeSession,
   forgotPassword,
   resetPassword,
   getMe,
   findUserByEmail,
 };
+
 
 
 

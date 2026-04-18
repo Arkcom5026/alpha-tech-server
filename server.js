@@ -4,12 +4,14 @@
 
 
 
+
 //  @filename: server.js
 
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 
 dotenv.config();
@@ -85,6 +87,7 @@ try {
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
 
 const allowedOrigins = [
   // Local dev
@@ -148,9 +151,9 @@ const corsOptions = {
     'Origin',
   ],
   exposedHeaders: ['X-Request-Id'],
-  // Most flows use Authorization header; cookies are optional.
-  // Turn on only when you truly need cookies across origins.
-  credentials: process.env.CORS_CREDENTIALS === 'true',
+  // Remember Me / refresh session uses HttpOnly cookies across FE ↔ BE origins.
+  // Therefore credentials must be enabled for browser requests.
+  credentials: true,
   maxAge: 86400,
   optionsSuccessStatus: 204,
 };
@@ -276,6 +279,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
 
 
 

@@ -1,3 +1,5 @@
+
+
 generator client {
   provider = "prisma-client-js"
   // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
@@ -246,6 +248,7 @@ model User {
   customerProfile     CustomerProfile?
   employeeProfile     EmployeeProfile?
   passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -1802,3 +1805,30 @@ model PasswordResetToken {
   @@index([tokenHash])
   @@index([expiresAt])
 }
+
+model RefreshToken {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String
+  expiresAt DateTime
+
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  replacedByTokenId Int?
+  replacedByToken   RefreshToken?  @relation("RefreshTokenRotation", fields: [replacedByTokenId], references: [id], onDelete: SetNull)
+  previousTokens    RefreshToken[] @relation("RefreshTokenRotation")
+
+  userAgent String?
+  ipAddress String?
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+    
