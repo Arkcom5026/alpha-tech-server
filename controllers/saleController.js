@@ -1,5 +1,6 @@
 
 
+
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -431,7 +432,15 @@ const createSale = async (req, res) => {
             isHeadOffice: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                loginId: true,
+              },
+            },
+          },
+        },
         employee: true,
         items: { include: { stockItem: { include: { product: true } } } },
       },
@@ -515,7 +524,15 @@ const getAllSales = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take,
       include: {
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                loginId: true,
+              },
+            },
+          },
+        },
         employee: true,
       },
     });
@@ -565,7 +582,15 @@ const getSaleById = async (req, res) => {
       where: { id },
       include: {
         branch: true,
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                loginId: true,
+              },
+            },
+          },
+        },
         employee: true,
         items: { include: { stockItem: { include: { product: true } } } },
       },
@@ -675,7 +700,15 @@ const getSalesByBranchId = async (req, res) => {
       where: { branchId: Number(branchId) },
       orderBy: { soldAt: 'desc' },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                loginId: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -685,7 +718,7 @@ const getSalesByBranchId = async (req, res) => {
       totalAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(sale.totalAmount) : sale.totalAmount,
       createdAt: sale.createdAt,
       customerName: sale.customer?.name || '-',
-      customerPhone: '-',
+      customerPhone: sale.customer?.user?.loginId || '-',
     }));
 
     return res.json(mapped);
@@ -860,7 +893,15 @@ const searchPrintableSales = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take,
       include: {
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                loginId: true,
+              },
+            },
+          },
+        },
         employee: true,
       },
     });
@@ -945,7 +986,7 @@ const searchPrintableSales = async (req, res) => {
         lastPaidAt,
         customerName: s.customer?.name || '-',
         companyName: s.customer?.companyName || '-',
-        customerPhone: '-',
+        customerPhone: s.customer?.user?.loginId || '-',
         employeeName: s.employee?.name || '-',
         status: s.status,
         isCredit: !!s.isCredit,
@@ -988,6 +1029,7 @@ module.exports = {
   getAllSalesReturn,
   searchPrintableSales,
 };
+
 
 
 

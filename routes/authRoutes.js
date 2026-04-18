@@ -1,4 +1,6 @@
 
+
+
 // ✅ routes/authRoutes.js (CommonJS)
 const express = require('express');
 const router = express.Router();
@@ -39,7 +41,12 @@ router.post('/register', register);
 // 🔍 Find user by email (for employee approval)
 router.get('/users/find', verifyToken, findUserByEmail);
 
+// ✅ NEW: verify current session
+const getMe = ensureFn('getMe');
+router.get('/me', verifyToken, getMe);
+
 module.exports = router;
+
 
 
 

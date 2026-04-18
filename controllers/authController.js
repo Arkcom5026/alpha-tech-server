@@ -1,4 +1,6 @@
 
+
+
 // ✅ authController.js — Prisma singleton, safer errors, consistent JWT payload
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -399,11 +401,71 @@ const findUserByEmail = async (req, res) => {
   }
 };
 
+// ✅ get current session (used by FE: verifySession)
+const getMe = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        customerProfile: true,
+        employeeProfile: {
+          include: {
+            branch: true,
+            position: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const profile = user.customerProfile || user.employeeProfile || null;
+    const profileType = user.customerProfile
+      ? 'customer'
+      : user.employeeProfile
+      ? 'employee'
+      : null;
+
+    return res.json({
+      role: user.role,
+      profileType,
+      branchId: user.employeeProfile?.branchId || null,
+      profile: {
+        id: profile?.id || null,
+        name: profile?.name || '',
+        phone: profile?.phone || '',
+        email: user.email || '',
+        branch: user.employeeProfile?.branch || null,
+        position: user.employeeProfile?.position || null,
+        branchId: user.employeeProfile?.branchId || null,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('❌ getMe error:', error);
+    return res.status(500).json({ message: 'Failed to verify session' });
+  }
+};
+
 module.exports = {
   register,
   login,
+  getMe,
   findUserByEmail,
 };
+
 
 
 
