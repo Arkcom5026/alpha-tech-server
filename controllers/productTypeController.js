@@ -1,3 +1,5 @@
+
+
 // controllers/productTypeController.js
 // Guards: slug-based unique-by-parent (categoryId), safer P2002 detail
 
@@ -9,6 +11,20 @@ const toInt = (v) =>
   v === undefined || v === null || v === '' ? undefined : parseInt(v, 10);
 const omitUndefined = (obj) =>
   Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+
+const getBranchIdFromReq = (req) => toInt(req.user?.branchId);
+
+const requireBranchId = (req, res) => {
+  const branchId = getBranchIdFromReq(req);
+  if (!branchId) {
+    res.status(403).json({
+      error: 'BRANCH_REQUIRED',
+      message: 'ไม่พบข้อมูลสาขาใน token กรุณาเข้าสู่ระบบใหม่',
+    });
+    return null;
+  }
+  return branchId;
+};
 
 // Inline normalizer/slugify (ไม่พึ่ง external deps)
 const toSpaces = (s) => s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -35,10 +51,10 @@ async function getCategoryGuardInfo(categoryId) {
 }
 
 // ---------- queries ----------
-async function findDuplicateType({ categoryId, slug }) {
-  if (!categoryId || !slug) return null;
+async function findDuplicateType({ branchId, categoryId, slug }) {
+  if (!branchId || !categoryId || !slug) return null;
   return prisma.productType.findFirst({
-    where: { categoryId, slug },
+    where: { branchId, categoryId, slug },
     select: { id: true, name: true, slug: true, pathCached: true },
   });
 }
@@ -46,6 +62,8 @@ async function findDuplicateType({ categoryId, slug }) {
 // ✅ GET: list
 const getAllProductType = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const { q, categoryId, includeInactive, page: pageQ, limit: limitQ } = req.query || {};
     const pageRaw = Number(pageQ);
     const limitRaw = Number(limitQ);
@@ -53,6 +71,7 @@ const getAllProductType = async (req, res) => {
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 20;
 
     const where = omitUndefined({
+      branchId,
       ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
       ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
       ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
@@ -80,11 +99,13 @@ const getAllProductType = async (req, res) => {
 // ✅ GET: single
 const getProductTypeById = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const productType = await prisma.productType.findUnique({
-      where: { id },
+    const productType = await prisma.productType.findFirst({
+      where: { id, branchId },
       include: { category: true },
     });
 
@@ -102,6 +123,8 @@ const getProductTypeById = async (req, res) => {
 // ✅ POST: create
 const createProductType = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const { name, categoryId } = req.body || {};
 
     if (!name || String(name).trim() === '') {
@@ -122,13 +145,13 @@ const createProductType = async (req, res) => {
     const slug = slugify(nameTrim);
 
     // Pre-check to return conflict detail (UX ดีกว่า)
-    const dupe = await findDuplicateType({ categoryId: categoryIdInt, slug });
+    const dupe = await findDuplicateType({ branchId, categoryId: categoryIdInt, slug });
     if (dupe) {
       return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม', conflict: dupe });
     }
 
     const created = await prisma.productType.create({
-      data: { name: nameTrim, normalizedName: normalized, slug, categoryId: categoryIdInt, active: true },
+      data: { name: nameTrim, normalizedName: normalized, slug, categoryId: categoryIdInt, branchId, active: true },
       include: { category: true },
     });
 
@@ -146,13 +169,15 @@ const createProductType = async (req, res) => {
 // ✅ PATCH: update
 const updateProductType = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
     const { name, categoryId } = req.body || {};
     const categoryIdInt = toInt(categoryId);
 
-    const current = await prisma.productType.findUnique({ where: { id }, select: { id: true, categoryId: true } });
+    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, categoryId: true, branchId: true } });
     if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการอัปเดต' });
 
     const currentCat = await getCategoryGuardInfo(current.categoryId);
@@ -174,9 +199,18 @@ const updateProductType = async (req, res) => {
       normalized = normalizeName(nameTrim);
       slug = slugify(nameTrim);
 
-      const dupe = await findDuplicateType({ categoryId: targetCategoryId, slug });
+      const dupe = await findDuplicateType({
+        branchId,
+        categoryId: targetCategoryId,
+        slug,
+      });
+
       if (dupe && dupe.id !== id) {
-        return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม', conflict: dupe });
+        return res.status(409).json({
+          error: 'DUPLICATE',
+          message: 'พบรายการเดิม',
+          conflict: dupe,
+        });
       }
     }
 
@@ -206,10 +240,12 @@ const updateProductType = async (req, res) => {
 // ✅ Archive: set active=false (block if referenced)
 const archiveProductType = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const current = await prisma.productType.findUnique({ where: { id }, select: { id: true, active: true, categoryId: true } });
+    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, active: true, categoryId: true, branchId: true } });
     if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการปิดการใช้งาน' });
 
     const cat = await getCategoryGuardInfo(current.categoryId);
@@ -238,10 +274,12 @@ const archiveProductType = async (req, res) => {
 // ✅ Restore: set active=true
 const restoreProductType = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const current = await prisma.productType.findUnique({ where: { id }, select: { id: true, active: true, categoryId: true } });
+    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, active: true, categoryId: true, branchId: true } });
     if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการกู้คืน' });
 
     const cat = await getCategoryGuardInfo(current.categoryId);
@@ -262,8 +300,10 @@ const restoreProductType = async (req, res) => {
 // ✅ dropdowns
 const getProductTypeDropdowns = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
     const types = await prisma.productType.findMany({
-      where: { active: true },
+      where: { active: true, branchId },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
@@ -283,6 +323,8 @@ module.exports = {
   restoreProductType,
   getProductTypeDropdowns,
 };
+
+
 
 
 

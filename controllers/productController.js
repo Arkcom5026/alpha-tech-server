@@ -4,6 +4,7 @@
 
 
 
+
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
@@ -1374,33 +1375,53 @@ const getProductOnlineById = async (req, res) => {
 
 // =====================================================
 // GET: /api/products/dropdowns (auth) + /api/products/online/dropdowns (public)
-// - No branch scope required. (All are GLOBAL lists)
+// - ProductType is BRANCH-SCOPED.
+// - Category / Brand / Profile / Template remain shared catalog data.
 // =====================================================
 const getProductDropdowns = async (req, res) => {
   try {
     const includeInactive = String(req.query?.includeInactive ?? 'false').toLowerCase() === 'true'
-    const [cats, types, profiles, templatesRaw, brandsRaw, productTypeBrandsRaw] = await Promise.all([
+    const branchId = Number(req.user?.branchId) || toInt(req.query?.branchId)
+
+    if (!branchId) {
+      return res.status(400).json({ error: 'BRANCH_REQUIRED', message: 'ไม่พบข้อมูลสาขา' })
+    }
+
+    const [cats, types, profiles, templatesRaw, brandsRaw] = await Promise.all([
       prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-      prisma.productType.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, categoryId: true } }),
+      prisma.productType.findMany({
+        where: { branchId },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, categoryId: true, branchId: true },
+      }),
       prisma.productProfile.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.productTemplate.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, productProfileId: true } }),
-    
+
       // ✅ Brands are GLOBAL (ข้อมูลกลาง ใช้ทุกสาขา)
       prisma.brand.findMany({
         where: includeInactive ? {} : { active: true },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, active: true },
       }),
-    
-      // ✅ ProductTypeBrand mapping (GLOBAL)
-      prisma.productTypeBrand.findMany({
-        orderBy: [{ productTypeId: 'asc' }, { brandId: 'asc' }],
-        select: { productTypeId: true, brandId: true },
-      }),
     ])
 
+    const scopedProductTypeIds = types.map((t) => Number(t.id)).filter(Boolean)
+
+    const productTypeBrandsRaw = scopedProductTypeIds.length
+      ? await prisma.productTypeBrand.findMany({
+          where: { productTypeId: { in: scopedProductTypeIds } },
+          orderBy: [{ productTypeId: 'asc' }, { brandId: 'asc' }],
+          select: { productTypeId: true, brandId: true },
+        })
+      : []
+
     const categories = cats.map((c) => ({ id: Number(c.id), name: c.name }))
-    const productTypes = types.map((t) => ({ id: Number(t.id), name: t.name, categoryId: Number(t.categoryId) }))
+    const productTypes = types.map((t) => ({
+      id: Number(t.id),
+      name: t.name,
+      categoryId: t.categoryId == null ? null : Number(t.categoryId),
+      branchId: Number(t.branchId),
+    }))
     const productProfiles = profiles.map((p) => ({ id: Number(p.id), name: p.name }))
 
     const productTemplates = templatesRaw.map((tp) => ({
@@ -1983,17 +2004,6 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
