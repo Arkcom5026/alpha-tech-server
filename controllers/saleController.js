@@ -1,6 +1,7 @@
 
 
 
+
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -53,6 +54,14 @@ const normalizeSaleMoney = (sale) => {
     sale.items = sale.items.map((it) => {
       const cloned = { ...it };
       for (const k of ['basePrice', 'vatAmount', 'price', 'discount', 'refundedAmount'])
+        if (k in cloned && cloned[k] != null) cloned[k] = toNum(cloned[k]);
+      return cloned;
+    });
+  }
+  if (Array.isArray(sale.simpleItems)) {
+    sale.simpleItems = sale.simpleItems.map((it) => {
+      const cloned = { ...it };
+      for (const k of ['quantity', 'basePrice', 'vatAmount', 'price', 'discount', 'unitCost'])
         if (k in cloned && cloned[k] != null) cloned[k] = toNum(cloned[k]);
       return cloned;
     });
@@ -592,7 +601,38 @@ const getSaleById = async (req, res) => {
           },
         },
         employee: true,
-        items: { include: { stockItem: { include: { product: true } } } },
+        items: {
+          include: {
+            stockItem: {
+              include: {
+                product: {
+                  include: {
+                    unit: true,
+                    template: {
+                      include: {
+                        unit: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        simpleItems: {
+          include: {
+            product: {
+              include: {
+                unit: true,
+                template: {
+                  include: {
+                    unit: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
