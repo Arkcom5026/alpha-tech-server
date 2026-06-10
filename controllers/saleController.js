@@ -75,6 +75,7 @@ const normalizeSaleMoney = (sale) => {
 const generateSaleCode = async (branchId, attempt = 0) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
+  const { SALE_DOCUMENT_INCLUDE } = require('../src/modules/sales/contracts/saleDocument.include');
   const prefix = `SL-${paddedBranch}${now.format('YYMM')}`;
 
   const count = await prisma.sale.count({
@@ -427,32 +428,8 @@ const createSale = async (req, res) => {
     }
 
     const sale = await prisma.sale.findUnique({
-      where: { id: createdSale.id },
-      include: {
-        // ✅ include branch fields needed for document header
-        // NOTE: if you see Prisma error "Unknown field 'taxId'", it means Branch model is missing the field.
-        branch: {
-          select: {
-            id: true,
-            name: true,            address: true,
-            phone: true,
-            taxId: true,
-            branchCode: true,
-            isHeadOffice: true,
-          },
-        },
-        customer: {
-          include: {
-            user: {
-              select: {
-                loginId: true,
-              },
-            },
-          },
-        },
-        employee: true,
-        items: { include: { stockItem: { include: { product: true } } } },
-      },
+      where: { id },
+      include: SALE_DOCUMENT_INCLUDE,
     });
 
     // Fetch payments separately to avoid include name differences across schemas
@@ -472,14 +449,6 @@ const createSale = async (req, res) => {
     return res.status(500).json({ error: 'ไม่สามารถสร้างการขายได้ เนื่องจากเกิดข้อผิดพลาดภายในระบบ' });
   }
 };
-
-
-
-
-
-
-
-
 
 
 
