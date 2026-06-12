@@ -1,55 +1,60 @@
 // src/modules/sales/contracts/saleDocument.include.js
 
 const SALE_DOCUMENT_INCLUDE = {
-    branch: true,
-  
-    customer: {
-      include: {
-        user: {
-          select: {
-            loginId: true,
-          },
+  branch: true,
+
+  customer: {
+    include: {
+      user: {
+        select: {
+          loginId: true,
         },
       },
-    },
-  
-    employee: true,
-  
-    items: {
-      include: {
-        stockItem: {
-          include: {
-            product: {
-              include: {
-                unit: true,
-                template: {
-                  include: {
-                    unit: true,
-                  },
-                },
-              },
+
+      // ✅ Customer address truth:
+      // CustomerProfile.addressDetail contains house/building detail only.
+      // Full address requires Subdistrict → District → Province.
+      subdistrict: {
+        include: {
+          district: {
+            include: {
+              province: true,
             },
           },
         },
       },
     },
-  
-    simpleItems: {
-      include: {
-        product: {
-          include: {
-            unit: true,
-            template: {
-              include: {
-                unit: true,
-              },
+  },
+
+  employee: true,
+
+  items: {
+    include: {
+      stockItem: {
+        include: {
+          product: {
+            include: {
+              // ✅ Product.unit is the document/runtime unit truth.
+              unit: true,
             },
           },
         },
       },
     },
-  };
-  
-  module.exports = {
-    SALE_DOCUMENT_INCLUDE,
-  };
+  },
+
+  simpleItems: {
+    include: {
+      product: {
+        include: {
+          // ✅ Product.unit is the document/runtime unit truth.
+          unit: true,
+        },
+      },
+    },
+  },
+};
+
+module.exports = {
+  SALE_DOCUMENT_INCLUDE,
+};

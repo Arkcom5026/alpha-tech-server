@@ -1313,6 +1313,10 @@ model SaleItem {
   saleId      Int
   stockItemId Int @unique
 
+  documentPrefix      String? @db.Text
+  documentDescription String? @db.Text
+  documentSuffix      String? @db.Text
+
   basePrice      Decimal @db.Decimal(12, 2)
   vatAmount      Decimal @db.Decimal(12, 2)
   price          Decimal @db.Decimal(12, 2)
@@ -1334,6 +1338,10 @@ model SaleItemSimple {
   saleId    Int
   productId Int
   quantity  Decimal @db.Decimal(12, 2)
+
+  documentPrefix      String? @db.Text
+  documentDescription String? @db.Text
+  documentSuffix      String? @db.Text
 
   basePrice Decimal @db.Decimal(12, 2)
   discount  Decimal @db.Decimal(12, 2)

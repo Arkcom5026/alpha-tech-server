@@ -399,6 +399,10 @@ const getAllProducts = async (req, res) => {
         // ✅ Brand (optional)
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
+
+        // ✅ Product Unit Runtime Truth
+        unitId: true,
+        unit: { select: { id: true, name: true } },
       },
       take: takeNum,
       skip: skipNum,
@@ -438,6 +442,11 @@ const getAllProducts = async (req, res) => {
         // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
         brandName: (p.brand?.name ?? null),
+
+        // ✅ Product Unit Runtime Truth
+        unitId: p.unitId ?? p.unit?.id ?? null,
+        unitName: p.unit?.name ?? null,
+        unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
 
         imageUrl: null,
       }
@@ -572,6 +581,10 @@ const getProductsForPos = async (req, res) => {
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
 
+        // ✅ Product Unit Runtime Truth
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+
         branchPrice: {
           where: { branchId },
           take: 1,
@@ -646,6 +659,11 @@ const getProductsForPos = async (req, res) => {
         // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
         brandName: (p.brand?.name ?? null),
+
+        // ✅ Product Unit Runtime Truth
+        unitId: p.unitId ?? p.unit?.id ?? null,
+        unitName: p.unit?.name ?? null,
+        unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
 
         noSN: p.noSN,
         trackSerialNumber: p.trackSerialNumber,
@@ -784,6 +802,10 @@ const getProductsForOnline = async (req, res) => {
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
 
+        // ✅ Product Unit Runtime Truth
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -830,6 +852,11 @@ const getProductsForOnline = async (req, res) => {
         // ✅ Brand (optional)
         brandId: p.brandId ?? p.brand?.id ?? null,
         brandName: (p.brand?.name ?? null),
+
+        // ✅ Product Unit Runtime Truth
+        unitId: p.unitId ?? p.unit?.id ?? null,
+        unitName: p.unit?.name ?? null,
+        unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
 
         hasPrice: !!bp,
         branchPriceActive: bp?.isActive ?? true,
@@ -922,6 +949,8 @@ const getReadyToSell = async (req, res) => {
             name: true,
             brandId: true,
             brand: { select: { id: true, name: true } },
+            unitId: true,
+            unit: { select: { id: true, name: true } },
           },
         })
 
@@ -969,6 +998,9 @@ const getReadyToSell = async (req, res) => {
             productName: p?.name ?? null,
             brandId: p?.brandId ?? p?.brand?.id ?? null,
             brandName: p?.brand?.name ?? null,
+            unitId: p?.unitId ?? p?.unit?.id ?? null,
+            unitName: p?.unit?.name ?? null,
+            unit: p?.unit ? { id: p.unit.id, name: p.unit.name } : null,
             qty,
             receivedAt: g._max.receivedAt ?? null,
             displayCode: qty <= 1 ? (previewBarcode || '-') : 'หลายบาร์โค้ด',
@@ -1008,6 +1040,8 @@ const getReadyToSell = async (req, res) => {
                 name: true,
                 brandId: true,
                 brand: { select: { id: true, name: true } },
+                unitId: true,
+                unit: { select: { id: true, name: true } },
               },
             },
           },
@@ -1025,6 +1059,9 @@ const getReadyToSell = async (req, res) => {
               productName: r.product?.name ?? null,
               brandId: r.product?.brandId ?? r.product?.brand?.id ?? null,
               brandName: r.product?.brand?.name ?? null,
+              unitId: r.product?.unitId ?? r.product?.unit?.id ?? null,
+              unitName: r.product?.unit?.name ?? null,
+              unit: r.product?.unit ? { id: r.product.unit.id, name: r.product.unit.name } : null,
               qty: available,
               receivedAt: r.updatedAt ?? null,
               status: 'IN_STOCK',
@@ -1124,6 +1161,8 @@ const getReadyToSellStructuredDetails = async (req, res) => {
 
             // ✅ optional extensions (safe)
             brand: { select: { id: true, name: true } },
+            unitId: true,
+            unit: { select: { id: true, name: true } },
             category: { select: { id: true, name: true } },
             productType: { select: { id: true, name: true } },
 
@@ -1206,6 +1245,10 @@ const getProductPosById = async (req, res) => {
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
 
+        // ✅ Product Unit Runtime Truth
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+
         productImages: {
           where: { active: true },
           orderBy: [{ isCover: 'desc' }, { id: 'asc' }],
@@ -1267,8 +1310,9 @@ const getProductPosById = async (req, res) => {
       mode,
       noSN: p.noSN,
       trackSerialNumber: p.trackSerialNumber,
-      unitId: null,
-      unitName: null,
+      unitId: p.unitId ?? p.unit?.id ?? null,
+      unitName: p.unit?.name ?? null,
+      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
 
       categoryId: (p.productType?.categoryId ?? p.categoryId ?? null),
       productTypeId: p.productTypeId ?? null,
@@ -1329,6 +1373,10 @@ const getProductOnlineById = async (req, res) => {
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
 
+        // ✅ Product Unit Runtime Truth
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -1356,6 +1404,11 @@ const getProductOnlineById = async (req, res) => {
       // ✅ Brand (optional)
       brandId: p.brandId ?? p.brand?.id ?? null,
       brandName: (p.brand?.name ?? null),
+
+      // ✅ Product Unit Runtime Truth
+      unitId: p.unitId ?? p.unit?.id ?? null,
+      unitName: p.unit?.name ?? null,
+      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
 
       imageUrl,
 
@@ -1387,17 +1440,27 @@ const getProductDropdowns = async (req, res) => {
       return res.status(400).json({ error: 'BRANCH_REQUIRED', message: 'ไม่พบข้อมูลสาขา' })
     }
 
-    const [cats, types, profiles, templatesRaw, brandsRaw] = await Promise.all([
+    const [cats, types, profiles, templatesRaw, unitsRaw, brandsRaw] = await Promise.all([
       prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.productType.findMany({
         where: { branchId },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, categoryId: true, branchId: true },
       }),
-      prisma.productProfile.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-      prisma.productTemplate.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, productProfileId: true } }),
-
-      // ✅ Brands are GLOBAL (ข้อมูลกลาง ใช้ทุกสาขา)
+      prisma.productProfile.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
+      prisma.productTemplate.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, productProfileId: true },
+      }),
+    
+      prisma.unit.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
+    
       prisma.brand.findMany({
         where: includeInactive ? {} : { active: true },
         orderBy: { name: 'asc' },
@@ -1430,6 +1493,7 @@ const getProductDropdowns = async (req, res) => {
       productProfileId: (tp.productProfileId == null ? null : Number(tp.productProfileId)),
     }))
     const brands = (brandsRaw || []).map((b) => ({ id: Number(b.id), name: b.name, active: !!b.active }))
+    const units = (unitsRaw || []).map((u) => ({ id: Number(u.id), name: u.name }))
     const productTypeBrands = (productTypeBrandsRaw || []).map((x) => ({
       productTypeId: Number(x.productTypeId),
       brandId: Number(x.brandId),
@@ -1446,6 +1510,7 @@ const getProductDropdowns = async (req, res) => {
       productProfiles,
       productTemplates,
       brands,
+      units,
       productTypeBrands,
       productModes,
       templates: productTemplates,
@@ -1516,6 +1581,7 @@ const createProduct = async (req, res) => {
 
         // optional extensions
         brandId: (data.brandId === null ? null : toInt(data.brandId)),
+        unitId: (data.unitId === null ? null : toInt(data.unitId)),
         productProfileId: finalProfileId,
         templateId: tplCheck.templateId,
 
@@ -1671,6 +1737,7 @@ const updateProduct = async (req, res) => {
 
           // optional extensions
           brandId: toIntOpt(data.brandId),
+          unitId: toIntOpt(data.unitId),
 
           productProfileId: finalProfileId,
           templateId: tplCheck.templateId,

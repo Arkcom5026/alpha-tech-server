@@ -1,11 +1,12 @@
 
 
 
-
 // saleController.js
 
 const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
+const { SALE_DOCUMENT_INCLUDE } = require('../src/modules/sales/contracts/saleDocument.include');
+const { updateSaleDocumentLines } = require('../src/modules/sales/services/saleDocument.service');
 
 // --- Feature Flags (Backward-Compatible) ---
 const ENABLE_PAYMENT_AUTOCREATE = process.env.ENABLE_PAYMENT_AUTOCREATE === '1'; // สร้าง Payment อัตโนมัติเมื่อขายสด
@@ -75,7 +76,6 @@ const normalizeSaleMoney = (sale) => {
 const generateSaleCode = async (branchId, attempt = 0) => {
   const paddedBranch = String(branchId).padStart(2, '0');
   const now = dayjs();
-  const { SALE_DOCUMENT_INCLUDE } = require('../src/modules/sales/contracts/saleDocument.include');
   const prefix = `SL-${paddedBranch}${now.format('YYMM')}`;
 
   const count = await prisma.sale.count({
@@ -384,6 +384,12 @@ const createSale = async (req, res) => {
                   price: D(item.price),
                   discount: D(item.discount),
                   remark: item.remark,
+
+                  // ✅ Document Line runtime fields
+                  // ใช้เฉพาะรายการขายนี้ ไม่แก้ Product/Stock Truth
+                  documentPrefix: item.documentPrefix ?? null,
+                  documentDescription: item.documentDescription ?? null,
+                  documentSuffix: item.documentSuffix ?? null,
                 })),
               },
             },
@@ -428,7 +434,7 @@ const createSale = async (req, res) => {
     }
 
     const sale = await prisma.sale.findUnique({
-      where: { id },
+      where: { id: createdSale.id },
       include: SALE_DOCUMENT_INCLUDE,
     });
 
@@ -501,18 +507,7 @@ const getAllSales = async (req, res) => {
       where,
       orderBy: { createdAt: 'desc' },
       take,
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                loginId: true,
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: SALE_DOCUMENT_INCLUDE,
     });
 
     const normalized = NORMALIZE_DECIMAL_TO_NUMBER
@@ -558,51 +553,7 @@ const getSaleById = async (req, res) => {
 
     const sale = await prisma.sale.findUnique({
       where: { id },
-      include: {
-        branch: true,
-        customer: {
-          include: {
-            user: {
-              select: {
-                loginId: true,
-              },
-            },
-          },
-        },
-        employee: true,
-        items: {
-          include: {
-            stockItem: {
-              include: {
-                product: {
-                  include: {
-                    unit: true,
-                    template: {
-                      include: {
-                        unit: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        simpleItems: {
-          include: {
-            product: {
-              include: {
-                unit: true,
-                template: {
-                  include: {
-                    unit: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: SALE_DOCUMENT_INCLUDE,
     });
 
     if (!sale) return res.status(404).json({ error: 'Sale not found' });
@@ -708,17 +659,7 @@ const getSalesByBranchId = async (req, res) => {
     const sales = await prisma.sale.findMany({
       where: { branchId: Number(branchId) },
       orderBy: { soldAt: 'desc' },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                loginId: true,
-              },
-            },
-          },
-        },
-      },
+      include: SALE_DOCUMENT_INCLUDE,
     });
 
     const mapped = sales.map((sale) => ({
@@ -726,7 +667,7 @@ const getSalesByBranchId = async (req, res) => {
       code: sale.code,
       totalAmount: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(sale.totalAmount) : sale.totalAmount,
       createdAt: sale.createdAt,
-      customerName: sale.customer?.name || '-',
+      customerName: sale.customer?.name || sale.customer?.companyName || '-',
       customerPhone: sale.customer?.user?.loginId || '-',
     }));
 
@@ -901,18 +842,7 @@ const searchPrintableSales = async (req, res) => {
       where,
       orderBy: { createdAt: 'desc' },
       take,
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                loginId: true,
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: SALE_DOCUMENT_INCLUDE,
     });
 
     // Fetch payments separately (schema-safe: Sale model may not expose `payments` relation)
@@ -1021,7 +951,36 @@ const searchPrintableSales = async (req, res) => {
 };
 
 
+const updateSaleDocumentLinesController = async (req, res) => {
+  try {
+    const saleId = Number(req.params.id ?? req.params.saleId);
+    const branchId = Number(req.user?.branchId);
 
+    const result = await updateSaleDocumentLines({
+      prisma,
+      saleId,
+      branchId,
+      items: req.body?.items,
+      simpleItems: req.body?.simpleItems,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+
+    if (status >= 500) {
+      console.error('❌ [updateSaleDocumentLines] error:', error);
+    }
+
+    return res.status(status).json({
+      error: error?.message || 'ไม่สามารถบันทึกข้อความก่อน/หลังสินค้าได้',
+    });
+  }
+};
+
+// 🧭 Backward-compatible controller alias.
+// Keep temporarily so older routes/imports do not break during transition.
+const updateSaleDocumentDescriptionsController = updateSaleDocumentLinesController;
 
 
 
@@ -1037,12 +996,6 @@ module.exports = {
   markSaleAsPaid,
   getAllSalesReturn,
   searchPrintableSales,
+  updateSaleDocumentLinesController,
+  updateSaleDocumentDescriptionsController,
 };
-
-
-
-
-
-
-
-
