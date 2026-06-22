@@ -1,0 +1,25 @@
+name: AI Orchestrator Runner
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  run-orchestrator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run AI Orchestrator Scan
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Starting Backend Orchestrator..."
+          # คำสั่งรันบอทจริงจะมาเสียบตรงนี้ในสเต็ปถัดไป
+          echo "Scanning old-legacy-code/ and routes/..."
