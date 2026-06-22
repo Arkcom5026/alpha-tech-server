@@ -19,7 +19,8 @@ jobs:
           echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING..."
           echo "======================================================="
           
-          curl -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}" \
+          # ปรับตำแหน่ง Endpoint เป็น v1beta และใช้ชื่อโมเดลมาตรฐานระดับสากล
+          curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d '{
               "contents": [{
@@ -33,7 +34,11 @@ jobs:
             const fs = require('fs');
             try {
               const res = JSON.parse(fs.readFileSync('gemini_response.json', 'utf8'));
-              console.log(res.candidates[0].content.parts[0].text);
+              if (res.error) {
+                console.log('API Error:', res.error.message);
+              } else {
+                console.log(res.candidates[0].content.parts[0].text);
+              }
             } catch(e) {
               console.log('Error parsing response, displaying raw production logs.');
               console.log(fs.readFileSync('gemini_response.json', 'utf8'));
