@@ -11,36 +11,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: System Analysis by Gemini
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: System Analysis by Gemini SDK
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "======================================================="
-          echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING..."
+          echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING WITH SDK..."
           echo "======================================================="
           
-          # เปลี่ยนไปใช้ endpoint โมเดล v1/models/gemini-pro ที่เปิดรับและเสถียรที่สุดสำหรับ curl ยิงตรง
-          curl -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "contents": [{
-                "parts": [{
-                  "text": "คุณคือสถาปนิกซอฟต์แวร์มืออาชีพ (Software Architect) จงวิเคราะห์และสรุปแนวทางการปรับโครงสร้างจากโปรเจกต์นี้ ซึ่งประกอบไปด้วยโฟลเดอร์ api, controllers, routes, prisma, และ middlewares แนะนำแนวทางการจัดกลุ่มโฟลเดอร์ใหม่ให้เป็นระเบียบตามมาตรฐานสากล (เช่น Clean Architecture หรือ Module-based) สรุปออกมาเป็นข้อๆ และร่างไดอะแกรมโครงสร้างใหม่ที่แนะนำมาให้ดูด้วย"
-                }]
-              }]
-            }' > gemini_response.json
-
+          # 1. ติดตั้งไลบรารีทางการของ Google
+          npm install @google/generative-ai
+          
+          # 2. สร้างและรันสคริปต์สแกนเนอร์ผ่าน Node.js
           node -e "
-            const fs = require('fs');
-            try {
-              const res = JSON.parse(fs.readFileSync('gemini_response.json', 'utf8'));
-              if (res.error) {
-                console.log('API Error:', res.error.message);
-              } else {
-                console.log(res.candidates[0].content.parts[0].text);
+            const { GoogleGenAI } = require('@google/generative-ai');
+            
+            async function main() {
+              try {
+                // สำหรับ SDK ตัวใหม่ล่าสุดจะใช้โครงสร้างระบุ API Key ผ่าน Environment Variable หรือตัวแปรตรง
+                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                
+                const response = await ai.models.generateContent({
+                  model: 'gemini-1.5-flash',
+                  contents: 'คุณคือสถาปนิกซอฟต์แวร์มืออาชีพ (Software Architect) จงวิเคราะห์และสรุปแนวทางการปรับโครงสร้างจากโปรเจกต์นี้ ซึ่งประกอบไปด้วยโฟลเดอร์ api, controllers, routes, prisma, และ middlewares แนะนำแนวทางการจัดกลุ่มโฟลเดอร์ใหม่ให้เป็นระเบียบตามมาตรฐานสากล (เช่น Clean Architecture หรือ Module-based) สรุปออกมาเป็นข้อๆ และร่างไดอะแกรมโครงสร้างใหม่ที่แนะนำมาให้ดูด้วย',
+                });
+                
+                console.log('=======================================================');
+                console.log('🏗️ BLUEPRINT REPORT FROM GEMINI ARCHITECT:');
+                console.log('=======================================================');
+                console.log(response.text);
+              } catch (error) {
+                console.error('SDK Execution Error:', error);
               }
-            } catch(e) {
-              console.log('Error parsing response, displaying raw production logs.');
-              console.log(fs.readFileSync('gemini_response.json', 'utf8'));
             }
+            
+            main();
           "
