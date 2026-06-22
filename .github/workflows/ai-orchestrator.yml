@@ -19,8 +19,8 @@ jobs:
           echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING..."
           echo "======================================================="
           
-          # ปรับตำแหน่ง Endpoint เป็น v1beta และใช้ชื่อโมเดลมาตรฐานระดับสากล
-          curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+          # ปรับชื่อโมเดลตามไวยากรณ์ทางการล่าสุดเป็น gemini-1.5-flash-latest
+          curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d '{
               "contents": [{
