@@ -19,8 +19,7 @@ jobs:
           echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING..."
           echo "======================================================="
           
-          # คำสั่งสั่งให้ AI สแกนภาพรวมและพ่นแผนสรุปโครงสร้างใหม่
-          curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+          curl -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d '{
               "contents": [{
@@ -30,7 +29,6 @@ jobs:
               }]
             }' > gemini_response.json
 
-          # แสดงผลลัพธ์สรุปออกมาบนหน้าจอ Logs ของ GitHub
           node -e "
             const fs = require('fs');
             try {
