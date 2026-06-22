@@ -24,27 +24,23 @@ jobs:
           echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING WITH SDK..."
           echo "======================================================="
           
-          # 1. ติดตั้งไลบรารีทางการของ Google
           npm install @google/generative-ai
           
-          # 2. สร้างและรันสคริปต์สแกนเนอร์ผ่าน Node.js
+          # ปรับชื่อคลาสตัวเรียกเป็น GoogleGenerativeAI ตามคู่มือทางการล่าสุด
           node -e "
-            const { GoogleGenAI } = require('@google/generative-ai');
+            const { GoogleGenerativeAI } = require('@google/generative-ai');
             
             async function main() {
               try {
-                // สำหรับ SDK ตัวใหม่ล่าสุดจะใช้โครงสร้างระบุ API Key ผ่าน Environment Variable หรือตัวแปรตรง
-                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
                 
-                const response = await ai.models.generateContent({
-                  model: 'gemini-1.5-flash',
-                  contents: 'คุณคือสถาปนิกซอฟต์แวร์มืออาชีพ (Software Architect) จงวิเคราะห์และสรุปแนวทางการปรับโครงสร้างจากโปรเจกต์นี้ ซึ่งประกอบไปด้วยโฟลเดอร์ api, controllers, routes, prisma, และ middlewares แนะนำแนวทางการจัดกลุ่มโฟลเดอร์ใหม่ให้เป็นระเบียบตามมาตรฐานสากล (เช่น Clean Architecture หรือ Module-based) สรุปออกมาเป็นข้อๆ และร่างไดอะแกรมโครงสร้างใหม่ที่แนะนำมาให้ดูด้วย',
-                });
+                const response = await model.generateContent('คุณคือสถาปนิกซอฟต์แวร์มืออาชีพ (Software Architect) จงวิเคราะห์และสรุปแนวทางการปรับโครงสร้างจากโปรเจกต์นี้ ซึ่งประกอบไปด้วยโฟลเดอร์ api, controllers, routes, prisma, และ middlewares แนะนำแนวทางการจัดกลุ่มโฟลเดอร์ใหม่ให้เป็นระเบียบตามมาตรฐานสากล (เช่น Clean Architecture หรือ Module-based) สรุปออกมาเป็นข้อๆ และร่างไดอะแกรมโครงสร้างใหม่ที่แนะนำมาให้ดูด้วย');
                 
                 console.log('=======================================================');
                 console.log('🏗️ BLUEPRINT REPORT FROM GEMINI ARCHITECT:');
                 console.log('=======================================================');
-                console.log(response.text);
+                console.log(response.response.text());
               } catch (error) {
                 console.error('SDK Execution Error:', error);
               }
