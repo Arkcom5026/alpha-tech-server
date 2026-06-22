@@ -16,35 +16,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: System Analysis by Gemini SDK
+      - name: Execute System Analysis
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "======================================================="
-          echo "🤖 STARTING GLOBAL LEGACY CODE SCANNING WITH SDK..."
-          echo "======================================================="
-          
           npm install @google/generative-ai
-          
-          # ปรับชื่อคลาสตัวเรียกเป็น GoogleGenerativeAI ตามคู่มือทางการล่าสุด
-          node -e "
-            const { GoogleGenerativeAI } = require('@google/generative-ai');
-            
-            async function main() {
-              try {
-                const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-                
-                const response = await model.generateContent('คุณคือสถาปนิกซอฟต์แวร์มืออาชีพ (Software Architect) จงวิเคราะห์และสรุปแนวทางการปรับโครงสร้างจากโปรเจกต์นี้ ซึ่งประกอบไปด้วยโฟลเดอร์ api, controllers, routes, prisma, และ middlewares แนะนำแนวทางการจัดกลุ่มโฟลเดอร์ใหม่ให้เป็นระเบียบตามมาตรฐานสากล (เช่น Clean Architecture หรือ Module-based) สรุปออกมาเป็นข้อๆ และร่างไดอะแกรมโครงสร้างใหม่ที่แนะนำมาให้ดูด้วย');
-                
-                console.log('=======================================================');
-                console.log('🏗️ BLUEPRINT REPORT FROM GEMINI ARCHITECT:');
-                console.log('=======================================================');
-                console.log(response.response.text());
-              } catch (error) {
-                console.error('SDK Execution Error:', error);
-              }
-            }
-            
-            main();
-          "
+          # สั่งรันไฟล์สคริปต์ตรง ๆ ปลอดภัยจากปัญหา syntax ของ terminal
+          node scripts/ai-scanner.js
