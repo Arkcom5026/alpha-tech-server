@@ -1,9 +1,4 @@
-
-
-
-
-
-// ✅ routes/authRoutes.js 
+// routes/authRoutes.js 
 const express = require('express');
 const router = express.Router();
 
@@ -16,7 +11,6 @@ const ensureFn = (key) => {
   throw new Error(`[authRoutes] authController.${key} must be a function (got ${typeof fn})`);
 };
 
-// บางครั้ง controller อาจ export เป็น object (เช่น { handler })
 const resolveHandler = (key) => {
   const v = authController?.[key];
   if (typeof v === 'function') return v;
@@ -30,14 +24,16 @@ const login = ensureFn('login');
 const register = ensureFn('register');
 const refreshSession = ensureFn('refreshSession');
 const logoutSession = ensureFn('logoutSession');
+const addSubEmployee = ensureFn('addSubEmployee'); // 🟢 ดึงโมดูล Atomic เพิ่มพนักงานรายย่อยมาร่วมท่อขาย
 const revokeSession = resolveHandler('revokeSession') || resolveHandler('logoutAllSessions') || resolveHandler('logoutAll');
 const findUserByEmail = resolveHandler('findUserByEmail');
+
 if (typeof findUserByEmail !== 'function') {
   throw new Error(`[authRoutes] authController.findUserByEmail must be a function (got ${typeof findUserByEmail})`);
 }
+
 // ✅ verifyToken: single export (CommonJS)
 const verifyToken = require('../middlewares/verifyToken');
-
 
 // 🔐 Login / Register / Session
 router.post('/login', login);
@@ -47,7 +43,9 @@ router.post('/register', register);
 router.post('/refresh', refreshSession);
 router.post('/logout', logoutSession);
 
-
+// 👥 [SUB-EMPLOYEE CREATION LINK]: เจาะช่องเปิดท่อรับคำสั่งเพิ่มพนักงานย่อยฝั่งสาขา
+// บังคับผ่าน Middleware 'verifyToken' เพื่อดักเช็กค่าแกะ branchId เสมอตามนโยบาย Multi-Tenancy
+router.post('/add-sub-employee', verifyToken, addSubEmployee);
 
 if (typeof revokeSession === 'function') {
   router.post('/logout-all', verifyToken, revokeSession);
@@ -67,9 +65,3 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
 module.exports = router;
-
-
-
-
-
-

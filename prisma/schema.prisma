@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // Explicit output to be Prisma 7–ready (relative to prisma/schema.prisma)
   output   = "../node_modules/.prisma/client"
 }
 
@@ -10,11 +9,21 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// =========================================================================
+// 🔐 ENUMS & GLOBAL CONFIGURATIONS
+// =========================================================================
+
 enum Role {
   CUSTOMER
   EMPLOYEE
   ADMIN
   SUPERADMIN
+}
+
+enum EmployeeRole {
+  OWNER
+  MANAGER
+  CASHIER
 }
 
 enum PurchaseOrderStatus {
@@ -233,6 +242,10 @@ enum CustomerReceiptStatus {
   CANCELLED
 }
 
+// =========================================================================
+// 👥 CORE IDENTITIES & ACCESS CONTROL (AUTH & RBAC ENHANCED)
+// =========================================================================
+
 model User {
   id          Int       @id @default(autoincrement())
   email       String?   @unique
@@ -253,92 +266,7 @@ model User {
   orderOnline OrderOnline[]
   cart        Cart[]
 }
-
-model CustomerProfile {
-  id   Int     @id @default(autoincrement())
-  name String?
-
-  picture       String?
-  companyName   String?
-  taxId         String?
-  addressDetail String?
-
-  subdistrictCode String?      @db.Char(6)
-  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
-
-  type   CustomerType @default(INDIVIDUAL)
-  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int          @unique
-
-  paymentTerms  Int?     @default(0)
-  creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
-  creditBalance Decimal? @default(0) @db.Decimal(12, 2)
-
-  orders   Order[]
-  cart     Cart[]
-  services ServiceOrder[]
-
-  sales            Sale[]
-  orderOnlines     OrderOnline[]
-  customerDeposits CustomerDeposit[]
-  customerReceipts CustomerReceipt[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  combinedBillingDocuments CombinedBillingDocument[]
-
-  @@index([subdistrictCode])
-}
-
-model CustomerDeposit {
-  id Int @id @default(autoincrement())
-
-  cashAmount     Decimal @default(0) @db.Decimal(12, 2)
-  transferAmount Decimal @default(0) @db.Decimal(12, 2)
-  cardAmount     Decimal @default(0) @db.Decimal(12, 2)
-  usedAmount     Decimal @default(0) @db.Decimal(12, 2)
-  usedSaleId     Int?
-  note           String? @db.Text
-
-  totalAmount Decimal @db.Decimal(12, 2)
-
-  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId Int?
-
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  branchId Int?
-
-  status DepositStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now())
-
-  createdBy    Int?
-  createdByEmp EmployeeProfile? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  updatedAt    DateTime         @updatedAt
-  depositUsage DepositUsage[]
-
-  @@index([customerId])
-  @@index([branchId])
-  @@index([branchId, createdAt])
-}
-
-model DepositUsage {
-  id                Int      @id @default(autoincrement())
-  customerDepositId Int
-  paymentId         Int?
-  saleId            Int?
-  amountUsed        Decimal  @db.Decimal(12, 2)
-  createdAt         DateTime @default(now())
-
-  customerDeposit CustomerDeposit @relation(fields: [customerDepositId], references: [id])
-  payment         Payment?        @relation(fields: [paymentId], references: [id])
-  sale            Sale?           @relation(fields: [saleId], references: [id])
-
-  @@index([paymentId])
-  @@index([customerDepositId])
-}
-
+ 
 model EmployeeProfile {
   id    Int     @id @default(autoincrement())
   name  String?
@@ -352,6 +280,10 @@ model EmployeeProfile {
 
   position   Position? @relation(fields: [positionId], references: [id], onDelete: Cascade)
   positionId Int?
+
+  // Greenfield Core Authentication Support (V2 API)
+  v2Role         EmployeeRole @default(CASHIER)
+  passwordHashV2 String?      // เก็บแฮชความปลอดภัยกรณีสลับสิทธิ์มาใช้ระบบแยกชิ้นส่วนคลีน
 
   confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
 
@@ -381,6 +313,10 @@ model EmployeeProfile {
   PurchaseOrderReceipt    PurchaseOrderReceipt[]
   inputTaxFilingBatches   InputTaxFilingBatch[]
   salesTaxFilingBatches   SalesTaxFilingBatch[]
+  v2StockAudits           V2StockAudit[]
+
+  // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับของช่างเทคนิคผู้คุมเคสซ่อม v2
+  repairJobs              RepairJob[]
 }
 
 model Branch {
@@ -388,7 +324,8 @@ model Branch {
   name    String
   address String
   phone   String?
-
+  slug    String? @unique
+  
   taxId        String? @db.VarChar(13)
   branchCode   String? @db.VarChar(5)
   isHeadOffice Boolean @default(false)
@@ -434,55 +371,17 @@ model Branch {
   stockBalances         StockBalance[]
   inputTaxFilingBatches InputTaxFilingBatch[]
   salesTaxFilingBatches SalesTaxFilingBatch[]
+  v2StockAudits         V2StockAudit[]
+
+  // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับไปยังระบบงานซ่อม v2
+  repairJobs            RepairJob[]
 
   @@index([subdistrictCode])
 }
 
-model Province {
-  code   String @id
-  nameTh String
-
-  region    String
-  districts District[]
-}
-
-model District {
-  code         String        @id
-  nameTh       String
-  provinceCode String
-  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
-  subdistricts Subdistrict[]
-
-  @@index([provinceCode])
-}
-
-model Subdistrict {
-  code            String            @id
-  nameTh          String
-  districtCode    String
-  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
-  postcode        String?
-  branches        Branch[]
-  CustomerProfile CustomerProfile[]
-
-  @@index([districtCode])
-  @@index([postcode])
-}
-
-model Position {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  description String?
-  isActive    Boolean @default(true)
-
-  employees EmployeeProfile[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@index([name])
-}
+// =========================================================================
+// 📦 INVENTORY & MULTI-MODE PRODUCT ECOSYSTEM
+// =========================================================================
 
 model Category {
   id       Int     @id @default(autoincrement())
@@ -496,21 +395,17 @@ model Category {
   updatedAt DateTime  @updatedAt
   Product   Product[]
 }
-
-model ProductType {
+ model ProductType {
   id             Int     @id @default(autoincrement())
   name           String
   slug           String
   normalizedName String?
   active         Boolean @default(true)
 
-  typeBrands ProductTypeBrand[]
-
-  guideExamples String[] @default([])
+  typeBrands    ProductTypeBrand[]
+  guideExamples String[]           @default([])
   pathCached    String?
-
-  // ProductProfile is no longer tied to ProductType (BestLine)
-
+  
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId Int?
 
@@ -538,9 +433,6 @@ model ProductProfile {
   guideExamples String[] @default([])
   pathCached    String?
 
-  // ❌ BestLine: ProductProfile is a reusable group NOT tied to Category/ProductType
-  // (Products choose ProductProfile optionally)
-
   templates ProductTemplate[]
 
   active    Boolean   @default(true)
@@ -548,7 +440,6 @@ model ProductProfile {
   updatedAt DateTime  @updatedAt
   Product   Product[]
 
-  // Global uniqueness (BestLine)
   @@unique([slug])
   @@unique([normalizedName])
   @@index([normalizedName])
@@ -570,8 +461,6 @@ model ProductTemplate {
 
   applicableBusinessTypes BusinessType[] @default([])
 
-  // ✅ BestLine: ProductTemplate is a reusable extension (NOT tied under Category/ProductType/ProductProfile)
-  // Optional link to ProductProfile for grouping/suggestions only
   productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
   productProfileId Int?
 
@@ -582,7 +471,6 @@ model ProductTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Global uniqueness (BestLine)
   @@unique([slug])
   @@unique([normalizedName])
   @@index([normalizedName])
@@ -621,51 +509,40 @@ model ProductTypeBrand {
   @@index([productTypeId])
   @@index([brandId])
 }
+ 
 
-model Product {
+ model Product {
   id   Int    @id @default(autoincrement())
   name String
 
-  // Core behavior (BestLine): every Product is sellable; barcode behavior is handled by downstream flow
-  // SIMPLE  -> LOT barcode (SimpleLot)
-  // STRUCTURED -> SN/piece barcode (StockItem)
   mode ProductMode @default(STRUCTURED)
 
-  // Legacy / compatibility flags (keep, but do not force in UX)
   noSN              Boolean @default(false)
   trackSerialNumber Boolean @default(false)
 
   active Boolean @default(true)
 
-  // Optional helpers (do NOT require in UX)
-  category         Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId       Int?
-  productType      ProductType?    @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
+  category         Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   productTypeId    Int?
-  productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
+  productType      ProductType?     @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
   productProfileId Int?
+  productProfile   ProductProfile?  @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
 
-  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   templateId Int?
+  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
-  // Brand (global) — optional during transition
-  brand   Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
   brandId Int?
+  brand   Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
 
-  // Product-level spec overrides (BestLine)
-  // - Use when Product is unique (no Template/Profile reuse)
-  // - If NULL -> fallback to Template (if selected)
   warrantyDays Int?
   codeType     String?
 
-  unit   Unit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
   unitId Int?
+  unit   Unit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
-  // Flexible spec payload for unique products (do NOT force Template)
-  // Example: { attributes: {...}, notes: "..." }
   productConfig Json?
 
-  // Relations
   productImages      ProductImage[]
   stockItems         StockItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -681,6 +558,10 @@ model Product {
   simpleLots               SimpleLot[]
   stockBalances            StockBalance[]
   PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
+  v2StockAuditItems        V2StockAuditItem[]
+
+  // ➔ Added for Batch 5: ตัวชี้สายสัมพันธ์ขากลับแก้อาการ Error P1012 แบบเป๊ะตรงตัวล็อก
+  repairPartItems          RepairPartItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -693,6 +574,7 @@ model Product {
   @@index([brandId])
   @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
 }
+
 
 model BranchPrice {
   id Int @id @default(autoincrement())
@@ -721,7 +603,6 @@ model BranchPrice {
   @@unique([productId, branchId])
 }
 
-/// Branch-level quantity สำหรับสินค้า SIMPLE (no SN)
 model StockBalance {
   id Int @id @default(autoincrement())
 
@@ -795,8 +676,8 @@ model Unit {
   productTemplate ProductTemplate[]
   Product         Product[]
 }
-
-model StockItem {
+ 
+ model StockItem {
   id           Int     @id @default(autoincrement())
   barcode      String  @unique
   serialNumber String?
@@ -816,17 +697,17 @@ model StockItem {
   checkedBy    String?
   color        String?
 
-  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id], onDelete: Cascade)
   scannedByEmployeeId Int?
+  scannedBy           EmployeeProfile? @relation(fields: [scannedByEmployeeId], references: [id], onDelete: Cascade)
 
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptItemId Int?
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id], onDelete: Cascade)
 
   barcodeReceiptItem BarcodeReceiptItem[]
   saleItem           SaleItem?
@@ -837,12 +718,47 @@ model StockItem {
   stockAuditSnapshotItem StockAuditSnapshotItem[]
   stockAuditScanLog      StockAuditScanLog[]
 
+  // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับระบบเช็กประกันและใบเคลมผ่าน Serial รายชิ้น v2
+  repairJobs             RepairJob[]
+  warrantyClaims         WarrantyClaim[]
+
   @@unique([serialNumber, productId])
   @@index([branchId, status, productId])
   @@index([productId, status])
 }
 
-//----------------------------------------------------------------------------- 2
+// =========================================================================
+// 📑 RECONCILIATION AUDIT (V2 STOCK AUDITING COMPLIANCE)
+// =========================================================================
+
+model V2StockAudit {
+  id          Int                @id @default(autoincrement())
+  branchId    Int
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  auditorId   Int
+  auditor     EmployeeProfile    @relation(fields: [auditorId], references: [id])
+  status      String             @default("PENDING") // PENDING, ADJUSTED, CANCELLED
+  items       V2StockAuditItem[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([branchId])
+}
+
+model V2StockAuditItem {
+  id           Int          @id @default(autoincrement())
+  stockAuditId Int
+  stockAudit   V2StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
+  productId    Int
+  product      Product      @relation(fields: [productId], references: [id])
+  expectedQty  Int          
+  actualQty    Int          
+  difference   Int          
+}
+
+// =========================================================================
+// 🤝 PROCUREMENT & FINANCIAL SUPPLY CHAIN
+// =========================================================================
 
 model Supplier {
   isSystem      Boolean         @default(false)
@@ -894,14 +810,14 @@ model PurchaseOrder {
   note   String?
   status PurchaseOrderStatus @default(PENDING)
 
-  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierId Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId Int
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   items    PurchaseOrderItem[]
   receipts PurchaseOrderReceipt[]
@@ -919,8 +835,8 @@ model PurchaseOrderItem {
   costPrice        Decimal                    @db.Decimal(12, 2)
   receipts         PurchaseOrderReceiptItem[]
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   purchaseOrderId Int
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -943,19 +859,17 @@ model PurchaseOrderReceipt {
   statusPayment PaymentStatus @default(UNPAID)
 
   receivedById Int
-  // Link to EmployeeProfile for audit trail
   receivedBy   EmployeeProfile @relation(fields: [receivedById], references: [id], onDelete: Cascade)
 
   printed  Boolean @default(false)
-  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  // Optional supplier at receipt level (supports QUICK or PO-less receipts)
   supplierId Int?
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
 
-  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   purchaseOrderId Int?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
 
   source ReceiptSource @default(PO)
 
@@ -965,38 +879,24 @@ model PurchaseOrderReceipt {
   updatedAt              DateTime                   @updatedAt
   supplierPaymentReceipt SupplierPaymentReceipt[]
 
-  // ✅ Input Tax Filing (Batch) linkage (do NOT store filed status here; use batch items)
   inputTaxFilingItems InputTaxFilingItem[]
 
   @@index([branchId, receivedAt])
   @@index([purchaseOrderId])
-  // Improve query performance by channel/time
   @@index([source, receivedAt])
-}
-
-// =============================
-// Input Tax Filing (Batch)
-// =============================
-
-enum InputTaxFilingStatus {
-  DRAFT
-  SUBMITTED
-  VOIDED
 }
 
 model InputTaxFilingBatch {
   id       Int    @id @default(autoincrement())
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  // Filing period (Thai VAT filing is monthly)
   month Int
   year  Int
 
   status InputTaxFilingStatus @default(DRAFT)
   note   String?
 
-  // Who created this filing batch (audit)
   createdById Int
   createdBy   EmployeeProfile @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
@@ -1009,11 +909,7 @@ model InputTaxFilingBatch {
   @@index([status])
 }
 
-// =============================
-// Sales Tax Filing (Batch)
-// =============================
-
-enum SalesTaxFilingStatus {
+enum InputTaxFilingStatus {
   DRAFT
   SUBMITTED
   VOIDED
@@ -1022,17 +918,15 @@ enum SalesTaxFilingStatus {
 model SalesTaxFilingBatch {
   id Int @id @default(autoincrement())
 
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  // Filing period (monthly)
   month Int
   year  Int
 
   status SalesTaxFilingStatus @default(DRAFT)
   note   String?
 
-  // Who created this filing batch (audit)
   createdById Int
   createdBy   EmployeeProfile @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
@@ -1045,37 +939,39 @@ model SalesTaxFilingBatch {
   @@index([status])
 }
 
+enum SalesTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
 model SalesTaxFilingItem {
   id Int @id @default(autoincrement())
 
-  batch   SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   batchId Int
+  batch   SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
-  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
   saleId Int
+  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  // Prevent duplicates inside the same batch
   @@unique([batchId, saleId])
-  // Fast lookup: check whether a sale is already included in any batch
   @@index([saleId])
 }
 
 model InputTaxFilingItem {
   id Int @id @default(autoincrement())
 
-  batch   InputTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   batchId Int
+  batch   InputTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
-  receipt                PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptId Int
+  receipt                PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  // Prevent duplicates inside the same batch
   @@unique([batchId, purchaseOrderReceiptId])
-  // Fast lookup: check whether a receipt is already included in any batch
   @@index([purchaseOrderReceiptId])
 }
 
@@ -1083,15 +979,12 @@ model PurchaseOrderReceiptItem {
   id        Int @id @default(autoincrement())
   receiptId Int
 
-  // Optional for QUICK receipts (no PO)
   purchaseOrderItemId Int?
   purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
 
-  // Direct product link for QUICK
   productId Int?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  // Decimal quantity to support SIMPLE mode
   quantity  Decimal @db.Decimal(12, 2)
   costPrice Decimal @db.Decimal(12, 2)
 
@@ -1105,6 +998,10 @@ model PurchaseOrderReceiptItem {
   @@index([receiptId])
   @@index([productId])
 }
+
+// =========================================================================
+// 🛒 CUSTOMER SERVICES, BILLING & LOGISTICS
+// =========================================================================
 
 model Order {
   id              Int         @id @default(autoincrement())
@@ -1147,8 +1044,8 @@ model Cart {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
   customerProfileId Int?
+  CustomerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
 }
 
 model CartItem {
@@ -1225,22 +1122,21 @@ model BarcodeReceiptItem {
   status        BarcodeStatus @default(READY)
 
   printed     Boolean    @default(false)
-  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
   stockItemId Int?
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
 
-  // Support LOT codes for SIMPLE via SimpleLot relation
-  kind        BarcodeKind @default(SN) // enum has SN | LOT in real schema
+  kind        BarcodeKind @default(SN) 
   simpleLotId Int?
   simpleLot   SimpleLot?  @relation(fields: [simpleLotId], references: [id], onDelete: SetNull)
 
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderReceiptId Int
+  purchaseOrderReceipt   PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
 
-  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
   receiptItemId Int
+  receiptItem   PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1248,6 +1144,10 @@ model BarcodeReceiptItem {
   @@unique([branchId, yearMonth, runningNumber])
   @@index([purchaseOrderReceiptId, branchId])
 }
+
+// =========================================================================
+// 💰 TRANS-MONETARY POS & TAX COMPLIANCE
+// =========================================================================
 
 model Sale {
   id   Int    @id @default(autoincrement())
@@ -1270,7 +1170,6 @@ model Sale {
   paid                Boolean    @default(false)
   paidAt              DateTime?
 
-  // ✅ AR (Accounts Receivable) baseline: status + paid amount for partial payments
   statusPayment PaymentStatus @default(UNPAID)
   paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
 
@@ -1332,7 +1231,6 @@ model SaleItem {
   updatedAt DateTime @updatedAt
 }
 
-// SIMPLE Sale Item (ไม่ใช้ SN)
 model SaleItemSimple {
   id        Int     @id @default(autoincrement())
   saleId    Int
@@ -1369,8 +1267,8 @@ model SaleItemSimple {
 model Payment {
   id     Int    @id @default(autoincrement())
   code   String @unique
-  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
   saleId Int
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   receivedAt           DateTime @default(now())
   note                 String?
@@ -1380,8 +1278,8 @@ model Payment {
   cancelNote  String?
   cancelledAt DateTime?
 
-  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
   employeeProfileId Int?
+  employeeProfile   EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
 
   branchId Int
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
@@ -1398,8 +1296,8 @@ model Payment {
 
 model PaymentItem {
   id        Int     @id @default(autoincrement())
-  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   paymentId Int
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   paymentMethod PaymentMethod
   amount        Decimal       @db.Decimal(12, 2)
@@ -1496,8 +1394,8 @@ model RefundTransaction {
 model SupplierPayment {
   id         Int      @id @default(autoincrement())
   code       String?  @unique
-  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierId Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   debitAmount  Decimal? @db.Decimal(12, 2)
   creditAmount Decimal? @db.Decimal(12, 2)
@@ -1515,11 +1413,11 @@ model SupplierPayment {
   paymentType PaymentType @default(RECEIPT_BASED)
 
   paidAt     DateTime        @default(now())
-  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   employeeId Int
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
   branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   supplierPaymentReceipts SupplierPaymentReceipt[]
 
@@ -1533,11 +1431,11 @@ model SupplierPayment {
 model SupplierPaymentReceipt {
   id Int @id @default(autoincrement())
 
-  payment   SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   paymentId Int
+  payment   SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
-  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   receiptId Int
+  receipt   PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
 
   amountPaid Decimal @db.Decimal(12, 2)
 
@@ -1578,8 +1476,8 @@ model OrderOnline {
 
   items       OrderOnlineItem[]
   createdAt   DateTime          @default(now())
-  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int?
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   paymentDate DateTime?
 }
 
@@ -1697,7 +1595,7 @@ model SimpleLot {
   branchId      Int
   productId     Int
   receiptItemId Int?
-  barcode       String          @unique // SL-<branch><YYMM>-####
+  barcode       String          @unique 
   qtyInitial    Decimal         @db.Decimal(12, 2)
   qtyRemaining  Decimal         @db.Decimal(12, 2)
   unitCost      Decimal         @db.Decimal(12, 2)
@@ -1715,7 +1613,7 @@ model SimpleLot {
   BarcodeReceiptItem BarcodeReceiptItem[]
 
   @@index([branchId, productId, receivedAt])
-  @@index([branchId, status]) // <— เพิ่มบรรทัดนี้
+  @@index([branchId, status]) 
 }
 
 model SaleReturnItemSimple {
@@ -1798,9 +1696,6 @@ model CustomerReceiptAllocation {
   @@map("CustomerReceiptAllocations")
 }
 
-// =============================
-// 🔐 Password Reset Token
-// =============================
 model PasswordResetToken {
   id Int @id @default(autoincrement())
 
@@ -1841,4 +1736,220 @@ model RefreshToken {
   @@index([tokenHash])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+// =========================================================================
+// 🌐 GEOGRAPHIC & MASTER COMPLIANCE DATA
+// =========================================================================
+
+model CustomerProfile {
+  id   Int     @id @default(autoincrement())
+  name String?
+
+  picture       String?
+  companyName   String?
+  taxId         String?
+  addressDetail String?
+
+  subdistrictCode String?      @db.Char(6)
+  subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+
+  type   CustomerType @default(INDIVIDUAL)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int          @unique
+
+  paymentTerms  Int?     @default(0)
+  creditLimit   Decimal? @default(0) @db.Decimal(12, 2)
+  creditBalance Decimal? @default(0) @db.Decimal(12, 2)
+
+  // Greenfield V2 Added Debt Tracking
+  outstandingDebt_v2 Float @default(0.0)
+  depositBalance_v2   Float @default(0.0)
+
+  orders   Order[]
+  cart     Cart[]
+  services ServiceOrder[]
+
+  sales            Sale[]
+  orderOnlines     OrderOnline[]
+  customerDeposits CustomerDeposit[]
+  customerReceipts CustomerReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  combinedBillingDocuments CombinedBillingDocument[]
+  v2CustomerDeposits       V2CustomerDeposit[]
+
+  // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับของประวัติงานซ่อมลูกค้าในเมืองใหม่ v2
+  repairJobs               RepairJob[]
+
+  @@index([subdistrictCode])
+}
+
+model CustomerDeposit {
+  id Int @id @default(autoincrement())
+
+  cashAmount     Decimal @default(0) @db.Decimal(12, 2)
+  transferAmount Decimal @default(0) @db.Decimal(12, 2)
+  cardAmount     Decimal @default(0) @db.Decimal(12, 2)
+  usedAmount     Decimal @default(0) @db.Decimal(12, 2)
+  usedSaleId     Int?
+  note           String? @db.Text
+
+  totalAmount Decimal @db.Decimal(12, 2)
+
+  customer   CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int?
+
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branchId Int?
+
+  status DepositStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  createdBy    Int?
+  createdByEmp EmployeeProfile? @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt    DateTime         @updatedAt
+  depositUsage DepositUsage[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([branchId, createdAt])
+}
+
+model DepositUsage {
+  id                Int      @id @default(autoincrement())
+  customerDepositId Int
+  paymentId         Int?
+  saleId            Int?
+  amountUsed        Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+
+  customerDeposit CustomerDeposit @relation(fields: [customerDepositId], references: [id])
+  payment         Payment?        @relation(fields: [paymentId], references: [id])
+  sale            Sale?           @relation(fields: [saleId], references: [id])
+
+  @@index([paymentId])
+  @@index([customerDepositId])
+}
+
+// Greenfield V2 Traceable Customer Log
+model V2CustomerDeposit {
+  id              Int             @id @default(autoincrement())
+  customerId      Int
+  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount          Float
+  transactionType String          // DEPOSIT, DEDUCTION
+  referenceNumber String?         
+  createdAt       DateTime        @default(now())
+}
+
+model Province {
+  code   String @id
+  nameTh String
+
+  region    String
+  districts District[]
+}
+
+model District {
+  code         String        @id
+  nameTh       String
+  provinceCode String
+  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  subdistricts Subdistrict[]
+
+  @@index([provinceCode])
+}
+
+model Subdistrict {
+  code            String            @id
+  nameTh          String
+  districtCode    String
+  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+  postcode        String?
+  branches        Branch[]
+  CustomerProfile CustomerProfile[]
+
+  @@index([districtCode])
+  @@index([postcode])
+}
+
+model Position {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+
+  employees EmployeeProfile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+
+// =========================================================================
+// ⚙️ BATCH 5: REPAIR, WARRANTY & CLAIM MANAGEMENT (IT SPECIALIST COMPLIANCE)
+// =========================================================================
+
+model RepairJob {
+  id               Int              @id @default(autoincrement())
+  jobNo            String           @unique
+  
+  branchId         Int
+  branch           Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  
+  customerId       Int
+  customer         CustomerProfile  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  stockItemId      Int?
+  stockItem        StockItem?       @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  
+  deviceModel      String            
+  reportedSymptoms String            
+  technicianNotes  String?           
+  
+  status           ServiceStatus     @default(RECEIVED) 
+  estimatedCost    Decimal           @default(0.0) @db.Decimal(12, 2)
+  depositPaid      Decimal           @default(0.0) @db.Decimal(12, 2) 
+  
+  technicianId     Int?
+  technician       EmployeeProfile?  @relation(fields: [technicianId], references: [id], onDelete: SetNull) 
+  
+  partsUsed        RepairPartItem[]  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([branchId])
+  @@index([stockItemId])
+}
+
+model RepairPartItem {
+  id          Int       @id @default(autoincrement())
+  repairJobId Int
+  repairJob   RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  
+  productId   Int       
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  qtyUsed     Int       @default(1) 
+  unitPrice   Decimal   @db.Decimal(12, 2) 
+}
+
+model WarrantyClaim {
+  id          Int         @id @default(autoincrement())
+  claimNo     String      @unique 
+  
+  stockItemId Int
+  stockItem   StockItem   @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  
+  status      StockStatus @default(CLAIMED) 
+  reason      String      
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }

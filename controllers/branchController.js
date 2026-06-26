@@ -14,11 +14,11 @@ function normalizeBranchBody(body = {}) {
     name: getStr(body.name),
     address: getStr(body.address),
     phone: getStr(body.phone),
+    // 🚀 [ADDED] ดึงค่า slug แปลงเป็นพิมพ์เล็ก ไร้ช่องว่าง ตามระเบียบสากลของระบบ URL Path
+    slug: getStr(body.slug).toLowerCase().replace(/\s+/g, '') || undefined,
     subdistrictCode: getStr(body.subdistrictCode) || getStr(body.subdistrict_id) || getStr(body.subdistrictId) || getStr(body.subdistrict),
-    // enums/flags (optional)
     businessType: getStr(body.businessType).toUpperCase() || undefined,
     features: (body.features && typeof body.features === 'object') ? body.features : undefined,
-    // ให้ DB ใช้ default(true) ถ้าไม่ส่งมา
     RBACEnabled: (typeof body.RBACEnabled === 'boolean') ? body.RBACEnabled : undefined,
   };
   return out;
@@ -32,18 +32,16 @@ function buildPartialUpdate(body = {}) {
   if (has('name')) data.name = n.name;
   if (has('address')) data.address = n.address;
   if (has('phone')) data.phone = n.phone || null;
+  if (has('slug')) data.slug = n.slug || null; // 🚀 [ADDED] ผูกลงท่อสำหรับอัปเดตลงฐานข้อมูล
   if (has('RBACEnabled')) data.RBACEnabled = n.RBACEnabled;
 
-  // businessType (enum)
   if (has('businessType')) {
     if (n.businessType) data.businessType = n.businessType;
   }
-  // features (Json)
   if (has('features')) {
     data.features = (n.features !== undefined) ? n.features : Prisma.JsonNull;
   }
 
-  // subdistrict relation (connect by unique `code` if provided)
   if (has('subdistrictCode', 'subdistrict_id', 'subdistrictId', 'subdistrict')) {
     if (n.subdistrictCode) {
       data.subdistrict = { connect: { code: n.subdistrictCode } };
@@ -54,7 +52,6 @@ function buildPartialUpdate(body = {}) {
   return data;
 }
 
-// GET /branches
 // Helper include tree for address hydration
 const ADDRESS_INCLUDE = {
   subdistrict: {
@@ -109,7 +106,27 @@ const getAllBranches = async (req, res) => {
   }
 };
 
-// GET /branches/:id — include subdistrict relation and hydrate codes for FE
+// 🚀 [ADDED] GET /branches/profile-by-slug/:slug
+// ดึงข้อมูลโปรไฟล์สาขาจากตัวย่อ URL เพื่อนำไปใช้จัดการแบรนดิ้งหลังร้านแบบ Dynamic
+const getBranchBySlug = async (req, res) => {
+  try {
+    const slug = getStr(req.params.slug).toLowerCase();
+    if (!slug) return res.status(400).json({ error: 'กรุณาระบุชื่อย่อร้านค้า (slug)' });
+
+    const row = await prisma.branch.findUnique({
+      where: { slug },
+      include: ADDRESS_INCLUDE,
+    });
+    
+    if (!row) return res.status(404).json({ error: 'ไม่พบร้านค้าพาร์ตเนอร์ที่ระบุในระบบ' });
+    return res.json(hydrateBranchAddress(row));
+  } catch (err) {
+    console.error('❌ [getBranchBySlug] error:', err);
+    return res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลโปรไฟล์พาร์ตเนอร์ได้' });
+  }
+};
+
+// GET /branches/:id
 const getBranchById = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -125,16 +142,15 @@ const getBranchById = async (req, res) => {
   }
 };
 
-// POST /branches — map codes to existing columns and connect subdistrict relation
+// POST /branches
 const createBranch = async (req, res) => {
-  const BASE_BRANCH_ID = 2; // branch template for cloning prices
+  const BASE_BRANCH_ID = 2;
   try {
     const n = normalizeBranchBody(req.body || {});
 
     if (!n.name) return res.status(400).json({ error: 'กรุณากรอกชื่อสาขา' });
     if (!n.address) return res.status(400).json({ error: 'กรุณากรอกที่อยู่สาขา' });
 
-    // ถ้า businessType มี แต่ features ไม่ส่งมา → ใช้ preset
     if (n.businessType && !n.features) {
       const preset = presets[n.businessType];
       if (preset) n.features = preset;
@@ -144,6 +160,7 @@ const createBranch = async (req, res) => {
       name: n.name,
       address: n.address,
       phone: n.phone || null,
+      slug: n.slug || null, // 🚀 ยัดเก็บค่าลงถังสำหรับการสร้างพาร์ตเนอร์รายใหม่
       RBACEnabled: n.RBACEnabled,
       businessType: n.businessType,
       features: n.features,
@@ -152,7 +169,6 @@ const createBranch = async (req, res) => {
 
     const created = await prisma.branch.create({ data });
 
-    // Clone prices from base branch (best-effort)
     try {
       const basePrices = await prisma.branchPrice.findMany({ where: { branchId: BASE_BRANCH_ID } });
       if (basePrices.length > 0) {
@@ -178,19 +194,18 @@ const createBranch = async (req, res) => {
   } catch (err) {
     console.error('❌ [createBranch] error:', err);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return res.status(409).json({ error: 'ชื่อสาขาซ้ำ (unique constraint)' });
+      return res.status(409).json({ error: 'ชื่อสาขาหรือชื่อย่อ URL (slug) ซ้ำกับระบบอื่น' });
     }
     return res.status(500).json({ error: 'ไม่สามารถสร้างสาขาได้' });
   }
 };
 
-// PATCH /branches/:id — partial update using existing columns + relation connect
+// PATCH /branches/:id
 const updateBranch = async (req, res) => {
   try {
     const id = toInt(req.params?.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    // Auto-apply feature preset when businessType changed and features not provided
     const body = req.body || {};
     if (Object.prototype.hasOwnProperty.call(body, 'businessType') && !Object.prototype.hasOwnProperty.call(body, 'features')) {
       const bt = getStr(body.businessType).toUpperCase();
@@ -211,7 +226,7 @@ const updateBranch = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบสาขาที่ต้องการอัปเดต' });
     }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return res.status(409).json({ error: 'ชื่อสาขาซ้ำ (unique constraint)' });
+      return res.status(409).json({ error: 'ชื่อสาขาหรือชื่อย่อ URL (slug) ซ้ำกับระบบอื่น' });
     }
     return res.status(500).json({ error: 'ไม่สามารถอัปเดตสาขาได้' });
   }
@@ -240,6 +255,7 @@ const deleteBranch = async (req, res) => {
 module.exports = {
   getAllBranches,
   getBranchById,
+  getBranchBySlug, // 🚀 ส่งออกฟังก์ชันตัวใหม่เข้าขบวนเพื่อนำไปผูกกับ Express Route
   createBranch,
   updateBranch,
   deleteBranch,

@@ -1,7 +1,5 @@
-
-
-
-// saleController.js
+// src/controllers/saleController.js
+// 🏛️ Clean Architecture Routing: Unified Premium Integration (Safe Emergency Rollback Edition)
 
 const { prisma, Prisma } = require('../lib/prisma');
 const dayjs = require('dayjs');
@@ -23,17 +21,27 @@ const isMoneyLike = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v ===
 // ✅ rounding helper (2 decimals) for list/print consistency
 const round2 = (n) => Number((Number(n || 0)).toFixed(2));
 
+// 🟢 FIXED: นิยามฟังก์ชัน toLocalRange เพื่อสยบปัญหา ReferenceError และปรับช่วงวันเวลาดึงบิลพิมพ์ให้แม่นยำ 100%
+const toLocalRange = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+
+  const start = new Date(d);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+};
+
 // ✅ canonical total resolver (minimal-disruption)
-// - Some legacy rows may have `totalAmount` drift (e.g. VAT double-applied)
-// - Prefer computed = (totalBeforeDiscount - totalDiscount + vat) when it looks more trustworthy
-// ✅ VAT-INCLUDED STANDARD (Production Lock)
 // ในระบบนี้ totalAmount คือ “ยอดรวมรวม VAT แล้ว (Gross)” เสมอ
-// ห้ามนำ totalBeforeDiscount หรือ vat ไปบวก/คูณใหม่เพื่อหลีกเลี่ยง VAT ซ้ำ
 const resolveCanonicalTotalAmount = (sale) => {
   const stored = round2(sale?.totalAmount != null ? toNum(sale.totalAmount) : 0);
   return stored;
 };
-
 
 const normalizePayment = (payment) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !payment) return payment;
@@ -92,11 +100,6 @@ const generateSaleCode = async (branchId, attempt = 0) => {
   return `${prefix}-${running}`;
 };
 
-
-
-
-
-
 const createSale = async (req, res) => {
   try {
     const {
@@ -107,15 +110,10 @@ const createSale = async (req, res) => {
       vatRate,
       totalAmount,
       note,
-      items, // [{ stockItemId, price, discount, basePrice, vatAmount, remark }]
+      items, 
       mode = 'CASH',
-
-      // ✅ Backward-compatible extra fields (FE may send or omit)
-      // - Credit sale: tax invoice must be false (sale-time)
       isTaxInvoice: isTaxInvoiceFromClient,
-      // - Credit + หน่วยงาน: PRINT (default) | NO_PRINT
       deliveryNoteMode,
-      // - Optional override; still validated by customer type below
       saleType: saleTypeFromClient,
     } = req.body;
 
@@ -129,12 +127,10 @@ const createSale = async (req, res) => {
       return res.status(400).json({ error: 'ต้องมีรายการสินค้าอย่างน้อยหนึ่งรายการ' });
     }
 
-    // ✅ Guardrail: เครดิตต้องมีลูกค้า (debtor) เสมอ
     if (mode === 'CREDIT' && !customerId) {
       return res.status(400).json({ error: 'การขายแบบเครดิตต้องเลือกชื่อลูกค้าก่อน' });
     }
 
-    // Validate money fields (accept number or string)
     const moneyFields = { totalBeforeDiscount, totalDiscount, vat, vatRate, totalAmount };
     for (const [key, value] of Object.entries(moneyFields)) {
       if (!isMoneyLike(value) || (key !== 'totalDiscount' && Number(value) < 0)) {
@@ -158,24 +154,12 @@ const createSale = async (req, res) => {
         if (!isMoneyLike(value)) {
           return res.status(400).json({ error: `ข้อมูล ${key} ในรายการสินค้า (stockItemId: ${item.stockItemId}) ไม่ถูกต้อง` });
         }
-
-        // ✅ VAT-included pricing baseline
-        // - basePrice = ราคาขายตั้งต้นก่อนส่วนลด/บวกเพิ่ม (รวม VAT แล้ว)
-        // - discount  = ส่วนลดสุทธิระดับรายการ
-        //              ค่าบวก  = ลดราคา
-        //              ค่าลบ   = บวกเพิ่มราคา (manual markup)
-        // - price     = ราคาสุทธิหลังปรับแล้ว (รวม VAT แล้ว)
-        // ดังนั้น discount อนุญาตให้ติดลบได้ แต่ field อื่นห้ามติดลบ
         if (key !== 'discount' && Number(value) < 0) {
           return res.status(400).json({ error: `ข้อมูล ${key} ในรายการสินค้า (stockItemId: ${item.stockItemId}) ไม่ถูกต้อง หรือเป็นค่าติดลบ` });
         }
       }
     }
 
-    // ✅ Canonical money snapshot (VAT-included pricing)
-    // totalBeforeDiscount = gross before discount
-    // totalAmount         = gross after discount (VAT already included)
-    // ระบบนี้ยึด “ราคารวม VAT แล้ว” เป็นมาตรฐานกลางเสมอ
     const moneyTolerance = 0.01;
 
     const clientTotalBeforeDiscount = round2(totalBeforeDiscount);
@@ -188,10 +172,6 @@ const createSale = async (req, res) => {
     const computedItemDiscount = round2(items.reduce((sum, item) => sum + Number(item.discount || 0), 0));
     const computedBaseBeforeDiscount = round2(items.reduce((sum, item) => sum + Number(item.basePrice || 0), 0));
 
-    // ✅ Canonical selection (VAT-included)
-    // - totalBeforeDiscount ต้องเทียบกับผลรวม basePrice
-    // - totalDiscount       ต้องเทียบกับผลรวม discount
-    // - totalAmount         ต้องเทียบกับผลรวม price (สุทธิหลังหักส่วนลดแล้ว และรวม VAT แล้ว)
     const canonicalTotalBeforeDiscount =
       Math.abs(clientTotalBeforeDiscount - computedBaseBeforeDiscount) <= moneyTolerance
         ? clientTotalBeforeDiscount
@@ -212,67 +192,45 @@ const createSale = async (req, res) => {
       ? round2((canonicalTotalAmount * effectiveVatRate) / (100 + effectiveVatRate))
       : 0;
 
-    // ✅ Guardrail: totalAmount ต้องสอดคล้องกับ beforeDiscount - discount ด้วย
     const derivedTotalAmount = round2(Math.max(0, canonicalTotalBeforeDiscount - canonicalTotalDiscount));
     if (Math.abs(derivedTotalAmount - canonicalTotalAmount) > moneyTolerance) {
       return res.status(400).json({
         error: 'ยอดรวมสุทธิไม่สอดคล้องกับราคาก่อนลดและส่วนลด กรุณาตรวจสอบรายการสินค้าอีกครั้ง',
-        detail: {
-          canonicalTotalBeforeDiscount,
-          canonicalTotalDiscount,
-          canonicalTotalAmount,
-          derivedTotalAmount,
-        },
+        detail: { canonicalTotalBeforeDiscount, canonicalTotalDiscount, canonicalTotalAmount, derivedTotalAmount },
       });
     }
 
     if (Math.abs(clientTotalAmount - canonicalTotalAmount) > moneyTolerance) {
       return res.status(400).json({
         error: 'ยอดรวมสุทธิไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่อีกครั้ง',
-        detail: {
-          clientTotalAmount,
-          canonicalTotalAmount,
-          canonicalTotalBeforeDiscount,
-          canonicalTotalDiscount,
-        },
+        detail: { clientTotalAmount, canonicalTotalAmount, canonicalTotalBeforeDiscount, canonicalTotalDiscount },
       });
     }
 
     if (Math.abs(clientVat - canonicalVat) > moneyTolerance) {
       return res.status(400).json({
         error: 'ข้อมูลภาษีมูลค่าเพิ่มไม่ถูกต้อง กรุณารีเฟรชแล้วลองใหม่อีกครั้ง',
-        detail: {
-          clientVat,
-          canonicalVat,
-          canonicalTotalAmount,
-          vatRate: effectiveVatRate,
-        },
+        detail: { clientVat, canonicalVat, canonicalTotalAmount, vatRate: effectiveVatRate },
       });
     }
 
     if (computedBaseBeforeDiscount > 0 && Math.abs(computedBaseBeforeDiscount - canonicalTotalBeforeDiscount) > moneyTolerance) {
       return res.status(400).json({
         error: 'ข้อมูลราคาสินค้าไม่สอดคล้องกัน กรุณาตรวจสอบรายการสินค้าอีกครั้ง',
-        detail: {
-          computedBaseBeforeDiscount,
-          canonicalTotalBeforeDiscount,
-        },
+        detail: { computedBaseBeforeDiscount, canonicalTotalBeforeDiscount },
       });
     }
 
-    // Determine sale meta
     let saleStatus;
     let isCreditSale = false;
     let paidStatus = false;
     let paidAtDate = null;
-    // ✅ NEW AR baseline fields (Prisma: Sale.statusPayment, Sale.paidAmount)
     let statusPayment = 'UNPAID';
     let paidAmountDecimal = D(0);
     let soldAtDate = new Date();
     let dueDate = null;
     let customerSaleType = 'NORMAL';
 
-    // ✅ tax invoice policy (sale-time): credit sale cannot issue tax invoice
     const isTaxInvoiceEffective = mode === 'CREDIT' ? false : !!isTaxInvoiceFromClient;
 
     if (customerId) {
@@ -292,18 +250,14 @@ const createSale = async (req, res) => {
 
     if (mode === 'CREDIT') {
       isCreditSale = true;
-      saleStatus = CREDIT_SALE_STATUS; // Backward-compatible default: DRAFT
+      saleStatus = CREDIT_SALE_STATUS; 
       paidStatus = false;
       statusPayment = 'UNPAID';
       paidAmountDecimal = D(0);
-      // ✅ Prisma schema requires soldAt (non-null). For credit sales, use creation time as soldAt.
       soldAtDate = soldAtDate || new Date();
     } else {
-      // ขายสด: ถือว่ามีการขายเกิดขึ้นแล้ว → เซ็ต soldAt เสมอ (ช่วย sorting/printing)
       soldAtDate = new Date();
-
       if (STRICT_COMPLETED_REQUIRES_PAYMENT && !ENABLE_PAYMENT_AUTOCREATE) {
-        // ยังไม่สร้าง Payment อัตโนมัติ → ยังไม่ควร mark เป็น COMPLETED
         saleStatus = 'FINALIZED';
         paidStatus = false;
         paidAtDate = null;
@@ -319,7 +273,6 @@ const createSale = async (req, res) => {
     }
 
     const stockItemIds = items.map((i) => i.stockItemId).filter(Boolean);
-    // Prevent duplicate stock items in the same sale
     const dup = stockItemIds.find((id, i) => stockItemIds.indexOf(id) !== i);
     if (dup) {
       return res.status(400).json({ error: `ห้ามใส่สินค้าชิ้นเดียวกันซ้ำ (stockItemId=${dup})` });
@@ -335,7 +288,6 @@ const createSale = async (req, res) => {
       return res.status(400).json({ error: 'บางรายการไม่พร้อมขาย หรือถูกขายไปแล้ว', unavailableStockItemIds: unavailable });
     }
 
-    // Try create with retry on unique collision (code)
     let createdSale;
     for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt++) {
       const code = await generateSaleCode(branchId, attempt);
@@ -350,30 +302,19 @@ const createSale = async (req, res) => {
               paid: paidStatus,
               paidAt: paidAtDate,
               dueDate,
-              // ✅ Prisma CreateInput: use relation connect (customerId scalar is not accepted here)
               customer: customerId ? { connect: { id: customerId } } : undefined,
-              // ✅ Prisma relation required: connect employee profile (instead of raw employeeId)
               employee: { connect: { id: employeeId } },
-              // ✅ Prisma relation required: connect branch (instead of raw branchId)
               branch: { connect: { id: branchId } },
               totalBeforeDiscount: D(canonicalTotalBeforeDiscount),
               totalDiscount: D(canonicalTotalDiscount),
               vat: D(canonicalVat),
               vatRate: D(effectiveVatRate),
               totalAmount: D(canonicalTotalAmount),
-              // ✅ AR baseline: canonical paid status (prefer statusPayment; keep paid boolean for backward compat)
               statusPayment,
               paidAmount: paidAmountDecimal,
               note,
-              // ✅ allow client to suggest saleType (still bounded by derived customerSaleType)
               saleType: saleTypeFromClient || customerSaleType,
-
-              // ✅ Credit sale-time: never issue tax invoice
               isTaxInvoice: isTaxInvoiceEffective,
-
-              // ✅ CREDIT + หน่วยงาน: เอกสารได้แค่ ใบส่งของ หรือไม่พิมพ์
-              // - PRINT (default) -> DN-<sale.code>
-              // - NO_PRINT -> null
               officialDocumentNumber:
                 isCreditSale && String(deliveryNoteMode || 'PRINT') === 'PRINT' ? `DN-${code}` : null,
               items: {
@@ -384,9 +325,6 @@ const createSale = async (req, res) => {
                   price: D(item.price),
                   discount: D(item.discount),
                   remark: item.remark,
-
-                  // ✅ Document Line runtime fields
-                  // ใช้เฉพาะรายการขายนี้ ไม่แก้ Product/Stock Truth
                   documentPrefix: item.documentPrefix ?? null,
                   documentDescription: item.documentDescription ?? null,
                   documentSuffix: item.documentSuffix ?? null,
@@ -404,6 +342,17 @@ const createSale = async (req, res) => {
             throw Object.assign(new Error('Some items already sold.'), { status: 409, code: 'STOCK_CONFLICT' });
           }
 
+          const movementData = stockItemIds.map((stockId) => ({
+            stockItemId: stockId,
+            type: 'SALE',
+            qty: -1, 
+            note: `ขายสินค้าหน้าร้านอัตโนมัติผ่านเลขบิลเอกสาร ${code}`,
+          }));
+
+          await tx.stockMovement.createMany({
+            data: movementData,
+          });
+
           if (ENABLE_PAYMENT_AUTOCREATE && !isCreditSale) {
             await tx.payment.create({
               data: {
@@ -420,12 +369,12 @@ const createSale = async (req, res) => {
 
           return sale;
         });
-        break; // success
+        break; 
       } catch (err) {
         if (err?.code === 'P2002' && /code/.test(String(err?.meta?.target))) {
-          if (attempt < SALE_CODE_MAX_RETRY) continue; // retry with next running
+          if (attempt < SALE_CODE_MAX_RETRY) continue; 
         }
-        throw err; // unknown error or max retry reached
+        throw err; 
       }
     }
 
@@ -438,7 +387,6 @@ const createSale = async (req, res) => {
       include: SALE_DOCUMENT_INCLUDE,
     });
 
-    // Fetch payments separately to avoid include name differences across schemas
     const payments = await prisma.payment.findMany({
       where: { saleId: sale.id },
       include: { items: true },
@@ -456,10 +404,6 @@ const createSale = async (req, res) => {
   }
 };
 
-
-
-
-
 const getAllSales = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
@@ -469,38 +413,19 @@ const getAllSales = async (req, res) => {
     const limitParsed = parseInt(limitRaw, 10);
     const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 200, 1), 500);
 
-    // ✅ branch scope
     const where = { branchId };
 
-    // ✅ Canonical money rule (VAT-included system)
-    // totalAmount = final price after discount (VAT already included)
-    // vat         = VAT portion inside totalAmount
-    // beforeVat   = totalAmount - vat
     const computeTotals = (sale) => {
       const vatRate = Number.isFinite(Number(sale?.vatRate)) ? Number(sale.vatRate) : 7;
-
       const totalAmount = resolveCanonicalTotalAmount(sale);
       const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
-      const vatAmount = vatStored != null
-        ? vatStored
-        : round2((totalAmount * vatRate) / (100 + vatRate));
+      const vatAmount = vatStored != null ? vatStored : round2((totalAmount * vatRate) / (100 + vatRate));
 
       const beforeVat = round2(totalAmount - vatAmount);
-      const totalBeforeDiscount = round2(
-        sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0
-      );
-      const totalDiscount = round2(
-        sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0
-      );
+      const totalBeforeDiscount = round2(sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0);
+      const totalDiscount = round2(sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0);
 
-      return {
-        vatRate,
-        totalBeforeDiscount,
-        totalDiscount,
-        totalAmount: round2(totalAmount),
-        beforeVat,
-        vatAmount,
-      };
+      return { vatRate, totalBeforeDiscount, totalDiscount, totalAmount: round2(totalAmount), beforeVat, vatAmount };
     };
 
     const sales = await prisma.sale.findMany({
@@ -510,13 +435,10 @@ const getAllSales = async (req, res) => {
       include: SALE_DOCUMENT_INCLUDE,
     });
 
-    const normalized = NORMALIZE_DECIMAL_TO_NUMBER
-      ? sales.map((s) => normalizeSaleMoney(s))
-      : sales;
+    const normalized = NORMALIZE_DECIMAL_TO_NUMBER ? sales.map((s) => normalizeSaleMoney(s)) : sales;
 
     const out = normalized.map((s) => {
       const totals = computeTotals(s);
-
       return {
         ...s,
         vatRate: totals.vatRate,
@@ -539,11 +461,6 @@ const getAllSales = async (req, res) => {
   }
 };
 
-
-
-
-
-
 const getSaleById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -561,7 +478,6 @@ const getSaleById = async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
-    // ✅ NEW: query flags (backward-compatible)
     const includePayments = String(req.query?.includePayments ?? '1') !== '0';
     const requestedPaymentId = req.query?.paymentId != null ? String(req.query.paymentId) : '';
 
@@ -573,7 +489,6 @@ const getSaleById = async (req, res) => {
         orderBy: { receivedAt: 'asc' },
       });
 
-      // ✅ optional: move requested payment to front (no shape change)
       if (requestedPaymentId && Array.isArray(payments) && payments.length > 1) {
         payments = payments.slice().sort((a, b) => {
           const ax = String(a?.id) === requestedPaymentId ? -1 : 0;
@@ -585,16 +500,10 @@ const getSaleById = async (req, res) => {
 
     const normalized = normalizeSaleMoney({ ...sale, payments });
 
-    // ✅ Canonical totals for detail endpoint
-    // totalAmount = final amount after discount, VAT included already
-    // vat         = VAT portion inside totalAmount
-    // totalBeforeDiscount = gross before discount
     const totalAmount = resolveCanonicalTotalAmount(sale);
     const vatRate = round2(sale?.vatRate != null ? toNum(sale.vatRate) : 7);
     const vatStored = sale?.vat != null ? round2(toNum(sale.vat)) : null;
-    const vatAmount = vatStored != null
-      ? vatStored
-      : round2((totalAmount * vatRate) / (100 + vatRate));
+    const vatAmount = vatStored != null ? vatStored : round2((totalAmount * vatRate) / (100 + vatRate));
     const beforeVat = round2(totalAmount - vatAmount);
     const totalBeforeDiscount = round2(sale?.totalBeforeDiscount != null ? toNum(sale.totalBeforeDiscount) : 0);
     const totalDiscount = round2(sale?.totalDiscount != null ? toNum(sale.totalDiscount) : 0);
@@ -615,14 +524,7 @@ const getSaleById = async (req, res) => {
 
     const response = {
       ...normalized,
-      totals: {
-        totalBeforeDiscount,
-        totalDiscount,
-        beforeVat,
-        vatAmount,
-        totalAmount: round2(totalAmount),
-        vatRate,
-      },
+      totals: { totalBeforeDiscount, totalDiscount, beforeVat, vatAmount, totalAmount: round2(totalAmount), vatRate },
       paymentSummary: {
         totalAmount: round2(totalAmount),
         receivedAmount,
@@ -641,20 +543,10 @@ const getSaleById = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
-
 const getSalesByBranchId = async (req, res) => {
   try {
     const branchId = req.user?.branchId;
-
-    if (!branchId) {
-      return res.status(400).json({ error: 'branchId ไม่ถูกต้อง' });
-    }
+    if (!branchId) return res.status(400).json({ error: 'branchId ไม่ถูกต้อง' });
 
     const sales = await prisma.sale.findMany({
       where: { branchId: Number(branchId) },
@@ -678,20 +570,12 @@ const getSalesByBranchId = async (req, res) => {
   }
 };
 
-
-
-
-
 const markSaleAsPaid = async (req, res) => {
   const saleId = parseInt(req.params.id, 10);
   const branchId = Number(req.user?.branchId);
 
-  if (!saleId || Number.isNaN(saleId)) {
-    return res.status(400).json({ message: 'Sale ID ไม่ถูกต้อง' });
-  }
-  if (!branchId || Number.isNaN(branchId)) {
-    return res.status(401).json({ message: 'unauthorized' });
-  }
+  if (!saleId || Number.isNaN(saleId)) return res.status(400).json({ message: 'Sale ID ไม่ถูกต้อง' });
+  if (!branchId || Number.isNaN(branchId)) return res.status(401).json({ message: 'unauthorized' });
 
   try {
     const sale = await prisma.sale.findUnique({
@@ -703,12 +587,9 @@ const markSaleAsPaid = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบรายการขายนี้ในสาขาของคุณ' });
     }
 
-    // ✅ Canonical sale total (VAT-included already)
-    // totalAmount is the final amount to be paid and must never be grossed-up with VAT again.
     const canonicalTotalAmount = resolveCanonicalTotalAmount(sale);
     const canonicalTotalDecimal = D(canonicalTotalAmount);
 
-    // รวมยอดชำระจาก PaymentItem (ไม่รวมที่ถูกยกเลิก)
     const agg = await prisma.paymentItem.aggregate({
       _sum: { amount: true },
       where: { payment: { saleId, isCancelled: false } },
@@ -721,7 +602,6 @@ const markSaleAsPaid = async (req, res) => {
         ? paidSum.greaterThanOrEqualTo(canonicalTotalDecimal)
         : toNum(paidSum) >= canonicalTotalAmount;
 
-    // ✅ idempotent: ถ้าปิดบิลแล้ว และยอดครบแล้ว ให้ตอบ ok
     if (sale.paid && isFullyPaid) {
       return res.status(200).json({ success: true });
     }
@@ -737,26 +617,19 @@ const markSaleAsPaid = async (req, res) => {
       });
     }
 
-    // ✅ เมื่อรับเงินครบ: mark paid + finalize status
     await prisma.$transaction(async (tx) => {
       await tx.sale.update({
         where: { id: saleId },
         data: {
           paid: true,
           paidAt: new Date(),
-          // ✅ credit sale อาจยังไม่มี soldAt (ตั้งไว้ตอนรับเงินครบ)
           soldAt: sale.soldAt || new Date(),
-          // ✅ ปิดงานให้ชัดเจน
           status: 'COMPLETED',
-          // ✅ NEW AR baseline fields
           statusPayment: 'PAID',
           paidAmount: paidSum,
-          // ❗ ไม่แตะ isTaxInvoice ที่นี่ (กติกาคุณคือออกใบกำกับภายหลังเป็น feature แยก)
         },
       });
 
-      // ✅ minimal-disruption: สินค้าควรถูก mark SOLD ตั้งแต่ createSale แล้ว
-      // แต่กัน edge case: ถ้ายังมีชิ้นไหนหลุดเป็น IN_STOCK ให้ปิดให้เรียบร้อย
       const stockItemIds = (sale.items || []).map((it) => it.stockItemId).filter(Boolean);
       if (stockItemIds.length > 0) {
         await tx.stockItem.updateMany({
@@ -773,40 +646,14 @@ const markSaleAsPaid = async (req, res) => {
   }
 };
 
-// --- Helpers (date range; TH timezone default) ---
-const toLocalRange = (dateStr, tz = '+07:00') => {
-  if (!dateStr) return null;
-  const start = new Date(`${dateStr}T00:00:00.000${tz}`);
-  const end = new Date(`${dateStr}T23:59:59.999${tz}`);
-  return { start, end };
-};
-
-
-
-
-
-
-// ✅ Printable Sales (ย้อนหลัง) = “เห็นใบขายทั้งหมด”
-// - ใช้ช่วงวันที่จาก sale.createdAt (ไม่ใช่ receivedAt / soldAt)
-// - สรุปยอดชำระจาก PaymentItem ของ Payment ที่ isCancelled=false
-// - ส่ง payload สำหรับ list (เบา + ชัด)
 const searchPrintableSales = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
     const { keyword = '', fromDate, toDate, limit: limitRaw, onlyUnpaid, onlyPaid } = req.query;
-
-    // ✅ optional filter: only unpaid (Delivery Note list)
     const onlyUnpaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyUnpaid ?? '').toLowerCase());
-
-    // ✅ optional filter: only paid (PrintBill list)
-    // "paid" here should mean: ปิดบิลแล้ว / ชำระครบแล้ว (ไม่ใช่แค่มีเงินเข้าบางส่วน)
-    // - ใช้ isFullyPaid เป็นหลัก เพื่อกันเคส partial payment หลุดเข้าหน้า "พิมพ์ใบเสร็จย้อนหลัง"
     const onlyPaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyPaid ?? '').toLowerCase());
-
-    // 🔒 Guard: if both flags are sent, prefer deterministic intersection behavior
-    // (paidAmount > 0 AND balanceAmount > 0)
     const bothFlags = onlyPaidBool && onlyUnpaidBool;
 
     const limitParsed = parseInt(limitRaw, 10);
@@ -845,25 +692,16 @@ const searchPrintableSales = async (req, res) => {
       include: SALE_DOCUMENT_INCLUDE,
     });
 
-    // Fetch payments separately (schema-safe: Sale model may not expose `payments` relation)
     const saleIds = sales.map((s) => s.id);
 
     const payments = saleIds.length
       ? await prisma.payment.findMany({
-          where: {
-            saleId: { in: saleIds },
-            isCancelled: false,
-          },
+          where: { saleId: { in: saleIds }, isCancelled: false },
           orderBy: { receivedAt: 'desc' },
-          select: {
-            saleId: true,
-            receivedAt: true,
-            items: { select: { amount: true } },
-          },
+          select: { saleId: true, receivedAt: true, items: { select: { amount: true } } },
         })
       : [];
 
-    // Build { saleId -> { paidAmount, lastPaidAt } }
     const paymentAgg = new Map();
     for (const p of payments) {
       const sid = p.saleId;
@@ -876,49 +714,30 @@ const searchPrintableSales = async (req, res) => {
       const nextPaid = prev.paidAmount + itemSum;
       const nextLast = !prev.lastPaidAt
         ? p.receivedAt || null
-        : p.receivedAt && new Date(p.receivedAt) > new Date(prev.lastPaidAt)
-          ? p.receivedAt
-          : prev.lastPaidAt;
+        : p.receivedAt && new Date(p.receivedAt) > new Date(prev.lastPaidAt) ? p.receivedAt : prev.lastPaidAt;
 
       paymentAgg.set(sid, { paidAmount: nextPaid, lastPaidAt: nextLast });
     }
 
     const rowsAll = sales.map((s) => {
-      // ✅ Production lock:
-      // totalAmount = gross after discount (VAT included already)
-      // vat         = VAT portion inside totalAmount
-      // totalBeforeDiscount = gross before discount
-      // Therefore, printable/history list must use sale.totalAmount as the canonical sale total,
-      // and must NEVER gross-up with VAT again.
       const totalAmount = resolveCanonicalTotalAmount(s);
-
-      // ✅ Prefer stored paidAmount when it is trustworthy, otherwise fallback to aggregated payments
-      // - บางกรณี sale.paidAmount อาจยังเป็น 0 แต่มี Payment จริงแล้ว (เช่น legacy/compat flow)
-      // - เพื่อความปลอดภัย ให้ใช้ค่าที่มากกว่าเสมอ (ไม่ทำให้ยอดหาย)
       const storedPaidAmount = s?.paidAmount != null ? toNum(s.paidAmount) : null;
-
       const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null };
       const aggPaid = agg.paidAmount || 0;
-
       const paidAmount = storedPaidAmount == null ? aggPaid : Math.max(storedPaidAmount, aggPaid);
-
       const balanceAmount = Math.max(0, round2(totalAmount - paidAmount));
       const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
-
       const lastPaidAt = (storedPaidAmount != null ? null : agg.lastPaidAt) || null;
 
       return {
         id: s.id,
         code: s.code,
         createdAt: s.createdAt,
-        soldAt: s.soldAt || null, // เผื่อใช้แสดง/ตรวจสอบ แต่ไม่ใช้เป็น filter
+        soldAt: s.soldAt || null, 
         totalAmount: round2(totalAmount),
         paidAmount: Number(paidAmount.toFixed(2)),
         balanceAmount,
-        // legacy flag (kept for backward compatibility)
         paid: !!(s.paid || paidEnough),
-
-        // ✅ explicit semantic flags (production clarity)
         hasPayment: paidAmount > 0,
         isFullyPaid: paidEnough,
         isPartiallyPaid: paidAmount > 0 && paidAmount < totalAmount,
@@ -933,10 +752,7 @@ const searchPrintableSales = async (req, res) => {
     });
 
     let rows = rowsAll;
-
-    // Apply filters deterministically
     if (bothFlags) {
-      // paidAmount > 0 AND balanceAmount > 0
       rows = rows.filter((r) => (r?.paidAmount ?? 0) > 0 && (r?.balanceAmount ?? 0) > 0);
     } else {
       if (onlyUnpaidBool) rows = rows.filter((r) => (r?.balanceAmount ?? 0) > 0);
@@ -949,7 +765,6 @@ const searchPrintableSales = async (req, res) => {
     return res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบขายย้อนหลังได้' });
   }
 };
-
 
 const updateSaleDocumentLinesController = async (req, res) => {
   try {
@@ -967,25 +782,12 @@ const updateSaleDocumentLinesController = async (req, res) => {
     return res.json(result);
   } catch (error) {
     const status = Number(error?.status) || 500;
-
-    if (status >= 500) {
-      console.error('❌ [updateSaleDocumentLines] error:', error);
-    }
-
-    return res.status(status).json({
-      error: error?.message || 'ไม่สามารถบันทึกข้อความก่อน/หลังสินค้าได้',
-    });
+    if (status >= 500) console.error('❌ [updateSaleDocumentLines] error:', error);
+    return res.status(status).json({ error: error?.message || 'ไม่สามารถบันทึกข้อความก่อน/หลังสินค้าได้' });
   }
 };
 
-// 🧭 Backward-compatible controller alias.
-// Keep temporarily so older routes/imports do not break during transition.
 const updateSaleDocumentDescriptionsController = updateSaleDocumentLinesController;
-
-
-
-
-// ✅ Backward-compat alias (some routes may still import getAllSalesReturn)
 const getAllSalesReturn = getAllSales;
 
 module.exports = {
