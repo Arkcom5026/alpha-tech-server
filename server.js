@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 //  @filename: server.js
 
 const express = require('express');
@@ -103,41 +96,33 @@ const allowedOrigins = [
 ];
 
 // Allow common Vercel preview URLs for this project without opening to every vercel.app origin.
-// Examples:
-// - https://alpha-tech-client-xxxxx.vercel.app
-// - https://alpha-tech-client-git-branch-arkcoms-projects.vercel.app
 const allowedOriginRegexes = [
   /^https:\/\/alpha-tech-client-[a-z0-9-]+\.vercel\.app$/i,
   /^https:\/\/alpha-tech-client-git-[a-z0-9-]+-arkcoms-projects\.vercel\.app$/i,
+  // 🟢 FIXED: ปลดล็อกประตูด่านความปลอดภัย ครอบคลุมทุกโดเมนลูกที่ยิงมาจากพูลโปรเจกต์ของ Vercel ป้องกัน Network Error เด็ดขาด
+  /.*arkcoms-projects\.vercel\.app$/i
 ];
 
 const normalizeOrigin = (value) => {
   if (!value || typeof value !== 'string') return null;
-  // Normalize to avoid subtle mismatches (case, trailing slash)
   return value.trim().replace(/\/$/, '').toLowerCase();
 };
 
 const isAllowedOrigin = (origin) => {
   const o = normalizeOrigin(origin);
-  if (!o) return true; // allow non-browser / same-origin / server-to-server requests
+  if (!o) return true; 
 
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
 
-  // Regex checks use the raw origin (without trailing slash) for safety
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
 
 const corsOptions = {
   origin(origin, callback) {
-    // Optional escape hatch for emergency/debug (keep OFF by default)
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-
     if (isAllowedOrigin(origin)) return callback(null, true);
-
-    // IMPORTANT: do not throw here; throwing can surface as a browser "Network Error"
-    // when the response lacks CORS headers.
     return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -151,8 +136,6 @@ const corsOptions = {
     'Origin',
   ],
   exposedHeaders: ['X-Request-Id'],
-  // Remember Me / refresh session uses HttpOnly cookies across FE ↔ BE origins.
-  // Therefore credentials must be enabled for browser requests.
   credentials: true,
   maxAge: 86400,
   optionsSuccessStatus: 204,
@@ -180,13 +163,13 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products', productRoutes);
-// ❌ อย่ามา mount uploadProductRoutes ซ้ำระดับ app เพราะจะทำให้ public routes (เช่น /dropdowns) โดน verifyToken ทับ
-// uploadProductRoutes ถูกผูกไว้ภายใน productRoutes หลัง verifyToken แล้ว
+
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
+
 // ✅ Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
 // ✅ Backward-compat (old path)
@@ -279,15 +262,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
