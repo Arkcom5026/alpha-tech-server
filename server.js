@@ -95,11 +95,9 @@ const allowedOrigins = [
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
 
-// Allow common Vercel preview URLs for this project without opening to every vercel.app origin.
 const allowedOriginRegexes = [
   /^https:\/\/alpha-tech-client-[a-z0-9-]+\.vercel\.app$/i,
   /^https:\/\/alpha-tech-client-git-[a-z0-9-]+-arkcoms-projects\.vercel\.app$/i,
-  // 🟢 FIXED: ปลดล็อกประตูด่านความปลอดภัย ครอบคลุมทุกโดเมนลูกที่ยิงมาจากพูลโปรเจกต์ของ Vercel ป้องกัน Network Error เด็ดขาด
   /.*arkcoms-projects\.vercel\.app$/i
 ];
 
@@ -109,6 +107,9 @@ const normalizeOrigin = (value) => {
 };
 
 const isAllowedOrigin = (origin) => {
+  // 🟢 FIXED: คืนค่า true ทันทีหากไม่มีค่า Origin แนบมา เพื่อไม่ให้สกัดกั้นคำขอภายในระบบเดียวกัน
+  if (!origin) return true;
+
   const o = normalizeOrigin(origin);
   if (!o) return true; 
 
@@ -122,8 +123,13 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-    if (isAllowedOrigin(origin)) return callback(null, true);
-    return callback(null, false);
+    
+    // 🟢 FIXED: ปรับแต่งให้สอดคล้องกันอย่างปลอดภัย ตรวจสอบโครงสร้าง Origin
+    if (!origin || isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
@@ -170,9 +176,9 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
-// ✅ Sales (new canonical path)
+// Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
-// ✅ Backward-compat (old path)
+// Backward-compat (old path)
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
 app.use('/api/refunds', refundRoutes);

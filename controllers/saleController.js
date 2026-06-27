@@ -18,10 +18,9 @@ const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
 const toNum = (v) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 const isMoneyLike = (v) => (typeof v === 'number' && !isNaN(v)) || (typeof v === 'string' && /^\d+(\.\d{1,2})?$/.test(v));
 
-// ✅ rounding helper (2 decimals) for list/print consistency
+// rounding helper (2 decimals) for list/print consistency
 const round2 = (n) => Number((Number(n || 0)).toFixed(2));
 
-// 🟢 FIXED: นิยามฟังก์ชัน toLocalRange เพื่อสยบปัญหา ReferenceError และปรับช่วงวันเวลาดึงบิลพิมพ์ให้แม่นยำ 100%
 const toLocalRange = (dateStr) => {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -36,8 +35,7 @@ const toLocalRange = (dateStr) => {
   return { start, end };
 };
 
-// ✅ canonical total resolver (minimal-disruption)
-// ในระบบนี้ totalAmount คือ “ยอดรวมรวม VAT แล้ว (Gross)” เสมอ
+// canonical total resolver (minimal-disruption)
 const resolveCanonicalTotalAmount = (sale) => {
   const stored = round2(sale?.totalAmount != null ? toNum(sale.totalAmount) : 0);
   return stored;
@@ -280,13 +278,15 @@ const createSale = async (req, res) => {
 
     const stockItems = await prisma.stockItem.findMany({
       where: { id: { in: stockItemIds }, status: 'IN_STOCK' },
-      select: { id: true },
+      select: { id: true, productId: true },
     });
     if (stockItems.length !== items.length) {
       const availableIds = new Set(stockItems.map((si) => si.id));
       const unavailable = items.filter((it) => !availableIds.has(it.stockItemId)).map((it) => it.stockItemId);
       return res.status(400).json({ error: 'บางรายการไม่พร้อมขาย หรือถูกขายไปแล้ว', unavailableStockItemIds: unavailable });
     }
+
+    const stockIdToProductIdMap = new Map(stockItems.map(si => [si.id, si.productId]));
 
     let createdSale;
     for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt++) {
@@ -342,12 +342,17 @@ const createSale = async (req, res) => {
             throw Object.assign(new Error('Some items already sold.'), { status: 409, code: 'STOCK_CONFLICT' });
           }
 
-          const movementData = stockItemIds.map((stockId) => ({
-            stockItemId: stockId,
-            type: 'SALE',
-            qty: -1, 
-            note: `ขายสินค้าหน้าร้านอัตโนมัติผ่านเลขบิลเอกสาร ${code}`,
-          }));
+          // 🟢 FIXED: ถอด stockItemId ออกเพื่อให้ตรงตามมาตรฐานฟิลด์ของโมเดล StockMovement ใน schema.prisma เป๊ะๆ
+          const movementData = stockItemIds.map((stockId) => {
+            const pId = stockIdToProductIdMap.get(stockId);
+            return {
+              productId: pId,
+              branchId: Number(branchId),
+              type: 'SALE',
+              qty: -1, 
+              note: `ขายสินค้าหน้าร้านอัตโนมัติผ่านเลขบิลเอกสาร ${code}`,
+            };
+          });
 
           await tx.stockMovement.createMany({
             data: movementData,

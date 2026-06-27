@@ -1,4 +1,3 @@
-
 // customerController.js — aligned with CartController style (Prisma import, helpers, transactions)
 
 const { prisma, Prisma } = require('../lib/prisma');
@@ -48,11 +47,21 @@ const getCustomerByPhone = async (req, res) => {
 
     if (!customer) return res.status(404).json({ message: 'ไม่พบลูกค้า' });
 
+    // 🟢 BE LAYER: ดึงข้อมูลและแยกก้อนโค้ด ADM ออกจากโครงสร้างความสัมพันธ์ Prisma
+    const sdCode = customer.subdistrict?.code || null;
+    const dCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+    const pCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
+
     return res.json({
       id: customer.id,
       name: customer.name,
       phone: customer.user?.loginId || null,
-      subdistrictCode: customer.subdistrict?.code || null,
+      
+      // ✅ แนบคีย์รหัสแยกส่วนส่งออกไปให้หน้าบ้านไฮไลท์เลือก Dropdown ทันที
+      provinceCode: pCode,
+      districtCode: dCode,
+      subdistrictCode: sdCode,
+      
       addressDetail: customer.addressDetail || null,
       email: '', // POS policy: ไม่รับ/ไม่เก็บ email
       type: customer.type,
@@ -89,21 +98,33 @@ const getCustomerByName = async (req, res) => {
     });
 
     return res.json(
-      customers.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.user?.loginId || null,
-        subdistrictCode: c.subdistrict?.code || null,
-        addressDetail: c.addressDetail || null,
-        email: '', // POS policy: ไม่รับ/ไม่เก็บ email
-        type: c.type,
-        companyName: c.companyName,
-        taxId: c.taxId,
-        creditLimit: c.creditLimit,
-        creditBalance: c.creditBalance,
-        postcode: c.subdistrict?.postcode || null,
-        customerAddress: buildCustomerAddress(c),
-      }))
+      customers.map((c) => {
+        // 🟢 BE LAYER: แกะข้อมูลพิกัดระดับความสัมพันธ์รายแถว
+        const sdCode = c.subdistrict?.code || null;
+        const dCode = c.subdistrict?.districtCode || c.subdistrict?.district?.code || null;
+        const pCode = c.subdistrict?.district?.provinceCode || c.subdistrict?.district?.province?.code || null;
+
+        return {
+          id: c.id,
+          name: c.name,
+          phone: c.user?.loginId || null,
+          
+          // ✅ แตกคีย์จัดโครงสร้าง JSON Object เพื่อปราบสายสตริงยาวพืดหน้าบ้าน
+          provinceCode: pCode,
+          districtCode: dCode,
+          subdistrictCode: sdCode,
+          
+          addressDetail: c.addressDetail || null,
+          email: '', // POS policy: ไม่รับ/ไม่เก็บ email
+          type: c.type,
+          companyName: c.companyName,
+          taxId: c.taxId,
+          creditLimit: c.creditLimit,
+          creditBalance: c.creditBalance,
+          postcode: c.subdistrict?.postcode || null,
+          customerAddress: buildCustomerAddress(c),
+        };
+      })
     );
   } catch (err) {
     console.error('❌ getCustomerByName error:', err);
@@ -125,12 +146,21 @@ async function getCustomerByUserId(req, res) {
 
     if (!customer) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
 
+    const sdCode = customer.subdistrict?.code || null;
+    const dCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+    const pCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
+
     return res.json({
       id: customer.id,
       name: customer.name,
       phone: customer.user?.loginId || null,
       email: '', // POS policy: ไม่รับ/ไม่เก็บ email
-      subdistrictCode: customer.subdistrict?.code || null,
+      
+      // ✅ ส่งพิกัดข้อมูลการเข้าถึงบัญชีตัวเองออนไลน์
+      provinceCode: pCode,
+      districtCode: dCode,
+      subdistrictCode: sdCode,
+      
       addressDetail: customer.addressDetail || null,
       companyName: customer.companyName,
       taxId: customer.taxId,
@@ -143,13 +173,10 @@ async function getCustomerByUserId(req, res) {
   }
 }
 
-
 // POST /api/customers
 const createCustomer = async (req, res) => {
   try {
     const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } = req.body ?? {};
-    // POS policy: ignore email from client
-
     const normalizedPhone = normalizePhone(phone);
 
     if (!name || !isValidPhone(normalizedPhone)) {
@@ -158,7 +185,6 @@ const createCustomer = async (req, res) => {
 
     const existingUser = await prisma.user.findUnique({ where: { loginId: normalizedPhone } });
 
-    // 🔒 กันผูก CustomerProfile ให้ User ผิดประเภท (เช่น EMPLOYEE)
     if (existingUser && existingUser.role !== 'CUSTOMER') {
       return res.status(409).json({ message: 'เบอร์นี้ถูกใช้ในบัญชีประเภทอื่นแล้ว' });
     }
@@ -166,18 +192,26 @@ const createCustomer = async (req, res) => {
       return res.status(409).json({ message: 'เบอร์นี้ถูกใช้กับวิธีล็อกอินอื่นแล้ว' });
     }
 
-    // ✅ Idempotent: มีอยู่แล้วให้คืนตัวเดิม (ไม่ throw)
     if (existingUser) {
       const existingProfile = await prisma.customerProfile.findFirst({
         where: { userId: existingUser.id },
         include: { user: true, subdistrict: { include: { district: { include: { province: true } } } } },
       });
       if (existingProfile) {
+        const sdCode = existingProfile.subdistrict?.code || null;
+        const dCode = existingProfile.subdistrict?.districtCode || existingProfile.subdistrict?.district?.code || null;
+        const pCode = existingProfile.subdistrict?.district?.provinceCode || existingProfile.subdistrict?.district?.province?.code || null;
+
         return res.json({
           id: existingProfile.id,
           name: existingProfile.name,
           phone: existingProfile.user?.loginId || null,
-          subdistrictCode: existingProfile.subdistrict?.code || null,
+          
+          // ✅ ปิดเลนบกพร่องกรณีดึงข้อมูลชนกันซ้ำซ้อน
+          provinceCode: pCode,
+          districtCode: dCode,
+          subdistrictCode: sdCode,
+          
           addressDetail: existingProfile.addressDetail || null,
           email: '', // POS policy: ไม่รับ/ไม่เก็บ email
           type: existingProfile.type,
@@ -194,7 +228,6 @@ const createCustomer = async (req, res) => {
     const rawPassword = normalizedPhone.slice(-4);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    // ตรวจสอบความสอดคล้องของ postcode กับ subdistrictCode (ถ้ามีส่งมา)
     const clientPostcode = (req.body?.postalCode ?? req.body?.postcode)
       ? String(req.body?.postalCode ?? req.body?.postcode)
       : undefined;
@@ -212,7 +245,7 @@ const createCustomer = async (req, res) => {
         ? existingUser
         : await tx.user.create({
           data: {
-            email: null, // 🔒 baseline A: ไม่ใช้ User.email
+            email: null,
             loginId: normalizedPhone,
             password: hashedPassword,
             role: 'CUSTOMER',
@@ -236,6 +269,10 @@ const createCustomer = async (req, res) => {
       return profile;
     });
 
+    const finalSdCode = result.subdistrict?.code || null;
+    const finalDCode = result.subdistrict?.districtCode || result.subdistrict?.district?.code || null;
+    const finalPCode = result.subdistrict?.district?.provinceCode || result.subdistrict?.district?.province?.code || null;
+
     return res.status(201).json({
       id: result.id,
       name: result.name,
@@ -244,7 +281,12 @@ const createCustomer = async (req, res) => {
       type: result.type,
       companyName: result.companyName,
       taxId: result.taxId,
-      subdistrictCode: result.subdistrict?.code || null,
+      
+      // ✅ ส่งพิกัดสำหรับข้อมูลที่เพิ่งสร้างสำเร็จใหม่เอี่ยม
+      provinceCode: finalPCode,
+      districtCode: finalDCode,
+      subdistrictCode: finalSdCode,
+      
       addressDetail: result.addressDetail || null,
       postcode: result.subdistrict?.postcode || null,
       customerAddress: buildCustomerAddress(result),
@@ -271,8 +313,6 @@ const updateCustomerProfile = async (req, res) => {
     if (!id) return res.status(400).json({ message: 'รหัสลูกค้าไม่ถูกต้อง' });
 
     const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } = req.body ?? {};
-    // POS policy: ignore email from client
-
 
     if (typeof type !== 'undefined') {
       const ALLOWED = new Set(['INDIVIDUAL', 'ORGANIZATION', 'GOVERNMENT']);
@@ -284,7 +324,6 @@ const updateCustomerProfile = async (req, res) => {
     const existing = await prisma.customerProfile.findUnique({ where: { id }, include: { user: true } });
     if (!existing) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
 
-    // (คง logic เดิมไว้ ถ้า schema มี branchId จริงก็ยังใช้ได้)
     if (existing.branchId && branchId && existing.branchId !== branchId && role !== 'SUPERADMIN') {
       return res.status(403).json({ message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าสาขาอื่น' });
     }
@@ -299,7 +338,6 @@ const updateCustomerProfile = async (req, res) => {
       }).filter(([, v]) => v !== undefined)
     );
 
-    // ตรวจสอบความสอดคล้องของ postcode กับ subdistrictCode (ถ้ามีส่งมา)
     const clientPostcode = (req.body?.postalCode ?? req.body?.postcode)
       ? String(req.body?.postalCode ?? req.body?.postcode)
       : undefined;
@@ -319,7 +357,6 @@ const updateCustomerProfile = async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // POS policy: ไม่รับ/ไม่เก็บ email (schema ไม่มี customerProfile.email)
       await tx.customerProfile.update({
         where: { id },
         data: {
@@ -330,8 +367,6 @@ const updateCustomerProfile = async (req, res) => {
         },
       });
 
-
-      // phone (loginId) ยังอยู่ที่ User ตามโครงสร้างเดิม
       if (phone) {
         const newPhone = normalizePhone(phone);
         if (!isValidPhone(newPhone)) throw new Error('INVALID_PHONE');
@@ -344,13 +379,22 @@ const updateCustomerProfile = async (req, res) => {
       include: { user: true, subdistrict: { include: { district: { include: { province: true } } } } },
     });
 
+    const upSdCode = full.subdistrict?.code || null;
+    const upDCode = full.subdistrict?.districtCode || full.subdistrict?.district?.code || null;
+    const upPCode = full.subdistrict?.district?.provinceCode || full.subdistrict?.district?.province?.code || null;
+
     return res.json({
       id: full.id,
       name: full.name,
       type: full.type,
       companyName: full.companyName,
       taxId: full.taxId,
-      subdistrictCode: full.subdistrict?.code || null,
+      
+      // ✅ ข้อมูลแยกส่วนจังหวะอัปเดตโพรไฟล์เสร็จสิ้น
+      provinceCode: upPCode,
+      districtCode: upDCode,
+      subdistrictCode: upSdCode,
+      
       addressDetail: full.addressDetail,
       postcode: full.subdistrict?.postcode || null,
       customerAddress: buildCustomerAddress(full),
@@ -365,8 +409,6 @@ const updateCustomerProfile = async (req, res) => {
   }
 };
 
-
-
 // PUT /api/customers/me
 const updateCustomerProfileOnline = async (req, res) => {
   try {
@@ -374,7 +416,6 @@ const updateCustomerProfileOnline = async (req, res) => {
     if (!user || user.role !== 'CUSTOMER') return res.status(403).json({ message: 'Forbidden' });
 
     const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } = req.body ?? {};
-    // POS policy: ignore email from client
 
     if (typeof type !== 'undefined') {
       const ALLOWED = new Set(['INDIVIDUAL', 'ORGANIZATION', 'GOVERNMENT']);
@@ -404,8 +445,7 @@ const updateCustomerProfileOnline = async (req, res) => {
     const existing = await prisma.customerProfile.findUnique({ where: { userId: user.id }, include: { user: true } });
 
     const updated = await prisma.$transaction(async (tx) => {
-      const emailPatch = {}; // POS policy: ไม่รับ/ไม่เก็บ email (schema ไม่มี customerProfile.email)
-
+      const emailPatch = {};
 
       let upd;
       if (existing) {
@@ -430,7 +470,6 @@ const updateCustomerProfileOnline = async (req, res) => {
         });
       }
 
-      // phone (loginId) ยังอยู่ที่ User ตามโครงสร้างเดิม
       if (phone) {
         const newPhone = normalizePhone(phone);
         if (!isValidPhone(newPhone)) throw new Error('INVALID_PHONE');
@@ -445,18 +484,26 @@ const updateCustomerProfileOnline = async (req, res) => {
       include: { user: true, subdistrict: { include: { district: { include: { province: true } } } } },
     });
 
+    const onlineSdCode = full.subdistrict?.code || null;
+    const onlineDCode = full.subdistrict?.districtCode || full.subdistrict?.district?.code || null;
+    const onlinePCode = full.subdistrict?.district?.provinceCode || full.subdistrict?.district?.province?.code || null;
+
     return res.json({
       id: full.id,
       name: full.name,
       type: full.type,
       companyName: full.companyName,
       taxId: full.taxId,
-      subdistrictCode: full.subdistrict?.code || null,
+      
+      // ✅ ส่งพิกัดแยกก้อนในโหมดอัปเดตออนไลน์
+      provinceCode: onlinePCode,
+      districtCode: onlineDCode,
+      subdistrictCode: onlineSdCode,
+      
       addressDetail: full.addressDetail,
       customerAddress: buildCustomerAddress(full),
       phone: full.user?.loginId || null,
       email: '', // POS policy: ไม่รับ/ไม่เก็บ email
-
     });
   } catch (err) {
     if (err && err.message === 'INVALID_PHONE') return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
@@ -464,7 +511,6 @@ const updateCustomerProfileOnline = async (req, res) => {
     return res.status(500).json({ message: 'Failed to update profile' });
   }
 };
-
 
 module.exports = {
   getCustomerByPhone,
@@ -474,7 +520,3 @@ module.exports = {
   updateCustomerProfile,
   updateCustomerProfileOnline,
 };
-
-
-
-

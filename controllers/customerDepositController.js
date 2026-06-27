@@ -1,12 +1,5 @@
-
-
-
-
-
-
-
 /* eslint-env node */
-// controllers/customerDepositController.js (updated)
+// controllers/customerDepositController.js (updated w/ full address codes injection)
 
 const { prisma, Prisma } = require('../lib/prisma');
 
@@ -80,8 +73,15 @@ const getDepositRemainingDecimal = (dep) => {
 const sumDeposits = (deps = []) =>
   deps.reduce((sum, d) => sum.plus(getDepositRemainingDecimal(d)), new Prisma.Decimal(0));
 
+// 🟢 BE REFACTOR LAYER: แก้ไขฟังก์ชันสรุปรวบยอดเพื่อฉีดพ่นค่ารหัสพิกัดแยกก้อนส่งกลับไปหน้าบ้านให้ตรงตามสัญญา Cascader เป๊ะๆ
 const projectCustomerSummary = (customer) => {
   const totalDeposit = sumDeposits(customer?.customerDeposits || []);
+  
+  // แกะข้อมูลโค้ดทางเดินสัมพันธ์จากตารางลูกย่อยผ่านความสัมพันธ์ Prisma
+  const sdCode = customer.subdistrictCode || null;
+  const dCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+  const pCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
+
   return {
     id: customer.id,
     name: customer.name || '',
@@ -92,14 +92,18 @@ const projectCustomerSummary = (customer) => {
     taxId: customer.taxId || '',
     creditLimit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(customer.creditLimit || 0) : customer.creditLimit,
     creditBalance: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(customer.creditBalance || 0) : customer.creditBalance,
-    subdistrictCode: customer.subdistrictCode || null,
+    
+    // ✅ ส่งกลุ่มฟิลด์รหัสพิกัดแยกก้อนสำหรับเปิดเรนเดอร์ใน Dropdown หน้าบ้านแบบไร้รอยต่อ
+    provinceCode: pCode,
+    districtCode: dCode,
+    subdistrictCode: sdCode,
+    
     addressDetail: customer.addressDetail || null,
     customerAddress: buildCustomerAddress(customer),
     totalDeposit: NORMALIZE_DECIMAL_TO_NUMBER ? toNum(totalDeposit) : totalDeposit,
     depositCount: Array.isArray(customer.customerDeposits) ? customer.customerDeposits.length : 0,
   };
 };
-
 
 // ─────────────────────────────────────────────────────────────
 // Create a new customer deposit (ACTIVE)
@@ -216,6 +220,11 @@ const getCustomerAndDepositByPhone = async (req, res) => {
 
     const totalDeposit = sumDeposits(customer.customerDeposits);
 
+    // 🟢 BE REFACTOR LAYER: ถอดและประกอบโครงสร้างรหัสแบบกระจายก้อนเพื่อส่งให้ FE ดักกรอกค่า Dropdown แบบออโต้
+    const sdCode = customer.subdistrictCode || null;
+    const dCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+    const pCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
+
     const customerOut = normalizeCustomerMoney({
       id: customer.id,
       name: customer.name,
@@ -226,7 +235,12 @@ const getCustomerAndDepositByPhone = async (req, res) => {
       taxId: customer.taxId,
       creditLimit: customer.creditLimit,
       creditBalance: customer.creditBalance,
-      subdistrictCode: customer.subdistrictCode || null,
+      
+      // ✅ เติมรหัสก้อนแยกเพื่อทำลายพฤติกรรม String ยาวพืดดั้งเดิมส่งตรงเข้าหน้าบ้าน
+      provinceCode: pCode,
+      districtCode: dCode,
+      subdistrictCode: sdCode,
+      
       addressDetail: customer.addressDetail || null,
       customerAddress: buildCustomerAddress(customer),
     });
@@ -310,6 +324,11 @@ const getCustomerAndDepositByCustomerId = async (req, res) => {
 
     const totalDeposit = sumDeposits(customer.customerDeposits);
 
+    // 🟢 BE REFACTOR LAYER: ถอดและประกอบโครงสร้างรหัสแบบกระจายก้อนเพื่อส่งให้ FE ดักกรอกค่า Dropdown แบบออโต้เมื่อเรียกรายไอดี
+    const sdCode = customer.subdistrictCode || null;
+    const dCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+    const pCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
+
     const customerOut = normalizeCustomerMoney({
       id: customer.id,
       name: customer.name,
@@ -320,7 +339,12 @@ const getCustomerAndDepositByCustomerId = async (req, res) => {
       taxId: customer.taxId,
       creditLimit: customer.creditLimit,
       creditBalance: customer.creditBalance,
-      subdistrictCode: customer.subdistrictCode || null,
+      
+      // ✅ เติมรหัสก้อนแยกเพื่อทำลายพฤติกรรม String ยาวพืดดั้งเดิมส่งตรงเข้าหน้าบ้าน
+      provinceCode: pCode,
+      districtCode: dCode,
+      subdistrictCode: sdCode,
+      
       addressDetail: customer.addressDetail || null,
       customerAddress: buildCustomerAddress(customer),
     });
@@ -490,8 +514,3 @@ module.exports = {
   useCustomerDeposit,
   getCustomerAndDepositByName,
 };
-
-
-
-
-
