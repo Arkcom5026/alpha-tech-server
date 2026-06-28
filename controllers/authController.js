@@ -244,11 +244,16 @@ const revokeRefreshTokenFamilyChain = async ({ tokenId, tx = prisma, revokedAt =
   }
 };
 
+
 const register = async (req, res) => {
   try {
     const shopName = normalize(req.body?.shopName);
     const shopSlug = normalize(req.body?.shopSlug).toLowerCase();
     const email = normalizeEmail(req.body?.email);
+    
+    // 🟢 1. เปิดท่อดักรับค่า categoryId พ่วงเพิ่มเข้ามาจาก Payload หน้าบ้าน
+    const categoryId = req.body?.categoryId ? Number(req.body.categoryId) : 1;
+    
     const rawPassword = Math.random().toString(36).slice(-10) + 'A1!';
 
     if (!shopName || !shopSlug || !email) {
@@ -268,12 +273,14 @@ const register = async (req, res) => {
     const hashedPassword = await bcryptHash(rawPassword, 10);
 
     const transactionResult = await prisma.$transaction(async (tx) => {
+      // 🟢 2. ยัดสลักล็อกความสัมพันธ์ categoryId เข้าสู่พิมพ์เขียวระดับกลุ่มธุรกิจสาขาตอนสมัครทันที
       const branch = await tx.branch.create({
         data: {
           name: shopName,
           slug: shopSlug,
           address: 'กรุณาอัปเดตที่อยู่ร้านค้า',
-          businessType: 'GENERAL'
+          categoryId: categoryId, // ➔ ผูกมัดเข้าหา Category สากล (1-6) 
+          businessType: 'GENERAL'  // คงค่า Enum เดิมไว้ชั่วคราวเพื่อกันลอจิกสัดส่วนอื่นเอฟเฟกต์
         }
       });
 
@@ -318,7 +325,7 @@ const register = async (req, res) => {
       return { user, branch, employeeProfile, customerProfile, rawToken };
     });
 
-    console.log(`[auth.register] Success: Branch ${shopSlug} and Dual-Profile created.`);
+    console.log(`[auth.register] Success: Branch ${shopSlug} and Dual-Profile created with Category ID: ${categoryId}.`);
 
     const resetUrl = buildPasswordResetUrl(req, transactionResult.rawToken);
     const subject = `🔑 ข้อมูลบัญชีและลิงก์ตั้งค่ารหัสผ่านสำหรับร้าน ${shopName}`;
