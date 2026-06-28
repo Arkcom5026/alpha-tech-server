@@ -266,7 +266,7 @@ model User {
   orderOnline OrderOnline[]
   cart        Cart[]
 }
- 
+
 model EmployeeProfile {
   id    Int     @id @default(autoincrement())
   name  String?
@@ -283,7 +283,7 @@ model EmployeeProfile {
 
   // Greenfield Core Authentication Support (V2 API)
   v2Role         EmployeeRole @default(CASHIER)
-  passwordHashV2 String?      // เก็บแฮชความปลอดภัยกรณีสลับสิทธิ์มาใช้ระบบแยกชิ้นส่วนคลีน
+  passwordHashV2 String? // เก็บแฮชความปลอดภัยกรณีสลับสิทธิ์มาใช้ระบบแยกชิ้นส่วนคลีน
 
   confirmedOrders OrderOnline[] @relation("EmployeeConfirmedOrders")
 
@@ -316,7 +316,7 @@ model EmployeeProfile {
   v2StockAudits           V2StockAudit[]
 
   // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับของช่างเทคนิคผู้คุมเคสซ่อม v2
-  repairJobs              RepairJob[]
+  repairJobs RepairJob[]
 }
 
 model Branch {
@@ -325,13 +325,16 @@ model Branch {
   address String
   phone   String?
   slug    String? @unique
-  
+
   taxId        String? @db.VarChar(13)
   branchCode   String? @db.VarChar(5)
   isHeadOffice Boolean @default(false)
 
   subdistrictCode String?
   subdistrict     Subdistrict? @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+
+  categoryId Int      @default(1)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   businessType BusinessType @default(GENERAL)
   features     Json?
@@ -374,7 +377,7 @@ model Branch {
   v2StockAudits         V2StockAudit[]
 
   // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับไปยังระบบงานซ่อม v2
-  repairJobs            RepairJob[]
+  repairJobs RepairJob[]
 
   @@index([subdistrictCode])
 }
@@ -389,13 +392,36 @@ model Category {
   active   Boolean @default(true)
   isSystem Boolean @default(false)
 
+  globalProductTypes GlobalProductType[]
+  branches           Branch[]
+
   productTypes ProductType[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   Product   Product[]
 }
- model ProductType {
+
+model GlobalProductType {
+  id     Int     @id @default(autoincrement())
+  name   String // เช่น "คอมพิวเตอร์พกพา", "สว่านและเครื่องเจาะ"
+  slug   String  @unique // เช่น "portable-computers", "power-drills"
+  active Boolean @default(true)
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // สายสัมพันธ์ขากลับเชื่อมไปยังประเภทสินค้าของแต่ละร้านค้าที่วิ่งมาจับคู่ (Map)
+  localProductTypes ProductType[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([active])
+}
+
+model ProductType {
   id             Int     @id @default(autoincrement())
   name           String
   slug           String
@@ -405,9 +431,13 @@ model Category {
   typeBrands    ProductTypeBrand[]
   guideExamples String[]           @default([])
   pathCached    String?
-  
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // 🟢 ขันน็อตล็อกสิทธิ์กลับมาเป็น Required (เอาเครื่องหมาย ? ออก)
+  globalProductTypeId Int
+  globalProductType   GlobalProductType @relation(fields: [globalProductTypeId], references: [id], onDelete: Restrict)
+
   categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
   branchId Int?
@@ -416,66 +446,11 @@ model Category {
   updatedAt DateTime  @updatedAt
   Product   Product[]
 
-  @@unique([branchId, categoryId, slug])
-  @@unique([branchId, categoryId, normalizedName])
+  // 🟢 ดึงกำแพงความปลอดภัยสากลกลับมาประจำการ (รอบนี้รันผ่านแน่นอนเพราะไม่มีคอลัมน์ว่างแล้ว)
+  @@unique([branchId, globalProductTypeId, slug])
+  @@unique([branchId, globalProductTypeId, normalizedName])
   @@index([branchId])
-  @@index([branchId, categoryId])
-  @@index([normalizedName])
-}
-
-model ProductProfile {
-  id             Int     @id @default(autoincrement())
-  name           String
-  slug           String
-  normalizedName String?
-  description    String?
-
-  guideExamples String[] @default([])
-  pathCached    String?
-
-  templates ProductTemplate[]
-
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  Product   Product[]
-
-  @@unique([slug])
-  @@unique([normalizedName])
-  @@index([normalizedName])
-  @@index([active])
-}
-
-model ProductTemplate {
-  id             Int     @id @default(autoincrement())
-  name           String
-  slug           String
-  normalizedName String?
-  warranty       Int?
-  noSN           Boolean @default(false)
-  codeType       String  @default("D")
-  active         Boolean @default(true)
-
-  guideExamples String[] @default([])
-  pathCached    String?
-
-  applicableBusinessTypes BusinessType[] @default([])
-
-  productProfile   ProductProfile? @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
-  productProfileId Int?
-
-  products Product[]
-  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  unitId   Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([slug])
-  @@unique([normalizedName])
-  @@index([normalizedName])
-  @@index([active])
-  @@index([productProfileId])
+  @@index([globalProductTypeId])
 }
 
 model Brand {
@@ -509,9 +484,8 @@ model ProductTypeBrand {
   @@index([productTypeId])
   @@index([brandId])
 }
- 
 
- model Product {
+model Product {
   id   Int    @id @default(autoincrement())
   name String
 
@@ -522,15 +496,10 @@ model ProductTypeBrand {
 
   active Boolean @default(true)
 
-  categoryId       Int?
-  category         Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  productTypeId    Int?
-  productType      ProductType?     @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
-  productProfileId Int?
-  productProfile   ProductProfile?  @relation(fields: [productProfileId], references: [id], onDelete: SetNull)
-
-  templateId Int?
-  template   ProductTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  categoryId    Int?
+  category      Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  productTypeId Int?
+  productType   ProductType? @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
 
   brandId Int?
   brand   Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
@@ -560,21 +529,16 @@ model ProductTypeBrand {
   PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
   v2StockAuditItems        V2StockAuditItem[]
 
-  // ➔ Added for Batch 5: ตัวชี้สายสัมพันธ์ขากลับแก้อาการ Error P1012 แบบเป๊ะตรงตัวล็อก
-  repairPartItems          RepairPartItem[]
+  repairPartItems RepairPartItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([mode, active])
-  @@index([templateId])
   @@index([categoryId])
   @@index([productTypeId])
-  @@index([productProfileId])
   @@index([brandId])
-  @@index([mode, active, categoryId, productTypeId, productProfileId, templateId])
 }
-
 
 model BranchPrice {
   id Int @id @default(autoincrement())
@@ -671,13 +635,13 @@ model Unit {
   id   Int    @id @default(autoincrement())
   name String @unique
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  productTemplate ProductTemplate[]
-  Product         Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Product Product[]
 }
- 
- model StockItem {
+
+model StockItem {
   id           Int     @id @default(autoincrement())
   barcode      String  @unique
   serialNumber String?
@@ -719,8 +683,8 @@ model Unit {
   stockAuditScanLog      StockAuditScanLog[]
 
   // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับระบบเช็กประกันและใบเคลมผ่าน Serial รายชิ้น v2
-  repairJobs             RepairJob[]
-  warrantyClaims         WarrantyClaim[]
+  repairJobs     RepairJob[]
+  warrantyClaims WarrantyClaim[]
 
   @@unique([serialNumber, productId])
   @@index([branchId, status, productId])
@@ -732,15 +696,15 @@ model Unit {
 // =========================================================================
 
 model V2StockAudit {
-  id          Int                @id @default(autoincrement())
-  branchId    Int
-  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  auditorId   Int
-  auditor     EmployeeProfile    @relation(fields: [auditorId], references: [id])
-  status      String             @default("PENDING") // PENDING, ADJUSTED, CANCELLED
-  items       V2StockAuditItem[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id        Int                @id @default(autoincrement())
+  branchId  Int
+  branch    Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  auditorId Int
+  auditor   EmployeeProfile    @relation(fields: [auditorId], references: [id])
+  status    String             @default("PENDING") // PENDING, ADJUSTED, CANCELLED
+  items     V2StockAuditItem[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   @@index([branchId])
 }
@@ -751,9 +715,9 @@ model V2StockAuditItem {
   stockAudit   V2StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
   productId    Int
   product      Product      @relation(fields: [productId], references: [id])
-  expectedQty  Int          
-  actualQty    Int          
-  difference   Int          
+  expectedQty  Int
+  actualQty    Int
+  difference   Int
 }
 
 // =========================================================================
@@ -1125,7 +1089,7 @@ model BarcodeReceiptItem {
   stockItemId Int?
   stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
 
-  kind        BarcodeKind @default(SN) 
+  kind        BarcodeKind @default(SN)
   simpleLotId Int?
   simpleLot   SimpleLot?  @relation(fields: [simpleLotId], references: [id], onDelete: SetNull)
 
@@ -1595,7 +1559,7 @@ model SimpleLot {
   branchId      Int
   productId     Int
   receiptItemId Int?
-  barcode       String          @unique 
+  barcode       String          @unique
   qtyInitial    Decimal         @db.Decimal(12, 2)
   qtyRemaining  Decimal         @db.Decimal(12, 2)
   unitCost      Decimal         @db.Decimal(12, 2)
@@ -1613,7 +1577,7 @@ model SimpleLot {
   BarcodeReceiptItem BarcodeReceiptItem[]
 
   @@index([branchId, productId, receivedAt])
-  @@index([branchId, status]) 
+  @@index([branchId, status])
 }
 
 model SaleReturnItemSimple {
@@ -1764,7 +1728,7 @@ model CustomerProfile {
 
   // Greenfield V2 Added Debt Tracking
   outstandingDebt_v2 Float @default(0.0)
-  depositBalance_v2   Float @default(0.0)
+  depositBalance_v2  Float @default(0.0)
 
   orders   Order[]
   cart     Cart[]
@@ -1782,7 +1746,7 @@ model CustomerProfile {
   v2CustomerDeposits       V2CustomerDeposit[]
 
   // ➔ Added for Batch 5: รองรับความสัมพันธ์ขากลับของประวัติงานซ่อมลูกค้าในเมืองใหม่ v2
-  repairJobs               RepairJob[]
+  repairJobs RepairJob[]
 
   @@index([subdistrictCode])
 }
@@ -1841,8 +1805,8 @@ model V2CustomerDeposit {
   customerId      Int
   customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
   amount          Float
-  transactionType String          // DEPOSIT, DEDUCTION
-  referenceNumber String?         
+  transactionType String // DEPOSIT, DEDUCTION
+  referenceNumber String?
   createdAt       DateTime        @default(now())
 }
 
@@ -1892,38 +1856,37 @@ model Position {
   @@index([name])
 }
 
-
 // =========================================================================
 // ⚙️ BATCH 5: REPAIR, WARRANTY & CLAIM MANAGEMENT (IT SPECIALIST COMPLIANCE)
 // =========================================================================
 
 model RepairJob {
-  id               Int              @id @default(autoincrement())
-  jobNo            String           @unique
-  
-  branchId         Int
-  branch           Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  
-  customerId       Int
-  customer         CustomerProfile  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  stockItemId      Int?
-  stockItem        StockItem?       @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
-  
-  deviceModel      String            
-  reportedSymptoms String            
-  technicianNotes  String?           
-  
-  status           ServiceStatus     @default(RECEIVED) 
-  estimatedCost    Decimal           @default(0.0) @db.Decimal(12, 2)
-  depositPaid      Decimal           @default(0.0) @db.Decimal(12, 2) 
-  
-  technicianId     Int?
-  technician       EmployeeProfile?  @relation(fields: [technicianId], references: [id], onDelete: SetNull) 
-  
-  partsUsed        RepairPartItem[]  
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id    Int    @id @default(autoincrement())
+  jobNo String @unique
+
+  branchId Int
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  customerId Int
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  stockItemId Int?
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+
+  deviceModel      String
+  reportedSymptoms String
+  technicianNotes  String?
+
+  status        ServiceStatus @default(RECEIVED)
+  estimatedCost Decimal       @default(0.0) @db.Decimal(12, 2)
+  depositPaid   Decimal       @default(0.0) @db.Decimal(12, 2)
+
+  technicianId Int?
+  technician   EmployeeProfile? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  partsUsed RepairPartItem[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@index([branchId])
   @@index([stockItemId])
@@ -1933,23 +1896,23 @@ model RepairPartItem {
   id          Int       @id @default(autoincrement())
   repairJobId Int
   repairJob   RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
-  
-  productId   Int       
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  qtyUsed     Int       @default(1) 
-  unitPrice   Decimal   @db.Decimal(12, 2) 
+
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  qtyUsed   Int     @default(1)
+  unitPrice Decimal @db.Decimal(12, 2)
 }
 
 model WarrantyClaim {
-  id          Int         @id @default(autoincrement())
-  claimNo     String      @unique 
-  
+  id      Int    @id @default(autoincrement())
+  claimNo String @unique
+
   stockItemId Int
-  stockItem   StockItem   @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-  
-  status      StockStatus @default(CLAIMED) 
-  reason      String      
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  status    StockStatus @default(CLAIMED)
+  reason    String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }

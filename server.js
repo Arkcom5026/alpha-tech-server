@@ -85,6 +85,7 @@ app.use(cookieParser());
 const allowedOrigins = [
   // Local dev
   'http://localhost:5173',
+  'http://localhost:3000',
 
   // Primary web domains
   'https://saduaksabuy.com',
@@ -107,28 +108,32 @@ const normalizeOrigin = (value) => {
 };
 
 const isAllowedOrigin = (origin) => {
-  // 🟢 FIXED: คืนค่า true ทันทีหากไม่มีค่า Origin แนบมา เพื่อไม่ให้สกัดกั้นคำขอภายในระบบเดียวกัน
   if (!origin) return true;
 
   const o = normalizeOrigin(origin);
   if (!o) return true; 
 
+  // 1. ตรวจสอบจาก Array รายชื่อโดเมนหลัก (เปรียบเทียบหลังผ่านการ Normalize แล้ว)
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
 
+  // 2. ตรวจสอบผ่านระบบ Regex (สำหรับ Vercel Preview/Branch URL)
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
 
 const corsOptions = {
   origin(origin, callback) {
+    // โหมดข้ามการตรวจสิทธิ์หากตั้งค่าไว้ใน Environment
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
     
-    // 🟢 FIXED: ปรับแต่งให้สอดคล้องกันอย่างปลอดภัย ตรวจสอบโครงสร้าง Origin
+    // 🟢 FIXED: คืนค่าสิทธิ์ผ่านฉลุยทันทีเมื่อตรวจสอบแล้วว่า Origin ปลอดภัยและมาจากระบบหลักจริง
     if (!origin || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     
+    // บันทึกข้อผิดพลาดกรณีพบ Origin แปลกปลอมที่ไม่ได้รับอนุญาต
+    console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
