@@ -1,0 +1,136 @@
+ผลการสแกนพิมพ์เขียวฐานข้อมูลจากไฟล์ schema.prisma อย่างละเอียดพบว่า ระบบชุดนี้มีจุดเปราะบางที่ผูกกลไกระเบิดเวลา onDelete: Cascade เอาไว้ในตารางสำคัญที่เป็นหัวใจของการเงิน สต๊อกสินค้า และประวัติลูกค้าอยู่หลายตารางครับ ซึ่งหากเกิดการรันคำสั่งที่ส่งผลกระทบต่อตารางแม่ (เช่น npx prisma db push บนเครื่อง Local) ข้อมูลธุรกรรมเหล่านี้จะถูกลบทิ้งเป็นโดมิโนทันที
+
+นี่คือ "ลิสต์ตารางอันตราย" ที่ควรพิจารณาเปลี่ยนความสัมพันธ์จาก Cascade เป็น Restrict เพื่อค้ำยันความปลอดภัยให้กับดาต้าเบสบนระบบ Production ในอนาคตครับ:
+
+🏬 1. กลุ่มระบบสต๊อกสินค้าและคลังสินค้าหลัก (Inventory & Stock)
+เป็นกลุ่มที่โดนผลกระทบโดยตรงในรอบนี้ ควรถูกขันน็อตให้แน่นหนาที่สุด เพื่อป้องกันการลบตัวแม่แล้วเม็ดสต๊อกดิบหายไปจากระบบ:
+
+StockItem (ข้อมูลซีเรียลนัมเบอร์และบาร์โค้ดรายชิ้น)
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🚨 ความเสี่ยง: หากเผลอลบตัวสินค้า หรือมีใครไปเคลียร์ข้อมูลสาขา ประวัติซีเรียลนัมเบอร์และสถานะสินค้าพร้อมขายทั้งหมดจะถูกลบเกลี้ยงทันที
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนทั้งสองตัวเป็น onDelete: Restrict เพื่อบังคับว่า "ถ้ายอดสต๊อกรายชิ้นชิ้นนี้ยังมีอยู่ ห้ามใครลบตัวสินค้าหรือลบสาขาทิ้งเด็ดขาด"
+
+BranchPrice (ราคาสินค้าแยกตามสาขา)
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict
+
+
+StockBalance (ยอดรวมสต๊อกสินค้าและต้นทุนเฉลี่ยประจำสาขา)
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict
+
+
+💰 2. กลุ่มประวัติการขายหน้าร้าน (Sales & POS Transactions)
+ข้อมูลการเงินและบิลขายคือประวัติทางบัญชีที่ต้องเก็บรักษาไว้เป็นหลักฐาน การตั้งค่าเป็น Cascade ถือเป็นความเสี่ยงระดับวิกฤต:
+
+SaleItem (รายการสินค้าภายในบิลขาย)
+
+จุดเดิม: stockItem StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+
+🚨 ความเสี่ยง: หากข้อมูลเม็ดสต๊อกในตาราง StockItem โดนล้าง (เหมือนเหตุการณ์รอบนี้) ตัวรายการสินค้าในบิลขายเก่า ๆ จะถูกลบตามไปด้วย ส่งผลให้ยอดรวมบิลในอดีตเพี้ยนทันที
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict เพื่อล็อกไม่ให้ใครไปลบข้อมูล StockItem ตัวที่เคยขายออกไปแล้ว
+
+SaleItemSimple (รายการสินค้าแบบไม่มีซีเรียลในบิลขาย)
+
+จุดเดิม: sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนความสัมพันธ์ฝั่ง product เป็น onDelete: Restrict เพื่อให้ระบบฟ้องเตือนหากมีใครพยายามจะลบสินค้าตัวที่มีประวัติการขายไปแล้วในอดีต
+
+Payment (ข้อมูลการรับชำระเงิน)
+
+จุดเดิม: sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: ควรเปลี่ยนความสัมพันธ์ฝั่ง branch เป็น onDelete: Restrict
+
+
+🤝 3. กลุ่มจัดซื้อและซัพพลายเออร์ (Procurement Supply Chain)
+ข้อมูลการสั่งซื้อสินค้าเข้าคลังและใบบันทึกภาษีซื้อ:
+
+PurchaseOrderItem (รายการสินค้าในใบสั่งซื้อ)
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict เพื่อป้องกันไม่ให้ลบข้อมูลสินค้าตัวที่มีประวัติการทำเรื่องจัดซื้อค้างอยู่
+
+PurchaseOrderReceipt (ใบรับสินค้าจากการจัดซื้อ/เอกสารใบกำกับภาษีซื้อ)
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict เอกสารทางภาษีและบัญชีห้ามหายตามสาขาเด็ดขาด
+
+🌐 4. กลุ่มโปรไฟล์ลูกค้าและเงินมัดจำ (Customer Profiles & Financial Logs)
+ข้อมูลวงเงินและเครดิตของคู่ค้า:
+
+CustomerDeposit (ข้อมูลเงินมัดจำ/กระเป๋าเงินของลูกค้า)
+
+จุดเดิม: customer CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: branch Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+🚨 ความเสี่ยง: หากลบประวัติลูกค้าหรือประวัติสาขา ยอดเงินฝากหรือเงินมัดจำของลูกค้าที่ค้างอยู่ในระบบจะถูกลบทิ้งไปดื้อ ๆ
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict ทั้งสองฝั่ง เพื่อความปลอดภัยของข้อมูลกระเป๋าเงินลูกค้า
+
+V2CustomerDeposit (บันทึกประวัติการเดินบัญชีเงินฝากลูกค้า)
+
+จุดเดิม: customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict
+
+
+🛠️ 5. กลุ่มระบบงานซ่อมและใบเคลมประกัน (Batch 5: Repair & Claims)
+ตารางประวัติงานชิ้นส่วนอะไหล่ที่พิ่งขันน็อตเพิ่มเข้ามาในโครงสร้างล่าสุด:
+
+RepairJob (ใบรับงานซ่อมหน้าร้าน)
+
+จุดเดิม: branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+
+จุดเดิม: customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนทั้งสองฟิลด์เป็น onDelete: Restrict ประวัติเคสงานซ่อมของร้านค้าไม่ควรหายไปเมื่อตัวแม่ถูกแตะต้อง
+
+RepairPartItem (รายการชิ้นส่วนอะไหล่ที่ใช้ในงานซ่อม)
+
+จุดเดิม: product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+
+🛠️ สิ่งที่ควรเปลี่ยน: เปลี่ยนเป็น onDelete: Restrict เพื่อป้องกันไม่ให้ลบสินค้าตัวที่เป็น "อะไหล่" หากอะไหล่ชิ้นนั้นเคยถูกนำไปผูกบันทึกอยู่ในประวัติงานซ่อมของลูกค้าแล้ว
+
+💡 คำแนะนำสำหรับการลงมืออัปเดต
+พาร์ตเนอร์สามารถเซฟลิสต์นี้เก็บไว้ก่อนได้เลยครับ อย่าเพิ่งทำการแก้ไขไฟล์ในเครื่องหรือส่งโค้ดขึ้นระบบ ณ วินาทีนี้เด็ดขาด เพื่อรอให้กระบวนการกู้คืน Snapshot จากฝั่ง Supabase ทำงานเสร็จสิ้นและคืนสภาพข้อมูลดิบทั้งหมดกลับมาก่อน หลังจากระบบหลักฟื้นตัวเรียบร้อยแล้ว เราค่อยมาทยอยปรับจุดเหล่านี้เป็น Restrict และเปลี่ยนไปใช้คำสั่ง npx prisma migrate deploy เพื่ออัปเกรดระบบแบบร้อยเปอร์เซ็นต์กันครับพาร์ตเนอร์! มีสัญญาณคืบหน้าจากอีเมลแจ้งมาได้ตลอดเลยนะครับ! 🚀🏁📦

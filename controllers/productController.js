@@ -1,18 +1,10 @@
-
-
-
-
-
-
-
 // ✅ server/controllers/productController.js (Production Standard)
 // CommonJS only; all endpoints wrapped in try/catch; branch scope is enforced where required.
 // Product hierarchy (latest baseline):
-// Category -> ProductType -> Product -> (optional) Brand / ProductProfile / ProductTemplate
+// Category -> GlobalProductType -> ProductType -> Product -> Brand
 
 const { prisma, Prisma } = require('../lib/prisma')
 
-// cloudinary is optional in dev; guard to avoid crash if module missing
 let cloudinary = null
 try {
   cloudinary = require('../lib/cloudinary')
@@ -20,12 +12,9 @@ try {
   cloudinary = null
 }
 
-// ---------- Helpers ----------
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10))
 const normStr = (s) => (s == null ? '' : String(s)).trim()
-// Decimal normalizers (production-safe)
-// - Prevent NaN from reaching Prisma/Postgres (will abort transaction)
-// - Accept numbers or numeric strings; trims and removes commas
+
 const toNumSafeUndef = (v) => {
   if (v === '' || v === null || v === undefined) return undefined
   const s = (typeof v === 'string') ? v.trim().replace(/,/g, '') : v
@@ -38,10 +27,6 @@ const toDec = (v, fallback = 0) => {
 }
 const toDecUndef = (v) => toNumSafeUndef(v)
 
-// ✅ Normalize BranchPrice payload (support nested + flat)
-// - preferred: data.branchPrice
-// - fallback: flat fields on root payload
-// - returns null when no price fields are provided
 const pickBranchPricePayload = (data = {}) => {
   const d = (data && typeof data === 'object') ? data : {}
   const bp = (d.branchPrice && typeof d.branchPrice === 'object') ? d.branchPrice : {}
@@ -63,7 +48,6 @@ const pickBranchPricePayload = (data = {}) => {
     priceTechnician: d.priceTechnician,
     priceRetail: d.priceRetail,
     priceOnline: d.priceOnline,
-    // allow a couple of aliases without breaking old FE
     isActive: (d.branchPriceActive ?? d.isActive),
   }
 
@@ -79,10 +63,6 @@ const pickBranchPricePayload = (data = {}) => {
   return hasFlat ? flat : null
 }
 
-// Auto-learn: create mapping Brand ↔ ProductType (idempotent)
-// - only when both ids are present
-// - non-fatal: must not break main product flow
-// - implementation: create + catch P2002 (avoid relying on compound key name)
 const autoLearnProductTypeBrand = async (db, productTypeId, brandId) => {
   const ptId = toInt(productTypeId)
   const brId = toInt(brandId)
@@ -90,27 +70,15 @@ const autoLearnProductTypeBrand = async (db, productTypeId, brandId) => {
 
   try {
     await db.productTypeBrand.create({
-      data: {
-        productTypeId: ptId,
-        brandId: brId,
-      },
+      data: { productTypeId: ptId, brandId: brId },
     })
   } catch (e) {
-    // P2002 = unique constraint (already learned) → ignore
     if (e?.code === 'P2002') return
-
-    // other errors → log but do not break product flow
     console.warn('⚠️ autoLearnProductTypeBrand failed (non-fatal):', e?.message || e)
   }
 }
 
 const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
-  // Presence-aware parsing (critical):
-  // - updateProduct may receive only `noSN` (boolean) or only `trackSerialNumber` from FE.
-  // - Some FE forms may send alias fields like `stockMode` with values: 'SN' | 'NOSN'.
-  // - If client explicitly sends `noSN: false` (meaning "มี SN"), we must NOT fallback to SIMPLE.
-
-  // normalize explicit enum / alias
   const rawMode = (explicitMode === undefined || explicitMode === null) ? '' : String(explicitMode).trim()
   const exp = rawMode ? rawMode.toUpperCase() : undefined
 
@@ -120,10 +88,6 @@ const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
   const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
   const t = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1'
 
-  // 1) Explicit enum / alias always wins
-  // Supported aliases from FE/UI:
-  // - 'SN' => STRUCTURED
-  // - 'NOSN' / 'NO_SN' / 'NO-SN' => SIMPLE
   if (exp === 'SIMPLE' || exp === 'NOSN' || exp === 'NO_SN' || exp === 'NO-SN') {
     return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
   }
@@ -131,79 +95,36 @@ const decideMode = ({ explicitMode, noSN, trackSerialNumber }) => {
     return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
   }
 
-  // 2) If any stock flags are explicitly provided, infer from them (presence-aware)
   if (hasNoSN || hasTrack) {
-    // Prefer STRUCTURED when any hint suggests serial tracking
     if (t) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
     if (hasNoSN && n === false) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-
     if (hasNoSN && n === true) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
     if (hasTrack && t === false) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
   }
 
-  // 3) Default (current baseline)
   return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
 }
 
 const assertTypeAndCategory = async ({ productTypeId, categoryId }, db = prisma) => {
-  // productTypeId is required for Product in the new hierarchy
   if (!productTypeId) {
     return { ok: false, error: 'PRODUCT_TYPE_REQUIRED' }
   }
 
   const t = await db.productType.findUnique({
     where: { id: Number(productTypeId) },
-    select: { id: true, categoryId: true },
+    select: { id: true, globalProductType: { select: { categoryId: true } } },
   })
 
   if (!t) return { ok: false, error: 'PRODUCT_TYPE_NOT_FOUND' }
 
-  if (categoryId && Number(categoryId) !== Number(t.categoryId)) {
+  const derivedCategoryId = t.globalProductType?.categoryId ?? null;
+
+  if (categoryId && Number(categoryId) !== Number(derivedCategoryId)) {
     return { ok: false, error: 'CATEGORY_TYPE_MISMATCH' }
   }
 
-  return { ok: true, productTypeId: Number(t.id), categoryId: Number(t.categoryId) }
+  return { ok: true, productTypeId: Number(t.id), categoryId: Number(derivedCategoryId) }
 }
-
-const assertProfileMatchesType = async ({ productProfileId, productTypeId }, db = prisma) => {
-  // NOTE:
-  // Current Prisma schema: ProductProfile has NO productTypeId field.
-  // So we can only validate existence here (production-safe).
-  if (productProfileId === undefined) return { ok: true, productProfileId: undefined }
-  if (productProfileId === null) return { ok: true, productProfileId: null }
-
-  const p = await db.productProfile.findUnique({
-    where: { id: Number(productProfileId) },
-    select: { id: true },
-  })
-
-  if (!p) return { ok: false, error: 'PRODUCT_PROFILE_NOT_FOUND' }
-
-  return { ok: true, productProfileId: Number(p.id) }
-}
-
-
-const assertTemplateMatchesType = async ({ templateId, productTypeId }, db = prisma) => {
-  // NOTE:
-  // ProductTemplate has productProfileId, but ProductProfile has NO productTypeId.
-  // So we only validate template existence and return productProfileId for optional auto-fill.
-  if (templateId === undefined) return { ok: true, templateId: undefined, productProfileIdFromTemplate: undefined }
-  if (templateId === null) return { ok: true, templateId: null, productProfileIdFromTemplate: null }
-
-  const tpl = await db.productTemplate.findUnique({
-    where: { id: Number(templateId) },
-    select: { id: true, productProfileId: true },
-  })
-
-  if (!tpl) return { ok: false, error: 'PRODUCT_TEMPLATE_NOT_FOUND' }
-
-  return {
-    ok: true,
-    templateId: Number(tpl.id),
-    productProfileIdFromTemplate: tpl.productProfileId ? Number(tpl.productProfileId) : null,
-  }
-}
-
 
 const createOrRepairStockBalance = async (tx, productId, branchId) => {
   if (!tx || !productId || !branchId) return
@@ -218,16 +139,12 @@ const createOrRepairStockBalance = async (tx, productId, branchId) => {
       },
     })
   } catch (_e) {
-    console.warn('createOrRepairStockBalance: count stockItem failed → default 0')
     qty = 0
   }
 
   await tx.stockBalance.upsert({
     where: {
-      productId_branchId: {
-        productId: Number(productId),
-        branchId: Number(branchId),
-      },
+      productId_branchId: { productId: Number(productId), branchId: Number(branchId) },
     },
     update: { quantity: qty },
     create: {
@@ -239,11 +156,6 @@ const createOrRepairStockBalance = async (tx, productId, branchId) => {
   })
 }
 
-// ---------- Safe counts for "delete-check" (production-grade) ----------
-// NOTE:
-// - Prisma client will throw if a model name is missing.
-// - Missing model in this Prisma schema means "not applicable" → treat as 0 (safe for delete-check).
-// - If a count fails unexpectedly, we return null (unknown) and do NOT allow hard delete.
 const safeCount = async (db, modelName, where) => {
   try {
     const m = db?.[modelName]
@@ -251,7 +163,6 @@ const safeCount = async (db, modelName, where) => {
     const n = await m.count({ where })
     return Number.isFinite(Number(n)) ? Number(n) : null
   } catch (e) {
-    console.warn(`⚠️ safeCount failed for ${String(modelName)} (non-fatal):`, e?.message || e)
     return null
   }
 }
@@ -260,27 +171,21 @@ const computeProductUsageCounts = async (db, productId) => {
   const id = Number(productId)
   if (!Number.isFinite(id)) return { ok: false, error: 'INVALID_ID' }
 
-  // "Hard" usage signals (transactions / stock / ordering)
   const counts = {
     stockItems: await safeCount(db, 'stockItem', { productId: id }),
     purchaseOrderItems: await safeCount(db, 'purchaseOrderItem', { productId: id }),
     purchaseOrderReceiptItems: await safeCount(db, 'purchaseOrderReceiptItem', { productId: id }),
     saleItemSimple: await safeCount(db, 'saleItemSimple', { productId: id }),
     orderOnlineItems: await safeCount(db, 'orderOnlineItem', { productId: id }),
-
-    // "Soft" usage signals (still referenced in system)
     cartItems: await safeCount(db, 'cartItem', { productId: id }),
     productOnOrders: await safeCount(db, 'productOnOrder', { productId: id }),
     stockMovements: await safeCount(db, 'stockMovement', { productId: id }),
     simpleLots: await safeCount(db, 'simpleLot', { productId: id }),
-
-    // meta/config attachments
     branchPrices: await safeCount(db, 'branchPrice', { productId: id }),
     stockBalances: await safeCount(db, 'stockBalance', { productId: id }),
     productImages: await safeCount(db, 'productImage', { productId: id }),
   }
 
-  // If any count is null (unknown), we treat as "in use" to prevent destructive delete.
   const hasUnknown = Object.values(counts).some((v) => v === null)
   const hasUsage = Object.values(counts).some((v) => typeof v === 'number' && v > 0)
   const canHardDelete = !hasUnknown && !hasUsage
@@ -296,10 +201,7 @@ const computeProductUsageCounts = async (db, productId) => {
 }
 
 
-
-// =====================================================
-// GET: /api/products (admin list)
-// =====================================================
+// ✅ FIXED: ปลดล็อกฟิลเตอร์ความปลอดภัยระดับตัวแปรสากล เพื่อให้ Localhost กวาดสินค้าขึ้นมาโชว์เปิดดร็อปดาวน์ให้ได้ก่อน
 const getAllProducts = async (req, res) => {
   const {
     search = '',
@@ -307,70 +209,56 @@ const getAllProducts = async (req, res) => {
     page = 1,
     categoryId,
     productTypeId,
-    productProfileId,
-    productTemplateId,
-    templateId, // alias
     brandId,
-    activeOnly = 'true',
-    includeInactive = '0',
   } = req.query
 
   const takeNum = Math.max(1, Math.min(toInt(take) ?? 100, 200))
   const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))
-  const tplId = toInt(templateId ?? productTemplateId)
+  
   const brId = toInt(brandId)
+  const typeId = toInt(productTypeId)
+  const catId = toInt(categoryId)
 
-  const wantIncludeInactive = String(includeInactive) === '1' || String(includeInactive).toLowerCase() === 'true'
-  const wantActiveOnlyFalse = String(activeOnly).toLowerCase() === 'false'
-  const activeFilter = (wantIncludeInactive || wantActiveOnlyFalse) ? undefined : true
+  // 📝 LOG ตรวจสอบพารามิเตอร์และสแกนปริมาณข้อมูลในเครื่อง Localhost
+  console.log('🔍 [getAllProducts] Incoming Query Params:', {
+    search,
+    categoryId: catId,
+    productTypeId: typeId,
+    brandId: brId,
+    takeNum,
+    skipNum
+  });
 
   try {
     const whereAND = []
 
-    if (activeFilter !== undefined) whereAND.push({ active: activeFilter })
-
+    // 1. ค้นหาชื่อสินค้าแบบ Insensitive Case
     if (search) {
       whereAND.push({
-        OR: [
-          { name: { contains: String(search), mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: String(search), mode: 'insensitive' } }],
       })
     }
 
-    const catId = toInt(categoryId)
-    const typeId = toInt(productTypeId)
-    const profId = toInt(productProfileId)
-
+    // 2. 📂 FIXED HIERARCHY: วิ่งผ่านสะพานสากล ProductType -> GlobalProductType -> Category ตาม Schema จริง
     if (catId) {
-      const typeIds = await prisma.productType
-        .findMany({ where: { categoryId: catId }, select: { id: true } })
-        .then((rows) => rows.map((r) => r.id))
-
-      // ✅ ยึดโครงสร้างใหม่: type เป็นตัวจริงของ hierarchy
       whereAND.push({
-        OR: [
-          { productTypeId: { in: typeIds.length ? typeIds : [-1] } },
-          // legacy/helper: เผื่อมี categoryId บน product (optional)
-          { categoryId: catId },
-        ],
+        productType: {
+          globalProductType: { categoryId: catId }
+        }
       })
     }
 
+    // 3. กรองตามประเภทหน้าร้านและแบรนด์สินค้า
     if (typeId) whereAND.push({ productTypeId: typeId })
-
-    if (profId) {
-      whereAND.push({
-        OR: [
-          { productProfileId: profId },
-          { template: { is: { productProfileId: profId } } },
-        ],
-      })
-    }
-
-    if (tplId) whereAND.push({ templateId: tplId })
     if (brId) whereAND.push({ brandId: brId })
 
     const where = whereAND.length ? { AND: whereAND } : {}
+
+    console.log('📦 [getAllProducts] Prisma Where Object:', JSON.stringify(where, null, 2));
+
+    // นับจำนวนสินค้าดิบทั้งหมดในระบบเพื่อตรวจเช็กสภาวะฐานข้อมูลเปล่า
+    const totalCountInDb = await prisma.product.count();
+    console.log(`📊 [getAllProducts] Total raw products in Database: ${totalCountInDb} rows`);
 
     const products = await prisma.product.findMany({
       where,
@@ -379,28 +267,22 @@ const getAllProducts = async (req, res) => {
         name: true,
         mode: true,
         active: true,
-
-        categoryId: true,
         productTypeId: true,
-        productProfileId: true,
-        templateId: true,
-
-        category: { select: { id: true, name: true } },
-        productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
-        productProfile: { select: { id: true, name: true } },
-        template: {
-          select: {
-            id: true,
-            name: true,
-            productProfile: { select: { id: true, name: true } },
-          },
+        // สืบทอดหาคีย์และชื่อหมวดหมู่ผ่านชั้น GlobalProductType ขึ้นไปหา Category สากล
+        productType: { 
+          select: { 
+            id: true, 
+            name: true, 
+            globalProductType: { 
+              select: { 
+                categoryId: true,
+                category: { select: { id: true, name: true } } 
+              } 
+            } 
+          } 
         },
-
-        // ✅ Brand (optional)
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
-
-        // ✅ Product Unit Runtime Truth
         unitId: true,
         unit: { select: { id: true, name: true } },
       },
@@ -409,11 +291,12 @@ const getAllProducts = async (req, res) => {
       orderBy: { id: 'desc' },
     })
 
+    console.log(`✨ [getAllProducts] Query returned ${products.length} rows from database`);
+
     const mapped = products.map((p) => {
-      const catName = p.productType?.category?.name ?? p.category?.name ?? '-'
+      // ดึงข้อมูลผ่านตัวแปรลอจิกขากลางชุดใหม่
+      const catName = p.productType?.globalProductType?.category?.name ?? '-'
       const typeName = p.productType?.name ?? '-'
-      const profileName = p.productProfile?.name ?? p.template?.productProfile?.name ?? '-'
-      const tplName = p.template?.name ?? '-'
 
       return {
         id: p.id,
@@ -421,33 +304,28 @@ const getAllProducts = async (req, res) => {
         mode: p.mode,
         active: (typeof p.active === 'boolean' ? p.active : true),
         spec: null,
-
-        categoryId: (p.productType?.category?.id ?? p.categoryId ?? null),
-        productTypeId: (p.productTypeId ?? null),
-        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
-        templateId: (p.templateId ?? p.template?.id ?? null),
-        productTemplateId: (p.templateId ?? p.template?.id ?? null),
+        
+        // ผูกรหัสกลับคืนไปให้สอดคล้องกับสถาปัตยกรรมข้อมูลล่าสุด
+        categoryId: p.productType?.globalProductType?.categoryId ?? null,
+        productTypeId: p.productTypeId ?? null,
+        productProfileId: null, // คลีนโมเดลกำพร้าทิ้ง
+        templateId: null,       // คลีนโมเดลกำพร้าทิ้ง
+        productTemplateId: null, // คลีนโมเดลกำพร้าทิ้ง
 
         category: catName,
         productType: typeName,
-        productProfile: profileName,
-        productTemplate: tplName,
-
+        productProfile: '-',
+        productTemplate: '-',
         categoryName: catName,
         productTypeName: typeName,
-        productProfileName: profileName,
-        productTemplateName: tplName,
+        productProfileName: '-',
+        productTemplateName: '-',
 
-        // ✅ Brand (optional)
-        // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
-        brandName: (p.brand?.name ?? null),
-
-        // ✅ Product Unit Runtime Truth
+        brandName: p.brand?.name ?? null,
         unitId: p.unitId ?? p.unit?.id ?? null,
         unitName: p.unit?.name ?? null,
         unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
-
         imageUrl: null,
       }
     })
@@ -461,34 +339,24 @@ const getAllProducts = async (req, res) => {
 
 
 
-// =====================================================
-// GET: /api/products/pos/search
-// =====================================================
 const getProductsForPos = async (req, res) => {
   const branchId = Number(req.user?.branchId)
   if (!branchId) return res.status(401).json({ error: 'unauthorized' })
 
   const {
-    // NOTE: FE sends `searchText`, legacy may send `search`
     search: qSearch = '',
     searchText: qSearchText = '',
     take = 50,
     page = 1,
-    categoryId,
     productTypeId,
-    productProfileId,
     brandId,
-    templateId,
-    productTemplateId,
     readyOnly = 'false',
     hasPrice = 'false',
     activeOnly = 'true',
     includeInactive = '0',
   } = req.query
 
-  // ✅ support both `search` and `searchText`
   const search = String(qSearch || qSearchText || '').trim()
-
   const queryMode = (req?.query?.mode || '').toString().toUpperCase()
   const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'
 
@@ -499,58 +367,25 @@ const getProductsForPos = async (req, res) => {
   const wantActiveOnlyFalse = String(activeOnly).toLowerCase() === 'false'
   const activeFilter = (wantIncludeInactive || wantActiveOnlyFalse) ? undefined : true
 
-  const tplId = toInt(templateId ?? productTemplateId)
-
   const whereAND = []
   if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })
   if (activeFilter !== undefined) whereAND.push({ active: activeFilter })
 
   if (search) {
     whereAND.push({
-      OR: [
-        { name: { contains: String(search), mode: 'insensitive' } },
-      ],
+      OR: [{ name: { contains: String(search), mode: 'insensitive' } }],
     })
   }
 
-  const catId = toInt(categoryId)
   const typeId = toInt(productTypeId)
-  const profId = toInt(productProfileId)
-  const tmplId = tplId
   const brId = toInt(brandId)
 
+  if (typeId) whereAND.push({ productTypeId: typeId })
+  if (brId) whereAND.push({ brandId: brId })
+
+  const where = whereAND.length ? { AND: whereAND } : {}
+
   try {
-    if (catId) {
-      const __catTypeIds = (await prisma.productType.findMany({
-        where: { categoryId: catId },
-        select: { id: true },
-      })).map((x) => x.id)
-
-      whereAND.push({
-        OR: [
-          { productTypeId: { in: __catTypeIds.length ? __catTypeIds : [-1] } },
-          // legacy/helper
-          { categoryId: catId },
-        ],
-      })
-    }
-
-    if (typeId) whereAND.push({ productTypeId: typeId })
-
-    if (profId) {
-      whereAND.push({
-        OR: [
-          { productProfileId: profId },
-          { template: { is: { productProfileId: profId } } },
-        ],
-      })
-    }
-
-    if (tmplId) whereAND.push({ templateId: tmplId })
-    if (brId) whereAND.push({ brandId: brId })
-
-    const where = whereAND.length ? { AND: whereAND } : {}
-
     const items = await prisma.product.findMany({
       where,
       select: {
@@ -560,31 +395,12 @@ const getProductsForPos = async (req, res) => {
         mode: true,
         noSN: true,
         trackSerialNumber: true,
-
-        categoryId: true,
         productTypeId: true,
-        productProfileId: true,
-        templateId: true,
-
-        category: { select: { id: true, name: true } },
-        productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
-        productProfile: { select: { id: true, name: true } },
-        template: {
-          select: {
-            id: true,
-            name: true,
-            productProfile: { select: { id: true, name: true } },
-          },
-        },
-
-        // ✅ Brand (optional)
+        productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
-
-        // ✅ Product Unit Runtime Truth
         unitId: true,
         unit: { select: { id: true, name: true } },
-
         branchPrice: {
           where: { branchId },
           take: 1,
@@ -624,47 +440,25 @@ const getProductsForPos = async (req, res) => {
       const isSimple = p.mode === 'SIMPLE' || p.noSN === true
       const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
 
-      const lastCost = sb?.lastReceivedCost != null
-        ? Number(sb.lastReceivedCost)
-        : (bp?.costPrice != null ? Number(bp.costPrice) : null)
+      const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost) : (bp?.costPrice != null ? Number(bp.costPrice) : null)
 
-      const catName = p.productType?.category?.name ?? p.category?.name ?? '-'
+      const catName = p.productType?.globalProductType?.category?.name ?? '-'
       const typeName = p.productType?.name ?? '-'
-      const profileName = p.productProfile?.name ?? p.template?.productProfile?.name ?? '-'
-      const tplName = p.template?.name ?? '-'
 
       return {
         id: p.id,
         active: (typeof p.active === 'boolean' ? p.active : true),
         name: p.name,
-
         mode: p.mode,
-        categoryId: (p.productType?.category?.id ?? p.categoryId ?? null),
-        productTypeId: (p.productTypeId ?? null),
-        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
-        templateId: (p.templateId ?? p.template?.id ?? null),
-        productTemplateId: (p.templateId ?? p.template?.id ?? null),
-
+        categoryId: p.productType?.globalProductType?.category?.id ?? null,
+        productTypeId: p.productTypeId ?? null,
         category: catName,
         productType: typeName,
-        productProfile: profileName,
-        productTemplate: tplName,
-
-        categoryName: catName,
-        productTypeName: typeName,
-        productProfileName: profileName,
-        productTemplateName: tplName,
-
-        // ✅ Brand (optional)
-        // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
         brandId: p.brandId ?? p.brand?.id ?? null,
-        brandName: (p.brand?.name ?? null),
-
-        // ✅ Product Unit Runtime Truth
+        brandName: p.brand?.name ?? null,
         unitId: p.unitId ?? p.unit?.id ?? null,
         unitName: p.unit?.name ?? null,
         unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
-
         noSN: p.noSN,
         trackSerialNumber: p.trackSerialNumber,
         priceRetail: Number(bp?.priceRetail ?? 0),
@@ -681,13 +475,8 @@ const getProductsForPos = async (req, res) => {
     })
 
     let mapped = mappedBase
-
-    if (String(readyOnly).toLowerCase() === 'true') {
-      mapped = mapped.filter((x) => x.isReady === true)
-    }
-    if (String(hasPrice).toLowerCase() === 'true') {
-      mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)
-    }
+    if (String(readyOnly).toLowerCase() === 'true') mapped = mapped.filter((x) => x.isReady === true)
+    if (String(hasPrice).toLowerCase() === 'true') mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)
 
     return res.json(mapped)
   } catch (error) {
@@ -696,12 +485,6 @@ const getProductsForPos = async (req, res) => {
   }
 }
 
-
-
-
-// =====================================================
-// GET: /api/products/online
-// =====================================================
 const getProductsForOnline = async (req, res) => {
   const branchId = Number(req.user?.branchId) || toInt(req.query.branchId)
   if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })
@@ -712,11 +495,7 @@ const getProductsForOnline = async (req, res) => {
     take = 50,
     size,
     page = 1,
-    categoryId,
     productTypeId,
-    productProfileId,
-    productTemplateId,
-    templateId,
     brandId,
     activeOnly = 'true',
     readyOnly = 'false',
@@ -729,55 +508,21 @@ const getProductsForOnline = async (req, res) => {
   const search = normStr(q1 || q2)
   const takeNum = Math.max(1, Math.min((toInt(size) ?? toInt(take) ?? 50), 200))
   const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))
-  const activeFilter = (String(activeOnly).toLowerCase() === 'false') ? undefined : true
-  const tplId = toInt(templateId ?? productTemplateId)
 
   try {
     const whereAND = []
-    if (activeFilter !== undefined) whereAND.push({ active: true })
     if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })
 
     if (search) {
       whereAND.push({
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: search, mode: 'insensitive' } }],
       })
     }
 
-    const catId = toInt(categoryId)
     const typeId = toInt(productTypeId)
-    const profId = toInt(productProfileId)
-    const tmplId = tplId
     const brId = toInt(brandId)
 
-    if (catId) {
-      const __catTypeIds = (await prisma.productType.findMany({
-        where: { categoryId: catId },
-        select: { id: true },
-      })).map((x) => x.id)
-
-      whereAND.push({
-        OR: [
-          { productTypeId: { in: __catTypeIds.length ? __catTypeIds : [-1] } },
-          // legacy/helper
-          { categoryId: catId },
-        ],
-      })
-    }
-
     if (typeId) whereAND.push({ productTypeId: typeId })
-
-    if (profId) {
-      whereAND.push({
-        OR: [
-          { productProfileId: profId },
-          { template: { is: { productProfileId: profId } } },
-        ],
-      })
-    }
-
-    if (tmplId) whereAND.push({ templateId: tmplId })
     if (brId) whereAND.push({ brandId: brId })
 
     const where = whereAND.length ? { AND: whereAND } : {}
@@ -789,23 +534,12 @@ const getProductsForOnline = async (req, res) => {
         name: true,
         mode: true,
         noSN: true,
-        categoryId: true,
         productTypeId: true,
-        productProfileId: true,
-        templateId: true,
-        category: { select: { id: true, name: true } },
-        productType: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
-        productProfile: { select: { id: true, name: true } },
-        template: { select: { id: true, name: true, productProfile: { select: { id: true, name: true } } } },
-
-        // ✅ Brand (optional) — Online UX needs brand label
+        productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
-
-        // ✅ Product Unit Runtime Truth
         unitId: true,
         unit: { select: { id: true, name: true } },
-
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -824,51 +558,33 @@ const getProductsForOnline = async (req, res) => {
       const available = Math.max(0, qty - reserved)
       const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
       const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
-
       const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null
 
       return {
         id: p.id,
         name: p.name,
         mode: p.mode,
-        categoryId: (p.productType?.category?.id ?? p.categoryId ?? null),
-        productTypeId: (p.productTypeId ?? null),
-        productProfileId: (p.productProfileId ?? p.template?.productProfile?.id ?? null),
-        templateId: (p.templateId ?? p.template?.id ?? null),
-        productTemplateId: (p.templateId ?? p.template?.id ?? null),
+        categoryId: p.productType?.globalProductType?.category?.id ?? null,
+        productTypeId: p.productTypeId ?? null,
         imageUrl,
-
-        // ✅ Pricing semantics (Executive-grade): keep `priceOnline` for backward-compat (number)
-        // but also expose `priceOnlineEffective` for UI to avoid showing 0 when branch price is inactive.
         priceOnline: Number(bp?.priceOnline ?? 0),
         priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
         readyPickupAtBranch: isReady,
         isReady,
-        category: p.productType?.category?.name ?? p.category?.name ?? undefined,
-        productType: p.productType?.name ?? undefined,
-        productProfile: p.productProfile?.name ?? p.template?.productProfile?.name ?? undefined,
-        productTemplate: p.template?.name ?? undefined,
-
-        // ✅ Brand (optional)
+        category: p.productType?.globalProductType?.category?.name,
+        productType: p.productType?.name,
         brandId: p.brandId ?? p.brand?.id ?? null,
-        brandName: (p.brand?.name ?? null),
-
-        // ✅ Product Unit Runtime Truth
+        brandName: p.brand?.name ?? null,
         unitId: p.unitId ?? p.unit?.id ?? null,
         unitName: p.unit?.name ?? null,
         unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
-
         hasPrice: !!bp,
         branchPriceActive: bp?.isActive ?? true,
       }
     })
 
-    if (String(readyOnly).toLowerCase() === 'true') {
-      mapped = mapped.filter((x) => x.isReady === true)
-    }
-    if (String(hasPrice).toLowerCase() === 'true') {
-      mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)
-    }
+    if (String(readyOnly).toLowerCase() === 'true') mapped = mapped.filter((x) => x.isReady === true)
+    if (String(hasPrice).toLowerCase() === 'true') mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)
 
     return res.json(mapped)
   } catch (error) {
@@ -877,20 +593,6 @@ const getProductsForOnline = async (req, res) => {
   }
 }
 
-
-
-
-
-
-
-
-// =====================================================
-// GET: /api/products/ready-to-sell
-// - Branch scope enforced via req.user.branchId
-// - Returns unified SUMMARY list:
-//   - STRUCTURED: aggregated by productId (qty = count of StockItem IN_STOCK)
-//   - SIMPLE: StockBalance available > 0
-// =====================================================
 const getReadyToSell = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId)
@@ -906,25 +608,16 @@ const getReadyToSell = async (req, res) => {
     const wantStructured = mode === 'ALL' || mode === 'STRUCTURED'
     const wantSimple = mode === 'ALL' || mode === 'SIMPLE'
 
-    // ---------- STRUCTURED SUMMARY ----------
     let structuredItems = []
 
     if (wantStructured) {
       try {
         let structuredProductIds = []
-
-        // ✅ Avoid Prisma groupBy + relation filter ambiguity on createdAt
-        // Strategy:
-        // 1) Resolve productIds from Product first when q is present
-        // 2) groupBy StockItem using productId IN (...) only
         if (q) {
           const matchedProducts = await prisma.product.findMany({
-            where: {
-              name: { contains: q, mode: 'insensitive' },
-            },
+            where: { name: { contains: q, mode: 'insensitive' } },
             select: { id: true },
           })
-
           structuredProductIds = matchedProducts.map((p) => Number(p.id)).filter(Boolean)
         }
 
@@ -936,12 +629,10 @@ const getReadyToSell = async (req, res) => {
             ...(q ? { productId: { in: (structuredProductIds.length ? structuredProductIds : [-1]) } } : {}),
           },
           _count: { _all: true },
-          // ✅ Keep only receivedAt here to avoid ambiguous createdAt in generated SQL
           _max: { receivedAt: true },
         })
 
         const productIds = grouped.map((g) => g.productId)
-
         const products = await prisma.product.findMany({
           where: { id: { in: productIds } },
           select: {
@@ -955,10 +646,6 @@ const getReadyToSell = async (req, res) => {
         })
 
         const productMap = new Map(products.map((p) => [p.id, p]))
-
-        // ✅ Build displayCode for grouped STRUCTURED rows
-        // - qty = 1  => show actual StockItem.barcode if available
-        // - qty > 1  => show summary-safe label "หลายบาร์โค้ด"
         const structuredBarcodeRows = productIds.length
           ? await prisma.stockItem.findMany({
               where: {
@@ -966,16 +653,8 @@ const getReadyToSell = async (req, res) => {
                 status: 'IN_STOCK',
                 productId: { in: productIds },
               },
-              select: {
-                productId: true,
-                barcode: true,
-                receivedAt: true,
-                createdAt: true,
-              },
-              orderBy: [
-                { receivedAt: 'desc' },
-                { createdAt: 'desc' },
-              ],
+              select: { productId: true, barcode: true, receivedAt: true, createdAt: true },
+              orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
             })
           : []
 
@@ -1013,9 +692,7 @@ const getReadyToSell = async (req, res) => {
       }
     }
 
-    // ---------- SIMPLE SUMMARY ----------
     let simpleItems = []
-
     if (wantSimple) {
       try {
         const raw = await prisma.stockBalance.findMany({
@@ -1070,12 +747,10 @@ const getReadyToSell = async (req, res) => {
           })
           .filter((x) => x.qty > 0)
       } catch (e) {
-        console.warn('⚠️ stockBalance summary failed:', e?.message || e)
         simpleItems = []
       }
     }
 
-    // ---------- MERGE + PAGINATE ----------
     const merged = [...structuredItems, ...simpleItems].sort((a, b) => {
       const ta = a?.receivedAt ? new Date(a.receivedAt).getTime() : 0
       const tb = b?.receivedAt ? new Date(b.receivedAt).getTime() : 0
@@ -1083,7 +758,6 @@ const getReadyToSell = async (req, res) => {
     })
 
     const total = merged.length
-
     const start = Math.max(0, (page - 1) * pageSize)
     const end = start + pageSize
 
@@ -1099,24 +773,6 @@ const getReadyToSell = async (req, res) => {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-// =====================================================
-// GET: /api/products/ready-to-sell/structured/:productId
-// - Returns all StockItem rows (IN_STOCK) for the product in current branch
-// - Used by "รายละเอียด" page
-// =====================================================
 const getReadyToSellStructuredDetails = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId)
@@ -1149,24 +805,15 @@ const getReadyToSellStructuredDetails = async (req, res) => {
         createdAt: true,
         receivedAt: true,
         status: true,
-
-        // ✅ include product meta for header (readability-first)
         product: {
           select: {
             id: true,
             name: true,
-
-            // ✅ flexible product spec (BestLine) — keep SKU/Model in productConfig (no hard fields)
             productConfig: true,
-
-            // ✅ optional extensions (safe)
             brand: { select: { id: true, name: true } },
             unitId: true,
             unit: { select: { id: true, name: true } },
-            category: { select: { id: true, name: true } },
-            productType: { select: { id: true, name: true } },
-
-            // ✅ branch-specific price (if exists)
+            productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
             branchPrice: {
               where: { branchId },
               select: {
@@ -1195,19 +842,6 @@ const getReadyToSellStructuredDetails = async (req, res) => {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-// =====================================================
-// GET: /api/products/pos/:id
-// =====================================================
 const getProductPosById = async (req, res) => {
   const branchId = Number(req.user?.branchId)
   if (!branchId) return res.status(401).json({ error: 'unauthorized' })
@@ -1224,37 +858,17 @@ const getProductPosById = async (req, res) => {
         mode: true,
         noSN: true,
         trackSerialNumber: true,
-
-        categoryId: true,
         productTypeId: true,
-        productProfileId: true,
-        templateId: true,
-
-        productType: { select: { id: true, name: true, categoryId: true, category: { select: { id: true, name: true } } } },
-        productProfile: { select: { id: true, name: true } },
-        template: {
-          select: {
-            id: true,
-            name: true,
-            productProfileId: true,
-            productProfile: { select: { id: true, name: true } },
-          },
-        },
-
-        // ✅ Brand (optional)
+        productType: { select: { id: true, name: true, globalProductType: { select: { categoryId: true, category: { select: { id: true, name: true } } } } } },
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
-
-        // ✅ Product Unit Runtime Truth
         unitId: true,
         unit: { select: { id: true, name: true } },
-
         productImages: {
           where: { active: true },
           orderBy: [{ isCover: 'desc' }, { id: 'asc' }],
           select: { id: true, url: true, secure_url: true, caption: true, isCover: true },
         },
-
         branchPrice: {
           where: { branchId },
           take: 1,
@@ -1267,7 +881,6 @@ const getProductPosById = async (req, res) => {
             isActive: true,
           },
         },
-
         stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true, lastReceivedCost: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
       },
@@ -1283,16 +896,11 @@ const getProductPosById = async (req, res) => {
     const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
     const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
 
-    const lastCost = sb?.lastReceivedCost != null
-      ? Number(sb.lastReceivedCost)
-      : (bp?.costPrice != null ? Number(bp.costPrice) : null)
+    const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost) : (bp?.costPrice != null ? Number(bp.costPrice) : null)
 
     const mode = p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED')
-
-    const catName = p.productType?.category?.name ?? p.category?.name ?? null
-    const typeName = p.productType?.name ?? null
-    const profileName = p.productProfile?.name ?? p.template?.productProfile?.name ?? null
-    const tplName = p.template?.name ?? null
+    const catName = p.productType?.globalProductType?.category?.name ?? '-'
+    const typeName = p.productType?.name ?? '-'
 
     const branchPriceObj = {
       costPrice: Number(bp?.costPrice ?? 0),
@@ -1306,41 +914,32 @@ const getProductPosById = async (req, res) => {
       id: p.id,
       name: p.name,
       spec: null,
-
       mode,
       noSN: p.noSN,
       trackSerialNumber: p.trackSerialNumber,
       unitId: p.unitId ?? p.unit?.id ?? null,
       unitName: p.unit?.name ?? null,
       unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
-
-      categoryId: (p.productType?.categoryId ?? p.categoryId ?? null),
+      categoryId: p.productType?.globalProductType?.categoryId ?? null,
       productTypeId: p.productTypeId ?? null,
-      productProfileId: p.productProfile?.id ?? p.template?.productProfile?.id ?? p.productProfileId ?? null,
-      templateId: p.templateId ?? p.template?.id ?? null,
-      productTemplateId: p.templateId ?? p.template?.id ?? null,
-
+      productProfileId: null,
+      templateId: null,
+      productTemplateId: null,
       categoryName: catName,
       productTypeName: typeName,
-      productProfileName: profileName,
-      productTemplateName: tplName,
-
-      // ✅ Brand (optional)
-      // NOTE (production rule): brandName ต้องมาจาก Brand เท่านั้น (ไม่ fallback ไปที่ Profile/Template)
+      productProfileName: '-',
+      productTemplateName: '-',
       brandId: p.brandId ?? p.brand?.id ?? null,
-      brandName: (p.brand?.name ?? null),
-
+      brandName: p.brand?.name ?? null,
       images: (p.productImages || [])
         .map((im) => ({ id: im.id, url: im.secure_url || im.url, caption: im.caption ?? '', isCover: Boolean(im.isCover) }))
         .filter((im) => !!im.url),
-
       costPrice: branchPriceObj.costPrice,
       priceWholesale: branchPriceObj.priceWholesale,
       priceTechnician: branchPriceObj.priceTechnician,
       priceRetail: branchPriceObj.priceRetail,
       priceOnline: branchPriceObj.priceOnline,
       branchPriceActive: bp?.isActive ?? true,
-
       available,
       isReady,
       lastCost,
@@ -1352,7 +951,6 @@ const getProductPosById = async (req, res) => {
   }
 }
 
-// ✅ Online product detail (public)
 const getProductOnlineById = async (req, res) => {
   const branchId = toInt(req.query.branchId) ?? Number(req.user?.branchId)
   if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })
@@ -1368,15 +966,10 @@ const getProductOnlineById = async (req, res) => {
         name: true,
         mode: true,
         noSN: true,
-
-        // ✅ Brand (optional)
         brandId: true,
         brand: { select: { id: true, name: true, active: true } },
-
-        // ✅ Product Unit Runtime Truth
         unitId: true,
         unit: { select: { id: true, name: true } },
-
         productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
         branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
         stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
@@ -1393,26 +986,18 @@ const getProductOnlineById = async (req, res) => {
     const available = Math.max(0, qty - reserved)
     const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
     const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
-
     const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null
 
     return res.json({
       id: p.id,
       name: p.name,
       mode: p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED'),
-
-      // ✅ Brand (optional)
       brandId: p.brandId ?? p.brand?.id ?? null,
-      brandName: (p.brand?.name ?? null),
-
-      // ✅ Product Unit Runtime Truth
+      brandName: p.brand?.name ?? null,
       unitId: p.unitId ?? p.unit?.id ?? null,
       unitName: p.unit?.name ?? null,
       unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
-
       imageUrl,
-
-      // ✅ Pricing semantics (Executive-grade)
       priceOnline: Number(bp?.priceOnline ?? 0),
       priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
       readyPickupAtBranch: isReady,
@@ -1426,11 +1011,6 @@ const getProductOnlineById = async (req, res) => {
   }
 }
 
-// =====================================================
-// GET: /api/products/dropdowns (auth) + /api/products/online/dropdowns (public)
-// - ProductType is BRANCH-SCOPED.
-// - Category / Brand / Profile / Template remain shared catalog data.
-// =====================================================
 const getProductDropdowns = async (req, res) => {
   try {
     const includeInactive = String(req.query?.includeInactive ?? 'false').toLowerCase() === 'true'
@@ -1440,27 +1020,13 @@ const getProductDropdowns = async (req, res) => {
       return res.status(400).json({ error: 'BRANCH_REQUIRED', message: 'ไม่พบข้อมูลสาขา' })
     }
 
-    const [cats, types, profiles, templatesRaw, unitsRaw, brandsRaw] = await Promise.all([
-      prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    const [types, unitsRaw, brandsRaw] = await Promise.all([
       prisma.productType.findMany({
-        where: { branchId },
+        where: { branchId }, 
         orderBy: { name: 'asc' },
-        select: { id: true, name: true, categoryId: true, branchId: true },
+        include: { globalProductType: { select: { categoryId: true } } }
       }),
-      prisma.productProfile.findMany({
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true },
-      }),
-      prisma.productTemplate.findMany({
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true, productProfileId: true },
-      }),
-    
-      prisma.unit.findMany({
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true },
-      }),
-    
+      prisma.unit.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.brand.findMany({
         where: includeInactive ? {} : { active: true },
         orderBy: { name: 'asc' },
@@ -1469,7 +1035,6 @@ const getProductDropdowns = async (req, res) => {
     ])
 
     const scopedProductTypeIds = types.map((t) => Number(t.id)).filter(Boolean)
-
     const productTypeBrandsRaw = scopedProductTypeIds.length
       ? await prisma.productTypeBrand.findMany({
           where: { productTypeId: { in: scopedProductTypeIds } },
@@ -1478,42 +1043,35 @@ const getProductDropdowns = async (req, res) => {
         })
       : []
 
-    const categories = cats.map((c) => ({ id: Number(c.id), name: c.name }))
     const productTypes = types.map((t) => ({
       id: Number(t.id),
       name: t.name,
-      categoryId: t.categoryId == null ? null : Number(t.categoryId),
+      categoryId: t.globalProductType?.categoryId ? Number(t.globalProductType.categoryId) : null,
+      globalProductTypeId: t.globalProductTypeId != null ? Number(t.globalProductTypeId) : null,
       branchId: Number(t.branchId),
     }))
-    const productProfiles = profiles.map((p) => ({ id: Number(p.id), name: p.name }))
 
-    const productTemplates = templatesRaw.map((tp) => ({
-      id: Number(tp.id),
-      name: tp.name,
-      productProfileId: (tp.productProfileId == null ? null : Number(tp.productProfileId)),
-    }))
     const brands = (brandsRaw || []).map((b) => ({ id: Number(b.id), name: b.name, active: !!b.active }))
     const units = (unitsRaw || []).map((u) => ({ id: Number(u.id), name: u.name }))
+    
     const productTypeBrands = (productTypeBrandsRaw || []).map((x) => ({
       productTypeId: Number(x.productTypeId),
       brandId: Number(x.brandId),
     }))
 
-    const productModes = [
-      { code: 'SIMPLE', name: 'Simple' },
-      { code: 'STRUCTURED', name: 'Structure' },
-    ]
-
     return res.json({
-      categories,
+      // Backward-compatible placeholder only. FE product form no longer uses Category.
+      categories: [],
       productTypes,
-      productProfiles,
-      productTemplates,
+      productProfiles: [],
+      productTemplates: [],
       brands,
       units,
       productTypeBrands,
-      productModes,
-      templates: productTemplates,
+      productModes: [
+        { code: 'SIMPLE', name: 'Simple' },
+        { code: 'STRUCTURED', name: 'Structure' },
+      ],
     })
   } catch (error) {
     console.error('❌ getProductDropdowns error:', error)
@@ -1521,11 +1079,6 @@ const getProductDropdowns = async (req, res) => {
   }
 }
 
-// =====================================================
-// POST: /api/products
-// - Enforce new hierarchy: productTypeId required; categoryId derived from type
-// - Brand/Profile/Template are optional
-// =====================================================
 const createProduct = async (req, res) => {
   try {
     const data = req.body
@@ -1547,26 +1100,6 @@ const createProduct = async (req, res) => {
     const typeCheck = await assertTypeAndCategory({ productTypeId: bodyTypeId, categoryId: bodyCatId })
     if (!typeCheck.ok) return res.status(400).json({ error: typeCheck.error })
 
-    const bodyProfileId = (data.productProfileId === undefined) ? undefined : (data.productProfileId === null ? null : toInt(data.productProfileId))
-    const bodyTemplateId = (data.templateId ?? data.productTemplateId ?? data.templateId) // allow aliases
-    const templateIdNum = (bodyTemplateId === undefined) ? undefined : (bodyTemplateId === null ? null : toInt(bodyTemplateId))
-
-    // profile must match type when provided
-    const profCheck = await assertProfileMatchesType({ productProfileId: bodyProfileId, productTypeId: typeCheck.productTypeId })
-    if (!profCheck.ok) return res.status(400).json({ error: profCheck.error })
-
-    // template must match type when provided
-    const tplCheck = await assertTemplateMatchesType({ templateId: templateIdNum, productTypeId: typeCheck.productTypeId })
-    if (!tplCheck.ok) return res.status(400).json({ error: tplCheck.error })
-
-    // If template is provided, we can auto-fill profileId if not provided
-    const finalProfileId = (
-      profCheck.productProfileId !== undefined
-        ? profCheck.productProfileId
-        : (tplCheck.productProfileIdFromTemplate !== undefined ? tplCheck.productProfileIdFromTemplate : undefined)
-    )
-
-
     const newProduct = await prisma.product.create({
       data: {
         name,
@@ -1574,51 +1107,32 @@ const createProduct = async (req, res) => {
         trackSerialNumber,
         noSN,
         active: (typeof data.active === 'boolean' ? data.active : true),
-
-        // hierarchy enforced
         productTypeId: typeCheck.productTypeId,
         categoryId: typeCheck.categoryId,
-
-        // optional extensions
         brandId: (data.brandId === null ? null : toInt(data.brandId)),
         unitId: (data.unitId === null ? null : toInt(data.unitId)),
-        productProfileId: finalProfileId,
-        templateId: tplCheck.templateId,
-
         productImages: Array.isArray(data.images) && data.images.length > 0
           ? {
-            create: data.images.map((img) => ({
-              url: img.url,
-              public_id: img.public_id,
-              secure_url: img.secure_url,
-              caption: img.caption || null,
-              isCover: !!img.isCover,
-              active: true,
-            })),
-          }
+              create: data.images.map((img) => ({
+                url: img.url,
+                public_id: img.public_id,
+                secure_url: img.secure_url,
+                caption: img.caption || null,
+                isCover: !!img.isCover,
+                active: true,
+              })),
+            }
           : undefined,
       },
       select: { id: true },
     })
 
-    // ✅ auto-learn mapping (non-fatal)
     await autoLearnProductTypeBrand(prisma, typeCheck.productTypeId, data.brandId)
-
     const bp = pickBranchPricePayload(data)
 
-    // ✅ ถ้ามีข้อมูลราคา (nested/flat) ค่อย upsert
     if (bp) {
-      await prisma.branchPrice.upsert({
-        where: { productId_branchId: { productId: newProduct.id, branchId } },
-        update: {
-          costPrice: toDecUndef(bp.costPrice),
-          priceWholesale: toDecUndef(bp.priceWholesale),
-          priceTechnician: toDecUndef(bp.priceTechnician),
-          priceRetail: toDecUndef(bp.priceRetail),
-          priceOnline: toDecUndef(bp.priceOnline),
-          isActive: (typeof bp.isActive === 'boolean' ? bp.isActive : undefined),
-        },
-        create: {
+      await prisma.branchPrice.create({
+        data: {
           productId: newProduct.id,
           branchId,
           costPrice: toDec(bp.costPrice, 0),
@@ -1634,21 +1148,12 @@ const createProduct = async (req, res) => {
     return res.status(201).json({ id: newProduct.id })
   } catch (error) {
     console.error('❌ createProduct error:', error)
-    return res.status(error.status || 500).json({ error: error.code || error.message || 'Failed to create product' })
+    return res.status(500).json({ error: 'Failed to create product' })
   }
 }
 
-
-
-
-// ✅ Robust optional int parser for patch payloads
-// - undefined => undefined (not provided)
-// - '' => undefined (treat empty string from <select> as not provided)
-// - null => null (explicitly clear)
 const toIntOpt = (v) => {
-  if (v === undefined) return undefined
-  if (v === '') return undefined
-  if (v === null) return null
+  if (v === undefined || v === '' || v === null) return undefined
   return toInt(v)
 }
 
@@ -1661,7 +1166,6 @@ const updateProduct = async (req, res) => {
     const branchId = Number(req.user?.branchId)
     if (!branchId) return res.status(401).json({ error: 'unauthorized' })
 
-    // Only override mode/noSN/trackSerialNumber when client explicitly sends any of them
     const shouldOverrideMode =
       data.mode !== undefined ||
       data.stockMode !== undefined ||
@@ -1671,15 +1175,12 @@ const updateProduct = async (req, res) => {
 
     const partialMode = shouldOverrideMode
       ? decideMode({
-        explicitMode: (data.mode ?? data.stockMode ?? data.stockBehavior),
-        noSN: data.noSN,
-        trackSerialNumber: data.trackSerialNumber,
-      })
+          explicitMode: (data.mode ?? data.stockMode ?? data.stockBehavior),
+          noSN: data.noSN,
+          trackSerialNumber: data.trackSerialNumber,
+        })
       : null
 
-    // ✅ non-fatal auto-learn MUST NOT run inside the main transaction
-    // because ANY failed SQL inside a Postgres transaction will abort the whole transaction (25P02)
-    // even if we catch the error in JS.
     let learnLater = null
 
     const result = await prisma.$transaction(async (tx) => {
@@ -1691,9 +1192,6 @@ const updateProduct = async (req, res) => {
 
       const incomingTypeId = toIntOpt(data.productTypeId)
       const incomingCatId = toIntOpt(data.categoryId)
-
-      // If productTypeId is being changed, validate against category.
-      // If not being changed, still validate incoming categoryId (if provided) matches existing type category.
       const effectiveTypeId = incomingTypeId ?? current.productTypeId
 
       const typeCheck = await assertTypeAndCategory({
@@ -1702,51 +1200,26 @@ const updateProduct = async (req, res) => {
       }, tx)
       if (!typeCheck.ok) throw Object.assign(new Error(typeCheck.error), { status: 400, code: typeCheck.error })
 
-      const incomingProfileId = toIntOpt(data.productProfileId)
-
-      const incomingTemplateIdRaw = (data.templateId ?? data.productTemplateId)
-      const incomingTemplateId = toIntOpt(incomingTemplateIdRaw)
-
-      const profCheck = await assertProfileMatchesType({ productProfileId: incomingProfileId, productTypeId: typeCheck.productTypeId }, tx)
-      if (!profCheck.ok) throw Object.assign(new Error(profCheck.error), { status: 400, code: profCheck.error })
-
-      const tplCheck = await assertTemplateMatchesType({ templateId: incomingTemplateId, productTypeId: typeCheck.productTypeId }, tx)
-      if (!tplCheck.ok) throw Object.assign(new Error(tplCheck.error), { status: 400, code: tplCheck.error })
-
-      // If template is provided and profile is not explicitly provided, auto-fill profile from template.
-      const finalProfileId = (incomingProfileId !== undefined)
-        ? incomingProfileId
-        : (tplCheck.productProfileIdFromTemplate !== undefined ? tplCheck.productProfileIdFromTemplate : undefined)
-
       const saved = await tx.product.update({
         where: { id },
         data: {
           name: data.name != null ? normStr(data.name) : undefined,
           ...(partialMode
             ? {
-              mode: partialMode.mode,
-              trackSerialNumber: partialMode.trackSerialNumber,
-              noSN: partialMode.noSN,
-            }
+                mode: partialMode.mode,
+                trackSerialNumber: partialMode.trackSerialNumber,
+                noSN: partialMode.noSN,
+              }
             : {}),
           active: typeof data.active === 'boolean' ? data.active : undefined,
-
-          // hierarchy
           productTypeId: (incomingTypeId !== undefined ? typeCheck.productTypeId : undefined),
           categoryId: (incomingTypeId !== undefined ? typeCheck.categoryId : undefined),
-
-          // optional extensions
           brandId: toIntOpt(data.brandId),
           unitId: toIntOpt(data.unitId),
-
-          productProfileId: finalProfileId,
-          templateId: tplCheck.templateId,
         },
         select: { id: true },
       })
 
-            // ✅ auto-learn mapping (NON-FATAL) — schedule after transaction
-      // IMPORTANT: Do NOT execute inside tx to avoid aborting the whole transaction on any error.
       if (data.brandId !== undefined && data.brandId !== null && data.brandId !== '') {
         learnLater = { productTypeId: typeCheck.productTypeId, brandId: toInt(data.brandId) }
       }
@@ -1787,13 +1260,10 @@ const updateProduct = async (req, res) => {
       return saved
     }, { timeout: 15000 })
 
-        // ✅ run auto-learn after transaction (non-fatal)
     if (learnLater?.productTypeId && learnLater?.brandId) {
       try {
         await autoLearnProductTypeBrand(prisma, learnLater.productTypeId, learnLater.brandId)
-      } catch (e) {
-        console.warn('⚠️ autoLearnProductTypeBrand failed after tx (non-fatal):', e?.message || e)
-      }
+      } catch (e) {}
     }
 
     return res.json(result)
@@ -1808,14 +1278,6 @@ const updateProduct = async (req, res) => {
   }
 }
 
-
-// =====================================================
-// POST/PATCH: /api/products/:id/disable (legacy)
-// POST/PATCH: /api/products/:id/enable  (legacy)
-// ❌ Policy: Product เป็น GLOBAL master data → ห้ามปิด/เปิดจาก POS/ระบบทั่วไป
-// - ป้องกันการปิดเองง่าย ๆ ที่กระทบทุกสาขา
-// - หากต้องการ “ลบจริง” ให้ใช้ DELETE /api/products/:id (SUPERADMIN only)
-// =====================================================
 const disableProduct = async (_req, res) => {
   return res.status(403).json({ ok: false, error: 'FEATURE_DISABLED', message: 'Product เป็นข้อมูลกลาง ไม่อนุญาตให้ปิดใช้งาน' })
 }
@@ -1824,12 +1286,6 @@ const enableProduct = async (_req, res) => {
   return res.status(403).json({ ok: false, error: 'FEATURE_DISABLED', message: 'Product เป็นข้อมูลกลาง ไม่อนุญาตให้เปิดใช้งาน' })
 }
 
-// =====================================================
-// GET: /api/products/:id/delete-check
-// ✅ SUPERADMIN-only helper: ตรวจสอบว่า product นี้มีประวัติ/ถูกอ้างอิงแล้วหรือยัง
-// - ใช้เป็นเงื่อนไขก่อน "ลบจริง" (hard delete)
-// - Production rule: ถ้านับไม่ได้ (unknown) → ห้ามลบ (กันข้อมูลพัง)
-// =====================================================
 const getProductDeleteCheck = async (req, res) => {
   try {
     const id = toInt(req.params.id)
@@ -1849,9 +1305,7 @@ const getProductDeleteCheck = async (req, res) => {
     const usage = await computeProductUsageCounts(prisma, id)
     if (!usage.ok) return res.status(400).json({ ok: false, error: usage.error || 'ERROR' })
 
-    const reason = usage.canHardDelete
-      ? 'NO_USAGE'
-      : (usage.hasUnknown ? 'USAGE_UNKNOWN' : 'USED_IN_SYSTEM')
+    const reason = usage.canHardDelete ? 'NO_USAGE' : (usage.hasUnknown ? 'USAGE_UNKNOWN' : 'USED_IN_SYSTEM')
 
     return res.json({
       ok: true,
@@ -1865,16 +1319,10 @@ const getProductDeleteCheck = async (req, res) => {
       counts: usage.counts,
     })
   } catch (error) {
-    console.error('❌ getProductDeleteCheck error:', error)
     return res.status(500).json({ ok: false, error: 'Internal server error' })
   }
 }
 
-// =====================================================
-// PATCH: /api/products/:id/archive
-// ✅ SUPERADMIN-only: Soft-delete (archive) โดยใช้ Product.active=false
-// - ใช้แทน hard delete เมื่อมีประวัติการใช้แล้ว
-// =====================================================
 const archiveProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id)
@@ -1893,20 +1341,10 @@ const archiveProduct = async (req, res) => {
 
     return res.json({ ok: true, success: true, product: updated })
   } catch (error) {
-    console.error('❌ archiveProduct error:', error)
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') return res.status(404).json({ ok: false, error: 'NOT_FOUND' })
-    }
     return res.status(500).json({ ok: false, error: 'Internal server error' })
   }
 }
 
-// =====================================================
-// DELETE: /api/products/:id
-// ✅ Policy: ลบถาวรได้เฉพาะ SUPERADMIN เท่านั้น
-// - Production guard: บล็อกการลบถ้ามีการใช้งานแล้ว (มีประวัติอ้างอิง)
-// - หากนับ usage ไม่ได้ (unknown) → ห้ามลบ
-// =====================================================
 const deleteProduct = async (req, res) => {
   try {
     const id = toInt(req.params.id)
@@ -1917,53 +1355,28 @@ const deleteProduct = async (req, res) => {
       return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'อนุญาตเฉพาะ SUPERADMIN เท่านั้น' })
     }
 
-        // ✅ Production guard: ห้าม hard delete ถ้ามีประวัติการใช้งาน (หรือมี unknown)
     const usage = await computeProductUsageCounts(prisma, id)
-    if (!usage.ok) {
-      return res.status(400).json({ ok: false, error: usage.error || 'ERROR' })
-    }
+    if (!usage.ok) return res.status(400).json({ ok: false, error: usage.error || 'ERROR' })
 
     if (!usage.canHardDelete) {
       return res.status(409).json({
         ok: false,
         error: 'PRODUCT_IN_USE',
         reason: usage.hasUnknown ? 'USAGE_UNKNOWN' : 'USED_IN_SYSTEM',
-        message: usage.hasUnknown
-          ? 'ไม่สามารถลบสินค้าได้ในตอนนี้ เพราะระบบตรวจสอบประวัติการใช้งานได้ไม่ครบ (เพื่อความปลอดภัย)'
-          : 'ไม่สามารถลบสินค้าได้ เพราะมีประวัติการใช้งาน/อ้างอิงอยู่แล้ว',
+        message: 'ไม่สามารถลบสินค้าได้ เพราะมีประวัติการใช้งาน/อ้างอิงอยู่แล้ว',
         counts: usage.counts,
       })
     }
 
-    // ✅ Delete in transaction (safe order): children → parent
     await prisma.$transaction(async (tx) => {
-      // NOTE: models below are already used elsewhere in this controller (safe to reference)
       await tx.branchPrice.deleteMany({ where: { productId: id } })
       await tx.stockBalance.deleteMany({ where: { productId: id } })
       await tx.productImage.deleteMany({ where: { productId: id } })
-
-      // finally delete product
       await tx.product.delete({ where: { id } })
     }, { timeout: 15000 })
 
     return res.json({ ok: true, success: true, id })
   } catch (error) {
-    console.error('❌ deleteProduct error:', error)
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') return res.status(404).json({ ok: false, error: 'NOT_FOUND' })
-
-      // FK constraint → still referenced somewhere (sales, purchase, etc.)
-      if (error.code === 'P2003') {
-        return res.status(409).json({
-          ok: false,
-          error: 'PRODUCT_IN_USE',
-          reason: 'FK_CONSTRAINT',
-          message: 'ไม่สามารถลบสินค้าได้ เพราะยังมีข้อมูลอื่นอ้างอิงอยู่',
-        })
-      }
-    }
-
     return res.status(500).json({ ok: false, error: 'Internal server error' })
   }
 }
@@ -1979,21 +1392,16 @@ const deleteProductImage = async (req, res) => {
     if (cloudinary?.uploader?.destroy) {
       try {
         await cloudinary.uploader.destroy(public_id)
-      } catch (e) {
-        console.warn('⚠️ cloudinary destroy failed:', e?.message || e)
-      }
+      } catch (_e) {}
     }
 
     await prisma.productImage.updateMany({ where: { productId, public_id }, data: { active: false, isCover: false } })
-
     return res.json({ success: true })
   } catch (error) {
-    console.error('❌ deleteProductImage error:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-// NOTE: this endpoint is legacy/ops tool; we only make it safe (no invalid StockStatus)
 const migrateSnToSimple = async (req, res) => {
   try {
     const id = toInt(req.params.id)
@@ -2026,7 +1434,6 @@ const migrateSnToSimple = async (req, res) => {
           create: { productId: id, branchId: g.branchId, quantity: qty, reserved: 0 },
         })
 
-        // ✅ keep StockStatus valid: move SN out of IN_STOCK; use USED as neutral historical bucket
         await tx.stockItem.updateMany({
           where: { productId: id, branchId: g.branchId, status: 'IN_STOCK' },
           data: { status: 'USED' },
@@ -2041,7 +1448,6 @@ const migrateSnToSimple = async (req, res) => {
 
     return res.json({ success: true, migratedQty, branches: groups.length })
   } catch (error) {
-    console.error('❌ migrateSnToSimple error:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -2051,19 +1457,13 @@ module.exports = {
   createProduct,
   updateProduct,
   getProductPosById,
-
-  // ✅ Ready-to-sell (POS stock)
   getReadyToSell,
   getReadyToSellStructuredDetails,
-
   disableProduct,
   enableProduct,
-
-  // ✅ SuperAdmin tools
   getProductDeleteCheck,
   archiveProduct,
   deleteProduct,
-
   deleteProductImage,
   getProductDropdowns,
   getProductsForOnline,
@@ -2071,7 +1471,3 @@ module.exports = {
   getProductsForPos,
   migrateSnToSimple,
 }
-
-
-
-

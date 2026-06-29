@@ -70,6 +70,10 @@ const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 
+// 🟢 FIXED: แก้ตำแหน่งเพื่อให้เข้าถึงโฟลเดอร์ src/modules ได้อย่างถูกต้องตามรูปโครงสร้างในเครื่อง
+const quickStockRoutes = require('./src/modules/quickStock/routes/quickStockRoutes');
+
+
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
 try {
@@ -181,6 +185,8 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
+app.use('/api/quick-stock', quickStockRoutes);
+
 // Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
 // Backward-compat (old path)
@@ -208,6 +214,7 @@ app.use('/api/locations', locationsRoutes);
 app.use('/api/receipts/simple', receiptSimpleRoutes);
 app.use('/api/po-receipts/simple', purchaseOrderReceiptSimpleRoutes);
 app.use('/api/quick-receipts', quickReceiptRoutes);
+
 
 if (simpleStockRoutes) {
   app.use('/api/simple', simpleStockRoutes);

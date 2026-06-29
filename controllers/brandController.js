@@ -1,12 +1,13 @@
-
-
-
 // controllers/brandController.js — Prisma singleton + validations + safer errors
 
 const { prisma, Prisma } = require('../lib/prisma')
 
 // ===== helpers =====
-const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v))
+const toInt = (v) => {
+  if (v === undefined || v === null || v === '') return undefined
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
 
 const normalizeName = (name) => String(name || '').trim()
 
@@ -63,8 +64,8 @@ exports.listBrands = async (req, res) => {
 // GET /brands/dropdowns?includeInactive=false&q=...&productTypeId=123
 // - For dropdown usage (no pagination)
 // - Returns array only (lighter payload)
-// - Assistive filter by productTypeId (auto-learn mapping)
-//   - If mapping exists for productTypeId → filter brands by mapping
+// - Assistive filter by productTypeId:
+//   - If mapping exists for productTypeId → filter brands by ProductTypeBrand mapping
 //   - If mapping does NOT exist yet → fallback to all brands (avoid blocking user)
 exports.listBrandDropdowns = async (req, res) => {
   try {
@@ -79,17 +80,18 @@ exports.listBrandDropdowns = async (req, res) => {
 
     let where = whereBase
 
-    // ✅ Assistive filter: only apply when mapping exists
+    // ✅ Current Prisma relation name:
+    // Brand.productTypeBrands -> ProductTypeBrand[]
+    // ❌ old/invalid: Brand.typeBrands
     if (productTypeId) {
       const mapCount = await prisma.productTypeBrand.count({
         where: { productTypeId: Number(productTypeId) },
       })
 
       if (mapCount > 0) {
-        // Requires Prisma back-relation: Brand.typeBrands -> ProductTypeBrand[]
         where = {
           ...whereBase,
-          typeBrands: {
+          productTypeBrands: {
             some: { productTypeId: Number(productTypeId) },
           },
         }
@@ -103,7 +105,6 @@ exports.listBrandDropdowns = async (req, res) => {
       select: { id: true, name: true, active: true },
     })
 
-    // Return array only (as contract for dropdown)
     return res.json(items)
   } catch (err) {
     return sendError(res, err, 'เกิดข้อผิดพลาดในการดึงข้อมูลแบรนด์สำหรับ dropdown')
@@ -196,9 +197,3 @@ exports.toggleBrand = async (req, res) => {
     return sendError(res, err, 'ไม่สามารถเปลี่ยนสถานะแบรนด์ได้')
   }
 }
-
-
-
-
-
-

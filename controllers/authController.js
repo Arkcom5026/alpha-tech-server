@@ -72,25 +72,15 @@ const getRefreshTokenExpiresIn = (rememberMe = false) => (
   rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER_ME : REFRESH_TOKEN_EXPIRES_DEFAULT
 );
 
-const getRefreshCookieOptions = (rememberMe = false) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const maxAgeSource = getRefreshTokenExpiresIn(rememberMe);
-  let maxAgeMs;
-
-  if (/^[0-9]+d$/.test(maxAgeSource)) {
-    maxAgeMs = Number(maxAgeSource.replace('d', '')) * 24 * 60 * 60 * 1000;
-  } else if (/^[0-9]+h$/.test(maxAgeSource)) {
-    maxAgeMs = Number(maxAgeSource.replace('h', '')) * 60 * 60 * 1000;
-  }
-
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
-    path: '/api/auth',
-    ...(maxAgeMs ? { maxAge: maxAgeMs } : {}),
-  };
-};
+const getRefreshCookieOptions = (rememberMe = false) => ({
+  httpOnly: true,
+  secure: false,
+  sameSite: 'lax',
+  path: '/api/auth',
+  maxAge: rememberMe
+    ? 7 * 24 * 60 * 60 * 1000
+    : 24 * 60 * 60 * 1000,
+});
 
 const getRefreshTokenExpiresAt = (rememberMe = false) => {
   const expiresIn = getRefreshTokenExpiresIn(rememberMe);
@@ -383,6 +373,7 @@ const register = async (req, res) => {
     return res.status(500).json({ ok: false, error: err?.message || 'ระบบหลังบ้านขัดข้อง กรุณาลองใหม่อีกครั้ง' });
   }
 };
+
 
 const login = async (req, res, next) => {
   if (!global.__bcryptProviderLogged) {
