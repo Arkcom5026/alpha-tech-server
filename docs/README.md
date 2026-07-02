@@ -6,6 +6,7 @@
 - [Backend Runtime Map](./backend/RUNTIME_MAP.md)
 - [Stock / Procurement / Sales Domain Map](./backend/DOMAIN_MAP_STOCK_PROCUREMENT_SALES.md)
 - [Backend Migration Map](./backend/MIGRATION_MAP.md)
+- [Backend Mission Map](./backend/MISSION_MAP.md)
 
 ## Current Mission Focus
 
@@ -26,6 +27,7 @@ Read order for backend boot:
 2. backend/RUNTIME_MAP.md
 3. backend/DOMAIN_MAP_STOCK_PROCUREMENT_SALES.md
 4. backend/MIGRATION_MAP.md
+5. backend/MISSION_MAP.md
 ```
 
-Use `RUNTIME_MAP.md` for Mission B details, `DOMAIN_MAP_STOCK_PROCUREMENT_SALES.md` when a change touches Stock / PO Receipt / Sales runtime, and `MIGRATION_MAP.md` before any backend refactor, extraction, or legacy cleanup.
+Use `MISSION_MAP.md` as the workflow lens, `RUNTIME_MAP.md` for Mission B runtime details, `DOMAIN_MAP_STOCK_PROCUREMENT_SALES.md` when a change touches Stock / PO Receipt / Sales runtime, and `MIGRATION_MAP.md` before any backend refactor, extraction, or legacy cleanup.
