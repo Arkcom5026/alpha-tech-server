@@ -55,11 +55,8 @@ class ProductTemplateRepository {
 
     const whereAND = [
       {
-        branchPrice: {
-          some: {
-            branchId: Number(templateBranchId),
-            isActive: true,
-          },
+        productType: {
+          branchId: Number(templateBranchId),
         },
       },
     ]
@@ -170,10 +167,6 @@ class ProductTemplateRepository {
           },
         },
         branchPrice: {
-          where: {
-            branchId: Number(templateBranchId),
-            isActive: true,
-          },
           take: 1,
           select: {
             id: true,
