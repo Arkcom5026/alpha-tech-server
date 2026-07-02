@@ -1,0 +1,675 @@
+{
+  "ok": true,
+  "mode": "execute",
+  "branchCode": "T01",
+  "generatedAt": "2026-07-01T16:13:02.021Z",
+  "elapsedMs": 26233,
+  "mappingCount": 19,
+  "items": [
+    {
+      "mapping": {
+        "keepId": 211,
+        "removeId": 1748,
+        "reason": "Duplicate purchase: Canon GI-790 Black"
+      },
+      "keep": {
+        "id": 211,
+        "name": "หมึกแท้ Canon GI-790 Black"
+      },
+      "remove": {
+        "id": 1748,
+        "name": "Canon GI-790 Black Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1748
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 212,
+        "removeId": 1749,
+        "reason": "Duplicate purchase: Canon GI-790 Cyan"
+      },
+      "keep": {
+        "id": 212,
+        "name": "หมึกแท้ Canon GI-790 Cyan"
+      },
+      "remove": {
+        "id": 1749,
+        "name": "Canon GI-790 Cyan Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1749
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 213,
+        "removeId": 1750,
+        "reason": "Duplicate purchase: Canon GI-790 Magenta"
+      },
+      "keep": {
+        "id": 213,
+        "name": "หมึกแท้ Canon GI-790 Magenta"
+      },
+      "remove": {
+        "id": 1750,
+        "name": "Canon GI-790 Magenta Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1750
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 214,
+        "removeId": 1751,
+        "reason": "Duplicate purchase: Canon GI-790 Yellow"
+      },
+      "keep": {
+        "id": 214,
+        "name": "หมึกแท้ Canon GI-790 Yellow"
+      },
+      "remove": {
+        "id": 1751,
+        "name": "Canon GI-790 Yellow Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1751
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 215,
+        "removeId": 1799,
+        "reason": "Duplicate purchase: Epson 003 Black"
+      },
+      "keep": {
+        "id": 215,
+        "name": "หมึกแท้ Epson 003 Black"
+      },
+      "remove": {
+        "id": 1799,
+        "name": "Epson 003 Black Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1799
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 216,
+        "removeId": 1800,
+        "reason": "Duplicate purchase: Epson 003 Cyan"
+      },
+      "keep": {
+        "id": 216,
+        "name": "หมึกแท้ Epson 003 Cyan"
+      },
+      "remove": {
+        "id": 1800,
+        "name": "Epson 003 Cyan Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1800
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 217,
+        "removeId": 1801,
+        "reason": "Duplicate purchase: Epson 003 Magenta"
+      },
+      "keep": {
+        "id": 217,
+        "name": "หมึกแท้ Epson 003 Magenta"
+      },
+      "remove": {
+        "id": 1801,
+        "name": "Epson 003 Magenta Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1801
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 218,
+        "removeId": 1802,
+        "reason": "Duplicate purchase: Epson 003 Yellow"
+      },
+      "keep": {
+        "id": 218,
+        "name": "หมึกแท้ Epson 003 Yellow"
+      },
+      "remove": {
+        "id": 1802,
+        "name": "Epson 003 Yellow Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1802
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 236,
+        "removeId": 1847,
+        "reason": "Duplicate purchase: Brother BT5000C Cyan"
+      },
+      "keep": {
+        "id": 236,
+        "name": "หมึกแท้ Brother BT5000C Cyan"
+      },
+      "remove": {
+        "id": 1847,
+        "name": "Brother BT5000C Cyan Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1847
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 237,
+        "removeId": 1848,
+        "reason": "Duplicate purchase: Brother BT5000M Magenta"
+      },
+      "keep": {
+        "id": 237,
+        "name": "หมึกแท้ Brother BT5000M Magenta"
+      },
+      "remove": {
+        "id": 1848,
+        "name": "Brother BT5000M Magenta Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1848
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 238,
+        "removeId": 1849,
+        "reason": "Duplicate purchase: Brother BT5000Y Yellow"
+      },
+      "keep": {
+        "id": 238,
+        "name": "หมึกแท้ Brother BT5000Y Yellow"
+      },
+      "remove": {
+        "id": 1849,
+        "name": "Brother BT5000Y Yellow Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1849
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 241,
+        "removeId": 1807,
+        "reason": "Duplicate purchase: Epson 664 Black"
+      },
+      "keep": {
+        "id": 241,
+        "name": "หมึกแท้ Epson 664 Black"
+      },
+      "remove": {
+        "id": 1807,
+        "name": "Epson 664 Black Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1807
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 242,
+        "removeId": 1808,
+        "reason": "Duplicate purchase: Epson 664 Cyan"
+      },
+      "keep": {
+        "id": 242,
+        "name": "หมึกแท้ Epson 664 Cyan"
+      },
+      "remove": {
+        "id": 1808,
+        "name": "Epson 664 Cyan Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1808
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 243,
+        "removeId": 1809,
+        "reason": "Duplicate purchase: Epson 664 Magenta"
+      },
+      "keep": {
+        "id": 243,
+        "name": "หมึกแท้ Epson 664 Magenta"
+      },
+      "remove": {
+        "id": 1809,
+        "name": "Epson 664 Magenta Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1809
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 244,
+        "removeId": 1810,
+        "reason": "Duplicate purchase: Epson 664 Yellow"
+      },
+      "keep": {
+        "id": 244,
+        "name": "หมึกแท้ Epson 664 Yellow"
+      },
+      "remove": {
+        "id": 1810,
+        "name": "Epson 664 Yellow Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1810
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 267,
+        "removeId": 1891,
+        "reason": "Duplicate purchase: HP GT53 Black"
+      },
+      "keep": {
+        "id": 267,
+        "name": "หมึกแท้ HP GT53 Black"
+      },
+      "remove": {
+        "id": 1891,
+        "name": "HP GT53 Black Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1891
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 268,
+        "removeId": 1888,
+        "reason": "Duplicate purchase: HP GT52 Cyan"
+      },
+      "keep": {
+        "id": 268,
+        "name": "หมึกแท้ HP GT52 Cyan"
+      },
+      "remove": {
+        "id": 1888,
+        "name": "HP GT52 Cyan Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1888
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 269,
+        "removeId": 1889,
+        "reason": "Duplicate purchase: HP GT52 Magenta"
+      },
+      "keep": {
+        "id": 269,
+        "name": "หมึกแท้ HP GT52 Magenta"
+      },
+      "remove": {
+        "id": 1889,
+        "name": "HP GT52 Magenta Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1889
+        }
+      ]
+    },
+    {
+      "mapping": {
+        "keepId": 270,
+        "removeId": 1890,
+        "reason": "Duplicate purchase: HP GT52 Yellow"
+      },
+      "keep": {
+        "id": 270,
+        "name": "หมึกแท้ HP GT52 Yellow"
+      },
+      "remove": {
+        "id": 1890,
+        "name": "HP GT52 Yellow Ink Bottle"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1890
+        }
+      ]
+    }
+  ]
+}

@@ -35,6 +35,7 @@ const productProfileRoutes = require('./routes/productProfileRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const productRoutes = require('./routes/productRoutes');
+const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
@@ -130,12 +131,12 @@ const corsOptions = {
   origin(origin, callback) {
     // โหมดข้ามการตรวจสิทธิ์หากตั้งค่าไว้ใน Environment
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-    
+
     // 🟢 FIXED: คืนค่าสิทธิ์ผ่านฉลุยทันทีเมื่อตรวจสอบแล้วว่า Origin ปลอดภัยและมาจากระบบหลักจริง
     if (!origin || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
-    
+
     // บันทึกข้อผิดพลาดกรณีพบ Origin แปลกปลอมที่ไม่ได้รับอนุญาต
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
@@ -177,6 +178,7 @@ app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
+app.use('/api/products/template', templateProductSearchRoutes);
 app.use('/api/products', productRoutes);
 
 app.use('/api/purchase-orders', purchaseOrderRoutes);

@@ -161,6 +161,28 @@ const quickStockInAllInOne = async (req, res) => {
 };
 
 /**
+ * Runtime Contract
+ *
+ * Required
+ * ----------
+ * productId
+ * costPrice
+ * priceRetail
+ * queue (barcodes/items)
+ *
+ * Optional
+ * ----------
+ * priceWholesale
+ * priceTechnician
+ * priceOnline
+ *
+ * Queue Item
+ * ----------
+ * barcode
+ * serialNumber
+ */
+
+/**
  * API สำหรับรับสินค้าเข้า Stock Runtime จาก Product เดิม
  * ใช้กับ Recovery / Quick Receive / Manufacture ที่ไม่ผ่าน PO
  */
@@ -184,6 +206,28 @@ const quickStockExistingReceive = async (req, res) => {
       });
     }
 
+    if (
+      data.costPrice === undefined ||
+      data.costPrice === null ||
+      Number(data.costPrice) <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'ข้อมูลไม่สมบูรณ์: จำเป็นต้องกำหนดราคาทุน'
+      });
+    }
+
+    if (
+      data.priceRetail === undefined ||
+      data.priceRetail === null ||
+      Number(data.priceRetail) <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'ข้อมูลไม่สมบูรณ์: จำเป็นต้องกำหนดราคาขายปลีก'
+      });
+    }
+
     const incomingBarcodes = Array.isArray(data.barcodes)
       ? data.barcodes
       : Array.isArray(data.items)
@@ -195,6 +239,21 @@ const quickStockExistingReceive = async (req, res) => {
         success: false,
         message: 'ข้อมูลไม่สมบูรณ์: จำเป็นต้องมีรายการบาร์โค้ดอย่างน้อย 1 รายการ'
       });
+    }
+
+    for (const row of incomingBarcodes) {
+      if (
+        Object.prototype.hasOwnProperty.call(row, 'costPrice') ||
+        Object.prototype.hasOwnProperty.call(row, 'priceRetail') ||
+        Object.prototype.hasOwnProperty.call(row, 'priceWholesale') ||
+        Object.prototype.hasOwnProperty.call(row, 'priceTechnician') ||
+        Object.prototype.hasOwnProperty.call(row, 'priceOnline')
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Runtime Contract ไม่อนุญาตให้ส่งข้อมูลราคาในแต่ละ Queue Item'
+        });
+      }
     }
 
     const result = await quickStockService.quickReceiveExistingProduct(

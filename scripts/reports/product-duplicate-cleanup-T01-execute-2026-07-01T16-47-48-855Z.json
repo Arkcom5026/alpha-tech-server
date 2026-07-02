@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "mode": "execute",
+  "branchCode": "T01",
+  "generatedAt": "2026-07-01T16:47:48.854Z",
+  "elapsedMs": 2068,
+  "mappingCount": 1,
+  "items": [
+    {
+      "mapping": {
+        "keepId": 256,
+        "removeId": 1797,
+        "reason": "Duplicate purchase: Canon BH-7 Black Printhead"
+      },
+      "keep": {
+        "id": 256,
+        "name": "หัวพิมพ์แท้ Canon BH-7 BK (Black) Printhead"
+      },
+      "remove": {
+        "id": 1797,
+        "name": "Canon Printhead BH-7 Black"
+      },
+      "beforeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "actions": [
+        {
+          "table": "BranchPrice",
+          "moved": 0,
+          "deleted": 1
+        },
+        {
+          "table": "Product",
+          "deleted": 1797
+        }
+      ]
+    }
+  ]
+}

@@ -54,6 +54,28 @@ const getActiveBranchPrice = async (req, res) => {
   }
 };
 
+/**
+ * Runtime Branch Price Contract
+ *
+ * Source of Truth
+ * --------------------
+ * Quick Receive Runtime Session
+ *
+ * Required
+ * --------------------
+ * productId
+ * costPrice
+ * priceRetail
+ *
+ * Optional
+ * --------------------
+ * priceWholesale
+ * priceTechnician
+ * priceOnline
+ *
+ * Queue Item must never contain pricing.
+ */
+
 // POST /branch-prices/upsert
 const upsertBranchPrice = async (req, res) => {
   try {
@@ -79,6 +101,15 @@ const upsertBranchPrice = async (req, res) => {
 
     if (!branchId || !productId) {
       return res.status(400).json({ error: 'branchId หรือ productId ไม่ถูกต้อง' });
+    }
+
+    if (costPrice === undefined || costPrice === null || Number(costPrice) <= 0) {
+      return res.status(400).json({ error: 'กรุณาระบุราคาทุน' });
+    }
+
+    const retailValue = retailPrice ?? priceRetail;
+    if (retailValue === undefined || retailValue === null || Number(retailValue) <= 0) {
+      return res.status(400).json({ error: 'กรุณาระบุราคาขายปลีก' });
     }
 
     const pid = toInt(productId);

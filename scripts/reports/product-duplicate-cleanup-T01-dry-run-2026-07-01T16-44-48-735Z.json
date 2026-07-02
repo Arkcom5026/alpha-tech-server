@@ -1,0 +1,802 @@
+{
+  "ok": true,
+  "mode": "dry-run",
+  "branchCode": "T01",
+  "generatedAt": "2026-07-01T16:44:48.733Z",
+  "elapsedMs": 241600,
+  "mappingCount": 20,
+  "items": [
+    {
+      "mapping": {
+        "keepId": 211,
+        "removeId": 1748,
+        "reason": "Duplicate purchase: Canon GI-790 Black"
+      },
+      "keep": {
+        "id": 211,
+        "name": "หมึกแท้ Canon GI-790 Black",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 212,
+        "removeId": 1749,
+        "reason": "Duplicate purchase: Canon GI-790 Cyan"
+      },
+      "keep": {
+        "id": 212,
+        "name": "หมึกแท้ Canon GI-790 Cyan",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 213,
+        "removeId": 1750,
+        "reason": "Duplicate purchase: Canon GI-790 Magenta"
+      },
+      "keep": {
+        "id": 213,
+        "name": "หมึกแท้ Canon GI-790 Magenta",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 214,
+        "removeId": 1751,
+        "reason": "Duplicate purchase: Canon GI-790 Yellow"
+      },
+      "keep": {
+        "id": 214,
+        "name": "หมึกแท้ Canon GI-790 Yellow",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 215,
+        "removeId": 1799,
+        "reason": "Duplicate purchase: Epson 003 Black"
+      },
+      "keep": {
+        "id": 215,
+        "name": "หมึกแท้ Epson 003 Black",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 216,
+        "removeId": 1800,
+        "reason": "Duplicate purchase: Epson 003 Cyan"
+      },
+      "keep": {
+        "id": 216,
+        "name": "หมึกแท้ Epson 003 Cyan",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 217,
+        "removeId": 1801,
+        "reason": "Duplicate purchase: Epson 003 Magenta"
+      },
+      "keep": {
+        "id": 217,
+        "name": "หมึกแท้ Epson 003 Magenta",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 218,
+        "removeId": 1802,
+        "reason": "Duplicate purchase: Epson 003 Yellow"
+      },
+      "keep": {
+        "id": 218,
+        "name": "หมึกแท้ Epson 003 Yellow",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 236,
+        "removeId": 1847,
+        "reason": "Duplicate purchase: Brother BT5000C Cyan"
+      },
+      "keep": {
+        "id": 236,
+        "name": "หมึกแท้ Brother BT5000C Cyan",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 237,
+        "removeId": 1848,
+        "reason": "Duplicate purchase: Brother BT5000M Magenta"
+      },
+      "keep": {
+        "id": 237,
+        "name": "หมึกแท้ Brother BT5000M Magenta",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 238,
+        "removeId": 1849,
+        "reason": "Duplicate purchase: Brother BT5000Y Yellow"
+      },
+      "keep": {
+        "id": 238,
+        "name": "หมึกแท้ Brother BT5000Y Yellow",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 241,
+        "removeId": 1807,
+        "reason": "Duplicate purchase: Epson 664 Black"
+      },
+      "keep": {
+        "id": 241,
+        "name": "หมึกแท้ Epson 664 Black",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 242,
+        "removeId": 1808,
+        "reason": "Duplicate purchase: Epson 664 Cyan"
+      },
+      "keep": {
+        "id": 242,
+        "name": "หมึกแท้ Epson 664 Cyan",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 243,
+        "removeId": 1809,
+        "reason": "Duplicate purchase: Epson 664 Magenta"
+      },
+      "keep": {
+        "id": 243,
+        "name": "หมึกแท้ Epson 664 Magenta",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 244,
+        "removeId": 1810,
+        "reason": "Duplicate purchase: Epson 664 Yellow"
+      },
+      "keep": {
+        "id": 244,
+        "name": "หมึกแท้ Epson 664 Yellow",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 267,
+        "removeId": 1891,
+        "reason": "Duplicate purchase: HP GT53 Black"
+      },
+      "keep": {
+        "id": 267,
+        "name": "หมึกแท้ HP GT53 Black",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 268,
+        "removeId": 1888,
+        "reason": "Duplicate purchase: HP GT52 Cyan"
+      },
+      "keep": {
+        "id": 268,
+        "name": "หมึกแท้ HP GT52 Cyan",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 269,
+        "removeId": 1889,
+        "reason": "Duplicate purchase: HP GT52 Magenta"
+      },
+      "keep": {
+        "id": 269,
+        "name": "หมึกแท้ HP GT52 Magenta",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 270,
+        "removeId": 1890,
+        "reason": "Duplicate purchase: HP GT52 Yellow"
+      },
+      "keep": {
+        "id": 270,
+        "name": "หมึกแท้ HP GT52 Yellow",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": null,
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 0,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    },
+    {
+      "mapping": {
+        "keepId": 256,
+        "removeId": 1797,
+        "reason": "Duplicate purchase: Canon BH-7 Black Printhead"
+      },
+      "keep": {
+        "id": 256,
+        "name": "หัวพิมพ์แท้ Canon BH-7 BK (Black) Printhead",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "remove": {
+        "id": 1797,
+        "name": "Canon Printhead BH-7 Black",
+        "productTypeId": 214,
+        "templateProductId": null,
+        "productType": {
+          "id": 214,
+          "branchId": 1,
+          "branch": {
+            "branchCode": "T01"
+          }
+        }
+      },
+      "keepRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      },
+      "removeRefs": {
+        "branchPrice": 1,
+        "stockItem": 0,
+        "stockBalance": 0,
+        "stockMovement": 0,
+        "productImage": 0,
+        "simpleLot": 0,
+        "clonedProducts": 0
+      }
+    }
+  ]
+}

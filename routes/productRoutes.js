@@ -42,6 +42,7 @@ router.get('/dropdowns', productController.getProductDropdowns)
 
 // --- POS search / detail ---
 router.get('/pos/search', productController.getProductsForPos)
+router.get('/pos/runtime-by-template/:templateProductId', productController.getOperationalProductByTemplateId)
 router.get('/pos/:id', productController.getProductPosById)
 
 // --- Ready-to-sell (branch-scoped) ---

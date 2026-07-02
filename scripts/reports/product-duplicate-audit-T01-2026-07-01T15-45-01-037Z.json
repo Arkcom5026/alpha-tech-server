@@ -1,0 +1,713 @@
+{
+  "ok": true,
+  "branchCode": "T01",
+  "generatedAt": "2026-07-01T15:45:01.036Z",
+  "totalProductsScanned": 730,
+  "duplicateGroupCount": 19,
+  "duplicateProductCount": 38,
+  "groups": [
+    {
+      "groupNo": 9,
+      "brandId": 3,
+      "brandName": "Brother",
+      "normalizedName": "BROTHER BT5000C CYAN",
+      "qty": 2,
+      "recommendedKeepId": 236,
+      "recommendedRemoveIds": [
+        1847
+      ],
+      "products": [
+        {
+          "id": 236,
+          "name": "หมึกแท้ Brother BT5000C Cyan",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 106.96
+        },
+        {
+          "id": 1847,
+          "name": "Brother BT5000C Cyan Ink Bottle",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.05
+        }
+      ]
+    },
+    {
+      "groupNo": 10,
+      "brandId": 3,
+      "brandName": "Brother",
+      "normalizedName": "BROTHER BT5000M MAGENTA",
+      "qty": 2,
+      "recommendedKeepId": 237,
+      "recommendedRemoveIds": [
+        1848
+      ],
+      "products": [
+        {
+          "id": 237,
+          "name": "หมึกแท้ Brother BT5000M Magenta",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 106.66
+        },
+        {
+          "id": 1848,
+          "name": "Brother BT5000M Magenta Ink Bottle",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 104.75
+        }
+      ]
+    },
+    {
+      "groupNo": 11,
+      "brandId": 3,
+      "brandName": "Brother",
+      "normalizedName": "BROTHER BT5000Y YELLOW",
+      "qty": 2,
+      "recommendedKeepId": 238,
+      "recommendedRemoveIds": [
+        1849
+      ],
+      "products": [
+        {
+          "id": 238,
+          "name": "หมึกแท้ Brother BT5000Y Yellow",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 106.76
+        },
+        {
+          "id": 1849,
+          "name": "Brother BT5000Y Yellow Ink Bottle",
+          "brandId": 3,
+          "brandName": "Brother",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 104.85
+        }
+      ]
+    },
+    {
+      "groupNo": 1,
+      "brandId": 1,
+      "brandName": "Canon",
+      "normalizedName": "CANON GI790BLACK",
+      "qty": 2,
+      "recommendedKeepId": 211,
+      "recommendedRemoveIds": [
+        1748
+      ],
+      "products": [
+        {
+          "id": 211,
+          "name": "หมึกแท้ Canon GI-790 Black",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.19
+        },
+        {
+          "id": 1748,
+          "name": "Canon GI-790 Black Ink Bottle",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.35
+        }
+      ]
+    },
+    {
+      "groupNo": 2,
+      "brandId": 1,
+      "brandName": "Canon",
+      "normalizedName": "CANON GI790CYAN",
+      "qty": 2,
+      "recommendedKeepId": 212,
+      "recommendedRemoveIds": [
+        1749
+      ],
+      "products": [
+        {
+          "id": 212,
+          "name": "หมึกแท้ Canon GI-790 Cyan",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.29
+        },
+        {
+          "id": 1749,
+          "name": "Canon GI-790 Cyan Ink Bottle",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.45
+        }
+      ]
+    },
+    {
+      "groupNo": 3,
+      "brandId": 1,
+      "brandName": "Canon",
+      "normalizedName": "CANON GI790MAGENTA",
+      "qty": 2,
+      "recommendedKeepId": 213,
+      "recommendedRemoveIds": [
+        1750
+      ],
+      "products": [
+        {
+          "id": 213,
+          "name": "หมึกแท้ Canon GI-790 Magenta",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 106.99
+        },
+        {
+          "id": 1750,
+          "name": "Canon GI-790 Magenta Ink Bottle",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.15
+        }
+      ]
+    },
+    {
+      "groupNo": 4,
+      "brandId": 1,
+      "brandName": "Canon",
+      "normalizedName": "CANON GI790YELLOW",
+      "qty": 2,
+      "recommendedKeepId": 214,
+      "recommendedRemoveIds": [
+        1751
+      ],
+      "products": [
+        {
+          "id": 214,
+          "name": "หมึกแท้ Canon GI-790 Yellow",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.09
+        },
+        {
+          "id": 1751,
+          "name": "Canon GI-790 Yellow Ink Bottle",
+          "brandId": 1,
+          "brandName": "Canon",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.25
+        }
+      ]
+    },
+    {
+      "groupNo": 5,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON003BLACK",
+      "qty": 2,
+      "recommendedKeepId": 215,
+      "recommendedRemoveIds": [
+        1799
+      ],
+      "products": [
+        {
+          "id": 215,
+          "name": "หมึกแท้ Epson 003 Black",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.48
+        },
+        {
+          "id": 1799,
+          "name": "Epson 003 Black Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.6
+        }
+      ]
+    },
+    {
+      "groupNo": 6,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON003CYAN",
+      "qty": 2,
+      "recommendedKeepId": 216,
+      "recommendedRemoveIds": [
+        1800
+      ],
+      "products": [
+        {
+          "id": 216,
+          "name": "หมึกแท้ Epson 003 Cyan",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.58
+        },
+        {
+          "id": 1800,
+          "name": "Epson 003 Cyan Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.7
+        }
+      ]
+    },
+    {
+      "groupNo": 7,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON003MAGENTA",
+      "qty": 2,
+      "recommendedKeepId": 217,
+      "recommendedRemoveIds": [
+        1801
+      ],
+      "products": [
+        {
+          "id": 217,
+          "name": "หมึกแท้ Epson 003 Magenta",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.28
+        },
+        {
+          "id": 1801,
+          "name": "Epson 003 Magenta Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.4
+        }
+      ]
+    },
+    {
+      "groupNo": 8,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON003YELLOW",
+      "qty": 2,
+      "recommendedKeepId": 218,
+      "recommendedRemoveIds": [
+        1802
+      ],
+      "products": [
+        {
+          "id": 218,
+          "name": "หมึกแท้ Epson 003 Yellow",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.38
+        },
+        {
+          "id": 1802,
+          "name": "Epson 003 Yellow Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.5
+        }
+      ]
+    },
+    {
+      "groupNo": 12,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON664BLACK",
+      "qty": 2,
+      "recommendedKeepId": 241,
+      "recommendedRemoveIds": [
+        1807
+      ],
+      "products": [
+        {
+          "id": 241,
+          "name": "หมึกแท้ Epson 664 Black",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.46
+        },
+        {
+          "id": 1807,
+          "name": "Epson 664 Black Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.59
+        }
+      ]
+    },
+    {
+      "groupNo": 13,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON664CYAN",
+      "qty": 2,
+      "recommendedKeepId": 242,
+      "recommendedRemoveIds": [
+        1808
+      ],
+      "products": [
+        {
+          "id": 242,
+          "name": "หมึกแท้ Epson 664 Cyan",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.56
+        },
+        {
+          "id": 1808,
+          "name": "Epson 664 Cyan Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.69
+        }
+      ]
+    },
+    {
+      "groupNo": 14,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON664MAGENTA",
+      "qty": 2,
+      "recommendedKeepId": 243,
+      "recommendedRemoveIds": [
+        1809
+      ],
+      "products": [
+        {
+          "id": 243,
+          "name": "หมึกแท้ Epson 664 Magenta",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.26
+        },
+        {
+          "id": 1809,
+          "name": "Epson 664 Magenta Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.39
+        }
+      ]
+    },
+    {
+      "groupNo": 15,
+      "brandId": 2,
+      "brandName": "Epson",
+      "normalizedName": "EPSON664YELLOW",
+      "qty": 2,
+      "recommendedKeepId": 244,
+      "recommendedRemoveIds": [
+        1810
+      ],
+      "products": [
+        {
+          "id": 244,
+          "name": "หมึกแท้ Epson 664 Yellow",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.36
+        },
+        {
+          "id": 1810,
+          "name": "Epson 664 Yellow Ink Bottle",
+          "brandId": 2,
+          "brandName": "Epson",
+          "productTypeId": 215,
+          "productTypeName": "อุปกรณ์เสริมไอที (เมาส์/คีย์บอร์ด/สายแปลง)",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.49
+        }
+      ]
+    },
+    {
+      "groupNo": 17,
+      "brandId": 28,
+      "brandName": "HP",
+      "normalizedName": "HP GT52CYAN",
+      "qty": 2,
+      "recommendedKeepId": 268,
+      "recommendedRemoveIds": [
+        1888
+      ],
+      "products": [
+        {
+          "id": 268,
+          "name": "หมึกแท้ HP GT52 Cyan",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.73
+        },
+        {
+          "id": 1888,
+          "name": "HP GT52 Cyan Ink Bottle",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.81
+        }
+      ]
+    },
+    {
+      "groupNo": 18,
+      "brandId": 28,
+      "brandName": "HP",
+      "normalizedName": "HP GT52MAGENTA",
+      "qty": 2,
+      "recommendedKeepId": 269,
+      "recommendedRemoveIds": [
+        1889
+      ],
+      "products": [
+        {
+          "id": 269,
+          "name": "หมึกแท้ HP GT52 Magenta",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.43
+        },
+        {
+          "id": 1889,
+          "name": "HP GT52 Magenta Ink Bottle",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.51
+        }
+      ]
+    },
+    {
+      "groupNo": 19,
+      "brandId": 28,
+      "brandName": "HP",
+      "normalizedName": "HP GT52YELLOW",
+      "qty": 2,
+      "recommendedKeepId": 270,
+      "recommendedRemoveIds": [
+        1890
+      ],
+      "products": [
+        {
+          "id": 270,
+          "name": "หมึกแท้ HP GT52 Yellow",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.53
+        },
+        {
+          "id": 1890,
+          "name": "HP GT52 Yellow Ink Bottle",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.61
+        }
+      ]
+    },
+    {
+      "groupNo": 16,
+      "brandId": 28,
+      "brandName": "HP",
+      "normalizedName": "HP GT53BLACK",
+      "qty": 2,
+      "recommendedKeepId": 267,
+      "recommendedRemoveIds": [
+        1891
+      ],
+      "products": [
+        {
+          "id": 267,
+          "name": "หมึกแท้ HP GT53 Black",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 107.63
+        },
+        {
+          "id": 1891,
+          "name": "HP GT53 Black Ink Bottle",
+          "brandId": 28,
+          "brandName": "HP",
+          "productTypeId": 214,
+          "productTypeName": "คอมพิวเตอร์ / โน้ตบุ๊ก",
+          "branchCode": "T01",
+          "imageCount": 0,
+          "branchPriceCount": 1,
+          "score": 105.71
+        }
+      ]
+    }
+  ]
+}
