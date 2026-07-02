@@ -22,6 +22,71 @@ New Module Runtime
 
 Production compatibility remains the source of truth. New module architecture grows alongside the existing runtime and is reused when it is already available and safe.
 
+## Incremental Backend Migration Doctrine
+
+P1 backend must not be rewritten or migrated in one large step.
+
+The approved migration model is:
+
+```txt
+Production Runtime first
+→ Compatibility preserved
+→ New module capability reused when available
+→ Responsibilities extracted gradually
+→ Every intermediate state deployable
+```
+
+### Core Rules
+
+- Legacy `controllers/` and `routes/` remain valid production entrypoints until a workflow-specific migration replaces them safely.
+- `src/modules/*` is the migration target and capability layer, not a reason to force refactor.
+- New work should use existing production paths when they are the safest way to keep the workflow working.
+- If module logic already exists and is stable, call/reuse it instead of copying logic into legacy controllers.
+- If module logic is missing or risky, complete the operational workflow first with the smallest safe patch, then extract later.
+- Do not move unrelated code just to make architecture look cleaner.
+- Do not combine feature recovery with broad cleanup.
+- Do not make a patch that leaves the system in a non-deployable intermediate state.
+
+### Migration Trigger Rule
+
+Migrate or extract backend responsibility only when one of these is true:
+
+```txt
+- The current workflow needs that responsibility.
+- A bug fix requires touching that logic.
+- A feature extension needs a cleaner boundary.
+- The module already exists and is safer to reuse than duplicate.
+- The Mission Architect explicitly approves a migration patch.
+```
+
+### Preferred Shape Over Time
+
+```txt
+Legacy Route
+  ↓
+Legacy Controller as Adapter
+  ↓
+Module Service / Runtime Engine
+  ↓
+Repository / Prisma Access
+```
+
+The long-term goal is thin controllers and reusable module runtime services, but this must happen through workflow-driven patches, not forced migration.
+
+### Mission Assignment Rule
+
+Every backend assignment must state:
+
+```txt
+- Is this production-runtime patch or migration patch?
+- Which workflow checkpoint does it advance?
+- Which legacy files are allowed?
+- Which module files are allowed?
+- What must not be refactored?
+```
+
+If this is not clear, the task must stop and ask ROLE-ARCH for clarification.
+
 ## Mission Execution Doctrine
 
 Mission B is not a Backend Mission or Frontend Mission.
