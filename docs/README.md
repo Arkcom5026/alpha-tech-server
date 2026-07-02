@@ -2,6 +2,7 @@
 
 ## Runtime Maps
 
+- [Backend System Map](./backend/SYSTEM_MAP.md)
 - [Backend Runtime Map](./backend/RUNTIME_MAP.md)
 
 ## Current Mission Focus
@@ -16,4 +17,4 @@ Template Search
 → Product usable in branch runtime
 ```
 
-Read `backend/RUNTIME_MAP.md` before issuing or executing backend Mission B assignments.
+Read `backend/SYSTEM_MAP.md` first for backend-wide understanding, then `backend/RUNTIME_MAP.md` for Mission B runtime details before issuing or executing backend Mission B assignments.
