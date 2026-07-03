@@ -72,11 +72,65 @@ Every Role must boot before changing code:
 
 ```txt
 1. Read assigned Role file
-2. Read current Mission / Blackboard / Assignment
-3. Read required system/runtime/domain/migration maps
-4. Confirm scope and forbidden areas
-5. Execute smallest safe patch
-6. Produce verification or handover report
+2. Read current Mission / Blackboard
+3. Read required system/runtime/domain/migration/mission maps
+4. Identify assigned Role Workspace
+5. Read Assignment from the Role Workspace
+6. Confirm scope and forbidden areas
+7. Execute smallest safe patch
+8. Produce verification or handover report in the Role Workspace inbox
+```
+
+## Role Workspace Rule
+
+Each Role has its own workspace inside each Mission.
+
+Preferred structure:
+
+```txt
+docs/<mission>/
+  assignments/
+    ROLE-ID/
+      ASSIGNMENT-###.md
+  inbox/
+    ROLE-ID/
+      VERIFY-###.md
+      REPORT-###.md
+      HANDOVER-###.md
+```
+
+Example:
+
+```txt
+docs/mission-b/assignments/FE-01/ASSIGNMENT-018.md
+docs/mission-b/inbox/FE-01/FLOW-DESIGN-001.md
+```
+
+Rules:
+
+- Assignments must state the receiving Role.
+- Reports must be written to the same Role workspace unless ROLE-ARCH says otherwise.
+- A Role must not write reports into another Role workspace.
+- Cross-role handover must name the next Role explicitly.
+- Legacy shared paths may remain for historical reports, but new assignments should prefer Role workspace paths.
+
+## P1 Boot Sequence
+
+Use this complete boot sequence for new Tasks:
+
+```txt
+1. Blueprint / current Mission state
+2. Mission Blackboard
+3. SYSTEM_MAP
+4. RUNTIME_MAP
+5. DOMAIN_MAP when relevant
+6. MIGRATION_MAP when backend architecture or cleanup is involved
+7. MISSION_MAP
+8. Role Boot file
+9. Role Workspace
+10. Assignment
+11. Verification target
+12. Begin work
 ```
 
 ## Universal Handover Rule
