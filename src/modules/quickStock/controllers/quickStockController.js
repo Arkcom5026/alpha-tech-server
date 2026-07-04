@@ -1,8 +1,7 @@
 // src/modules/quickStock/controllers/quickStockController.js
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../../../../lib/prisma');
 const QuickStockService = require('../services/QuickStockService');
 
-const prisma = new PrismaClient();
 const quickStockService = new QuickStockService(prisma);
 
 /**
