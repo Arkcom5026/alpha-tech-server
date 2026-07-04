@@ -3,6 +3,7 @@
 
 const { prisma } = require('../../../../lib/prisma');
 const { ProductTemplateService } = require('../services/productTemplateService');
+const { getClonePreview } = require('../services/templateClonePreviewService');
 
 const service = new ProductTemplateService(prisma);
 
@@ -19,11 +20,7 @@ const sendError = (res, error, fallbackMessage, fallbackCode) => {
 const getAllProductTemplates = async (req, res) => {
   try {
     const result = await service.listTemplates(req.query || {});
-    return res.status(200).json({
-      success: true,
-      ...result,
-      data: result.items,
-    });
+    return res.status(200).json({ success: true, ...result, data: result.items });
   } catch (error) {
     return sendError(res, error, 'ไม่สามารถโหลด Product Templates ได้', 'PRODUCT_TEMPLATE_LIST_FAILED');
   }
@@ -35,6 +32,19 @@ const getProductTemplateById = async (req, res) => {
     return res.status(200).json({ success: true, data: template, item: template });
   } catch (error) {
     return sendError(res, error, 'ไม่สามารถโหลด Product Template ได้', 'PRODUCT_TEMPLATE_DETAIL_FAILED');
+  }
+};
+
+const previewTemplateClone = async (req, res) => {
+  try {
+    const preview = await getClonePreview(prisma, {
+      templateProductId: req.params.id,
+      targetBranchId: req.query.targetBranchId || req.body?.targetBranchId,
+      templateBranchCode: req.query.templateBranchCode || req.body?.templateBranchCode,
+    });
+    return res.status(200).json({ success: true, data: preview, item: preview });
+  } catch (error) {
+    return sendError(res, error, 'ไม่สามารถ Preview การ Clone Template ได้', 'PRODUCT_TEMPLATE_CLONE_PREVIEW_FAILED');
   }
 };
 
@@ -87,6 +97,7 @@ const toggleProductTemplateActive = async (req, res) => {
 module.exports = {
   getAllProductTemplates,
   getProductTemplateById,
+  previewTemplateClone,
   createProductTemplate,
   updateProductTemplate,
   archiveProductTemplate,
