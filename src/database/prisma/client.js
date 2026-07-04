@@ -1,20 +1,7 @@
 // src/database/prisma/client.js
-const { PrismaClient } = require('@prisma/client');
+// Canonical Prisma singleton bridge.
+// Keep this path for legacy imports, but delegate to lib/prisma.js only.
 
-let prisma;
+const { prisma } = require('../../../lib/prisma')
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient({
-    log: ['error', 'warn'],
-  });
-} else {
-  // สำหรับสภาพแวดล้อมเพื่อการพัฒนา (Development) ป้องกันการสปอนอินสแตนซ์ซ้ำซ้อนเมื่อเซิร์ฟเวอร์โหลดใหม่
-  if (!global.prisma) {
-    global.prisma = new PrismaClient({
-      log: ['query', 'info', 'warn', 'error'],
-    });
-  }
-  prisma = global.prisma;
-}
-
-module.exports = prisma;
+module.exports = prisma
