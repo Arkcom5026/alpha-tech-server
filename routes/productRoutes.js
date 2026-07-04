@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 
 const productController = require('../controllers/productController')
+const productDuplicatePreviewController = require('../controllers/productDuplicatePreviewController')
 const verifyToken = require('../middlewares/verifyToken')
 const {
   createLocalOperationalProduct: createLocalOperationalProductService,
@@ -68,6 +69,7 @@ router.get('/online/detail/:id', productController.getProductOnlineById)
 router.use(verifyToken)
 
 router.get('/dropdowns', productController.getProductDropdowns)
+router.get('/duplicate-preview', productDuplicatePreviewController.getProductDuplicatePreview)
 router.get('/pos/search', productController.getProductsForPos)
 router.get('/pos/runtime-by-template/:templateProductId', productController.getOperationalProductByTemplateId)
 router.post('/pos/create-local', createLocalOperationalProduct)
