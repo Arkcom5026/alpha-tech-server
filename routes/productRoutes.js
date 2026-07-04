@@ -4,50 +4,11 @@ const router = express.Router()
 const productController = require('../controllers/productController')
 const verifyToken = require('../middlewares/verifyToken')
 const { prisma } = require('../lib/prisma')
+const {
+  createLocalOperationalProduct: createLocalOperationalProductService,
+} = require('../src/modules/product/services/operationalProductRuntimeService')
 
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10))
-const toNum = (v) => {
-  if (v === undefined || v === null || v === '') return undefined
-  const n = Number(typeof v === 'string' ? v.trim().replace(/,/g, '') : v)
-  return Number.isFinite(n) ? n : undefined
-}
-
-const pickBranchPricePayload = (data = {}) => {
-  const d = data && typeof data === 'object' ? data : {}
-  const bp = d.branchPrice && typeof d.branchPrice === 'object' ? d.branchPrice : {}
-  const hasNested = ['costPrice', 'priceRetail', 'priceWholesale', 'priceTechnician', 'priceOnline', 'isActive'].some((k) => bp[k] !== undefined)
-  if (hasNested) return bp
-
-  const flat = {
-    costPrice: d.costPrice,
-    priceRetail: d.priceRetail,
-    priceWholesale: d.priceWholesale,
-    priceTechnician: d.priceTechnician,
-    priceOnline: d.priceOnline,
-    isActive: d.branchPriceActive ?? d.isActive,
-  }
-  const hasFlat = ['costPrice', 'priceRetail', 'priceWholesale', 'priceTechnician', 'priceOnline', 'isActive'].some((k) => flat[k] !== undefined)
-  return hasFlat ? flat : null
-}
-
-const decideLocalMode = ({ explicitMode, noSN, trackSerialNumber }) => {
-  const rawMode = explicitMode === undefined || explicitMode === null ? '' : String(explicitMode).trim()
-  const exp = rawMode ? rawMode.toUpperCase() : undefined
-  const hasNoSN = noSN !== undefined
-  const hasTrack = trackSerialNumber !== undefined
-  const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
-  const t = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1'
-
-  if (exp === 'SIMPLE' || exp === 'NOSN' || exp === 'NO_SN' || exp === 'NO-SN') return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  if (exp === 'STRUCTURED' || exp === 'SN') return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-  if (hasNoSN || hasTrack) {
-    if (t) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && n === false) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && n === true) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-    if (hasTrack && t === false) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  }
-  return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-}
 
 const toRuntimeProduct = (product, branchId) => {
   const bp = product.branchPrice?.[0] || null
@@ -149,106 +110,21 @@ const fetchRuntimeProduct = (productId, branchId, db = prisma) => db.product.fin
   select: runtimeSelect(branchId),
 })
 
-const autoLearnProductTypeBrand = async (db, productTypeId, brandId) => {
-  const ptId = toInt(productTypeId)
-  const brId = toInt(brandId)
-  if (!ptId || !brId) return
-  try {
-    await db.productTypeBrand.create({ data: { productTypeId: ptId, brandId: brId } })
-  } catch (error) {
-    if (error?.code === 'P2002') return
-    console.warn('autoLearnProductTypeBrand failed:', error?.message || error)
-  }
-}
-
 const createLocalOperationalProduct = async (req, res) => {
-  const branchId = Number(req.user?.branchId)
-  if (!branchId) return res.status(401).json({ success: false, error: 'BRANCH_ID_MISSING' })
-
-  const data = req.body || {}
-
-  if (data.branchId !== undefined) return res.status(400).json({ success: false, error: 'BODY_BRANCH_ID_NOT_ALLOWED' })
-  if (data.templateProductId !== undefined) return res.status(400).json({ success: false, error: 'TEMPLATE_PRODUCT_ID_NOT_ALLOWED' })
-  if (Array.isArray(data.barcodes) || Array.isArray(data.items)) return res.status(400).json({ success: false, error: 'STOCK_QUEUE_NOT_ALLOWED' })
-
-  const name = String(data.name || '').trim()
-  if (!name) return res.status(400).json({ success: false, error: 'NAME_REQUIRED' })
-
-  const productTypeId = toInt(data.productTypeId)
-  if (!productTypeId) return res.status(400).json({ success: false, error: 'PRODUCT_TYPE_REQUIRED' })
-
-  const pricePayload = pickBranchPricePayload(data)
-  if (!pricePayload) return res.status(400).json({ success: false, error: 'BRANCH_PRICE_REQUIRED' })
-
-  const costPrice = toNum(pricePayload.costPrice)
-  const priceRetail = toNum(pricePayload.priceRetail)
-  if (!costPrice || costPrice <= 0) return res.status(400).json({ success: false, error: 'COST_PRICE_REQUIRED' })
-  if (!priceRetail || priceRetail <= 0) return res.status(400).json({ success: false, error: 'PRICE_RETAIL_REQUIRED' })
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const productType = await tx.productType.findFirst({
-        where: { id: productTypeId, branchId },
-        select: { id: true, globalProductType: { select: { categoryId: true } } },
-      })
-      if (!productType) throw Object.assign(new Error('PRODUCT_TYPE_NOT_FOUND_IN_BRANCH'), { status: 400, code: 'PRODUCT_TYPE_NOT_FOUND_IN_BRANCH' })
+    const result = await createLocalOperationalProductService({
+      branchId: req.user?.branchId,
+      data: req.body || {},
+    })
 
-      const { mode, noSN, trackSerialNumber } = decideLocalMode({
-        explicitMode: data.mode ?? data.stockMode ?? data.stockBehavior,
-        noSN: data.noSN,
-        trackSerialNumber: data.trackSerialNumber,
-      })
-
-      const product = await tx.product.create({
-        data: {
-          name,
-          mode,
-          noSN,
-          trackSerialNumber,
-          active: typeof data.active === 'boolean' ? data.active : true,
-          templateProductId: null,
-          productTypeId: productType.id,
-          categoryId: productType.globalProductType?.categoryId ?? null,
-          brandId: data.brandId === null ? null : toInt(data.brandId),
-          unitId: data.unitId === null ? null : toInt(data.unitId),
-        },
-        select: { id: true },
-      })
-
-      await tx.branchPrice.upsert({
-        where: { productId_branchId: { productId: product.id, branchId } },
-        update: {
-          costPrice,
-          priceRetail,
-          priceWholesale: toNum(pricePayload.priceWholesale),
-          priceTechnician: toNum(pricePayload.priceTechnician),
-          priceOnline: toNum(pricePayload.priceOnline),
-          isActive: typeof pricePayload.isActive === 'boolean' ? pricePayload.isActive : true,
-        },
-        create: {
-          productId: product.id,
-          branchId,
-          costPrice,
-          priceRetail,
-          priceWholesale: toNum(pricePayload.priceWholesale),
-          priceTechnician: toNum(pricePayload.priceTechnician),
-          priceOnline: toNum(pricePayload.priceOnline),
-          isActive: typeof pricePayload.isActive === 'boolean' ? pricePayload.isActive : true,
-        },
-      })
-
-      await autoLearnProductTypeBrand(tx, productType.id, data.brandId)
-
-      const runtime = await fetchRuntimeProduct(product.id, branchId, tx)
-      return runtime
-    }, { timeout: 15000 })
-
-    const mapped = toRuntimeProduct(result, branchId)
-    return res.status(201).json({ success: true, created: true, data: mapped, product: mapped, branchId })
+    return res.status(201).json(result)
   } catch (error) {
     console.error('createLocalOperationalProduct error:', error)
     const status = error?.status || error?.statusCode || 500
-    return res.status(status).json({ success: false, error: error?.code || error?.message || 'CREATE_LOCAL_OPERATIONAL_PRODUCT_FAILED' })
+    return res.status(status).json({
+      success: false,
+      error: error?.code || error?.message || 'CREATE_LOCAL_OPERATIONAL_PRODUCT_FAILED',
+    })
   }
 }
 
