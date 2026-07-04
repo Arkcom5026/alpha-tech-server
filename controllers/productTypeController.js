@@ -1,3 +1,5 @@
+
+
 // controllers/productTypeController.js
 // Guards: slug-based unique-by-parent (categoryId), safer P2002 detail
 
@@ -39,33 +41,6 @@ function slugify(raw) {
   return base.replace(/\./g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-const dedupeProductTypeDropdowns = (rows = []) => {
-  const seen = new Set();
-  const result = [];
-
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const name = String(row?.name ?? '').trim();
-    if (!row?.id || !name) continue;
-
-    const categoryKey = row?.categoryId == null ? 'none' : String(row.categoryId);
-    const nameKey = String(row?.normalizedName || normalizeName(name)).trim().toLowerCase();
-    const key = `${categoryKey}:${nameKey}`;
-
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    result.push({
-      id: row.id,
-      name,
-      categoryId: row.categoryId ?? null,
-      branchId: row.branchId ?? null,
-      globalProductTypeId: row.globalProductTypeId ?? null,
-    });
-  }
-
-  return result;
-};
-
 // ---------- parent category guard ----------
 async function getCategoryGuardInfo(categoryId) {
   if (!categoryId) return null;
@@ -106,19 +81,22 @@ const getAllProductType = async (req, res) => {
       prisma.productType.count({ where }),
       prisma.productType.findMany({
         where,
-        orderBy: [{ pathCached: 'asc' }, { name: 'asc' }],
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
-        select: { id: true, name: true, slug: true, categoryId: true, active: true, pathCached: true, level: true, sortOrder: true, parentId: true, updatedAt: true },
+        include: { category: true },
       }),
     ]);
-    return res.json({ items, total, page, limit, pages: Math.ceil(total / limit) });
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ items, total, page, limit });
   } catch (err) {
-    console.error('❌ Get ProductType Failed:', err);
-    return res.status(500).json({ error: 'ไม่สามารถดึงประเภทสินค้าได้' });
+    console.error('❌ GET ProductTypes Failed:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
+// ✅ GET: single
 const getProductTypeById = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
@@ -126,102 +104,140 @@ const getProductTypeById = async (req, res) => {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const item = await prisma.productType.findFirst({
+    const productType = await prisma.productType.findFirst({
       where: { id, branchId },
-      select: { id: true, name: true, slug: true, categoryId: true, active: true, pathCached: true, level: true, sortOrder: true, parentId: true, updatedAt: true },
+      include: { category: true },
     });
-    if (!item) return res.status(404).json({ error: 'ไม่พบประเภทสินค้า' });
-    return res.json(item);
+
+    if (!productType) {
+      return res.status(404).json({ error: 'ไม่พบประเภทสินค้านี้' });
+    }
+
+    res.json(productType);
   } catch (err) {
-    console.error('❌ Get ProductType by id Failed:', err);
-    return res.status(500).json({ error: 'ไม่สามารถดึงประเภทสินค้าได้' });
+    console.error('❌ getProductTypeById error:', err);
+    res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลประเภทสินค้าได้' });
   }
 };
 
+// ✅ POST: create
 const createProductType = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
     if (!branchId) return;
-    const body = req.body || {};
-    const name = String(body.name || '').trim();
-    const categoryId = toInt(body.categoryId);
-    if (!name) return res.status(400).json({ error: 'กรุณาระบุชื่อประเภทสินค้า' });
-    if (!categoryId) return res.status(400).json({ error: 'กรุณาระบุหมวดหมู่สินค้า' });
+    const { name, categoryId } = req.body || {};
 
-    const cat = await getCategoryGuardInfo(categoryId);
-    if (!cat) return res.status(404).json({ error: 'ไม่พบหมวดหมู่สินค้า' });
+    if (!name || String(name).trim() === '') {
+      return res.status(400).json({ error: 'กรุณาระบุชื่อประเภทสินค้า' });
+    }
+    const categoryIdInt = toInt(categoryId);
+    if (!categoryIdInt) {
+      return res.status(400).json({ error: 'กรุณาระบุหมวดหมู่สินค้า (categoryId) ให้ถูกต้อง' });
+    }
+
+    const cat = await getCategoryGuardInfo(categoryIdInt);
+    if (!cat) return res.status(404).json({ error: 'ไม่พบหมวดหมู่สินค้า (category)' });
+    if (cat.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้แก้ไข/เพิ่มข้อมูลย่อย' });
     if (cat.active === false) return res.status(409).json({ error: 'PARENT_INACTIVE', message: 'หมวดหมู่ถูกปิดการใช้งานอยู่ กรุณากู้คืนหมวดหมู่ก่อน' });
 
-    const slug = slugify(name);
-    const dup = await findDuplicateType({ branchId, categoryId, slug });
-    if (dup) return res.status(409).json({ error: 'DUPLICATE_PRODUCT_TYPE', duplicate: dup });
+    const nameTrim = String(name).trim();
+    const normalized = normalizeName(nameTrim);
+    const slug = slugify(nameTrim);
 
-    const item = await prisma.productType.create({
-      data: omitUndefined({
-        name,
-        slug,
-        normalizedName: normalizeName(name),
-        categoryId,
-        branchId,
-        active: body.active === undefined ? true : Boolean(body.active),
-        sortOrder: toInt(body.sortOrder) ?? 0,
-      }),
-      select: { id: true, name: true, slug: true, categoryId: true, active: true, pathCached: true, level: true, sortOrder: true, parentId: true },
+    // Pre-check to return conflict detail (UX ดีกว่า)
+    const dupe = await findDuplicateType({ branchId, categoryId: categoryIdInt, slug });
+    if (dupe) {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม', conflict: dupe });
+    }
+
+    const created = await prisma.productType.create({
+      data: { name: nameTrim, normalizedName: normalized, slug, categoryId: categoryIdInt, branchId, active: true },
+      include: { category: true },
     });
-    return res.status(201).json(item);
+
+    res.status(201).json(created);
   } catch (err) {
-    console.error('❌ Create ProductType Failed:', err);
-    if (err?.code === 'P2002') return res.status(409).json({ error: 'DUPLICATE_PRODUCT_TYPE', target: err?.meta?.target });
-    return res.status(500).json({ error: 'ไม่สามารถสร้างประเภทสินค้าได้' });
+    console.error('❌ CREATE ProductType Failed:', err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // Race condition guard: unique (categoryId, slug)
+      return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม (unique constraint)' });
+    }
+    return res.status(500).json({ error: 'ไม่สามารถเพิ่มประเภทสินค้าได้' });
   }
 };
 
+// ✅ PATCH: update
 const updateProductType = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
     if (!branchId) return;
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
-    const body = req.body || {};
 
-    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, categoryId: true, name: true, slug: true } });
-    if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้า' });
+    const { name, categoryId } = req.body || {};
+    const categoryIdInt = toInt(categoryId);
 
-    const nextName = body.name === undefined ? current.name : String(body.name || '').trim();
-    const nextCategoryId = body.categoryId === undefined ? current.categoryId : toInt(body.categoryId);
-    if (!nextName) return res.status(400).json({ error: 'กรุณาระบุชื่อประเภทสินค้า' });
-    if (!nextCategoryId) return res.status(400).json({ error: 'กรุณาระบุหมวดหมู่สินค้า' });
+    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, categoryId: true, branchId: true } });
+    if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการอัปเดต' });
 
-    const cat = await getCategoryGuardInfo(nextCategoryId);
-    if (!cat) return res.status(404).json({ error: 'ไม่พบหมวดหมู่สินค้า' });
-    if (cat.active === false) return res.status(409).json({ error: 'PARENT_INACTIVE', message: 'หมวดหมู่ถูกปิดการใช้งานอยู่ กรุณากู้คืนหมวดหมู่ก่อน' });
+    const currentCat = await getCategoryGuardInfo(current.categoryId);
+    if (currentCat?.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้แก้ไขข้อมูลย่อย' });
 
-    const nextSlug = slugify(nextName);
-    if (nextCategoryId !== current.categoryId || nextSlug !== current.slug) {
-      const dup = await findDuplicateType({ branchId, categoryId: nextCategoryId, slug: nextSlug });
-      if (dup && dup.id !== id) return res.status(409).json({ error: 'DUPLICATE_PRODUCT_TYPE', duplicate: dup });
+    const targetCategoryId = categoryId !== undefined ? categoryIdInt : current.categoryId;
+    if (categoryId !== undefined) {
+      if (!categoryIdInt) return res.status(400).json({ error: 'categoryId ไม่ถูกต้อง' });
+      const targetCat = await getCategoryGuardInfo(categoryIdInt);
+      if (!targetCat) return res.status(404).json({ error: 'ไม่พบหมวดหมู่สินค้า (category)' });
+      if (targetCat.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้ย้าย/เพิ่มข้อมูลย่อย' });
+      if (targetCat.active === false) return res.status(409).json({ error: 'PARENT_INACTIVE', message: 'หมวดหมู่ปลายทางถูกปิดการใช้งานอยู่ กรุณากู้คืนก่อน' });
     }
 
-    const item = await prisma.productType.update({
-      where: { id },
-      data: omitUndefined({
-        name: nextName,
-        slug: nextSlug,
-        normalizedName: normalizeName(nextName),
-        categoryId: nextCategoryId,
-        active: body.active === undefined ? undefined : Boolean(body.active),
-        sortOrder: toInt(body.sortOrder),
-      }),
-      select: { id: true, name: true, slug: true, categoryId: true, active: true, pathCached: true, level: true, sortOrder: true, parentId: true },
+    let nameTrim, normalized, slug;
+    if (name !== undefined) {
+      if (String(name).trim() === '') return res.status(400).json({ error: 'ชื่อประเภทสินค้าต้องไม่ว่าง' });
+      nameTrim = String(name).trim();
+      normalized = normalizeName(nameTrim);
+      slug = slugify(nameTrim);
+
+      const dupe = await findDuplicateType({
+        branchId,
+        categoryId: targetCategoryId,
+        slug,
+      });
+
+      if (dupe && dupe.id !== id) {
+        return res.status(409).json({
+          error: 'DUPLICATE',
+          message: 'พบรายการเดิม',
+          conflict: dupe,
+        });
+      }
+    }
+
+    const data = omitUndefined({
+      name: nameTrim,
+      normalizedName: normalized,
+      slug,
+      categoryId: targetCategoryId !== current.categoryId ? targetCategoryId : undefined,
     });
-    return res.json(item);
+
+    const updated = await prisma.productType.update({
+      where: { id },
+      data,
+      include: { category: true },
+    });
+
+    res.json(updated);
   } catch (err) {
-    console.error('❌ Update ProductType Failed:', err);
-    if (err?.code === 'P2002') return res.status(409).json({ error: 'DUPLICATE_PRODUCT_TYPE', target: err?.meta?.target });
+    console.error('❌ UPDATE ProductType Failed:', err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'พบรายการเดิม (unique constraint)' });
+    }
     return res.status(500).json({ error: 'ไม่สามารถแก้ไขประเภทสินค้าได้' });
   }
 };
 
+// ✅ Archive: set active=false (block if referenced)
 const archiveProductType = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
@@ -229,21 +245,33 @@ const archiveProductType = async (req, res) => {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, active: true } });
-    if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการปิดใช้งาน' });
+    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, active: true, categoryId: true, branchId: true } });
+    if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการปิดการใช้งาน' });
+
+    const cat = await getCategoryGuardInfo(current.categoryId);
+    if (cat?.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้ปิดการใช้งานข้อมูลย่อย' });
+
+    const usedByProfile = await prisma.productProfile.findFirst({ where: { productTypeId: id } });
+    if (usedByProfile) {
+      return res.status(409).json({
+        error: 'HAS_REFERENCES',
+        message: 'ไม่สามารถปิดการใช้งานได้ เนื่องจากมีการอ้างอิงอยู่ (productProfile)',
+      });
+    }
 
     if (current.active === false) {
       return res.json({ message: 'ประเภทสินค้านี้ถูกปิดใช้งานอยู่แล้ว', id });
     }
 
     await prisma.productType.update({ where: { id }, data: { active: false } });
-    return res.json({ message: 'ปิดใช้งานประเภทสินค้าเรียบร้อย', id });
+    return res.json({ message: 'ปิดการใช้งานประเภทสินค้าเรียบร้อย', id });
   } catch (err) {
     console.error('❌ ARCHIVE ProductType Failed:', err);
-    return res.status(500).json({ error: 'ไม่สามารถปิดใช้งานประเภทสินค้าได้' });
+    return res.status(500).json({ error: 'ไม่สามารถปิดการใช้งานประเภทสินค้าได้' });
   }
 };
 
+// ✅ Restore: set active=true
 const restoreProductType = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
@@ -274,22 +302,12 @@ const getProductTypeDropdowns = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
     if (!branchId) return;
-
     const types = await prisma.productType.findMany({
       where: { active: true, branchId },
-      select: {
-        id: true,
-        name: true,
-        categoryId: true,
-        branchId: true,
-        normalizedName: true,
-        globalProductTypeId: true,
-      },
-      orderBy: [{ categoryId: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     });
-
-    res.set('Cache-Control', 'no-store');
-    res.json(dedupeProductTypeDropdowns(types));
+    res.json(types);
   } catch (err) {
     console.error('❌ getProductTypeDropdowns error:', err);
     res.status(500).json({ error: 'Failed to load product types' });
@@ -305,3 +323,5 @@ module.exports = {
   restoreProductType,
   getProductTypeDropdowns,
 };
+
+
