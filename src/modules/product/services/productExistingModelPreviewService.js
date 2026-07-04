@@ -6,10 +6,18 @@ const toInt = (value) => {
   return Number.isFinite(n) ? n : undefined
 }
 
-const getProductExistingModelPreview = async ({ productTypeId, brandId, take } = {}) => {
+const getProductExistingModelPreview = async ({ branchId, productTypeId, brandId, take } = {}) => {
+  const bId = toInt(branchId)
   const ptId = toInt(productTypeId)
   const brId = toInt(brandId)
   const takeNum = Math.max(1, Math.min(toInt(take) ?? 80, 200))
+
+  if (!bId) {
+    const error = new Error('BRANCH_ID_REQUIRED')
+    error.status = 403
+    error.code = 'BRANCH_ID_REQUIRED'
+    throw error
+  }
 
   if (!ptId || !brId) {
     return { items: [], total: 0 }
@@ -20,6 +28,12 @@ const getProductExistingModelPreview = async ({ productTypeId, brandId, take } =
       active: true,
       productTypeId: ptId,
       brandId: brId,
+      branchPrices: {
+        some: {
+          branchId: bId,
+          isActive: true,
+        },
+      },
     },
     select: {
       id: true,
