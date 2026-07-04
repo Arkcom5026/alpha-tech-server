@@ -1,8 +1,7 @@
 // src/modules/quickStock/controllers/quickStockController.js
-const { prisma } = require('../../../../lib/prisma');
-const QuickStockService = require('../services/QuickStockService');
+const QuickStockService = require('../services/QuickStockServiceSingleton');
 
-const quickStockService = new QuickStockService(prisma);
+const quickStockService = new QuickStockService();
 
 /**
  * ดึงข้อมูลเบื้องต้นสำหรับแสดงผลหน้าจอ QuickStock
