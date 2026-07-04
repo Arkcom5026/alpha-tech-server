@@ -5,11 +5,7 @@
 
 const { prisma, Prisma } = require('../lib/prisma')
 const {
-  findOperationalProductById,
   findOperationalProductByTemplateId,
-  findOperationalProductsForPOS,
-  findOperationalProductsForOnline,
-  findOperationalProductOnlineById,
 } = require('../src/modules/product/services/operationalProductRuntimeService')
 
 let cloudinary = null
@@ -405,33 +401,304 @@ const getAllProducts = async (req, res) => {
 
 
 const getProductsForPos = async (req, res) => {
+  const branchId = Number(req.user?.branchId)
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' })
+
+  const {
+    search: qSearch = '',
+    searchText: qSearchText = '',
+    take = 50,
+    page = 1,
+    productTypeId,
+    brandId,
+    readyOnly = 'false',
+    hasPrice = 'false',
+    activeOnly = 'true',
+    includeInactive = '0',
+  } = req.query
+
+  const search = String(qSearch || qSearchText || '').trim()
+  const queryMode = (req?.query?.mode || '').toString().toUpperCase()
+  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'
+
+  const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200))
+  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))
+
+  const wantIncludeInactive =
+    String(includeInactive) === '1' ||
+    String(includeInactive).toLowerCase() === 'true'
+
+  const wantActiveOnlyFalse =
+    String(activeOnly).toLowerCase() === 'false'
+
+  const activeFilter =
+    wantIncludeInactive || wantActiveOnlyFalse
+      ? undefined
+      : true
+
+  // =====================================================
+  // PATCH START
+  // แสดงเฉพาะ Operational Product ของ Branch ปัจจุบัน
+  // =====================================================
+  const whereAND = [
+    {
+      productType: {
+        branchId,
+      },
+    },
+  ]
+  // =====================================================
+  // PATCH END
+  // =====================================================
+
+  if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })
+  if (activeFilter !== undefined) whereAND.push({ active: activeFilter })
+
+  if (search) {
+    whereAND.push({
+      OR: [
+        {
+          name: {
+            contains: String(search),
+            mode: 'insensitive',
+          },
+        },
+      ],
+    })
+  }
+
+  const typeId = toInt(productTypeId)
+  const brId = toInt(brandId)
+
+  if (typeId) whereAND.push({ productTypeId: typeId })
+  if (brId) whereAND.push({ brandId: brId })
+
+  const where = {
+    AND: whereAND,
+  }
+
   try {
-    const result = await findOperationalProductsForPOS({
-      branchId: req.user?.branchId,
-      search: req.query.search || req.query.searchText || '',
-      take: req.query.take,
-      page: req.query.page,
-      productTypeId: req.query.productTypeId,
-      brandId: req.query.brandId,
-      readyOnly: req.query.readyOnly,
-      hasPrice: req.query.hasPrice,
-      activeOnly: req.query.activeOnly,
-      includeInactive: req.query.includeInactive,
-      mode: req.query.mode,
-      simpleOnly: req.query.simpleOnly,
+    const items = await prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        active: true,
+        name: true,
+        mode: true,
+        noSN: true,
+        trackSerialNumber: true,
+
+        productTypeId: true,
+        productType: {
+          select: {
+            id: true,
+            name: true,
+            branchId: true,
+            globalProductType: {
+              select: {
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        brandId: true,
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            active: true,
+          },
+        },
+
+        unitId: true,
+        unit: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+
+        branchPrice: {
+          where: {
+            branchId,
+          },
+          take: 1,
+          select: {
+            costPrice: true,
+            priceRetail: true,
+            priceOnline: true,
+            priceWholesale: true,
+            priceTechnician: true,
+            isActive: true,
+          },
+        },
+
+        stockItems: {
+          where: {
+            branchId,
+            status: 'IN_STOCK',
+          },
+          take: 1,
+          select: {
+            id: true,
+          },
+        },
+
+        stockBalances: {
+          where: {
+            branchId,
+          },
+          take: 1,
+          select: {
+            quantity: true,
+            reserved: true,
+            lastReceivedCost: true,
+          },
+        },
+      },
+
+      take: takeNum,
+      skip: skipNum,
+      orderBy: {
+        id: 'desc',
+      },
     })
 
-    return res.json(result)
-  } catch (error) {
-    if (error?.code === 'unauthorized') return res.status(401).json({ error: 'unauthorized' })
+    const uniqueItems = (() => {
+      const map = new Map()
 
+      for (const p of items) {
+        if (!map.has(p.id)) {
+          map.set(p.id, p)
+        }
+      }
+
+      return [...map.values()]
+    })()
+
+    const mappedBase = uniqueItems.map((p) => {
+      const bp = p.branchPrice?.[0]
+      const sb = p.stockBalances?.[0]
+
+      const qty = Number(sb?.quantity ?? 0)
+      const reserved = Number(sb?.reserved ?? 0)
+
+      const available = Math.max(0, qty - reserved)
+
+      const isSimple =
+        p.mode === 'SIMPLE' ||
+        p.noSN === true
+
+      const isReady = isSimple
+        ? available > 0
+        : (p.stockItems?.length ?? 0) > 0
+
+      const lastCost =
+        sb?.lastReceivedCost != null
+          ? Number(sb.lastReceivedCost)
+          : bp?.costPrice != null
+            ? Number(bp.costPrice)
+            : null
+
+      const catName =
+        p.productType?.globalProductType?.category?.name ?? '-'
+
+      const typeName =
+        p.productType?.name ?? '-'
+
+      return {
+        id: p.id,
+        active:
+          typeof p.active === 'boolean'
+            ? p.active
+            : true,
+
+        name: p.name,
+        mode: p.mode,
+
+        categoryId:
+          p.productType?.globalProductType?.category?.id ?? null,
+
+        productTypeId:
+          p.productTypeId ?? null,
+
+        category: catName,
+        productType: typeName,
+
+        brandId:
+          p.brandId ??
+          p.brand?.id ??
+          null,
+
+        brandName:
+          p.brand?.name ??
+          null,
+
+        unitId:
+          p.unitId ??
+          p.unit?.id ??
+          null,
+
+        unitName:
+          p.unit?.name ??
+          null,
+
+        unit: p.unit
+          ? {
+              id: p.unit.id,
+              name: p.unit.name,
+            }
+          : null,
+
+        noSN: p.noSN,
+        trackSerialNumber: p.trackSerialNumber,
+
+        priceRetail: Number(bp?.priceRetail ?? 0),
+        priceWholesale: Number(bp?.priceWholesale ?? 0),
+        priceTechnician: Number(bp?.priceTechnician ?? 0),
+        priceOnline: Number(bp?.priceOnline ?? 0),
+
+        branchPriceActive:
+          bp?.isActive ?? true,
+
+        available,
+        isReady,
+
+        lastCost,
+        costPrice: lastCost,
+
+        hasPrice: !!bp,
+      }
+    })
+
+    let mapped = mappedBase
+
+    if (String(readyOnly).toLowerCase() === 'true') {
+      mapped = mapped.filter((x) => x.isReady)
+    }
+
+    if (String(hasPrice).toLowerCase() === 'true') {
+      mapped = mapped.filter(
+        (x) =>
+          x.hasPrice &&
+          x.branchPriceActive !== false
+      )
+    }
+
+    return res.json(mapped)
+  } catch (error) {
     console.error('❌ getProductsForPos error:', error)
     return res.status(500).json({
       error: 'Internal server error',
     })
   }
 }
-
 
 
 const mapRuntimeProductForPos = (p, branchId) => {
@@ -503,341 +770,354 @@ const getOperationalProductByTemplateId = async (req, res) => {
     return res.json(result)
   } catch (error) {
     if (error?.code === 'BRANCH_ID_MISSING') {
-      return res.status(401).json({ success: false, error: 'BRANCH_ID_MISSING' })
+      return res.status(401).json({ success:false,error:'BRANCH_ID_MISSING' })
     }
     if (error?.code === 'TEMPLATE_PRODUCT_ID_MISSING') {
-      return res.status(400).json({
-        success: false,
-        error: 'TEMPLATE_PRODUCT_ID_MISSING',
-        message: 'ไม่พบ templateProductId',
-      })
+      return res.status(400).json({ success:false,error:'TEMPLATE_PRODUCT_ID_MISSING',message:'ไม่พบ templateProductId' })
     }
     console.error('❌ getOperationalProductByTemplateId error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'RUNTIME_PRODUCT_LOOKUP_FAILED',
-      message: 'ตรวจสอบ Operational Product ไม่สำเร็จ',
-    })
+    return res.status(500).json({success:false,error:'RUNTIME_PRODUCT_LOOKUP_FAILED',message:'ตรวจสอบ Operational Product ไม่สำเร็จ'})
   }
 }
 
 
-
 const getProductsForOnline = async (req, res) => {
+  const branchId = Number(req.user?.branchId) || toInt(req.query.branchId)
+  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })
+
+  const {
+    search: q1 = '',
+    searchText: q2 = '',
+    take = 50,
+    size,
+    page = 1,
+    productTypeId,
+    brandId,
+    activeOnly = 'true',
+    readyOnly = 'false',
+    hasPrice = 'false',
+  } = req.query
+
+  const queryMode = (req?.query?.mode || '').toString().toUpperCase()
+  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'
+
+  const search = normStr(q1 || q2)
+  const takeNum = Math.max(1, Math.min((toInt(size) ?? toInt(take) ?? 50), 200))
+  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))
+
   try {
-    const result = await findOperationalProductsForOnline({
-      branchId: Number(req.user?.branchId) || toInt(req.query.branchId),
-      search: req.query.search || req.query.searchText || '',
-      take: req.query.take,
-      size: req.query.size,
-      page: req.query.page,
-      productTypeId: req.query.productTypeId,
-      brandId: req.query.brandId,
-      readyOnly: req.query.readyOnly,
-      hasPrice: req.query.hasPrice,
-      mode: req.query.mode,
-      simpleOnly: req.query.simpleOnly,
+    // Runtime Catalog Separation:
+    // Online catalog must expose only Operational Product of selected branch.
+    const whereAND = [
+      {
+        productType: {
+          branchId,
+        },
+      },
+    ]
+    if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })
+
+    if (search) {
+      whereAND.push({
+        OR: [{ name: { contains: search, mode: 'insensitive' } }],
+      })
+    }
+
+    const typeId = toInt(productTypeId)
+    const brId = toInt(brandId)
+
+    if (typeId) whereAND.push({ productTypeId: typeId })
+    if (brId) whereAND.push({ brandId: brId })
+
+    const where = whereAND.length ? { AND: whereAND } : {}
+
+    const items = await prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        mode: true,
+        noSN: true,
+        productTypeId: true,
+        productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
+        brandId: true,
+        brand: { select: { id: true, name: true, active: true } },
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
+        branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
+      },
+      take: takeNum,
+      skip: skipNum,
+      orderBy: { id: 'desc' },
     })
 
-    return res.json(result)
-  } catch (error) {
-    if (error?.code === 'BRANCH_REQUIRED') return res.status(400).json({ error: 'BRANCH_REQUIRED' })
+    let mapped = items.map((p) => {
+      const bp = p.branchPrice?.[0]
+      const sb = p.stockBalances?.[0]
+      const qty = Number(sb?.quantity ?? 0)
+      const reserved = Number(sb?.reserved ?? 0)
+      const available = Math.max(0, qty - reserved)
+      const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
+      const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
+      const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null
 
+      return {
+        id: p.id,
+        name: p.name,
+        mode: p.mode,
+        categoryId: p.productType?.globalProductType?.category?.id ?? null,
+        productTypeId: p.productTypeId ?? null,
+        imageUrl,
+        priceOnline: Number(bp?.priceOnline ?? 0),
+        priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
+        readyPickupAtBranch: isReady,
+        isReady,
+        category: p.productType?.globalProductType?.category?.name,
+        productType: p.productType?.name,
+        brandId: p.brandId ?? p.brand?.id ?? null,
+        brandName: p.brand?.name ?? null,
+        unitId: p.unitId ?? p.unit?.id ?? null,
+        unitName: p.unit?.name ?? null,
+        unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
+        hasPrice: !!bp,
+        branchPriceActive: bp?.isActive ?? true,
+      }
+    })
+
+    if (String(readyOnly).toLowerCase() === 'true') mapped = mapped.filter((x) => x.isReady === true)
+    if (String(hasPrice).toLowerCase() === 'true') mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)
+
+    return res.json(mapped)
+  } catch (error) {
     console.error('❌ getProductsForOnline error:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-
-
 const getReadyToSell = async (req, res) => {
   try {
-    const branchId = Number(req.user?.branchId)
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
-
-    const q = normStr(req.query?.q || req.query?.search || req.query?.searchText)
-    const mode = String(req.query?.mode || 'ALL').toUpperCase()
-
-    const page = Math.max(1, toInt(req.query?.page) ?? 1)
-    const pageSizeRaw = toInt(req.query?.pageSize) ?? 25
-    const pageSize = Math.max(1, Math.min(pageSizeRaw, 100))
-
-    const wantStructured = mode === 'ALL' || mode === 'STRUCTURED'
-    const wantSimple = mode === 'ALL' || mode === 'SIMPLE'
-
-    let structuredItems = []
-
-    if (wantStructured) {
-      try {
-        let structuredProductIds = []
-        if (q) {
-          const matchedProducts = await prisma.product.findMany({
-            where: { name: { contains: q, mode: 'insensitive' } },
-            select: { id: true },
-          })
-          structuredProductIds = matchedProducts.map((p) => Number(p.id)).filter(Boolean)
-        }
-
-        const grouped = await prisma.stockItem.groupBy({
-          by: ['productId'],
-          where: {
-            branchId,
-            status: 'IN_STOCK',
-            ...(q ? { productId: { in: (structuredProductIds.length ? structuredProductIds : [-1]) } } : {}),
-          },
-          _count: { _all: true },
-          _max: { receivedAt: true },
-        })
-
-        const productIds = grouped.map((g) => g.productId)
-        const products = await prisma.product.findMany({
-          where: { id: { in: productIds } },
-          select: {
-            id: true,
-            name: true,
-            brandId: true,
-            brand: { select: { id: true, name: true } },
-            unitId: true,
-            unit: { select: { id: true, name: true } },
-          },
-        })
-
-        const productMap = new Map(products.map((p) => [p.id, p]))
-        const structuredBarcodeRows = productIds.length
-          ? await prisma.stockItem.findMany({
-              where: {
-                branchId,
-                status: 'IN_STOCK',
-                productId: { in: productIds },
-              },
-              select: { productId: true, barcode: true, receivedAt: true, createdAt: true },
-              orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
-            })
-          : []
-
-        const structuredPreviewMap = new Map()
-        for (const row of structuredBarcodeRows) {
-          if (!structuredPreviewMap.has(row.productId)) {
-            structuredPreviewMap.set(row.productId, row)
-          }
-        }
-
-        structuredItems = grouped.map((g) => {
-          const p = productMap.get(g.productId)
-          const preview = structuredPreviewMap.get(g.productId)
-          const qty = Number(g._count._all ?? 0)
-          const previewBarcode = normStr(preview?.barcode)
-
-          return {
-            kind: 'STRUCTURED',
-            productId: g.productId,
-            productName: p?.name ?? null,
-            brandId: p?.brandId ?? p?.brand?.id ?? null,
-            brandName: p?.brand?.name ?? null,
-            unitId: p?.unitId ?? p?.unit?.id ?? null,
-            unitName: p?.unit?.name ?? null,
-            unit: p?.unit ? { id: p.unit.id, name: p.unit.name } : null,
-            qty,
-            receivedAt: g._max.receivedAt ?? null,
-            displayCode: qty <= 1 ? (previewBarcode || '-') : 'หลายบาร์โค้ด',
-            hasDetails: true,
-          }
-        })
-      } catch (e) {
-        console.error('❌ structured summary failed:', e)
-        structuredItems = []
-      }
-    }
-
-    let simpleItems = []
-    if (wantSimple) {
-      try {
-        const raw = await prisma.stockBalance.findMany({
-          where: {
-            branchId,
-            product: {
-              is: {
-                OR: [{ mode: 'SIMPLE' }, { noSN: true }],
-                ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
-              },
-            },
-          },
-          select: {
-            id: true,
-            productId: true,
-            quantity: true,
-            reserved: true,
-            updatedAt: true,
-            product: {
-              select: {
-                id: true,
-                name: true,
-                brandId: true,
-                brand: { select: { id: true, name: true } },
-                unitId: true,
-                unit: { select: { id: true, name: true } },
-              },
-            },
-          },
-        })
-
-        simpleItems = raw
-          .map((r) => {
-            const qty = Number(r.quantity ?? 0)
-            const reserved = Number(r.reserved ?? 0)
-            const available = Math.max(0, qty - reserved)
-
-            return {
-              kind: 'SIMPLE',
-              productId: r.productId,
-              productName: r.product?.name ?? null,
-              brandId: r.product?.brandId ?? r.product?.brand?.id ?? null,
-              brandName: r.product?.brand?.name ?? null,
-              unitId: r.product?.unitId ?? r.product?.unit?.id ?? null,
-              unitName: r.product?.unit?.name ?? null,
-              unit: r.product?.unit ? { id: r.product.unit.id, name: r.product.unit.name } : null,
-              qty: available,
-              receivedAt: r.updatedAt ?? null,
-              status: 'IN_STOCK',
-              hasDetails: false,
-            }
-          })
-          .filter((x) => x.qty > 0)
-      } catch (e) {
-        simpleItems = []
-      }
-    }
-
-    const merged = [...structuredItems, ...simpleItems].sort((a, b) => {
-      const ta = a?.receivedAt ? new Date(a.receivedAt).getTime() : 0
-      const tb = b?.receivedAt ? new Date(b.receivedAt).getTime() : 0
-      return tb - ta
-    })
-
-    const total = merged.length
-    const start = Math.max(0, (page - 1) * pageSize)
-    const end = start + pageSize
-
-    return res.json({
-      items: merged.slice(start, end),
-      total,
-      page,
-      pageSize,
-    })
-  } catch (error) {
-    console.error('❌ getReadyToSell error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}
-
-const getReadyToSellStructuredDetails = async (req, res) => {
-  try {
-    const branchId = Number(req.user?.branchId)
-    const productId = Number(req.params.productId)
-
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' })
-    if (!productId) return res.status(400).json({ error: 'invalid productId' })
-
-    const q = normStr(req.query?.q || '')
-
-    const items = await prisma.stockItem.findMany({
-      where: {
-        branchId,
-        productId,
-        status: 'IN_STOCK',
-        ...(q
-          ? {
-              OR: [
-                { barcode: { contains: q, mode: 'insensitive' } },
-                { serialNumber: { contains: q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        serialNumber: true,
-        barcode: true,
-        createdAt: true,
-        receivedAt: true,
-        status: true,
-        product: {
-          select: {
-            id: true,
-            name: true,
-            productConfig: true,
-            brand: { select: { id: true, name: true } },
-            unitId: true,
-            unit: { select: { id: true, name: true } },
-            productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
-            branchPrice: {
-              where: { branchId },
-              select: {
-                costPrice: true,
-                priceRetail: true,
-                priceWholesale: true,
-                priceTechnician: true,
-                priceOnline: true,
-                isActive: true,
-                updatedAt: true,
-              },
-              take: 1,
-            },
-          },
-        },
-      },
-    })
-
-    return res.json({
-      items,
-      total: items.length,
-    })
-  } catch (error) {
-    console.error('❌ getReadyToSellStructuredDetails error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}
-
-const getProductPosById = async (req, res) => {
-  try {
-    const result = await findOperationalProductById({
+    const result = await getReadyToSellService({
       branchId: req.user?.branchId,
-      productId: req.params.id,
+      q: req.query?.q,
+      search: req.query?.search,
+      searchText: req.query?.searchText,
+      mode: req.query?.mode,
+      page: req.query?.page,
+      pageSize: req.query?.pageSize,
     })
 
     return res.json(result)
   } catch (error) {
     if (error?.code === 'unauthorized') return res.status(401).json({ error: 'unauthorized' })
-    if (error?.code === 'INVALID_ID') return res.status(400).json({ error: 'INVALID_ID' })
-    if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' })
 
+    console.error('❌ getReadyToSell error:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+
+
+const getReadyToSellStructuredDetails = async (req, res) => {
+  try {
+    const result = await getReadyToSellStructuredDetailsService({
+      branchId: req.user?.branchId,
+      productId: req.params.productId,
+      q: req.query?.q || '',
+    })
+
+    return res.json(result)
+  } catch (error) {
+    if (error?.code === 'unauthorized') return res.status(401).json({ error: 'unauthorized' })
+    if (error?.code === 'INVALID_PRODUCT_ID') return res.status(400).json({ error: 'invalid productId' })
+
+    console.error('❌ getReadyToSellStructuredDetails error:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+
+
+const getProductPosById = async (req, res) => {
+  const branchId = Number(req.user?.branchId)
+  if (!branchId) return res.status(401).json({ error: 'unauthorized' })
+
+  const id = toInt(req.params.id)
+  if (!id) return res.status(400).json({ error: 'INVALID_ID' })
+
+  try {
+    const p = await prisma.product.findFirst({
+      where: {
+        id,
+        productType: {
+          branchId,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        mode: true,
+        noSN: true,
+        trackSerialNumber: true,
+        productTypeId: true,
+        productType: { select: { id: true, name: true, globalProductType: { select: { categoryId: true, category: { select: { id: true, name: true } } } } } },
+        brandId: true,
+        brand: { select: { id: true, name: true, active: true } },
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+        productImages: {
+          where: { active: true },
+          orderBy: [{ isCover: 'desc' }, { id: 'asc' }],
+          select: { id: true, url: true, secure_url: true, caption: true, isCover: true },
+        },
+        branchPrice: {
+          where: { branchId },
+          take: 1,
+          select: {
+            costPrice: true,
+            priceWholesale: true,
+            priceTechnician: true,
+            priceRetail: true,
+            priceOnline: true,
+            isActive: true,
+          },
+        },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true, lastReceivedCost: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+      },
+    })
+
+    if (!p) return res.status(404).json({ error: 'NOT_FOUND' })
+
+    const bp = p.branchPrice?.[0]
+    const sb = p.stockBalances?.[0]
+    const qty = Number(sb?.quantity ?? 0)
+    const reserved = Number(sb?.reserved ?? 0)
+    const available = Math.max(0, qty - reserved)
+    const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
+    const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
+
+    const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost) : (bp?.costPrice != null ? Number(bp.costPrice) : null)
+
+    const mode = p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED')
+    const catName = p.productType?.globalProductType?.category?.name ?? '-'
+    const typeName = p.productType?.name ?? '-'
+
+    const branchPriceObj = {
+      costPrice: Number(bp?.costPrice ?? 0),
+      priceWholesale: Number(bp?.priceWholesale ?? 0),
+      priceTechnician: Number(bp?.priceTechnician ?? 0),
+      priceRetail: Number(bp?.priceRetail ?? 0),
+      priceOnline: Number(bp?.priceOnline ?? 0),
+    }
+
+    return res.json({
+      id: p.id,
+      name: p.name,
+      spec: null,
+      mode,
+      noSN: p.noSN,
+      trackSerialNumber: p.trackSerialNumber,
+      unitId: p.unitId ?? p.unit?.id ?? null,
+      unitName: p.unit?.name ?? null,
+      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
+      categoryId: p.productType?.globalProductType?.categoryId ?? null,
+      productTypeId: p.productTypeId ?? null,
+      productProfileId: null,
+      templateId: null,
+      productTemplateId: null,
+      categoryName: catName,
+      productTypeName: typeName,
+      productProfileName: '-',
+      productTemplateName: '-',
+      brandId: p.brandId ?? p.brand?.id ?? null,
+      brandName: p.brand?.name ?? null,
+      images: (p.productImages || [])
+        .map((im) => ({ id: im.id, url: im.secure_url || im.url, caption: im.caption ?? '', isCover: Boolean(im.isCover) }))
+        .filter((im) => !!im.url),
+      costPrice: branchPriceObj.costPrice,
+      priceWholesale: branchPriceObj.priceWholesale,
+      priceTechnician: branchPriceObj.priceTechnician,
+      priceRetail: branchPriceObj.priceRetail,
+      priceOnline: branchPriceObj.priceOnline,
+      branchPriceActive: bp?.isActive ?? true,
+      available,
+      isReady,
+      lastCost,
+      branchPrice: branchPriceObj,
+    })
+  } catch (error) {
     console.error('❌ getProductPosById error:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-
-
 const getProductOnlineById = async (req, res) => {
+  const branchId = toInt(req.query.branchId) ?? Number(req.user?.branchId)
+  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })
+
+  const id = toInt(req.params.id)
+  if (!id) return res.status(400).json({ error: 'INVALID_ID' })
+
   try {
-    const result = await findOperationalProductOnlineById({
-      branchId: toInt(req.query.branchId) ?? Number(req.user?.branchId),
-      productId: req.params.id,
+    const p = await prisma.product.findFirst({
+      where: {
+        id,
+        productType: {
+          branchId,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        mode: true,
+        noSN: true,
+        brandId: true,
+        brand: { select: { id: true, name: true, active: true } },
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },
+        branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },
+        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },
+        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },
+      },
     })
 
-    return res.json(result)
-  } catch (error) {
-    if (error?.code === 'BRANCH_REQUIRED') return res.status(400).json({ error: 'BRANCH_REQUIRED' })
-    if (error?.code === 'INVALID_ID') return res.status(400).json({ error: 'INVALID_ID' })
-    if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' })
+    if (!p) return res.status(404).json({ error: 'NOT_FOUND' })
 
+    const bp = p.branchPrice?.[0]
+    const sb = p.stockBalances?.[0]
+    const qty = Number(sb?.quantity ?? 0)
+    const reserved = Number(sb?.reserved ?? 0)
+    const available = Math.max(0, qty - reserved)
+    const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)
+    const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)
+    const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null
+
+    return res.json({
+      id: p.id,
+      name: p.name,
+      mode: p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED'),
+      brandId: p.brandId ?? p.brand?.id ?? null,
+      brandName: p.brand?.name ?? null,
+      unitId: p.unitId ?? p.unit?.id ?? null,
+      unitName: p.unit?.name ?? null,
+      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,
+      imageUrl,
+      priceOnline: Number(bp?.priceOnline ?? 0),
+      priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),
+      readyPickupAtBranch: isReady,
+      isReady,
+      hasPrice: !!bp,
+      branchPriceActive: bp?.isActive ?? true,
+    })
+  } catch (error) {
     console.error('❌ getProductOnlineById error:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
-
-
 
 const getProductDropdowns = async (req, res) => {
   try {

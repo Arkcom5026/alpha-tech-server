@@ -3,112 +3,10 @@ const router = express.Router()
 
 const productController = require('../controllers/productController')
 const verifyToken = require('../middlewares/verifyToken')
-const { prisma } = require('../lib/prisma')
 const {
   createLocalOperationalProduct: createLocalOperationalProductService,
+  createOperationalProductFromTemplate: createOperationalProductFromTemplateService,
 } = require('../src/modules/product/services/operationalProductRuntimeService')
-
-const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number.parseInt(v, 10))
-
-const toRuntimeProduct = (product, branchId) => {
-  const bp = product.branchPrice?.[0] || null
-  const sb = product.stockBalances?.[0] || null
-  const quantity = Number(sb?.quantity ?? 0)
-  const reserved = Number(sb?.reserved ?? 0)
-  const available = Math.max(0, quantity - reserved)
-
-  return {
-    id: product.id,
-    active: product.active !== false,
-    name: product.name,
-    mode: product.mode,
-    noSN: product.noSN,
-    trackSerialNumber: product.trackSerialNumber,
-    templateProductId: product.templateProductId,
-    isTemplateProduct: false,
-    isOperationalProduct: true,
-    categoryId: product.productType?.globalProductType?.category?.id ?? null,
-    categoryName: product.productType?.globalProductType?.category?.name ?? null,
-    category: product.productType?.globalProductType?.category?.name ?? '-',
-    productTypeId: product.productTypeId ?? null,
-    productTypeName: product.productType?.name ?? '-',
-    productType: product.productType?.name ?? '-',
-    brandId: product.brandId ?? product.brand?.id ?? null,
-    brandName: product.brand?.name ?? null,
-    unitId: product.unitId ?? product.unit?.id ?? null,
-    unitName: product.unit?.name ?? null,
-    unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
-    costPrice: Number(bp?.costPrice ?? sb?.lastReceivedCost ?? 0),
-    priceRetail: Number(bp?.priceRetail ?? 0),
-    priceWholesale: Number(bp?.priceWholesale ?? 0),
-    priceTechnician: Number(bp?.priceTechnician ?? 0),
-    priceOnline: Number(bp?.priceOnline ?? 0),
-    branchPriceActive: bp?.isActive ?? false,
-    hasPrice: !!bp,
-    available,
-    stockBalance: sb
-      ? {
-          quantity,
-          reserved,
-          available,
-          lastReceivedCost: sb.lastReceivedCost,
-        }
-      : null,
-    branchPrice: bp ? [bp] : [],
-    branchId,
-  }
-}
-
-const runtimeSelect = (branchId) => ({
-  id: true,
-  active: true,
-  name: true,
-  mode: true,
-  noSN: true,
-  trackSerialNumber: true,
-  templateProductId: true,
-  productTypeId: true,
-  productType: {
-    select: {
-      id: true,
-      name: true,
-      branchId: true,
-      globalProductType: { select: { category: { select: { id: true, name: true } } } },
-    },
-  },
-  brandId: true,
-  brand: { select: { id: true, name: true } },
-  unitId: true,
-  unit: { select: { id: true, name: true } },
-  branchPrice: {
-    where: { branchId },
-    take: 1,
-    select: {
-      id: true,
-      branchId: true,
-      costPrice: true,
-      priceRetail: true,
-      priceWholesale: true,
-      priceTechnician: true,
-      priceOnline: true,
-      isActive: true,
-    },
-  },
-  stockBalances: {
-    where: { branchId },
-    take: 1,
-    select: {
-      quantity: true,
-      reserved: true,
-      lastReceivedCost: true,
-    },
-  },
-})
-
-const fetchRuntimeProduct = (productId, branchId, db = prisma) => db.product.findFirst({
-  where: { id: productId, active: true, productType: { branchId } },
-  select: runtimeSelect(branchId),
-})
 
 const createLocalOperationalProduct = async (req, res) => {
   try {
@@ -129,71 +27,37 @@ const createLocalOperationalProduct = async (req, res) => {
 }
 
 const createOperationalProductFromTemplate = async (req, res) => {
-  const branchId = Number(req.user?.branchId)
-  if (!branchId) return res.status(401).json({ success: false, error: 'BRANCH_ID_MISSING' })
-
-  const templateProductId = toInt(req.body?.templateProductId)
-  if (!templateProductId) return res.status(400).json({ success: false, error: 'TEMPLATE_PRODUCT_ID_MISSING' })
-
   try {
-    const templateBranch = await prisma.branch.findFirst({ where: { branchCode: 'T01' }, select: { id: true } })
-    if (!templateBranch) return res.status(404).json({ success: false, error: 'TEMPLATE_BRANCH_NOT_FOUND' })
-
-    const template = await prisma.product.findFirst({
-      where: { id: templateProductId, active: true, productType: { branchId: templateBranch.id } },
-      select: {
-        id: true,
-        name: true,
-        mode: true,
-        noSN: true,
-        trackSerialNumber: true,
-        brandId: true,
-        unitId: true,
-        productType: { select: { globalProductTypeId: true } },
-      },
-    })
-    if (!template) return res.status(404).json({ success: false, error: 'TEMPLATE_PRODUCT_NOT_FOUND' })
-
-    const existing = await prisma.product.findFirst({
-      where: { active: true, templateProductId, productType: { branchId } },
-      select: runtimeSelect(branchId),
-      orderBy: { id: 'desc' },
-    })
-    if (existing) {
-      const mapped = toRuntimeProduct(existing, branchId)
-      return res.status(200).json({ success: true, created: false, exists: true, data: mapped, product: mapped, templateProductId, branchId })
-    }
-
-    const branchType = await prisma.productType.findFirst({
-      where: { branchId, globalProductTypeId: template.productType?.globalProductTypeId },
-      select: { id: true, globalProductType: { select: { categoryId: true } } },
-    })
-    if (!branchType) return res.status(400).json({ success: false, error: 'PRODUCT_TYPE_NOT_FOUND_IN_BRANCH' })
-
-    const structured = template.mode === 'STRUCTURED' || template.trackSerialNumber === true
-    const created = await prisma.product.create({
-      data: {
-        name: template.name,
-        mode: structured ? 'STRUCTURED' : 'SIMPLE',
-        noSN: !structured,
-        trackSerialNumber: structured,
-        active: true,
-        templateProductId,
-        productTypeId: branchType.id,
-        categoryId: branchType.globalProductType?.categoryId ?? null,
-        brandId: template.brandId ?? null,
-        unitId: template.unitId ?? null,
-      },
-      select: { id: true },
+    const result = await createOperationalProductFromTemplateService({
+      branchId: req.user?.branchId,
+      templateProductId: req.body?.templateProductId,
     })
 
-    const runtime = await fetchRuntimeProduct(created.id, branchId)
-    const mapped = toRuntimeProduct(runtime, branchId)
+    const status = result.statusCode || (result.created ? 201 : 200)
+    const { statusCode, ...payload } = result
 
-    return res.status(201).json({ success: true, created: true, exists: false, data: mapped, product: mapped, templateProductId, branchId })
+    return res.status(status).json(payload)
   } catch (error) {
     console.error('createOperationalProductFromTemplate error:', error)
-    return res.status(500).json({ success: false, error: 'CREATE_OPERATIONAL_PRODUCT_FROM_TEMPLATE_FAILED' })
+
+    const code = error?.code || error?.message
+    if (
+      code === 'BRANCH_ID_MISSING' ||
+      code === 'TEMPLATE_PRODUCT_ID_MISSING' ||
+      code === 'TEMPLATE_BRANCH_NOT_FOUND' ||
+      code === 'TEMPLATE_PRODUCT_NOT_FOUND' ||
+      code === 'PRODUCT_TYPE_NOT_FOUND_IN_BRANCH'
+    ) {
+      return res.status(error?.status || error?.statusCode || 400).json({
+        success: false,
+        error: code,
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: 'CREATE_OPERATIONAL_PRODUCT_FROM_TEMPLATE_FAILED',
+    })
   }
 }
 
@@ -213,13 +77,17 @@ router.get('/pos/:id', productController.getProductPosById)
 if (typeof productController.getReadyToSell === 'function') {
   router.get('/ready-to-sell', productController.getReadyToSell)
 } else {
-  router.get('/ready-to-sell', (_req, res) => res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL' }))
+  router.get('/ready-to-sell', (_req, res) =>
+    res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL' })
+  )
 }
 
 if (typeof productController.getReadyToSellStructuredDetails === 'function') {
   router.get('/ready-to-sell/structured/:productId', productController.getReadyToSellStructuredDetails)
 } else {
-  router.get('/ready-to-sell/structured/:productId', (_req, res) => res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL_DETAILS' }))
+  router.get('/ready-to-sell/structured/:productId', (_req, res) =>
+    res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL_DETAILS' })
+  )
 }
 
 router.get('/', productController.getAllProducts)
@@ -235,7 +103,11 @@ router['delete']('/:id/images', productController.deleteProductImage)
 router.post('/:id/migrate-to-simple', productController.migrateSnToSimple)
 
 let productPriceController = null
-try { productPriceController = require('../controllers/productPriceController') } catch (_e) { productPriceController = null }
+try {
+  productPriceController = require('../controllers/productPriceController')
+} catch (_e) {
+  productPriceController = null
+}
 
 if (productPriceController) {
   router.get('/:productId/prices', productPriceController.getProductPrices)
