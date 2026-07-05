@@ -41,6 +41,12 @@ class QuickReceiveDropdownRepository {
             active: true,
           },
         },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: [{ productType: { name: 'asc' } }, { brand: { name: 'asc' } }, { id: 'asc' }],
       take: 5000,
