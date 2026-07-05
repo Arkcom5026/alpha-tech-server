@@ -1,4 +1,4 @@
-// src/modules/quickStock/controllers/quickStockController.js
+// src/modules/product/quickStock/controllers/quickStockController.js
 const QuickStockService = require('../services/QuickStockServiceSingleton');
 
 const quickStockService = new QuickStockService();

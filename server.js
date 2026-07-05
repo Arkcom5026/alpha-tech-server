@@ -72,7 +72,7 @@ const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 
 // 🟢 FIXED: แก้ตำแหน่งเพื่อให้เข้าถึงโฟลเดอร์ src/modules ได้อย่างถูกต้องตามรูปโครงสร้างในเครื่อง
-const quickStockRoutes = require('./src/modules/quickStock/routes/quickStockRoutes');
+const quickStockRoutes = require('./src/modules/product/quickStock/routes/quickStockRoutes');
 const productCreateRoutes = require('./src/modules/product/create/routes/productCreateRoutes');
 
 

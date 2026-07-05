@@ -1,4 +1,4 @@
-const { prisma: sharedPrisma } = require('../../../../lib/prisma')
+const { prisma: sharedPrisma } = require('../../../../../lib/prisma')
 const QuickStockService = require('./QuickStockService')
 
 class QuickStockServiceSingleton extends QuickStockService {

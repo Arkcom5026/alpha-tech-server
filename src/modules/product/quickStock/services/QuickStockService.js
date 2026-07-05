@@ -1,4 +1,4 @@
-// src/modules/quickStock/services/QuickStockService.js
+// src/modules/product/quickStock/services/QuickStockService.js
 // QuickStockService Runtime Trace Edition v2
 // - Safe transaction
 // - Trace every runtime step
@@ -6,7 +6,11 @@
 // - Designed for QuickStock / Recovery / Template Clone Runtime
 
 const { PrismaClient } = require('@prisma/client');
-const { cloneProductFromTemplate } = require('../../product/services/productTemplateEngine');
+const productTemplateEngine = require('../../services/productTemplateEngine')
+const cloneProductFromTemplate =
+  productTemplateEngine.cloneProductFromTemplate ||
+  productTemplateEngine.default ||
+  productTemplateEngine
 
 class QuickStockService {
   constructor(prisma) {
