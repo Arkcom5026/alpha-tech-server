@@ -4,6 +4,7 @@ const router = express.Router()
 
 // 🟢 FIXED: เลี้ยวเข้าหาโฟลเดอร์ controllers ตามที่คุณจัดระเบียบโครงสร้างล่าสุด
 const quickStockController = require('../controllers/quickStockController')
+const quickReceiveDropdownController = require('../controllers/quickReceiveDropdownController')
 
 // ดึงฟังก์ชันออกมาพร้อมผูก Context (bind) ป้องกันอาการบริบท Class Instance หลุด
 const handleQuickEnroll = quickStockController?.handleQuickEnroll
@@ -17,6 +18,10 @@ const handleQuickStockInAllInOne = quickStockController?.quickStockInAllInOne
 
 const handleQuickStockExistingReceive = quickStockController?.quickStockExistingReceive
   ? quickStockController.quickStockExistingReceive.bind(quickStockController)
+  : null
+
+const handleQuickReceiveDropdowns = quickReceiveDropdownController?.getQuickReceiveDropdowns
+  ? quickReceiveDropdownController.getQuickReceiveDropdowns.bind(quickReceiveDropdownController)
   : null
 
 // ถอย 4 ชั้น (../../../../) ออกไปหา verifyToken ที่อยู่ระดับนอกสุดเคียงข้าง server.js
@@ -35,6 +40,9 @@ if (typeof handleQuickStockInAllInOne !== 'function') {
 }
 if (typeof handleQuickStockExistingReceive !== 'function') {
   throw new Error('[quickStockRoutes] handleQuickStockExistingReceive (quickStockExistingReceive) is not a function — check src/modules/quickStock/controllers/quickStockController.js export')
+}
+if (typeof handleQuickReceiveDropdowns !== 'function') {
+  throw new Error('[quickStockRoutes] handleQuickReceiveDropdowns is not a function — check src/modules/quickStock/controllers/quickReceiveDropdownController.js export')
 }
 
 // ✅ server.js mount เรียบร้อยแล้วที่: app.use('/api/quick-stock', quickStockRoutes)
@@ -62,6 +70,8 @@ const allowQuickStockForEmployeeContext = (req, res, next) => {
 }
 
 // ===== Endpoints =====
+router.get('/dropdowns', verifyToken, allowQuickStockForEmployeeContext, handleQuickReceiveDropdowns)
+
 router.post('/quick-enroll', verifyToken, allowQuickStockForEmployeeContext, handleQuickEnroll)
 
 // 🟢 [เพิ่มใหม่] เปิด Endpoint รับข้อมูลเพิ่มสินค้าด่วนออลอินวัน ผ่านด่านตรวจนิรภัยแบบ Hybrid Guard แน่นหนา
