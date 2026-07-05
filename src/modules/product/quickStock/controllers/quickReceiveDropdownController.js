@@ -1,8 +1,8 @@
-// src/modules/quickStock/controllers/quickReceiveDropdownController.js
+// src/modules/product/quickStock/controllers/quickReceiveDropdownController.js
 // Workflow-specific dropdown controller for Quick Receive / QuickStock search.
 // This endpoint is intentionally isolated from Product Create dropdowns.
 
-const { prisma } = require('../../../../lib/prisma')
+const { prisma } = require('../../../../../lib/prisma')
 const { QuickReceiveDropdownService } = require('../services/quickReceiveDropdownService')
 
 const service = new QuickReceiveDropdownService(prisma)
