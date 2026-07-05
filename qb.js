@@ -11,7 +11,31 @@ const path = require('path');
 const BACKUP_VERSION = 'P1-HARDENED-BACKUP-V2';
 const SCHEMA_NAME = process.env.BACKUP_SCHEMA || 'public';
 const OUTPUT_DIR = process.env.BACKUP_OUTPUT_DIR || process.cwd();
-const CONNECTION_STRING = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const RAW_CONNECTION_STRING = process.env.DIRECT_URL || process.env.DATABASE_URL;
+
+function buildPgConnectionConfig(connectionString) {
+  const isSupabase = String(connectionString || '').includes('supabase');
+
+  // pg-connection-string can turn sslmode=require into a strict TLS verify path.
+  // For this local backup tool, remove sslmode from the URL and set ssl explicitly.
+  let normalizedConnectionString = connectionString;
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete('sslmode');
+    normalizedConnectionString = url.toString();
+  } catch (_error) {
+    normalizedConnectionString = connectionString;
+  }
+
+  return {
+    connectionString: normalizedConnectionString,
+    ssl: isSupabase
+      ? { rejectUnauthorized: false }
+      : false,
+  };
+}
+
+const CONNECTION_STRING = RAW_CONNECTION_STRING;
 
 const SKIP_TABLES = new Set([
   '_prisma_migrations',
@@ -169,7 +193,7 @@ async function getDatabaseMetadata(client, tableNames) {
 
 async function runAlphaTechBackup() {
   const startedAt = Date.now();
-  const client = new Client({ connectionString: CONNECTION_STRING });
+  const client = new Client(buildPgConnectionConfig(CONNECTION_STRING));
 
   try {
     await client.connect();

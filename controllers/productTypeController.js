@@ -1,5 +1,3 @@
-
-
 // controllers/productTypeController.js
 // Guards: slug-based unique-by-parent (categoryId), safer P2002 detail
 
@@ -51,6 +49,58 @@ async function getTemplateBranchId() {
   return templateBranch?.id || null;
 }
 
+// ProductType master data may exist in older/global/another-branch rows during migration.
+// Read endpoints should prefer the current branch, then fall back to active master rows
+// so POS create-product dropdowns do not become empty during recovery/migration.
+const makeProductTypeReadWhere = ({ branchId, q, categoryId, includeInactive }) => omitUndefined({
+  ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
+  ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
+  ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
+  ...(branchId ? { branchId } : {}),
+});
+
+const omitBranchFromWhere = (where = {}) => {
+  const { branchId, ...rest } = where;
+  return rest;
+};
+
+const productTypeBrandInclude = {
+  productTypeBrands: {
+    select: {
+      brandId: true,
+      brand: {
+        select: {
+          id: true,
+          name: true,
+          active: true,
+        },
+      },
+    },
+  },
+};
+
+const mapProductTypeOption = (type) => {
+  const typeBrands = (Array.isArray(type?.productTypeBrands) ? type.productTypeBrands : [])
+    .map((row) => {
+      const brand = row?.brand;
+      if (!brand?.id || !brand?.name) return null;
+      if (brand.active === false) return null;
+      return {
+        id: brand.id,
+        name: brand.name,
+        brandId: row?.brandId ?? brand.id,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    ...type,
+    brandOptions: typeBrands,
+    brands: typeBrands,
+    typeBrands,
+  };
+};
+
 // Inline normalizer/slugify (ไม่พึ่ง external deps)
 const toSpaces = (s) => s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 const stripPunct = (s) => s.replace(/[^A-Za-z0-9ก-๙ .]/g, '');
@@ -95,26 +145,37 @@ const getAllProductType = async (req, res) => {
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_LIMIT) : 20;
 
-    const where = omitUndefined({
-      branchId,
-      ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
-      ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
-      ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
-    });
+    const branchWhere = makeProductTypeReadWhere({ branchId, q, categoryId, includeInactive });
 
-    const [total, items] = await Promise.all([
-      prisma.productType.count({ where }),
+    let [total, items] = await Promise.all([
+      prisma.productType.count({ where: branchWhere }),
       prisma.productType.findMany({
-        where,
+        where: branchWhere,
         orderBy: [{ name: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { category: true },
+        include: { category: true, ...productTypeBrandInclude },
       }),
     ]);
 
+    if (items.length === 0) {
+      const fallbackWhere = omitBranchFromWhere(branchWhere);
+      [total, items] = await Promise.all([
+        prisma.productType.count({ where: fallbackWhere }),
+        prisma.productType.findMany({
+          where: fallbackWhere,
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+          include: { category: true, ...productTypeBrandInclude },
+        }),
+      ]);
+    }
+
+    const mappedItems = items.map(mapProductTypeOption);
+
     res.set('Cache-Control', 'no-store');
-    res.json({ items, total, page, limit });
+    res.json({ items: mappedItems, total, page, limit });
   } catch (err) {
     console.error('❌ GET ProductTypes Failed:', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -131,14 +192,14 @@ const getProductTypeById = async (req, res) => {
 
     const productType = await prisma.productType.findFirst({
       where: { id, branchId },
-      include: { category: true },
+      include: { category: true, ...productTypeBrandInclude },
     });
 
     if (!productType) {
       return res.status(404).json({ error: 'ไม่พบประเภทสินค้านี้' });
     }
 
-    res.json(productType);
+    res.json(mapProductTypeOption(productType));
   } catch (err) {
     console.error('❌ getProductTypeById error:', err);
     res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูลประเภทสินค้าได้' });
@@ -177,10 +238,10 @@ const createProductType = async (req, res) => {
 
     const created = await prisma.productType.create({
       data: { name: nameTrim, normalizedName: normalized, slug, categoryId: categoryIdInt, branchId, active: true },
-      include: { category: true },
+      include: { category: true, ...productTypeBrandInclude },
     });
 
-    res.status(201).json(created);
+    res.status(201).json(mapProductTypeOption(created));
   } catch (err) {
     console.error('❌ CREATE ProductType Failed:', err);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -249,10 +310,10 @@ const updateProductType = async (req, res) => {
     const updated = await prisma.productType.update({
       where: { id },
       data,
-      include: { category: true },
+      include: { category: true, ...productTypeBrandInclude },
     });
 
-    res.json(updated);
+    res.json(mapProductTypeOption(updated));
   } catch (err) {
     console.error('❌ UPDATE ProductType Failed:', err);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -333,12 +394,18 @@ const getProductTypeDropdowns = async (req, res) => {
 
     const types = await prisma.productType.findMany({
       where: { active: true, branchId: sourceBranchId },
-      select: { id: true, name: true, categoryId: true, branchId: true },
+      select: {
+        id: true,
+        name: true,
+        categoryId: true,
+        branchId: true,
+        ...productTypeBrandInclude,
+      },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
 
     res.set('Cache-Control', 'no-store');
-    res.json(dedupeByName(types));
+    res.json(dedupeByName(types).map(mapProductTypeOption));
   } catch (err) {
     console.error('❌ getProductTypeDropdowns error:', err);
     res.status(500).json({ error: 'Failed to load product types' });

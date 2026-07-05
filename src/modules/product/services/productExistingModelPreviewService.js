@@ -28,13 +28,14 @@ const getProductExistingModelPreview = async ({ branchId, productTypeId, brandId
       active: true,
       productTypeId: ptId,
       brandId: brId,
-      branchPrices: {
+      branchPrice: {
         some: {
           branchId: bId,
           isActive: true,
         },
       },
     },
+
     select: {
       id: true,
       name: true,
