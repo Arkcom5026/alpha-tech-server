@@ -218,18 +218,15 @@ model Product {
   productConfig            Json?
   unitId                   Int?
   warrantyDays             Int?
-
-  // Template clone tracking
   templateProductId        Int?
-  templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  clonedProducts           Product[]                  @relation("ProductTemplateClone")
-
   branchPrice              BranchPrice[]
   cartItems                CartItem[]
   orderOnlineItem          OrderOnlineItem[]
   brand                    Brand?                     @relation(fields: [brandId], references: [id])
   category                 Category?                  @relation(fields: [categoryId], references: [id])
   productType              ProductType?               @relation(fields: [productTypeId], references: [id])
+  templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onUpdate: NoAction)
+  clonedProducts           Product[]                  @relation("ProductTemplateClone")
   unit                     Unit?                      @relation(fields: [unitId], references: [id])
   productImages            ProductImage[]
   orderItems               ProductOnOrder[]

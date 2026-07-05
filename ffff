@@ -1,0 +1,727 @@
+[1mdiff --git a/controllers/productController.js b/controllers/productController.js[m
+[1mindex dec1e5a..3b5ec02 100644[m
+[1m--- a/controllers/productController.js[m
+[1m+++ b/controllers/productController.js[m
+[36m@@ -4,9 +4,15 @@[m
+ // Category -> GlobalProductType -> ProductType -> Product -> Brand[m
+ [m
+ const { prisma, Prisma } = require('../lib/prisma')[m
+[31m-const {[m
+[31m-  findOperationalProductByTemplateId,[m
+[31m-} = require('../src/modules/product/services/operationalProductRuntimeService')[m
+[32m+[m[32mconst {[m
+[32m+[m[32m  findOperationalProductById,[m
+[32m+[m[32m  findOperationalProductByTemplateId,[m
+[32m+[m[32m  findOperationalProductsForPOS,[m
+[32m+[m[32m  findOperationalProductsForOnline,[m
+[32m+[m[32m  findOperationalProductOnlineById,[m
+[32m+[m[32m  getReadyToSell: getReadyToSellService,[m
+[32m+[m[32m  getReadyToSellStructuredDetails: getReadyToSellStructuredDetailsService,[m
+[32m+[m[32m} = require('../src/modules/product/services/operationalProductRuntimeService')[m
+ [m
+ let cloudinary = null[m
+ try {[m
+[36m@@ -400,307 +406,32 @@[m [mconst getAllProducts = async (req, res) => {[m
+ [m
+ [m
+ [m
+[31m-const getProductsForPos = async (req, res) => {[m
+[31m-  const branchId = Number(req.user?.branchId)[m
+[31m-  if (!branchId) return res.status(401).json({ error: 'unauthorized' })[m
+[31m-[m
+[31m-  const {[m
+[31m-    search: qSearch = '',[m
+[31m-    searchText: qSearchText = '',[m
+[31m-    take = 50,[m
+[31m-    page = 1,[m
+[31m-    productTypeId,[m
+[31m-    brandId,[m
+[31m-    readyOnly = 'false',[m
+[31m-    hasPrice = 'false',[m
+[31m-    activeOnly = 'true',[m
+[31m-    includeInactive = '0',[m
+[31m-  } = req.query[m
+[31m-[m
+[31m-  const search = String(qSearch || qSearchText || '').trim()[m
+[31m-  const queryMode = (req?.query?.mode || '').toString().toUpperCase()[m
+[31m-  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'[m
+[31m-[m
+[31m-  const takeNum = Math.max(1, Math.min(toInt(take) ?? 50, 200))[m
+[31m-  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))[m
+[31m-[m
+[31m-  const wantIncludeInactive =[m
+[31m-    String(includeInactive) === '1' ||[m
+[31m-    String(includeInactive).toLowerCase() === 'true'[m
+[31m-[m
+[31m-  const wantActiveOnlyFalse =[m
+[31m-    String(activeOnly).toLowerCase() === 'false'[m
+[31m-[m
+[31m-  const activeFilter =[m
+[31m-    wantIncludeInactive || wantActiveOnlyFalse[m
+[31m-      ? undefined[m
+[31m-      : true[m
+[31m-[m
+[31m-  // =====================================================[m
+[31m-  // PATCH START[m
+[31m-  // แสดงเฉพาะ Operational Product ของ Branch ปัจจุบัน[m
+[31m-  // =====================================================[m
+[31m-  const whereAND = [[m
+[31m-    {[m
+[31m-      productType: {[m
+[31m-        branchId,[m
+[31m-      },[m
+[31m-    },[m
+[31m-  ][m
+[31m-  // =====================================================[m
+[31m-  // PATCH END[m
+[31m-  // =====================================================[m
+[31m-[m
+[31m-  if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })[m
+[31m-  if (activeFilter !== undefined) whereAND.push({ active: activeFilter })[m
+[31m-[m
+[31m-  if (search) {[m
+[31m-    whereAND.push({[m
+[31m-      OR: [[m
+[31m-        {[m
+[31m-          name: {[m
+[31m-            contains: String(search),[m
+[31m-            mode: 'insensitive',[m
+[31m-          },[m
+[31m-        },[m
+[31m-      ],[m
+[31m-    })[m
+[31m-  }[m
+[31m-[m
+[31m-  const typeId = toInt(productTypeId)[m
+[31m-  const brId = toInt(brandId)[m
+[31m-[m
+[31m-  if (typeId) whereAND.push({ productTypeId: typeId })[m
+[31m-  if (brId) whereAND.push({ brandId: brId })[m
+[31m-[m
+[31m-  const where = {[m
+[31m-    AND: whereAND,[m
+[31m-  }[m
+[31m-[m
+[31m-  try {[m
+[31m-    const items = await prisma.product.findMany({[m
+[31m-      where,[m
+[31m-      select: {[m
+[31m-        id: true,[m
+[31m-        active: true,[m
+[31m-        name: true,[m
+[31m-        mode: true,[m
+[31m-        noSN: true,[m
+[31m-        trackSerialNumber: true,[m
+[31m-[m
+[31m-        productTypeId: true,[m
+[31m-        productType: {[m
+[31m-          select: {[m
+[31m-            id: true,[m
+[31m-            name: true,[m
+[31m-            branchId: true,[m
+[31m-            globalProductType: {[m
+[31m-              select: {[m
+[31m-                category: {[m
+[31m-                  select: {[m
+[31m-                    id: true,[m
+[31m-                    name: true,[m
+[31m-                  },[m
+[31m-                },[m
+[31m-              },[m
+[31m-            },[m
+[31m-          },[m
+[31m-        },[m
+[31m-[m
+[31m-        brandId: true,[m
+[31m-        brand: {[m
+[31m-          select: {[m
+[31m-            id: true,[m
+[31m-            name: true,[m
+[31m-            active: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-[m
+[31m-        unitId: true,[m
+[31m-        unit: {[m
+[31m-          select: {[m
+[31m-            id: true,[m
+[31m-            name: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-[m
+[31m-        branchPrice: {[m
+[31m-          where: {[m
+[31m-            branchId,[m
+[31m-          },[m
+[31m-          take: 1,[m
+[31m-          select: {[m
+[31m-            costPrice: true,[m
+[31m-            priceRetail: true,[m
+[31m-            priceOnline: true,[m
+[31m-            priceWholesale: true,[m
+[31m-            priceTechnician: true,[m
+[31m-            isActive: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-[m
+[31m-        stockItems: {[m
+[31m-          where: {[m
+[31m-            branchId,[m
+[31m-            status: 'IN_STOCK',[m
+[31m-          },[m
+[31m-          take: 1,[m
+[31m-          select: {[m
+[31m-            id: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-[m
+[31m-        stockBalances: {[m
+[31m-          where: {[m
+[31m-            branchId,[m
+[31m-          },[m
+[31m-          take: 1,[m
+[31m-          select: {[m
+[31m-            quantity: true,[m
+[31m-            reserved: true,[m
+[31m-            lastReceivedCost: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-      },[m
+[31m-[m
+[31m-      take: takeNum,[m
+[31m-      skip: skipNum,[m
+[31m-      orderBy: {[m
+[31m-        id: 'desc',[m
+[31m-      },[m
+[31m-    })[m
+[31m-[m
+[31m-    const uniqueItems = (() => {[m
+[31m-      const map = new Map()[m
+[31m-[m
+[31m-      for (const p of items) {[m
+[31m-        if (!map.has(p.id)) {[m
+[31m-          map.set(p.id, p)[m
+[31m-        }[m
+[31m-      }[m
+[31m-[m
+[31m-      return [...map.values()][m
+[31m-    })()[m
+[31m-[m
+[31m-    const mappedBase = uniqueItems.map((p) => {[m
+[31m-      const bp = p.branchPrice?.[0][m
+[31m-      const sb = p.stockBalances?.[0][m
+[31m-[m
+[31m-      const qty = Number(sb?.quantity ?? 0)[m
+[31m-      const reserved = Number(sb?.reserved ?? 0)[m
+[31m-[m
+[31m-      const available = Math.max(0, qty - reserved)[m
+[31m-[m
+[31m-      const isSimple =[m
+[31m-        p.mode === 'SIMPLE' ||[m
+[31m-        p.noSN === true[m
+[31m-[m
+[31m-      const isReady = isSimple[m
+[31m-        ? available > 0[m
+[31m-        : (p.stockItems?.length ?? 0) > 0[m
+[31m-[m
+[31m-      const lastCost =[m
+[31m-        sb?.lastReceivedCost != null[m
+[31m-          ? Number(sb.lastReceivedCost)[m
+[31m-          : bp?.costPrice != null[m
+[31m-            ? Number(bp.costPrice)[m
+[31m-            : null[m
+[31m-[m
+[31m-      const catName =[m
+[31m-        p.productType?.globalProductType?.category?.name ?? '-'[m
+[31m-[m
+[31m-      const typeName =[m
+[31m-        p.productType?.name ?? '-'[m
+[31m-[m
+[31m-      return {[m
+[31m-        id: p.id,[m
+[31m-        active:[m
+[31m-          typeof p.active === 'boolean'[m
+[31m-            ? p.active[m
+[31m-            : true,[m
+[31m-[m
+[31m-        name: p.name,[m
+[31m-        mode: p.mode,[m
+[31m-[m
+[31m-        categoryId:[m
+[31m-          p.productType?.globalProductType?.category?.id ?? null,[m
+[31m-[m
+[31m-        productTypeId:[m
+[31m-          p.productTypeId ?? null,[m
+[31m-[m
+[31m-        category: catName,[m
+[31m-        productType: typeName,[m
+[31m-[m
+[31m-        brandId:[m
+[31m-          p.brandId ??[m
+[31m-          p.brand?.id ??[m
+[31m-          null,[m
+[31m-[m
+[31m-        brandName:[m
+[31m-          p.brand?.name ??[m
+[31m-          null,[m
+[31m-[m
+[31m-        unitId:[m
+[31m-          p.unitId ??[m
+[31m-          p.unit?.id ??[m
+[31m-          null,[m
+[31m-[m
+[31m-        unitName:[m
+[31m-          p.unit?.name ??[m
+[31m-          null,[m
+[31m-[m
+[31m-        unit: p.unit[m
+[31m-          ? {[m
+[31m-              id: p.unit.id,[m
+[31m-              name: p.unit.name,[m
+[31m-            }[m
+[31m-          : null,[m
+[31m-[m
+[31m-        noSN: p.noSN,[m
+[31m-        trackSerialNumber: p.trackSerialNumber,[m
+[31m-[m
+[31m-        priceRetail: Number(bp?.priceRetail ?? 0),[m
+[31m-        priceWholesale: Number(bp?.priceWholesale ?? 0),[m
+[31m-        priceTechnician: Number(bp?.priceTechnician ?? 0),[m
+[31m-        priceOnline: Number(bp?.priceOnline ?? 0),[m
+[31m-[m
+[31m-        branchPriceActive:[m
+[31m-          bp?.isActive ?? true,[m
+[31m-[m
+[31m-        available,[m
+[31m-        isReady,[m
+[31m-[m
+[31m-        lastCost,[m
+[31m-        costPrice: lastCost,[m
+[31m-[m
+[31m-        hasPrice: !!bp,[m
+[31m-      }[m
+[31m-    })[m
+[31m-[m
+[31m-    let mapped = mappedBase[m
+[31m-[m
+[31m-    if (String(readyOnly).toLowerCase() === 'true') {[m
+[31m-      mapped = mapped.filter((x) => x.isReady)[m
+[31m-    }[m
+[31m-[m
+[31m-    if (String(hasPrice).toLowerCase() === 'true') {[m
+[31m-      mapped = mapped.filter([m
+[31m-        (x) =>[m
+[31m-          x.hasPrice &&[m
+[31m-          x.branchPriceActive !== false[m
+[31m-      )[m
+[31m-    }[m
+[31m-[m
+[31m-    return res.json(mapped)[m
+[31m-  } catch (error) {[m
+[31m-    console.error('❌ getProductsForPos error:', error)[m
+[31m-    return res.status(500).json({[m
+[31m-      error: 'Internal server error',[m
+[31m-    })[m
+[31m-  }[m
+[31m-}[m
+[31m-[m
+[31m-[m
+[32m+[m[32mconst getProductsForPos = async (req, res) => {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const result = await findOperationalProductsForPOS({[m
+[32m+[m[32m      branchId: req.user?.branchId,[m
+[32m+[m[32m      search: req.query.search || req.query.searchText || '',[m
+[32m+[m[32m      take: req.query.take,[m
+[32m+[m[32m      page: req.query.page,[m
+[32m+[m[32m      productTypeId: req.query.productTypeId,[m
+[32m+[m[32m      brandId: req.query.brandId,[m
+[32m+[m[32m      readyOnly: req.query.readyOnly,[m
+[32m+[m[32m      hasPrice: req.query.hasPrice,[m
+[32m+[m[32m      activeOnly: req.query.activeOnly,[m
+[32m+[m[32m      includeInactive: req.query.includeInactive,[m
+[32m+[m[32m      mode: req.query.mode,[m
+[32m+[m[32m      simpleOnly: req.query.simpleOnly,[m
+[32m+[m[32m    })[m
+[32m+[m
+[32m+[m[32m    return res.json(result)[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    if (error?.code === 'unauthorized') return res.status(401).json({ error: 'unauthorized' })[m
+[32m+[m
+[32m+[m[32m    console.error('❌ getProductsForPos error:', error)[m
+[32m+[m[32m    return res.status(500).json({ error: 'Internal server error' })[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+ const mapRuntimeProductForPos = (p, branchId) => {[m
+   if (!p) return null[m
+ [m
+[36m@@ -781,122 +512,31 @@[m [mconst getOperationalProductByTemplateId = async (req, res) => {[m
+ }[m
+ [m
+ [m
+[31m-const getProductsForOnline = async (req, res) => {[m
+[31m-  const branchId = Number(req.user?.branchId) || toInt(req.query.branchId)[m
+[31m-  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })[m
+[31m-[m
+[31m-  const {[m
+[31m-    search: q1 = '',[m
+[31m-    searchText: q2 = '',[m
+[31m-    take = 50,[m
+[31m-    size,[m
+[31m-    page = 1,[m
+[31m-    productTypeId,[m
+[31m-    brandId,[m
+[31m-    activeOnly = 'true',[m
+[31m-    readyOnly = 'false',[m
+[31m-    hasPrice = 'false',[m
+[31m-  } = req.query[m
+[31m-[m
+[31m-  const queryMode = (req?.query?.mode || '').toString().toUpperCase()[m
+[31m-  const simpleOnly = req?.query?.simpleOnly === '1' || queryMode === 'SIMPLE'[m
+[31m-[m
+[31m-  const search = normStr(q1 || q2)[m
+[31m-  const takeNum = Math.max(1, Math.min((toInt(size) ?? toInt(take) ?? 50), 200))[m
+[31m-  const skipNum = Math.max(0, (toInt(page) ? (toInt(page) - 1) * takeNum : 0))[m
+[31m-[m
+[31m-  try {[m
+[31m-    // Runtime Catalog Separation:[m
+[31m-    // Online catalog must expose only Operational Product of selected branch.[m
+[31m-    const whereAND = [[m
+[31m-      {[m
+[31m-        productType: {[m
+[31m-          branchId,[m
+[31m-        },[m
+[31m-      },[m
+[31m-    ][m
+[31m-    if (simpleOnly) whereAND.push({ mode: 'SIMPLE' })[m
+[31m-[m
+[31m-    if (search) {[m
+[31m-      whereAND.push({[m
+[31m-        OR: [{ name: { contains: search, mode: 'insensitive' } }],[m
+[31m-      })[m
+[31m-    }[m
+[31m-[m
+[31m-    const typeId = toInt(productTypeId)[m
+[31m-    const brId = toInt(brandId)[m
+[31m-[m
+[31m-    if (typeId) whereAND.push({ productTypeId: typeId })[m
+[31m-    if (brId) whereAND.push({ brandId: brId })[m
+[31m-[m
+[31m-    const where = whereAND.length ? { AND: whereAND } : {}[m
+[31m-[m
+[31m-    const items = await prisma.product.findMany({[m
+[31m-      where,[m
+[31m-      select: {[m
+[31m-        id: true,[m
+[31m-        name: true,[m
+[31m-        mode: true,[m
+[31m-        noSN: true,[m
+[31m-        productTypeId: true,[m
+[31m-        productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },[m
+[31m-        brandId: true,[m
+[31m-        brand: { select: { id: true, name: true, active: true } },[m
+[31m-        unitId: true,[m
+[31m-        unit: { select: { id: true, name: true } },[m
+[31m-        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },[m
+[31m-        branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },[m
+[31m-        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },[m
+[31m-        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },[m
+[31m-      },[m
+[31m-      take: takeNum,[m
+[31m-      skip: skipNum,[m
+[31m-      orderBy: { id: 'desc' },[m
+[31m-    })[m
+[31m-[m
+[31m-    let mapped = items.map((p) => {[m
+[31m-      const bp = p.branchPrice?.[0][m
+[31m-      const sb = p.stockBalances?.[0][m
+[31m-      const qty = Number(sb?.quantity ?? 0)[m
+[31m-      const reserved = Number(sb?.reserved ?? 0)[m
+[31m-      const available = Math.max(0, qty - reserved)[m
+[31m-      const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)[m
+[31m-      const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)[m
+[31m-      const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null[m
+[31m-[m
+[31m-      return {[m
+[31m-        id: p.id,[m
+[31m-        name: p.name,[m
+[31m-        mode: p.mode,[m
+[31m-        categoryId: p.productType?.globalProductType?.category?.id ?? null,[m
+[31m-        productTypeId: p.productTypeId ?? null,[m
+[31m-        imageUrl,[m
+[31m-        priceOnline: Number(bp?.priceOnline ?? 0),[m
+[31m-        priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),[m
+[31m-        readyPickupAtBranch: isReady,[m
+[31m-        isReady,[m
+[31m-        category: p.productType?.globalProductType?.category?.name,[m
+[31m-        productType: p.productType?.name,[m
+[31m-        brandId: p.brandId ?? p.brand?.id ?? null,[m
+[31m-        brandName: p.brand?.name ?? null,[m
+[31m-        unitId: p.unitId ?? p.unit?.id ?? null,[m
+[31m-        unitName: p.unit?.name ?? null,[m
+[31m-        unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,[m
+[31m-        hasPrice: !!bp,[m
+[31m-        branchPriceActive: bp?.isActive ?? true,[m
+[31m-      }[m
+[31m-    })[m
+[31m-[m
+[31m-    if (String(readyOnly).toLowerCase() === 'true') mapped = mapped.filter((x) => x.isReady === true)[m
+[31m-    if (String(hasPrice).toLowerCase() === 'true') mapped = mapped.filter((x) => x.hasPrice === true && x.branchPriceActive !== false)[m
+[31m-[m
+[31m-    return res.json(mapped)[m
+[31m-  } catch (error) {[m
+[31m-    console.error('❌ getProductsForOnline error:', error)[m
+[31m-    return res.status(500).json({ error: 'Internal server error' })[m
+[31m-  }[m
+[31m-}[m
+[31m-[m
+[32m+[m[32mconst getProductsForOnline = async (req, res) => {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const result = await findOperationalProductsForOnline({[m
+[32m+[m[32m      branchId: Number(req.user?.branchId) || toInt(req.query.branchId),[m
+[32m+[m[32m      search: req.query.search || req.query.searchText || '',[m
+[32m+[m[32m      take: req.query.take,[m
+[32m+[m[32m      size: req.query.size,[m
+[32m+[m[32m      page: req.query.page,[m
+[32m+[m[32m      productTypeId: req.query.productTypeId,[m
+[32m+[m[32m      brandId: req.query.brandId,[m
+[32m+[m[32m      readyOnly: req.query.readyOnly,[m
+[32m+[m[32m      hasPrice: req.query.hasPrice,[m
+[32m+[m[32m      mode: req.query.mode,[m
+[32m+[m[32m      simpleOnly: req.query.simpleOnly,[m
+[32m+[m[32m    })[m
+[32m+[m
+[32m+[m[32m    return res.json(result)[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    if (error?.code === 'BRANCH_REQUIRED') return res.status(400).json({ error: 'BRANCH_REQUIRED' })[m
+[32m+[m
+[32m+[m[32m    console.error('❌ getProductsForOnline error:', error)[m
+[32m+[m[32m    return res.status(500).json({ error: 'Internal server error' })[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+ const getReadyToSell = async (req, res) => {[m
+   try {[m
+     const result = await getReadyToSellService({[m
+[36m@@ -940,185 +580,42 @@[m [mconst getReadyToSellStructuredDetails = async (req, res) => {[m
+ [m
+ [m
+ [m
+[31m-const getProductPosById = async (req, res) => {[m
+[31m-  const branchId = Number(req.user?.branchId)[m
+[31m-  if (!branchId) return res.status(401).json({ error: 'unauthorized' })[m
+[31m-[m
+[31m-  const id = toInt(req.params.id)[m
+[31m-  if (!id) return res.status(400).json({ error: 'INVALID_ID' })[m
+[31m-[m
+[31m-  try {[m
+[31m-    const p = await prisma.product.findFirst({[m
+[31m-      where: {[m
+[31m-        id,[m
+[31m-        productType: {[m
+[31m-          branchId,[m
+[31m-        },[m
+[31m-      },[m
+[31m-      select: {[m
+[31m-        id: true,[m
+[31m-        name: true,[m
+[31m-        mode: true,[m
+[31m-        noSN: true,[m
+[31m-        trackSerialNumber: true,[m
+[31m-        productTypeId: true,[m
+[31m-        productType: { select: { id: true, name: true, globalProductType: { select: { categoryId: true, category: { select: { id: true, name: true } } } } } },[m
+[31m-        brandId: true,[m
+[31m-        brand: { select: { id: true, name: true, active: true } },[m
+[31m-        unitId: true,[m
+[31m-        unit: { select: { id: true, name: true } },[m
+[31m-        productImages: {[m
+[31m-          where: { active: true },[m
+[31m-          orderBy: [{ isCover: 'desc' }, { id: 'asc' }],[m
+[31m-          select: { id: true, url: true, secure_url: true, caption: true, isCover: true },[m
+[31m-        },[m
+[31m-        branchPrice: {[m
+[31m-          where: { branchId },[m
+[31m-          take: 1,[m
+[31m-          select: {[m
+[31m-            costPrice: true,[m
+[31m-            priceWholesale: true,[m
+[31m-            priceTechnician: true,[m
+[31m-            priceRetail: true,[m
+[31m-            priceOnline: true,[m
+[31m-            isActive: true,[m
+[31m-          },[m
+[31m-        },[m
+[31m-        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true, lastReceivedCost: true } },[m
+[31m-        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },[m
+[31m-      },[m
+[31m-    })[m
+[31m-[m
+[31m-    if (!p) return res.status(404).json({ error: 'NOT_FOUND' })[m
+[31m-[m
+[31m-    const bp = p.branchPrice?.[0][m
+[31m-    const sb = p.stockBalances?.[0][m
+[31m-    const qty = Number(sb?.quantity ?? 0)[m
+[31m-    const reserved = Number(sb?.reserved ?? 0)[m
+[31m-    const available = Math.max(0, qty - reserved)[m
+[31m-    const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)[m
+[31m-    const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)[m
+[31m-[m
+[31m-    const lastCost = sb?.lastReceivedCost != null ? Number(sb.lastReceivedCost) : (bp?.costPrice != null ? Number(bp.costPrice) : null)[m
+[31m-[m
+[31m-    const mode = p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED')[m
+[31m-    const catName = p.productType?.globalProductType?.category?.name ?? '-'[m
+[31m-    const typeName = p.productType?.name ?? '-'[m
+[31m-[m
+[31m-    const branchPriceObj = {[m
+[31m-      costPrice: Number(bp?.costPrice ?? 0),[m
+[31m-      priceWholesale: Number(bp?.priceWholesale ?? 0),[m
+[31m-      priceTechnician: Number(bp?.priceTechnician ?? 0),[m
+[31m-      priceRetail: Number(bp?.priceRetail ?? 0),[m
+[31m-      priceOnline: Number(bp?.priceOnline ?? 0),[m
+[31m-    }[m
+[31m-[m
+[31m-    return res.json({[m
+[31m-      id: p.id,[m
+[31m-      name: p.name,[m
+[31m-      spec: null,[m
+[31m-      mode,[m
+[31m-      noSN: p.noSN,[m
+[31m-      trackSerialNumber: p.trackSerialNumber,[m
+[31m-      unitId: p.unitId ?? p.unit?.id ?? null,[m
+[31m-      unitName: p.unit?.name ?? null,[m
+[31m-      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,[m
+[31m-      categoryId: p.productType?.globalProductType?.categoryId ?? null,[m
+[31m-      productTypeId: p.productTypeId ?? null,[m
+[31m-      productProfileId: null,[m
+[31m-      templateId: null,[m
+[31m-      productTemplateId: null,[m
+[31m-      categoryName: catName,[m
+[31m-      productTypeName: typeName,[m
+[31m-      productProfileName: '-',[m
+[31m-      productTemplateName: '-',[m
+[31m-      brandId: p.brandId ?? p.brand?.id ?? null,[m
+[31m-      brandName: p.brand?.name ?? null,[m
+[31m-      images: (p.productImages || [])[m
+[31m-        .map((im) => ({ id: im.id, url: im.secure_url || im.url, caption: im.caption ?? '', isCover: Boolean(im.isCover) }))[m
+[31m-        .filter((im) => !!im.url),[m
+[31m-      costPrice: branchPriceObj.costPrice,[m
+[31m-      priceWholesale: branchPriceObj.priceWholesale,[m
+[31m-      priceTechnician: branchPriceObj.priceTechnician,[m
+[31m-      priceRetail: branchPriceObj.priceRetail,[m
+[31m-      priceOnline: branchPriceObj.priceOnline,[m
+[31m-      branchPriceActive: bp?.isActive ?? true,[m
+[31m-      available,[m
+[31m-      isReady,[m
+[31m-      lastCost,[m
+[31m-      branchPrice: branchPriceObj,[m
+[31m-    })[m
+[31m-  } catch (error) {[m
+[31m-    console.error('❌ getProductPosById error:', error)[m
+[31m-    return res.status(500).json({ error: 'Internal server error' })[m
+[31m-  }[m
+[31m-}[m
+[31m-[m
+[31m-const getProductOnlineById = async (req, res) => {[m
+[31m-  const branchId = toInt(req.query.branchId) ?? Number(req.user?.branchId)[m
+[31m-  if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' })[m
+[31m-[m
+[31m-  const id = toInt(req.params.id)[m
+[31m-  if (!id) return res.status(400).json({ error: 'INVALID_ID' })[m
+[31m-[m
+[31m-  try {[m
+[31m-    const p = await prisma.product.findFirst({[m
+[31m-      where: {[m
+[31m-        id,[m
+[31m-        productType: {[m
+[31m-          branchId,[m
+[31m-        },[m
+[31m-      },[m
+[31m-      select: {[m
+[31m-        id: true,[m
+[31m-        name: true,[m
+[31m-        mode: true,[m
+[31m-        noSN: true,[m
+[31m-        brandId: true,[m
+[31m-        brand: { select: { id: true, name: true, active: true } },[m
+[31m-        unitId: true,[m
+[31m-        unit: { select: { id: true, name: true } },[m
+[31m-        productImages: { where: { isCover: true, active: true }, take: 1, select: { secure_url: true, url: true } },[m
+[31m-        branchPrice: { where: { branchId }, take: 1, select: { priceOnline: true, isActive: true } },[m
+[31m-        stockItems: { where: { branchId, status: 'IN_STOCK' }, select: { id: true }, take: 1 },[m
+[31m-        stockBalances: { where: { branchId }, take: 1, select: { quantity: true, reserved: true } },[m
+[31m-      },[m
+[31m-    })[m
+[31m-[m
+[31m-    if (!p) return res.status(404).json({ error: 'NOT_FOUND' })[m
+[31m-[m
+[31m-    const bp = p.branchPrice?.[0][m
+[31m-    const sb = p.stockBalances?.[0][m
+[31m-    const qty = Number(sb?.quantity ?? 0)[m
+[31m-    const reserved = Number(sb?.reserved ?? 0)[m
+[31m-    const available = Math.max(0, qty - reserved)[m
+[31m-    const isSimple = (p.mode === 'SIMPLE') || (p.noSN === true)[m
+[31m-    const isReady = isSimple ? available > 0 : ((p.stockItems?.length ?? 0) > 0)[m
+[31m-    const imageUrl = p.productImages?.[0]?.secure_url || p.productImages?.[0]?.url || null[m
+[31m-[m
+[31m-    return res.json({[m
+[31m-      id: p.id,[m
+[31m-      name: p.name,[m
+[31m-      mode: p.mode ?? (p.noSN ? 'SIMPLE' : 'STRUCTURED'),[m
+[31m-      brandId: p.brandId ?? p.brand?.id ?? null,[m
+[31m-      brandName: p.brand?.name ?? null,[m
+[31m-      unitId: p.unitId ?? p.unit?.id ?? null,[m
+[31m-      unitName: p.unit?.name ?? null,[m
+[31m-      unit: p.unit ? { id: p.unit.id, name: p.unit.name } : null,[m
+[31m-      imageUrl,[m
+[31m-      priceOnline: Number(bp?.priceOnline ?? 0),[m
+[31m-      priceOnlineEffective: (bp && bp.isActive === false) ? null : Number(bp?.priceOnline ?? 0),[m
+[31m-      readyPickupAtBranch: isReady,[m
+[31m-      isReady,[m
+[31m-      hasPrice: !!bp,[m
+[31m-      branchPriceActive: bp?.isActive ?? true,[m
+[31m-    })[m
+[31m-  } catch (error) {[m
+[31m-    console.error('❌ getProductOnlineById error:', error)[m
+[31m-    return res.status(500).json({ error: 'Internal server error' })[m
+[31m-  }[m
+[31m-}[m
+[31m-[m
+[32m+[m[32mconst getProductPosById = async (req, res) => {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const result = await findOperationalProductById({[m
+[32m+[m[32m      branchId: req.user?.branchId,[m
+[32m+[m[32m      productId: req.params.id,[m
+[32m+[m[32m    })[m
+[32m+[m
+[32m+[m[32m    return res.json(result)[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    if (error?.code === 'unauthorized') return res.status(401).json({ error: 'unauthorized' })[m
+[32m+[m[32m    if (error?.code === 'INVALID_ID') return res.status(400).json({ error: 'INVALID_ID' })[m
+[32m+[m[32m    if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' })[m
+[32m+[m
+[32m+[m[32m    console.error('❌ getProductPosById error:', error)[m
+[32m+[m[32m    return res.status(500).json({ error: 'Internal server error' })[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst getProductOnlineById = async (req, res) => {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const result = await findOperationalProductOnlineById({[m
+[32m+[m[32m      branchId: toInt(req.query.branchId) ?? Number(req.user?.branchId),[m
+[32m+[m[32m      productId: req.params.id,[m
+[32m+[m[32m    })[m
+[32m+[m
+[32m+[m[32m    return res.json(result)[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    if (error?.code === 'BRANCH_REQUIRED') return res.status(400).json({ error: 'BRANCH_REQUIRED' })[m
+[32m+[m[32m    if (error?.code === 'INVALID_ID') return res.status(400).json({ error: 'INVALID_ID' })[m
+[32m+[m[32m    if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: 'NOT_FOUND' })[m
+[32m+[m
+[32m+[m[32m    console.error('❌ getProductOnlineById error:', error)[m
+[32m+[m[32m    return res.status(500).json({ error: 'Internal server error' })[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+ const getProductDropdowns = async (req, res) => {[m
+   try {[m
+     const includeInactive = String(req.query?.includeInactive ?? 'false').toLowerCase() === 'true'[m

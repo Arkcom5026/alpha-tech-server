@@ -73,6 +73,7 @@ const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 
 // 🟢 FIXED: แก้ตำแหน่งเพื่อให้เข้าถึงโฟลเดอร์ src/modules ได้อย่างถูกต้องตามรูปโครงสร้างในเครื่อง
 const quickStockRoutes = require('./src/modules/quickStock/routes/quickStockRoutes');
+const productCreateRoutes = require('./src/modules/product/create/routes/productCreateRoutes');
 
 
 // Optional SIMPLE routes
@@ -188,6 +189,7 @@ app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
 app.use('/api/quick-stock', quickStockRoutes);
+app.use('/api/product-create', productCreateRoutes);
 
 // Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
