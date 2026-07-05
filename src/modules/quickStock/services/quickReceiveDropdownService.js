@@ -62,6 +62,7 @@ class QuickReceiveDropdownService {
         .map((row) => row.brand)
         .filter((brand) => brand && brand.active !== false)
     )
+    const units = dedupeByName(rows.map((row) => row.unit).filter(Boolean))
 
     return {
       success: true,
@@ -70,6 +71,7 @@ class QuickReceiveDropdownService {
       templateBranchCode: templateBranch.branchCode,
       productTypes,
       brands,
+      units,
     }
   }
 }
