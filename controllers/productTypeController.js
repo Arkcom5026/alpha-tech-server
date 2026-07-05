@@ -5,6 +5,7 @@
 
 const { prisma, Prisma } = require('../lib/prisma');
 const MAX_LIMIT = 100;
+const TEMPLATE_BRANCH_CODE = 'T01';
 
 // ---------- helpers ----------
 const toInt = (v) =>
@@ -25,6 +26,30 @@ const requireBranchId = (req, res) => {
   }
   return branchId;
 };
+
+const dedupeByName = (items = []) => {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const id = toInt(item?.id);
+    const name = String(item?.name ?? '').trim();
+    const key = normalizeName(name);
+    if (!id || !name || !key || seen.has(key)) continue;
+    seen.add(key);
+    result.push({ ...item, id, name });
+  }
+
+  return result.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
+};
+
+async function getTemplateBranchId() {
+  const templateBranch = await prisma.branch.findFirst({
+    where: { branchCode: TEMPLATE_BRANCH_CODE },
+    select: { id: true },
+  });
+  return templateBranch?.id || null;
+}
 
 // Inline normalizer/slugify (ไม่พึ่ง external deps)
 const toSpaces = (s) => s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -300,14 +325,20 @@ const restoreProductType = async (req, res) => {
 // ✅ dropdowns
 const getProductTypeDropdowns = async (req, res) => {
   try {
-    const branchId = requireBranchId(req, res);
-    if (!branchId) return;
+    const currentBranchId = requireBranchId(req, res);
+    if (!currentBranchId) return;
+
+    const templateBranchId = await getTemplateBranchId();
+    const sourceBranchId = templateBranchId || currentBranchId;
+
     const types = await prisma.productType.findMany({
-      where: { active: true, branchId },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
+      where: { active: true, branchId: sourceBranchId },
+      select: { id: true, name: true, categoryId: true, branchId: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
-    res.json(types);
+
+    res.set('Cache-Control', 'no-store');
+    res.json(dedupeByName(types));
   } catch (err) {
     console.error('❌ getProductTypeDropdowns error:', err);
     res.status(500).json({ error: 'Failed to load product types' });
@@ -323,5 +354,3 @@ module.exports = {
   restoreProductType,
   getProductTypeDropdowns,
 };
-
-
