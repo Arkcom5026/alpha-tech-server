@@ -29,11 +29,12 @@ const sendError = (res, err, fallbackMessage) => {
 
 // ===== controllers =====
 
-// GET /brands?page=1&pageSize=20&includeInactive=false&q=...
+// GET /brands?page=1&pageSize=20&includeInactive=false&q=...&productTypeId=123
 exports.listBrands = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim()
     const includeInactive = String(req.query.includeInactive || 'false') === 'true'
+    const productTypeId = toInt(req.query.productTypeId)
 
     const page = Math.max(1, parseInt(req.query.page || '1', 10))
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)))
@@ -42,6 +43,13 @@ exports.listBrands = async (req, res) => {
     const where = {
       ...(includeInactive ? {} : { active: true }),
       ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+      ...(productTypeId
+        ? {
+            productTypeBrands: {
+              some: { productTypeId: Number(productTypeId) },
+            },
+          }
+        : {}),
     }
 
     const [items, total] = await Promise.all([
