@@ -18,6 +18,8 @@ const verifyToken = require('../middlewares/verifyToken');
 const requireAdmin = require('../middlewares/requireAdmin');
 
 const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : parseInt(v, 10));
+const TEMPLATE_BRANCH_CODE = 'T01';
+const TEMPLATE_BRANCH_ID_FALLBACK = 1;
 
 // ✅ ทุก route ต้องผ่านการยืนยันตัวตนก่อน
 router.use(verifyToken);
@@ -25,9 +27,9 @@ router.use(verifyToken);
 // ⚠️ วาง route เฉพาะเจาะจงก่อน `/:id` เสมอ
 router.get('/dropdowns', getProductTypeDropdowns); // GET /api/product-types/dropdowns
 
-// GET /api/product-types/global-options
-// ใช้ในหน้าเพิ่มประเภทสินค้า: GlobalProductType เป็น template/reference ตามประเภทธุรกิจของสาขาปัจจุบัน
-router.get('/global-options', async (req, res) => {
+// GET /api/product-types/template-options
+// ใช้ในหน้าเพิ่มประเภทสินค้า: คัดลอก ProductType จากสาขาต้นแบบ แล้วสร้างเป็นของร้านปัจจุบัน
+router.get('/template-options', async (req, res) => {
   try {
     const branchId = toInt(req.user?.branchId);
     if (!branchId) {
@@ -53,8 +55,27 @@ router.get('/global-options', async (req, res) => {
       });
     }
 
-    const items = await prisma.globalProductType.findMany({
+    const templateBranch = await prisma.branch.findFirst({
       where: {
+        OR: [
+          { branchCode: TEMPLATE_BRANCH_CODE },
+          { id: TEMPLATE_BRANCH_ID_FALLBACK },
+        ],
+      },
+      select: { id: true, name: true, branchCode: true, categoryId: true },
+      orderBy: { id: 'asc' },
+    });
+
+    if (!templateBranch?.id) {
+      return res.status(404).json({
+        error: 'TEMPLATE_BRANCH_NOT_FOUND',
+        message: 'ไม่พบสาขาต้นแบบสำหรับคัดลอกประเภทสินค้า',
+      });
+    }
+
+    const items = await prisma.productType.findMany({
+      where: {
+        branchId: templateBranch.id,
         categoryId: branch.categoryId,
         active: true,
       },
@@ -64,18 +85,31 @@ router.get('/global-options', async (req, res) => {
         name: true,
         slug: true,
         categoryId: true,
+        branchId: true,
+        globalProductTypeId: true,
         category: { select: { id: true, name: true } },
+        _count: {
+          select: {
+            productTypeBrands: true,
+            Product: true,
+          },
+        },
       },
     });
 
     res.set('Cache-Control', 'no-store');
     return res.json({
       category: branch.category,
-      items,
+      templateBranch,
+      items: items.map((item) => ({
+        ...item,
+        brandCount: item?._count?.productTypeBrands || 0,
+        productCount: item?._count?.Product || 0,
+      })),
     });
   } catch (err) {
-    console.error('❌ GET ProductType global-options Failed:', err);
-    return res.status(500).json({ error: 'ไม่สามารถโหลด Template ประเภทสินค้าได้' });
+    console.error('❌ GET ProductType template-options Failed:', err);
+    return res.status(500).json({ error: 'ไม่สามารถโหลดประเภทสินค้าจากสาขาต้นแบบได้' });
   }
 });
 
