@@ -3,7 +3,6 @@
 
 const { prisma, Prisma } = require('../lib/prisma');
 const MAX_LIMIT = 100;
-const TEMPLATE_BRANCH_CODE = 'T01';
 
 // ---------- helpers ----------
 const toInt = (v) =>
@@ -41,28 +40,14 @@ const dedupeByName = (items = []) => {
   return result.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
 };
 
-async function getTemplateBranchId() {
-  const templateBranch = await prisma.branch.findFirst({
-    where: { branchCode: TEMPLATE_BRANCH_CODE },
-    select: { id: true },
-  });
-  return templateBranch?.id || null;
-}
-
-// ProductType master data may exist in older/global/another-branch rows during migration.
-// Read endpoints should prefer the current branch, then fall back to active master rows
-// so POS create-product dropdowns do not become empty during recovery/migration.
+// ProductType runtime reads must be branch-scoped.
+// Template/global rows are reference data only and must not be mixed into branch runtime screens.
 const makeProductTypeReadWhere = ({ branchId, q, categoryId, includeInactive }) => omitUndefined({
   ...(q ? { name: { contains: String(q), mode: 'insensitive' } } : {}),
   ...(toInt(categoryId) ? { categoryId: toInt(categoryId) } : {}),
   ...((String(includeInactive || '').toLowerCase() === 'true') ? {} : { active: true }),
   ...(branchId ? { branchId } : {}),
 });
-
-const omitBranchFromWhere = (where = {}) => {
-  const { branchId, ...rest } = where;
-  return rest;
-};
 
 const productTypeBrandInclude = {
   productTypeBrands: {
@@ -75,6 +60,15 @@ const productTypeBrandInclude = {
           active: true,
         },
       },
+    },
+  },
+};
+
+const productTypeRuntimeCountInclude = {
+  _count: {
+    select: {
+      Product: true,
+      productTypeBrands: true,
     },
   },
 };
@@ -93,8 +87,13 @@ const mapProductTypeOption = (type) => {
     })
     .filter(Boolean);
 
+  const productCount = Number(type?._count?.Product ?? type?.productCount ?? 0);
+  const brandCount = Number(type?._count?.productTypeBrands ?? typeBrands.length ?? 0);
+
   return {
     ...type,
+    productCount,
+    brandCount,
     brandOptions: typeBrands,
     brands: typeBrands,
     typeBrands,
@@ -147,30 +146,16 @@ const getAllProductType = async (req, res) => {
 
     const branchWhere = makeProductTypeReadWhere({ branchId, q, categoryId, includeInactive });
 
-    let [total, items] = await Promise.all([
+    const [total, items] = await Promise.all([
       prisma.productType.count({ where: branchWhere }),
       prisma.productType.findMany({
         where: branchWhere,
         orderBy: [{ name: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { category: true, ...productTypeBrandInclude },
+        include: { category: true, ...productTypeBrandInclude, ...productTypeRuntimeCountInclude },
       }),
     ]);
-
-    if (items.length === 0) {
-      const fallbackWhere = omitBranchFromWhere(branchWhere);
-      [total, items] = await Promise.all([
-        prisma.productType.count({ where: fallbackWhere }),
-        prisma.productType.findMany({
-          where: fallbackWhere,
-          orderBy: [{ name: 'asc' }, { id: 'asc' }],
-          skip: (page - 1) * limit,
-          take: limit,
-          include: { category: true, ...productTypeBrandInclude },
-        }),
-      ]);
-    }
 
     const mappedItems = items.map(mapProductTypeOption);
 
@@ -192,7 +177,7 @@ const getProductTypeById = async (req, res) => {
 
     const productType = await prisma.productType.findFirst({
       where: { id, branchId },
-      include: { category: true, ...productTypeBrandInclude },
+      include: { category: true, ...productTypeBrandInclude, ...productTypeRuntimeCountInclude },
     });
 
     if (!productType) {
@@ -211,7 +196,7 @@ const createProductType = async (req, res) => {
   try {
     const branchId = requireBranchId(req, res);
     if (!branchId) return;
-    const { name, categoryId } = req.body || {};
+    const { name, categoryId, globalProductTypeId } = req.body || {};
 
     if (!name || String(name).trim() === '') {
       return res.status(400).json({ error: 'กรุณาระบุชื่อประเภทสินค้า' });
@@ -226,6 +211,36 @@ const createProductType = async (req, res) => {
     if (cat.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้แก้ไข/เพิ่มข้อมูลย่อย' });
     if (cat.active === false) return res.status(409).json({ error: 'PARENT_INACTIVE', message: 'หมวดหมู่ถูกปิดการใช้งานอยู่ กรุณากู้คืนหมวดหมู่ก่อน' });
 
+    const globalProductTypeIdInt = toInt(globalProductTypeId);
+    let resolvedGlobalProductTypeId = globalProductTypeIdInt;
+
+    if (!resolvedGlobalProductTypeId) {
+      const fallbackGlobalType = await prisma.globalProductType.findFirst({
+        where: { categoryId: categoryIdInt, active: true },
+        orderBy: { id: 'asc' },
+        select: { id: true },
+      });
+      resolvedGlobalProductTypeId = fallbackGlobalType?.id;
+    }
+
+    if (!resolvedGlobalProductTypeId) {
+      return res.status(400).json({
+        error: 'GLOBAL_PRODUCT_TYPE_REQUIRED',
+        message: 'กรุณาระบุ GlobalProductType สำหรับประเภทสินค้านี้',
+      });
+    }
+
+    const globalType = await prisma.globalProductType.findFirst({
+      where: { id: resolvedGlobalProductTypeId, categoryId: categoryIdInt, active: true },
+      select: { id: true },
+    });
+    if (!globalType) {
+      return res.status(400).json({
+        error: 'INVALID_GLOBAL_PRODUCT_TYPE',
+        message: 'GlobalProductType ไม่ถูกต้องหรือไม่อยู่ในหมวดหมู่นี้',
+      });
+    }
+
     const nameTrim = String(name).trim();
     const normalized = normalizeName(nameTrim);
     const slug = slugify(nameTrim);
@@ -237,8 +252,16 @@ const createProductType = async (req, res) => {
     }
 
     const created = await prisma.productType.create({
-      data: { name: nameTrim, normalizedName: normalized, slug, categoryId: categoryIdInt, branchId, active: true },
-      include: { category: true, ...productTypeBrandInclude },
+      data: {
+        name: nameTrim,
+        normalizedName: normalized,
+        slug,
+        categoryId: categoryIdInt,
+        branchId,
+        globalProductTypeId: resolvedGlobalProductTypeId,
+        active: true,
+      },
+      include: { category: true, ...productTypeBrandInclude, ...productTypeRuntimeCountInclude },
     });
 
     res.status(201).json(mapProductTypeOption(created));
@@ -260,10 +283,14 @@ const updateProductType = async (req, res) => {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'id ไม่ถูกต้อง' });
 
-    const { name, categoryId } = req.body || {};
+    const { name, categoryId, globalProductTypeId } = req.body || {};
     const categoryIdInt = toInt(categoryId);
+    const globalProductTypeIdInt = toInt(globalProductTypeId);
 
-    const current = await prisma.productType.findFirst({ where: { id, branchId }, select: { id: true, categoryId: true, branchId: true } });
+    const current = await prisma.productType.findFirst({
+      where: { id, branchId },
+      select: { id: true, categoryId: true, branchId: true, globalProductTypeId: true },
+    });
     if (!current) return res.status(404).json({ error: 'ไม่พบประเภทสินค้าที่ต้องการอัปเดต' });
 
     const currentCat = await getCategoryGuardInfo(current.categoryId);
@@ -276,6 +303,23 @@ const updateProductType = async (req, res) => {
       if (!targetCat) return res.status(404).json({ error: 'ไม่พบหมวดหมู่สินค้า (category)' });
       if (targetCat.isSystem) return res.status(403).json({ error: 'หมวดระบบ (isSystem) ไม่อนุญาตให้ย้าย/เพิ่มข้อมูลย่อย' });
       if (targetCat.active === false) return res.status(409).json({ error: 'PARENT_INACTIVE', message: 'หมวดหมู่ปลายทางถูกปิดการใช้งานอยู่ กรุณากู้คืนก่อน' });
+    }
+
+    const targetGlobalProductTypeId =
+      globalProductTypeId !== undefined ? globalProductTypeIdInt : current.globalProductTypeId;
+
+    if (globalProductTypeId !== undefined) {
+      if (!globalProductTypeIdInt) return res.status(400).json({ error: 'globalProductTypeId ไม่ถูกต้อง' });
+      const globalType = await prisma.globalProductType.findFirst({
+        where: { id: globalProductTypeIdInt, categoryId: targetCategoryId, active: true },
+        select: { id: true },
+      });
+      if (!globalType) {
+        return res.status(400).json({
+          error: 'INVALID_GLOBAL_PRODUCT_TYPE',
+          message: 'GlobalProductType ไม่ถูกต้องหรือไม่อยู่ในหมวดหมู่นี้',
+        });
+      }
     }
 
     let nameTrim, normalized, slug;
@@ -305,12 +349,14 @@ const updateProductType = async (req, res) => {
       normalizedName: normalized,
       slug,
       categoryId: targetCategoryId !== current.categoryId ? targetCategoryId : undefined,
+      globalProductTypeId:
+        targetGlobalProductTypeId !== current.globalProductTypeId ? targetGlobalProductTypeId : undefined,
     });
 
     const updated = await prisma.productType.update({
       where: { id },
       data,
-      include: { category: true, ...productTypeBrandInclude },
+      include: { category: true, ...productTypeBrandInclude, ...productTypeRuntimeCountInclude },
     });
 
     res.json(mapProductTypeOption(updated));
@@ -389,16 +435,14 @@ const getProductTypeDropdowns = async (req, res) => {
     const currentBranchId = requireBranchId(req, res);
     if (!currentBranchId) return;
 
-    const templateBranchId = await getTemplateBranchId();
-    const sourceBranchId = templateBranchId || currentBranchId;
-
     const types = await prisma.productType.findMany({
-      where: { active: true, branchId: sourceBranchId },
+      where: { active: true, branchId: currentBranchId },
       select: {
         id: true,
         name: true,
         categoryId: true,
         branchId: true,
+        globalProductTypeId: true,
         ...productTypeBrandInclude,
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
