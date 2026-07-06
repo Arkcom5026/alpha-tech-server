@@ -1,0 +1,40 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V1-LOCAL-MIRROR",
+  "provider": "local-mirror",
+  "uploadedAt": "2026-07-06T15:56:19.323Z",
+  "targetDir": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+      "sizeBytes": 167770,
+      "sha256": "d2d014fc21ea23a033416e94bc004824b658250b5206482341dbaf947bc92eb3"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql",
+      "sizeBytes": 4610029,
+      "sha256": "b5a39a6339bfd599acca31ad83fe44a03af659274b7f6de762f23a1b7fd25cd9"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+      "targetPath": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+      "sourceSha256": "d2d014fc21ea23a033416e94bc004824b658250b5206482341dbaf947bc92eb3",
+      "targetSha256": "d2d014fc21ea23a033416e94bc004824b658250b5206482341dbaf947bc92eb3",
+      "sizeBytes": 167770,
+      "verified": true
+    },
+    "sql": {
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql",
+      "targetPath": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql",
+      "sourceSha256": "b5a39a6339bfd599acca31ad83fe44a03af659274b7f6de762f23a1b7fd25cd9",
+      "targetSha256": "b5a39a6339bfd599acca31ad83fe44a03af659274b7f6de762f23a1b7fd25cd9",
+      "sizeBytes": 4610029,
+      "verified": true
+    }
+  },
+  "ok": true,
+  "uploadManifestPath": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.upload.json"
+}

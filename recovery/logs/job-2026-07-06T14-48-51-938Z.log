@@ -1,0 +1,89 @@
+[2026-07-06T14:48:51.940Z] ============================================================
+[2026-07-06T14:48:51.947Z] 🧭 AlphaTech Recovery Workflow Runner ALPHATECH-RECOVERY-JOB-RUNNER-V2-WORKFLOW
+[2026-07-06T14:48:51.948Z] ============================================================
+[2026-07-06T14:48:51.948Z] Mode: backup-workflow
+[2026-07-06T14:48:51.949Z] ▶️  Run: node qb.js
+[2026-07-06T14:48:52.437Z] node: 🔌 Connected to PostgreSQL successfully.
+[2026-07-06T14:48:52.438Z] node: ⏳ Starting P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore...
+[2026-07-06T14:48:55.856Z] node: 📦 Exporting table: Bank
+[2026-07-06T14:48:55.897Z] node: 📦 Exporting table: Brand
+[2026-07-06T14:48:55.942Z] node: 📦 Exporting table: Category
+[2026-07-06T14:48:55.981Z] node: 📦 Exporting table: GlobalProductType
+[2026-07-06T14:48:56.020Z] node: 📦 Exporting table: Position
+[2026-07-06T14:48:56.060Z] node: 📦 Exporting table: Province
+[2026-07-06T14:48:56.100Z] node: 📦 Exporting table: District
+[2026-07-06T14:48:56.187Z] node: 📦 Exporting table: Subdistrict
+[2026-07-06T14:48:56.394Z] node: 📦 Exporting table: Branch
+[2026-07-06T14:48:56.433Z] node: 📦 Exporting table: BarcodeCounter
+[2026-07-06T14:48:56.472Z] node: 📦 Exporting table: PaymentCodeCounter
+[2026-07-06T14:48:56.511Z] node: 📦 Exporting table: ProductType
+[2026-07-06T14:48:56.551Z] node: 📦 Exporting table: ProductTypeBrand
+[2026-07-06T14:48:56.592Z] node: 📦 Exporting table: Supplier
+[2026-07-06T14:48:56.632Z] node: 📦 Exporting table: Unit
+[2026-07-06T14:48:56.676Z] node: 📦 Exporting table: Product
+[2026-07-06T14:48:56.762Z] node: 📦 Exporting table: BranchPrice
+[2026-07-06T14:48:56.830Z] node: 📦 Exporting table: ProductImage
+[2026-07-06T14:48:56.874Z] node: 📦 Exporting table: StockBalance
+[2026-07-06T14:48:56.930Z] node: 📦 Exporting table: User
+[2026-07-06T14:48:56.973Z] node: 📦 Exporting table: CustomerProfile
+[2026-07-06T14:48:57.019Z] node: 📦 Exporting table: Cart
+[2026-07-06T14:48:57.058Z] node: 📦 Exporting table: CartItem
+[2026-07-06T14:48:57.098Z] node: 📦 Exporting table: EmployeeProfile
+[2026-07-06T14:48:57.136Z] node: 📦 Exporting table: CombinedBillingDocument
+[2026-07-06T14:48:57.175Z] node: 📦 Exporting table: CombinedSaleDocument
+[2026-07-06T14:48:57.214Z] node: 📦 Exporting table: CustomerDeposit
+[2026-07-06T14:48:57.252Z] node: 📦 Exporting table: CustomerReceipts
+[2026-07-06T14:48:57.291Z] node: 📦 Exporting table: InputTaxFilingBatch
+[2026-07-06T14:48:57.330Z] node: 📦 Exporting table: Order
+[2026-07-06T14:48:57.369Z] node: 📦 Exporting table: OrderOnline
+[2026-07-06T14:48:57.408Z] node: 📦 Exporting table: OrderOnlineItem
+[2026-07-06T14:48:57.447Z] node: 📦 Exporting table: PasswordResetToken
+[2026-07-06T14:48:57.486Z] node: 📦 Exporting table: ProductOnOrder
+[2026-07-06T14:48:57.524Z] node: 📦 Exporting table: PurchaseOrder
+[2026-07-06T14:48:57.563Z] node: 📦 Exporting table: PurchaseOrderItem
+[2026-07-06T14:48:57.609Z] node: 📦 Exporting table: PurchaseOrderReceipt
+[2026-07-06T14:48:57.648Z] node: 📦 Exporting table: InputTaxFilingItem
+[2026-07-06T14:48:57.687Z] node: 📦 Exporting table: PurchaseOrderReceiptItem
+[2026-07-06T14:48:57.726Z] node: 📦 Exporting table: RefreshToken
+[2026-07-06T14:48:57.906Z] node: 📦 Exporting table: Sale
+[2026-07-06T14:48:57.946Z] node: 📦 Exporting table: CustomerReceiptAllocations
+[2026-07-06T14:48:57.985Z] node: 📦 Exporting table: Payment
+[2026-07-06T14:48:58.024Z] node: 📦 Exporting table: DepositUsage
+[2026-07-06T14:48:58.063Z] node: 📦 Exporting table: PaymentItem
+[2026-07-06T14:48:58.102Z] node: 📦 Exporting table: SaleReturn
+[2026-07-06T14:48:58.140Z] node: 📦 Exporting table: RefundTransaction
+[2026-07-06T14:48:58.179Z] node: 📦 Exporting table: SalesTaxFilingBatch
+[2026-07-06T14:48:58.218Z] node: 📦 Exporting table: SalesTaxFilingItem
+[2026-07-06T14:48:58.257Z] node: 📦 Exporting table: ServiceOrder
+[2026-07-06T14:48:58.295Z] node: 📦 Exporting table: ServiceItem
+[2026-07-06T14:48:58.334Z] node: 📦 Exporting table: SimpleLot
+[2026-07-06T14:48:58.372Z] node: 📦 Exporting table: SaleItemSimple
+[2026-07-06T14:48:58.411Z] node: 📦 Exporting table: SaleReturnItemSimple
+[2026-07-06T14:48:58.450Z] node: 📦 Exporting table: StockAuditSession
+[2026-07-06T14:48:58.489Z] node: 📦 Exporting table: StockItem
+[2026-07-06T14:48:58.546Z] node: 📦 Exporting table: BarcodeReceiptItem
+[2026-07-06T14:48:58.585Z] node: 📦 Exporting table: RepairJob
+[2026-07-06T14:48:58.625Z] node: 📦 Exporting table: RepairPartItem
+[2026-07-06T14:48:58.664Z] node: 📦 Exporting table: SaleItem
+[2026-07-06T14:48:58.703Z] node: 📦 Exporting table: SaleReturnItem
+[2026-07-06T14:48:58.741Z] node: 📦 Exporting table: StockAuditScanLog
+[2026-07-06T14:48:58.779Z] node: 📦 Exporting table: StockAuditSnapshotItem
+[2026-07-06T14:48:58.818Z] node: 📦 Exporting table: StockMovement
+[2026-07-06T14:48:58.859Z] node: 📦 Exporting table: SupplierPayment
+[2026-07-06T14:48:58.898Z] node: 📦 Exporting table: SupplierPaymentReceipt
+[2026-07-06T14:48:58.937Z] node: 📦 Exporting table: V2CustomerDeposit
+[2026-07-06T14:48:58.975Z] node: 📦 Exporting table: V2StockAudit
+[2026-07-06T14:48:59.014Z] node: 📦 Exporting table: V2StockAuditItem
+[2026-07-06T14:48:59.052Z] node: 📦 Exporting table: WarrantyClaim
+[2026-07-06T14:49:01.849Z] node: 🎉 P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore completed successfully.
+[2026-07-06T14:49:01.849Z] node: 💾 Backup file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T14-48-55-833Z.sql
+[2026-07-06T14:49:01.851Z] node: 🧾 Manifest file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T14-48-55-833Z.manifest.json
+[2026-07-06T14:49:01.851Z] node: 📊 Tables exported: 70
+[2026-07-06T14:49:01.851Z] node: 📦 Rows exported: 15079
+[2026-07-06T14:49:01.852Z] node: 🔢 Sequences prepared: 67
+[2026-07-06T14:49:01.852Z] node: 🔐 SHA256: e0a41486537757d6b87fddb11dcdf8b6dde0e584105c73355283cdd1131de753
+[2026-07-06T14:49:01.852Z] node: 📐 File size: 4.39 MB
+[2026-07-06T14:49:01.853Z] node: ⏱️ Duration: 7.03 seconds
+[2026-07-06T14:49:01.853Z] node: ✅ Verification: PASS (70 tables checked)
+[2026-07-06T14:49:01.914Z] 🧾 Job manifest: D:\alpha-tech\server\recovery\jobs\job-2026-07-06T14-48-51-938Z.json
+[2026-07-06T14:49:01.915Z] ✅ Job result: PASS exitCode=0
