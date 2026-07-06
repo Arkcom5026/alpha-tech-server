@@ -4,6 +4,49 @@ const router = express.Router();
 
 const authController = require('../controllers/authController');
 
+const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
+const isProduction = process.env.NODE_ENV === 'production';
+
+const getRefreshCookieTransportOptions = () => ({
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  path: '/api/auth',
+});
+
+// ✅ Production-grade refresh-cookie transport guard
+// FE keeps accessToken in memory and relies on /auth/refresh + HttpOnly cookie.
+// Cross-domain deployments such as Vercel -> API require SameSite=None + Secure.
+router.use((req, res, next) => {
+  const originalCookie = res.cookie.bind(res);
+  const originalClearCookie = res.clearCookie.bind(res);
+
+  res.cookie = (name, value, options = {}) => {
+    if (name === REFRESH_COOKIE_NAME) {
+      return originalCookie(name, value, {
+        ...options,
+        ...getRefreshCookieTransportOptions(),
+        httpOnly: true,
+      });
+    }
+
+    return originalCookie(name, value, options);
+  };
+
+  res.clearCookie = (name, options = {}) => {
+    if (name === REFRESH_COOKIE_NAME) {
+      return originalClearCookie(name, {
+        ...options,
+        ...getRefreshCookieTransportOptions(),
+        httpOnly: true,
+      });
+    }
+
+    return originalClearCookie(name, options);
+  };
+
+  next();
+});
+
 // ✅ กัน error: handler ต้องเป็น function เท่านั้น
 const ensureFn = (key) => {
   const fn = authController?.[key];
