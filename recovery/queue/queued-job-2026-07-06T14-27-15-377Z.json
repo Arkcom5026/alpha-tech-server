@@ -1,0 +1,10 @@
+{
+  "queueVersion": "ALPHATECH-RECOVERY-SCHEDULER-V1",
+  "jobId": "2026-07-06T14-27-15-377Z",
+  "source": "manual-run-once",
+  "mode": "backup-only",
+  "status": "QUEUED",
+  "createdAt": "2026-07-06T14:27:15.377Z",
+  "pickedAt": null,
+  "finishedAt": null
+}

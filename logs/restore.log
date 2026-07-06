@@ -1,0 +1,223 @@
+[2026-07-06T11:45:31.763Z] ============================================================
+[2026-07-06T11:45:31.767Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V2
+[2026-07-06T11:45:31.768Z] ============================================================
+[2026-07-06T11:45:31.787Z] ✅ Manifest loaded.
+[2026-07-06T11:45:31.787Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql
+[2026-07-06T11:45:31.788Z] ✅ SHA256 verified: bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b
+[2026-07-06T11:45:31.789Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T11:45:31.789Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T11:45:31.797Z] 🎯 Port: 5432
+[2026-07-06T11:45:31.797Z] 🎯 Database: postgres
+[2026-07-06T11:45:31.798Z] 🎯 Schema: public
+[2026-07-06T11:45:32.185Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T11:45:32.267Z] 📊 Existing tables: 0
+[2026-07-06T11:45:32.267Z] 📦 Existing rows: 0
+[2026-07-06T11:45:32.269Z] 🔎 Product: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.269Z] 🔎 BranchPrice: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.269Z] 🔎 StockItem: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.270Z] 🔎 Sale: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.270Z] 🔎 SaleItem: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.271Z] 🔎 SaleItemSimple: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.271Z] 🔎 Payment: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.271Z] 🔎 PaymentItem: TABLE_NOT_FOUND
+[2026-07-06T11:45:32.272Z] ⚠️ Target database is missing 70 expected tables.
+[2026-07-06T11:45:41.742Z] ❌ Schema init cancelled by user.
+[2026-07-06T11:58:56.897Z] ============================================================
+[2026-07-06T11:58:56.900Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V2
+[2026-07-06T11:58:56.901Z] ============================================================
+[2026-07-06T11:58:56.918Z] ✅ Manifest loaded.
+[2026-07-06T11:58:56.919Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql
+[2026-07-06T11:58:56.919Z] ✅ SHA256 verified: bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b
+[2026-07-06T11:58:56.920Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T11:58:56.920Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T11:58:56.921Z] 🎯 Port: 5432
+[2026-07-06T11:58:56.921Z] 🎯 Database: postgres
+[2026-07-06T11:58:56.921Z] 🎯 Schema: public
+[2026-07-06T11:58:57.304Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T11:58:57.388Z] 📊 Existing tables: 0
+[2026-07-06T11:58:57.388Z] 📦 Existing rows: 0
+[2026-07-06T11:58:57.389Z] 🔎 Product: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.390Z] 🔎 BranchPrice: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.390Z] 🔎 StockItem: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.391Z] 🔎 Sale: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.391Z] 🔎 SaleItem: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.392Z] 🔎 SaleItemSimple: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.392Z] 🔎 Payment: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.392Z] 🔎 PaymentItem: TABLE_NOT_FOUND
+[2026-07-06T11:58:57.393Z] ⚠️ Target database is missing 70 expected tables.
+[2026-07-06T12:00:47.556Z] ❌ Missing .env.recovery. Refusing to run Prisma db push without explicit Recovery env file.
+[2026-07-06T12:01:05.098Z] ============================================================
+[2026-07-06T12:01:05.102Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V2
+[2026-07-06T12:01:05.102Z] ============================================================
+[2026-07-06T12:01:05.120Z] ✅ Manifest loaded.
+[2026-07-06T12:01:05.121Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql
+[2026-07-06T12:01:05.121Z] ✅ SHA256 verified: bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b
+[2026-07-06T12:01:05.122Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T12:01:05.122Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T12:01:05.123Z] 🎯 Port: 5432
+[2026-07-06T12:01:05.123Z] 🎯 Database: postgres
+[2026-07-06T12:01:05.123Z] 🎯 Schema: public
+[2026-07-06T12:01:05.491Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T12:01:05.571Z] 📊 Existing tables: 0
+[2026-07-06T12:01:05.571Z] 📦 Existing rows: 0
+[2026-07-06T12:01:05.572Z] 🔎 Product: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.573Z] 🔎 BranchPrice: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.573Z] 🔎 StockItem: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.574Z] 🔎 Sale: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.574Z] 🔎 SaleItem: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.574Z] 🔎 SaleItemSimple: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.575Z] 🔎 Payment: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.575Z] 🔎 PaymentItem: TABLE_NOT_FOUND
+[2026-07-06T12:01:05.576Z] ⚠️ Target database is missing 70 expected tables.
+[2026-07-06T12:01:08.396Z] ❌ Missing .env.recovery. Refusing to run Prisma db push without explicit Recovery env file.
+[2026-07-06T12:04:50.336Z] ============================================================
+[2026-07-06T12:04:50.339Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V2
+[2026-07-06T12:04:50.340Z] ============================================================
+[2026-07-06T12:04:50.358Z] ✅ Manifest loaded.
+[2026-07-06T12:04:50.359Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql
+[2026-07-06T12:04:50.359Z] ✅ SHA256 verified: bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b
+[2026-07-06T12:04:50.360Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T12:04:50.361Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T12:04:50.361Z] 🎯 Port: 5432
+[2026-07-06T12:04:50.361Z] 🎯 Database: postgres
+[2026-07-06T12:04:50.362Z] 🎯 Schema: public
+[2026-07-06T12:04:50.745Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T12:04:50.825Z] 📊 Existing tables: 0
+[2026-07-06T12:04:50.825Z] 📦 Existing rows: 0
+[2026-07-06T12:04:50.826Z] 🔎 Product: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.827Z] 🔎 BranchPrice: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.827Z] 🔎 StockItem: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.828Z] 🔎 Sale: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.828Z] 🔎 SaleItem: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.828Z] 🔎 SaleItemSimple: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.829Z] 🔎 Payment: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.829Z] 🔎 PaymentItem: TABLE_NOT_FOUND
+[2026-07-06T12:04:50.830Z] ⚠️ Target database is missing 70 expected tables.
+[2026-07-06T12:04:55.037Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-06T12:04:55.038Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-06T12:04:58.331Z] npx stderr: Environment variables loaded from .env
+[2026-07-06T12:04:58.332Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-06T12:04:58.342Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-06T12:05:14.532Z] npx: Your database is now in sync with your Prisma schema. Done in 15.64s
+[2026-07-06T12:05:14.535Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-06T12:05:15.474Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-06T12:05:16.624Z] npx: [2K[1A[2K[GEPERM: operation not permitted, rename 'D:\alpha-tech\server\node_modules\.prism
+[2026-07-06T12:05:16.624Z] npx: a\client\query_engine-windows.dll.node.tmp1320' -> 'D:\alpha-tech\server\node_mo
+[2026-07-06T12:05:16.625Z] npx: dules\.prisma\client\query_engine-windows.dll.node'
+[2026-07-06T12:05:16.679Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-06T12:05:19.827Z] 📊 Existing tables: 70
+[2026-07-06T12:05:19.828Z] 📦 Existing rows: 0
+[2026-07-06T12:05:19.829Z] 🔎 Product: 0
+[2026-07-06T12:05:19.829Z] 🔎 BranchPrice: 0
+[2026-07-06T12:05:19.830Z] 🔎 StockItem: 0
+[2026-07-06T12:05:19.830Z] 🔎 Sale: 0
+[2026-07-06T12:05:19.831Z] 🔎 SaleItem: 0
+[2026-07-06T12:05:19.831Z] 🔎 SaleItemSimple: 0
+[2026-07-06T12:05:19.831Z] 🔎 Payment: 0
+[2026-07-06T12:05:19.832Z] 🔎 PaymentItem: 0
+[2026-07-06T12:05:52.364Z] 🚚 Starting SQL restore via psql...
+[2026-07-06T12:05:52.374Z] psql stderr: 'psql' is not recognized as an internal or external command,
+[2026-07-06T12:05:52.374Z] psql stderr: operable program or batch file.
+[2026-07-06T12:05:52.377Z] ❌ Restore failed: psql exited with code 1
+[2026-07-06T12:19:14.276Z] ============================================================
+[2026-07-06T12:19:14.279Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-06T12:19:14.280Z] ============================================================
+[2026-07-06T12:19:14.297Z] ✅ Manifest loaded.
+[2026-07-06T12:19:14.298Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql
+[2026-07-06T12:19:14.298Z] ✅ SHA256 verified: bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b
+[2026-07-06T12:19:14.299Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T12:19:14.300Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T12:19:14.300Z] 🎯 Port: 5432
+[2026-07-06T12:19:14.301Z] 🎯 Database: postgres
+[2026-07-06T12:19:14.301Z] 🎯 Schema: public
+[2026-07-06T12:19:14.680Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T12:19:17.710Z] 📊 Existing tables: 70
+[2026-07-06T12:19:17.711Z] 📦 Existing rows: 0
+[2026-07-06T12:19:17.712Z] 🔎 Product: 0
+[2026-07-06T12:19:17.712Z] 🔎 BranchPrice: 0
+[2026-07-06T12:19:17.713Z] 🔎 StockItem: 0
+[2026-07-06T12:19:17.713Z] 🔎 Sale: 0
+[2026-07-06T12:19:17.714Z] 🔎 SaleItem: 0
+[2026-07-06T12:19:17.714Z] 🔎 SaleItemSimple: 0
+[2026-07-06T12:19:17.714Z] 🔎 Payment: 0
+[2026-07-06T12:19:17.715Z] 🔎 PaymentItem: 0
+[2026-07-06T12:19:21.645Z] 📖 SQL loaded into memory (4.20 MB).
+[2026-07-06T12:19:21.646Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-06T12:19:23.078Z] ❌ Restore failed: column "guideExamples" is of type text[] but expression is of type jsonb
+[2026-07-06T12:32:34.501Z] ============================================================
+[2026-07-06T12:32:34.506Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-06T12:32:34.506Z] ============================================================
+[2026-07-06T12:32:34.528Z] ✅ Manifest loaded.
+[2026-07-06T12:32:34.529Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v4_2026-07-06_2026-07-06T12-32-06-598Z.sql
+[2026-07-06T12:32:34.530Z] ✅ SHA256 verified: 2dc3124a0c8ae4dda7f3a67ba0c28b34483a31c382debcca0c57096d1e6ed9b5
+[2026-07-06T12:32:34.530Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T12:32:34.531Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T12:32:34.531Z] 🎯 Port: 5432
+[2026-07-06T12:32:34.532Z] 🎯 Database: postgres
+[2026-07-06T12:32:34.532Z] 🎯 Schema: public
+[2026-07-06T12:32:34.912Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T12:32:37.633Z] 📊 Existing tables: 70
+[2026-07-06T12:32:37.634Z] 📦 Existing rows: 0
+[2026-07-06T12:32:37.634Z] 🔎 Product: 0
+[2026-07-06T12:32:37.635Z] 🔎 BranchPrice: 0
+[2026-07-06T12:32:37.635Z] 🔎 StockItem: 0
+[2026-07-06T12:32:37.636Z] 🔎 Sale: 0
+[2026-07-06T12:32:37.636Z] 🔎 SaleItem: 0
+[2026-07-06T12:32:37.636Z] 🔎 SaleItemSimple: 0
+[2026-07-06T12:32:37.637Z] 🔎 Payment: 0
+[2026-07-06T12:32:37.637Z] 🔎 PaymentItem: 0
+[2026-07-06T12:32:42.321Z] 📖 SQL loaded into memory (4.22 MB).
+[2026-07-06T12:32:42.322Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-06T12:32:44.472Z] ❌ Restore failed: insert or update on table "Product" violates foreign key constraint "Product_templateProductId_fkey"
+[2026-07-06T12:52:48.182Z] ============================================================
+[2026-07-06T12:52:48.185Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-06T12:52:48.186Z] ============================================================
+[2026-07-06T12:52:48.206Z] ✅ Manifest loaded.
+[2026-07-06T12:52:48.206Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v5_2026-07-06_2026-07-06T12-52-23-679Z.sql
+[2026-07-06T12:52:48.206Z] ✅ SHA256 verified: f27fcb124480dafd6893ef937e245421578af21f148289d43392d9c9f4244f50
+[2026-07-06T12:52:48.207Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T12:52:48.208Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T12:52:48.208Z] 🎯 Port: 5432
+[2026-07-06T12:52:48.208Z] 🎯 Database: postgres
+[2026-07-06T12:52:48.209Z] 🎯 Schema: public
+[2026-07-06T12:52:48.598Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T12:52:51.546Z] 📊 Existing tables: 70
+[2026-07-06T12:52:51.547Z] 📦 Existing rows: 0
+[2026-07-06T12:52:51.548Z] 🔎 Product: 0
+[2026-07-06T12:52:51.548Z] 🔎 BranchPrice: 0
+[2026-07-06T12:52:51.549Z] 🔎 StockItem: 0
+[2026-07-06T12:52:51.549Z] 🔎 Sale: 0
+[2026-07-06T12:52:51.550Z] 🔎 SaleItem: 0
+[2026-07-06T12:52:51.550Z] 🔎 SaleItemSimple: 0
+[2026-07-06T12:52:51.550Z] 🔎 Payment: 0
+[2026-07-06T12:52:51.551Z] 🔎 PaymentItem: 0
+[2026-07-06T12:52:55.479Z] 📖 SQL loaded into memory (4.23 MB).
+[2026-07-06T12:52:55.480Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-06T12:52:57.235Z] ❌ Restore failed: insert or update on table "RefreshToken" violates foreign key constraint "RefreshToken_replacedByTokenId_fkey"
+[2026-07-06T13:10:45.775Z] ============================================================
+[2026-07-06T13:10:45.778Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-06T13:10:45.779Z] ============================================================
+[2026-07-06T13:10:45.799Z] ✅ Manifest loaded.
+[2026-07-06T13:10:45.799Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T13-10-19-159Z.sql
+[2026-07-06T13:10:45.800Z] ✅ SHA256 verified: 32e12d09fff330e5d139774bada7667250ea70f6d1cd2f2a944d9245ed750cb3
+[2026-07-06T13:10:45.801Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-06T13:10:45.801Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-06T13:10:45.801Z] 🎯 Port: 5432
+[2026-07-06T13:10:45.802Z] 🎯 Database: postgres
+[2026-07-06T13:10:45.802Z] 🎯 Schema: public
+[2026-07-06T13:10:46.174Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-06T13:10:48.906Z] 📊 Existing tables: 70
+[2026-07-06T13:10:48.906Z] 📦 Existing rows: 0
+[2026-07-06T13:10:48.907Z] 🔎 Product: 0
+[2026-07-06T13:10:48.908Z] 🔎 BranchPrice: 0
+[2026-07-06T13:10:48.908Z] 🔎 StockItem: 0
+[2026-07-06T13:10:48.909Z] 🔎 Sale: 0
+[2026-07-06T13:10:48.909Z] 🔎 SaleItem: 0
+[2026-07-06T13:10:48.909Z] 🔎 SaleItemSimple: 0
+[2026-07-06T13:10:48.910Z] 🔎 Payment: 0
+[2026-07-06T13:10:48.910Z] 🔎 PaymentItem: 0
+[2026-07-06T13:10:52.377Z] 📖 SQL loaded into memory (4.39 MB).
+[2026-07-06T13:10:52.377Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-06T13:10:54.445Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-06T13:10:57.067Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-06T13:10:57.068Z] 🎉 Restore completed successfully in 11.29 seconds.

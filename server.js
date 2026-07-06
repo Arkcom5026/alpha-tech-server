@@ -25,14 +25,14 @@ app.use((req, res, next) => {
 
 // ===================== Routes =====================
 const authRoutes = require('./routes/authRoutes');
-const productTypeRoutes = require('./routes/productTypeRoutes');
+const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const superAdminCategoryRoutes = require('./routes/superAdminCategoryRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const productTemplateRoutes = require('./src/modules/productTemplate/routes/productTemplateRoutes');
 const productProfileRoutes = require('./routes/productProfileRoutes');
-const brandRoutes = require('./routes/brandRoutes');
+const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const productRoutes = require('./routes/productRoutes');
 const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');

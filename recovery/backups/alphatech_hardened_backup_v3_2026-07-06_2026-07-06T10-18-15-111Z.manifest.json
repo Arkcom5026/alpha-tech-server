@@ -1,0 +1,1353 @@
+{
+  "backupVersion": "P1-HARDENED-BACKUP-V3",
+  "createdAt": "2026-07-06T10:18:15.111Z",
+  "localeTime": "6/7/2569 17:18:15",
+  "schema": "public",
+  "database": {
+    "name": "postgres",
+    "user": "postgres",
+    "postgresVersion": "15.8"
+  },
+  "files": {
+    "sqlFileName": "alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql",
+    "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.sql",
+    "manifestFileName": "alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.manifest.json",
+    "manifestFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v3_2026-07-06_2026-07-06T10-18-15-111Z.manifest.json",
+    "fileSizeBytes": 4401113,
+    "fileSizeMb": 4.1972,
+    "sha256": "bfbd615d2d72dad8187d5026df8e237f4448c353a0882f9aedd6203f1c1d895b"
+  },
+  "summary": {
+    "totalTables": 70,
+    "totalRows": 14979,
+    "sequenceCount": 67,
+    "durationMs": 6511,
+    "durationSeconds": 6.51
+  },
+  "restoreOrder": [
+    "Bank",
+    "Brand",
+    "Category",
+    "GlobalProductType",
+    "Position",
+    "Province",
+    "District",
+    "Subdistrict",
+    "Branch",
+    "BarcodeCounter",
+    "PaymentCodeCounter",
+    "ProductType",
+    "ProductTypeBrand",
+    "Supplier",
+    "Unit",
+    "Product",
+    "BranchPrice",
+    "ProductImage",
+    "StockBalance",
+    "User",
+    "CustomerProfile",
+    "Cart",
+    "CartItem",
+    "EmployeeProfile",
+    "CombinedBillingDocument",
+    "CombinedSaleDocument",
+    "CustomerDeposit",
+    "CustomerReceipts",
+    "InputTaxFilingBatch",
+    "Order",
+    "OrderOnline",
+    "OrderOnlineItem",
+    "PasswordResetToken",
+    "ProductOnOrder",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderReceipt",
+    "InputTaxFilingItem",
+    "PurchaseOrderReceiptItem",
+    "RefreshToken",
+    "Sale",
+    "CustomerReceiptAllocations",
+    "Payment",
+    "DepositUsage",
+    "PaymentItem",
+    "SaleReturn",
+    "RefundTransaction",
+    "SalesTaxFilingBatch",
+    "SalesTaxFilingItem",
+    "ServiceOrder",
+    "ServiceItem",
+    "SimpleLot",
+    "SaleItemSimple",
+    "SaleReturnItemSimple",
+    "StockAuditSession",
+    "StockItem",
+    "BarcodeReceiptItem",
+    "RepairJob",
+    "RepairPartItem",
+    "SaleItem",
+    "SaleReturnItem",
+    "StockAuditScanLog",
+    "StockAuditSnapshotItem",
+    "StockMovement",
+    "SupplierPayment",
+    "SupplierPaymentReceipt",
+    "V2CustomerDeposit",
+    "V2StockAudit",
+    "V2StockAuditItem",
+    "WarrantyClaim"
+  ],
+  "cyclicTables": [],
+  "sequences": [
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Bank_id_seq",
+      "table_schema": "public",
+      "table_name": "Bank",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BarcodeCounter_id_seq",
+      "table_schema": "public",
+      "table_name": "BarcodeCounter",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BarcodeReceiptItem_id_seq",
+      "table_schema": "public",
+      "table_name": "BarcodeReceiptItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Branch_id_seq",
+      "table_schema": "public",
+      "table_name": "Branch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BranchPrice_id_seq",
+      "table_schema": "public",
+      "table_name": "BranchPrice",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Brand_id_seq",
+      "table_schema": "public",
+      "table_name": "Brand",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Cart_id_seq",
+      "table_schema": "public",
+      "table_name": "Cart",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CartItem_id_seq",
+      "table_schema": "public",
+      "table_name": "CartItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Category_id_seq",
+      "table_schema": "public",
+      "table_name": "Category",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CombinedBillingDocument_id_seq",
+      "table_schema": "public",
+      "table_name": "CombinedBillingDocument",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CombinedSaleDocument_id_seq",
+      "table_schema": "public",
+      "table_name": "CombinedSaleDocument",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerDeposit_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerDeposit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerProfile_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerProfile",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerReceiptAllocations_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerReceiptAllocations",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerReceipts_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerReceipts",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "DepositUsage_id_seq",
+      "table_schema": "public",
+      "table_name": "DepositUsage",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "EmployeeProfile_id_seq",
+      "table_schema": "public",
+      "table_name": "EmployeeProfile",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "GlobalProductType_id_seq",
+      "table_schema": "public",
+      "table_name": "GlobalProductType",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "InputTaxFilingBatch_id_seq",
+      "table_schema": "public",
+      "table_name": "InputTaxFilingBatch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "InputTaxFilingItem_id_seq",
+      "table_schema": "public",
+      "table_name": "InputTaxFilingItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Order_id_seq",
+      "table_schema": "public",
+      "table_name": "Order",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "OrderOnline_id_seq",
+      "table_schema": "public",
+      "table_name": "OrderOnline",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "OrderOnlineItem_id_seq",
+      "table_schema": "public",
+      "table_name": "OrderOnlineItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PasswordResetToken_id_seq",
+      "table_schema": "public",
+      "table_name": "PasswordResetToken",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Payment_id_seq",
+      "table_schema": "public",
+      "table_name": "Payment",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PaymentCodeCounter_id_seq",
+      "table_schema": "public",
+      "table_name": "PaymentCodeCounter",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PaymentItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PaymentItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Position_id_seq",
+      "table_schema": "public",
+      "table_name": "Position",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Product_id_seq",
+      "table_schema": "public",
+      "table_name": "Product",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductImage_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductImage",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductOnOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductOnOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductType_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductType",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductTypeBrand_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductTypeBrand",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderReceipt_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderReceipt",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderReceiptItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderReceiptItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RefreshToken_id_seq",
+      "table_schema": "public",
+      "table_name": "RefreshToken",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RefundTransaction_id_seq",
+      "table_schema": "public",
+      "table_name": "RefundTransaction",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RepairJob_id_seq",
+      "table_schema": "public",
+      "table_name": "RepairJob",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RepairPartItem_id_seq",
+      "table_schema": "public",
+      "table_name": "RepairPartItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Sale_id_seq",
+      "table_schema": "public",
+      "table_name": "Sale",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleItemSimple_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleItemSimple",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturn_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturn",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturnItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturnItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturnItemSimple_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturnItemSimple",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SalesTaxFilingBatch_id_seq",
+      "table_schema": "public",
+      "table_name": "SalesTaxFilingBatch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SalesTaxFilingItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SalesTaxFilingItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ServiceItem_id_seq",
+      "table_schema": "public",
+      "table_name": "ServiceItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ServiceOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "ServiceOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SimpleLot_id_seq",
+      "table_schema": "public",
+      "table_name": "SimpleLot",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditScanLog_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditScanLog",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditSession_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditSession",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditSnapshotItem_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditSnapshotItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockBalance_id_seq",
+      "table_schema": "public",
+      "table_name": "StockBalance",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockItem_id_seq",
+      "table_schema": "public",
+      "table_name": "StockItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockMovement_id_seq",
+      "table_schema": "public",
+      "table_name": "StockMovement",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Supplier_id_seq",
+      "table_schema": "public",
+      "table_name": "Supplier",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SupplierPayment_id_seq",
+      "table_schema": "public",
+      "table_name": "SupplierPayment",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SupplierPaymentReceipt_id_seq",
+      "table_schema": "public",
+      "table_name": "SupplierPaymentReceipt",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Unit_id_seq",
+      "table_schema": "public",
+      "table_name": "Unit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "User_id_seq",
+      "table_schema": "public",
+      "table_name": "User",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2CustomerDeposit_id_seq",
+      "table_schema": "public",
+      "table_name": "V2CustomerDeposit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2StockAudit_id_seq",
+      "table_schema": "public",
+      "table_name": "V2StockAudit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2StockAuditItem_id_seq",
+      "table_schema": "public",
+      "table_name": "V2StockAuditItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "WarrantyClaim_id_seq",
+      "table_schema": "public",
+      "table_name": "WarrantyClaim",
+      "column_name": "id"
+    }
+  ],
+  "keyTableCounts": {
+    "Product": 903,
+    "BranchPrice": 901,
+    "StockItem": 439,
+    "Sale": 1,
+    "SaleItem": 1,
+    "SaleItemSimple": 0,
+    "Payment": 1,
+    "PaymentItem": 1
+  },
+  "tables": {
+    "Bank": {
+      "rowCount": 14,
+      "expectedRowCount": 14,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active"
+      ]
+    },
+    "Brand": {
+      "rowCount": 172,
+      "expectedRowCount": 172,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "normalizedName",
+        "active",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "rowCount": 2,
+      "expectedRowCount": 2,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active",
+        "isSystem"
+      ]
+    },
+    "GlobalProductType": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "slug",
+        "active",
+        "categoryId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Position": {
+      "rowCount": 8,
+      "expectedRowCount": 8,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "description",
+        "isActive"
+      ]
+    },
+    "Province": {
+      "rowCount": 77,
+      "expectedRowCount": 77,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "region"
+      ]
+    },
+    "District": {
+      "rowCount": 928,
+      "expectedRowCount": 928,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "provinceCode",
+        "created_at"
+      ]
+    },
+    "Subdistrict": {
+      "rowCount": 7436,
+      "expectedRowCount": 7436,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "districtCode",
+        "postcode"
+      ]
+    },
+    "Branch": {
+      "rowCount": 3,
+      "expectedRowCount": 3,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "address",
+        "createdAt",
+        "updatedAt",
+        "RBACEnabled",
+        "phone",
+        "subdistrictCode",
+        "businessType",
+        "features",
+        "branchCode",
+        "isHeadOffice",
+        "taxId",
+        "slug",
+        "categoryId"
+      ]
+    },
+    "BarcodeCounter": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PaymentCodeCounter": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "yyyymmdd",
+        "lastNo"
+      ]
+    },
+    "ProductType": {
+      "rowCount": 17,
+      "expectedRowCount": 17,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active",
+        "categoryId",
+        "guideExamples",
+        "normalizedName",
+        "pathCached",
+        "slug",
+        "branchId",
+        "globalProductTypeId"
+      ]
+    },
+    "ProductTypeBrand": {
+      "rowCount": 108,
+      "expectedRowCount": 108,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productTypeId",
+        "brandId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Supplier": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "address",
+        "createdAt",
+        "updatedAt",
+        "contactPerson",
+        "country",
+        "creditLimit",
+        "email",
+        "notes",
+        "paymentTerms",
+        "phone",
+        "postalCode",
+        "province",
+        "taxId",
+        "accountNumber",
+        "accountType",
+        "bankId",
+        "branchId",
+        "active",
+        "creditBalance",
+        "taxBranchCode",
+        "isSystem"
+      ]
+    },
+    "Unit": {
+      "rowCount": 9,
+      "expectedRowCount": 9,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Product": {
+      "rowCount": 903,
+      "expectedRowCount": 903,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "noSN",
+        "active",
+        "name",
+        "mode",
+        "trackSerialNumber",
+        "categoryId",
+        "productTypeId",
+        "brandId",
+        "codeType",
+        "productConfig",
+        "unitId",
+        "warrantyDays",
+        "templateProductId"
+      ]
+    },
+    "BranchPrice": {
+      "rowCount": 901,
+      "expectedRowCount": 901,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "effectiveDate",
+        "expiredDate",
+        "note",
+        "updatedBy",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "costPrice",
+        "priceOnline",
+        "priceRetail",
+        "priceTechnician",
+        "priceWholesale"
+      ]
+    },
+    "ProductImage": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockBalance": {
+      "rowCount": 100,
+      "expectedRowCount": 100,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "quantity",
+        "reserved",
+        "avgCost",
+        "lastReceivedCost",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "User": {
+      "rowCount": 182,
+      "expectedRowCount": 182,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "email",
+        "password",
+        "role",
+        "enabled",
+        "lastLoginAt",
+        "createdAt",
+        "updatedAt",
+        "loginId",
+        "loginType"
+      ]
+    },
+    "CustomerProfile": {
+      "rowCount": 182,
+      "expectedRowCount": 182,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "picture",
+        "userId",
+        "createdAt",
+        "updatedAt",
+        "creditBalance",
+        "creditLimit",
+        "paymentTerms",
+        "type",
+        "companyName",
+        "subdistrictCode",
+        "taxId",
+        "addressDetail",
+        "depositBalance_v2",
+        "outstandingDebt_v2"
+      ]
+    },
+    "Cart": {
+      "rowCount": 3,
+      "expectedRowCount": 3,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "customerProfileId",
+        "userId"
+      ]
+    },
+    "CartItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "EmployeeProfile": {
+      "rowCount": 6,
+      "expectedRowCount": 6,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "phone",
+        "userId",
+        "branchId",
+        "positionId",
+        "createdAt",
+        "updatedAt",
+        "approved",
+        "active",
+        "passwordHashV2",
+        "v2Role"
+      ]
+    },
+    "CombinedBillingDocument": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "CombinedSaleDocument": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "CustomerDeposit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "CustomerReceipts": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "InputTaxFilingBatch": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "Order": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "OrderOnline": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "OrderOnlineItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PasswordResetToken": {
+      "rowCount": 9,
+      "expectedRowCount": 9,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "userId",
+        "tokenHash",
+        "expiresAt",
+        "usedAt",
+        "createdAt"
+      ]
+    },
+    "ProductOnOrder": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PurchaseOrder": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PurchaseOrderItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PurchaseOrderReceipt": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "InputTaxFilingItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PurchaseOrderReceiptItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "RefreshToken": {
+      "rowCount": 3364,
+      "expectedRowCount": 3364,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "userId",
+        "tokenHash",
+        "expiresAt",
+        "revokedAt",
+        "createdAt",
+        "replacedByTokenId",
+        "userAgent",
+        "ipAddress"
+      ]
+    },
+    "Sale": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "soldAt",
+        "customerId",
+        "employeeId",
+        "branchId",
+        "totalBeforeDiscount",
+        "totalDiscount",
+        "vat",
+        "vatRate",
+        "totalAmount",
+        "note",
+        "refCode",
+        "isTaxInvoice",
+        "createdAt",
+        "updatedAt",
+        "combinedDocumentId",
+        "dueDate",
+        "finalizedAt",
+        "isCredit",
+        "officialDocumentNumber",
+        "saleType",
+        "status",
+        "paid",
+        "paidAt",
+        "combinedBillingId",
+        "paidAmount",
+        "statusPayment"
+      ]
+    },
+    "CustomerReceiptAllocations": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "Payment": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "saleId",
+        "receivedAt",
+        "note",
+        "combinedDocumentCode",
+        "employeeProfileId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "code",
+        "cancelNote",
+        "cancelledAt",
+        "isCancelled",
+        "id"
+      ]
+    },
+    "DepositUsage": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "PaymentItem": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "paymentId",
+        "amount",
+        "note",
+        "slipImage",
+        "cardRef",
+        "govImage",
+        "createdAt",
+        "paymentMethod"
+      ]
+    },
+    "SaleReturn": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "RefundTransaction": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SalesTaxFilingBatch": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SalesTaxFilingItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "ServiceOrder": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "ServiceItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SimpleLot": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SaleItemSimple": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SaleReturnItemSimple": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockAuditSession": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockItem": {
+      "rowCount": 439,
+      "expectedRowCount": 439,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "barcode",
+        "serialNumber",
+        "receivedAt",
+        "warrantyDays",
+        "expiredAt",
+        "soldAt",
+        "remark",
+        "productId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "status",
+        "purchaseOrderReceiptItemId",
+        "batchNumber",
+        "checkedBy",
+        "locationCode",
+        "qrCodeData",
+        "source",
+        "tag",
+        "scannedAt",
+        "scannedByEmployeeId",
+        "color",
+        "costPrice"
+      ]
+    },
+    "BarcodeReceiptItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "RepairJob": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "RepairPartItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SaleItem": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleId",
+        "stockItemId",
+        "basePrice",
+        "vatAmount",
+        "price",
+        "discount",
+        "refundedAmount",
+        "remark",
+        "createdAt",
+        "updatedAt",
+        "documentDescription",
+        "documentPrefix",
+        "documentSuffix"
+      ]
+    },
+    "SaleReturnItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockAuditScanLog": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockAuditSnapshotItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "StockMovement": {
+      "rowCount": 105,
+      "expectedRowCount": 105,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "qty",
+        "type",
+        "refType",
+        "refId",
+        "note",
+        "createdAt",
+        "simpleLotId"
+      ]
+    },
+    "SupplierPayment": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "SupplierPaymentReceipt": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "V2CustomerDeposit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "V2StockAudit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "V2StockAuditItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    },
+    "WarrantyClaim": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true
+    }
+  },
+  "verification": {
+    "ok": true,
+    "checkedAt": "2026-07-06T10:18:20.316Z",
+    "checkedTables": 70,
+    "keyTables": [
+      {
+        "tableName": "Product",
+        "expected": 903,
+        "actual": 903,
+        "passed": true
+      },
+      {
+        "tableName": "BranchPrice",
+        "expected": 901,
+        "actual": 901,
+        "passed": true
+      },
+      {
+        "tableName": "Sale",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      },
+      {
+        "tableName": "Payment",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      },
+      {
+        "tableName": "PaymentItem",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItemSimple",
+        "expected": 0,
+        "actual": 0,
+        "passed": true
+      },
+      {
+        "tableName": "StockItem",
+        "expected": 439,
+        "actual": 439,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItem",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      }
+    ],
+    "mismatches": []
+  },
+  "retention": {
+    "enabled": true,
+    "retentionDays": 30,
+    "deletedFiles": [],
+    "skipped": []
+  }
+}
