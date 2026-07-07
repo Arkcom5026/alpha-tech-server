@@ -95,9 +95,6 @@ const findProductTypeById = async ({ db, productTypeId } = {}) => {
       globalProductType: {
         select: { id: true, name: true, categoryId: true },
       },
-      category: {
-        select: { id: true, name: true },
-      },
       productTypeBrands: {
         select: {
           brandId: true,
@@ -123,7 +120,6 @@ const findBranchProductTypeMatch = async ({ db, branchId, sourceProductType } = 
   const globalProductTypeId = toInt(sourceProductType.globalProductTypeId)
   const normalizedName = sourceProductType.normalizedName || normalizeName(sourceProductType.name)
   const slug = sourceProductType.slug || makeSlug(sourceProductType.name)
-  const categoryId = sourceProductType.categoryId ?? sourceProductType.globalProductType?.categoryId ?? null
 
   return client.productType.findFirst({
     where: {
@@ -134,11 +130,9 @@ const findBranchProductTypeMatch = async ({ db, branchId, sourceProductType } = 
         { slug },
         { name: sourceProductType.name },
       ],
-      ...(categoryId ? { categoryId } : {}),
     },
     include: {
       globalProductType: true,
-      category: true,
       productTypeBrands: true,
     },
   })
@@ -149,7 +143,6 @@ const createBranchProductTypeFromSource = async ({ db, branchId, sourceProductTy
   const brId = toInt(branchId)
   if (!brId || !sourceProductType) return null
 
-  const categoryId = sourceProductType.categoryId ?? sourceProductType.globalProductType?.categoryId ?? null
   const normalizedName = sourceProductType.normalizedName || normalizeName(sourceProductType.name)
   const slug = sourceProductType.slug || makeSlug(sourceProductType.name)
 
@@ -158,7 +151,6 @@ const createBranchProductTypeFromSource = async ({ db, branchId, sourceProductTy
       data: {
         name: sourceProductType.name,
         active: true,
-        categoryId,
         guideExamples: Array.isArray(sourceProductType.guideExamples)
           ? sourceProductType.guideExamples
           : [],
@@ -170,8 +162,7 @@ const createBranchProductTypeFromSource = async ({ db, branchId, sourceProductTy
       },
       include: {
         globalProductType: true,
-        category: true,
-        productTypeBrands: true,
+          productTypeBrands: true,
       },
     })
   } catch (error) {
@@ -249,11 +240,9 @@ const listTemplateProductTypes = async ({ includeInactive = false } = {}) => {
       name: true,
       active: true,
       branchId: true,
-      categoryId: true,
       normalizedName: true,
       slug: true,
       globalProductTypeId: true,
-      category: { select: { id: true, name: true } },
       globalProductType: { select: { id: true, name: true, categoryId: true } },
     },
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
