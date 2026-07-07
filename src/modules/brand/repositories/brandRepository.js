@@ -5,7 +5,7 @@
 //
 // Current domain rule:
 // ProductType ownership is branchId only.
-// Do not use categoryId or globalProductTypeId as filters/guards in Brand module.
+// Do not use categoryId, slug, or globalProductTypeId as filters/guards in Brand module.
 
 const toPositiveInt = (value) => {
   const n = Number(value);
@@ -53,7 +53,6 @@ class BrandRepository {
       select: {
         id: true,
         name: true,
-        slug: true,
         active: true,
         branchId: true,
         globalProductTypeId: true,
@@ -174,7 +173,7 @@ class BrandRepository {
         name: true,
         branchId: true,
         globalProductTypeId: true,
-        globalProductType: { select: { id:true,name:true,categoryId:true } },
+        globalProductType: { select: { id: true, name: true, categoryId: true } },
         active: true,
       },
     });
@@ -271,7 +270,7 @@ class BrandRepository {
             id: true,
             name: true,
             branchId: true,
-                globalProductTypeId: true,
+            globalProductTypeId: true,
           },
         },
         brand: {
