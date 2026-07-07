@@ -170,16 +170,14 @@ model ProductType {
   guideExamples       String[] @default([])
   normalizedName      String?
   pathCached          String?
-  slug                String
   branchId            Int?
   globalProductTypeId Int
 
   Product           Product[]
-  branch            Branch?            @relation(fields: [branchId], references: [id])
-  globalProductType GlobalProductType  @relation(fields: [globalProductTypeId], references: [id])
+  branch            Branch?           @relation(fields: [branchId], references: [id])
+  globalProductType GlobalProductType @relation(fields: [globalProductTypeId], references: [id])
   productTypeBrands ProductTypeBrand[]
 
-  @@unique([branchId, globalProductTypeId, slug])
   @@unique([branchId, globalProductTypeId, normalizedName])
   @@index([branchId])
   @@index([globalProductTypeId])
