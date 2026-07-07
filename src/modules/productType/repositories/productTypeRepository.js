@@ -1,5 +1,5 @@
 // src/modules/productType/repositories/productTypeRepository.js
-// ProductType Module Repository v2
+// ProductType Module Repository v3
 //
 // Module Isolation Rule:
 // ProductType module owns ProductType behavior only.
@@ -8,8 +8,9 @@
 // Current Domain Rule:
 // - ProductType ownership is branchId only.
 // - ProductType does not own categoryId.
- // - Category truth flows through ProductType -> GlobalProductType -> Category.
- // - globalProductTypeId is the runtime taxonomy anchor for ProductType.
+// - ProductType does not use slug as runtime identity.
+// - Category truth flows through ProductType -> GlobalProductType -> Category.
+// - globalProductTypeId is the runtime taxonomy anchor for ProductType.
 
 const DEFAULT_TEMPLATE_BRANCH_CODE = 'T01';
 const DEFAULT_TEMPLATE_BRANCH_ID = 1;
@@ -20,6 +21,18 @@ const toPositiveInt = (value) => {
 };
 
 const normalizeText = (value) => String(value || '').trim();
+
+const globalProductTypeSelect = {
+  id: true,
+  name: true,
+  categoryId: true,
+  category: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+};
 
 class ProductTypeRepository {
   constructor(prisma) {
@@ -94,7 +107,6 @@ class ProductTypeRepository {
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { normalizedName: { contains: q, mode: 'insensitive' } },
-              { slug: { contains: q, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -107,20 +119,7 @@ class ProductTypeRepository {
         skip,
         take,
         include: {
-          globalProductType: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              categoryId: true,
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
+          globalProductType: { select: globalProductTypeSelect },
           _count: {
             select: {
               Product: true,
@@ -161,7 +160,6 @@ class ProductTypeRepository {
       select: {
         id: true,
         name: true,
-        slug: true,
         active: true,
         branchId: true,
         globalProductTypeId: true,
@@ -169,7 +167,6 @@ class ProductTypeRepository {
           select: {
             id: true,
             name: true,
-            slug: true,
             categoryId: true,
           },
         },
@@ -189,20 +186,7 @@ class ProductTypeRepository {
         ...(includeInactive ? {} : { active: true }),
       },
       include: {
-          globalProductType: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              categoryId: true,
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
+        globalProductType: { select: globalProductTypeSelect },
         _count: {
           select: {
             Product: true,
@@ -235,7 +219,6 @@ class ProductTypeRepository {
       select: {
         id: true,
         name: true,
-        slug: true,
         active: true,
         branchId: true,
         globalProductTypeId: true,
@@ -243,7 +226,6 @@ class ProductTypeRepository {
           select: {
             id: true,
             name: true,
-            slug: true,
             categoryId: true,
           },
         },
@@ -267,7 +249,6 @@ class ProductTypeRepository {
       select: {
         id: true,
         name: true,
-        slug: true,
         active: true,
         branchId: true,
         globalProductTypeId: true,
@@ -275,7 +256,6 @@ class ProductTypeRepository {
           select: {
             id: true,
             name: true,
-            slug: true,
             categoryId: true,
           },
         },
@@ -299,6 +279,7 @@ class ProductTypeRepository {
     return this.prisma.productType.findFirst({
       where: {
         branchId: bId,
+        globalProductTypeId: gId,
         normalizedName: nName,
         ...(exId ? { id: { not: exId } } : {}),
       },
@@ -311,7 +292,6 @@ class ProductTypeRepository {
       },
     });
   }
-
 
   async listGlobalProductTypeOptions({
     categoryId = null,
@@ -327,10 +307,7 @@ class ProductTypeRepository {
         ...(includeInactive ? {} : { active: true }),
         ...(q
           ? {
-              OR: [
-                { name: { contains: q, mode: 'insensitive' } },
-                { slug: { contains: q, mode: 'insensitive' } },
-              ],
+              OR: [{ name: { contains: q, mode: 'insensitive' } }],
             }
           : {}),
       },
@@ -338,7 +315,6 @@ class ProductTypeRepository {
       select: {
         id: true,
         name: true,
-        slug: true,
         active: true,
         categoryId: true,
         category: {
@@ -390,20 +366,7 @@ class ProductTypeRepository {
       const full = await tx.productType.findUnique({
         where: { id: created.id },
         include: {
-          globalProductType: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              categoryId: true,
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
+          globalProductType: { select: globalProductTypeSelect },
           _count: {
             select: {
               Product: true,
