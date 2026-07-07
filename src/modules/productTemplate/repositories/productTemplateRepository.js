@@ -25,7 +25,6 @@ const templateProductSelect = {
   mode: true,
   noSN: true,
   trackSerialNumber: true,
-  categoryId: true,
   productTypeId: true,
   brandId: true,
   codeType: true,
@@ -33,7 +32,6 @@ const templateProductSelect = {
   unitId: true,
   warrantyDays: true,
   templateProductId: true,
-  category: { select: { id: true, name: true, active: true } },
   productType: {
     select: {
       id: true,
@@ -118,12 +116,7 @@ class ProductTemplateRepository {
 
     const catId = toPositiveInt(categoryId);
     if (catId) {
-      whereAND.push({
-        OR: [
-          { categoryId: catId },
-          { productType: { globalProductType: { categoryId: catId } } },
-        ],
-      });
+      whereAND.push({ productType: { globalProductType: { categoryId: catId } } });
     }
 
     const normalizedMode = normalizeText(mode).toUpperCase();
@@ -189,7 +182,6 @@ class ProductTemplateRepository {
         mode: normalizeText(payload.mode).toUpperCase() === 'SIMPLE' ? 'SIMPLE' : 'STRUCTURED',
         noSN: Boolean(payload.noSN),
         trackSerialNumber: Boolean(payload.trackSerialNumber),
-        categoryId: toPositiveInt(payload.categoryId),
         productTypeId,
         brandId: toPositiveInt(payload.brandId),
         codeType: payload.codeType ? normalizeText(payload.codeType) : undefined,
@@ -211,7 +203,6 @@ class ProductTemplateRepository {
     if (payload.mode !== undefined) data.mode = normalizeText(payload.mode).toUpperCase() === 'SIMPLE' ? 'SIMPLE' : 'STRUCTURED';
     if (payload.noSN !== undefined) data.noSN = Boolean(payload.noSN);
     if (payload.trackSerialNumber !== undefined) data.trackSerialNumber = Boolean(payload.trackSerialNumber);
-    if (payload.categoryId !== undefined) data.categoryId = toPositiveInt(payload.categoryId);
     if (payload.productTypeId !== undefined) data.productTypeId = toPositiveInt(payload.productTypeId);
     if (payload.brandId !== undefined) data.brandId = toPositiveInt(payload.brandId);
     if (payload.codeType !== undefined) data.codeType = payload.codeType ? normalizeText(payload.codeType) : null;
