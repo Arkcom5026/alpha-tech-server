@@ -2,7 +2,7 @@
 // AlphaTech Recovery Toolkit — Phase 6 Standby Restore Workflow
 //
 // Workflow:
-//   HEALTH_CHECK -> BACKUP -> VERIFY_BACKUP -> UPLOAD -> RETENTION -> RESTORE_RECOVERY -> VERIFY_RECOVERY -> REPORT
+//   HEALTH_CHECK -> BACKUP -> VERIFY_BACKUP -> UPLOAD -> R2_RETENTION -> RETENTION -> RESTORE_RECOVERY -> VERIFY_RECOVERY -> REPORT
 //
 // Upload is enabled when:
 //   RECOVERY_UPLOAD_ENABLED=true or --upload
@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V6-STANDBY-RESTORE';
+const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V7-R2-RETENTION';
 const ROOT_DIR = process.cwd();
 const RECOVERY_DIR = path.join(ROOT_DIR, 'recovery');
 const JOB_DIR = path.join(RECOVERY_DIR, 'jobs');
@@ -37,9 +37,14 @@ const UPLOAD_ENABLED = String(process.env.RECOVERY_UPLOAD_ENABLED || 'false').to
 const RETENTION_ENABLED = String(process.env.RECOVERY_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
 const RETENTION_APPLY = String(process.env.RECOVERY_RETENTION_APPLY || 'false').toLowerCase() === 'true';
 const STANDBY_RESTORE_ENABLED = String(process.env.RECOVERY_STANDBY_RESTORE_ENABLED || process.env.RECOVERY_RESTORE_ENABLED || 'false').toLowerCase() === 'true';
+const R2_RETENTION_ENABLED = String(process.env.RECOVERY_R2_RETENTION_ENABLED || process.env.RECOVERY_OFFSITE_RETENTION_ENABLED || process.env.RECOVERY_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
+const R2_RETENTION_APPLY = String(process.env.RECOVERY_R2_RETENTION_APPLY || process.env.RECOVERY_RETENTION_APPLY || 'false').toLowerCase() === 'true';
+const R2_RETENTION_DAYS = Number(process.env.RETENTION_R2_DAYS || process.env.RETENTION_OFFSITE_DAYS || 7);
+const R2_BUCKET = process.env.S3_BUCKET || process.env.R2_BUCKET;
+const R2_PREFIX = String(process.env.S3_PREFIX || process.env.R2_PREFIX || '').replace(/^\/+|\/+$/g, '');
 
 const STEP_STATUS = { PENDING:'PENDING', RUNNING:'RUNNING', PASS:'PASS', FAIL:'FAIL', SKIPPED:'SKIPPED' };
-const WORKFLOW_STEPS = ['HEALTH_CHECK','BACKUP','VERIFY_BACKUP','UPLOAD','RETENTION','RESTORE_RECOVERY','VERIFY_RECOVERY','REPORT'];
+const WORKFLOW_STEPS = ['HEALTH_CHECK','BACKUP','VERIFY_BACKUP','UPLOAD','R2_RETENTION','RETENTION','RESTORE_RECOVERY','VERIFY_RECOVERY','REPORT'];
 
 function nowIso(){ return new Date().toISOString(); }
 function safeIdFromIso(iso){ return iso.replace(/[:.]/g,'-'); }
@@ -61,6 +66,9 @@ function parseArgs(argv){
   if(flags.includes('--retention-apply')) args.retentionApply=true;
   if(flags.includes('--standby-restore') || flags.includes('--restore-standby')) args.standbyRestoreEnabled=true;
   if(flags.includes('--no-standby-restore') || flags.includes('--no-restore-standby')) args.standbyRestoreEnabled=false;
+  if(flags.includes('--r2-retention') || flags.includes('--offsite-retention')) args.r2RetentionEnabled=true;
+  if(flags.includes('--no-r2-retention') || flags.includes('--no-offsite-retention')) args.r2RetentionEnabled=false;
+  if(flags.includes('--r2-retention-apply') || flags.includes('--offsite-retention-apply')) args.r2RetentionApply=true;
   return args;
 }
 
@@ -68,6 +76,8 @@ function uploadActive(args){ return args.uploadEnabled === true || (args.uploadE
 function retentionActive(args){ return args.retentionEnabled === true || (args.retentionEnabled !== false && RETENTION_ENABLED); }
 function retentionApply(args){ return args.retentionApply === true || RETENTION_APPLY; }
 function standbyRestoreActive(args){ return args.standbyRestoreEnabled === true || (args.standbyRestoreEnabled !== false && STANDBY_RESTORE_ENABLED) || args.mode === 'full-drill'; }
+function r2RetentionActive(args){ return args.r2RetentionEnabled === true || (args.r2RetentionEnabled !== false && R2_RETENTION_ENABLED); }
+function r2RetentionApply(args){ return args.r2RetentionApply === true || R2_RETENTION_APPLY; }
 
 function createLogger(jobId){
   ensureDir(LOG_DIR);
@@ -91,6 +101,7 @@ function initializeWorkflow(mode,args){
     steps.VERIFY_RECOVERY.status=STEP_STATUS.SKIPPED; steps.VERIFY_RECOVERY.details.reason='standby restore not enabled';
   }
   if(!uploadActive(args)){ steps.UPLOAD.status=STEP_STATUS.SKIPPED; steps.UPLOAD.details.reason='upload not enabled'; }
+  if(!r2RetentionActive(args)){ steps.R2_RETENTION.status=STEP_STATUS.SKIPPED; steps.R2_RETENTION.details.reason='R2 retention not enabled'; }
   if(!retentionActive(args)){ steps.RETENTION.status=STEP_STATUS.SKIPPED; steps.RETENTION.details.reason='retention not enabled'; }
   return steps;
 }
@@ -186,6 +197,150 @@ async function stepUpload(job,logger,args){
   const details={latestReport:fs.existsSync(latest)?latest:null};
   return finishStep(job,'UPLOAD',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details});
 }
+
+function parseBackupDateFromR2Key(key){
+  const normalized = String(key || '').replace(/\\/g,'/');
+  const escapedPrefix = R2_PREFIX ? R2_PREFIX.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') : '';
+  const patterns = [
+    escapedPrefix ? new RegExp(`^${escapedPrefix}/(\\d{4}-\\d{2}-\\d{2})/`) : null,
+    /(?:^|\/)(\d{4}-\d{2}-\d{2})(?:\/|$)/,
+    /alphatech_hardened_backup_v\d+_(\d{4}-\d{2}-\d{2})_/
+  ].filter(Boolean);
+
+  for(const pattern of patterns){
+    const match = normalized.match(pattern);
+    if(match && match[1]) return match[1];
+  }
+
+  return null;
+}
+
+function startOfUtcDayMs(date){
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+async function stepR2Retention(job,logger,args){
+  if(!r2RetentionActive(args)) return job.workflow.steps.R2_RETENTION;
+
+  const mode = r2RetentionApply(args) ? 'APPLY' : 'DRY_RUN';
+  startStep(job,'R2_RETENTION',`Cloudflare R2 retention ${mode}`);
+
+  if(!R2_BUCKET) {
+    return finishStep(job,'R2_RETENTION',{ok:false,exitCode:81,error:'S3_BUCKET/R2_BUCKET is missing'});
+  }
+
+  if(!uploadActive(args)) {
+    return finishStep(job,'R2_RETENTION',{ok:true,exitCode:0,details:{reason:'upload not active; R2 retention skipped safely'}});
+  }
+
+  let S3Client, ListObjectsV2Command, DeleteObjectsCommand;
+  try {
+    ({ S3Client, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3'));
+  } catch (_error) {
+    return finishStep(job,'R2_RETENTION',{ok:false,exitCode:82,error:'Missing dependency @aws-sdk/client-s3'});
+  }
+
+  const endpoint = process.env.S3_ENDPOINT || process.env.R2_ENDPOINT;
+  const region = process.env.S3_REGION || process.env.R2_REGION || 'auto';
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY;
+
+  if(!endpoint || !accessKeyId || !secretAccessKey) {
+    return finishStep(job,'R2_RETENTION',{ok:false,exitCode:83,error:'R2/S3 credentials are incomplete'});
+  }
+
+  const client = new S3Client({
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+
+  const prefix = R2_PREFIX ? `${R2_PREFIX}/` : '';
+  const cutoffMs = startOfUtcDayMs(new Date()) - (R2_RETENTION_DAYS - 1) * 24 * 60 * 60 * 1000;
+
+  const scanned = [];
+  let ContinuationToken = undefined;
+
+  try {
+    do {
+      const response = await client.send(new ListObjectsV2Command({
+        Bucket: R2_BUCKET,
+        Prefix: prefix,
+        ContinuationToken,
+      }));
+
+      for(const object of response.Contents || []) {
+        if(object.Key) scanned.push(object);
+      }
+
+      ContinuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (ContinuationToken);
+
+    const candidates = scanned.filter((object) => {
+      const datePart = parseBackupDateFromR2Key(object.Key);
+      if(!datePart) return false;
+      const objectDayMs = Date.parse(`${datePart}T00:00:00.000Z`);
+      return objectDayMs < cutoffMs;
+    });
+
+    const deleted = [];
+    const failed = [];
+
+    if(r2RetentionApply(args) && candidates.length > 0) {
+      for(let i = 0; i < candidates.length; i += 1000) {
+        const batch = candidates.slice(i, i + 1000);
+        try {
+          const response = await client.send(new DeleteObjectsCommand({
+            Bucket: R2_BUCKET,
+            Delete: {
+              Objects: batch.map((object) => ({ Key: object.Key })),
+              Quiet: false,
+            },
+          }));
+
+          for(const item of response.Deleted || []) deleted.push(item.Key);
+          for(const item of response.Errors || []) failed.push({ key:item.Key, code:item.Code, message:item.Message });
+        } catch (error) {
+          for(const object of batch) failed.push({ key:object.Key, error:error.message || String(error) });
+        }
+      }
+    }
+
+    logger.log('------------------------------------------------------------');
+    logger.log('Target      : cloudflare-r2');
+    logger.log(`Bucket      : ${R2_BUCKET}`);
+    logger.log(`Prefix      : ${prefix || '(bucket root)'}`);
+    logger.log(`Retention   : ${R2_RETENTION_DAYS} day(s)`);
+    logger.log(`Mode        : ${mode}`);
+    logger.log(`Scanned     : ${scanned.length}`);
+    logger.log(`Candidates  : ${candidates.length}`);
+    logger.log(`Deleted     : ${r2RetentionApply(args) ? deleted.length : 0}`);
+    logger.log(`Remaining   : ${scanned.length - candidates.length}`);
+    logger.log(`Failed      : ${failed.length}`);
+
+    return finishStep(job,'R2_RETENTION',{
+      ok: failed.length === 0,
+      exitCode: failed.length === 0 ? 0 : 84,
+      details: {
+        bucket: R2_BUCKET,
+        prefix,
+        mode,
+        retentionDays: R2_RETENTION_DAYS,
+        scannedFiles: scanned.length,
+        deleteCandidates: candidates.length,
+        deletedFiles: r2RetentionApply(args) ? deleted.length : 0,
+        remainingFiles: scanned.length - candidates.length,
+        failedFiles: failed,
+        cutoffAt: new Date(cutoffMs).toISOString(),
+      },
+      error: failed.length === 0 ? null : `R2 retention failed for ${failed.length} object(s)`,
+    });
+  } catch (error) {
+    return finishStep(job,'R2_RETENTION',{ok:false,exitCode:85,error:error.stack || error.message || String(error)});
+  }
+}
+
 async function stepRetention(job,logger,args){
   if(!retentionActive(args)) return job.workflow.steps.RETENTION;
   const modeArg = retentionApply(args) ? '--apply' : '--dry-run';
@@ -203,6 +358,7 @@ function computeOverall(job,args){
   if(job.mode==='full-drill') required.push('VERIFY_BACKUP');
   if(standbyRestoreActive(args)) required.push('RESTORE_RECOVERY','VERIFY_RECOVERY');
   if(uploadActive(args)) required.push('UPLOAD');
+  if(r2RetentionActive(args)) required.push('R2_RETENTION');
   if(retentionActive(args)) required.push('RETENTION');
   const requiredFailed=required.map(n=>job.workflow.steps[n]).filter(s=>!s||s.status!==STEP_STATUS.PASS);
   const failed=Object.values(job.workflow.steps).filter(s=>s.status===STEP_STATUS.FAIL);
@@ -243,6 +399,7 @@ async function main(){
     const backup=await stepBackup(job,logger); if(backup.status!==STEP_STATUS.PASS){ exitCode=10; finalizeReport(job,args); return; }
     if(args.mode!=='backup-only'){ const vb=await stepVerifyBackup(job); if(vb.status!==STEP_STATUS.PASS){ exitCode=20; finalizeReport(job,args); return; } }
     const upload=await stepUpload(job,logger,args); if(upload.status===STEP_STATUS.FAIL){ exitCode=60; finalizeReport(job,args); return; }
+    const r2Retention=await stepR2Retention(job,logger,args); if(r2Retention.status===STEP_STATUS.FAIL){ exitCode=80; finalizeReport(job,args); return; }
     const retention=await stepRetention(job,logger,args); if(retention.status===STEP_STATUS.FAIL){ exitCode=70; finalizeReport(job,args); return; }
     const restore=await stepRestore(job,logger,args); if(restore.status===STEP_STATUS.FAIL){ exitCode=30; finalizeReport(job,args); return; }
     const vr=await stepVerifyRecovery(job,logger,args); if(vr.status===STEP_STATUS.FAIL){ exitCode=40; finalizeReport(job,args); return; }
