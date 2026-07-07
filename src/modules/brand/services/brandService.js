@@ -7,7 +7,8 @@
 // Current domain rule:
 // ProductType ownership is branchId only.
 // categoryId is business category context and must not be used as ProductType/Brand guard.
-// globalProductTypeId is future platform search reference and is not used as a filter now.
+// ProductType slug is not a runtime identity.
+// globalProductTypeId is taxonomy reference and is not used as a Brand guard.
 
 const { Prisma } = require('../../../../lib/prisma');
 const { BrandRepository } = require('../repositories/brandRepository');
@@ -70,7 +71,6 @@ class BrandService {
     return {
       id: row.id,
       name: row.name,
-      slug: row.slug,
       active: row.active,
       isActive: row.active,
       branchId: row.branchId,

@@ -17,14 +17,9 @@ const toInt = (value) => {
 }
 
 const getProductTypeDedupeKey = (item = {}) => {
-  if (item.globalProductTypeId) return `global:${item.globalProductTypeId}`
-
-  const normalized =
-    item.normalizedName ||
-    item.globalProductType?.name ||
-    item.name
-
-  return `name:${normalizeName(normalized)}`
+  const globalProductTypeId = toInt(item.globalProductTypeId)
+  const normalized = item.normalizedName || item.name
+  return `global:${globalProductTypeId || 'none'}:${normalizeName(normalized)}`
 }
 
 const dedupeProductTypes = (items = []) => {
@@ -84,9 +79,6 @@ class QuickReceiveDropdownRepository {
         globalProductType: {
           select: { id: true, name: true, categoryId: true },
         },
-        category: {
-          select: { id: true, name: true },
-        },
         productTypeBrands: {
           select: {
             brandId: true,
@@ -118,11 +110,8 @@ class QuickReceiveDropdownRepository {
         name: true,
         active: true,
         branchId: true,
-        categoryId: true,
         normalizedName: true,
-        slug: true,
         globalProductTypeId: true,
-        category: { select: { id: true, name: true } },
         globalProductType: { select: { id: true, name: true, categoryId: true } },
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
