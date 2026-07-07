@@ -12,3 +12,38 @@
 [2026-07-06T15:56:19.633Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T15-56-19-629Z.json
 [2026-07-06T15:56:19.634Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T15-56-19-629Z.txt
 [2026-07-06T15:56:19.634Z] ✅ Overall: PASS
+[2026-07-06T18:53:45.904Z] ============================================================
+[2026-07-06T18:53:45.912Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-06T18:53:45.913Z] ============================================================
+[2026-07-06T18:53:45.914Z] Mode: DRY_RUN
+[2026-07-06T18:53:45.924Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T18-53-45-920Z.json
+[2026-07-06T18:53:45.925Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T18-53-45-920Z.txt
+[2026-07-06T18:53:45.925Z] ✅ Overall: PASS
+[2026-07-06T19:27:40.826Z] ============================================================
+[2026-07-06T19:27:40.836Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-06T19:27:40.837Z] ============================================================
+[2026-07-06T19:27:40.837Z] Mode: DRY_RUN
+[2026-07-06T19:27:40.846Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T19-27-40-844Z.json
+[2026-07-06T19:27:40.846Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T19-27-40-844Z.txt
+[2026-07-06T19:27:40.847Z] ✅ Overall: PASS
+[2026-07-06T19:56:40.891Z] ============================================================
+[2026-07-06T19:56:40.898Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-06T19:56:40.899Z] ============================================================
+[2026-07-06T19:56:40.900Z] Mode: DRY_RUN
+[2026-07-06T19:56:40.913Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T19-56-40-908Z.json
+[2026-07-06T19:56:40.914Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T19-56-40-908Z.txt
+[2026-07-06T19:56:40.915Z] ✅ Overall: PASS
+[2026-07-06T21:34:36.126Z] ============================================================
+[2026-07-06T21:34:36.134Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-06T21:34:36.135Z] ============================================================
+[2026-07-06T21:34:36.136Z] Mode: DRY_RUN
+[2026-07-06T21:34:36.153Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T21-34-36-144Z.json
+[2026-07-06T21:34:36.155Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-06T21-34-36-144Z.txt
+[2026-07-06T21:34:36.156Z] ✅ Overall: PASS
+[2026-07-07T03:34:36.330Z] ============================================================
+[2026-07-07T03:34:36.338Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-07T03:34:36.339Z] ============================================================
+[2026-07-07T03:34:36.341Z] Mode: APPLY
+[2026-07-07T03:34:36.353Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-07T03-34-36-348Z.json
+[2026-07-07T03:34:36.355Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-07T03-34-36-348Z.txt
+[2026-07-07T03:34:36.359Z] ✅ Overall: PASS

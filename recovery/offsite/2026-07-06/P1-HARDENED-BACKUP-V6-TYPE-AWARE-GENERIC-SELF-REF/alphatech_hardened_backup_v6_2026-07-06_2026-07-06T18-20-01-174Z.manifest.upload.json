@@ -1,0 +1,39 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
+  "provider": "local-mirror",
+  "uploadedAt": "2026-07-06T18:20:06.577Z",
+  "targetDir": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+      "sizeBytes": 167770,
+      "sha256": "3731410b20e5419f433470db35751afc809fb7524a441d23671ad73fc2bcce02"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.sql",
+      "sizeBytes": 4615586,
+      "sha256": "d86a54e37a1774101e33c4d85a93c968aa238b01873917d7a944e1d1ade222ec"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+      "targetPath": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+      "sourceSha256": "3731410b20e5419f433470db35751afc809fb7524a441d23671ad73fc2bcce02",
+      "targetSha256": "3731410b20e5419f433470db35751afc809fb7524a441d23671ad73fc2bcce02",
+      "sizeBytes": 167770,
+      "verified": true
+    },
+    "sql": {
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.sql",
+      "targetPath": "D:\\alpha-tech\\server\\recovery\\offsite\\2026-07-06\\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.sql",
+      "sourceSha256": "d86a54e37a1774101e33c4d85a93c968aa238b01873917d7a944e1d1ade222ec",
+      "targetSha256": "d86a54e37a1774101e33c4d85a93c968aa238b01873917d7a944e1d1ade222ec",
+      "sizeBytes": 4615586,
+      "verified": true
+    }
+  },
+  "ok": true
+}

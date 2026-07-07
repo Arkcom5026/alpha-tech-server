@@ -14,6 +14,7 @@ const {
   archiveProductType,
   restoreProductType,
   getProductTypeDropdowns,
+  getGlobalProductTypeOptions,
   getTemplateProductTypeOptions,
 } = require('../controllers/productTypeController');
 
@@ -21,6 +22,7 @@ router.use(verifyToken);
 
 // Specific routes must be declared before /:id
 router.get('/dropdowns', getProductTypeDropdowns);
+router.get('/global-options', getGlobalProductTypeOptions);
 router.get('/template-options', getTemplateProductTypeOptions);
 
 // Branch-owned runtime ProductType

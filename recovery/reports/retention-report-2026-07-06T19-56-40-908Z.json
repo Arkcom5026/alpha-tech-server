@@ -1,0 +1,36 @@
+{
+  "version": "ALPHATECH-RECOVERY-RETENTION-V1",
+  "createdAt": "2026-07-06T19:56:40.908Z",
+  "mode": "DRY_RUN",
+  "ok": true,
+  "policy": {
+    "localDays": 7,
+    "offsiteDays": 90
+  },
+  "targets": [
+    {
+      "label": "local-backups",
+      "dir": "D:\\alpha-tech\\server\\backups",
+      "days": 7,
+      "cutoffAt": "2026-06-29T19:56:40.902Z",
+      "scannedFiles": 22,
+      "deleteCandidates": 0,
+      "deletedFiles": [],
+      "keptFiles": 22,
+      "failedFiles": [],
+      "ok": true
+    },
+    {
+      "label": "offsite-local-mirror",
+      "dir": "D:\\alpha-tech\\server\\recovery\\offsite",
+      "days": 90,
+      "cutoffAt": "2026-04-07T19:56:40.906Z",
+      "scannedFiles": 12,
+      "deleteCandidates": 0,
+      "deletedFiles": [],
+      "keptFiles": 12,
+      "failedFiles": [],
+      "ok": true
+    }
+  ]
+}

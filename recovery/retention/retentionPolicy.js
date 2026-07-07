@@ -149,6 +149,7 @@ function renderTextReport(report) {
     lines.push(`Scanned files    : ${target.scannedFiles}`);
     lines.push(`Delete candidates: ${target.deleteCandidates}`);
     lines.push(`Deleted/Dry-run  : ${target.deletedFiles.length}`);
+    lines.push(`Remaining        : ${target.keptFiles}`);
     lines.push(`Failed           : ${target.failedFiles.length}`);
     lines.push('');
   }
@@ -184,6 +185,18 @@ async function main() {
       apply: args.apply,
     }),
   ];
+
+  for (const target of targets) {
+    log('------------------------------------------------------------');
+    log(`Target      : ${target.label}`);
+    log(`Directory   : ${target.dir}`);
+    log(`Retention   : ${target.days} day(s)`);
+    log(`Scanned     : ${target.scannedFiles}`);
+    log(`Candidates  : ${target.deleteCandidates}`);
+    log(`Deleted     : ${target.deletedFiles.length}`);
+    log(`Remaining   : ${target.keptFiles}`);
+    log(`Failed      : ${target.failedFiles.length}`);
+  }
 
   const ok = targets.every((target) => target.ok);
 

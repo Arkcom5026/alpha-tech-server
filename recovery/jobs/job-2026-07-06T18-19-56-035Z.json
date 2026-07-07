@@ -1,0 +1,244 @@
+{
+  "jobVersion": "ALPHATECH-RECOVERY-JOB-RUNNER-V5-RETENTION",
+  "jobId": "2026-07-06T18-19-56-035Z",
+  "mode": "backup-workflow",
+  "startedAt": "2026-07-06T18:19:56.035Z",
+  "finishedAt": "2026-07-06T18:20:06.681Z",
+  "durationMs": 10646,
+  "ok": true,
+  "exitCode": 0,
+  "workflow": {
+    "status": "SUCCESS",
+    "steps": {
+      "HEALTH_CHECK": {
+        "name": "HEALTH_CHECK",
+        "status": "PASS",
+        "startedAt": "2026-07-06T18:19:56.049Z",
+        "finishedAt": "2026-07-06T18:19:57.133Z",
+        "durationMs": 1084,
+        "exitCode": 0,
+        "command": "node recovery/health/healthCheck.js",
+        "details": {
+          "latestReport": "D:\\alpha-tech\\server\\recovery\\reports\\health-check.latest.json"
+        },
+        "error": null
+      },
+      "BACKUP": {
+        "name": "BACKUP",
+        "status": "PASS",
+        "startedAt": "2026-07-06T18:19:57.133Z",
+        "finishedAt": "2026-07-06T18:20:06.470Z",
+        "durationMs": 9337,
+        "exitCode": 0,
+        "command": "node qb.js",
+        "details": {
+          "latestManifest": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+          "manifest": {
+            "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json",
+            "backupVersion": "P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+            "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.sql",
+            "sha256": "d86a54e37a1774101e33c4d85a93c968aa238b01873917d7a944e1d1ade222ec",
+            "summary": {
+              "totalTables": 70,
+              "totalRows": 15097,
+              "sequenceCount": 67,
+              "durationMs": 6782,
+              "durationSeconds": 6.78
+            },
+            "verification": {
+              "ok": true,
+              "checkedAt": "2026-07-06T18:20:06.409Z",
+              "checkedTables": 70,
+              "keyTables": [
+                {
+                  "tableName": "Product",
+                  "expected": 917,
+                  "actual": 917,
+                  "passed": true
+                },
+                {
+                  "tableName": "BranchPrice",
+                  "expected": 915,
+                  "actual": 915,
+                  "passed": true
+                },
+                {
+                  "tableName": "Sale",
+                  "expected": 1,
+                  "actual": 1,
+                  "passed": true
+                },
+                {
+                  "tableName": "Payment",
+                  "expected": 1,
+                  "actual": 1,
+                  "passed": true
+                },
+                {
+                  "tableName": "PaymentItem",
+                  "expected": 1,
+                  "actual": 1,
+                  "passed": true
+                },
+                {
+                  "tableName": "SaleItemSimple",
+                  "expected": 0,
+                  "actual": 0,
+                  "passed": true
+                },
+                {
+                  "tableName": "StockItem",
+                  "expected": 461,
+                  "actual": 461,
+                  "passed": true
+                },
+                {
+                  "tableName": "SaleItem",
+                  "expected": 1,
+                  "actual": 1,
+                  "passed": true
+                }
+              ],
+              "mismatches": []
+            }
+          }
+        },
+        "error": null
+      },
+      "VERIFY_BACKUP": {
+        "name": "VERIFY_BACKUP",
+        "status": "PASS",
+        "startedAt": "2026-07-06T18:20:06.471Z",
+        "finishedAt": "2026-07-06T18:20:06.471Z",
+        "durationMs": 0,
+        "exitCode": 0,
+        "command": "manifest.verification check",
+        "details": {
+          "verification": {
+            "ok": true,
+            "checkedAt": "2026-07-06T18:20:06.409Z",
+            "checkedTables": 70,
+            "keyTables": [
+              {
+                "tableName": "Product",
+                "expected": 917,
+                "actual": 917,
+                "passed": true
+              },
+              {
+                "tableName": "BranchPrice",
+                "expected": 915,
+                "actual": 915,
+                "passed": true
+              },
+              {
+                "tableName": "Sale",
+                "expected": 1,
+                "actual": 1,
+                "passed": true
+              },
+              {
+                "tableName": "Payment",
+                "expected": 1,
+                "actual": 1,
+                "passed": true
+              },
+              {
+                "tableName": "PaymentItem",
+                "expected": 1,
+                "actual": 1,
+                "passed": true
+              },
+              {
+                "tableName": "SaleItemSimple",
+                "expected": 0,
+                "actual": 0,
+                "passed": true
+              },
+              {
+                "tableName": "StockItem",
+                "expected": 461,
+                "actual": 461,
+                "passed": true
+              },
+              {
+                "tableName": "SaleItem",
+                "expected": 1,
+                "actual": 1,
+                "passed": true
+              }
+            ],
+            "mismatches": []
+          }
+        },
+        "error": null
+      },
+      "VERIFY_RECOVERY": {
+        "name": "VERIFY_RECOVERY",
+        "status": "SKIPPED",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {
+          "reason": "requires full-drill"
+        },
+        "error": null
+      },
+      "UPLOAD": {
+        "name": "UPLOAD",
+        "status": "PASS",
+        "startedAt": "2026-07-06T18:20:06.471Z",
+        "finishedAt": "2026-07-06T18:20:06.679Z",
+        "durationMs": 208,
+        "exitCode": 0,
+        "command": "node recovery/upload/uploadBackup.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T18-20-01-174Z.manifest.json\"",
+        "details": {
+          "latestReport": "D:\\alpha-tech\\server\\recovery\\reports\\upload-report.latest.json"
+        },
+        "error": null
+      },
+      "RETENTION": {
+        "name": "RETENTION",
+        "status": "SKIPPED",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {
+          "reason": "retention not enabled"
+        },
+        "error": null
+      },
+      "REPORT": {
+        "name": "REPORT",
+        "status": "PASS",
+        "startedAt": "2026-07-06T18:20:06.680Z",
+        "finishedAt": "2026-07-06T18:20:06.681Z",
+        "durationMs": 1,
+        "exitCode": null,
+        "command": null,
+        "details": {
+          "reportJsonPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-06T18-19-56-035Z.json",
+          "reportTxtPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-06T18-19-56-035Z.txt",
+          "latestJsonPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report.latest.json",
+          "latestTxtPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report.latest.txt"
+        },
+        "error": null
+      }
+    },
+    "overall": {
+      "ok": true,
+      "failedSteps": [],
+      "requiredFailedSteps": [],
+      "requiredSteps": [
+        "HEALTH_CHECK",
+        "BACKUP",
+        "VERIFY_BACKUP",
+        "UPLOAD"
+      ]
+    }
+  }
+}

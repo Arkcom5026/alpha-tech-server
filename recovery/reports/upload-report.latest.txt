@@ -1,17 +1,18 @@
 ========================================
 AlphaTech Recovery Upload Report
 ========================================
-Version    : ALPHATECH-RECOVERY-UPLOAD-V1-LOCAL-MIRROR
-Provider   : local-mirror
-Uploaded At: 2026-07-06T15:56:19.323Z
+Version    : ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+Provider   : s3-compatible
+Uploaded At: 2026-07-07T03:34:34.552Z
 Overall    : PASS
 
-Target Dir : D:\alpha-tech\server\recovery\offsite\2026-07-06\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF
+Bucket     : saduaksabuy-recovery
+Base Key   : alphatech-production/2026-07-07/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF
 
 Files
 ----------------------------------------
-SQL      : PASS D:\alpha-tech\server\recovery\offsite\2026-07-06\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql
-Manifest : PASS D:\alpha-tech\server\recovery\offsite\2026-07-06\P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json
+SQL      : PASS alphatech-production/2026-07-07/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.sql
+Manifest : PASS alphatech-production/2026-07-07/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.manifest.json
 ----------------------------------------
 Overall: PASS
 ========================================

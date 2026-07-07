@@ -16,3 +16,52 @@
 [2026-07-06T15:56:19.401Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T15-56-19-399Z.json
 [2026-07-06T15:56:19.401Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T15-56-19-399Z.txt
 [2026-07-06T15:56:19.401Z] ✅ Overall: PASS
+[2026-07-06T18:20:06.545Z] ============================================================
+[2026-07-06T18:20:06.552Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T18:20:06.554Z] ============================================================
+[2026-07-06T18:20:06.652Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T18-20-06-644Z.json
+[2026-07-06T18:20:06.653Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T18-20-06-644Z.txt
+[2026-07-06T18:20:06.654Z] Overall: PASS
+[2026-07-06T18:50:06.630Z] ============================================================
+[2026-07-06T18:50:06.637Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T18:50:06.639Z] ============================================================
+[2026-07-06T18:50:06.677Z] Upload failed: Error: Missing dependency @aws-sdk/client-s3. Run: npm install @aws-sdk/client-s3
+    at uploadS3Compatible (D:\alpha-tech\server\recovery\upload\uploadBackup.js:102:26)
+    at main (D:\alpha-tech\server\recovery\upload\uploadBackup.js:185:99)
+    at Object.<anonymous> (D:\alpha-tech\server\recovery\upload\uploadBackup.js:202:1)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at node:internal/main/run_main_module:28:49
+[2026-07-06T18:53:44.031Z] ============================================================
+[2026-07-06T18:53:44.039Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T18:53:44.040Z] ============================================================
+[2026-07-06T18:53:45.806Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T18-53-45-804Z.json
+[2026-07-06T18:53:45.806Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T18-53-45-804Z.txt
+[2026-07-06T18:53:45.806Z] Overall: PASS
+[2026-07-06T19:27:38.717Z] ============================================================
+[2026-07-06T19:27:38.726Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T19:27:38.727Z] ============================================================
+[2026-07-06T19:27:40.718Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T19-27-40-717Z.json
+[2026-07-06T19:27:40.719Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T19-27-40-717Z.txt
+[2026-07-06T19:27:40.719Z] Overall: PASS
+[2026-07-06T19:56:38.271Z] ============================================================
+[2026-07-06T19:56:38.281Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T19:56:38.282Z] ============================================================
+[2026-07-06T19:56:40.776Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T19-56-40-773Z.json
+[2026-07-06T19:56:40.777Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T19-56-40-773Z.txt
+[2026-07-06T19:56:40.777Z] Overall: PASS
+[2026-07-06T21:34:34.085Z] ============================================================
+[2026-07-06T21:34:34.093Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-06T21:34:34.095Z] ============================================================
+[2026-07-06T21:34:35.851Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T21-34-35-850Z.json
+[2026-07-06T21:34:35.853Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-06T21-34-35-850Z.txt
+[2026-07-06T21:34:35.853Z] Overall: PASS
+[2026-07-07T03:34:34.371Z] ============================================================
+[2026-07-07T03:34:34.378Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-07T03:34:34.380Z] ============================================================
+[2026-07-07T03:34:36.209Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-07T03-34-36-207Z.json
+[2026-07-07T03:34:36.210Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-07T03-34-36-207Z.txt
+[2026-07-07T03:34:36.211Z] Overall: PASS
