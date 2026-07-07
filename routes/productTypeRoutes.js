@@ -76,18 +76,27 @@ router.get('/template-options', async (req, res) => {
     const items = await prisma.productType.findMany({
       where: {
         branchId: templateBranch.id,
-        categoryId: branch.categoryId,
         active: true,
+        globalProductType: {
+          categoryId: branch.categoryId,
+          active: true,
+        },
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
         name: true,
-        slug: true,
-        categoryId: true,
+        active: true,
         branchId: true,
         globalProductTypeId: true,
-        category: { select: { id: true, name: true } },
+        globalProductType: {
+          select: {
+            id: true,
+            name: true,
+            categoryId: true,
+            category: { select: { id: true, name: true, active: true } },
+          },
+        },
         _count: {
           select: {
             productTypeBrands: true,
@@ -103,6 +112,7 @@ router.get('/template-options', async (req, res) => {
       templateBranch,
       items: items.map((item) => ({
         ...item,
+        categoryId: item.globalProductType?.categoryId ?? null,
         brandCount: item?._count?.productTypeBrands || 0,
         productCount: item?._count?.Product || 0,
       })),
