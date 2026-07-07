@@ -10,14 +10,6 @@ const normalizeName = (value) =>
     .replace(/\s+/g, ' ')
     .toLowerCase()
 
-const makeSlug = (value, fallback = 'product-type') => {
-  const base = normalizeName(value || fallback)
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/^-+|-+$/g, '')
-
-  return base || fallback
-}
-
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return null
   const n = Number.parseInt(value, 10)
@@ -33,14 +25,9 @@ const toMoneyOrNull = (value) => {
 const getDb = (db) => db || prisma
 
 const getProductTypeDedupeKey = (item = {}) => {
-  if (item.globalProductTypeId) return `global:${item.globalProductTypeId}`
-
-  const normalized =
-    item.normalizedName ||
-    item.globalProductType?.name ||
-    item.name
-
-  return `name:${normalizeName(normalized)}`
+  const globalProductTypeId = toInt(item.globalProductTypeId)
+  const normalized = item.normalizedName || item.name
+  return `global:${globalProductTypeId || 'none'}:${normalizeName(normalized)}`
 }
 
 const dedupeProductTypes = (items = []) => {
@@ -119,7 +106,6 @@ const findBranchProductTypeMatch = async ({ db, branchId, sourceProductType } = 
 
   const globalProductTypeId = toInt(sourceProductType.globalProductTypeId)
   const normalizedName = sourceProductType.normalizedName || normalizeName(sourceProductType.name)
-  const slug = sourceProductType.slug || makeSlug(sourceProductType.name)
 
   return client.productType.findFirst({
     where: {
@@ -127,7 +113,6 @@ const findBranchProductTypeMatch = async ({ db, branchId, sourceProductType } = 
       globalProductTypeId,
       OR: [
         { normalizedName },
-        { slug },
         { name: sourceProductType.name },
       ],
     },
@@ -144,7 +129,6 @@ const createBranchProductTypeFromSource = async ({ db, branchId, sourceProductTy
   if (!brId || !sourceProductType) return null
 
   const normalizedName = sourceProductType.normalizedName || normalizeName(sourceProductType.name)
-  const slug = sourceProductType.slug || makeSlug(sourceProductType.name)
 
   try {
     return await client.productType.create({
@@ -156,13 +140,12 @@ const createBranchProductTypeFromSource = async ({ db, branchId, sourceProductTy
           : [],
         normalizedName,
         pathCached: sourceProductType.pathCached || null,
-        slug,
         branchId: brId,
         globalProductTypeId: sourceProductType.globalProductTypeId,
       },
       include: {
         globalProductType: true,
-          productTypeBrands: true,
+        productTypeBrands: true,
       },
     })
   } catch (error) {
@@ -241,7 +224,6 @@ const listTemplateProductTypes = async ({ includeInactive = false } = {}) => {
       active: true,
       branchId: true,
       normalizedName: true,
-      slug: true,
       globalProductTypeId: true,
       globalProductType: { select: { id: true, name: true, categoryId: true } },
     },
@@ -392,7 +374,6 @@ const upsertBranchPrice = async ({ db, productId, branchId, payload } = {}) => {
 module.exports = {
   DEFAULT_TEMPLATE_BRANCH_CODE,
   normalizeName,
-  makeSlug,
   toInt,
   toMoneyOrNull,
   findTemplateBranch,
