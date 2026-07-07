@@ -1,5 +1,5 @@
 // src/modules/productType/services/productTypeService.js
-// ProductType Module Service v2
+// ProductType Module Service v3
 //
 // Module Isolation Rule:
 // ProductType service owns ProductType behavior only.
@@ -7,8 +7,9 @@
 // Current Domain Rule:
 // - ProductType ownership is branchId only.
 // - ProductType does not own categoryId.
- // - Category truth flows through ProductType -> GlobalProductType -> Category.
- // - globalProductTypeId is the runtime taxonomy anchor for ProductType.
+// - ProductType does not use slug as runtime identity.
+// - Category truth flows through ProductType -> GlobalProductType -> Category.
+// - globalProductTypeId is the runtime taxonomy anchor for ProductType.
 
 const {
   DEFAULT_TEMPLATE_BRANCH_CODE,
@@ -27,11 +28,6 @@ const normalizeName = (raw) => {
   s = s.replace(/[^A-Za-z0-9ก-๙ .]/g, '');
   s = s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
   return s;
-};
-
-const slugify = (raw) => {
-  const base = normalizeName(raw);
-  return base.replace(/\./g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 };
 
 const parseBool = (value, defaultValue = false) => {
@@ -76,7 +72,6 @@ class ProductTypeService {
     return {
       id: row.id,
       name: row.name,
-      slug: row.slug,
       active: row.active,
       isActive: row.active,
       branchId: row.branchId,
@@ -100,7 +95,6 @@ class ProductTypeService {
     return {
       id: row.id,
       name: row.name,
-      slug: row.slug,
       active: row.active,
       branchId: row.branchId,
       categoryId: row.globalProductType?.categoryId ?? null,
@@ -112,14 +106,12 @@ class ProductTypeService {
     };
   }
 
-
   mapGlobalProductTypeOption(row) {
     if (!row) return null;
 
     return {
       id: row.id,
       name: row.name,
-      slug: row.slug,
       active: row.active,
       categoryId: row.categoryId,
       category: row.category || null,
@@ -189,7 +181,6 @@ class ProductTypeService {
 
     return this.mapProductType(row);
   }
-
 
   async listGlobalOptions({ branchId, query = {} } = {}) {
     const currentBranchId = this.requireBranchId(branchId);
@@ -333,12 +324,9 @@ class ProductTypeService {
       productTypeData: {
         name: nameTrim,
         normalizedName,
-        slug: slugify(nameTrim),
         branchId: currentBranchId,
         globalProductTypeId,
         active: true,
-        // categoryId intentionally omitted.
-        // It is legacy/business-category residue and must not drive ProductType runtime.
       },
       sourceProductTypeId,
     });
@@ -401,7 +389,6 @@ class ProductTypeService {
     const data = {
       name: nameTrim,
       normalizedName,
-      slug: slugify(nameTrim),
     };
 
     if (nextGlobalProductTypeId) {
