@@ -14,6 +14,7 @@
 //   node qbrs.js --manifest "D:\alpha-tech\server\backups\file.manifest.json" --init
 //   node qbrs.js --manifest "D:\alpha-tech\server\backups\file.manifest.json" --init --yes
 //   node qbrs.js --manifest "D:\alpha-tech\server\backups\file.manifest.json" --dry-run
+//   node qbrs.js --manifest "D:\alpha-tech\server\backups\file.manifest.json" --init --yes --reset-schema
 
 const fs = require('fs');
 const path = require('path');
@@ -74,6 +75,7 @@ function parseArgs(argv) {
     allowNonEmpty: false,
     dryRun: false,
     initSchema: false,
+    resetSchema: false,
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -101,6 +103,12 @@ function parseArgs(argv) {
     }
 
     if (arg === '--init' || arg === '--init-schema') {
+      args.initSchema = true;
+      continue;
+    }
+
+    if (arg === '--reset-schema' || arg === '--reset') {
+      args.resetSchema = true;
       args.initSchema = true;
       continue;
     }
@@ -300,6 +308,17 @@ async function runPrismaDbPushForRecovery() {
   log('✅ Prisma db push completed for Recovery DB.');
 }
 
+
+async function resetTargetSchema(client) {
+  log(`🧨 Resetting target schema "${SCHEMA_NAME}" before restore...`);
+  log('🛡️ This action is intended for Recovery / Standby DB only.');
+
+  await client.query(`DROP SCHEMA IF EXISTS ${quoteIdent(SCHEMA_NAME)} CASCADE;`);
+  await client.query(`CREATE SCHEMA ${quoteIdent(SCHEMA_NAME)};`);
+
+  log(`✅ Schema "${SCHEMA_NAME}" reset completed.`);
+}
+
 async function runNodePgRestore({ connectionString, sqlFilePath }) {
   const sql = fs.readFileSync(sqlFilePath, 'utf8');
   const client = new Client(buildPgConnectionConfig(connectionString));
@@ -407,6 +426,33 @@ async function main() {
   }
 
   printInspection(inspection);
+
+  if (args.resetSchema) {
+    if (!args.yes) {
+      const ok = await askYesNo('RESET target schema before restore? This deletes Recovery DB data. Type Y to continue:');
+      if (!ok) fail('Schema reset cancelled by user.', 0);
+    }
+
+    const resetClient = new Client(buildPgConnectionConfig(RESTORE_DATABASE_URL));
+    try {
+      await resetClient.connect();
+      await resetTargetSchema(resetClient);
+    } finally {
+      await resetClient.end().catch(() => undefined);
+    }
+
+    await runPrismaDbPushForRecovery();
+
+    client = new Client(buildPgConnectionConfig(RESTORE_DATABASE_URL));
+    try {
+      await client.connect();
+      inspection = await inspectTargetDatabase(client, manifest);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+
+    printInspection(inspection);
+  }
 
   if (inspection.missingExpectedTables.length > 0) {
     log(`⚠️ Target database is missing ${inspection.missingExpectedTables.length} expected tables.`);

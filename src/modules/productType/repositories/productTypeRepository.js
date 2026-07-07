@@ -37,6 +37,13 @@ class ProductTypeRepository {
         id: true,
         name: true,
         branchCode: true,
+        categoryId: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }
@@ -56,6 +63,13 @@ class ProductTypeRepository {
         id: true,
         name: true,
         branchCode: true,
+        categoryId: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: { id: 'asc' },
     });
@@ -245,6 +259,45 @@ class ProductTypeRepository {
         categoryId: true,
         globalProductTypeId: true,
         normalizedName: true,
+      },
+    });
+  }
+
+
+  async listGlobalProductTypeOptions({
+    categoryId = null,
+    includeInactive = false,
+    search = '',
+  } = {}) {
+    const cId = toPositiveInt(categoryId);
+    const q = normalizeText(search);
+
+    return this.prisma.globalProductType.findMany({
+      where: {
+        ...(cId ? { categoryId: cId } : {}),
+        ...(includeInactive ? {} : { active: true }),
+        ...(q
+          ? {
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { slug: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        active: true,
+        categoryId: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }

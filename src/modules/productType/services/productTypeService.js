@@ -110,6 +110,21 @@ class ProductTypeService {
     };
   }
 
+
+  mapGlobalProductTypeOption(row) {
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      active: row.active,
+      categoryId: row.categoryId,
+      category: row.category || null,
+      isGlobalProductType: true,
+    };
+  }
+
   async listBranchProductTypes({ branchId, query = {} } = {}) {
     const currentBranchId = this.requireBranchId(branchId);
 
@@ -171,6 +186,31 @@ class ProductTypeService {
     }
 
     return this.mapProductType(row);
+  }
+
+
+  async listGlobalOptions({ branchId, query = {} } = {}) {
+    const currentBranchId = this.requireBranchId(branchId);
+
+    const branch = await this.repository.findBranchById(currentBranchId);
+    if (!branch?.id) {
+      const err = new Error('ไม่พบข้อมูลสาขา');
+      err.statusCode = 404;
+      err.status = 404;
+      err.code = 'BRANCH_NOT_FOUND';
+      throw err;
+    }
+
+    const rows = await this.repository.listGlobalProductTypeOptions({
+      categoryId: branch.categoryId,
+      includeInactive: parseBool(query.includeInactive, false),
+      search: query.search || query.q || '',
+    });
+
+    return {
+      branch,
+      items: rows.map((row) => this.mapGlobalProductTypeOption(row)).filter(Boolean),
+    };
   }
 
   async listTemplateOptions({

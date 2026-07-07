@@ -1,0 +1,20 @@
+========================================
+AlphaTech Recovery Workflow Report
+========================================
+Job ID     : 2026-07-06T18-53-33-681Z
+Mode       : backup-workflow
+Overall    : PASS
+
+Steps
+----------------------------------------
+HEALTH_CHECK       PASS     953ms
+BACKUP             PASS     9311ms
+VERIFY_BACKUP      PASS     0ms
+VERIFY_RECOVERY    SKIPPED  ms
+  reason: requires full-drill
+UPLOAD             PASS     1860ms
+RETENTION          PASS     127ms
+REPORT             RUNNING  ms
+----------------------------------------
+Exit Code: null
+========================================

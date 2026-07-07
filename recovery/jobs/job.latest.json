@@ -1,10 +1,10 @@
 {
   "jobVersion": "ALPHATECH-RECOVERY-JOB-RUNNER-V5-RETENTION",
-  "jobId": "2026-07-06T15-56-08-656Z",
+  "jobId": "2026-07-07T03-34-22-490Z",
   "mode": "backup-workflow",
-  "startedAt": "2026-07-06T15:56:08.656Z",
-  "finishedAt": "2026-07-06T15:56:19.665Z",
-  "durationMs": 11009,
+  "startedAt": "2026-07-07T03:34:22.490Z",
+  "finishedAt": "2026-07-07T03:34:36.546Z",
+  "durationMs": 14056,
   "ok": true,
   "exitCode": 0,
   "workflow": {
@@ -13,9 +13,9 @@
       "HEALTH_CHECK": {
         "name": "HEALTH_CHECK",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:08.670Z",
-        "finishedAt": "2026-07-06T15:56:09.607Z",
-        "durationMs": 937,
+        "startedAt": "2026-07-07T03:34:22.504Z",
+        "finishedAt": "2026-07-07T03:34:23.962Z",
+        "durationMs": 1458,
         "exitCode": 0,
         "command": "node recovery/health/healthCheck.js",
         "details": {
@@ -26,40 +26,40 @@
       "BACKUP": {
         "name": "BACKUP",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:09.608Z",
-        "finishedAt": "2026-07-06T15:56:19.216Z",
-        "durationMs": 9608,
+        "startedAt": "2026-07-07T03:34:23.962Z",
+        "finishedAt": "2026-07-07T03:34:34.287Z",
+        "durationMs": 10325,
         "exitCode": 0,
         "command": "node qb.js",
         "details": {
-          "latestManifest": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+          "latestManifest": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.manifest.json",
           "manifest": {
-            "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json",
+            "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.manifest.json",
             "backupVersion": "P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
-            "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.sql",
-            "sha256": "b5a39a6339bfd599acca31ad83fe44a03af659274b7f6de762f23a1b7fd25cd9",
+            "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.sql",
+            "sha256": "7bc64932340f6216b95fe4c4942dd123d97934af72bd6c9e7b7ebaf494048b26",
             "summary": {
               "totalTables": 70,
-              "totalRows": 15087,
+              "totalRows": 15187,
               "sequenceCount": 67,
-              "durationMs": 6718,
-              "durationSeconds": 6.72
+              "durationMs": 7399,
+              "durationSeconds": 7.4
             },
             "verification": {
               "ok": true,
-              "checkedAt": "2026-07-06T15:56:19.152Z",
+              "checkedAt": "2026-07-07T03:34:34.212Z",
               "checkedTables": 70,
               "keyTables": [
                 {
                   "tableName": "Product",
-                  "expected": 917,
-                  "actual": 917,
+                  "expected": 920,
+                  "actual": 920,
                   "passed": true
                 },
                 {
                   "tableName": "BranchPrice",
-                  "expected": 915,
-                  "actual": 915,
+                  "expected": 918,
+                  "actual": 918,
                   "passed": true
                 },
                 {
@@ -88,8 +88,8 @@
                 },
                 {
                   "tableName": "StockItem",
-                  "expected": 461,
-                  "actual": 461,
+                  "expected": 513,
+                  "actual": 513,
                   "passed": true
                 },
                 {
@@ -108,27 +108,27 @@
       "VERIFY_BACKUP": {
         "name": "VERIFY_BACKUP",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:19.216Z",
-        "finishedAt": "2026-07-06T15:56:19.216Z",
+        "startedAt": "2026-07-07T03:34:34.287Z",
+        "finishedAt": "2026-07-07T03:34:34.287Z",
         "durationMs": 0,
         "exitCode": 0,
         "command": "manifest.verification check",
         "details": {
           "verification": {
             "ok": true,
-            "checkedAt": "2026-07-06T15:56:19.152Z",
+            "checkedAt": "2026-07-07T03:34:34.212Z",
             "checkedTables": 70,
             "keyTables": [
               {
                 "tableName": "Product",
-                "expected": 917,
-                "actual": 917,
+                "expected": 920,
+                "actual": 920,
                 "passed": true
               },
               {
                 "tableName": "BranchPrice",
-                "expected": 915,
-                "actual": 915,
+                "expected": 918,
+                "actual": 918,
                 "passed": true
               },
               {
@@ -157,8 +157,8 @@
               },
               {
                 "tableName": "StockItem",
-                "expected": 461,
-                "actual": 461,
+                "expected": 513,
+                "actual": 513,
                 "passed": true
               },
               {
@@ -189,11 +189,11 @@
       "UPLOAD": {
         "name": "UPLOAD",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:19.217Z",
-        "finishedAt": "2026-07-06T15:56:19.453Z",
-        "durationMs": 236,
+        "startedAt": "2026-07-07T03:34:34.287Z",
+        "finishedAt": "2026-07-07T03:34:36.236Z",
+        "durationMs": 1949,
         "exitCode": 0,
-        "command": "node recovery/upload/uploadBackup.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-06_2026-07-06T15-56-13-306Z.manifest.json\"",
+        "command": "node recovery/upload/uploadBackup.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T03-34-28-274Z.manifest.json\"",
         "details": {
           "latestReport": "D:\\alpha-tech\\server\\recovery\\reports\\upload-report.latest.json"
         },
@@ -202,13 +202,13 @@
       "RETENTION": {
         "name": "RETENTION",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:19.453Z",
-        "finishedAt": "2026-07-06T15:56:19.663Z",
-        "durationMs": 210,
+        "startedAt": "2026-07-07T03:34:36.236Z",
+        "finishedAt": "2026-07-07T03:34:36.398Z",
+        "durationMs": 162,
         "exitCode": 0,
-        "command": "node recovery/retention/retentionPolicy.js --dry-run",
+        "command": "node recovery/retention/retentionPolicy.js --apply",
         "details": {
-          "mode": "--dry-run",
+          "mode": "--apply",
           "latestReport": "D:\\alpha-tech\\server\\recovery\\reports\\retention-report.latest.json"
         },
         "error": null
@@ -216,14 +216,14 @@
       "REPORT": {
         "name": "REPORT",
         "status": "PASS",
-        "startedAt": "2026-07-06T15:56:19.663Z",
-        "finishedAt": "2026-07-06T15:56:19.665Z",
-        "durationMs": 2,
+        "startedAt": "2026-07-07T03:34:36.398Z",
+        "finishedAt": "2026-07-07T03:34:36.546Z",
+        "durationMs": 148,
         "exitCode": null,
         "command": null,
         "details": {
-          "reportJsonPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-06T15-56-08-656Z.json",
-          "reportTxtPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-06T15-56-08-656Z.txt",
+          "reportJsonPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-07T03-34-22-490Z.json",
+          "reportTxtPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report-2026-07-07T03-34-22-490Z.txt",
           "latestJsonPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report.latest.json",
           "latestTxtPath": "D:\\alpha-tech\\server\\recovery\\reports\\workflow-report.latest.txt"
         },

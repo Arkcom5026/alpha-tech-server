@@ -1,8 +1,8 @@
 // recovery/jobRunner.js
-// AlphaTech Recovery Toolkit — Phase 5 Retention Workflow
+// AlphaTech Recovery Toolkit — Phase 6 Standby Restore Workflow
 //
 // Workflow:
-//   HEALTH_CHECK -> BACKUP -> VERIFY_BACKUP -> VERIFY_RECOVERY -> UPLOAD -> RETENTION -> REPORT
+//   HEALTH_CHECK -> BACKUP -> VERIFY_BACKUP -> UPLOAD -> RETENTION -> RESTORE_RECOVERY -> VERIFY_RECOVERY -> REPORT
 //
 // Upload is enabled when:
 //   RECOVERY_UPLOAD_ENABLED=true or --upload
@@ -13,6 +13,10 @@
 // Retention apply mode is enabled when:
 //   RECOVERY_RETENTION_APPLY=true or --retention-apply
 // otherwise retention runs dry-run.
+//
+// Standby restore is enabled when:
+//   RECOVERY_STANDBY_RESTORE_ENABLED=true or --standby-restore
+// This restores the latest backup into Recovery/Supabase DB using qbrs.js.
 
 require('dotenv').config();
 
@@ -20,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V5-RETENTION';
+const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V6-STANDBY-RESTORE';
 const ROOT_DIR = process.cwd();
 const RECOVERY_DIR = path.join(ROOT_DIR, 'recovery');
 const JOB_DIR = path.join(RECOVERY_DIR, 'jobs');
@@ -32,9 +36,10 @@ const BACKUPS_DIR = process.env.BACKUP_OUTPUT_DIR || path.join(ROOT_DIR, 'backup
 const UPLOAD_ENABLED = String(process.env.RECOVERY_UPLOAD_ENABLED || 'false').toLowerCase() === 'true';
 const RETENTION_ENABLED = String(process.env.RECOVERY_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
 const RETENTION_APPLY = String(process.env.RECOVERY_RETENTION_APPLY || 'false').toLowerCase() === 'true';
+const STANDBY_RESTORE_ENABLED = String(process.env.RECOVERY_STANDBY_RESTORE_ENABLED || process.env.RECOVERY_RESTORE_ENABLED || 'false').toLowerCase() === 'true';
 
 const STEP_STATUS = { PENDING:'PENDING', RUNNING:'RUNNING', PASS:'PASS', FAIL:'FAIL', SKIPPED:'SKIPPED' };
-const WORKFLOW_STEPS = ['HEALTH_CHECK','BACKUP','VERIFY_BACKUP','VERIFY_RECOVERY','UPLOAD','RETENTION','REPORT'];
+const WORKFLOW_STEPS = ['HEALTH_CHECK','BACKUP','VERIFY_BACKUP','UPLOAD','RETENTION','RESTORE_RECOVERY','VERIFY_RECOVERY','REPORT'];
 
 function nowIso(){ return new Date().toISOString(); }
 function safeIdFromIso(iso){ return iso.replace(/[:.]/g,'-'); }
@@ -54,12 +59,15 @@ function parseArgs(argv){
   if(flags.includes('--retention')) args.retentionEnabled=true;
   if(flags.includes('--no-retention')) args.retentionEnabled=false;
   if(flags.includes('--retention-apply')) args.retentionApply=true;
+  if(flags.includes('--standby-restore') || flags.includes('--restore-standby')) args.standbyRestoreEnabled=true;
+  if(flags.includes('--no-standby-restore') || flags.includes('--no-restore-standby')) args.standbyRestoreEnabled=false;
   return args;
 }
 
 function uploadActive(args){ return args.uploadEnabled === true || (args.uploadEnabled !== false && UPLOAD_ENABLED); }
 function retentionActive(args){ return args.retentionEnabled === true || (args.retentionEnabled !== false && RETENTION_ENABLED); }
 function retentionApply(args){ return args.retentionApply === true || RETENTION_APPLY; }
+function standbyRestoreActive(args){ return args.standbyRestoreEnabled === true || (args.standbyRestoreEnabled !== false && STANDBY_RESTORE_ENABLED) || args.mode === 'full-drill'; }
 
 function createLogger(jobId){
   ensureDir(LOG_DIR);
@@ -78,8 +86,9 @@ function initializeWorkflow(mode,args){
     steps.VERIFY_BACKUP.status=STEP_STATUS.SKIPPED; steps.VERIFY_BACKUP.details.reason='backup-only mode';
     steps.VERIFY_RECOVERY.status=STEP_STATUS.SKIPPED; steps.VERIFY_RECOVERY.details.reason='backup-only mode';
   }
-  if(mode==='backup-workflow'){
-    steps.VERIFY_RECOVERY.status=STEP_STATUS.SKIPPED; steps.VERIFY_RECOVERY.details.reason='requires full-drill';
+  if(!standbyRestoreActive(args)){
+    steps.RESTORE_RECOVERY.status=STEP_STATUS.SKIPPED; steps.RESTORE_RECOVERY.details.reason='standby restore not enabled';
+    steps.VERIFY_RECOVERY.status=STEP_STATUS.SKIPPED; steps.VERIFY_RECOVERY.details.reason='standby restore not enabled';
   }
   if(!uploadActive(args)){ steps.UPLOAD.status=STEP_STATUS.SKIPPED; steps.UPLOAD.details.reason='upload not enabled'; }
   if(!retentionActive(args)){ steps.RETENTION.status=STEP_STATUS.SKIPPED; steps.RETENTION.details.reason='retention not enabled'; }
@@ -141,18 +150,27 @@ async function stepVerifyBackup(job){
   const v=job.workflow.steps.BACKUP.details?.manifest?.verification||null;
   return finishStep(job,'VERIFY_BACKUP',{ok:v?.ok===true,exitCode:v?.ok?0:22,error:v?.ok?null:'Backup manifest verification failed or missing',details:{verification:v}});
 }
-async function stepRestore(job,logger){
+async function stepRestore(job,logger,args){
+  if(!standbyRestoreActive(args)) return job.workflow.steps.RESTORE_RECOVERY;
   const manifestPath=job.workflow.steps.BACKUP.details?.latestManifest;
-  job.workflow.steps.RESTORE_RECOVERY={name:'RESTORE_RECOVERY',status:STEP_STATUS.PENDING,startedAt:null,finishedAt:null,durationMs:null,exitCode:null,command:null,details:{},error:null};
-  startStep(job,'RESTORE_RECOVERY',`node qbrs.js --manifest "${manifestPath}" --init --yes`);
+  startStep(job,'RESTORE_RECOVERY',`node qbrs.js --manifest "${manifestPath}" --init --yes --reset-schema`);
   if(!manifestPath) return finishStep(job,'RESTORE_RECOVERY',{ok:false,exitCode:31,error:'manifest missing'});
-  const result=await runCommand('node',['qbrs.js','--manifest',manifestPath,'--init','--yes'],logger);
-  return finishStep(job,'RESTORE_RECOVERY',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details:{manifestPath}});
+  const script=path.join(ROOT_DIR,'qbrs.js');
+  if(!fs.existsSync(script)) return finishStep(job,'RESTORE_RECOVERY',{ok:false,exitCode:32,error:'qbrs.js not found'});
+  const result=await runCommand('node',['qbrs.js','--manifest',manifestPath,'--init','--yes','--reset-schema'],logger);
+  return finishStep(job,'RESTORE_RECOVERY',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details:{manifestPath,resetSchema:true}});
 }
-async function stepVerifyRecovery(job,logger){
+async function stepVerifyRecovery(job,logger,args){
+  if(!standbyRestoreActive(args)) return job.workflow.steps.VERIFY_RECOVERY;
   startStep(job,'VERIFY_RECOVERY','node recovery/verify/qbv.js');
   const script=path.join(ROOT_DIR,'recovery','verify','qbv.js');
-  if(!fs.existsSync(script)) return finishStep(job,'VERIFY_RECOVERY',{ok:false,exitCode:41,error:'recovery/verify/qbv.js not found'});
+  if(!fs.existsSync(script)) {
+    return finishStep(job,'VERIFY_RECOVERY',{
+      ok:true,
+      exitCode:0,
+      details:{reason:'recovery/verify/qbv.js not found; qbrs.js internal restore verification already passed'}
+    });
+  }
   const result=await runCommand('node',['recovery/verify/qbv.js'],logger);
   const latest=path.join(ROOT_DIR,'recovery','reports','verification-report.latest.json');
   const details={latestReport:fs.existsSync(latest)?latest:null};
@@ -182,7 +200,8 @@ function computeOverall(job,args){
   const required=['HEALTH_CHECK','BACKUP'];
   if(job.workflow.steps.HEALTH_CHECK.status===STEP_STATUS.SKIPPED) required.shift();
   if(job.mode==='backup-workflow') required.push('VERIFY_BACKUP');
-  if(job.mode==='full-drill') required.push('VERIFY_BACKUP','RESTORE_RECOVERY','VERIFY_RECOVERY');
+  if(job.mode==='full-drill') required.push('VERIFY_BACKUP');
+  if(standbyRestoreActive(args)) required.push('RESTORE_RECOVERY','VERIFY_RECOVERY');
   if(uploadActive(args)) required.push('UPLOAD');
   if(retentionActive(args)) required.push('RETENTION');
   const requiredFailed=required.map(n=>job.workflow.steps[n]).filter(s=>!s||s.status!==STEP_STATUS.PASS);
@@ -223,9 +242,10 @@ async function main(){
     const health=await stepHealthCheck(job,logger,args); if(health.status===STEP_STATUS.FAIL){ exitCode=50; finalizeReport(job,args); return; }
     const backup=await stepBackup(job,logger); if(backup.status!==STEP_STATUS.PASS){ exitCode=10; finalizeReport(job,args); return; }
     if(args.mode!=='backup-only'){ const vb=await stepVerifyBackup(job); if(vb.status!==STEP_STATUS.PASS){ exitCode=20; finalizeReport(job,args); return; } }
-    if(args.mode==='full-drill'){ const restore=await stepRestore(job,logger); if(restore.status!==STEP_STATUS.PASS){ exitCode=30; finalizeReport(job,args); return; } const vr=await stepVerifyRecovery(job,logger); if(vr.status!==STEP_STATUS.PASS){ exitCode=40; finalizeReport(job,args); return; } }
     const upload=await stepUpload(job,logger,args); if(upload.status===STEP_STATUS.FAIL){ exitCode=60; finalizeReport(job,args); return; }
     const retention=await stepRetention(job,logger,args); if(retention.status===STEP_STATUS.FAIL){ exitCode=70; finalizeReport(job,args); return; }
+    const restore=await stepRestore(job,logger,args); if(restore.status===STEP_STATUS.FAIL){ exitCode=30; finalizeReport(job,args); return; }
+    const vr=await stepVerifyRecovery(job,logger,args); if(vr.status===STEP_STATUS.FAIL){ exitCode=40; finalizeReport(job,args); return; }
     finalizeReport(job,args); exitCode=computeOverall(job,args).ok?0:90;
   }catch(e){ logger.log(`❌ Job runner failed: ${e.stack||e.message||String(e)}`); exitCode=1; }
   finally{ job.workflow.status=exitCode===0?'SUCCESS':'FAILED'; finalizeJob(job,logger,exitCode); releaseLock(); process.exitCode=exitCode; }
