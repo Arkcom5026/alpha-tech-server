@@ -29,7 +29,6 @@ class BrandRepository {
       select: {
         id: true,
         name: true,
-        categoryId: true,
         category: {
           select: {
             id: true,
@@ -57,7 +56,6 @@ class BrandRepository {
         slug: true,
         active: true,
         branchId: true,
-        categoryId: true,
         globalProductTypeId: true,
         _count: {
           select: {
@@ -175,8 +173,8 @@ class BrandRepository {
         id: true,
         name: true,
         branchId: true,
-        categoryId: true,
         globalProductTypeId: true,
+        globalProductType: { select: { id:true,name:true,categoryId:true } },
         active: true,
       },
     });
@@ -273,8 +271,7 @@ class BrandRepository {
             id: true,
             name: true,
             branchId: true,
-            categoryId: true,
-            globalProductTypeId: true,
+                globalProductTypeId: true,
           },
         },
         brand: {

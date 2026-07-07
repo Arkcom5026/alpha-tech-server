@@ -1,0 +1,9 @@
+[2026-07-07T07:40:38.376Z] ============================================================
+[2026-07-07T07:40:38.381Z] 🔎 AlphaTech Integrity Verification ALPHATECH-RECOVERY-VERIFY-V1
+[2026-07-07T07:40:38.381Z] ============================================================
+[2026-07-07T07:40:38.382Z] Collecting Production snapshot...
+[2026-07-07T07:40:50.237Z] Collecting Recovery snapshot...
+[2026-07-07T07:41:01.702Z] Comparing snapshots...
+[2026-07-07T07:41:01.913Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-07T07-41-01-706Z.json
+[2026-07-07T07:41:01.913Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-07T07-41-01-706Z.txt
+[2026-07-07T07:41:01.913Z] ✅ Overall: PASS

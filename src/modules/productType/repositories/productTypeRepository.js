@@ -7,9 +7,9 @@
 //
 // Current Domain Rule:
 // - ProductType ownership is branchId only.
-// - categoryId is legacy/business-category residue and is not used as guard/filter/duplicate key.
-// - globalProductTypeId is a platform reference for future online search; keep it as reference,
-//   but do not use it as guard/filter now.
+// - ProductType does not own categoryId.
+ // - Category truth flows through ProductType -> GlobalProductType -> Category.
+ // - globalProductTypeId is the runtime taxonomy anchor for ProductType.
 
 const DEFAULT_TEMPLATE_BRANCH_CODE = 'T01';
 const DEFAULT_TEMPLATE_BRANCH_ID = 1;
@@ -107,6 +107,20 @@ class ProductTypeRepository {
         skip,
         take,
         include: {
+          globalProductType: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              categoryId: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               Product: true,
@@ -150,8 +164,15 @@ class ProductTypeRepository {
         slug: true,
         active: true,
         branchId: true,
-        categoryId: true,
         globalProductTypeId: true,
+        globalProductType: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            categoryId: true,
+          },
+        },
       },
     });
   }
@@ -168,6 +189,20 @@ class ProductTypeRepository {
         ...(includeInactive ? {} : { active: true }),
       },
       include: {
+          globalProductType: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              categoryId: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         _count: {
           select: {
             Product: true,
@@ -203,8 +238,15 @@ class ProductTypeRepository {
         slug: true,
         active: true,
         branchId: true,
-        categoryId: true,
         globalProductTypeId: true,
+        globalProductType: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            categoryId: true,
+          },
+        },
       },
     });
   }
@@ -227,9 +269,16 @@ class ProductTypeRepository {
         name: true,
         slug: true,
         active: true,
-        categoryId: true,
         branchId: true,
         globalProductTypeId: true,
+        globalProductType: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            categoryId: true,
+          },
+        },
         _count: {
           select: {
             productTypeBrands: true,
@@ -240,11 +289,12 @@ class ProductTypeRepository {
     });
   }
 
-  async findBranchProductTypeDuplicate({ branchId, normalizedName, excludeId } = {}) {
+  async findBranchProductTypeDuplicate({ branchId, globalProductTypeId, normalizedName, excludeId } = {}) {
     const bId = toPositiveInt(branchId);
+    const gId = toPositiveInt(globalProductTypeId);
     const nName = normalizeText(normalizedName);
     const exId = toPositiveInt(excludeId);
-    if (!bId || !nName) return null;
+    if (!bId || !gId || !nName) return null;
 
     return this.prisma.productType.findFirst({
       where: {
@@ -256,7 +306,6 @@ class ProductTypeRepository {
         id: true,
         name: true,
         branchId: true,
-        categoryId: true,
         globalProductTypeId: true,
         normalizedName: true,
       },
@@ -341,6 +390,20 @@ class ProductTypeRepository {
       const full = await tx.productType.findUnique({
         where: { id: created.id },
         include: {
+          globalProductType: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              categoryId: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               Product: true,
