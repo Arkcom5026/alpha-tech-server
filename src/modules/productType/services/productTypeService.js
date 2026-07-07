@@ -6,9 +6,9 @@
 //
 // Current Domain Rule:
 // - ProductType ownership is branchId only.
-// - categoryId is legacy/business-category residue and is not used as guard/filter/duplicate key.
-// - globalProductTypeId is retained as reference for future platform/online search,
-//   but is not used as filter/guard now.
+// - ProductType does not own categoryId.
+ // - Category truth flows through ProductType -> GlobalProductType -> Category.
+ // - globalProductTypeId is the runtime taxonomy anchor for ProductType.
 
 const {
   DEFAULT_TEMPLATE_BRANCH_CODE,
@@ -80,8 +80,9 @@ class ProductTypeService {
       active: row.active,
       isActive: row.active,
       branchId: row.branchId,
-      categoryId: row.categoryId ?? null,
+      categoryId: row.globalProductType?.categoryId ?? null,
       globalProductTypeId: row.globalProductTypeId,
+      globalProductType: row.globalProductType || null,
       productCount: Number(row?._count?.Product || 0),
       brandCount: Number(row?._count?.productTypeBrands || typeBrands.length || 0),
       clonedBrandCount: Number(meta?.clonedBrandCount || 0),
@@ -102,8 +103,9 @@ class ProductTypeService {
       slug: row.slug,
       active: row.active,
       branchId: row.branchId,
-      categoryId: row.categoryId ?? null,
+      categoryId: row.globalProductType?.categoryId ?? null,
       globalProductTypeId: row.globalProductTypeId,
+      globalProductType: row.globalProductType || null,
       brandCount: row?._count?.productTypeBrands || 0,
       productCount: row?._count?.Product || 0,
       isTemplateBranchProductType: true,
@@ -314,6 +316,7 @@ class ProductTypeService {
     const normalizedName = normalizeName(nameTrim);
     const duplicate = await this.repository.findBranchProductTypeDuplicate({
       branchId: currentBranchId,
+      globalProductTypeId,
       normalizedName,
     });
 
@@ -376,8 +379,13 @@ class ProductTypeService {
     }
 
     const normalizedName = normalizeName(nameTrim);
+    const nextGlobalProductTypeId =
+      toPositiveInt(payload?.globalProductTypeId) ||
+      toPositiveInt(existing?.globalProductTypeId);
+
     const duplicate = await this.repository.findBranchProductTypeDuplicate({
       branchId: currentBranchId,
+      globalProductTypeId: nextGlobalProductTypeId,
       normalizedName,
       excludeId: productTypeId,
     });
@@ -396,7 +404,6 @@ class ProductTypeService {
       slug: slugify(nameTrim),
     };
 
-    const nextGlobalProductTypeId = toPositiveInt(payload?.globalProductTypeId);
     if (nextGlobalProductTypeId) {
       data.globalProductTypeId = nextGlobalProductTypeId;
     }

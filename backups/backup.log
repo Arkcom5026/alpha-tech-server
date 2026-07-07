@@ -1077,3 +1077,86 @@
 [2026-07-07T03:34:34.225Z] 📐 File size: 4.45 MB
 [2026-07-07T03:34:34.225Z] ⏱️ Duration: 7.40 seconds
 [2026-07-07T03:34:34.226Z] ✅ Verification: PASS (70 tables checked)
+[2026-07-07T07:39:50.541Z] 🔌 Connected to PostgreSQL successfully.
+[2026-07-07T07:39:50.550Z] ⏳ Starting P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore...
+[2026-07-07T07:39:53.854Z] 📦 Exporting table: Bank
+[2026-07-07T07:39:53.893Z] 📦 Exporting table: Brand
+[2026-07-07T07:39:53.936Z] 📦 Exporting table: Category
+[2026-07-07T07:39:53.973Z] 📦 Exporting table: GlobalProductType
+[2026-07-07T07:39:54.009Z] 📦 Exporting table: Position
+[2026-07-07T07:39:54.047Z] 📦 Exporting table: Province
+[2026-07-07T07:39:54.086Z] 📦 Exporting table: District
+[2026-07-07T07:39:54.173Z] 📦 Exporting table: Subdistrict
+[2026-07-07T07:39:54.370Z] 📦 Exporting table: Branch
+[2026-07-07T07:39:54.409Z] 📦 Exporting table: BarcodeCounter
+[2026-07-07T07:39:54.446Z] 📦 Exporting table: PaymentCodeCounter
+[2026-07-07T07:39:54.483Z] 📦 Exporting table: ProductType
+[2026-07-07T07:39:54.521Z] 📦 Exporting table: ProductTypeBrand
+[2026-07-07T07:39:54.559Z] 📦 Exporting table: Supplier
+[2026-07-07T07:39:54.596Z] 📦 Exporting table: Unit
+[2026-07-07T07:39:54.633Z] 📦 Exporting table: Product
+[2026-07-07T07:39:54.715Z] 📦 Exporting table: BranchPrice
+[2026-07-07T07:39:54.780Z] 📦 Exporting table: ProductImage
+[2026-07-07T07:39:54.817Z] 📦 Exporting table: StockBalance
+[2026-07-07T07:39:54.858Z] 📦 Exporting table: User
+[2026-07-07T07:39:54.902Z] 📦 Exporting table: CustomerProfile
+[2026-07-07T07:39:54.949Z] 📦 Exporting table: Cart
+[2026-07-07T07:39:54.986Z] 📦 Exporting table: CartItem
+[2026-07-07T07:39:55.022Z] 📦 Exporting table: EmployeeProfile
+[2026-07-07T07:39:55.060Z] 📦 Exporting table: CombinedBillingDocument
+[2026-07-07T07:39:55.096Z] 📦 Exporting table: CombinedSaleDocument
+[2026-07-07T07:39:55.133Z] 📦 Exporting table: CustomerDeposit
+[2026-07-07T07:39:55.169Z] 📦 Exporting table: CustomerReceipts
+[2026-07-07T07:39:55.205Z] 📦 Exporting table: InputTaxFilingBatch
+[2026-07-07T07:39:55.242Z] 📦 Exporting table: Order
+[2026-07-07T07:39:55.278Z] 📦 Exporting table: OrderOnline
+[2026-07-07T07:39:55.315Z] 📦 Exporting table: OrderOnlineItem
+[2026-07-07T07:39:55.351Z] 📦 Exporting table: PasswordResetToken
+[2026-07-07T07:39:55.388Z] 📦 Exporting table: ProductOnOrder
+[2026-07-07T07:39:55.425Z] 📦 Exporting table: PurchaseOrder
+[2026-07-07T07:39:55.461Z] 📦 Exporting table: PurchaseOrderItem
+[2026-07-07T07:39:55.497Z] 📦 Exporting table: PurchaseOrderReceipt
+[2026-07-07T07:39:55.534Z] 📦 Exporting table: InputTaxFilingItem
+[2026-07-07T07:39:55.571Z] 📦 Exporting table: PurchaseOrderReceiptItem
+[2026-07-07T07:39:55.607Z] 📦 Exporting table: RefreshToken
+[2026-07-07T07:39:55.802Z] 📦 Exporting table: Sale
+[2026-07-07T07:39:55.839Z] 📦 Exporting table: CustomerReceiptAllocations
+[2026-07-07T07:39:55.876Z] 📦 Exporting table: Payment
+[2026-07-07T07:39:55.913Z] 📦 Exporting table: DepositUsage
+[2026-07-07T07:39:55.950Z] 📦 Exporting table: PaymentItem
+[2026-07-07T07:39:55.986Z] 📦 Exporting table: SaleReturn
+[2026-07-07T07:39:56.023Z] 📦 Exporting table: RefundTransaction
+[2026-07-07T07:39:56.059Z] 📦 Exporting table: SalesTaxFilingBatch
+[2026-07-07T07:39:56.096Z] 📦 Exporting table: SalesTaxFilingItem
+[2026-07-07T07:39:56.132Z] 📦 Exporting table: ServiceOrder
+[2026-07-07T07:39:56.169Z] 📦 Exporting table: ServiceItem
+[2026-07-07T07:39:56.205Z] 📦 Exporting table: SimpleLot
+[2026-07-07T07:39:56.242Z] 📦 Exporting table: SaleItemSimple
+[2026-07-07T07:39:56.279Z] 📦 Exporting table: SaleReturnItemSimple
+[2026-07-07T07:39:56.315Z] 📦 Exporting table: StockAuditSession
+[2026-07-07T07:39:56.351Z] 📦 Exporting table: StockItem
+[2026-07-07T07:39:56.408Z] 📦 Exporting table: BarcodeReceiptItem
+[2026-07-07T07:39:56.445Z] 📦 Exporting table: RepairJob
+[2026-07-07T07:39:56.483Z] 📦 Exporting table: RepairPartItem
+[2026-07-07T07:39:56.520Z] 📦 Exporting table: SaleItem
+[2026-07-07T07:39:56.557Z] 📦 Exporting table: SaleReturnItem
+[2026-07-07T07:39:56.595Z] 📦 Exporting table: StockAuditScanLog
+[2026-07-07T07:39:56.632Z] 📦 Exporting table: StockAuditSnapshotItem
+[2026-07-07T07:39:56.668Z] 📦 Exporting table: StockMovement
+[2026-07-07T07:39:56.708Z] 📦 Exporting table: SupplierPayment
+[2026-07-07T07:39:56.769Z] 📦 Exporting table: SupplierPaymentReceipt
+[2026-07-07T07:39:56.806Z] 📦 Exporting table: V2CustomerDeposit
+[2026-07-07T07:39:56.842Z] 📦 Exporting table: V2StockAudit
+[2026-07-07T07:39:56.879Z] 📦 Exporting table: V2StockAuditItem
+[2026-07-07T07:39:56.916Z] 📦 Exporting table: WarrantyClaim
+[2026-07-07T07:39:59.527Z] 
+🎉 P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore completed successfully.
+[2026-07-07T07:39:59.528Z] 💾 Backup file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T07-39-53-819Z.sql
+[2026-07-07T07:39:59.529Z] 🧾 Manifest file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-07_2026-07-07T07-39-53-819Z.manifest.json
+[2026-07-07T07:39:59.530Z] 📊 Tables exported: 70
+[2026-07-07T07:39:59.530Z] 📦 Rows exported: 15216
+[2026-07-07T07:39:59.530Z] 🔢 Sequences prepared: 67
+[2026-07-07T07:39:59.530Z] 🔐 SHA256: 46f569eb153337e189db193a345abeb19ab5fe359e6ded4a96613c0cabe33673
+[2026-07-07T07:39:59.531Z] 📐 File size: 4.46 MB
+[2026-07-07T07:39:59.531Z] ⏱️ Duration: 6.73 seconds
+[2026-07-07T07:39:59.531Z] ✅ Verification: PASS (70 tables checked)
