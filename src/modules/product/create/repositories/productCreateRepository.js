@@ -233,6 +233,52 @@ const listTemplateProductTypes = async ({ includeInactive = false } = {}) => {
   return dedupeProductTypes(productTypes)
 }
 
+const listBranchProductTypes = async ({ branchId, includeInactive = false } = {}) => {
+  const brId = toInt(branchId)
+  if (!brId) return []
+
+  const productTypes = await prisma.productType.findMany({
+    where: {
+      branchId: brId,
+      ...(includeInactive ? {} : { active: true }),
+    },
+    select: {
+      id: true,
+      name: true,
+      active: true,
+      branchId: true,
+      normalizedName: true,
+      globalProductTypeId: true,
+      categoryId: true,
+      category: { select: { id: true, name: true } },
+      globalProductType: { select: { id: true, name: true, categoryId: true } },
+    },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  })
+
+  return dedupeProductTypes(productTypes)
+}
+
+const findBranchProductTypeById = async ({ db, branchId, productTypeId, includeInactive = false } = {}) => {
+  const client = getDb(db)
+  const brId = toInt(branchId)
+  const ptId = toInt(productTypeId)
+  if (!brId || !ptId) return null
+
+  return client.productType.findFirst({
+    where: {
+      id: ptId,
+      branchId: brId,
+      ...(includeInactive ? {} : { active: true }),
+    },
+    include: {
+      category: true,
+      globalProductType: true,
+      productTypeBrands: true,
+    },
+  })
+}
+
 const listUnits = async () => {
   return prisma.unit.findMany({
     select: { id: true, name: true },
@@ -240,24 +286,21 @@ const listUnits = async () => {
   })
 }
 
-const listBrandsForProductType = async ({ productTypeId, includeInactive = false } = {}) => {
-  const sourceProductType = await findProductTypeById({ productTypeId })
-  if (!sourceProductType) return []
+const listBrandsForProductType = async ({ branchId, productTypeId, includeInactive = false } = {}) => {
+  const brId = toInt(branchId)
+  const ptId = toInt(productTypeId)
+  if (!brId || !ptId) return []
 
-  const productTypes = await prisma.productType.findMany({
-    where: {
-      globalProductTypeId: sourceProductType.globalProductTypeId,
-      ...(includeInactive ? {} : { active: true }),
-    },
-    select: { id: true },
+  const branchProductType = await findBranchProductTypeById({
+    branchId: brId,
+    productTypeId: ptId,
+    includeInactive,
   })
-
-  const ids = productTypes.map((item) => item.id)
-  if (!ids.length) return []
+  if (!branchProductType) return []
 
   const mappings = await prisma.productTypeBrand.findMany({
     where: {
-      productTypeId: { in: ids },
+      productTypeId: branchProductType.id,
       brand: includeInactive ? {} : { active: true },
     },
     select: {
@@ -378,9 +421,11 @@ module.exports = {
   toMoneyOrNull,
   findTemplateBranch,
   findProductTypeById,
+  findBranchProductTypeById,
   ensureBranchProductType,
   ensureProductTypeBrand,
   listTemplateProductTypes,
+  listBranchProductTypes,
   listUnits,
   listBrandsForProductType,
   listExistingModels,

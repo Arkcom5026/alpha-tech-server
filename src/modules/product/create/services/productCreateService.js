@@ -26,11 +26,12 @@ const getBranchContext = ({ branchId } = {}) => {
   return brId
 }
 
-const getDropdowns = async ({ productTypeId, includeInactive = false } = {}) => {
-  const productTypes = await repo.listTemplateProductTypes({ includeInactive })
+const getDropdowns = async ({ branchId, productTypeId, includeInactive = false } = {}) => {
+  const brId = getBranchContext({ branchId })
+  const productTypes = await repo.listBranchProductTypes({ branchId: brId, includeInactive })
   const units = await repo.listUnits()
   const brands = productTypeId
-    ? await repo.listBrandsForProductType({ productTypeId, includeInactive })
+    ? await repo.listBrandsForProductType({ branchId: brId, productTypeId, includeInactive })
     : []
 
   return {
@@ -45,7 +46,7 @@ const getDropdowns = async ({ productTypeId, includeInactive = false } = {}) => 
         globalProductTypeId: item.globalProductTypeId,
         category: item.category || null,
         globalProductType: item.globalProductType || null,
-        source: 'TEMPLATE_PRODUCT_TYPE',
+        source: 'BRANCH_PRODUCT_TYPE',
       })),
       brands: brands.map((item) => ({
         id: item.id,
@@ -59,8 +60,9 @@ const getDropdowns = async ({ productTypeId, includeInactive = false } = {}) => 
   }
 }
 
-const getBrands = async ({ productTypeId, includeInactive = false } = {}) => {
-  const brands = await repo.listBrandsForProductType({ productTypeId, includeInactive })
+const getBrands = async ({ branchId, productTypeId, includeInactive = false } = {}) => {
+  const brId = getBranchContext({ branchId })
+  const brands = await repo.listBrandsForProductType({ branchId: brId, productTypeId, includeInactive })
 
   return {
     success: true,
@@ -104,8 +106,8 @@ const validateCreatePayload = (data = {}) => {
   const name = String(data.name || '').trim()
   if (!name) throw makeError('PRODUCT_NAME_REQUIRED', 400)
 
-  const sourceProductTypeId = toInt(data.productTypeId)
-  if (!sourceProductTypeId) throw makeError('PRODUCT_TYPE_REQUIRED', 400)
+  const productTypeId = toInt(data.productTypeId)
+  if (!productTypeId) throw makeError('PRODUCT_TYPE_REQUIRED', 400)
 
   const brandId = toInt(data.brandId)
   if (!brandId) throw makeError('BRAND_REQUIRED', 400)
@@ -120,7 +122,7 @@ const validateCreatePayload = (data = {}) => {
   if (costPrice === null || costPrice < 0) throw makeError('COST_PRICE_REQUIRED', 400)
   if (priceRetail === null || priceRetail <= 0) throw makeError('PRICE_RETAIL_REQUIRED', 400)
 
-  return { name, sourceProductTypeId, brandId, unitId, branchPrice }
+  return { name, productTypeId, brandId, unitId, branchPrice }
 }
 
 const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} } = {}) => {
@@ -130,14 +132,14 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} }
   const mode = normalizeMode(data.mode || data.stockMode || data.stockBehavior)
 
   const result = await prisma.$transaction(async (tx) => {
-    const branchProductType = await repo.ensureBranchProductType({
+    const branchProductType = await repo.findBranchProductTypeById({
       db: tx,
       branchId: brId,
-      productTypeId: validated.sourceProductTypeId,
+      productTypeId: validated.productTypeId,
     })
 
     if (!branchProductType?.id) {
-      throw makeError('PRODUCT_TYPE_CREATE_FAILED_FOR_BRANCH', 400)
+      throw makeError('PRODUCT_TYPE_NOT_FOUND_FOR_BRANCH', 400)
     }
 
     await repo.ensureProductTypeBrand({
@@ -199,7 +201,7 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} }
     runtime: {
       branchId: brId,
       ensuredProductTypeId: result.branchProductType.id,
-      sourceProductTypeId: validated.sourceProductTypeId,
+      sourceProductTypeId: null,
       flow: 'PRODUCT_CREATE_RUNTIME',
     },
   }
