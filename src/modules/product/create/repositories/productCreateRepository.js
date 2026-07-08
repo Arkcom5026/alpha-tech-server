@@ -249,8 +249,6 @@ const listBranchProductTypes = async ({ branchId, includeInactive = false } = {}
       branchId: true,
       normalizedName: true,
       globalProductTypeId: true,
-      categoryId: true,
-      category: { select: { id: true, name: true } },
       globalProductType: { select: { id: true, name: true, categoryId: true } },
     },
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
@@ -272,7 +270,6 @@ const findBranchProductTypeById = async ({ db, branchId, productTypeId, includeI
       ...(includeInactive ? {} : { active: true }),
     },
     include: {
-      category: true,
       globalProductType: true,
       productTypeBrands: true,
     },
