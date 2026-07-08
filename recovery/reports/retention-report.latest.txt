@@ -3,17 +3,17 @@ AlphaTech Recovery Retention Report
 ========================================
 Version : ALPHATECH-RECOVERY-RETENTION-V1
 Mode    : APPLY
-At      : 2026-07-07T09:34:36.321Z
+At      : 2026-07-08T03:34:35.798Z
 Overall : PASS
 
 local-backups
 ----------------------------------------
 Dir              : D:\alpha-tech\server\backups
 Retention days   : 3
-Scanned files    : 30
+Scanned files    : 40
 Delete candidates: 0
 Deleted/Dry-run  : 0
-Remaining        : 30
+Remaining        : 40
 Failed           : 0
 
 offsite-local-mirror

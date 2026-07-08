@@ -1,6 +1,6 @@
 {
   "version": "ALPHATECH-RECOVERY-HEALTH-CHECK-V1",
-  "checkedAt": "2026-07-07T09:34:23.552Z",
+  "checkedAt": "2026-07-08T03:34:23.881Z",
   "overallPass": true,
   "failedRequiredChecks": [],
   "checks": [
@@ -75,7 +75,7 @@
         "platform": "win32",
         "freeSpaceCheck": "not enforced by this version",
         "requiredFreeMb": 512,
-        "freeMb": 88882.05
+        "freeMb": 88242.5
       },
       "error": null
     },
@@ -88,7 +88,7 @@
       "details": {
         "database_name": "postgres",
         "database_user": "postgres",
-        "server_time": "2026-07-07T09:34:23.105Z"
+        "server_time": "2026-07-08T03:34:23.372Z"
       }
     },
     {
@@ -100,7 +100,7 @@
       "details": {
         "database_name": "postgres",
         "database_user": "postgres",
-        "server_time": "2026-07-07T09:34:23.459Z"
+        "server_time": "2026-07-08T03:34:23.833Z"
       }
     }
   ]

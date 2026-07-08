@@ -2,8 +2,8 @@
 AlphaTech Integrity Verification
 ========================================
 Version       : ALPHATECH-RECOVERY-VERIFY-V1
-Checked At    : 2026-07-07T09:35:34.179Z
-Overall       : FAIL
+Checked At    : 2026-07-08T03:35:34.164Z
+Overall       : PASS
 
 Production    : postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20
 Recovery      : postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
@@ -12,9 +12,9 @@ Summary
   totalTablesCompared: 70
   productionTables: 70
   recoveryTables: 70
-  productionRows: 15251
-  recoveryRows: 15250
-  rowCountMismatches: 1
+  productionRows: 15356
+  recoveryRows: 15356
+  rowCountMismatches: 0
   columnMismatches: 0
   duplicatePkFailures: 0
   productionBrokenFkCount: 0
@@ -56,15 +56,14 @@ Position                           PASS rows 8 / 8
 Product                            PASS rows 927 / 927
 ProductImage                       PASS rows 0 / 0
 ProductOnOrder                     PASS rows 0 / 0
-ProductType                        PASS rows 18 / 18
-ProductTypeBrand                   PASS rows 75 / 75
+ProductType                        PASS rows 68 / 68
+ProductTypeBrand                   PASS rows 80 / 80
 Province                           PASS rows 77 / 77
 PurchaseOrder                      PASS rows 0 / 0
 PurchaseOrderItem                  PASS rows 0 / 0
 PurchaseOrderReceipt               PASS rows 0 / 0
 PurchaseOrderReceiptItem           PASS rows 0 / 0
-RefreshToken                       FAIL rows 3476 / 3475
-  - row count mismatch
+RefreshToken                       PASS rows 3526 / 3526
 RefundTransaction                  PASS rows 0 / 0
 RepairJob                          PASS rows 0 / 0
 RepairPartItem                     PASS rows 0 / 0
@@ -96,5 +95,5 @@ V2StockAudit                       PASS rows 0 / 0
 V2StockAuditItem                   PASS rows 0 / 0
 WarrantyClaim                      PASS rows 0 / 0
 ----------------------------------------
-Overall: FAIL
+Overall: PASS
 ========================================

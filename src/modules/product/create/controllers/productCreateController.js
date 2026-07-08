@@ -34,6 +34,7 @@ const sendError = (res, error, fallback = 'PRODUCT_CREATE_RUNTIME_ERROR') => {
 const getDropdowns = async (req, res) => {
   try {
     const result = await productCreateService.getDropdowns({
+      branchId: getBranchId(req),
       productTypeId: req.query?.productTypeId,
       includeInactive: toBool(req.query?.includeInactive),
     })
@@ -47,6 +48,7 @@ const getDropdowns = async (req, res) => {
 const getBrands = async (req, res) => {
   try {
     const result = await productCreateService.getBrands({
+      branchId: getBranchId(req),
       productTypeId: req.query?.productTypeId,
       includeInactive: toBool(req.query?.includeInactive),
     })

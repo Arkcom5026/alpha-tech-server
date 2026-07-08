@@ -1,6 +1,6 @@
 {
   "verifyVersion": "ALPHATECH-RECOVERY-VERIFY-V1",
-  "checkedAt": "2026-07-07T09:35:34.179Z",
+  "checkedAt": "2026-07-08T03:35:34.164Z",
   "schema": "public",
   "options": {
     "includeFingerprint": false,
@@ -82,7 +82,7 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 15251
+    "totalRows": 15356
   },
   "recovery": {
     "connection": {
@@ -160,17 +160,17 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 15250
+    "totalRows": 15356
   },
   "comparison": {
-    "overallPass": false,
+    "overallPass": true,
     "summary": {
       "totalTablesCompared": 70,
       "productionTables": 70,
       "recoveryTables": 70,
-      "productionRows": 15251,
-      "recoveryRows": 15250,
-      "rowCountMismatches": 1,
+      "productionRows": 15356,
+      "recoveryRows": 15356,
+      "rowCountMismatches": 0,
       "columnMismatches": 0,
       "duplicatePkFailures": 0,
       "productionBrokenFkCount": 0,
@@ -1048,8 +1048,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 18,
-          "recovery": 18,
+          "production": 68,
+          "recovery": 68,
           "passed": true
         },
         "columns": {
@@ -1075,8 +1075,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 75,
-          "recovery": 75,
+          "production": 80,
+          "recovery": 80,
           "passed": true
         },
         "columns": {
@@ -1237,9 +1237,9 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 3476,
-          "recovery": 3475,
-          "passed": false
+          "production": 3526,
+          "recovery": 3526,
+          "passed": true
         },
         "columns": {
           "passed": true,
@@ -1257,7 +1257,7 @@
           "passed": true
         },
         "fingerprint": null,
-        "passed": false
+        "passed": true
       },
       {
         "tableName": "RefundTransaction",
