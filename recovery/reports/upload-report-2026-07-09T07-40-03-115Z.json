@@ -1,0 +1,41 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
+  "provider": "s3-compatible",
+  "uploadedAt": "2026-07-09T07:40:01.353Z",
+  "bucket": "saduaksabuy-recovery",
+  "endpoint": "https://8512ed1efcf4b85171877d165f6de85b.r2.cloudflarestorage.com",
+  "region": "auto",
+  "prefix": "alphatech-production",
+  "baseKey": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.manifest.json",
+      "sizeBytes": 167235,
+      "sha256": "8d5c40580bcaa48c006e73e1cb73392919609d0a966d02b47a5ea79ae023986d"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.sql",
+      "sizeBytes": 4812729,
+      "sha256": "f5482fef1001cf11d0d77d808549c1a01546f212a86049d12d441bec193092bd"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "key": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.manifest.json",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.manifest.json",
+      "sizeBytes": 167235,
+      "sha256": "8d5c40580bcaa48c006e73e1cb73392919609d0a966d02b47a5ea79ae023986d",
+      "verified": true
+    },
+    "sql": {
+      "key": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.sql",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T07-39-55-264Z.sql",
+      "sizeBytes": 4812729,
+      "sha256": "f5482fef1001cf11d0d77d808549c1a01546f212a86049d12d441bec193092bd",
+      "verified": true
+    }
+  },
+  "ok": true
+}

@@ -222,3 +222,253 @@
 [2026-07-08T03:34:35.799Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T03-34-35-798Z.json
 [2026-07-08T03:34:35.799Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T03-34-35-798Z.txt
 [2026-07-08T03:34:35.800Z] ✅ Overall: PASS
+[2026-07-08T07:40:03.099Z] ============================================================
+[2026-07-08T07:40:03.106Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T07:40:03.106Z] ============================================================
+[2026-07-08T07:40:03.107Z] Mode: APPLY
+[2026-07-08T07:40:03.115Z] ------------------------------------------------------------
+[2026-07-08T07:40:03.116Z] Target      : local-backups
+[2026-07-08T07:40:03.117Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T07:40:03.117Z] Retention   : 3 day(s)
+[2026-07-08T07:40:03.118Z] Scanned     : 42
+[2026-07-08T07:40:03.119Z] Candidates  : 0
+[2026-07-08T07:40:03.119Z] Deleted     : 0
+[2026-07-08T07:40:03.120Z] Remaining   : 42
+[2026-07-08T07:40:03.121Z] Failed      : 0
+[2026-07-08T07:40:03.121Z] ------------------------------------------------------------
+[2026-07-08T07:40:03.122Z] Target      : offsite-local-mirror
+[2026-07-08T07:40:03.123Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T07:40:03.123Z] Retention   : 7 day(s)
+[2026-07-08T07:40:03.124Z] Scanned     : 12
+[2026-07-08T07:40:03.124Z] Candidates  : 0
+[2026-07-08T07:40:03.125Z] Deleted     : 0
+[2026-07-08T07:40:03.125Z] Remaining   : 12
+[2026-07-08T07:40:03.125Z] Failed      : 0
+[2026-07-08T07:40:03.127Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T07-40-03-126Z.json
+[2026-07-08T07:40:03.127Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T07-40-03-126Z.txt
+[2026-07-08T07:40:03.127Z] ✅ Overall: PASS
+[2026-07-08T09:34:38.419Z] ============================================================
+[2026-07-08T09:34:38.427Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T09:34:38.428Z] ============================================================
+[2026-07-08T09:34:38.429Z] Mode: APPLY
+[2026-07-08T09:34:38.438Z] ------------------------------------------------------------
+[2026-07-08T09:34:38.439Z] Target      : local-backups
+[2026-07-08T09:34:38.440Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T09:34:38.440Z] Retention   : 3 day(s)
+[2026-07-08T09:34:38.441Z] Scanned     : 44
+[2026-07-08T09:34:38.441Z] Candidates  : 0
+[2026-07-08T09:34:38.443Z] Deleted     : 0
+[2026-07-08T09:34:38.444Z] Remaining   : 44
+[2026-07-08T09:34:38.444Z] Failed      : 0
+[2026-07-08T09:34:38.445Z] ------------------------------------------------------------
+[2026-07-08T09:34:38.445Z] Target      : offsite-local-mirror
+[2026-07-08T09:34:38.446Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T09:34:38.447Z] Retention   : 7 day(s)
+[2026-07-08T09:34:38.447Z] Scanned     : 12
+[2026-07-08T09:34:38.448Z] Candidates  : 0
+[2026-07-08T09:34:38.448Z] Deleted     : 0
+[2026-07-08T09:34:38.448Z] Remaining   : 12
+[2026-07-08T09:34:38.449Z] Failed      : 0
+[2026-07-08T09:34:38.452Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T09-34-38-450Z.json
+[2026-07-08T09:34:38.453Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T09-34-38-450Z.txt
+[2026-07-08T09:34:38.454Z] ✅ Overall: PASS
+[2026-07-08T13:40:03.291Z] ============================================================
+[2026-07-08T13:40:03.299Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T13:40:03.299Z] ============================================================
+[2026-07-08T13:40:03.300Z] Mode: APPLY
+[2026-07-08T13:40:03.315Z] ------------------------------------------------------------
+[2026-07-08T13:40:03.316Z] Target      : local-backups
+[2026-07-08T13:40:03.316Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T13:40:03.316Z] Retention   : 3 day(s)
+[2026-07-08T13:40:03.317Z] Scanned     : 46
+[2026-07-08T13:40:03.317Z] Candidates  : 0
+[2026-07-08T13:40:03.317Z] Deleted     : 0
+[2026-07-08T13:40:03.318Z] Remaining   : 46
+[2026-07-08T13:40:03.318Z] Failed      : 0
+[2026-07-08T13:40:03.318Z] ------------------------------------------------------------
+[2026-07-08T13:40:03.319Z] Target      : offsite-local-mirror
+[2026-07-08T13:40:03.319Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T13:40:03.319Z] Retention   : 7 day(s)
+[2026-07-08T13:40:03.319Z] Scanned     : 12
+[2026-07-08T13:40:03.320Z] Candidates  : 0
+[2026-07-08T13:40:03.320Z] Deleted     : 0
+[2026-07-08T13:40:03.320Z] Remaining   : 12
+[2026-07-08T13:40:03.320Z] Failed      : 0
+[2026-07-08T13:40:03.322Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T13-40-03-321Z.json
+[2026-07-08T13:40:03.322Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T13-40-03-321Z.txt
+[2026-07-08T13:40:03.322Z] ✅ Overall: PASS
+[2026-07-08T15:34:35.760Z] ============================================================
+[2026-07-08T15:34:35.767Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T15:34:35.767Z] ============================================================
+[2026-07-08T15:34:35.767Z] Mode: APPLY
+[2026-07-08T15:34:35.775Z] ------------------------------------------------------------
+[2026-07-08T15:34:35.775Z] Target      : local-backups
+[2026-07-08T15:34:35.776Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T15:34:35.776Z] Retention   : 3 day(s)
+[2026-07-08T15:34:35.776Z] Scanned     : 48
+[2026-07-08T15:34:35.776Z] Candidates  : 0
+[2026-07-08T15:34:35.777Z] Deleted     : 0
+[2026-07-08T15:34:35.777Z] Remaining   : 48
+[2026-07-08T15:34:35.778Z] Failed      : 0
+[2026-07-08T15:34:35.778Z] ------------------------------------------------------------
+[2026-07-08T15:34:35.778Z] Target      : offsite-local-mirror
+[2026-07-08T15:34:35.778Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T15:34:35.779Z] Retention   : 7 day(s)
+[2026-07-08T15:34:35.779Z] Scanned     : 12
+[2026-07-08T15:34:35.779Z] Candidates  : 0
+[2026-07-08T15:34:35.779Z] Deleted     : 0
+[2026-07-08T15:34:35.779Z] Remaining   : 12
+[2026-07-08T15:34:35.780Z] Failed      : 0
+[2026-07-08T15:34:35.789Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T15-34-35-780Z.json
+[2026-07-08T15:34:35.789Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T15-34-35-780Z.txt
+[2026-07-08T15:34:35.789Z] ✅ Overall: PASS
+[2026-07-08T19:40:01.146Z] ============================================================
+[2026-07-08T19:40:01.153Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T19:40:01.154Z] ============================================================
+[2026-07-08T19:40:01.154Z] Mode: APPLY
+[2026-07-08T19:40:01.163Z] ------------------------------------------------------------
+[2026-07-08T19:40:01.163Z] Target      : local-backups
+[2026-07-08T19:40:01.163Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T19:40:01.163Z] Retention   : 3 day(s)
+[2026-07-08T19:40:01.164Z] Scanned     : 50
+[2026-07-08T19:40:01.164Z] Candidates  : 0
+[2026-07-08T19:40:01.164Z] Deleted     : 0
+[2026-07-08T19:40:01.164Z] Remaining   : 50
+[2026-07-08T19:40:01.165Z] Failed      : 0
+[2026-07-08T19:40:01.165Z] ------------------------------------------------------------
+[2026-07-08T19:40:01.165Z] Target      : offsite-local-mirror
+[2026-07-08T19:40:01.165Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T19:40:01.165Z] Retention   : 7 day(s)
+[2026-07-08T19:40:01.166Z] Scanned     : 12
+[2026-07-08T19:40:01.166Z] Candidates  : 0
+[2026-07-08T19:40:01.166Z] Deleted     : 0
+[2026-07-08T19:40:01.166Z] Remaining   : 12
+[2026-07-08T19:40:01.166Z] Failed      : 0
+[2026-07-08T19:40:01.168Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T19-40-01-167Z.json
+[2026-07-08T19:40:01.169Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T19-40-01-167Z.txt
+[2026-07-08T19:40:01.169Z] ✅ Overall: PASS
+[2026-07-08T21:34:35.209Z] ============================================================
+[2026-07-08T21:34:35.217Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T21:34:35.217Z] ============================================================
+[2026-07-08T21:34:35.217Z] Mode: APPLY
+[2026-07-08T21:34:35.225Z] ------------------------------------------------------------
+[2026-07-08T21:34:35.226Z] Target      : local-backups
+[2026-07-08T21:34:35.226Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T21:34:35.226Z] Retention   : 3 day(s)
+[2026-07-08T21:34:35.227Z] Scanned     : 52
+[2026-07-08T21:34:35.227Z] Candidates  : 0
+[2026-07-08T21:34:35.227Z] Deleted     : 0
+[2026-07-08T21:34:35.228Z] Remaining   : 52
+[2026-07-08T21:34:35.228Z] Failed      : 0
+[2026-07-08T21:34:35.228Z] ------------------------------------------------------------
+[2026-07-08T21:34:35.229Z] Target      : offsite-local-mirror
+[2026-07-08T21:34:35.229Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T21:34:35.229Z] Retention   : 7 day(s)
+[2026-07-08T21:34:35.229Z] Scanned     : 12
+[2026-07-08T21:34:35.230Z] Candidates  : 0
+[2026-07-08T21:34:35.230Z] Deleted     : 0
+[2026-07-08T21:34:35.230Z] Remaining   : 12
+[2026-07-08T21:34:35.231Z] Failed      : 0
+[2026-07-08T21:34:35.232Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T21-34-35-231Z.json
+[2026-07-08T21:34:35.233Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T21-34-35-231Z.txt
+[2026-07-08T21:34:35.233Z] ✅ Overall: PASS
+[2026-07-09T03:34:35.704Z] ============================================================
+[2026-07-09T03:34:35.712Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-09T03:34:35.713Z] ============================================================
+[2026-07-09T03:34:35.713Z] Mode: APPLY
+[2026-07-09T03:34:35.722Z] ------------------------------------------------------------
+[2026-07-09T03:34:35.723Z] Target      : local-backups
+[2026-07-09T03:34:35.723Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-09T03:34:35.723Z] Retention   : 3 day(s)
+[2026-07-09T03:34:35.723Z] Scanned     : 54
+[2026-07-09T03:34:35.724Z] Candidates  : 0
+[2026-07-09T03:34:35.724Z] Deleted     : 0
+[2026-07-09T03:34:35.725Z] Remaining   : 54
+[2026-07-09T03:34:35.725Z] Failed      : 0
+[2026-07-09T03:34:35.725Z] ------------------------------------------------------------
+[2026-07-09T03:34:35.725Z] Target      : offsite-local-mirror
+[2026-07-09T03:34:35.726Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-09T03:34:35.726Z] Retention   : 7 day(s)
+[2026-07-09T03:34:35.726Z] Scanned     : 12
+[2026-07-09T03:34:35.727Z] Candidates  : 0
+[2026-07-09T03:34:35.727Z] Deleted     : 0
+[2026-07-09T03:34:35.728Z] Remaining   : 12
+[2026-07-09T03:34:35.728Z] Failed      : 0
+[2026-07-09T03:34:35.731Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T03-34-35-729Z.json
+[2026-07-09T03:34:35.732Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T03-34-35-729Z.txt
+[2026-07-09T03:34:35.732Z] ✅ Overall: PASS
+[2026-07-09T07:40:03.693Z] ============================================================
+[2026-07-09T07:40:03.700Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-09T07:40:03.700Z] ============================================================
+[2026-07-09T07:40:03.701Z] Mode: APPLY
+[2026-07-09T07:40:03.710Z] ------------------------------------------------------------
+[2026-07-09T07:40:03.710Z] Target      : local-backups
+[2026-07-09T07:40:03.711Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-09T07:40:03.711Z] Retention   : 3 day(s)
+[2026-07-09T07:40:03.712Z] Scanned     : 56
+[2026-07-09T07:40:03.712Z] Candidates  : 0
+[2026-07-09T07:40:03.712Z] Deleted     : 0
+[2026-07-09T07:40:03.713Z] Remaining   : 56
+[2026-07-09T07:40:03.713Z] Failed      : 0
+[2026-07-09T07:40:03.714Z] ------------------------------------------------------------
+[2026-07-09T07:40:03.714Z] Target      : offsite-local-mirror
+[2026-07-09T07:40:03.714Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-09T07:40:03.714Z] Retention   : 7 day(s)
+[2026-07-09T07:40:03.715Z] Scanned     : 12
+[2026-07-09T07:40:03.715Z] Candidates  : 0
+[2026-07-09T07:40:03.716Z] Deleted     : 0
+[2026-07-09T07:40:03.716Z] Remaining   : 12
+[2026-07-09T07:40:03.716Z] Failed      : 0
+[2026-07-09T07:40:03.718Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T07-40-03-717Z.json
+[2026-07-09T07:40:03.719Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T07-40-03-717Z.txt
+[2026-07-09T07:40:03.719Z] ✅ Overall: PASS
+[2026-07-09T09:34:36.859Z] ============================================================
+[2026-07-09T09:34:36.867Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-09T09:34:36.867Z] ============================================================
+[2026-07-09T09:34:36.868Z] Mode: APPLY
+[2026-07-09T09:34:36.877Z] ------------------------------------------------------------
+[2026-07-09T09:34:36.878Z] Target      : local-backups
+[2026-07-09T09:34:36.878Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-09T09:34:36.879Z] Retention   : 3 day(s)
+[2026-07-09T09:34:36.879Z] Scanned     : 58
+[2026-07-09T09:34:36.879Z] Candidates  : 0
+[2026-07-09T09:34:36.880Z] Deleted     : 0
+[2026-07-09T09:34:36.880Z] Remaining   : 58
+[2026-07-09T09:34:36.880Z] Failed      : 0
+[2026-07-09T09:34:36.881Z] ------------------------------------------------------------
+[2026-07-09T09:34:36.881Z] Target      : offsite-local-mirror
+[2026-07-09T09:34:36.881Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-09T09:34:36.881Z] Retention   : 7 day(s)
+[2026-07-09T09:34:36.882Z] Scanned     : 12
+[2026-07-09T09:34:36.882Z] Candidates  : 0
+[2026-07-09T09:34:36.882Z] Deleted     : 0
+[2026-07-09T09:34:36.882Z] Remaining   : 12
+[2026-07-09T09:34:36.883Z] Failed      : 0
+[2026-07-09T09:34:36.884Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T09-34-36-883Z.json
+[2026-07-09T09:34:36.884Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T09-34-36-883Z.txt
+[2026-07-09T09:34:36.884Z] ✅ Overall: PASS
+[2026-07-09T13:40:03.526Z] ============================================================
+[2026-07-09T13:40:03.533Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-09T13:40:03.533Z] ============================================================
+[2026-07-09T13:40:03.534Z] Mode: APPLY
+[2026-07-09T13:40:03.544Z] ------------------------------------------------------------
+[2026-07-09T13:40:03.544Z] Target      : local-backups
+[2026-07-09T13:40:03.544Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-09T13:40:03.545Z] Retention   : 3 day(s)
+[2026-07-09T13:40:03.545Z] Scanned     : 60
+[2026-07-09T13:40:03.545Z] Candidates  : 0
+[2026-07-09T13:40:03.545Z] Deleted     : 0
+[2026-07-09T13:40:03.546Z] Remaining   : 60
+[2026-07-09T13:40:03.546Z] Failed      : 0
+[2026-07-09T13:40:03.546Z] ------------------------------------------------------------
+[2026-07-09T13:40:03.546Z] Target      : offsite-local-mirror
+[2026-07-09T13:40:03.546Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-09T13:40:03.547Z] Retention   : 7 day(s)
+[2026-07-09T13:40:03.547Z] Scanned     : 12
+[2026-07-09T13:40:03.547Z] Candidates  : 0
+[2026-07-09T13:40:03.547Z] Deleted     : 0
+[2026-07-09T13:40:03.548Z] Remaining   : 12
+[2026-07-09T13:40:03.548Z] Failed      : 0
+[2026-07-09T13:40:03.550Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T13-40-03-548Z.json
+[2026-07-09T13:40:03.550Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-09T13-40-03-548Z.txt
+[2026-07-09T13:40:03.550Z] ✅ Overall: PASS
