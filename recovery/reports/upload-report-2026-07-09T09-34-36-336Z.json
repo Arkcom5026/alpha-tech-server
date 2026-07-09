@@ -1,0 +1,41 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
+  "provider": "s3-compatible",
+  "uploadedAt": "2026-07-09T09:34:34.331Z",
+  "bucket": "saduaksabuy-recovery",
+  "endpoint": "https://8512ed1efcf4b85171877d165f6de85b.r2.cloudflarestorage.com",
+  "region": "auto",
+  "prefix": "alphatech-production",
+  "baseKey": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.manifest.json",
+      "sizeBytes": 167235,
+      "sha256": "5d413c8b4603df8899c3e3bc0c638d222a7529c84ba5edf2d44b47818c9c09d6"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.sql",
+      "sizeBytes": 4837562,
+      "sha256": "5c150e6b71e46be1c6fc75556188dc8ab20d01b498e81ec18748c2131b838131"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "key": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.manifest.json",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.manifest.json",
+      "sizeBytes": 167235,
+      "sha256": "5d413c8b4603df8899c3e3bc0c638d222a7529c84ba5edf2d44b47818c9c09d6",
+      "verified": true
+    },
+    "sql": {
+      "key": "alphatech-production/2026-07-09/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.sql",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T09-34-28-014Z.sql",
+      "sizeBytes": 4837562,
+      "sha256": "5c150e6b71e46be1c6fc75556188dc8ab20d01b498e81ec18748c2131b838131",
+      "verified": true
+    }
+  },
+  "ok": true
+}

@@ -1,0 +1,208 @@
+[2026-07-08T13:39:48.892Z] ============================================================
+[2026-07-08T13:39:48.899Z] 🧭 AlphaTech Recovery Retention Workflow ALPHATECH-RECOVERY-JOB-RUNNER-V7-R2-RETENTION
+[2026-07-08T13:39:48.899Z] ============================================================
+[2026-07-08T13:39:48.900Z] Mode: backup-workflow
+[2026-07-08T13:39:48.901Z] ▶️  Run: node recovery/health/healthCheck.js
+[2026-07-08T13:39:49.096Z] node: [2026-07-08T13:39:49.094Z] ============================================================
+[2026-07-08T13:39:49.098Z] node: [2026-07-08T13:39:49.098Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-08T13:39:49.098Z] node: [2026-07-08T13:39:49.098Z] ============================================================
+[2026-07-08T13:39:50.172Z] node: [2026-07-08T13:39:50.172Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-08T13-39-50-170Z.json
+[2026-07-08T13:39:50.173Z] node: [2026-07-08T13:39:50.173Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-08T13-39-50-170Z.txt
+[2026-07-08T13:39:50.173Z] node: [2026-07-08T13:39:50.173Z] ✅ Overall: PASS
+[2026-07-08T13:39:50.186Z] ▶️  Run: node qb.js
+[2026-07-08T13:39:50.640Z] node: 🔌 Connected to PostgreSQL successfully.
+[2026-07-08T13:39:50.650Z] node: ⏳ Starting P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore...
+[2026-07-08T13:39:54.462Z] node: 📦 Exporting table: Bank
+[2026-07-08T13:39:54.500Z] node: 📦 Exporting table: Brand
+[2026-07-08T13:39:54.542Z] node: 📦 Exporting table: Category
+[2026-07-08T13:39:54.578Z] node: 📦 Exporting table: GlobalProductType
+[2026-07-08T13:39:54.615Z] node: 📦 Exporting table: Position
+[2026-07-08T13:39:54.651Z] node: 📦 Exporting table: Province
+[2026-07-08T13:39:54.688Z] node: 📦 Exporting table: District
+[2026-07-08T13:39:54.776Z] node: 📦 Exporting table: Subdistrict
+[2026-07-08T13:39:54.957Z] node: 📦 Exporting table: Branch
+[2026-07-08T13:39:54.994Z] node: 📦 Exporting table: BarcodeCounter
+[2026-07-08T13:39:55.030Z] node: 📦 Exporting table: PaymentCodeCounter
+[2026-07-08T13:39:55.066Z] node: 📦 Exporting table: ProductType
+[2026-07-08T13:39:55.105Z] node: 📦 Exporting table: ProductTypeBrand
+[2026-07-08T13:39:55.143Z] node: 📦 Exporting table: Supplier
+[2026-07-08T13:39:55.179Z] node: 📦 Exporting table: Unit
+[2026-07-08T13:39:55.216Z] node: 📦 Exporting table: Product
+[2026-07-08T13:39:55.295Z] node: 📦 Exporting table: BranchPrice
+[2026-07-08T13:39:55.357Z] node: 📦 Exporting table: ProductImage
+[2026-07-08T13:39:55.392Z] node: 📦 Exporting table: StockBalance
+[2026-07-08T13:39:55.431Z] node: 📦 Exporting table: User
+[2026-07-08T13:39:55.472Z] node: 📦 Exporting table: CustomerProfile
+[2026-07-08T13:39:55.516Z] node: 📦 Exporting table: Cart
+[2026-07-08T13:39:55.552Z] node: 📦 Exporting table: CartItem
+[2026-07-08T13:39:55.587Z] node: 📦 Exporting table: EmployeeProfile
+[2026-07-08T13:39:55.623Z] node: 📦 Exporting table: CombinedBillingDocument
+[2026-07-08T13:39:55.659Z] node: 📦 Exporting table: CombinedSaleDocument
+[2026-07-08T13:39:55.695Z] node: 📦 Exporting table: CustomerDeposit
+[2026-07-08T13:39:55.735Z] node: 📦 Exporting table: CustomerReceipts
+[2026-07-08T13:39:55.793Z] node: 📦 Exporting table: InputTaxFilingBatch
+[2026-07-08T13:39:55.828Z] node: 📦 Exporting table: Order
+[2026-07-08T13:39:55.868Z] node: 📦 Exporting table: OrderOnline
+[2026-07-08T13:39:55.916Z] node: 📦 Exporting table: OrderOnlineItem
+[2026-07-08T13:39:55.947Z] node: 📦 Exporting table: PasswordResetToken
+[2026-07-08T13:39:55.982Z] node: 📦 Exporting table: ProductOnOrder
+[2026-07-08T13:39:56.018Z] node: 📦 Exporting table: PurchaseOrder
+[2026-07-08T13:39:56.054Z] node: 📦 Exporting table: PurchaseOrderItem
+[2026-07-08T13:39:56.090Z] node: 📦 Exporting table: PurchaseOrderReceipt
+[2026-07-08T13:39:56.126Z] node: 📦 Exporting table: InputTaxFilingItem
+[2026-07-08T13:39:56.162Z] node: 📦 Exporting table: PurchaseOrderReceiptItem
+[2026-07-08T13:39:56.198Z] node: 📦 Exporting table: RefreshToken
+[2026-07-08T13:39:56.383Z] node: 📦 Exporting table: Sale
+[2026-07-08T13:39:56.420Z] node: 📦 Exporting table: CustomerReceiptAllocations
+[2026-07-08T13:39:56.456Z] node: 📦 Exporting table: Payment
+[2026-07-08T13:39:56.492Z] node: 📦 Exporting table: DepositUsage
+[2026-07-08T13:39:56.527Z] node: 📦 Exporting table: PaymentItem
+[2026-07-08T13:39:56.562Z] node: 📦 Exporting table: SaleReturn
+[2026-07-08T13:39:56.598Z] node: 📦 Exporting table: RefundTransaction
+[2026-07-08T13:39:56.634Z] node: 📦 Exporting table: SalesTaxFilingBatch
+[2026-07-08T13:39:56.670Z] node: 📦 Exporting table: SalesTaxFilingItem
+[2026-07-08T13:39:56.707Z] node: 📦 Exporting table: ServiceOrder
+[2026-07-08T13:39:56.742Z] node: 📦 Exporting table: ServiceItem
+[2026-07-08T13:39:56.778Z] node: 📦 Exporting table: SimpleLot
+[2026-07-08T13:39:56.813Z] node: 📦 Exporting table: SaleItemSimple
+[2026-07-08T13:39:56.849Z] node: 📦 Exporting table: SaleReturnItemSimple
+[2026-07-08T13:39:56.885Z] node: 📦 Exporting table: StockAuditSession
+[2026-07-08T13:39:56.921Z] node: 📦 Exporting table: StockItem
+[2026-07-08T13:39:56.982Z] node: 📦 Exporting table: BarcodeReceiptItem
+[2026-07-08T13:39:57.019Z] node: 📦 Exporting table: RepairJob
+[2026-07-08T13:39:57.054Z] node: 📦 Exporting table: RepairPartItem
+[2026-07-08T13:39:57.090Z] node: 📦 Exporting table: SaleItem
+[2026-07-08T13:39:57.127Z] node: 📦 Exporting table: SaleReturnItem
+[2026-07-08T13:39:57.162Z] node: 📦 Exporting table: StockAuditScanLog
+[2026-07-08T13:39:57.198Z] node: 📦 Exporting table: StockAuditSnapshotItem
+[2026-07-08T13:39:57.233Z] node: 📦 Exporting table: StockMovement
+[2026-07-08T13:39:57.271Z] node: 📦 Exporting table: SupplierPayment
+[2026-07-08T13:39:57.308Z] node: 📦 Exporting table: SupplierPaymentReceipt
+[2026-07-08T13:39:57.344Z] node: 📦 Exporting table: V2CustomerDeposit
+[2026-07-08T13:39:57.379Z] node: 📦 Exporting table: V2StockAudit
+[2026-07-08T13:39:57.414Z] node: 📦 Exporting table: V2StockAuditItem
+[2026-07-08T13:39:57.450Z] node: 📦 Exporting table: WarrantyClaim
+[2026-07-08T13:40:00.014Z] node: 🎉 P1 Hardened Backup v6 Type-aware + generic self-reference FK safe restore completed successfully.
+[2026-07-08T13:40:00.014Z] node: 💾 Backup file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-08_2026-07-08T13-39-54-372Z.sql
+[2026-07-08T13:40:00.015Z] node: 🧾 Manifest file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-08_2026-07-08T13-39-54-372Z.manifest.json
+[2026-07-08T13:40:00.016Z] node: 📊 Tables exported: 70
+[2026-07-08T13:40:00.016Z] node: 📦 Rows exported: 15403
+[2026-07-08T13:40:00.016Z] node: 🔢 Sequences prepared: 67
+[2026-07-08T13:40:00.017Z] node: 🔐 SHA256: f10d9013bc8aaaa1a4d01b2cac34ce4f172180d96d9abbdc209322ab06e7d529
+[2026-07-08T13:40:00.017Z] node: 📐 File size: 4.54 MB
+[2026-07-08T13:40:00.017Z] node: ⏱️ Duration: 7.17 seconds
+[2026-07-08T13:40:00.018Z] node: ✅ Verification: PASS (70 tables checked)
+[2026-07-08T13:40:00.076Z] ▶️  Run: node recovery/upload/uploadBackup.js --manifest D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-08_2026-07-08T13-39-54-372Z.manifest.json
+[2026-07-08T13:40:00.161Z] node: [2026-07-08T13:40:00.156Z] ============================================================
+[2026-07-08T13:40:00.163Z] node: [2026-07-08T13:40:00.163Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-08T13:40:00.163Z] node: [2026-07-08T13:40:00.163Z] ============================================================
+[2026-07-08T13:40:00.397Z] node stderr: (node:17636) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+[2026-07-08T13:40:00.397Z] node stderr: versions published after the first week of January 2027
+[2026-07-08T13:40:00.398Z] node stderr: will require node >=22. You are running node v20.19.0.
+[2026-07-08T13:40:00.398Z] node stderr: To continue receiving updates to AWS services, bug fixes,
+[2026-07-08T13:40:00.399Z] node stderr: and security updates please upgrade to node >=22.
+[2026-07-08T13:40:00.399Z] node stderr: More information can be found at: https://a.co/c895JFp
+[2026-07-08T13:40:00.399Z] node stderr: (Use `node --trace-warnings ...` to show where the warning was created)
+[2026-07-08T13:40:02.186Z] node: [2026-07-08T13:40:02.186Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-08T13-40-02-184Z.json
+[2026-07-08T13:40:02.186Z] node: [2026-07-08T13:40:02.186Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-08T13-40-02-184Z.txt
+[2026-07-08T13:40:02.187Z] node: [2026-07-08T13:40:02.186Z] Overall: PASS
+[2026-07-08T13:40:03.204Z] ------------------------------------------------------------
+[2026-07-08T13:40:03.205Z] Target      : cloudflare-r2
+[2026-07-08T13:40:03.206Z] Bucket      : saduaksabuy-recovery
+[2026-07-08T13:40:03.206Z] Prefix      : alphatech-production/
+[2026-07-08T13:40:03.206Z] Retention   : 7 day(s)
+[2026-07-08T13:40:03.207Z] Mode        : APPLY
+[2026-07-08T13:40:03.207Z] Scanned     : 30
+[2026-07-08T13:40:03.208Z] Candidates  : 0
+[2026-07-08T13:40:03.208Z] Deleted     : 0
+[2026-07-08T13:40:03.209Z] Remaining   : 30
+[2026-07-08T13:40:03.209Z] Failed      : 0
+[2026-07-08T13:40:03.210Z] ▶️  Run: node recovery/retention/retentionPolicy.js --apply
+[2026-07-08T13:40:03.297Z] node: [2026-07-08T13:40:03.291Z] ============================================================
+[2026-07-08T13:40:03.299Z] node: [2026-07-08T13:40:03.299Z] 🧹 AlphaTech Recovery Retention ALPHATECH-RECOVERY-RETENTION-V1
+[2026-07-08T13:40:03.300Z] node: [2026-07-08T13:40:03.299Z] ============================================================
+[2026-07-08T13:40:03.301Z] node: [2026-07-08T13:40:03.300Z] Mode: APPLY
+[2026-07-08T13:40:03.315Z] node: [2026-07-08T13:40:03.315Z] ------------------------------------------------------------
+[2026-07-08T13:40:03.317Z] node: [2026-07-08T13:40:03.316Z] Target      : local-backups
+[2026-07-08T13:40:03.317Z] node: [2026-07-08T13:40:03.316Z] Directory   : D:\alpha-tech\server\backups
+[2026-07-08T13:40:03.317Z] node: [2026-07-08T13:40:03.316Z] Retention   : 3 day(s)
+[2026-07-08T13:40:03.318Z] node: [2026-07-08T13:40:03.317Z] Scanned     : 46
+[2026-07-08T13:40:03.318Z] node: [2026-07-08T13:40:03.317Z] Candidates  : 0
+[2026-07-08T13:40:03.319Z] node: [2026-07-08T13:40:03.317Z] Deleted     : 0
+[2026-07-08T13:40:03.319Z] node: [2026-07-08T13:40:03.318Z] Remaining   : 46
+[2026-07-08T13:40:03.319Z] node: [2026-07-08T13:40:03.318Z] Failed      : 0
+[2026-07-08T13:40:03.320Z] node: [2026-07-08T13:40:03.318Z] ------------------------------------------------------------
+[2026-07-08T13:40:03.320Z] node: [2026-07-08T13:40:03.319Z] Target      : offsite-local-mirror
+[2026-07-08T13:40:03.320Z] node: [2026-07-08T13:40:03.319Z] Directory   : D:\alpha-tech\server\recovery\offsite
+[2026-07-08T13:40:03.320Z] node: [2026-07-08T13:40:03.319Z] Retention   : 7 day(s)
+[2026-07-08T13:40:03.321Z] node: [2026-07-08T13:40:03.319Z] Scanned     : 12
+[2026-07-08T13:40:03.321Z] node: [2026-07-08T13:40:03.320Z] Candidates  : 0
+[2026-07-08T13:40:03.321Z] node: [2026-07-08T13:40:03.320Z] Deleted     : 0
+[2026-07-08T13:40:03.322Z] node: [2026-07-08T13:40:03.320Z] Remaining   : 12
+[2026-07-08T13:40:03.322Z] node: [2026-07-08T13:40:03.320Z] Failed      : 0
+[2026-07-08T13:40:03.322Z] node: [2026-07-08T13:40:03.322Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T13-40-03-321Z.json
+[2026-07-08T13:40:03.322Z] node: [2026-07-08T13:40:03.322Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\retention-report-2026-07-08T13-40-03-321Z.txt
+[2026-07-08T13:40:03.323Z] node: [2026-07-08T13:40:03.322Z] ✅ Overall: PASS
+[2026-07-08T13:40:03.333Z] ▶️  Run: node qbrs.js --manifest D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-08_2026-07-08T13-39-54-372Z.manifest.json --init --yes --reset-schema
+[2026-07-08T13:40:03.485Z] node: [2026-07-08T13:40:03.483Z] ============================================================
+[2026-07-08T13:40:03.487Z] node: [2026-07-08T13:40:03.486Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-08T13:40:03.487Z] node: [2026-07-08T13:40:03.487Z] ============================================================
+[2026-07-08T13:40:03.510Z] node: [2026-07-08T13:40:03.510Z] ✅ Manifest loaded.
+[2026-07-08T13:40:03.511Z] node: [2026-07-08T13:40:03.511Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-08_2026-07-08T13-39-54-372Z.sql
+[2026-07-08T13:40:03.512Z] node: [2026-07-08T13:40:03.512Z] ✅ SHA256 verified: f10d9013bc8aaaa1a4d01b2cac34ce4f172180d96d9abbdc209322ab06e7d529
+[2026-07-08T13:40:03.513Z] node: [2026-07-08T13:40:03.513Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-08T13:40:03.514Z] node: [2026-07-08T13:40:03.513Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-08T13:40:03.514Z] node: [2026-07-08T13:40:03.514Z] 🎯 Port: 5432
+[2026-07-08T13:40:03.514Z] node: [2026-07-08T13:40:03.514Z] 🎯 Database: postgres
+[2026-07-08T13:40:03.515Z] node: [2026-07-08T13:40:03.514Z] 🎯 Schema: public
+[2026-07-08T13:40:03.894Z] node: [2026-07-08T13:40:03.894Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-08T13:40:07.274Z] node: [2026-07-08T13:40:07.274Z] 📊 Existing tables: 70
+[2026-07-08T13:40:07.274Z] node: [2026-07-08T13:40:07.274Z] 📦 Existing rows: 15396
+[2026-07-08T13:40:07.275Z] node: [2026-07-08T13:40:07.274Z] 🔎 Product: 929
+[2026-07-08T13:40:07.276Z] node: [2026-07-08T13:40:07.275Z] 🔎 BranchPrice: 927
+[2026-07-08T13:40:07.276Z] node: [2026-07-08T13:40:07.275Z] 🔎 StockItem: 530
+[2026-07-08T13:40:07.276Z] node: [2026-07-08T13:40:07.275Z] 🔎 Sale: 1
+[2026-07-08T13:40:07.277Z] node: [2026-07-08T13:40:07.275Z] 🔎 SaleItem: 1
+[2026-07-08T13:40:07.277Z] node: [2026-07-08T13:40:07.275Z] 🔎 SaleItemSimple: 0
+[2026-07-08T13:40:07.278Z] node: [2026-07-08T13:40:07.276Z] 🔎 Payment: 1
+[2026-07-08T13:40:07.278Z] node: [2026-07-08T13:40:07.276Z] 🔎 PaymentItem: 1
+[2026-07-08T13:40:07.525Z] node: [2026-07-08T13:40:07.524Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-08T13:40:07.525Z] node: [2026-07-08T13:40:07.525Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-08T13:40:08.055Z] node: [2026-07-08T13:40:08.055Z] ✅ Schema "public" reset completed.
+[2026-07-08T13:40:08.089Z] node: [2026-07-08T13:40:08.089Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-08T13:40:08.090Z] node: [2026-07-08T13:40:08.090Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-08T13:40:12.053Z] node: [2026-07-08T13:40:12.053Z] npx stderr: Environment variables loaded from .env
+[2026-07-08T13:40:12.055Z] node: [2026-07-08T13:40:12.055Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-08T13:40:12.066Z] node: [2026-07-08T13:40:12.066Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-08T13:40:28.885Z] node: [2026-07-08T13:40:28.885Z] npx: Your database is now in sync with your Prisma schema. Done in 16.22s
+[2026-07-08T13:40:28.943Z] node: [2026-07-08T13:40:28.887Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-08T13:40:30.374Z] node: [2026-07-08T13:40:30.374Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-08T13:40:31.705Z] node: [2026-07-08T13:40:31.705Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.33s
+[2026-07-08T13:40:31.761Z] node: [2026-07-08T13:40:31.761Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-08T13:40:35.521Z] node: [2026-07-08T13:40:35.521Z] 📊 Existing tables: 70
+[2026-07-08T13:40:35.523Z] node: [2026-07-08T13:40:35.522Z] 📦 Existing rows: 0
+[2026-07-08T13:40:35.523Z] node: [2026-07-08T13:40:35.522Z] 🔎 Product: 0
+[2026-07-08T13:40:35.524Z] node: [2026-07-08T13:40:35.522Z] 🔎 BranchPrice: 0
+[2026-07-08T13:40:35.525Z] node: [2026-07-08T13:40:35.522Z] 🔎 StockItem: 0
+[2026-07-08T13:40:35.527Z] node: [2026-07-08T13:40:35.523Z] 🔎 Sale: 0
+[2026-07-08T13:40:35.528Z] node: [2026-07-08T13:40:35.523Z] 🔎 SaleItem: 0
+[2026-07-08T13:40:35.529Z] node: [2026-07-08T13:40:35.523Z] 🔎 SaleItemSimple: 0
+[2026-07-08T13:40:35.529Z] node: [2026-07-08T13:40:35.523Z] 🔎 Payment: 0
+[2026-07-08T13:40:35.530Z] node: [2026-07-08T13:40:35.524Z] 🔎 PaymentItem: 0
+[2026-07-08T13:40:35.710Z] node: [2026-07-08T13:40:35.710Z] 📖 SQL loaded into memory (4.54 MB).
+[2026-07-08T13:40:35.712Z] node: [2026-07-08T13:40:35.711Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-08T13:40:38.185Z] node: [2026-07-08T13:40:38.185Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-08T13:40:40.950Z] node: [2026-07-08T13:40:40.950Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-08T13:40:40.952Z] node: [2026-07-08T13:40:40.950Z] 🎉 Restore completed successfully in 37.47 seconds.
+[2026-07-08T13:40:40.965Z] ▶️  Run: node recovery/verify/qbv.js
+[2026-07-08T13:40:41.139Z] node: [2026-07-08T13:40:41.137Z] ============================================================
+[2026-07-08T13:40:41.142Z] node: [2026-07-08T13:40:41.141Z] 🔎 AlphaTech Integrity Verification ALPHATECH-RECOVERY-VERIFY-V1
+[2026-07-08T13:40:41.142Z] node: [2026-07-08T13:40:41.141Z] ============================================================
+[2026-07-08T13:40:41.143Z] node: [2026-07-08T13:40:41.142Z] Collecting Production snapshot...
+[2026-07-08T13:40:52.535Z] node: [2026-07-08T13:40:52.534Z] Collecting Recovery snapshot...
+[2026-07-08T13:41:04.035Z] node: [2026-07-08T13:41:04.034Z] Comparing snapshots...
+[2026-07-08T13:41:04.049Z] node: [2026-07-08T13:41:04.048Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-08T13-41-04-038Z.json
+[2026-07-08T13:41:04.050Z] node: [2026-07-08T13:41:04.049Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-08T13-41-04-038Z.txt
+[2026-07-08T13:41:04.050Z] node: [2026-07-08T13:41:04.049Z] ✅ Overall: PASS
+[2026-07-08T13:41:04.071Z] 🧾 Job manifest: D:\alpha-tech\server\recovery\jobs\job-2026-07-08T13-39-48-889Z.json
+[2026-07-08T13:41:04.072Z] ✅ Job result: PASS exitCode=0

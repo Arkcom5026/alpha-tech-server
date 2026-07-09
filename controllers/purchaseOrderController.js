@@ -1,15 +1,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 // controllers/purchaseOrderController.js
 const { Prisma } = require('@prisma/client');
 const { prisma } = require('../lib/prisma');
@@ -132,11 +123,20 @@ const getPurchaseOrderById = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                category: { select: { name: true } },
-                productType: { select: { name: true } },
+                productType: {
+                  select: {
+                    name: true,
+                    globalProductType: {
+                      select: {
+                        category: {
+                          select: { name: true },
+                        },
+                      },
+                    },
+                  },
+                },
                 brand: { select: { name: true } },
-                productProfile: { select: { name: true } },
-                template: {
+                templateProduct: {
                   select: {
                     name: true,
                     unit: { select: { name: true } },
@@ -171,12 +171,12 @@ const getPurchaseOrderById = async (req, res) => {
           receivedQuantity,
 
           // flatten names for table
-          categoryName: p.category?.name ?? null,
+          categoryName: p.productType?.globalProductType?.category?.name ?? null,
           productTypeName: p.productType?.name ?? null,
           brandName: p.brand?.name ?? null,
-          productProfileName: p.productProfile?.name ?? null,
-          productTemplateName: p.template?.name ?? null,
-          unitName: p.unit?.name ?? p.template?.unit?.name ?? null,
+          productProfileName: null,
+          productTemplateName: p.templateProduct?.name ?? null,
+          unitName: p.unit?.name ?? p.templateProduct?.unit?.name ?? null,
 
           // keep legacy fields
           productModel: null,
@@ -509,38 +509,6 @@ module.exports = {
   getPurchaseOrdersBySupplier,
   createPurchaseOrderWithAdvance,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
