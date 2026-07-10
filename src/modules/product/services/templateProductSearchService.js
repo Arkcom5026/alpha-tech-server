@@ -53,7 +53,7 @@ class TemplateProductSearchService {
       templateBranchId: templateBranch.id,
       templateBranchCode: templateBranch.branchCode,
 
-      categoryId: category?.id ?? product.productType?.globalProductType?.categoryId ?? product.categoryId ?? null,
+      categoryId: category?.id ?? product.productType?.globalProductType?.categoryId ?? null,
       categoryName: category?.name ?? null,
       category: category?.name ?? null,
 

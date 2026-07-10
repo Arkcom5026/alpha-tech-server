@@ -47,7 +47,7 @@ class ProductTemplateService {
 
   mapTemplate(product, templateBranch = null) {
     if (!product) return null;
-    const category = product.category || product.productType?.globalProductType?.category || null;
+    const category = product.productType?.globalProductType?.category || null;
     const cover = (product.productImages || []).find((image) => image.isCover) || product.productImages?.[0] || null;
     const branchPrice = product.branchPrice?.[0] || null;
 
@@ -62,7 +62,7 @@ class ProductTemplateService {
       mode: product.mode,
       noSN: product.noSN,
       trackSerialNumber: product.trackSerialNumber,
-      categoryId: category?.id ?? product.categoryId ?? null,
+      categoryId: category?.id ?? product.productType?.globalProductType?.categoryId ?? null,
       categoryName: category?.name ?? null,
       category,
       productTypeId: product.productTypeId,

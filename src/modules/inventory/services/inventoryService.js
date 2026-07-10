@@ -27,7 +27,7 @@ class InventoryService {
       return {
         id: product.id,
         name: product.name,
-        category: product.category ? product.category.name : 'Unassigned',
+        category: product.productType?.globalProductType?.category?.name ?? 'Unassigned',
         priceOnline,
         availableStock: totalAvailable < 0 ? 0 : totalAvailable,
         mode: businessType === 'IT' || businessType === 'ELECTRONICS' ? 'STRUCTURED' : 'SIMPLE'

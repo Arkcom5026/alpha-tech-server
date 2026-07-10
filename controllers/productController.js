@@ -713,7 +713,6 @@ const createProduct = async (req, res) => {
         noSN,
         active: (typeof data.active === 'boolean' ? data.active : true),
         productTypeId: typeCheck.productTypeId,
-        categoryId: typeCheck.categoryId,
         brandId: (data.brandId === null ? null : toInt(data.brandId)),
         unitId: (data.unitId === null ? null : toInt(data.unitId)),
         productImages: Array.isArray(data.images) && data.images.length > 0
@@ -796,7 +795,7 @@ const updateProduct = async (req, res) => {
             branchId,
           },
         },
-        select: { id: true, productTypeId: true, categoryId: true },
+        select: { id: true, productTypeId: true },
       })
       if (!current) throw Object.assign(new Error('NOT_FOUND'), { status: 404, code: 'NOT_FOUND' })
 
@@ -824,7 +823,6 @@ const updateProduct = async (req, res) => {
             : {}),
           active: typeof data.active === 'boolean' ? data.active : undefined,
           productTypeId: (incomingTypeId !== undefined ? typeCheck.productTypeId : undefined),
-          categoryId: (incomingTypeId !== undefined ? typeCheck.categoryId : undefined),
           brandId: toIntOpt(data.brandId),
           unitId: toIntOpt(data.unitId),
         },
