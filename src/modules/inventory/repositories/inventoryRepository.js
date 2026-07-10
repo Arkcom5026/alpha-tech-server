@@ -6,7 +6,15 @@ class InventoryRepository {
     const isStructured = businessType === 'IT' || businessType === 'ELECTRONICS';
 
     const include = {
-      category: true,
+      productType: {
+        include: {
+          globalProductType: {
+            include: {
+              category: true
+            }
+          }
+        }
+      },
       branchPrices: {
         where: { branchId }
       },
@@ -23,7 +31,7 @@ class InventoryRepository {
     }
 
     return await prisma.product.findMany({
-      where: { branchId },
+      where: { productType: { branchId } },
       include
     });
   }

@@ -85,7 +85,7 @@ const getClonePreview = async (prisma, {
       name: templateProduct.name,
       productTypeId: templateProduct.productTypeId,
       brandId: templateProduct.brandId,
-      categoryId: templateProduct.categoryId,
+      categoryId: templateProduct.productType?.globalProductType?.categoryId ?? null,
       unitId: templateProduct.unitId,
       warrantyDays: templateProduct.warrantyDays,
       mode: templateProduct.mode,
