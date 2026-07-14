@@ -1,0 +1,105 @@
+========================================
+AlphaTech Integrity Verification
+========================================
+Version       : ALPHATECH-RECOVERY-VERIFY-V1
+Checked At    : 2026-07-12T09:35:34.622Z
+Overall       : FAIL
+
+Production    : postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20
+Recovery      : postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+
+Summary
+  totalTablesCompared: 70
+  productionTables: 70
+  recoveryTables: 70
+  productionRows: 18618
+  recoveryRows: 18611
+  rowCountMismatches: 6
+  columnMismatches: 0
+  duplicatePkFailures: 0
+  productionBrokenFkCount: 0
+  recoveryBrokenFkCount: 0
+  fingerprintEnabled: false
+  fingerprintMismatches: null
+
+Tables
+----------------------------------------
+Bank                               PASS rows 14 / 14
+BarcodeCounter                     PASS rows 1 / 1
+BarcodeReceiptItem                 PASS rows 4 / 4
+Branch                             PASS rows 3 / 3
+BranchPrice                        FAIL rows 1382 / 1381
+  - row count mismatch
+Brand                              PASS rows 180 / 180
+Cart                               PASS rows 3 / 3
+CartItem                           PASS rows 0 / 0
+Category                           PASS rows 2 / 2
+CombinedBillingDocument            PASS rows 0 / 0
+CombinedSaleDocument               PASS rows 0 / 0
+CustomerDeposit                    PASS rows 0 / 0
+CustomerProfile                    PASS rows 183 / 183
+CustomerReceiptAllocations         PASS rows 0 / 0
+CustomerReceipts                   PASS rows 0 / 0
+DepositUsage                       PASS rows 0 / 0
+District                           PASS rows 928 / 928
+EmployeeProfile                    PASS rows 6 / 6
+GlobalProductType                  PASS rows 10 / 10
+InputTaxFilingBatch                PASS rows 0 / 0
+InputTaxFilingItem                 PASS rows 0 / 0
+Order                              PASS rows 0 / 0
+OrderOnline                        PASS rows 0 / 0
+OrderOnlineItem                    PASS rows 0 / 0
+PasswordResetToken                 PASS rows 9 / 9
+Payment                            PASS rows 4 / 4
+PaymentCodeCounter                 PASS rows 1 / 1
+PaymentItem                        PASS rows 4 / 4
+Position                           PASS rows 8 / 8
+Product                            FAIL rows 1384 / 1383
+  - row count mismatch
+ProductImage                       PASS rows 0 / 0
+ProductOnOrder                     PASS rows 0 / 0
+ProductType                        PASS rows 85 / 85
+ProductTypeBrand                   FAIL rows 216 / 215
+  - row count mismatch
+Province                           PASS rows 77 / 77
+PurchaseOrder                      PASS rows 3 / 3
+PurchaseOrderItem                  PASS rows 3 / 3
+PurchaseOrderReceipt               PASS rows 3 / 3
+PurchaseOrderReceiptItem           PASS rows 3 / 3
+RefreshToken                       PASS rows 3788 / 3788
+RefundTransaction                  PASS rows 0 / 0
+RepairJob                          PASS rows 0 / 0
+RepairPartItem                     PASS rows 0 / 0
+Sale                               PASS rows 6 / 6
+SaleItem                           PASS rows 8 / 8
+SaleItemSimple                     PASS rows 0 / 0
+SaleReturn                         PASS rows 0 / 0
+SaleReturnItem                     PASS rows 0 / 0
+SaleReturnItemSimple               PASS rows 0 / 0
+SalesTaxFilingBatch                PASS rows 0 / 0
+SalesTaxFilingItem                 PASS rows 0 / 0
+ServiceItem                        PASS rows 0 / 0
+ServiceOrder                       PASS rows 0 / 0
+SimpleLot                          PASS rows 0 / 0
+StockAuditScanLog                  PASS rows 0 / 0
+StockAuditSession                  PASS rows 0 / 0
+StockAuditSnapshotItem             PASS rows 0 / 0
+StockBalance                       FAIL rows 554 / 553
+  - row count mismatch
+StockItem                          FAIL rows 1501 / 1499
+  - row count mismatch
+StockMovement                      FAIL rows 613 / 612
+  - row count mismatch
+Subdistrict                        PASS rows 7436 / 7436
+Supplier                           PASS rows 4 / 4
+SupplierPayment                    PASS rows 0 / 0
+SupplierPaymentReceipt             PASS rows 0 / 0
+Unit                               PASS rows 9 / 9
+User                               PASS rows 183 / 183
+V2CustomerDeposit                  PASS rows 0 / 0
+V2StockAudit                       PASS rows 0 / 0
+V2StockAuditItem                   PASS rows 0 / 0
+WarrantyClaim                      PASS rows 0 / 0
+----------------------------------------
+Overall: FAIL
+========================================

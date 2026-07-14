@@ -1,0 +1,6285 @@
+{
+  "backupVersion": "P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "createdAt": "2026-07-13T09:34:27.747Z",
+  "localeTime": "13/7/2569 16:34:27",
+  "schema": "public",
+  "database": {
+    "name": "postgres",
+    "user": "postgres",
+    "postgresVersion": "15.8"
+  },
+  "files": {
+    "sqlFileName": "alphatech_hardened_backup_v6_2026-07-13_2026-07-13T09-34-27-747Z.sql",
+    "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-13_2026-07-13T09-34-27-747Z.sql",
+    "manifestFileName": "alphatech_hardened_backup_v6_2026-07-13_2026-07-13T09-34-27-747Z.manifest.json",
+    "manifestFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-13_2026-07-13T09-34-27-747Z.manifest.json",
+    "fileSizeBytes": 6996634,
+    "fileSizeMb": 6.6725,
+    "sha256": "3f3c6c1499bdd3a42bf7b608f2ff70d78818fb2a4e699fb924ce45189071ce17"
+  },
+  "summary": {
+    "totalTables": 70,
+    "totalRows": 20183,
+    "sequenceCount": 67,
+    "durationMs": 7140,
+    "durationSeconds": 7.14
+  },
+  "restoreOrder": [
+    "Bank",
+    "Brand",
+    "Category",
+    "GlobalProductType",
+    "Position",
+    "Province",
+    "District",
+    "Subdistrict",
+    "Branch",
+    "BarcodeCounter",
+    "PaymentCodeCounter",
+    "ProductType",
+    "ProductTypeBrand",
+    "Supplier",
+    "Unit",
+    "Product",
+    "BranchPrice",
+    "ProductImage",
+    "StockBalance",
+    "User",
+    "CustomerProfile",
+    "Cart",
+    "CartItem",
+    "EmployeeProfile",
+    "CombinedBillingDocument",
+    "CombinedSaleDocument",
+    "CustomerDeposit",
+    "CustomerReceipts",
+    "InputTaxFilingBatch",
+    "Order",
+    "OrderOnline",
+    "OrderOnlineItem",
+    "PasswordResetToken",
+    "ProductOnOrder",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderReceipt",
+    "InputTaxFilingItem",
+    "PurchaseOrderReceiptItem",
+    "RefreshToken",
+    "Sale",
+    "CustomerReceiptAllocations",
+    "Payment",
+    "DepositUsage",
+    "PaymentItem",
+    "SaleReturn",
+    "RefundTransaction",
+    "SalesTaxFilingBatch",
+    "SalesTaxFilingItem",
+    "ServiceOrder",
+    "ServiceItem",
+    "SimpleLot",
+    "SaleItemSimple",
+    "SaleReturnItemSimple",
+    "StockAuditSession",
+    "StockItem",
+    "BarcodeReceiptItem",
+    "RepairJob",
+    "RepairPartItem",
+    "SaleItem",
+    "SaleReturnItem",
+    "StockAuditScanLog",
+    "StockAuditSnapshotItem",
+    "StockMovement",
+    "SupplierPayment",
+    "SupplierPaymentReceipt",
+    "V2CustomerDeposit",
+    "V2StockAudit",
+    "V2StockAuditItem",
+    "WarrantyClaim"
+  ],
+  "cyclicTables": [],
+  "selfReferenceForeignKeys": {
+    "Product": [
+      {
+        "constraintName": "Product_templateProductId_fkey",
+        "childColumns": [
+          "templateProductId"
+        ],
+        "parentColumns": [
+          "id"
+        ],
+        "isDeferrable": false,
+        "initiallyDeferred": false
+      }
+    ],
+    "RefreshToken": [
+      {
+        "constraintName": "RefreshToken_replacedByTokenId_fkey",
+        "childColumns": [
+          "replacedByTokenId"
+        ],
+        "parentColumns": [
+          "id"
+        ],
+        "isDeferrable": false,
+        "initiallyDeferred": false
+      }
+    ]
+  },
+  "sequences": [
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Bank_id_seq",
+      "table_schema": "public",
+      "table_name": "Bank",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BarcodeCounter_id_seq",
+      "table_schema": "public",
+      "table_name": "BarcodeCounter",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BarcodeReceiptItem_id_seq",
+      "table_schema": "public",
+      "table_name": "BarcodeReceiptItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Branch_id_seq",
+      "table_schema": "public",
+      "table_name": "Branch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "BranchPrice_id_seq",
+      "table_schema": "public",
+      "table_name": "BranchPrice",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Brand_id_seq",
+      "table_schema": "public",
+      "table_name": "Brand",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Cart_id_seq",
+      "table_schema": "public",
+      "table_name": "Cart",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CartItem_id_seq",
+      "table_schema": "public",
+      "table_name": "CartItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Category_id_seq",
+      "table_schema": "public",
+      "table_name": "Category",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CombinedBillingDocument_id_seq",
+      "table_schema": "public",
+      "table_name": "CombinedBillingDocument",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CombinedSaleDocument_id_seq",
+      "table_schema": "public",
+      "table_name": "CombinedSaleDocument",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerDeposit_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerDeposit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerProfile_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerProfile",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerReceiptAllocations_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerReceiptAllocations",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "CustomerReceipts_id_seq",
+      "table_schema": "public",
+      "table_name": "CustomerReceipts",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "DepositUsage_id_seq",
+      "table_schema": "public",
+      "table_name": "DepositUsage",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "EmployeeProfile_id_seq",
+      "table_schema": "public",
+      "table_name": "EmployeeProfile",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "GlobalProductType_id_seq",
+      "table_schema": "public",
+      "table_name": "GlobalProductType",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "InputTaxFilingBatch_id_seq",
+      "table_schema": "public",
+      "table_name": "InputTaxFilingBatch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "InputTaxFilingItem_id_seq",
+      "table_schema": "public",
+      "table_name": "InputTaxFilingItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Order_id_seq",
+      "table_schema": "public",
+      "table_name": "Order",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "OrderOnline_id_seq",
+      "table_schema": "public",
+      "table_name": "OrderOnline",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "OrderOnlineItem_id_seq",
+      "table_schema": "public",
+      "table_name": "OrderOnlineItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PasswordResetToken_id_seq",
+      "table_schema": "public",
+      "table_name": "PasswordResetToken",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Payment_id_seq",
+      "table_schema": "public",
+      "table_name": "Payment",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PaymentCodeCounter_id_seq",
+      "table_schema": "public",
+      "table_name": "PaymentCodeCounter",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PaymentItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PaymentItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Position_id_seq",
+      "table_schema": "public",
+      "table_name": "Position",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Product_id_seq",
+      "table_schema": "public",
+      "table_name": "Product",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductImage_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductImage",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductOnOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductOnOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductType_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductType",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ProductTypeBrand_id_seq",
+      "table_schema": "public",
+      "table_name": "ProductTypeBrand",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderReceipt_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderReceipt",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "PurchaseOrderReceiptItem_id_seq",
+      "table_schema": "public",
+      "table_name": "PurchaseOrderReceiptItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RefreshToken_id_seq",
+      "table_schema": "public",
+      "table_name": "RefreshToken",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RefundTransaction_id_seq",
+      "table_schema": "public",
+      "table_name": "RefundTransaction",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RepairJob_id_seq",
+      "table_schema": "public",
+      "table_name": "RepairJob",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "RepairPartItem_id_seq",
+      "table_schema": "public",
+      "table_name": "RepairPartItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Sale_id_seq",
+      "table_schema": "public",
+      "table_name": "Sale",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleItemSimple_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleItemSimple",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturn_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturn",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturnItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturnItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SaleReturnItemSimple_id_seq",
+      "table_schema": "public",
+      "table_name": "SaleReturnItemSimple",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SalesTaxFilingBatch_id_seq",
+      "table_schema": "public",
+      "table_name": "SalesTaxFilingBatch",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SalesTaxFilingItem_id_seq",
+      "table_schema": "public",
+      "table_name": "SalesTaxFilingItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ServiceItem_id_seq",
+      "table_schema": "public",
+      "table_name": "ServiceItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "ServiceOrder_id_seq",
+      "table_schema": "public",
+      "table_name": "ServiceOrder",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SimpleLot_id_seq",
+      "table_schema": "public",
+      "table_name": "SimpleLot",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditScanLog_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditScanLog",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditSession_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditSession",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockAuditSnapshotItem_id_seq",
+      "table_schema": "public",
+      "table_name": "StockAuditSnapshotItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockBalance_id_seq",
+      "table_schema": "public",
+      "table_name": "StockBalance",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockItem_id_seq",
+      "table_schema": "public",
+      "table_name": "StockItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "StockMovement_id_seq",
+      "table_schema": "public",
+      "table_name": "StockMovement",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Supplier_id_seq",
+      "table_schema": "public",
+      "table_name": "Supplier",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SupplierPayment_id_seq",
+      "table_schema": "public",
+      "table_name": "SupplierPayment",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "SupplierPaymentReceipt_id_seq",
+      "table_schema": "public",
+      "table_name": "SupplierPaymentReceipt",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "Unit_id_seq",
+      "table_schema": "public",
+      "table_name": "Unit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "User_id_seq",
+      "table_schema": "public",
+      "table_name": "User",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2CustomerDeposit_id_seq",
+      "table_schema": "public",
+      "table_name": "V2CustomerDeposit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2StockAudit_id_seq",
+      "table_schema": "public",
+      "table_name": "V2StockAudit",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "V2StockAuditItem_id_seq",
+      "table_schema": "public",
+      "table_name": "V2StockAuditItem",
+      "column_name": "id"
+    },
+    {
+      "sequence_schema": "public",
+      "sequence_name": "WarrantyClaim_id_seq",
+      "table_schema": "public",
+      "table_name": "WarrantyClaim",
+      "column_name": "id"
+    }
+  ],
+  "keyTableCounts": {
+    "Product": 1578,
+    "BranchPrice": 1576,
+    "StockItem": 1996,
+    "Sale": 10,
+    "SaleItem": 25,
+    "SaleItemSimple": 0,
+    "Payment": 5,
+    "PaymentItem": 5
+  },
+  "tables": {
+    "Bank": {
+      "rowCount": 14,
+      "expectedRowCount": 14,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        }
+      }
+    },
+    "Brand": {
+      "rowCount": 195,
+      "expectedRowCount": 195,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "normalizedName",
+        "active",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "normalizedName": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Category": {
+      "rowCount": 2,
+      "expectedRowCount": 2,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active",
+        "isSystem"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "isSystem": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        }
+      }
+    },
+    "GlobalProductType": {
+      "rowCount": 10,
+      "expectedRowCount": 10,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "slug",
+        "active",
+        "categoryId",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "slug": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "categoryId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Position": {
+      "rowCount": 8,
+      "expectedRowCount": 8,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "description",
+        "isActive"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "description": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "isActive": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        }
+      }
+    },
+    "Province": {
+      "rowCount": 77,
+      "expectedRowCount": 77,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "region"
+      ],
+      "columnTypes": {
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "nameTh": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "region": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        }
+      }
+    },
+    "District": {
+      "rowCount": 928,
+      "expectedRowCount": 928,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "provinceCode",
+        "created_at"
+      ],
+      "columnTypes": {
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "nameTh": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "provinceCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Subdistrict": {
+      "rowCount": 7436,
+      "expectedRowCount": 7436,
+      "verifiedDuringExport": true,
+      "columns": [
+        "code",
+        "nameTh",
+        "districtCode",
+        "postcode"
+      ],
+      "columnTypes": {
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "nameTh": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "districtCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "postcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        }
+      }
+    },
+    "Branch": {
+      "rowCount": 3,
+      "expectedRowCount": 3,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "address",
+        "createdAt",
+        "updatedAt",
+        "RBACEnabled",
+        "phone",
+        "subdistrictCode",
+        "businessType",
+        "features",
+        "branchCode",
+        "isHeadOffice",
+        "taxId",
+        "slug",
+        "categoryId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "address": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "RBACEnabled": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "phone": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "subdistrictCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "businessType": {
+          "dataType": "USER-DEFINED",
+          "udtName": "BusinessType",
+          "formattedType": "\"BusinessType\"",
+          "nullable": false
+        },
+        "features": {
+          "dataType": "jsonb",
+          "udtName": "jsonb",
+          "formattedType": "jsonb",
+          "nullable": true
+        },
+        "branchCode": {
+          "dataType": "character varying",
+          "udtName": "varchar",
+          "formattedType": "character varying(5)",
+          "nullable": true
+        },
+        "isHeadOffice": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "taxId": {
+          "dataType": "character varying",
+          "udtName": "varchar",
+          "formattedType": "character varying(13)",
+          "nullable": true
+        },
+        "slug": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "categoryId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "BarcodeCounter": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "yearMonth",
+        "lastNumber",
+        "updatedAt",
+        "createdAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "yearMonth": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "lastNumber": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "PaymentCodeCounter": {
+      "rowCount": 1,
+      "expectedRowCount": 1,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "yyyymmdd",
+        "lastNo"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "yyyymmdd": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "lastNo": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "ProductType": {
+      "rowCount": 95,
+      "expectedRowCount": 95,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt",
+        "active",
+        "guideExamples",
+        "normalizedName",
+        "pathCached",
+        "branchId",
+        "globalProductTypeId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "guideExamples": {
+          "dataType": "ARRAY",
+          "udtName": "_text",
+          "formattedType": "text[]",
+          "nullable": true
+        },
+        "normalizedName": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "pathCached": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "globalProductTypeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "ProductTypeBrand": {
+      "rowCount": 293,
+      "expectedRowCount": 293,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productTypeId",
+        "brandId",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productTypeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "brandId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Supplier": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "address",
+        "createdAt",
+        "updatedAt",
+        "contactPerson",
+        "country",
+        "creditLimit",
+        "email",
+        "notes",
+        "paymentTerms",
+        "phone",
+        "postalCode",
+        "province",
+        "taxId",
+        "accountNumber",
+        "accountType",
+        "bankId",
+        "branchId",
+        "active",
+        "creditBalance",
+        "taxBranchCode",
+        "isSystem"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "address": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "contactPerson": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "country": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "creditLimit": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "email": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "notes": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "paymentTerms": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "phone": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "postalCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "province": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "taxId": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "accountNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "accountType": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "bankId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "creditBalance": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "taxBranchCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "isSystem": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        }
+      }
+    },
+    "Unit": {
+      "rowCount": 12,
+      "expectedRowCount": 12,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Product": {
+      "rowCount": 1578,
+      "expectedRowCount": 1578,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "noSN",
+        "active",
+        "name",
+        "mode",
+        "trackSerialNumber",
+        "productTypeId",
+        "brandId",
+        "codeType",
+        "productConfig",
+        "unitId",
+        "warrantyDays",
+        "templateProductId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "noSN": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "mode": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ProductMode",
+          "formattedType": "\"ProductMode\"",
+          "nullable": false
+        },
+        "trackSerialNumber": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "productTypeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "brandId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "codeType": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "productConfig": {
+          "dataType": "jsonb",
+          "udtName": "jsonb",
+          "formattedType": "jsonb",
+          "nullable": true
+        },
+        "unitId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "warrantyDays": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "templateProductId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      },
+      "deferredSelfReferenceUpdates": {
+        "count": 76,
+        "columns": [
+          "templateProductId"
+        ],
+        "constraints": [
+          {
+            "constraintName": "Product_templateProductId_fkey",
+            "childColumns": [
+              "templateProductId"
+            ],
+            "parentColumns": [
+              "id"
+            ],
+            "isDeferrable": false,
+            "initiallyDeferred": false
+          }
+        ],
+        "reason": "self-referencing FK columns are inserted as NULL and restored after all rows in the table exist"
+      }
+    },
+    "BranchPrice": {
+      "rowCount": 1576,
+      "expectedRowCount": 1576,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "effectiveDate",
+        "expiredDate",
+        "note",
+        "updatedBy",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "costPrice",
+        "priceOnline",
+        "priceRetail",
+        "priceTechnician",
+        "priceWholesale"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "effectiveDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "expiredDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "updatedBy": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "isActive": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "costPrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "priceOnline": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "priceRetail": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "priceTechnician": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "priceWholesale": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "ProductImage": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "public_id",
+        "url",
+        "secure_url",
+        "active",
+        "productId",
+        "createdAt",
+        "updatedAt",
+        "caption",
+        "isCover"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "public_id": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "url": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "secure_url": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "caption": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "isCover": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": true
+        }
+      }
+    },
+    "StockBalance": {
+      "rowCount": 736,
+      "expectedRowCount": 736,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "quantity",
+        "reserved",
+        "avgCost",
+        "lastReceivedCost",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "quantity": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "reserved": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "avgCost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "lastReceivedCost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "User": {
+      "rowCount": 185,
+      "expectedRowCount": 185,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "email",
+        "password",
+        "role",
+        "enabled",
+        "lastLoginAt",
+        "createdAt",
+        "updatedAt",
+        "loginId",
+        "loginType"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "email": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "password": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "role": {
+          "dataType": "USER-DEFINED",
+          "udtName": "Role",
+          "formattedType": "\"Role\"",
+          "nullable": false
+        },
+        "enabled": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "lastLoginAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "loginId": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "loginType": {
+          "dataType": "USER-DEFINED",
+          "udtName": "LoginType",
+          "formattedType": "\"LoginType\"",
+          "nullable": false
+        }
+      }
+    },
+    "CustomerProfile": {
+      "rowCount": 185,
+      "expectedRowCount": 185,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "picture",
+        "userId",
+        "createdAt",
+        "updatedAt",
+        "creditBalance",
+        "creditLimit",
+        "paymentTerms",
+        "type",
+        "companyName",
+        "subdistrictCode",
+        "taxId",
+        "addressDetail",
+        "depositBalance_v2",
+        "outstandingDebt_v2"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "picture": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "creditBalance": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "creditLimit": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "paymentTerms": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "type": {
+          "dataType": "USER-DEFINED",
+          "udtName": "CustomerType",
+          "formattedType": "\"CustomerType\"",
+          "nullable": false
+        },
+        "companyName": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "subdistrictCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "taxId": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "addressDetail": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "depositBalance_v2": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "outstandingDebt_v2": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        }
+      }
+    },
+    "Cart": {
+      "rowCount": 3,
+      "expectedRowCount": 3,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "customerProfileId",
+        "userId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "customerProfileId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "CartItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "cartId",
+        "productId",
+        "quantity",
+        "priceAtThatTime",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "cartId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "quantity": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "priceAtThatTime": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "EmployeeProfile": {
+      "rowCount": 6,
+      "expectedRowCount": 6,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "name",
+        "phone",
+        "userId",
+        "branchId",
+        "positionId",
+        "createdAt",
+        "updatedAt",
+        "approved",
+        "active",
+        "passwordHashV2",
+        "v2Role"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "name": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "phone": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "positionId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "approved": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "active": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "passwordHashV2": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "v2Role": {
+          "dataType": "USER-DEFINED",
+          "udtName": "EmployeeRole",
+          "formattedType": "\"EmployeeRole\"",
+          "nullable": false
+        }
+      }
+    },
+    "CombinedBillingDocument": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "issueDate",
+        "note",
+        "createdBy",
+        "customerId",
+        "branchId",
+        "totalBeforeVat",
+        "vatAmount",
+        "totalAmount",
+        "createdAt",
+        "updatedAt",
+        "status"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "issueDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdBy": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "totalBeforeVat": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "vatAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "CombinedBillingStatus",
+          "formattedType": "\"CombinedBillingStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "CombinedSaleDocument": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "issueDate",
+        "note",
+        "createdBy",
+        "branchId",
+        "totalAmount",
+        "finalAmount",
+        "adjustmentNote",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "issueDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdBy": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "finalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "adjustmentNote": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "CustomerDeposit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "cashAmount",
+        "transferAmount",
+        "note",
+        "totalAmount",
+        "customerId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "cardAmount",
+        "usedAmount",
+        "usedSaleId",
+        "createdBy",
+        "status"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "cashAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "transferAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "cardAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "usedAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "usedSaleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "createdBy": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "DepositStatus",
+          "formattedType": "\"DepositStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "CustomerReceipts": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "branchId",
+        "customerId",
+        "receivedAt",
+        "totalAmount",
+        "allocatedAmount",
+        "remainingAmount",
+        "paymentMethod",
+        "referenceNo",
+        "note",
+        "status",
+        "createdByEmployeeProfileId",
+        "cancelledByEmployeeProfileId",
+        "cancelledAt",
+        "cancelReason",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receivedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "allocatedAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "remainingAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "paymentMethod": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentMethod",
+          "formattedType": "\"PaymentMethod\"",
+          "nullable": false
+        },
+        "referenceNo": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "CustomerReceiptStatus",
+          "formattedType": "\"CustomerReceiptStatus\"",
+          "nullable": false
+        },
+        "createdByEmployeeProfileId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "cancelledByEmployeeProfileId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "cancelledAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "cancelReason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "InputTaxFilingBatch": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "month",
+        "year",
+        "status",
+        "note",
+        "createdById",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "month": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "year": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "InputTaxFilingStatus",
+          "formattedType": "\"InputTaxFilingStatus\"",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdById": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Order": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "cartTotal",
+        "stripePaymentId",
+        "status",
+        "amount",
+        "currency",
+        "createdAt",
+        "updatedAt",
+        "customerId",
+        "orderStatus"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "cartTotal": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "stripePaymentId": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "amount": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "currency": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "orderStatus": {
+          "dataType": "USER-DEFINED",
+          "udtName": "OrderStatus",
+          "formattedType": "\"OrderStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "OrderOnline": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "customerId",
+        "branchId",
+        "note",
+        "status",
+        "confirmedByEmployeeId",
+        "shippedAt",
+        "cancelReason",
+        "createdAt",
+        "userId",
+        "deliveryDate",
+        "paymentMethod",
+        "source",
+        "trackingCode",
+        "statusPayment",
+        "code",
+        "paymentSlipStatus",
+        "paymentSlipUrl",
+        "paymentNote",
+        "paymentDate"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "OrderOnlineStatus",
+          "formattedType": "\"OrderOnlineStatus\"",
+          "nullable": false
+        },
+        "confirmedByEmployeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "shippedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "cancelReason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "deliveryDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "paymentMethod": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentMethod",
+          "formattedType": "\"PaymentMethod\"",
+          "nullable": true
+        },
+        "source": {
+          "dataType": "USER-DEFINED",
+          "udtName": "OrderSource",
+          "formattedType": "\"OrderSource\"",
+          "nullable": true
+        },
+        "trackingCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "statusPayment": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentStatus",
+          "formattedType": "\"PaymentStatus\"",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "paymentSlipStatus": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentSlipStatus",
+          "formattedType": "\"PaymentSlipStatus\"",
+          "nullable": false
+        },
+        "paymentSlipUrl": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "paymentNote": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "paymentDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        }
+      }
+    },
+    "OrderOnlineItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "orderId",
+        "productId",
+        "quantity",
+        "note",
+        "priceAtPurchase"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "orderId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "quantity": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "priceAtPurchase": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        }
+      }
+    },
+    "PasswordResetToken": {
+      "rowCount": 9,
+      "expectedRowCount": 9,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "userId",
+        "tokenHash",
+        "expiresAt",
+        "usedAt",
+        "createdAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "tokenHash": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "expiresAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "usedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "ProductOnOrder": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "orderId",
+        "count",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "orderId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "count": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "PurchaseOrder": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "date",
+        "note",
+        "status",
+        "supplierId",
+        "branchId",
+        "employeeId",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "date": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PurchaseOrderStatus",
+          "formattedType": "\"PurchaseOrderStatus\"",
+          "nullable": false
+        },
+        "supplierId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "PurchaseOrderItem": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "quantity",
+        "purchaseOrderId",
+        "receivedQuantity",
+        "createdAt",
+        "updatedAt",
+        "costPrice"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "quantity": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "purchaseOrderId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receivedQuantity": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "costPrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        }
+      }
+    },
+    "PurchaseOrderReceipt": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "receivedAt",
+        "note",
+        "purchaseOrderId",
+        "branchId",
+        "receivedById",
+        "createdAt",
+        "updatedAt",
+        "code",
+        "printed",
+        "paidAmount",
+        "totalAmount",
+        "statusPayment",
+        "statusReceipt",
+        "supplierTaxInvoiceDate",
+        "supplierTaxInvoiceNumber",
+        "vatRate",
+        "source",
+        "supplierId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receivedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "purchaseOrderId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receivedById": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "printed": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "paidAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "statusPayment": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentStatus",
+          "formattedType": "\"PaymentStatus\"",
+          "nullable": false
+        },
+        "statusReceipt": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ReceiptStatus",
+          "formattedType": "\"ReceiptStatus\"",
+          "nullable": false
+        },
+        "supplierTaxInvoiceDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "supplierTaxInvoiceNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "vatRate": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(5,2)",
+          "nullable": true
+        },
+        "source": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ReceiptSource",
+          "formattedType": "\"ReceiptSource\"",
+          "nullable": false
+        },
+        "supplierId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "InputTaxFilingItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "batchId",
+        "purchaseOrderReceiptId",
+        "createdAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "batchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "purchaseOrderReceiptId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "PurchaseOrderReceiptItem": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "receiptId",
+        "purchaseOrderItemId",
+        "quantity",
+        "costPrice",
+        "createdAt",
+        "updatedAt",
+        "productId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receiptId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "purchaseOrderItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "quantity": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "costPrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "RefreshToken": {
+      "rowCount": 3882,
+      "expectedRowCount": 3882,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "userId",
+        "tokenHash",
+        "expiresAt",
+        "revokedAt",
+        "createdAt",
+        "replacedByTokenId",
+        "userAgent",
+        "ipAddress"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "userId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "tokenHash": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "expiresAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "revokedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "replacedByTokenId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "userAgent": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "ipAddress": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        }
+      },
+      "deferredSelfReferenceUpdates": {
+        "count": 2358,
+        "columns": [
+          "replacedByTokenId"
+        ],
+        "constraints": [
+          {
+            "constraintName": "RefreshToken_replacedByTokenId_fkey",
+            "childColumns": [
+              "replacedByTokenId"
+            ],
+            "parentColumns": [
+              "id"
+            ],
+            "isDeferrable": false,
+            "initiallyDeferred": false
+          }
+        ],
+        "reason": "self-referencing FK columns are inserted as NULL and restored after all rows in the table exist"
+      }
+    },
+    "Sale": {
+      "rowCount": 10,
+      "expectedRowCount": 10,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "soldAt",
+        "customerId",
+        "employeeId",
+        "branchId",
+        "totalBeforeDiscount",
+        "totalDiscount",
+        "vat",
+        "vatRate",
+        "totalAmount",
+        "note",
+        "refCode",
+        "isTaxInvoice",
+        "createdAt",
+        "updatedAt",
+        "combinedDocumentId",
+        "dueDate",
+        "finalizedAt",
+        "isCredit",
+        "officialDocumentNumber",
+        "saleType",
+        "status",
+        "paid",
+        "paidAt",
+        "combinedBillingId",
+        "paidAmount",
+        "statusPayment"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "soldAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "totalBeforeDiscount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "totalDiscount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "vat": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "vatRate": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(5,2)",
+          "nullable": false
+        },
+        "totalAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "refCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "isTaxInvoice": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "combinedDocumentId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "dueDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "finalizedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "isCredit": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "officialDocumentNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "saleType": {
+          "dataType": "USER-DEFINED",
+          "udtName": "SaleType",
+          "formattedType": "\"SaleType\"",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "SaleStatus",
+          "formattedType": "\"SaleStatus\"",
+          "nullable": false
+        },
+        "paid": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "paidAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "combinedBillingId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "paidAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "statusPayment": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentStatus",
+          "formattedType": "\"PaymentStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "CustomerReceiptAllocations": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "receiptId",
+        "saleId",
+        "amount",
+        "note",
+        "allocatedAt",
+        "createdByEmployeeProfileId",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receiptId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "amount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "allocatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "createdByEmployeeProfileId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "Payment": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "saleId",
+        "receivedAt",
+        "note",
+        "combinedDocumentCode",
+        "employeeProfileId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "code",
+        "cancelNote",
+        "cancelledAt",
+        "isCancelled",
+        "id"
+      ],
+      "columnTypes": {
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receivedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "combinedDocumentCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "employeeProfileId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "cancelNote": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "cancelledAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "isCancelled": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "DepositUsage": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "customerDepositId",
+        "saleId",
+        "amountUsed",
+        "createdAt",
+        "paymentId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerDepositId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "amountUsed": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "paymentId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "PaymentItem": {
+      "rowCount": 5,
+      "expectedRowCount": 5,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "paymentId",
+        "amount",
+        "note",
+        "slipImage",
+        "cardRef",
+        "govImage",
+        "createdAt",
+        "paymentMethod"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "paymentId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "amount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "slipImage": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "cardRef": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "govImage": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "paymentMethod": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentMethod",
+          "formattedType": "\"PaymentMethod\"",
+          "nullable": false
+        }
+      }
+    },
+    "SaleReturn": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "code",
+        "saleId",
+        "returnedAt",
+        "employeeId",
+        "refundedByEmployeeId",
+        "branchId",
+        "totalRefund",
+        "note",
+        "createdAt",
+        "updatedAt",
+        "returnType",
+        "reason",
+        "deductedAmount",
+        "isFullyRefunded",
+        "refundedAmount",
+        "refundMethod",
+        "status"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "returnedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "refundedByEmployeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "totalRefund": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "returnType": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ReturnType",
+          "formattedType": "\"ReturnType\"",
+          "nullable": false
+        },
+        "reason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "deductedAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "isFullyRefunded": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "refundedAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "refundMethod": {
+          "dataType": "USER-DEFINED",
+          "udtName": "RefundMethod",
+          "formattedType": "\"RefundMethod\"",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "SaleReturnStatus",
+          "formattedType": "\"SaleReturnStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "RefundTransaction": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleReturnId",
+        "amount",
+        "note",
+        "refundedAt",
+        "refundedByEmployeeId",
+        "branchId",
+        "deducted",
+        "method"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleReturnId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "amount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "refundedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "refundedByEmployeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "deducted": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "method": {
+          "dataType": "USER-DEFINED",
+          "udtName": "RefundMethod",
+          "formattedType": "\"RefundMethod\"",
+          "nullable": false
+        }
+      }
+    },
+    "SalesTaxFilingBatch": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "month",
+        "year",
+        "status",
+        "note",
+        "createdById",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "month": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "year": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "SalesTaxFilingStatus",
+          "formattedType": "\"SalesTaxFilingStatus\"",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdById": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "SalesTaxFilingItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "batchId",
+        "saleId",
+        "createdAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "batchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "ServiceOrder": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "customerId",
+        "branchId",
+        "employeeId",
+        "receiveDate",
+        "status",
+        "description",
+        "note",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "receiveDate": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ServiceStatus",
+          "formattedType": "\"ServiceStatus\"",
+          "nullable": false
+        },
+        "description": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "ServiceItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "serviceId",
+        "productId",
+        "serialNumber",
+        "problem",
+        "solution",
+        "cost",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "serviceId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "serialNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "problem": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "solution": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "cost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "SimpleLot": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "productId",
+        "receiptItemId",
+        "barcode",
+        "qtyInitial",
+        "qtyRemaining",
+        "unitCost",
+        "receivedAt",
+        "printCount",
+        "lastPrintedAt",
+        "status"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receiptItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "barcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "qtyInitial": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "qtyRemaining": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "unitCost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "receivedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "printCount": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "lastPrintedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "SimpleLotStatus",
+          "formattedType": "\"SimpleLotStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "SaleItemSimple": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleId",
+        "productId",
+        "quantity",
+        "basePrice",
+        "discount",
+        "price",
+        "vatAmount",
+        "remark",
+        "createdAt",
+        "updatedAt",
+        "simpleLotId",
+        "unitCost",
+        "documentDescription",
+        "documentPrefix",
+        "documentSuffix"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "quantity": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "basePrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "discount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "price": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "vatAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "remark": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "simpleLotId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "unitCost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "documentDescription": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "documentPrefix": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "documentSuffix": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        }
+      }
+    },
+    "SaleReturnItemSimple": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleReturnId",
+        "saleItemSimpleId",
+        "refundAmount",
+        "reason",
+        "reasonCode",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleReturnId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleItemSimpleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "refundAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "reason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "reasonCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "StockAuditSession": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "employeeId",
+        "expectedCount",
+        "scannedCount",
+        "startedAt",
+        "confirmedAt",
+        "cancelledAt",
+        "note",
+        "createdAt",
+        "updatedAt",
+        "mode",
+        "status"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "expectedCount": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "scannedCount": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "startedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "confirmedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "cancelledAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "mode": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockAuditMode",
+          "formattedType": "\"StockAuditMode\"",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockAuditStatus",
+          "formattedType": "\"StockAuditStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "StockItem": {
+      "rowCount": 1996,
+      "expectedRowCount": 1996,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "barcode",
+        "serialNumber",
+        "receivedAt",
+        "warrantyDays",
+        "expiredAt",
+        "soldAt",
+        "remark",
+        "productId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "status",
+        "purchaseOrderReceiptItemId",
+        "batchNumber",
+        "checkedBy",
+        "locationCode",
+        "qrCodeData",
+        "source",
+        "tag",
+        "scannedAt",
+        "scannedByEmployeeId",
+        "color",
+        "costPrice"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "barcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "serialNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "receivedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "warrantyDays": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "expiredAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "soldAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "remark": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockStatus",
+          "formattedType": "\"StockStatus\"",
+          "nullable": false
+        },
+        "purchaseOrderReceiptItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "batchNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "checkedBy": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "locationCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "qrCodeData": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "source": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "tag": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "scannedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "scannedByEmployeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "color": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "costPrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        }
+      }
+    },
+    "BarcodeReceiptItem": {
+      "rowCount": 55,
+      "expectedRowCount": 55,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "barcode",
+        "branchId",
+        "yearMonth",
+        "runningNumber",
+        "createdAt",
+        "updatedAt",
+        "purchaseOrderReceiptId",
+        "stockItemId",
+        "printed",
+        "receiptItemId",
+        "status",
+        "kind",
+        "simpleLotId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "barcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "yearMonth": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "runningNumber": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "purchaseOrderReceiptId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "printed": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "receiptItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "BarcodeStatus",
+          "formattedType": "\"BarcodeStatus\"",
+          "nullable": false
+        },
+        "kind": {
+          "dataType": "USER-DEFINED",
+          "udtName": "BarcodeKind",
+          "formattedType": "\"BarcodeKind\"",
+          "nullable": false
+        },
+        "simpleLotId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "RepairJob": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "jobNo",
+        "branchId",
+        "customerId",
+        "stockItemId",
+        "deviceModel",
+        "reportedSymptoms",
+        "technicianNotes",
+        "status",
+        "estimatedCost",
+        "depositPaid",
+        "technicianId",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "jobNo": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "deviceModel": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "reportedSymptoms": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "technicianNotes": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "ServiceStatus",
+          "formattedType": "\"ServiceStatus\"",
+          "nullable": false
+        },
+        "estimatedCost": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "depositPaid": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "technicianId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "RepairPartItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "repairJobId",
+        "productId",
+        "qtyUsed",
+        "unitPrice"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "repairJobId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "qtyUsed": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "unitPrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        }
+      }
+    },
+    "SaleItem": {
+      "rowCount": 25,
+      "expectedRowCount": 25,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleId",
+        "stockItemId",
+        "basePrice",
+        "vatAmount",
+        "price",
+        "discount",
+        "refundedAmount",
+        "remark",
+        "createdAt",
+        "updatedAt",
+        "documentDescription",
+        "documentPrefix",
+        "documentSuffix"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "basePrice": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "vatAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "price": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "discount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "refundedAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "remark": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "documentDescription": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "documentPrefix": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "documentSuffix": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        }
+      }
+    },
+    "SaleReturnItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "saleReturnId",
+        "saleItemId",
+        "refundAmount",
+        "reason",
+        "reasonCode",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleReturnId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "saleItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "refundAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "reason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "reasonCode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "StockAuditScanLog": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "auditSessionId",
+        "stockItemId",
+        "barcode",
+        "scannedAt",
+        "byEmployeeId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "auditSessionId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "barcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "scannedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "byEmployeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "StockAuditSnapshotItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "auditSessionId",
+        "stockItemId",
+        "productId",
+        "barcode",
+        "expectedStatus",
+        "isScanned",
+        "scannedAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "auditSessionId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "barcode": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "expectedStatus": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockStatus",
+          "formattedType": "\"StockStatus\"",
+          "nullable": false
+        },
+        "isScanned": {
+          "dataType": "boolean",
+          "udtName": "bool",
+          "formattedType": "boolean",
+          "nullable": false
+        },
+        "scannedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "StockMovement": {
+      "rowCount": 827,
+      "expectedRowCount": 827,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "productId",
+        "branchId",
+        "qty",
+        "type",
+        "refType",
+        "refId",
+        "note",
+        "createdAt",
+        "simpleLotId"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "qty": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "type": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockMovementType",
+          "formattedType": "\"StockMovementType\"",
+          "nullable": false
+        },
+        "refType": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "refId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "simpleLotId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        }
+      }
+    },
+    "SupplierPayment": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "supplierId",
+        "method",
+        "note",
+        "paymentRef",
+        "paymentProofUrl",
+        "sourceType",
+        "sourcePOId",
+        "paidAt",
+        "employeeId",
+        "branchId",
+        "createdAt",
+        "updatedAt",
+        "paymentType",
+        "creditAmount",
+        "debitAmount",
+        "code",
+        "amount",
+        "statusPayment"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "supplierId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "method": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentMethod",
+          "formattedType": "\"PaymentMethod\"",
+          "nullable": false
+        },
+        "note": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "paymentRef": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "paymentProofUrl": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "sourceType": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "sourcePOId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": true
+        },
+        "paidAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "employeeId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "paymentType": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentType",
+          "formattedType": "\"PaymentType\"",
+          "nullable": false
+        },
+        "creditAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "debitAmount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "code": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "amount": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": true
+        },
+        "statusPayment": {
+          "dataType": "USER-DEFINED",
+          "udtName": "PaymentStatus",
+          "formattedType": "\"PaymentStatus\"",
+          "nullable": false
+        }
+      }
+    },
+    "SupplierPaymentReceipt": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "paymentId",
+        "receiptId",
+        "amountPaid",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "paymentId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "receiptId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "amountPaid": {
+          "dataType": "numeric",
+          "udtName": "numeric",
+          "formattedType": "numeric(12,2)",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "V2CustomerDeposit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "customerId",
+        "amount",
+        "transactionType",
+        "referenceNumber",
+        "createdAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "customerId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "amount": {
+          "dataType": "double precision",
+          "udtName": "float8",
+          "formattedType": "double precision",
+          "nullable": false
+        },
+        "transactionType": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "referenceNumber": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": true
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "V2StockAudit": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "branchId",
+        "auditorId",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "branchId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "auditorId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    },
+    "V2StockAuditItem": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "stockAuditId",
+        "productId",
+        "expectedQty",
+        "actualQty",
+        "difference"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "stockAuditId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "productId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "expectedQty": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "actualQty": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "difference": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        }
+      }
+    },
+    "WarrantyClaim": {
+      "rowCount": 0,
+      "expectedRowCount": 0,
+      "verifiedDuringExport": true,
+      "columns": [
+        "id",
+        "claimNo",
+        "stockItemId",
+        "status",
+        "reason",
+        "createdAt",
+        "updatedAt"
+      ],
+      "columnTypes": {
+        "id": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "claimNo": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "stockItemId": {
+          "dataType": "integer",
+          "udtName": "int4",
+          "formattedType": "integer",
+          "nullable": false
+        },
+        "status": {
+          "dataType": "USER-DEFINED",
+          "udtName": "StockStatus",
+          "formattedType": "\"StockStatus\"",
+          "nullable": false
+        },
+        "reason": {
+          "dataType": "text",
+          "udtName": "text",
+          "formattedType": "text",
+          "nullable": false
+        },
+        "createdAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        },
+        "updatedAt": {
+          "dataType": "timestamp without time zone",
+          "udtName": "timestamp",
+          "formattedType": "timestamp(3) without time zone",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "verification": {
+    "ok": true,
+    "checkedAt": "2026-07-13T09:34:33.501Z",
+    "checkedTables": 70,
+    "keyTables": [
+      {
+        "tableName": "Product",
+        "expected": 1578,
+        "actual": 1578,
+        "passed": true
+      },
+      {
+        "tableName": "BranchPrice",
+        "expected": 1576,
+        "actual": 1576,
+        "passed": true
+      },
+      {
+        "tableName": "Sale",
+        "expected": 10,
+        "actual": 10,
+        "passed": true
+      },
+      {
+        "tableName": "Payment",
+        "expected": 5,
+        "actual": 5,
+        "passed": true
+      },
+      {
+        "tableName": "PaymentItem",
+        "expected": 5,
+        "actual": 5,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItemSimple",
+        "expected": 0,
+        "actual": 0,
+        "passed": true
+      },
+      {
+        "tableName": "StockItem",
+        "expected": 1996,
+        "actual": 1996,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItem",
+        "expected": 25,
+        "actual": 25,
+        "passed": true
+      }
+    ],
+    "mismatches": []
+  },
+  "retention": {
+    "enabled": true,
+    "retentionDays": 30,
+    "deletedFiles": [],
+    "skipped": []
+  }
+}

@@ -1,7 +1,19 @@
 // src/modules/sales/contracts/saleDocument.include.js
 
 const SALE_DOCUMENT_INCLUDE = {
-  branch: true,
+  branch: {
+    include: {
+      subdistrict: {
+        include: {
+          district: {
+            include: {
+              province: true,
+            },
+          },
+        },
+      },
+    },
+  },
 
   customer: {
     include: {

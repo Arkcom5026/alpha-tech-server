@@ -1,0 +1,79 @@
+{
+  "version": "ALPHATECH-RECOVERY-RETENTION-V1",
+  "createdAt": "2026-07-12T21:34:36.085Z",
+  "mode": "APPLY",
+  "ok": true,
+  "policy": {
+    "localDays": 3,
+    "offsiteDays": 7
+  },
+  "targets": [
+    {
+      "label": "local-backups",
+      "dir": "D:\\alpha-tech\\server\\backups",
+      "days": 3,
+      "cutoffAt": "2026-07-09T21:34:36.071Z",
+      "scannedFiles": 46,
+      "deleteCandidates": 6,
+      "deletedFiles": [
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T15-34-27-634Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T15-34-27-634Z.manifest.json",
+          "sizeBytes": 167235,
+          "mtimeMs": 1783611273097.4602,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T15-34-27-634Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T15-34-27-634Z.sql",
+          "sizeBytes": 4851891,
+          "mtimeMs": 1783611270672.4514,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T19-39-53-215Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T19-39-53-215Z.manifest.json",
+          "sizeBytes": 167236,
+          "mtimeMs": 1783625998963.687,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T19-39-53-215Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T19-39-53-215Z.sql",
+          "sizeBytes": 4851892,
+          "mtimeMs": 1783625996372.7458,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T21-34-27-775Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T21-34-27-775Z.manifest.json",
+          "sizeBytes": 167236,
+          "mtimeMs": 1783632873567.3289,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-09_2026-07-09T21-34-27-775Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-09_2026-07-09T21-34-27-775Z.sql",
+          "sizeBytes": 4851892,
+          "mtimeMs": 1783632870929.2246,
+          "dryRun": false
+        }
+      ],
+      "keptFiles": 40,
+      "failedFiles": [],
+      "ok": true
+    },
+    {
+      "label": "offsite-local-mirror",
+      "dir": "D:\\alpha-tech\\server\\recovery\\offsite",
+      "days": 7,
+      "cutoffAt": "2026-07-05T21:34:36.077Z",
+      "scannedFiles": 12,
+      "deleteCandidates": 0,
+      "deletedFiles": [],
+      "keptFiles": 12,
+      "failedFiles": [],
+      "ok": true
+    }
+  ]
+}
