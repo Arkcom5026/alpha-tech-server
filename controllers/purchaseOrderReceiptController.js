@@ -319,7 +319,6 @@ const getPurchaseOrderReceiptById = async (req, res) => {
                   select: {
                     name: true,
                     unit: { select: { name: true } },
-                    template: { select: { unit: { select: { name: true } } } },
                   },
                 },
               },
@@ -371,7 +370,6 @@ const getPurchaseOrderReceiptById = async (req, res) => {
         productName: item.purchaseOrderItem.product.name,
         unitName:
           item.purchaseOrderItem.product.unit?.name ||
-          item.purchaseOrderItem.product.template?.unit?.name ||
           'N/A',
       })),
     };
@@ -450,11 +448,8 @@ const getPurchaseOrderDetailById = async (req, res) => {
           include: {
             product: {
               include: {
-                category: true,
                 productType: true,
                 brand: true,
-                productProfile: true,
-                template: true,
                 unit: true,
               },
             },
