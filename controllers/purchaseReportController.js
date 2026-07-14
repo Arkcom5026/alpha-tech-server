@@ -66,8 +66,15 @@ const getPurchaseReport = async (req, res) => {
           },
         ],
       },
-      // Product filter: รองรับ QUICK ที่ผูก productId ตรง
-      productId: toInt(productId),
+      // Product filter: QUICK ผูก productId ตรง ส่วน PO ผูกผ่าน purchaseOrderItem.productId
+      ...(toInt(productId)
+        ? {
+            OR: [
+              { productId: toInt(productId) },
+              { purchaseOrderItem: { productId: toInt(productId) } },
+            ],
+          }
+        : {}),
     };
 
     // ✅ 4) Query
@@ -87,7 +94,6 @@ const getPurchaseReport = async (req, res) => {
             product: {
               include: {
                 unit: true,
-                template: { include: { unit: true } },
               },
             },
           },
@@ -96,7 +102,6 @@ const getPurchaseReport = async (req, res) => {
         product: {
           include: {
             unit: true,
-            template: { include: { unit: true } },
           },
         },
       },
@@ -110,7 +115,7 @@ const getPurchaseReport = async (req, res) => {
       const totalDec = qtyDec.times(costDec);
 
       const product = item.purchaseOrderItem?.product || item.product;
-      const unitName = product?.unit?.name || product?.template?.unit?.name || 'N/A';
+      const unitName = product?.unit?.name || 'N/A';
       const supplierName =
         item.receipt.purchaseOrder?.supplier?.name ||
         item.receipt.supplier?.name ||
@@ -225,7 +230,10 @@ const getPurchaseReceiptReport = async (req, res) => {
           ? {
               items: {
                 some: {
-                  productId: productIdInt,
+                  OR: [
+                    { productId: productIdInt },
+                    { purchaseOrderItem: { productId: productIdInt } },
+                  ],
                 },
               },
             }
@@ -324,8 +332,9 @@ const getPurchaseReceiptReport = async (req, res) => {
           COUNT(*)::int AS "itemCount",
           COALESCE(SUM((i."quantity") * (i."costPrice")), 0) AS "totalAmount"
         FROM "PurchaseOrderReceiptItem" i
+        LEFT JOIN "PurchaseOrderItem" poi ON poi."id" = i."purchaseOrderItemId"
         WHERE i."receiptId" IN (${Prisma.join(receiptIds)})
-          ${hasProductFilter ? Prisma.sql`AND i."productId" = ${productIdInt}` : Prisma.empty}
+          ${hasProductFilter ? Prisma.sql`AND COALESCE(i."productId", poi."productId") = ${productIdInt}` : Prisma.empty}
         GROUP BY i."receiptId"
       `
     );
@@ -440,7 +449,6 @@ const getPurchaseReceiptReportDetail = async (req, res) => {
             product: {
               include: {
                 unit: true,
-                template: { include: { unit: true } },
               },
             },
           },
@@ -449,7 +457,6 @@ const getPurchaseReceiptReportDetail = async (req, res) => {
         product: {
           include: {
             unit: true,
-            template: { include: { unit: true } },
           },
         },
       },
@@ -462,7 +469,7 @@ const getPurchaseReceiptReportDetail = async (req, res) => {
       const totalDec = qtyDec.times(costDec);
 
       const product = item.purchaseOrderItem?.product || item.product;
-      const unitName = product?.unit?.name || product?.template?.unit?.name || 'N/A';
+      const unitName = product?.unit?.name || 'N/A';
 
       return {
         id: item.id,

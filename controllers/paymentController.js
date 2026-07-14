@@ -354,7 +354,7 @@ const searchPrintablePayments = async (req, res) => {
             items: {
               include: {
                 stockItem: {
-                  include: { product: { select: { name: true, template: true } } },
+                  include: { product: { select: { name: true, unit: { select: { name: true } } } } },
 
                 },
               },

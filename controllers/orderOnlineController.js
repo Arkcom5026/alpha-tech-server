@@ -668,10 +668,15 @@ const getOrderOnlineSummary = async (req, res) => {
             product: {
               include: {
                 brand: true,
-                category: true,
-                productType: true,
-                productProfile: true,
-                template: { include: { productProfile: true, unit: true } },
+                unit: true,
+                productType: {
+                  include: {
+                    globalProductType: {
+                      include: { category: true },
+                    },
+                  },
+                },
+                templateProduct: { select: { id: true, name: true } },
                 branchPrice: { where: { branchId } },
               },
             },

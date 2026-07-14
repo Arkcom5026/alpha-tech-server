@@ -183,34 +183,28 @@ const getBranchPricesByBranch = async (req, res) => {
     } = req.query || {};
 
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-
-    // ต้องมีอย่างน้อย 1 เงื่อนไข (ยกเว้นกรณีที่ฟรอนต์ตั้งใจดึงทั้งหมด)
-    if (!searchText && !categoryId && !productTypeId && !productProfileId && !templateId && !productTemplateId) {
+    if (productProfileId) {
+      return res.status(400).json({ error: 'UNSUPPORTED_LEGACY_FILTER', field: 'productProfileId' });
+    }
+    if (!searchText && !categoryId && !productTypeId && !templateId && !productTemplateId) {
       return res.json([]);
     }
 
-    const whereAND = [];
-
-    // โครงสร้างสินค้า
-    const templateParam = toInt(templateId ?? productTemplateId);
-    if (templateParam) whereAND.push({ templateId: templateParam });
-    if (productProfileId) whereAND.push({ template: { productProfileId: toInt(productProfileId) } });
-    if (productTypeId) whereAND.push({ template: { productProfile: { productTypeId: toInt(productTypeId) } } });
-    if (categoryId) whereAND.push({ template: { productProfile: { productType: { categoryId: toInt(categoryId) } } } });
-
-    // ค้นหาข้อความ
-    const q = String(searchText || '').trim();
-    if (q) {
+    const whereAND = [{ productType: { branchId } }];
+    const templateProductId = toInt(templateId ?? productTemplateId);
+    if (templateProductId) whereAND.push({ templateProductId });
+    if (productTypeId) whereAND.push({ productTypeId: toInt(productTypeId) });
+    if (categoryId) {
       whereAND.push({
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { model: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
-          { spec: { contains: q, mode: 'insensitive' } },
-          { template: { name: { contains: q, mode: 'insensitive' } } },
-        ],
+        productType: {
+          branchId,
+          globalProductType: { categoryId: toInt(categoryId) },
+        },
       });
     }
+
+    const q = String(searchText || '').trim();
+    if (q) whereAND.push({ name: { contains: q, mode: 'insensitive' } });
 
     const products = await prisma.product.findMany({
       where: { active: true, AND: whereAND },
@@ -218,11 +212,24 @@ const getBranchPricesByBranch = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
-        description: true,
-        spec: true,
-        templateId: true,
-        template: { select: { id: true, name: true } },
+        mode: true,
+        active: true,
+        templateProductId: true,
+        productType: {
+          select: {
+            id: true,
+            name: true,
+            globalProductType: {
+              select: {
+                categoryId: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+        brand: { select: { id: true, name: true } },
+        unit: { select: { id: true, name: true } },
+        templateProduct: { select: { id: true, name: true } },
       },
     });
 
@@ -230,9 +237,21 @@ const getBranchPricesByBranch = async (req, res) => {
     const prices = productIds.length
       ? await prisma.branchPrice.findMany({ where: { branchId, productId: { in: productIds } } })
       : [];
-    const priceMap = new Map(prices.map((p) => [p.productId, p]));
+    const priceMap = new Map(prices.map((row) => [row.productId, row]));
 
-    const result = products.map((product) => ({ product, branchPrice: priceMap.get(product.id) || null }));
+    const result = products.map((product) => ({
+      product: {
+        ...product,
+        categoryId: product.productType?.globalProductType?.categoryId ?? null,
+        category: product.productType?.globalProductType?.category ?? null,
+        model: null,
+        description: null,
+        spec: null,
+        templateId: product.templateProductId ?? null,
+        template: product.templateProduct || null,
+      },
+      branchPrice: priceMap.get(product.id) || null,
+    }));
 
     return res.json(result);
   } catch (err) {
@@ -241,7 +260,7 @@ const getBranchPricesByBranch = async (req, res) => {
   }
 };
 
-// GET /branch-prices/products — ใช้กรองสินค้าและแนบราคาสาขา
+// GET /branch-prices/products — Operational Product + BranchPrice
 const getAllProductsWithBranchPrice = async (req, res) => {
   try {
     const branchId = toInt(req.user?.branchId);
@@ -253,71 +272,57 @@ const getAllProductsWithBranchPrice = async (req, res) => {
       productTemplateId,
       productId,
       searchText,
-      q, // alias
+      q,
       includeInactive,
       page,
       pageSize,
-      sort, // e.g. "name:asc" or "updatedAt:desc"
+      sort,
       withMeta,
     } = req.query || {};
 
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-
-    // ป้องกันการดึงทั้งตารางโดยไม่จำเป็น (คงพฤติกรรมเดิม)
-    const hasAnyFilter = !!searchText || !!q || !!categoryId || !!productTypeId || !!productProfileId || !!templateId || !!productTemplateId || !!productId;
-    if (!hasAnyFilter && !page && !pageSize) {
-      return res.json([]);
+    if (productProfileId) {
+      return res.status(400).json({ error: 'UNSUPPORTED_LEGACY_FILTER', field: 'productProfileId' });
     }
 
-    const whereAND = [];
+    const hasAnyFilter = !!searchText || !!q || !!categoryId || !!productTypeId || !!templateId || !!productTemplateId || !!productId;
+    if (!hasAnyFilter && !page && !pageSize) return res.json([]);
 
-    // ตัวกรองตามโครงสร้างสินค้า
-    const templateParam = toInt(templateId ?? productTemplateId);
-    if (templateParam) whereAND.push({ templateId: templateParam });
-    if (productProfileId) whereAND.push({ template: { productProfileId: toInt(productProfileId) } });
-    if (productTypeId) whereAND.push({ template: { productProfile: { productTypeId: toInt(productTypeId) } } });
-    if (categoryId) whereAND.push({ template: { productProfile: { productType: { categoryId: toInt(categoryId) } } } });
-    if (productId) whereAND.push({ id: toInt(productId) });
-
-    // ค้นหาด้วยข้อความ — รองรับ alias q และค้นหาชื่อ template ด้วย
-    const text = String(searchText ?? q ?? '').trim();
-    if (text) {
+    const whereAND = [{ productType: { branchId } }];
+    const templateProductId = toInt(templateId ?? productTemplateId);
+    if (templateProductId) whereAND.push({ templateProductId });
+    if (productTypeId) whereAND.push({ productTypeId: toInt(productTypeId) });
+    if (categoryId) {
       whereAND.push({
-        OR: [
-          { name: { contains: text, mode: 'insensitive' } },
-          { model: { contains: text, mode: 'insensitive' } },
-          { description: { contains: text, mode: 'insensitive' } },
-          { spec: { contains: text, mode: 'insensitive' } },
-          { template: { name: { contains: text, mode: 'insensitive' } } },
-        ],
+        productType: {
+          branchId,
+          globalProductType: { categoryId: toInt(categoryId) },
+        },
       });
     }
+    if (productId) whereAND.push({ id: toInt(productId) });
 
-    // จัดการสถานะสินค้า (active) ตาม includeInactive
-    const incInact = String(includeInactive).toLowerCase() === 'true' || String(includeInactive) === '1';
-    if (!incInact) whereAND.push({ active: true });
+    const text = String(searchText ?? q ?? '').trim();
+    if (text) whereAND.push({ name: { contains: text, mode: 'insensitive' } });
 
-    // สร้าง where หลัก
-    const where = whereAND.length ? { AND: whereAND } : {};
+    const includeInactiveFlag = String(includeInactive).toLowerCase() === 'true' || String(includeInactive) === '1';
+    if (!includeInactiveFlag) whereAND.push({ active: true });
+    const where = { AND: whereAND };
 
-    // จัดเรียง
+    const allowedSortFields = new Set(['name', 'id', 'createdAt', 'updatedAt']);
     let orderBy = { name: 'asc' };
     if (sort && typeof sort === 'string') {
       const [field, dir] = String(sort).split(':');
-      if (field) orderBy = { [field]: (dir || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc' };
+      if (allowedSortFields.has(field)) {
+        orderBy = { [field]: String(dir).toLowerCase() === 'desc' ? 'desc' : 'asc' };
+      }
     }
 
-    // รองรับ pagination และจำกัด pageSize สูงสุด
     const cap = 200;
-    const _page = Math.max(0, toInt(page) || 0);
-    const _size = Math.min(cap, Math.max(0, toInt(pageSize) || 0));
-    const usePaging = _page > 0 && _size > 0;
-
-    // นับจำนวนทั้งหมด (เฉพาะเมื่อใช้ paging)
-    let total;
-    if (usePaging) {
-      total = await prisma.product.count({ where });
-    }
+    const currentPage = Math.max(0, toInt(page) || 0);
+    const size = Math.min(cap, Math.max(0, toInt(pageSize) || 0));
+    const usePaging = currentPage > 0 && size > 0;
+    const total = usePaging ? await prisma.product.count({ where }) : undefined;
 
     const products = await prisma.product.findMany({
       where,
@@ -325,35 +330,53 @@ const getAllProductsWithBranchPrice = async (req, res) => {
       select: {
         id: true,
         name: true,
-        model: true,
-        description: true,
-        spec: true,
-        templateId: true,
-        template: { select: { id: true, name: true } },
+        mode: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+        templateProductId: true,
+        productType: {
+          select: {
+            id: true,
+            name: true,
+            globalProductType: {
+              select: {
+                categoryId: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+        brand: { select: { id: true, name: true } },
+        unit: { select: { id: true, name: true } },
+        templateProduct: { select: { id: true, name: true } },
       },
-      ...(usePaging ? { skip: (_page - 1) * _size, take: _size } : {}),
+      ...(usePaging ? { skip: (currentPage - 1) * size, take: size } : {}),
     });
 
-    // ดึงราคาของสาขารวดเดียวแล้วแมป (ประสิทธิภาพดีกว่า)
     const productIds = products.map((p) => p.id);
     const prices = productIds.length
       ? await prisma.branchPrice.findMany({ where: { branchId, productId: { in: productIds } } })
       : [];
-    const priceMap = new Map(prices.map((p) => [p.productId, p]));
+    const priceMap = new Map(prices.map((row) => [row.productId, row]));
 
-    const items = products.map((product) => ({ product, branchPrice: priceMap.get(product.id) || null }));
+    const items = products.map((product) => ({
+      product: {
+        ...product,
+        categoryId: product.productType?.globalProductType?.categoryId ?? null,
+        category: product.productType?.globalProductType?.category ?? null,
+        model: null,
+        description: null,
+        spec: null,
+        templateId: product.templateProductId ?? null,
+        template: product.templateProduct || null,
+      },
+      branchPrice: priceMap.get(product.id) || null,
+    }));
 
-    if (usePaging && typeof total === 'number') {
-      // เผื่อฟรอนต์รุ่นเก่า: ใส่ header เพื่อทำเพจจิ้งได้
-      res.set('X-Total-Count', String(total));
-    }
-
-    // เผื่อฟรอนต์รุ่นใหม่: ขอ meta กลับไปใน body ได้
+    if (usePaging && typeof total === 'number') res.set('X-Total-Count', String(total));
     const wantMeta = String(withMeta).toLowerCase() === 'true' || String(withMeta) === '1';
-    if (wantMeta && usePaging) {
-      return res.json({ items, total, page: _page, pageSize: _size });
-    }
-
+    if (wantMeta && usePaging) return res.json({ items, total, page: currentPage, pageSize: size });
     return res.json(items);
   } catch (err) {
     console.error('❌ getAllProductsWithBranchPrice error:', err);

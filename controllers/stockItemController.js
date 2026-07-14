@@ -859,9 +859,16 @@ const getAvailableStockItemsByProduct = async (req, res) => {
           select: {
             name: true,
             brand: { select: { name: true } },
-            productProfile: { select: { name: true } },
-            productType: { select: { name: true } },
-            category: { select: { name: true } },
+            productType: {
+              select: {
+                name: true,
+                globalProductType: {
+                  select: {
+                    category: { select: { name: true } },
+                  },
+                },
+              },
+            },
             unit: { select: { name: true } },
           },
         },
