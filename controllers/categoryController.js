@@ -118,11 +118,11 @@ const archiveCategory = async (req, res) => {
     if (!current) return res.status(404).json({ message: 'ไม่พบหมวดหมู่ที่ต้องการปิดการใช้งาน' });
     if (current.isSystem) return res.status(403).json({ message: 'หมวดระบบ (isSystem) ไม่อนุญาตให้ปิดการใช้งาน' });
 
-    const usedByType = await prisma.productType.findFirst({ where: { categoryId: id }, select: { id: true, name: true } });
+    const usedByType = await prisma.globalProductType.findFirst({ where: { categoryId: id }, select: { id: true, name: true } });
     if (usedByType) {
       return res.status(409).json({
         error: 'HAS_REFERENCES',
-        message: 'ไม่สามารถปิดการใช้งานได้ เพราะมีประเภทสินค้า (ProductType) อ้างอิงอยู่',
+        message: 'ไม่สามารถปิดการใช้งานได้ เพราะมีประเภทสินค้ากลาง (GlobalProductType) อ้างอิงอยู่',
         conflict: usedByType,
       });
     }

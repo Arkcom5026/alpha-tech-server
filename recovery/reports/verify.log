@@ -412,3 +412,12 @@
 [2026-07-13T21:35:32.345Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-13T21-35-32-342Z.json
 [2026-07-13T21:35:32.345Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-13T21-35-32-342Z.txt
 [2026-07-13T21:35:32.346Z] ✅ Overall: PASS
+[2026-07-14T07:40:39.272Z] ============================================================
+[2026-07-14T07:40:39.287Z] 🔎 AlphaTech Integrity Verification ALPHATECH-RECOVERY-VERIFY-V1
+[2026-07-14T07:40:39.289Z] ============================================================
+[2026-07-14T07:40:39.290Z] Collecting Production snapshot...
+[2026-07-14T07:40:50.080Z] Collecting Recovery snapshot...
+[2026-07-14T07:41:00.531Z] Comparing snapshots...
+[2026-07-14T07:41:00.545Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-14T07-41-00-537Z.json
+[2026-07-14T07:41:00.551Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\verification-report_2026-07-14T07-41-00-537Z.txt
+[2026-07-14T07:41:00.553Z] ✅ Overall: FAIL

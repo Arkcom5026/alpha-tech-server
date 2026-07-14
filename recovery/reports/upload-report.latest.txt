@@ -3,16 +3,16 @@ AlphaTech Recovery Upload Report
 ========================================
 Version    : ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
 Provider   : s3-compatible
-Uploaded At: 2026-07-13T21:34:33.560Z
+Uploaded At: 2026-07-14T07:40:00.545Z
 Overall    : PASS
 
 Bucket     : saduaksabuy-recovery
-Base Key   : alphatech-production/2026-07-13/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF
+Base Key   : alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF
 
 Files
 ----------------------------------------
-SQL      : PASS alphatech-production/2026-07-13/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-13_2026-07-13T21-34-27-522Z.sql
-Manifest : PASS alphatech-production/2026-07-13/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-13_2026-07-13T21-34-27-522Z.manifest.json
+SQL      : PASS alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql
+Manifest : PASS alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json
 ----------------------------------------
 Overall: PASS
 ========================================

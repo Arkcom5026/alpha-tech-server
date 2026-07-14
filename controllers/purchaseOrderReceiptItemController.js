@@ -228,6 +228,7 @@ const updateReceiptItem = async (req, res) => {
     const purchaseOrderItemId = toInt(req.body?.purchaseOrderItemId);
     const quantity = toNum(req.body?.quantity);
     const costPrice = req.body?.costPrice;
+    const forceAccept = !!req.body?.forceAccept;
 
     console.log('🔄 [updateReceiptItem] req.body:', req.body);
 
@@ -247,6 +248,9 @@ const updateReceiptItem = async (req, res) => {
     });
 
     if (!existingItem) return res.status(404).json({ error: 'ไม่พบรายการที่ต้องการอัปเดต' });
+    if (String(existingItem.receipt?.statusReceipt || '').toUpperCase() === 'COMPLETED') {
+      return res.status(409).json({ error: 'ใบรับสินค้าถูกปิดแล้ว ไม่สามารถแก้ไขรายการได้' });
+    }
     if (existingItem.stockItems && existingItem.stockItems.length > 0) {
       return res.status(409).json({ error: 'อัปเดตไม่ได้: มีการยิง SN เข้าสต๊อกแล้ว' });
     }

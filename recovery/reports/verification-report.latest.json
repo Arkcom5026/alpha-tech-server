@@ -1,6 +1,6 @@
 {
   "verifyVersion": "ALPHATECH-RECOVERY-VERIFY-V1",
-  "checkedAt": "2026-07-13T21:35:32.342Z",
+  "checkedAt": "2026-07-14T07:41:00.537Z",
   "schema": "public",
   "options": {
     "includeFingerprint": false,
@@ -82,7 +82,7 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 20253
+    "totalRows": 22093
   },
   "recovery": {
     "connection": {
@@ -160,17 +160,17 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 20253
+    "totalRows": 22090
   },
   "comparison": {
-    "overallPass": true,
+    "overallPass": false,
     "summary": {
       "totalTablesCompared": 70,
       "productionTables": 70,
       "recoveryTables": 70,
-      "productionRows": 20253,
-      "recoveryRows": 20253,
-      "rowCountMismatches": 0,
+      "productionRows": 22093,
+      "recoveryRows": 22090,
+      "rowCountMismatches": 3,
       "columnMismatches": 0,
       "duplicatePkFailures": 0,
       "productionBrokenFkCount": 0,
@@ -238,8 +238,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 62,
-          "recovery": 62,
+          "production": 165,
+          "recovery": 165,
           "passed": true
         },
         "columns": {
@@ -292,8 +292,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 1583,
-          "recovery": 1583,
+          "production": 1694,
+          "recovery": 1694,
           "passed": true
         },
         "columns": {
@@ -319,8 +319,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 195,
-          "recovery": 195,
+          "production": 199,
+          "recovery": 199,
           "passed": true
         },
         "columns": {
@@ -508,8 +508,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 185,
-          "recovery": 185,
+          "production": 187,
+          "recovery": 187,
           "passed": true
         },
         "columns": {
@@ -967,8 +967,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 1585,
-          "recovery": 1585,
+          "production": 1696,
+          "recovery": 1696,
           "passed": true
         },
         "columns": {
@@ -1075,8 +1075,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 295,
-          "recovery": 295,
+          "production": 324,
+          "recovery": 324,
           "passed": true
         },
         "columns": {
@@ -1129,8 +1129,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 6,
-          "recovery": 6,
+          "production": 9,
+          "recovery": 9,
           "passed": true
         },
         "columns": {
@@ -1156,8 +1156,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 8,
-          "recovery": 8,
+          "production": 28,
+          "recovery": 28,
           "passed": true
         },
         "columns": {
@@ -1183,8 +1183,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 6,
-          "recovery": 6,
+          "production": 9,
+          "recovery": 9,
           "passed": true
         },
         "columns": {
@@ -1210,8 +1210,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 8,
-          "recovery": 8,
+          "production": 28,
+          "recovery": 28,
           "passed": true
         },
         "columns": {
@@ -1237,9 +1237,9 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 3896,
-          "recovery": 3896,
-          "passed": true
+          "production": 3985,
+          "recovery": 3984,
+          "passed": false
         },
         "columns": {
           "passed": true,
@@ -1257,7 +1257,7 @@
           "passed": true
         },
         "fingerprint": null,
-        "passed": true
+        "passed": false
       },
       {
         "tableName": "RefundTransaction",
@@ -1345,8 +1345,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 10,
-          "recovery": 10,
+          "production": 11,
+          "recovery": 11,
           "passed": true
         },
         "columns": {
@@ -1372,8 +1372,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 25,
-          "recovery": 25,
+          "production": 26,
+          "recovery": 26,
           "passed": true
         },
         "columns": {
@@ -1642,8 +1642,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 0,
-          "recovery": 0,
+          "production": 1,
+          "recovery": 1,
           "passed": true
         },
         "columns": {
@@ -1669,8 +1669,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 0,
-          "recovery": 0,
+          "production": 1,
+          "recovery": 1,
           "passed": true
         },
         "columns": {
@@ -1696,8 +1696,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 0,
-          "recovery": 0,
+          "production": 757,
+          "recovery": 757,
           "passed": true
         },
         "columns": {
@@ -1723,9 +1723,9 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 743,
-          "recovery": 743,
-          "passed": true
+          "production": 839,
+          "recovery": 838,
+          "passed": false
         },
         "columns": {
           "passed": true,
@@ -1743,16 +1743,16 @@
           "passed": true
         },
         "fingerprint": null,
-        "passed": true
+        "passed": false
       },
       {
         "tableName": "StockItem",
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 2007,
-          "recovery": 2007,
-          "passed": true
+          "production": 2391,
+          "recovery": 2390,
+          "passed": false
         },
         "columns": {
           "passed": true,
@@ -1770,15 +1770,15 @@
           "passed": true
         },
         "fingerprint": null,
-        "passed": true
+        "passed": false
       },
       {
         "tableName": "StockMovement",
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 831,
-          "recovery": 831,
+          "production": 930,
+          "recovery": 930,
           "passed": true
         },
         "columns": {
@@ -1831,8 +1831,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 7,
-          "recovery": 7,
+          "production": 9,
+          "recovery": 9,
           "passed": true
         },
         "columns": {
@@ -1912,8 +1912,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 12,
-          "recovery": 12,
+          "production": 13,
+          "recovery": 13,
           "passed": true
         },
         "columns": {
@@ -1939,8 +1939,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 185,
-          "recovery": 185,
+          "production": 187,
+          "recovery": 187,
           "passed": true
         },
         "columns": {
