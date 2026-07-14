@@ -1,8 +1,8 @@
 {
   "jobVersion": "ALPHATECH-RECOVERY-JOB-RUNNER-V7-R2-RETENTION",
-  "jobId": "2026-07-14T07-39-48-946Z",
+  "jobId": "2026-07-14T09-34-22-701Z",
   "mode": "backup-workflow",
-  "startedAt": "2026-07-14T07:39:48.946Z",
+  "startedAt": "2026-07-14T09:34:22.701Z",
   "finishedAt": null,
   "durationMs": null,
   "ok": false,
@@ -13,9 +13,9 @@
       "HEALTH_CHECK": {
         "name": "HEALTH_CHECK",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:39:48.964Z",
-        "finishedAt": "2026-07-14T07:39:50.047Z",
-        "durationMs": 1083,
+        "startedAt": "2026-07-14T09:34:22.713Z",
+        "finishedAt": "2026-07-14T09:34:23.729Z",
+        "durationMs": 1016,
         "exitCode": 0,
         "command": "node recovery/health/healthCheck.js",
         "details": {
@@ -26,58 +26,58 @@
       "BACKUP": {
         "name": "BACKUP",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:39:50.047Z",
-        "finishedAt": "2026-07-14T07:40:00.247Z",
-        "durationMs": 10200,
+        "startedAt": "2026-07-14T09:34:23.729Z",
+        "finishedAt": "2026-07-14T09:34:33.943Z",
+        "durationMs": 10214,
         "exitCode": 0,
         "command": "node qb.js",
         "details": {
-          "latestManifest": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
+          "latestManifest": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
           "manifest": {
-            "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
+            "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
             "backupVersion": "P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
-            "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql",
-            "sha256": "a7c0e3b2d9e92c579bfd0472bd437f00b60e5683762017d733afb6e154fa468e",
+            "sqlFilePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.sql",
+            "sha256": "f1237e4501742600cddac680e845bbf7f7b88abf3d690788e00ef3e0880ce42a",
             "summary": {
               "totalTables": 70,
-              "totalRows": 22090,
+              "totalRows": 22221,
               "sequenceCount": 67,
-              "durationMs": 7438,
+              "durationMs": 7442,
               "durationSeconds": 7.44
             },
             "verification": {
               "ok": true,
-              "checkedAt": "2026-07-14T07:40:00.172Z",
+              "checkedAt": "2026-07-14T09:34:33.878Z",
               "checkedTables": 70,
               "keyTables": [
                 {
                   "tableName": "Product",
-                  "expected": 1696,
-                  "actual": 1696,
+                  "expected": 1705,
+                  "actual": 1705,
                   "passed": true
                 },
                 {
                   "tableName": "BranchPrice",
-                  "expected": 1694,
-                  "actual": 1694,
+                  "expected": 1703,
+                  "actual": 1703,
                   "passed": true
                 },
                 {
                   "tableName": "Sale",
-                  "expected": 11,
-                  "actual": 11,
+                  "expected": 12,
+                  "actual": 12,
                   "passed": true
                 },
                 {
                   "tableName": "Payment",
-                  "expected": 5,
-                  "actual": 5,
+                  "expected": 6,
+                  "actual": 6,
                   "passed": true
                 },
                 {
                   "tableName": "PaymentItem",
-                  "expected": 5,
-                  "actual": 5,
+                  "expected": 6,
+                  "actual": 6,
                   "passed": true
                 },
                 {
@@ -88,14 +88,14 @@
                 },
                 {
                   "tableName": "StockItem",
-                  "expected": 2390,
-                  "actual": 2390,
+                  "expected": 2441,
+                  "actual": 2441,
                   "passed": true
                 },
                 {
                   "tableName": "SaleItem",
-                  "expected": 26,
-                  "actual": 26,
+                  "expected": 27,
+                  "actual": 27,
                   "passed": true
                 }
               ],
@@ -108,45 +108,45 @@
       "VERIFY_BACKUP": {
         "name": "VERIFY_BACKUP",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:40:00.247Z",
-        "finishedAt": "2026-07-14T07:40:00.247Z",
+        "startedAt": "2026-07-14T09:34:33.943Z",
+        "finishedAt": "2026-07-14T09:34:33.943Z",
         "durationMs": 0,
         "exitCode": 0,
         "command": "manifest.verification check",
         "details": {
           "verification": {
             "ok": true,
-            "checkedAt": "2026-07-14T07:40:00.172Z",
+            "checkedAt": "2026-07-14T09:34:33.878Z",
             "checkedTables": 70,
             "keyTables": [
               {
                 "tableName": "Product",
-                "expected": 1696,
-                "actual": 1696,
+                "expected": 1705,
+                "actual": 1705,
                 "passed": true
               },
               {
                 "tableName": "BranchPrice",
-                "expected": 1694,
-                "actual": 1694,
+                "expected": 1703,
+                "actual": 1703,
                 "passed": true
               },
               {
                 "tableName": "Sale",
-                "expected": 11,
-                "actual": 11,
+                "expected": 12,
+                "actual": 12,
                 "passed": true
               },
               {
                 "tableName": "Payment",
-                "expected": 5,
-                "actual": 5,
+                "expected": 6,
+                "actual": 6,
                 "passed": true
               },
               {
                 "tableName": "PaymentItem",
-                "expected": 5,
-                "actual": 5,
+                "expected": 6,
+                "actual": 6,
                 "passed": true
               },
               {
@@ -157,14 +157,14 @@
               },
               {
                 "tableName": "StockItem",
-                "expected": 2390,
-                "actual": 2390,
+                "expected": 2441,
+                "actual": 2441,
                 "passed": true
               },
               {
                 "tableName": "SaleItem",
-                "expected": 26,
-                "actual": 26,
+                "expected": 27,
+                "actual": 27,
                 "passed": true
               }
             ],
@@ -176,11 +176,11 @@
       "UPLOAD": {
         "name": "UPLOAD",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:40:00.248Z",
-        "finishedAt": "2026-07-14T07:40:02.370Z",
-        "durationMs": 2122,
+        "startedAt": "2026-07-14T09:34:33.943Z",
+        "finishedAt": "2026-07-14T09:34:36.068Z",
+        "durationMs": 2125,
         "exitCode": 0,
-        "command": "node recovery/upload/uploadBackup.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json\"",
+        "command": "node recovery/upload/uploadBackup.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json\"",
         "details": {
           "latestReport": "D:\\alpha-tech\\server\\recovery\\reports\\upload-report.latest.json"
         },
@@ -189,9 +189,9 @@
       "R2_RETENTION": {
         "name": "R2_RETENTION",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:40:02.370Z",
-        "finishedAt": "2026-07-14T07:40:03.164Z",
-        "durationMs": 794,
+        "startedAt": "2026-07-14T09:34:36.069Z",
+        "finishedAt": "2026-07-14T09:34:36.987Z",
+        "durationMs": 918,
         "exitCode": 0,
         "command": "Cloudflare R2 retention APPLY",
         "details": {
@@ -199,10 +199,10 @@
           "prefix": "alphatech-production/",
           "mode": "APPLY",
           "retentionDays": 7,
-          "scannedFiles": 82,
+          "scannedFiles": 84,
           "deleteCandidates": 0,
           "deletedFiles": 0,
-          "remainingFiles": 82,
+          "remainingFiles": 84,
           "failedFiles": [],
           "cutoffAt": "2026-07-08T00:00:00.000Z"
         },
@@ -211,9 +211,9 @@
       "RETENTION": {
         "name": "RETENTION",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:40:03.165Z",
-        "finishedAt": "2026-07-14T07:40:03.345Z",
-        "durationMs": 180,
+        "startedAt": "2026-07-14T09:34:36.987Z",
+        "finishedAt": "2026-07-14T09:34:37.141Z",
+        "durationMs": 154,
         "exitCode": 0,
         "command": "node recovery/retention/retentionPolicy.js --apply",
         "details": {
@@ -225,13 +225,13 @@
       "RESTORE_RECOVERY": {
         "name": "RESTORE_RECOVERY",
         "status": "PASS",
-        "startedAt": "2026-07-14T07:40:03.345Z",
-        "finishedAt": "2026-07-14T07:40:39.096Z",
-        "durationMs": 35751,
+        "startedAt": "2026-07-14T09:34:37.141Z",
+        "finishedAt": "2026-07-14T09:35:15.292Z",
+        "durationMs": 38151,
         "exitCode": 0,
-        "command": "node qbrs.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json\" --init --yes --reset-schema",
+        "command": "node qbrs.js --manifest \"D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json\" --init --yes --reset-schema",
         "details": {
-          "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
+          "manifestPath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
           "resetSchema": true
         },
         "error": null
@@ -239,9 +239,9 @@
       "VERIFY_RECOVERY": {
         "name": "VERIFY_RECOVERY",
         "status": "FAIL",
-        "startedAt": "2026-07-14T07:40:39.096Z",
-        "finishedAt": "2026-07-14T07:41:00.567Z",
-        "durationMs": 21471,
+        "startedAt": "2026-07-14T09:35:15.292Z",
+        "finishedAt": "2026-07-14T09:35:38.246Z",
+        "durationMs": 22954,
         "exitCode": 2,
         "command": "node recovery/verify/qbv.js",
         "details": {
@@ -252,7 +252,7 @@
       "REPORT": {
         "name": "REPORT",
         "status": "RUNNING",
-        "startedAt": "2026-07-14T07:41:00.568Z",
+        "startedAt": "2026-07-14T09:35:38.247Z",
         "finishedAt": null,
         "durationMs": null,
         "exitCode": null,

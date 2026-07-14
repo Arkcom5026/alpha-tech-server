@@ -1,7 +1,7 @@
 {
   "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
   "provider": "s3-compatible",
-  "uploadedAt": "2026-07-14T07:40:00.545Z",
+  "uploadedAt": "2026-07-14T09:34:34.206Z",
   "bucket": "saduaksabuy-recovery",
   "endpoint": "https://8512ed1efcf4b85171877d165f6de85b.r2.cloudflarestorage.com",
   "region": "auto",
@@ -9,31 +9,31 @@
   "baseKey": "alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
   "source": {
     "manifest": {
-      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
-      "fileName": "alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
       "sizeBytes": 167277,
-      "sha256": "f771ecce294691046d7327137e9a93425112d9e28b349323f493fec93a909b29"
+      "sha256": "d18a439d3bd7824ebcfb7bf47e4030f02b231672561b841e203756f22f98956f"
     },
     "sql": {
-      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql",
-      "fileName": "alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql",
-      "sizeBytes": 7801487,
-      "sha256": "a7c0e3b2d9e92c579bfd0472bd437f00b60e5683762017d733afb6e154fa468e"
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.sql",
+      "sizeBytes": 7866601,
+      "sha256": "f1237e4501742600cddac680e845bbf7f7b88abf3d690788e00ef3e0880ce42a"
     }
   },
   "uploaded": {
     "manifest": {
-      "key": "alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
-      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.manifest.json",
+      "key": "alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.manifest.json",
       "sizeBytes": 167277,
-      "sha256": "f771ecce294691046d7327137e9a93425112d9e28b349323f493fec93a909b29",
+      "sha256": "d18a439d3bd7824ebcfb7bf47e4030f02b231672561b841e203756f22f98956f",
       "verified": true
     },
     "sql": {
-      "key": "alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql",
-      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T07-39-54-245Z.sql",
-      "sizeBytes": 7801487,
-      "sha256": "a7c0e3b2d9e92c579bfd0472bd437f00b60e5683762017d733afb6e154fa468e",
+      "key": "alphatech-production/2026-07-14/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.sql",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T09-34-27-986Z.sql",
+      "sizeBytes": 7866601,
+      "sha256": "f1237e4501742600cddac680e845bbf7f7b88abf3d690788e00ef3e0880ce42a",
       "verified": true
     }
   },

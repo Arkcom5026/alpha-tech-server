@@ -347,3 +347,9 @@
 [2026-07-14T07:40:02.346Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-14T07-40-02-341Z.json
 [2026-07-14T07:40:02.347Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-14T07-40-02-341Z.txt
 [2026-07-14T07:40:02.347Z] Overall: PASS
+[2026-07-14T09:34:34.017Z] ============================================================
+[2026-07-14T09:34:34.024Z] AlphaTech Recovery Upload ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+[2026-07-14T09:34:34.025Z] ============================================================
+[2026-07-14T09:34:36.052Z] JSON report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-14T09-34-36-051Z.json
+[2026-07-14T09:34:36.053Z] TXT report: D:\alpha-tech\server\recovery\reports\upload-report-2026-07-14T09-34-36-051Z.txt
+[2026-07-14T09:34:36.053Z] Overall: PASS
