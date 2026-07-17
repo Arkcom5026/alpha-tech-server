@@ -1,0 +1,18 @@
+========================================
+AlphaTech Recovery Upload Report
+========================================
+Version    : ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE
+Provider   : s3-compatible
+Uploaded At: 2026-07-15T07:40:00.110Z
+Overall    : PASS
+
+Bucket     : saduaksabuy-recovery
+Base Key   : alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF
+
+Files
+----------------------------------------
+SQL      : PASS alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.sql
+Manifest : PASS alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.manifest.json
+----------------------------------------
+Overall: PASS
+========================================

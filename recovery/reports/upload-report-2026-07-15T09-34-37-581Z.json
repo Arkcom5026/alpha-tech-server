@@ -1,0 +1,41 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
+  "provider": "s3-compatible",
+  "uploadedAt": "2026-07-15T09:34:35.428Z",
+  "bucket": "saduaksabuy-recovery",
+  "endpoint": "https://8512ed1efcf4b85171877d165f6de85b.r2.cloudflarestorage.com",
+  "region": "auto",
+  "prefix": "alphatech-production",
+  "baseKey": "alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.manifest.json",
+      "sizeBytes": 167285,
+      "sha256": "e8eb3f0e540df4469bcaff7f133dd613ad922f90f50d93defe3bba83d9180941"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.sql",
+      "sizeBytes": 8251499,
+      "sha256": "7724ded585b69ff4a7e8068a3f53c01f11f69df77740cd3cdd341eb2a07e7b72"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "key": "alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.manifest.json",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.manifest.json",
+      "sizeBytes": 167285,
+      "sha256": "e8eb3f0e540df4469bcaff7f133dd613ad922f90f50d93defe3bba83d9180941",
+      "verified": true
+    },
+    "sql": {
+      "key": "alphatech-production/2026-07-15/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.sql",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.sql",
+      "sizeBytes": 8251499,
+      "sha256": "7724ded585b69ff4a7e8068a3f53c01f11f69df77740cd3cdd341eb2a07e7b72",
+      "verified": true
+    }
+  },
+  "ok": true
+}
