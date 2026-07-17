@@ -19,6 +19,34 @@ const MAX_SEARCH_LIMIT = 200;
 const DEFAULT_CANDIDATE_LIMIT = 50;
 const MAX_CANDIDATE_LIMIT = 200;
 
+const PAYMENT_METHOD_VALUES = new Set([
+  'CASH',
+  'TRANSFER',
+  'CARD',
+  'QR',
+  'E_WALLET',
+  'CHEQUE',
+  'OTHER',
+  'DEPOSIT',
+]);
+
+const PAYMENT_METHOD_ALIASES = {
+  QR_CODE: 'QR',
+  QR_PAYMENT: 'QR',
+  BANK_TRANSFER: 'TRANSFER',
+  CREDIT_CARD: 'CARD',
+  EWALLET: 'E_WALLET',
+  E_WALLET_PAYMENT: 'E_WALLET',
+};
+
+const normalizePaymentMethod = (value) => {
+  const raw = String(value ?? '').trim().toUpperCase();
+  if (!raw) return null;
+
+  const normalized = PAYMENT_METHOD_ALIASES[raw] || raw;
+  return PAYMENT_METHOD_VALUES.has(normalized) ? normalized : null;
+};
+
 const toNumber = (value, fallback = 0) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -458,7 +486,8 @@ const createCustomerReceipt = async (req, res) => {
     const customerId = toInt(req.body?.customerId);
     const totalAmount = roundMoney(req.body?.totalAmount);
     const receivedAt = asDateOrNull(req.body?.receivedAt) || new Date();
-    const paymentMethod = asNullableString(req.body?.paymentMethod);
+    const rawPaymentMethod = asNullableString(req.body?.paymentMethod);
+    const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
     const referenceNo = asNullableString(req.body?.referenceNo);
     const note = asNullableString(req.body?.note);
 
@@ -470,8 +499,15 @@ const createCustomerReceipt = async (req, res) => {
       return res.status(400).json({ success: false, message: 'totalAmount ต้องมากกว่า 0' });
     }
 
-    if (!paymentMethod) {
+    if (!rawPaymentMethod) {
       return res.status(400).json({ success: false, message: 'กรุณาระบุ paymentMethod' });
+    }
+
+    if (!paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentMethod ไม่ถูกต้อง',
+      });
     }
 
     const createdReceipt = await prisma.$transaction(async (tx) => {
@@ -940,7 +976,10 @@ const searchCustomerReceipts = async (req, res) => {
     const keyword = asNullableString(req.query?.keyword);
     const status = asNullableString(req.query?.status);
     const customerId = toInt(req.query?.customerId);
-    const paymentMethod = asNullableString(req.query?.paymentMethod);
+    const rawPaymentMethod = asNullableString(req.query?.paymentMethod);
+    const paymentMethod = rawPaymentMethod
+      ? normalizePaymentMethod(rawPaymentMethod)
+      : null;
     const fromDate = asDateOrNull(req.query?.fromDate);
     const toDate = asDateOrNull(req.query?.toDate);
     const page = Math.max(1, Number(req.query?.page) || 1);
@@ -954,6 +993,14 @@ const searchCustomerReceipts = async (req, res) => {
 
     if (status) where.status = status;
     if (Number.isInteger(customerId) && customerId > 0) where.customerId = customerId;
+
+    if (rawPaymentMethod && !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentMethod ไม่ถูกต้อง',
+      });
+    }
+
     if (paymentMethod) where.paymentMethod = paymentMethod;
 
     if (fromDate || toDate) {

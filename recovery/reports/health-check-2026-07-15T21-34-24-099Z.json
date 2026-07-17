@@ -1,0 +1,107 @@
+{
+  "version": "ALPHATECH-RECOVERY-HEALTH-CHECK-V1",
+  "checkedAt": "2026-07-15T21:34:24.099Z",
+  "overallPass": true,
+  "failedRequiredChecks": [],
+  "checks": [
+    {
+      "name": "env-production",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\.env",
+      "error": null
+    },
+    {
+      "name": "env-recovery",
+      "status": "PASS",
+      "required": false,
+      "path": "D:\\alpha-tech\\server\\.env.recovery",
+      "error": null
+    },
+    {
+      "name": "backup-engine-qb",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\qb.js",
+      "error": null
+    },
+    {
+      "name": "restore-engine-qbrs",
+      "status": "PASS",
+      "required": false,
+      "path": "D:\\alpha-tech\\server\\qbrs.js",
+      "error": null
+    },
+    {
+      "name": "verify-engine-qbv",
+      "status": "PASS",
+      "required": false,
+      "path": "D:\\alpha-tech\\server\\recovery\\verify\\qbv.js",
+      "error": null
+    },
+    {
+      "name": "job-runner",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\recovery\\jobRunner.js",
+      "error": null
+    },
+    {
+      "name": "backup-dir-writable",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\backups",
+      "error": null
+    },
+    {
+      "name": "reports-dir-writable",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\recovery\\reports",
+      "error": null
+    },
+    {
+      "name": "logs-dir-writable",
+      "status": "PASS",
+      "required": true,
+      "path": "D:\\alpha-tech\\server\\recovery\\logs",
+      "error": null
+    },
+    {
+      "name": "disk-space",
+      "status": "PASS",
+      "required": true,
+      "details": {
+        "platform": "win32",
+        "freeSpaceCheck": "not enforced by this version",
+        "requiredFreeMb": 512,
+        "freeMb": 93645.77
+      },
+      "error": null
+    },
+    {
+      "name": "production-db",
+      "status": "PASS",
+      "required": true,
+      "redactedUrl": "postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20",
+      "error": null,
+      "details": {
+        "database_name": "postgres",
+        "database_user": "postgres",
+        "server_time": "2026-07-15T21:34:24.112Z"
+      }
+    },
+    {
+      "name": "recovery-db",
+      "status": "PASS",
+      "required": false,
+      "redactedUrl": "postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres",
+      "error": null,
+      "details": {
+        "database_name": "postgres",
+        "database_user": "postgres",
+        "server_time": "2026-07-15T21:34:24.559Z"
+      }
+    }
+  ]
+}

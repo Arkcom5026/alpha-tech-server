@@ -2739,3 +2739,996 @@
 [2026-07-14T09:35:12.350Z] ✅ SQL restore completed via Node.js pg client.
 [2026-07-14T09:35:15.275Z] ✅ Restore verification PASS (70 tables checked).
 [2026-07-14T09:35:15.276Z] 🎉 Restore completed successfully in 37.98 seconds.
+[2026-07-14T13:40:05.107Z] ============================================================
+[2026-07-14T13:40:05.115Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-14T13:40:05.117Z] ============================================================
+[2026-07-14T13:40:05.156Z] ✅ Manifest loaded.
+[2026-07-14T13:40:05.157Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T13-39-54-760Z.sql
+[2026-07-14T13:40:05.157Z] ✅ SHA256 verified: 054ea0cf61cd8e45b6aa59e732c85438c3ef3dbb5e54dfd6a2f73695c69f642b
+[2026-07-14T13:40:05.161Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-14T13:40:05.167Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-14T13:40:05.169Z] 🎯 Port: 5432
+[2026-07-14T13:40:05.171Z] 🎯 Database: postgres
+[2026-07-14T13:40:05.172Z] 🎯 Schema: public
+[2026-07-14T13:40:05.548Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-14T13:40:08.822Z] 📊 Existing tables: 70
+[2026-07-14T13:40:08.822Z] 📦 Existing rows: 22221
+[2026-07-14T13:40:08.823Z] 🔎 Product: 1705
+[2026-07-14T13:40:08.824Z] 🔎 BranchPrice: 1703
+[2026-07-14T13:40:08.827Z] 🔎 StockItem: 2441
+[2026-07-14T13:40:08.830Z] 🔎 Sale: 12
+[2026-07-14T13:40:08.839Z] 🔎 SaleItem: 27
+[2026-07-14T13:40:08.840Z] 🔎 SaleItemSimple: 0
+[2026-07-14T13:40:08.846Z] 🔎 Payment: 6
+[2026-07-14T13:40:08.846Z] 🔎 PaymentItem: 6
+[2026-07-14T13:40:09.107Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-14T13:40:09.108Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-14T13:40:09.671Z] ✅ Schema "public" reset completed.
+[2026-07-14T13:40:09.705Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-14T13:40:09.705Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-14T13:40:13.479Z] npx stderr: Environment variables loaded from .env
+[2026-07-14T13:40:13.483Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-14T13:40:13.499Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-14T13:40:28.997Z] npx: Your database is now in sync with your Prisma schema. Done in 14.90s
+[2026-07-14T13:40:29.005Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-14T13:40:30.018Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-14T13:40:31.193Z] npx: [2K[1A[2K[GEPERM: operation not permitted, rename 'D:\alpha-tech\server\node_modules\.prism
+[2026-07-14T13:40:31.193Z] npx: a\client\query_engine-windows.dll.node.tmp31444' -> 'D:\alpha-tech\server\node_m
+[2026-07-14T13:40:31.193Z] npx: odules\.prisma\client\query_engine-windows.dll.node'
+[2026-07-14T13:40:31.258Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-14T13:40:34.411Z] 📊 Existing tables: 70
+[2026-07-14T13:40:34.411Z] 📦 Existing rows: 0
+[2026-07-14T13:40:34.414Z] 🔎 Product: 0
+[2026-07-14T13:40:34.414Z] 🔎 BranchPrice: 0
+[2026-07-14T13:40:34.414Z] 🔎 StockItem: 0
+[2026-07-14T13:40:34.415Z] 🔎 Sale: 0
+[2026-07-14T13:40:34.415Z] 🔎 SaleItem: 0
+[2026-07-14T13:40:34.415Z] 🔎 SaleItemSimple: 0
+[2026-07-14T13:40:34.416Z] 🔎 Payment: 0
+[2026-07-14T13:40:34.416Z] 🔎 PaymentItem: 0
+[2026-07-14T13:40:34.505Z] 📖 SQL loaded into memory (7.53 MB).
+[2026-07-14T13:40:34.506Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-14T13:40:38.094Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-14T13:40:41.294Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-14T13:40:41.294Z] 🎉 Restore completed successfully in 36.19 seconds.
+[2026-07-14T15:34:43.321Z] ============================================================
+[2026-07-14T15:34:43.326Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-14T15:34:43.327Z] ============================================================
+[2026-07-14T15:34:43.366Z] ✅ Manifest loaded.
+[2026-07-14T15:34:43.366Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T15-34-28-428Z.sql
+[2026-07-14T15:34:43.367Z] ✅ SHA256 verified: b360f5b6dd6931d6709193c87a9b7fbad21bebaeef661fa3477de85a5269f314
+[2026-07-14T15:34:43.376Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-14T15:34:43.379Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-14T15:34:43.381Z] 🎯 Port: 5432
+[2026-07-14T15:34:43.383Z] 🎯 Database: postgres
+[2026-07-14T15:34:43.386Z] 🎯 Schema: public
+[2026-07-14T15:34:43.810Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-14T15:34:47.057Z] 📊 Existing tables: 70
+[2026-07-14T15:34:47.057Z] 📦 Existing rows: 22278
+[2026-07-14T15:34:47.058Z] 🔎 Product: 1709
+[2026-07-14T15:34:47.058Z] 🔎 BranchPrice: 1707
+[2026-07-14T15:34:47.066Z] 🔎 StockItem: 2445
+[2026-07-14T15:34:47.090Z] 🔎 Sale: 12
+[2026-07-14T15:34:47.093Z] 🔎 SaleItem: 27
+[2026-07-14T15:34:47.093Z] 🔎 SaleItemSimple: 0
+[2026-07-14T15:34:47.097Z] 🔎 Payment: 6
+[2026-07-14T15:34:47.098Z] 🔎 PaymentItem: 6
+[2026-07-14T15:34:47.584Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-14T15:34:47.584Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-14T15:34:48.243Z] ✅ Schema "public" reset completed.
+[2026-07-14T15:34:48.294Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-14T15:34:48.294Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-14T15:34:52.881Z] npx stderr: Environment variables loaded from .env
+[2026-07-14T15:34:52.885Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-14T15:34:53.030Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-14T15:35:10.043Z] npx: Your database is now in sync with your Prisma schema. Done in 16.40s
+[2026-07-14T15:35:10.050Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-14T15:35:11.608Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-14T15:35:12.980Z] npx: [2K[1A[2K[GEPERM: operation not permitted, rename 'D:\alpha-tech\server\node_modules\.prism
+[2026-07-14T15:35:12.980Z] npx: a\client\query_engine-windows.dll.node.tmp34404' -> 'D:\alpha-tech\server\node_m
+[2026-07-14T15:35:12.980Z] npx: odules\.prisma\client\query_engine-windows.dll.node'
+[2026-07-14T15:35:13.155Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-14T15:35:16.374Z] 📊 Existing tables: 70
+[2026-07-14T15:35:16.375Z] 📦 Existing rows: 0
+[2026-07-14T15:35:16.378Z] 🔎 Product: 0
+[2026-07-14T15:35:16.383Z] 🔎 BranchPrice: 0
+[2026-07-14T15:35:16.387Z] 🔎 StockItem: 0
+[2026-07-14T15:35:16.395Z] 🔎 Sale: 0
+[2026-07-14T15:35:16.399Z] 🔎 SaleItem: 0
+[2026-07-14T15:35:16.402Z] 🔎 SaleItemSimple: 0
+[2026-07-14T15:35:16.409Z] 🔎 Payment: 0
+[2026-07-14T15:35:16.413Z] 🔎 PaymentItem: 0
+[2026-07-14T15:35:16.505Z] 📖 SQL loaded into memory (7.53 MB).
+[2026-07-14T15:35:16.507Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-14T15:35:20.347Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-14T15:35:23.099Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-14T15:35:23.100Z] 🎉 Restore completed successfully in 39.78 seconds.
+[2026-07-14T16:24:50.050Z] ============================================================
+[2026-07-14T16:24:50.054Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-14T16:24:50.054Z] ============================================================
+[2026-07-14T16:24:50.089Z] ✅ Manifest loaded.
+[2026-07-14T16:24:50.090Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T16-24-37-827Z.sql
+[2026-07-14T16:24:50.090Z] ✅ SHA256 verified: 509285a62f6743b95e03f29f4828a458a86c90d093262418ff0dfe38743531a3
+[2026-07-14T16:24:50.091Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-14T16:24:50.091Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-14T16:24:50.092Z] 🎯 Port: 5432
+[2026-07-14T16:24:50.092Z] 🎯 Database: postgres
+[2026-07-14T16:24:50.093Z] 🎯 Schema: public
+[2026-07-14T16:24:50.470Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-14T16:24:53.673Z] 📊 Existing tables: 70
+[2026-07-14T16:24:53.673Z] 📦 Existing rows: 22280
+[2026-07-14T16:24:53.674Z] 🔎 Product: 1709
+[2026-07-14T16:24:53.674Z] 🔎 BranchPrice: 1707
+[2026-07-14T16:24:53.674Z] 🔎 StockItem: 2445
+[2026-07-14T16:24:53.674Z] 🔎 Sale: 12
+[2026-07-14T16:24:53.674Z] 🔎 SaleItem: 27
+[2026-07-14T16:24:53.674Z] 🔎 SaleItemSimple: 0
+[2026-07-14T16:24:53.675Z] 🔎 Payment: 6
+[2026-07-14T16:24:53.675Z] 🔎 PaymentItem: 6
+[2026-07-14T16:24:53.933Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-14T16:24:53.933Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-14T16:24:54.466Z] ✅ Schema "public" reset completed.
+[2026-07-14T16:24:54.500Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-14T16:24:54.500Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-14T16:24:58.673Z] npx stderr: Environment variables loaded from .env
+[2026-07-14T16:24:58.674Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-14T16:24:58.684Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-14T16:25:14.510Z] npx: Your database is now in sync with your Prisma schema. Done in 15.23s
+[2026-07-14T16:25:14.512Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-14T16:25:15.472Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-14T16:25:16.767Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.29s
+[2026-07-14T16:25:16.823Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-14T16:25:20.065Z] 📊 Existing tables: 70
+[2026-07-14T16:25:20.066Z] 📦 Existing rows: 0
+[2026-07-14T16:25:20.066Z] 🔎 Product: 0
+[2026-07-14T16:25:20.066Z] 🔎 BranchPrice: 0
+[2026-07-14T16:25:20.066Z] 🔎 StockItem: 0
+[2026-07-14T16:25:20.066Z] 🔎 Sale: 0
+[2026-07-14T16:25:20.066Z] 🔎 SaleItem: 0
+[2026-07-14T16:25:20.067Z] 🔎 SaleItemSimple: 0
+[2026-07-14T16:25:20.067Z] 🔎 Payment: 0
+[2026-07-14T16:25:20.067Z] 🔎 PaymentItem: 0
+[2026-07-14T16:25:20.165Z] 📖 SQL loaded into memory (7.53 MB).
+[2026-07-14T16:25:20.165Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-14T16:25:23.771Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-14T16:25:26.701Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-14T16:25:26.702Z] 🎉 Restore completed successfully in 36.65 seconds.
+[2026-07-14T21:34:38.117Z] ============================================================
+[2026-07-14T21:34:38.120Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-14T21:34:38.120Z] ============================================================
+[2026-07-14T21:34:38.159Z] ✅ Manifest loaded.
+[2026-07-14T21:34:38.159Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-14_2026-07-14T21-34-28-255Z.sql
+[2026-07-14T21:34:38.160Z] ✅ SHA256 verified: d70d2162c2c8bbbb05881ebe4b22cbd3c9afb7b87e5bdd247b75a0e4e6f908d0
+[2026-07-14T21:34:38.162Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-14T21:34:38.163Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-14T21:34:38.163Z] 🎯 Port: 5432
+[2026-07-14T21:34:38.164Z] 🎯 Database: postgres
+[2026-07-14T21:34:38.164Z] 🎯 Schema: public
+[2026-07-14T21:34:38.560Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-14T21:34:42.093Z] 📊 Existing tables: 70
+[2026-07-14T21:34:42.094Z] 📦 Existing rows: 22283
+[2026-07-14T21:34:42.094Z] 🔎 Product: 1709
+[2026-07-14T21:34:42.094Z] 🔎 BranchPrice: 1707
+[2026-07-14T21:34:42.095Z] 🔎 StockItem: 2445
+[2026-07-14T21:34:42.096Z] 🔎 Sale: 12
+[2026-07-14T21:34:42.097Z] 🔎 SaleItem: 27
+[2026-07-14T21:34:42.097Z] 🔎 SaleItemSimple: 0
+[2026-07-14T21:34:42.098Z] 🔎 Payment: 6
+[2026-07-14T21:34:42.098Z] 🔎 PaymentItem: 6
+[2026-07-14T21:34:42.351Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-14T21:34:42.351Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-14T21:34:43.020Z] ✅ Schema "public" reset completed.
+[2026-07-14T21:34:43.058Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-14T21:34:43.058Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-14T21:34:47.830Z] npx stderr: Environment variables loaded from .env
+[2026-07-14T21:34:47.832Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-14T21:34:47.844Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-14T21:35:03.389Z] npx: Your database is now in sync with your Prisma schema. Done in 14.96s
+[2026-07-14T21:35:03.391Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-14T21:35:04.426Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-14T21:35:05.822Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.39s
+[2026-07-14T21:35:05.888Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-14T21:35:08.955Z] 📊 Existing tables: 70
+[2026-07-14T21:35:08.955Z] 📦 Existing rows: 0
+[2026-07-14T21:35:08.956Z] 🔎 Product: 0
+[2026-07-14T21:35:08.956Z] 🔎 BranchPrice: 0
+[2026-07-14T21:35:08.956Z] 🔎 StockItem: 0
+[2026-07-14T21:35:08.956Z] 🔎 Sale: 0
+[2026-07-14T21:35:08.956Z] 🔎 SaleItem: 0
+[2026-07-14T21:35:08.956Z] 🔎 SaleItemSimple: 0
+[2026-07-14T21:35:08.957Z] 🔎 Payment: 0
+[2026-07-14T21:35:08.957Z] 🔎 PaymentItem: 0
+[2026-07-14T21:35:09.042Z] 📖 SQL loaded into memory (7.53 MB).
+[2026-07-14T21:35:09.043Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-14T21:35:12.540Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-14T21:35:15.609Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-14T21:35:15.610Z] 🎉 Restore completed successfully in 37.49 seconds.
+[2026-07-15T01:40:02.550Z] ============================================================
+[2026-07-15T01:40:02.553Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T01:40:02.553Z] ============================================================
+[2026-07-15T01:40:02.589Z] ✅ Manifest loaded.
+[2026-07-15T01:40:02.590Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T01-39-53-844Z.sql
+[2026-07-15T01:40:02.590Z] ✅ SHA256 verified: 6863ad974f42f33e2f37fd6b53d28a738c6985ac0e203bbe1911e6e598b1becd
+[2026-07-15T01:40:02.591Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T01:40:02.591Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T01:40:02.592Z] 🎯 Port: 5432
+[2026-07-15T01:40:02.592Z] 🎯 Database: postgres
+[2026-07-15T01:40:02.593Z] 🎯 Schema: public
+[2026-07-15T01:40:02.957Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T01:40:06.364Z] 📊 Existing tables: 70
+[2026-07-15T01:40:06.365Z] 📦 Existing rows: 22283
+[2026-07-15T01:40:06.365Z] 🔎 Product: 1709
+[2026-07-15T01:40:06.366Z] 🔎 BranchPrice: 1707
+[2026-07-15T01:40:06.366Z] 🔎 StockItem: 2445
+[2026-07-15T01:40:06.366Z] 🔎 Sale: 12
+[2026-07-15T01:40:06.366Z] 🔎 SaleItem: 27
+[2026-07-15T01:40:06.366Z] 🔎 SaleItemSimple: 0
+[2026-07-15T01:40:06.367Z] 🔎 Payment: 6
+[2026-07-15T01:40:06.367Z] 🔎 PaymentItem: 6
+[2026-07-15T01:40:06.636Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T01:40:06.636Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T01:40:07.223Z] ✅ Schema "public" reset completed.
+[2026-07-15T01:40:07.260Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T01:40:07.260Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T01:40:11.831Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T01:40:11.833Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T01:40:11.844Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T01:40:28.186Z] npx: Your database is now in sync with your Prisma schema. Done in 15.76s
+[2026-07-15T01:40:28.190Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T01:40:29.225Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T01:40:30.905Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.68s
+[2026-07-15T01:40:30.907Z] npx stderr: ┌─────────────────────────────────────────────────────────┐
+[2026-07-15T01:40:30.908Z] npx stderr: │  Update available 6.16.2 -> 7.8.0                       │
+[2026-07-15T01:40:30.908Z] npx stderr: │                                                         │
+[2026-07-15T01:40:30.908Z] npx stderr: │  This is a major update - please follow the guide at    │
+[2026-07-15T01:40:30.910Z] npx stderr: │  https://pris.ly/d/major-version-upgrade                │
+[2026-07-15T01:40:30.910Z] npx stderr: │                                                         │
+[2026-07-15T01:40:30.910Z] npx stderr: │  Run the following to update                            │
+[2026-07-15T01:40:30.910Z] npx stderr: │    npm i --save-dev prisma@latest                       │
+[2026-07-15T01:40:30.910Z] npx stderr: │    npm i @prisma/client@latest                          │
+[2026-07-15T01:40:30.911Z] npx stderr: └─────────────────────────────────────────────────────────┘
+[2026-07-15T01:40:30.973Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T01:40:34.142Z] 📊 Existing tables: 70
+[2026-07-15T01:40:34.143Z] 📦 Existing rows: 0
+[2026-07-15T01:40:34.143Z] 🔎 Product: 0
+[2026-07-15T01:40:34.143Z] 🔎 BranchPrice: 0
+[2026-07-15T01:40:34.143Z] 🔎 StockItem: 0
+[2026-07-15T01:40:34.144Z] 🔎 Sale: 0
+[2026-07-15T01:40:34.144Z] 🔎 SaleItem: 0
+[2026-07-15T01:40:34.144Z] 🔎 SaleItemSimple: 0
+[2026-07-15T01:40:34.144Z] 🔎 Payment: 0
+[2026-07-15T01:40:34.144Z] 🔎 PaymentItem: 0
+[2026-07-15T01:40:34.229Z] 📖 SQL loaded into memory (7.54 MB).
+[2026-07-15T01:40:34.230Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T01:40:37.664Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T01:40:40.753Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T01:40:40.753Z] 🎉 Restore completed successfully in 38.20 seconds.
+[2026-07-15T03:34:37.934Z] ============================================================
+[2026-07-15T03:34:37.940Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T03:34:37.940Z] ============================================================
+[2026-07-15T03:34:37.975Z] ✅ Manifest loaded.
+[2026-07-15T03:34:37.976Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T03-34-28-254Z.sql
+[2026-07-15T03:34:37.976Z] ✅ SHA256 verified: c947c3a001d2d84ff008a55014f478e606bdf3760d23ceba48de52ecbb1d5458
+[2026-07-15T03:34:37.977Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T03:34:37.977Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T03:34:37.977Z] 🎯 Port: 5432
+[2026-07-15T03:34:37.978Z] 🎯 Database: postgres
+[2026-07-15T03:34:37.978Z] 🎯 Schema: public
+[2026-07-15T03:34:38.343Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T03:34:41.600Z] 📊 Existing tables: 70
+[2026-07-15T03:34:41.600Z] 📦 Existing rows: 22296
+[2026-07-15T03:34:41.600Z] 🔎 Product: 1709
+[2026-07-15T03:34:41.601Z] 🔎 BranchPrice: 1707
+[2026-07-15T03:34:41.601Z] 🔎 StockItem: 2450
+[2026-07-15T03:34:41.601Z] 🔎 Sale: 12
+[2026-07-15T03:34:41.601Z] 🔎 SaleItem: 27
+[2026-07-15T03:34:41.601Z] 🔎 SaleItemSimple: 0
+[2026-07-15T03:34:41.602Z] 🔎 Payment: 6
+[2026-07-15T03:34:41.602Z] 🔎 PaymentItem: 6
+[2026-07-15T03:34:41.920Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T03:34:41.921Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T03:34:42.452Z] ✅ Schema "public" reset completed.
+[2026-07-15T03:34:42.486Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T03:34:42.487Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T03:34:46.829Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T03:34:46.830Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T03:34:46.843Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T03:35:02.717Z] npx: Your database is now in sync with your Prisma schema. Done in 15.26s
+[2026-07-15T03:35:02.720Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T03:35:04.004Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T03:35:05.407Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.40s
+[2026-07-15T03:35:05.472Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T03:35:08.669Z] 📊 Existing tables: 70
+[2026-07-15T03:35:08.669Z] 📦 Existing rows: 0
+[2026-07-15T03:35:08.670Z] 🔎 Product: 0
+[2026-07-15T03:35:08.670Z] 🔎 BranchPrice: 0
+[2026-07-15T03:35:08.670Z] 🔎 StockItem: 0
+[2026-07-15T03:35:08.670Z] 🔎 Sale: 0
+[2026-07-15T03:35:08.670Z] 🔎 SaleItem: 0
+[2026-07-15T03:35:08.670Z] 🔎 SaleItemSimple: 0
+[2026-07-15T03:35:08.670Z] 🔎 Payment: 0
+[2026-07-15T03:35:08.671Z] 🔎 PaymentItem: 0
+[2026-07-15T03:35:08.754Z] 📖 SQL loaded into memory (7.64 MB).
+[2026-07-15T03:35:08.755Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T03:35:12.281Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T03:35:14.978Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T03:35:14.978Z] 🎉 Restore completed successfully in 37.05 seconds.
+[2026-07-15T06:37:37.248Z] ============================================================
+[2026-07-15T06:37:37.252Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T06:37:37.252Z] ============================================================
+[2026-07-15T06:37:37.289Z] ✅ Manifest loaded.
+[2026-07-15T06:37:37.290Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T06-37-26-153Z.sql
+[2026-07-15T06:37:37.290Z] ✅ SHA256 verified: 35b720ad25ed2f7cb750a58277cc20e6241738574b0c87f83e531e8e9dab5df7
+[2026-07-15T06:37:37.291Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T06:37:37.292Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T06:37:37.292Z] 🎯 Port: 5432
+[2026-07-15T06:37:37.293Z] 🎯 Database: postgres
+[2026-07-15T06:37:37.293Z] 🎯 Schema: public
+[2026-07-15T06:37:37.735Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T06:37:41.066Z] 📊 Existing tables: 70
+[2026-07-15T06:37:41.067Z] 📦 Existing rows: 22532
+[2026-07-15T06:37:41.067Z] 🔎 Product: 1716
+[2026-07-15T06:37:41.067Z] 🔎 BranchPrice: 1714
+[2026-07-15T06:37:41.068Z] 🔎 StockItem: 2503
+[2026-07-15T06:37:41.068Z] 🔎 Sale: 15
+[2026-07-15T06:37:41.068Z] 🔎 SaleItem: 67
+[2026-07-15T06:37:41.068Z] 🔎 SaleItemSimple: 0
+[2026-07-15T06:37:41.069Z] 🔎 Payment: 8
+[2026-07-15T06:37:41.069Z] 🔎 PaymentItem: 8
+[2026-07-15T06:37:41.336Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T06:37:41.337Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T06:37:41.844Z] ✅ Schema "public" reset completed.
+[2026-07-15T06:37:41.881Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T06:37:41.881Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T06:37:46.077Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T06:37:46.079Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T06:37:46.090Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T06:38:02.562Z] npx: Your database is now in sync with your Prisma schema. Done in 15.91s
+[2026-07-15T06:38:02.564Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T06:38:03.617Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T06:38:04.903Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.28s
+[2026-07-15T06:38:04.961Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T06:38:07.857Z] 📊 Existing tables: 70
+[2026-07-15T06:38:07.857Z] 📦 Existing rows: 0
+[2026-07-15T06:38:07.857Z] 🔎 Product: 0
+[2026-07-15T06:38:07.857Z] 🔎 BranchPrice: 0
+[2026-07-15T06:38:07.858Z] 🔎 StockItem: 0
+[2026-07-15T06:38:07.858Z] 🔎 Sale: 0
+[2026-07-15T06:38:07.858Z] 🔎 SaleItem: 0
+[2026-07-15T06:38:07.858Z] 🔎 SaleItemSimple: 0
+[2026-07-15T06:38:07.858Z] 🔎 Payment: 0
+[2026-07-15T06:38:07.858Z] 🔎 PaymentItem: 0
+[2026-07-15T06:38:07.943Z] 📖 SQL loaded into memory (7.72 MB).
+[2026-07-15T06:38:07.943Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T06:38:11.546Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T06:38:14.204Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T06:38:14.205Z] 🎉 Restore completed successfully in 36.96 seconds.
+[2026-07-15T07:40:02.664Z] ============================================================
+[2026-07-15T07:40:02.667Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T07:40:02.668Z] ============================================================
+[2026-07-15T07:40:02.704Z] ✅ Manifest loaded.
+[2026-07-15T07:40:02.704Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.sql
+[2026-07-15T07:40:02.705Z] ✅ SHA256 verified: 7d1acff3b3be4141e773b3d2c4b119f45e8bcb926d58506bff8f7da076b9008f
+[2026-07-15T07:40:02.706Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T07:40:02.706Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T07:40:02.706Z] 🎯 Port: 5432
+[2026-07-15T07:40:02.707Z] 🎯 Database: postgres
+[2026-07-15T07:40:02.707Z] 🎯 Schema: public
+[2026-07-15T07:40:03.076Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T07:40:06.313Z] 📊 Existing tables: 70
+[2026-07-15T07:40:06.313Z] 📦 Existing rows: 22693
+[2026-07-15T07:40:06.314Z] 🔎 Product: 1722
+[2026-07-15T07:40:06.314Z] 🔎 BranchPrice: 1720
+[2026-07-15T07:40:06.314Z] 🔎 StockItem: 2577
+[2026-07-15T07:40:06.314Z] 🔎 Sale: 15
+[2026-07-15T07:40:06.314Z] 🔎 SaleItem: 67
+[2026-07-15T07:40:06.314Z] 🔎 SaleItemSimple: 0
+[2026-07-15T07:40:06.315Z] 🔎 Payment: 8
+[2026-07-15T07:40:06.316Z] 🔎 PaymentItem: 8
+[2026-07-15T07:40:06.592Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T07:40:06.592Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T07:40:07.130Z] ✅ Schema "public" reset completed.
+[2026-07-15T07:40:07.168Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T07:40:07.169Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T07:40:10.893Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T07:40:10.894Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T07:40:10.906Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T07:40:28.251Z] npx: Your database is now in sync with your Prisma schema. Done in 16.75s
+[2026-07-15T07:40:28.253Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T07:40:29.456Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T07:40:31.022Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.56s
+[2026-07-15T07:40:31.080Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T07:40:34.222Z] 📊 Existing tables: 70
+[2026-07-15T07:40:34.223Z] 📦 Existing rows: 0
+[2026-07-15T07:40:34.223Z] 🔎 Product: 0
+[2026-07-15T07:40:34.223Z] 🔎 BranchPrice: 0
+[2026-07-15T07:40:34.223Z] 🔎 StockItem: 0
+[2026-07-15T07:40:34.224Z] 🔎 Sale: 0
+[2026-07-15T07:40:34.224Z] 🔎 SaleItem: 0
+[2026-07-15T07:40:34.224Z] 🔎 SaleItemSimple: 0
+[2026-07-15T07:40:34.224Z] 🔎 Payment: 0
+[2026-07-15T07:40:34.224Z] 🔎 PaymentItem: 0
+[2026-07-15T07:40:34.305Z] 📖 SQL loaded into memory (7.75 MB).
+[2026-07-15T07:40:34.306Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T07:40:37.794Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T07:40:40.721Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T07:40:40.721Z] 🎉 Restore completed successfully in 38.06 seconds.
+[2026-07-15T09:34:38.342Z] ============================================================
+[2026-07-15T09:34:38.345Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T09:34:38.346Z] ============================================================
+[2026-07-15T09:34:38.380Z] ✅ Manifest loaded.
+[2026-07-15T09:34:38.381Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T09-34-29-038Z.sql
+[2026-07-15T09:34:38.382Z] ✅ SHA256 verified: 7724ded585b69ff4a7e8068a3f53c01f11f69df77740cd3cdd341eb2a07e7b72
+[2026-07-15T09:34:38.383Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T09:34:38.383Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T09:34:38.383Z] 🎯 Port: 5432
+[2026-07-15T09:34:38.384Z] 🎯 Database: postgres
+[2026-07-15T09:34:38.384Z] 🎯 Schema: public
+[2026-07-15T09:34:38.741Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T09:34:42.040Z] 📊 Existing tables: 70
+[2026-07-15T09:34:42.041Z] 📦 Existing rows: 22749
+[2026-07-15T09:34:42.041Z] 🔎 Product: 1725
+[2026-07-15T09:34:42.041Z] 🔎 BranchPrice: 1723
+[2026-07-15T09:34:42.042Z] 🔎 StockItem: 2577
+[2026-07-15T09:34:42.042Z] 🔎 Sale: 15
+[2026-07-15T09:34:42.042Z] 🔎 SaleItem: 67
+[2026-07-15T09:34:42.042Z] 🔎 SaleItemSimple: 0
+[2026-07-15T09:34:42.042Z] 🔎 Payment: 8
+[2026-07-15T09:34:42.043Z] 🔎 PaymentItem: 8
+[2026-07-15T09:34:42.298Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T09:34:42.298Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T09:34:42.874Z] ✅ Schema "public" reset completed.
+[2026-07-15T09:34:42.909Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T09:34:42.909Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T09:34:46.401Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T09:34:46.403Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T09:34:46.414Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T09:35:03.367Z] npx: Your database is now in sync with your Prisma schema. Done in 16.35s
+[2026-07-15T09:35:03.369Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T09:35:04.351Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T09:35:05.746Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.39s
+[2026-07-15T09:35:05.813Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T09:35:09.101Z] 📊 Existing tables: 70
+[2026-07-15T09:35:09.101Z] 📦 Existing rows: 0
+[2026-07-15T09:35:09.101Z] 🔎 Product: 0
+[2026-07-15T09:35:09.102Z] 🔎 BranchPrice: 0
+[2026-07-15T09:35:09.102Z] 🔎 StockItem: 0
+[2026-07-15T09:35:09.102Z] 🔎 Sale: 0
+[2026-07-15T09:35:09.102Z] 🔎 SaleItem: 0
+[2026-07-15T09:35:09.102Z] 🔎 SaleItemSimple: 0
+[2026-07-15T09:35:09.102Z] 🔎 Payment: 0
+[2026-07-15T09:35:09.102Z] 🔎 PaymentItem: 0
+[2026-07-15T09:35:09.276Z] 📖 SQL loaded into memory (7.87 MB).
+[2026-07-15T09:35:09.277Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T09:35:12.822Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T09:35:15.623Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T09:35:15.623Z] 🎉 Restore completed successfully in 37.28 seconds.
+[2026-07-15T15:34:37.677Z] ============================================================
+[2026-07-15T15:34:37.680Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T15:34:37.681Z] ============================================================
+[2026-07-15T15:34:37.715Z] ✅ Manifest loaded.
+[2026-07-15T15:34:37.715Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T15-34-28-689Z.sql
+[2026-07-15T15:34:37.716Z] ✅ SHA256 verified: c28b5141eb86db2e0dcf794ab6fe8aac62ff0723e9085b8fb92c59d145db7a28
+[2026-07-15T15:34:37.717Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T15:34:37.717Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T15:34:37.717Z] 🎯 Port: 5432
+[2026-07-15T15:34:37.718Z] 🎯 Database: postgres
+[2026-07-15T15:34:37.718Z] 🎯 Schema: public
+[2026-07-15T15:34:38.067Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T15:34:41.208Z] 📊 Existing tables: 70
+[2026-07-15T15:34:41.208Z] 📦 Existing rows: 23066
+[2026-07-15T15:34:41.209Z] 🔎 Product: 1733
+[2026-07-15T15:34:41.209Z] 🔎 BranchPrice: 1731
+[2026-07-15T15:34:41.209Z] 🔎 StockItem: 2590
+[2026-07-15T15:34:41.209Z] 🔎 Sale: 18
+[2026-07-15T15:34:41.209Z] 🔎 SaleItem: 76
+[2026-07-15T15:34:41.210Z] 🔎 SaleItemSimple: 0
+[2026-07-15T15:34:41.210Z] 🔎 Payment: 9
+[2026-07-15T15:34:41.210Z] 🔎 PaymentItem: 9
+[2026-07-15T15:34:41.781Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T15:34:41.781Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T15:34:42.309Z] ✅ Schema "public" reset completed.
+[2026-07-15T15:34:42.365Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T15:34:42.366Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T15:34:46.167Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T15:34:46.169Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T15:34:46.179Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T15:35:01.469Z] npx: Your database is now in sync with your Prisma schema. Done in 14.70s
+[2026-07-15T15:35:01.471Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T15:35:02.427Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T15:35:03.733Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.30s
+[2026-07-15T15:35:03.795Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T15:35:07.074Z] 📊 Existing tables: 70
+[2026-07-15T15:35:07.074Z] 📦 Existing rows: 0
+[2026-07-15T15:35:07.074Z] 🔎 Product: 0
+[2026-07-15T15:35:07.074Z] 🔎 BranchPrice: 0
+[2026-07-15T15:35:07.074Z] 🔎 StockItem: 0
+[2026-07-15T15:35:07.075Z] 🔎 Sale: 0
+[2026-07-15T15:35:07.075Z] 🔎 SaleItem: 0
+[2026-07-15T15:35:07.075Z] 🔎 SaleItemSimple: 0
+[2026-07-15T15:35:07.075Z] 🔎 Payment: 0
+[2026-07-15T15:35:07.075Z] 🔎 PaymentItem: 0
+[2026-07-15T15:35:07.157Z] 📖 SQL loaded into memory (7.90 MB).
+[2026-07-15T15:35:07.157Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T15:35:10.895Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T15:35:13.624Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T15:35:13.624Z] 🎉 Restore completed successfully in 35.95 seconds.
+[2026-07-15T21:34:36.857Z] ============================================================
+[2026-07-15T21:34:36.860Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-15T21:34:36.860Z] ============================================================
+[2026-07-15T21:34:36.896Z] ✅ Manifest loaded.
+[2026-07-15T21:34:36.896Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T21-34-27-833Z.sql
+[2026-07-15T21:34:36.897Z] ✅ SHA256 verified: 6e6d1a980147a9f7c56a042c841f7963485ac5b022a33619d73f1a0c3902187c
+[2026-07-15T21:34:36.898Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-15T21:34:36.898Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-15T21:34:36.898Z] 🎯 Port: 5432
+[2026-07-15T21:34:36.898Z] 🎯 Database: postgres
+[2026-07-15T21:34:36.899Z] 🎯 Schema: public
+[2026-07-15T21:34:37.270Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-15T21:34:40.701Z] 📊 Existing tables: 70
+[2026-07-15T21:34:40.701Z] 📦 Existing rows: 23133
+[2026-07-15T21:34:40.702Z] 🔎 Product: 1737
+[2026-07-15T21:34:40.702Z] 🔎 BranchPrice: 1735
+[2026-07-15T21:34:40.702Z] 🔎 StockItem: 2600
+[2026-07-15T21:34:40.702Z] 🔎 Sale: 20
+[2026-07-15T21:34:40.703Z] 🔎 SaleItem: 78
+[2026-07-15T21:34:40.703Z] 🔎 SaleItemSimple: 0
+[2026-07-15T21:34:40.703Z] 🔎 Payment: 10
+[2026-07-15T21:34:40.703Z] 🔎 PaymentItem: 10
+[2026-07-15T21:34:40.956Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-15T21:34:40.957Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-15T21:34:41.580Z] ✅ Schema "public" reset completed.
+[2026-07-15T21:34:41.616Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-15T21:34:41.616Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-15T21:34:45.509Z] npx stderr: Environment variables loaded from .env
+[2026-07-15T21:34:45.510Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-15T21:34:45.523Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-15T21:35:02.489Z] npx: Your database is now in sync with your Prisma schema. Done in 16.38s
+[2026-07-15T21:35:02.491Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-15T21:35:03.574Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-15T21:35:04.881Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.30s
+[2026-07-15T21:35:04.884Z] npx stderr: ┌─────────────────────────────────────────────────────────┐
+[2026-07-15T21:35:04.884Z] npx stderr: │  Update available 6.16.2 -> 7.8.0                       │
+[2026-07-15T21:35:04.885Z] npx stderr: │                                                         │
+[2026-07-15T21:35:04.885Z] npx stderr: │  This is a major update - please follow the guide at    │
+[2026-07-15T21:35:04.885Z] npx stderr: │  https://pris.ly/d/major-version-upgrade                │
+[2026-07-15T21:35:04.885Z] npx stderr: │                                                         │
+[2026-07-15T21:35:04.886Z] npx stderr: │  Run the following to update                            │
+[2026-07-15T21:35:04.886Z] npx stderr: │    npm i --save-dev prisma@latest                       │
+[2026-07-15T21:35:04.886Z] npx stderr: │    npm i @prisma/client@latest                          │
+[2026-07-15T21:35:04.886Z] npx stderr: └─────────────────────────────────────────────────────────┘
+[2026-07-15T21:35:04.944Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-15T21:35:07.882Z] 📊 Existing tables: 70
+[2026-07-15T21:35:07.882Z] 📦 Existing rows: 0
+[2026-07-15T21:35:07.883Z] 🔎 Product: 0
+[2026-07-15T21:35:07.883Z] 🔎 BranchPrice: 0
+[2026-07-15T21:35:07.883Z] 🔎 StockItem: 0
+[2026-07-15T21:35:07.884Z] 🔎 Sale: 0
+[2026-07-15T21:35:07.884Z] 🔎 SaleItem: 0
+[2026-07-15T21:35:07.884Z] 🔎 SaleItemSimple: 0
+[2026-07-15T21:35:07.885Z] 🔎 Payment: 0
+[2026-07-15T21:35:07.885Z] 🔎 PaymentItem: 0
+[2026-07-15T21:35:07.968Z] 📖 SQL loaded into memory (7.90 MB).
+[2026-07-15T21:35:07.968Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-15T21:35:12.400Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-15T21:35:15.038Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-15T21:35:15.038Z] 🎉 Restore completed successfully in 38.18 seconds.
+[2026-07-16T01:40:04.995Z] ============================================================
+[2026-07-16T01:40:04.999Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T01:40:04.999Z] ============================================================
+[2026-07-16T01:40:05.036Z] ✅ Manifest loaded.
+[2026-07-16T01:40:05.037Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T01-39-54-868Z.sql
+[2026-07-16T01:40:05.038Z] ✅ SHA256 verified: 813ceee5f85350b9bd477b41ebbe9af9336b619b8550ae54d997f56d1f591aa0
+[2026-07-16T01:40:05.039Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T01:40:05.040Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T01:40:05.041Z] 🎯 Port: 5432
+[2026-07-16T01:40:05.042Z] 🎯 Database: postgres
+[2026-07-16T01:40:05.042Z] 🎯 Schema: public
+[2026-07-16T01:40:05.491Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T01:40:09.237Z] 📊 Existing tables: 70
+[2026-07-16T01:40:09.237Z] 📦 Existing rows: 23133
+[2026-07-16T01:40:09.239Z] 🔎 Product: 1737
+[2026-07-16T01:40:09.239Z] 🔎 BranchPrice: 1735
+[2026-07-16T01:40:09.239Z] 🔎 StockItem: 2600
+[2026-07-16T01:40:09.240Z] 🔎 Sale: 20
+[2026-07-16T01:40:09.240Z] 🔎 SaleItem: 78
+[2026-07-16T01:40:09.240Z] 🔎 SaleItemSimple: 0
+[2026-07-16T01:40:09.240Z] 🔎 Payment: 10
+[2026-07-16T01:40:09.241Z] 🔎 PaymentItem: 10
+[2026-07-16T01:40:09.905Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T01:40:09.905Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T01:40:10.532Z] ✅ Schema "public" reset completed.
+[2026-07-16T01:40:10.570Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T01:40:10.571Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T01:40:16.653Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T01:40:16.655Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T01:40:16.668Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T01:40:33.859Z] npx: Your database is now in sync with your Prisma schema. Done in 16.59s
+[2026-07-16T01:40:33.863Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T01:40:35.726Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T01:40:37.747Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 2.02s
+[2026-07-16T01:40:37.814Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T01:40:42.249Z] 📊 Existing tables: 70
+[2026-07-16T01:40:42.250Z] 📦 Existing rows: 0
+[2026-07-16T01:40:42.250Z] 🔎 Product: 0
+[2026-07-16T01:40:42.250Z] 🔎 BranchPrice: 0
+[2026-07-16T01:40:42.250Z] 🔎 StockItem: 0
+[2026-07-16T01:40:42.250Z] 🔎 Sale: 0
+[2026-07-16T01:40:42.251Z] 🔎 SaleItem: 0
+[2026-07-16T01:40:42.251Z] 🔎 SaleItemSimple: 0
+[2026-07-16T01:40:42.251Z] 🔎 Payment: 0
+[2026-07-16T01:40:42.251Z] 🔎 PaymentItem: 0
+[2026-07-16T01:40:42.570Z] 📖 SQL loaded into memory (7.91 MB).
+[2026-07-16T01:40:42.572Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T01:40:47.754Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T01:40:50.642Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T01:40:50.642Z] 🎉 Restore completed successfully in 45.65 seconds.
+[2026-07-16T03:34:39.213Z] ============================================================
+[2026-07-16T03:34:39.235Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T03:34:39.242Z] ============================================================
+[2026-07-16T03:34:39.367Z] ✅ Manifest loaded.
+[2026-07-16T03:34:39.376Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T03-34-28-563Z.sql
+[2026-07-16T03:34:39.383Z] ✅ SHA256 verified: 433df59fbdac302ff24db6284ae6600e0233e875cd6eb98e598ae2499fd0654e
+[2026-07-16T03:34:39.391Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T03:34:39.412Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T03:34:39.420Z] 🎯 Port: 5432
+[2026-07-16T03:34:39.421Z] 🎯 Database: postgres
+[2026-07-16T03:34:39.431Z] 🎯 Schema: public
+[2026-07-16T03:34:39.870Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T03:34:43.287Z] 📊 Existing tables: 70
+[2026-07-16T03:34:43.288Z] 📦 Existing rows: 23157
+[2026-07-16T03:34:43.288Z] 🔎 Product: 1737
+[2026-07-16T03:34:43.288Z] 🔎 BranchPrice: 1735
+[2026-07-16T03:34:43.289Z] 🔎 StockItem: 2617
+[2026-07-16T03:34:43.289Z] 🔎 Sale: 20
+[2026-07-16T03:34:43.289Z] 🔎 SaleItem: 78
+[2026-07-16T03:34:43.289Z] 🔎 SaleItemSimple: 0
+[2026-07-16T03:34:43.293Z] 🔎 Payment: 10
+[2026-07-16T03:34:43.295Z] 🔎 PaymentItem: 10
+[2026-07-16T03:34:43.576Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T03:34:43.576Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T03:34:44.055Z] ✅ Schema "public" reset completed.
+[2026-07-16T03:34:44.093Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T03:34:44.093Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T03:34:48.320Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T03:34:48.324Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T03:34:48.338Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T03:35:03.753Z] npx: Your database is now in sync with your Prisma schema. Done in 14.80s
+[2026-07-16T03:35:03.760Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T03:35:06.075Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T03:35:08.205Z] npx: [2K[1A[2K[GEPERM: operation not permitted, rename 'D:\alpha-tech\server\node_modules\.prism
+[2026-07-16T03:35:08.205Z] npx: a\client\query_engine-windows.dll.node.tmp14296' -> 'D:\alpha-tech\server\node_m
+[2026-07-16T03:35:08.205Z] npx: odules\.prisma\client\query_engine-windows.dll.node'
+[2026-07-16T03:35:08.271Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T03:35:11.424Z] 📊 Existing tables: 70
+[2026-07-16T03:35:11.427Z] 📦 Existing rows: 0
+[2026-07-16T03:35:11.430Z] 🔎 Product: 0
+[2026-07-16T03:35:11.431Z] 🔎 BranchPrice: 0
+[2026-07-16T03:35:11.456Z] 🔎 StockItem: 0
+[2026-07-16T03:35:11.457Z] 🔎 Sale: 0
+[2026-07-16T03:35:11.459Z] 🔎 SaleItem: 0
+[2026-07-16T03:35:11.462Z] 🔎 SaleItemSimple: 0
+[2026-07-16T03:35:11.469Z] 🔎 Payment: 0
+[2026-07-16T03:35:11.471Z] 🔎 PaymentItem: 0
+[2026-07-16T03:35:11.816Z] 📖 SQL loaded into memory (8.02 MB).
+[2026-07-16T03:35:11.817Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T03:35:15.429Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T03:35:18.214Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T03:35:18.214Z] 🎉 Restore completed successfully in 39.00 seconds.
+[2026-07-16T07:40:08.802Z] ============================================================
+[2026-07-16T07:40:08.805Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T07:40:08.805Z] ============================================================
+[2026-07-16T07:40:08.839Z] ✅ Manifest loaded.
+[2026-07-16T07:40:08.840Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T07-39-56-098Z.sql
+[2026-07-16T07:40:08.840Z] ✅ SHA256 verified: 0a229dcfc508397fb6c27580cd60c554757c037ebcb653486452a7545d0ed433
+[2026-07-16T07:40:08.841Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T07:40:08.841Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T07:40:08.842Z] 🎯 Port: 5432
+[2026-07-16T07:40:08.842Z] 🎯 Database: postgres
+[2026-07-16T07:40:08.843Z] 🎯 Schema: public
+[2026-07-16T07:40:09.216Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T07:40:12.696Z] 📊 Existing tables: 70
+[2026-07-16T07:40:12.697Z] 📦 Existing rows: 23383
+[2026-07-16T07:40:12.697Z] 🔎 Product: 1764
+[2026-07-16T07:40:12.697Z] 🔎 BranchPrice: 1762
+[2026-07-16T07:40:12.698Z] 🔎 StockItem: 2683
+[2026-07-16T07:40:12.698Z] 🔎 Sale: 21
+[2026-07-16T07:40:12.698Z] 🔎 SaleItem: 81
+[2026-07-16T07:40:12.698Z] 🔎 SaleItemSimple: 0
+[2026-07-16T07:40:12.699Z] 🔎 Payment: 10
+[2026-07-16T07:40:12.699Z] 🔎 PaymentItem: 10
+[2026-07-16T07:40:12.955Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T07:40:12.956Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T07:40:13.511Z] ✅ Schema "public" reset completed.
+[2026-07-16T07:40:13.547Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T07:40:13.547Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T07:40:17.181Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T07:40:17.183Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T07:40:17.193Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T07:40:32.120Z] npx: Your database is now in sync with your Prisma schema. Done in 14.34s
+[2026-07-16T07:40:32.122Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T07:40:33.147Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T07:40:34.546Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.40s
+[2026-07-16T07:40:34.549Z] npx stderr: ┌─────────────────────────────────────────────────────────┐
+[2026-07-16T07:40:34.549Z] npx stderr: │  Update available 6.16.2 -> 7.8.0                       │
+[2026-07-16T07:40:34.549Z] npx stderr: │                                                         │
+[2026-07-16T07:40:34.549Z] npx stderr: │  This is a major update - please follow the guide at    │
+[2026-07-16T07:40:34.550Z] npx stderr: │  https://pris.ly/d/major-version-upgrade                │
+[2026-07-16T07:40:34.550Z] npx stderr: │                                                         │
+[2026-07-16T07:40:34.550Z] npx stderr: │  Run the following to update                            │
+[2026-07-16T07:40:34.550Z] npx stderr: │    npm i --save-dev prisma@latest                       │
+[2026-07-16T07:40:34.550Z] npx stderr: │    npm i @prisma/client@latest                          │
+[2026-07-16T07:40:34.550Z] npx stderr: └─────────────────────────────────────────────────────────┘
+[2026-07-16T07:40:34.610Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T07:40:39.000Z] 📊 Existing tables: 70
+[2026-07-16T07:40:39.000Z] 📦 Existing rows: 0
+[2026-07-16T07:40:39.000Z] 🔎 Product: 0
+[2026-07-16T07:40:39.000Z] 🔎 BranchPrice: 0
+[2026-07-16T07:40:39.000Z] 🔎 StockItem: 0
+[2026-07-16T07:40:39.001Z] 🔎 Sale: 0
+[2026-07-16T07:40:39.001Z] 🔎 SaleItem: 0
+[2026-07-16T07:40:39.001Z] 🔎 SaleItemSimple: 0
+[2026-07-16T07:40:39.001Z] 🔎 Payment: 0
+[2026-07-16T07:40:39.001Z] 🔎 PaymentItem: 0
+[2026-07-16T07:40:40.393Z] 📖 SQL loaded into memory (8.31 MB).
+[2026-07-16T07:40:40.393Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T13:40:05.373Z] ============================================================
+[2026-07-16T13:40:05.376Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T13:40:05.376Z] ============================================================
+[2026-07-16T13:40:05.415Z] ✅ Manifest loaded.
+[2026-07-16T13:40:05.415Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T13-39-54-707Z.sql
+[2026-07-16T13:40:05.416Z] ✅ SHA256 verified: 016da84185f86cb28bcb33808f360ea1187504c12b9a1c8394d4ffb7a51ee646
+[2026-07-16T13:40:05.417Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T13:40:05.418Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T13:40:05.418Z] 🎯 Port: 5432
+[2026-07-16T13:40:05.419Z] 🎯 Database: postgres
+[2026-07-16T13:40:05.419Z] 🎯 Schema: public
+[2026-07-16T13:40:05.789Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T13:40:09.328Z] 📊 Existing tables: 70
+[2026-07-16T13:40:09.328Z] 📦 Existing rows: 24024
+[2026-07-16T13:40:09.329Z] 🔎 Product: 1842
+[2026-07-16T13:40:09.329Z] 🔎 BranchPrice: 1840
+[2026-07-16T13:40:09.329Z] 🔎 StockItem: 2904
+[2026-07-16T13:40:09.330Z] 🔎 Sale: 23
+[2026-07-16T13:40:09.330Z] 🔎 SaleItem: 83
+[2026-07-16T13:40:09.330Z] 🔎 SaleItemSimple: 0
+[2026-07-16T13:40:09.330Z] 🔎 Payment: 10
+[2026-07-16T13:40:09.331Z] 🔎 PaymentItem: 10
+[2026-07-16T13:40:09.611Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T13:40:09.611Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T13:40:10.133Z] ✅ Schema "public" reset completed.
+[2026-07-16T13:40:10.169Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T13:40:10.170Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T13:40:13.789Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T13:40:13.791Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T13:40:13.808Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T13:40:30.049Z] npx: Your database is now in sync with your Prisma schema. Done in 15.66s
+[2026-07-16T13:40:30.052Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T13:40:31.145Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T13:40:32.448Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.30s
+[2026-07-16T13:40:32.508Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T13:40:35.891Z] 📊 Existing tables: 70
+[2026-07-16T13:40:35.891Z] 📦 Existing rows: 0
+[2026-07-16T13:40:35.891Z] 🔎 Product: 0
+[2026-07-16T13:40:35.892Z] 🔎 BranchPrice: 0
+[2026-07-16T13:40:35.892Z] 🔎 StockItem: 0
+[2026-07-16T13:40:35.892Z] 🔎 Sale: 0
+[2026-07-16T13:40:35.892Z] 🔎 SaleItem: 0
+[2026-07-16T13:40:35.892Z] 🔎 SaleItemSimple: 0
+[2026-07-16T13:40:35.892Z] 🔎 Payment: 0
+[2026-07-16T13:40:35.893Z] 🔎 PaymentItem: 0
+[2026-07-16T13:40:35.981Z] 📖 SQL loaded into memory (8.39 MB).
+[2026-07-16T13:40:35.982Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T13:40:39.795Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T13:40:42.461Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T13:40:42.461Z] 🎉 Restore completed successfully in 37.09 seconds.
+[2026-07-16T15:34:38.324Z] ============================================================
+[2026-07-16T15:34:38.327Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T15:34:38.328Z] ============================================================
+[2026-07-16T15:34:38.364Z] ✅ Manifest loaded.
+[2026-07-16T15:34:38.365Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T15-34-28-171Z.sql
+[2026-07-16T15:34:38.365Z] ✅ SHA256 verified: c7b36e8df01bd0d1ada443ae56c6033140d8f6ca20638aa255e616ad056fa9cb
+[2026-07-16T15:34:38.366Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T15:34:38.366Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T15:34:38.366Z] 🎯 Port: 5432
+[2026-07-16T15:34:38.366Z] 🎯 Database: postgres
+[2026-07-16T15:34:38.367Z] 🎯 Schema: public
+[2026-07-16T15:34:39.073Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T15:34:42.381Z] 📊 Existing tables: 70
+[2026-07-16T15:34:42.382Z] 📦 Existing rows: 24207
+[2026-07-16T15:34:42.382Z] 🔎 Product: 1855
+[2026-07-16T15:34:42.382Z] 🔎 BranchPrice: 1853
+[2026-07-16T15:34:42.382Z] 🔎 StockItem: 2933
+[2026-07-16T15:34:42.383Z] 🔎 Sale: 25
+[2026-07-16T15:34:42.383Z] 🔎 SaleItem: 86
+[2026-07-16T15:34:42.383Z] 🔎 SaleItemSimple: 0
+[2026-07-16T15:34:42.383Z] 🔎 Payment: 12
+[2026-07-16T15:34:42.384Z] 🔎 PaymentItem: 12
+[2026-07-16T15:34:42.635Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T15:34:42.636Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T15:34:43.209Z] ✅ Schema "public" reset completed.
+[2026-07-16T15:34:43.244Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T15:34:43.245Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T15:34:46.857Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T15:34:46.858Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T15:34:46.868Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T15:35:02.184Z] npx: Your database is now in sync with your Prisma schema. Done in 14.77s
+[2026-07-16T15:35:02.186Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T15:35:03.708Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T15:35:05.042Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.33s
+[2026-07-16T15:35:05.097Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T15:35:07.870Z] 📊 Existing tables: 70
+[2026-07-16T15:35:07.870Z] 📦 Existing rows: 0
+[2026-07-16T15:35:07.870Z] 🔎 Product: 0
+[2026-07-16T15:35:07.870Z] 🔎 BranchPrice: 0
+[2026-07-16T15:35:07.871Z] 🔎 StockItem: 0
+[2026-07-16T15:35:07.871Z] 🔎 Sale: 0
+[2026-07-16T15:35:07.871Z] 🔎 SaleItem: 0
+[2026-07-16T15:35:07.871Z] 🔎 SaleItemSimple: 0
+[2026-07-16T15:35:07.871Z] 🔎 Payment: 0
+[2026-07-16T15:35:07.872Z] 🔎 PaymentItem: 0
+[2026-07-16T15:35:07.962Z] 📖 SQL loaded into memory (8.39 MB).
+[2026-07-16T15:35:07.963Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T15:35:12.087Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T15:35:14.780Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T15:35:14.780Z] 🎉 Restore completed successfully in 36.46 seconds.
+[2026-07-16T19:40:03.378Z] ============================================================
+[2026-07-16T19:40:03.382Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T19:40:03.382Z] ============================================================
+[2026-07-16T19:40:03.418Z] ✅ Manifest loaded.
+[2026-07-16T19:40:03.419Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T19-39-53-804Z.sql
+[2026-07-16T19:40:03.419Z] ✅ SHA256 verified: 159ac3218016f03fdd9407cd00a00922ba5cf411977ac297d11e38451a7d206d
+[2026-07-16T19:40:03.420Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T19:40:03.420Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T19:40:03.420Z] 🎯 Port: 5432
+[2026-07-16T19:40:03.421Z] 🎯 Database: postgres
+[2026-07-16T19:40:03.421Z] 🎯 Schema: public
+[2026-07-16T19:40:03.782Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T19:40:07.127Z] 📊 Existing tables: 70
+[2026-07-16T19:40:07.128Z] 📦 Existing rows: 24207
+[2026-07-16T19:40:07.128Z] 🔎 Product: 1855
+[2026-07-16T19:40:07.128Z] 🔎 BranchPrice: 1853
+[2026-07-16T19:40:07.129Z] 🔎 StockItem: 2933
+[2026-07-16T19:40:07.129Z] 🔎 Sale: 25
+[2026-07-16T19:40:07.129Z] 🔎 SaleItem: 86
+[2026-07-16T19:40:07.129Z] 🔎 SaleItemSimple: 0
+[2026-07-16T19:40:07.129Z] 🔎 Payment: 12
+[2026-07-16T19:40:07.130Z] 🔎 PaymentItem: 12
+[2026-07-16T19:40:07.392Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T19:40:07.392Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T19:40:07.958Z] ✅ Schema "public" reset completed.
+[2026-07-16T19:40:07.994Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T19:40:07.995Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T19:40:12.295Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T19:40:12.296Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T19:40:12.307Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T19:40:28.471Z] npx: Your database is now in sync with your Prisma schema. Done in 15.55s
+[2026-07-16T19:40:28.474Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T19:40:29.400Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T19:40:30.730Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.33s
+[2026-07-16T19:40:30.789Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T19:40:33.800Z] 📊 Existing tables: 70
+[2026-07-16T19:40:33.800Z] 📦 Existing rows: 0
+[2026-07-16T19:40:33.800Z] 🔎 Product: 0
+[2026-07-16T19:40:33.800Z] 🔎 BranchPrice: 0
+[2026-07-16T19:40:33.801Z] 🔎 StockItem: 0
+[2026-07-16T19:40:33.801Z] 🔎 Sale: 0
+[2026-07-16T19:40:33.801Z] 🔎 SaleItem: 0
+[2026-07-16T19:40:33.801Z] 🔎 SaleItemSimple: 0
+[2026-07-16T19:40:33.801Z] 🔎 Payment: 0
+[2026-07-16T19:40:33.801Z] 🔎 PaymentItem: 0
+[2026-07-16T19:40:33.885Z] 📖 SQL loaded into memory (8.39 MB).
+[2026-07-16T19:40:33.885Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T19:40:37.782Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T19:40:40.686Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T19:40:40.686Z] 🎉 Restore completed successfully in 37.31 seconds.
+[2026-07-16T21:34:37.154Z] ============================================================
+[2026-07-16T21:34:37.157Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-16T21:34:37.158Z] ============================================================
+[2026-07-16T21:34:37.194Z] ✅ Manifest loaded.
+[2026-07-16T21:34:37.194Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-16_2026-07-16T21-34-27-857Z.sql
+[2026-07-16T21:34:37.194Z] ✅ SHA256 verified: 5a026cc65fe710735e424d6453906f55b46c386ce46fb6bf3947048e389ac086
+[2026-07-16T21:34:37.195Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-16T21:34:37.196Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-16T21:34:37.196Z] 🎯 Port: 5432
+[2026-07-16T21:34:37.196Z] 🎯 Database: postgres
+[2026-07-16T21:34:37.197Z] 🎯 Schema: public
+[2026-07-16T21:34:37.540Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-16T21:34:40.644Z] 📊 Existing tables: 70
+[2026-07-16T21:34:40.645Z] 📦 Existing rows: 24207
+[2026-07-16T21:34:40.645Z] 🔎 Product: 1855
+[2026-07-16T21:34:40.646Z] 🔎 BranchPrice: 1853
+[2026-07-16T21:34:40.646Z] 🔎 StockItem: 2933
+[2026-07-16T21:34:40.646Z] 🔎 Sale: 25
+[2026-07-16T21:34:40.646Z] 🔎 SaleItem: 86
+[2026-07-16T21:34:40.646Z] 🔎 SaleItemSimple: 0
+[2026-07-16T21:34:40.647Z] 🔎 Payment: 12
+[2026-07-16T21:34:40.647Z] 🔎 PaymentItem: 12
+[2026-07-16T21:34:40.912Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-16T21:34:40.913Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-16T21:34:41.447Z] ✅ Schema "public" reset completed.
+[2026-07-16T21:34:41.483Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-16T21:34:41.484Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-16T21:34:44.344Z] npx stderr: Environment variables loaded from .env
+[2026-07-16T21:34:44.347Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-16T21:34:44.357Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-16T21:35:00.255Z] npx: Your database is now in sync with your Prisma schema. Done in 15.37s
+[2026-07-16T21:35:00.257Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-16T21:35:01.136Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-16T21:35:02.278Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.14s
+[2026-07-16T21:35:02.281Z] npx stderr: ┌─────────────────────────────────────────────────────────┐
+[2026-07-16T21:35:02.281Z] npx stderr: │  Update available 6.16.2 -> 7.8.0                       │
+[2026-07-16T21:35:02.281Z] npx stderr: │                                                         │
+[2026-07-16T21:35:02.281Z] npx stderr: │  This is a major update - please follow the guide at    │
+[2026-07-16T21:35:02.281Z] npx stderr: │  https://pris.ly/d/major-version-upgrade                │
+[2026-07-16T21:35:02.282Z] npx stderr: │                                                         │
+[2026-07-16T21:35:02.282Z] npx stderr: │  Run the following to update                            │
+[2026-07-16T21:35:02.282Z] npx stderr: │    npm i --save-dev prisma@latest                       │
+[2026-07-16T21:35:02.282Z] npx stderr: │    npm i @prisma/client@latest                          │
+[2026-07-16T21:35:02.282Z] npx stderr: └─────────────────────────────────────────────────────────┘
+[2026-07-16T21:35:02.338Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-16T21:35:05.408Z] 📊 Existing tables: 70
+[2026-07-16T21:35:05.409Z] 📦 Existing rows: 0
+[2026-07-16T21:35:05.409Z] 🔎 Product: 0
+[2026-07-16T21:35:05.409Z] 🔎 BranchPrice: 0
+[2026-07-16T21:35:05.409Z] 🔎 StockItem: 0
+[2026-07-16T21:35:05.410Z] 🔎 Sale: 0
+[2026-07-16T21:35:05.410Z] 🔎 SaleItem: 0
+[2026-07-16T21:35:05.410Z] 🔎 SaleItemSimple: 0
+[2026-07-16T21:35:05.410Z] 🔎 Payment: 0
+[2026-07-16T21:35:05.410Z] 🔎 PaymentItem: 0
+[2026-07-16T21:35:05.496Z] 📖 SQL loaded into memory (8.39 MB).
+[2026-07-16T21:35:05.496Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-16T21:35:09.277Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-16T21:35:12.145Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-16T21:35:12.145Z] 🎉 Restore completed successfully in 34.99 seconds.
+[2026-07-17T03:34:37.313Z] ============================================================
+[2026-07-17T03:34:37.316Z] 🚑 AlphaTech Restore Tool P1-HARDENED-RESTORE-V3-NODE-PG
+[2026-07-17T03:34:37.317Z] ============================================================
+[2026-07-17T03:34:37.355Z] ✅ Manifest loaded.
+[2026-07-17T03:34:37.355Z] ✅ SQL file: D:\alpha-tech\server\backups\alphatech_hardened_backup_v6_2026-07-17_2026-07-17T03-34-28-003Z.sql
+[2026-07-17T03:34:37.356Z] ✅ SHA256 verified: c6761ec77be0611fe46fdcff2362b896a916e440fb2347dfef4068da60eda25c
+[2026-07-17T03:34:37.357Z] 🎯 Target DB: postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+[2026-07-17T03:34:37.357Z] 🎯 Host: db.engqdeyzbvnmxbnpemau.supabase.co
+[2026-07-17T03:34:37.357Z] 🎯 Port: 5432
+[2026-07-17T03:34:37.358Z] 🎯 Database: postgres
+[2026-07-17T03:34:37.358Z] 🎯 Schema: public
+[2026-07-17T03:34:37.725Z] 🔌 Connected to target PostgreSQL successfully.
+[2026-07-17T03:34:41.030Z] 📊 Existing tables: 70
+[2026-07-17T03:34:41.031Z] 📦 Existing rows: 24207
+[2026-07-17T03:34:41.031Z] 🔎 Product: 1855
+[2026-07-17T03:34:41.031Z] 🔎 BranchPrice: 1853
+[2026-07-17T03:34:41.031Z] 🔎 StockItem: 2933
+[2026-07-17T03:34:41.031Z] 🔎 Sale: 25
+[2026-07-17T03:34:41.032Z] 🔎 SaleItem: 86
+[2026-07-17T03:34:41.032Z] 🔎 SaleItemSimple: 0
+[2026-07-17T03:34:41.032Z] 🔎 Payment: 12
+[2026-07-17T03:34:41.033Z] 🔎 PaymentItem: 12
+[2026-07-17T03:34:41.279Z] 🧨 Resetting target schema "public" before restore...
+[2026-07-17T03:34:41.280Z] 🛡️ This action is intended for Recovery / Standby DB only.
+[2026-07-17T03:34:41.870Z] ✅ Schema "public" reset completed.
+[2026-07-17T03:34:41.904Z] 🧱 Running Prisma db push against Recovery DB only...
+[2026-07-17T03:34:41.905Z] 🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.
+[2026-07-17T03:34:45.936Z] npx stderr: Environment variables loaded from .env
+[2026-07-17T03:34:45.937Z] npx: Prisma schema loaded from prisma\schema.prisma
+[2026-07-17T03:34:45.949Z] npx: Datasource "db": PostgreSQL database "postgres", schema "public" at "db.engqdeyzbvnmxbnpemau.supabase.co:5432"
+[2026-07-17T03:35:02.056Z] npx: Your database is now in sync with your Prisma schema. Done in 15.51s
+[2026-07-17T03:35:02.058Z] npx: Running generate... (Use --skip-generate to skip the generators)
+[2026-07-17T03:35:03.112Z] npx: [2K[1A[2K[GRunning generate... - Prisma Client
+[2026-07-17T03:35:04.458Z] npx: [2K[1A[2K[G✔ Generated Prisma Client (v6.16.2) to .\node_modules\.prisma\client in 1.34s
+[2026-07-17T03:35:04.517Z] ✅ Prisma db push completed for Recovery DB.
+[2026-07-17T03:35:07.630Z] 📊 Existing tables: 70
+[2026-07-17T03:35:07.630Z] 📦 Existing rows: 0
+[2026-07-17T03:35:07.630Z] 🔎 Product: 0
+[2026-07-17T03:35:07.631Z] 🔎 BranchPrice: 0
+[2026-07-17T03:35:07.631Z] 🔎 StockItem: 0
+[2026-07-17T03:35:07.631Z] 🔎 Sale: 0
+[2026-07-17T03:35:07.631Z] 🔎 SaleItem: 0
+[2026-07-17T03:35:07.631Z] 🔎 SaleItemSimple: 0
+[2026-07-17T03:35:07.631Z] 🔎 Payment: 0
+[2026-07-17T03:35:07.632Z] 🔎 PaymentItem: 0
+[2026-07-17T03:35:07.719Z] 📖 SQL loaded into memory (8.42 MB).
+[2026-07-17T03:35:07.719Z] 🚚 Starting SQL restore via Node.js pg client...
+[2026-07-17T03:35:12.568Z] ✅ SQL restore completed via Node.js pg client.
+[2026-07-17T03:35:15.516Z] ✅ Restore verification PASS (70 tables checked).
+[2026-07-17T03:35:15.516Z] 🎉 Restore completed successfully in 38.20 seconds.

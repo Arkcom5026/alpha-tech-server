@@ -1,0 +1,2078 @@
+{
+  "verifyVersion": "ALPHATECH-RECOVERY-VERIFY-V1",
+  "checkedAt": "2026-07-14T16:25:49.905Z",
+  "schema": "public",
+  "options": {
+    "includeFingerprint": false,
+    "maxFingerprintRows": 200000
+  },
+  "production": {
+    "connection": {
+      "redacted": "postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20"
+    },
+    "tables": [
+      "Bank",
+      "BarcodeCounter",
+      "BarcodeReceiptItem",
+      "Branch",
+      "BranchPrice",
+      "Brand",
+      "Cart",
+      "CartItem",
+      "Category",
+      "CombinedBillingDocument",
+      "CombinedSaleDocument",
+      "CustomerDeposit",
+      "CustomerProfile",
+      "CustomerReceiptAllocations",
+      "CustomerReceipts",
+      "DepositUsage",
+      "District",
+      "EmployeeProfile",
+      "GlobalProductType",
+      "InputTaxFilingBatch",
+      "InputTaxFilingItem",
+      "Order",
+      "OrderOnline",
+      "OrderOnlineItem",
+      "PasswordResetToken",
+      "Payment",
+      "PaymentCodeCounter",
+      "PaymentItem",
+      "Position",
+      "Product",
+      "ProductImage",
+      "ProductOnOrder",
+      "ProductType",
+      "ProductTypeBrand",
+      "Province",
+      "PurchaseOrder",
+      "PurchaseOrderItem",
+      "PurchaseOrderReceipt",
+      "PurchaseOrderReceiptItem",
+      "RefreshToken",
+      "RefundTransaction",
+      "RepairJob",
+      "RepairPartItem",
+      "Sale",
+      "SaleItem",
+      "SaleItemSimple",
+      "SaleReturn",
+      "SaleReturnItem",
+      "SaleReturnItemSimple",
+      "SalesTaxFilingBatch",
+      "SalesTaxFilingItem",
+      "ServiceItem",
+      "ServiceOrder",
+      "SimpleLot",
+      "StockAuditScanLog",
+      "StockAuditSession",
+      "StockAuditSnapshotItem",
+      "StockBalance",
+      "StockItem",
+      "StockMovement",
+      "Subdistrict",
+      "Supplier",
+      "SupplierPayment",
+      "SupplierPaymentReceipt",
+      "Unit",
+      "User",
+      "V2CustomerDeposit",
+      "V2StockAudit",
+      "V2StockAuditItem",
+      "WarrantyClaim"
+    ],
+    "totalRows": 22283
+  },
+  "recovery": {
+    "connection": {
+      "redacted": "postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres"
+    },
+    "tables": [
+      "Bank",
+      "BarcodeCounter",
+      "BarcodeReceiptItem",
+      "Branch",
+      "BranchPrice",
+      "Brand",
+      "Cart",
+      "CartItem",
+      "Category",
+      "CombinedBillingDocument",
+      "CombinedSaleDocument",
+      "CustomerDeposit",
+      "CustomerProfile",
+      "CustomerReceiptAllocations",
+      "CustomerReceipts",
+      "DepositUsage",
+      "District",
+      "EmployeeProfile",
+      "GlobalProductType",
+      "InputTaxFilingBatch",
+      "InputTaxFilingItem",
+      "Order",
+      "OrderOnline",
+      "OrderOnlineItem",
+      "PasswordResetToken",
+      "Payment",
+      "PaymentCodeCounter",
+      "PaymentItem",
+      "Position",
+      "Product",
+      "ProductImage",
+      "ProductOnOrder",
+      "ProductType",
+      "ProductTypeBrand",
+      "Province",
+      "PurchaseOrder",
+      "PurchaseOrderItem",
+      "PurchaseOrderReceipt",
+      "PurchaseOrderReceiptItem",
+      "RefreshToken",
+      "RefundTransaction",
+      "RepairJob",
+      "RepairPartItem",
+      "Sale",
+      "SaleItem",
+      "SaleItemSimple",
+      "SaleReturn",
+      "SaleReturnItem",
+      "SaleReturnItemSimple",
+      "SalesTaxFilingBatch",
+      "SalesTaxFilingItem",
+      "ServiceItem",
+      "ServiceOrder",
+      "SimpleLot",
+      "StockAuditScanLog",
+      "StockAuditSession",
+      "StockAuditSnapshotItem",
+      "StockBalance",
+      "StockItem",
+      "StockMovement",
+      "Subdistrict",
+      "Supplier",
+      "SupplierPayment",
+      "SupplierPaymentReceipt",
+      "Unit",
+      "User",
+      "V2CustomerDeposit",
+      "V2StockAudit",
+      "V2StockAuditItem",
+      "WarrantyClaim"
+    ],
+    "totalRows": 22283
+  },
+  "comparison": {
+    "overallPass": true,
+    "summary": {
+      "totalTablesCompared": 70,
+      "productionTables": 70,
+      "recoveryTables": 70,
+      "productionRows": 22283,
+      "recoveryRows": 22283,
+      "rowCountMismatches": 0,
+      "columnMismatches": 0,
+      "duplicatePkFailures": 0,
+      "productionBrokenFkCount": 0,
+      "recoveryBrokenFkCount": 0,
+      "fingerprintEnabled": false,
+      "fingerprintMismatches": null
+    },
+    "tables": [
+      {
+        "tableName": "Bank",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 14,
+          "recovery": 14,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "BarcodeCounter",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 2,
+          "recovery": 2,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "BarcodeReceiptItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 165,
+          "recovery": 165,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Branch",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 3,
+          "recovery": 3,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "BranchPrice",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 1707,
+          "recovery": 1707,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Brand",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 201,
+          "recovery": 201,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Cart",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 3,
+          "recovery": 3,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CartItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Category",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 2,
+          "recovery": 2,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CombinedBillingDocument",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CombinedSaleDocument",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CustomerDeposit",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CustomerProfile",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 187,
+          "recovery": 187,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CustomerReceiptAllocations",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "CustomerReceipts",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "DepositUsage",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "District",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 928,
+          "recovery": 928,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "EmployeeProfile",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 6,
+          "recovery": 6,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "GlobalProductType",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 10,
+          "recovery": 10,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "InputTaxFilingBatch",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "InputTaxFilingItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Order",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "OrderOnline",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "OrderOnlineItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PasswordResetToken",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 9,
+          "recovery": 9,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Payment",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 6,
+          "recovery": 6,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PaymentCodeCounter",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 1,
+          "recovery": 1,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PaymentItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 6,
+          "recovery": 6,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Position",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 8,
+          "recovery": 8,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Product",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 1709,
+          "recovery": 1709,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ProductImage",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ProductOnOrder",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ProductType",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 95,
+          "recovery": 95,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ProductTypeBrand",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 333,
+          "recovery": 333,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Province",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 77,
+          "recovery": 77,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PurchaseOrder",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 9,
+          "recovery": 9,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PurchaseOrderItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 28,
+          "recovery": 28,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PurchaseOrderReceipt",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 9,
+          "recovery": 9,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "PurchaseOrderReceiptItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 28,
+          "recovery": 28,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "RefreshToken",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 4046,
+          "recovery": 4046,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "RefundTransaction",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "RepairJob",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "RepairPartItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Sale",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 12,
+          "recovery": 12,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 27,
+          "recovery": 27,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SaleItemSimple",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SaleReturn",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SaleReturnItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SaleReturnItemSimple",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SalesTaxFilingBatch",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SalesTaxFilingItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ServiceItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "ServiceOrder",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SimpleLot",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockAuditScanLog",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 1,
+          "recovery": 1,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockAuditSession",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 1,
+          "recovery": 1,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockAuditSnapshotItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 757,
+          "recovery": 757,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockBalance",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 859,
+          "recovery": 859,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 2445,
+          "recovery": 2445,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "StockMovement",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 944,
+          "recovery": 944,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Subdistrict",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 7436,
+          "recovery": 7436,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Supplier",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 9,
+          "recovery": 9,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SupplierPayment",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "SupplierPaymentReceipt",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "Unit",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 13,
+          "recovery": 13,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "User",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 187,
+          "recovery": 187,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "V2CustomerDeposit",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "V2StockAudit",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "V2StockAuditItem",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      },
+      {
+        "tableName": "WarrantyClaim",
+        "existsInProduction": true,
+        "existsInRecovery": true,
+        "rowCount": {
+          "production": 0,
+          "recovery": 0,
+          "passed": true
+        },
+        "columns": {
+          "passed": true,
+          "mismatches": []
+        },
+        "duplicatePk": {
+          "production": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "recovery": {
+            "checked": true,
+            "duplicates": 0
+          },
+          "passed": true
+        },
+        "fingerprint": null,
+        "passed": true
+      }
+    ],
+    "foreignKeyIntegrity": {
+      "productionBrokenFks": [],
+      "recoveryBrokenFks": []
+    }
+  }
+}

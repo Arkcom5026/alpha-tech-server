@@ -1,0 +1,115 @@
+{
+  "jobVersion": "ALPHATECH-RECOVERY-JOB-RUNNER-V7-R2-RETENTION",
+  "jobId": "2026-07-16T09-34-22-817Z",
+  "mode": "backup-workflow",
+  "startedAt": "2026-07-16T09:34:22.817Z",
+  "finishedAt": "2026-07-16T09:34:22.834Z",
+  "durationMs": 17,
+  "ok": false,
+  "exitCode": 1,
+  "workflow": {
+    "status": "FAILED",
+    "steps": {
+      "HEALTH_CHECK": {
+        "name": "HEALTH_CHECK",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "BACKUP": {
+        "name": "BACKUP",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "VERIFY_BACKUP": {
+        "name": "VERIFY_BACKUP",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "UPLOAD": {
+        "name": "UPLOAD",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "R2_RETENTION": {
+        "name": "R2_RETENTION",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "RETENTION": {
+        "name": "RETENTION",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "RESTORE_RECOVERY": {
+        "name": "RESTORE_RECOVERY",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "VERIFY_RECOVERY": {
+        "name": "VERIFY_RECOVERY",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      },
+      "REPORT": {
+        "name": "REPORT",
+        "status": "PENDING",
+        "startedAt": null,
+        "finishedAt": null,
+        "durationMs": null,
+        "exitCode": null,
+        "command": null,
+        "details": {},
+        "error": null
+      }
+    },
+    "overall": null
+  }
+}

@@ -1,0 +1,99 @@
+========================================
+AlphaTech Integrity Verification
+========================================
+Version       : ALPHATECH-RECOVERY-VERIFY-V1
+Checked At    : 2026-07-16T19:41:02.291Z
+Overall       : PASS
+
+Production    : postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20
+Recovery      : postgresql://postgres:***@db.engqdeyzbvnmxbnpemau.supabase.co:5432/postgres
+
+Summary
+  totalTablesCompared: 70
+  productionTables: 70
+  recoveryTables: 70
+  productionRows: 24207
+  recoveryRows: 24207
+  rowCountMismatches: 0
+  columnMismatches: 0
+  duplicatePkFailures: 0
+  productionBrokenFkCount: 0
+  recoveryBrokenFkCount: 0
+  fingerprintEnabled: false
+  fingerprintMismatches: null
+
+Tables
+----------------------------------------
+Bank                               PASS rows 14 / 14
+BarcodeCounter                     PASS rows 2 / 2
+BarcodeReceiptItem                 PASS rows 531 / 531
+Branch                             PASS rows 3 / 3
+BranchPrice                        PASS rows 1853 / 1853
+Brand                              PASS rows 206 / 206
+Cart                               PASS rows 3 / 3
+CartItem                           PASS rows 0 / 0
+Category                           PASS rows 2 / 2
+CombinedBillingDocument            PASS rows 0 / 0
+CombinedSaleDocument               PASS rows 0 / 0
+CustomerDeposit                    PASS rows 0 / 0
+CustomerProfile                    PASS rows 190 / 190
+CustomerReceiptAllocations         PASS rows 0 / 0
+CustomerReceipts                   PASS rows 1 / 1
+DepositUsage                       PASS rows 0 / 0
+District                           PASS rows 928 / 928
+EmployeeProfile                    PASS rows 6 / 6
+GlobalProductType                  PASS rows 10 / 10
+InputTaxFilingBatch                PASS rows 0 / 0
+InputTaxFilingItem                 PASS rows 0 / 0
+Order                              PASS rows 0 / 0
+OrderOnline                        PASS rows 0 / 0
+OrderOnlineItem                    PASS rows 0 / 0
+PasswordResetToken                 PASS rows 9 / 9
+Payment                            PASS rows 12 / 12
+PaymentCodeCounter                 PASS rows 2 / 2
+PaymentItem                        PASS rows 12 / 12
+Position                           PASS rows 8 / 8
+Product                            PASS rows 1855 / 1855
+ProductImage                       PASS rows 0 / 0
+ProductOnOrder                     PASS rows 0 / 0
+ProductType                        PASS rows 98 / 98
+ProductTypeBrand                   PASS rows 369 / 369
+Province                           PASS rows 77 / 77
+PurchaseOrder                      PASS rows 25 / 25
+PurchaseOrderItem                  PASS rows 77 / 77
+PurchaseOrderReceipt               PASS rows 25 / 25
+PurchaseOrderReceiptItem           PASS rows 77 / 77
+RefreshToken                       PASS rows 4244 / 4244
+RefundTransaction                  PASS rows 0 / 0
+RepairJob                          PASS rows 0 / 0
+RepairPartItem                     PASS rows 0 / 0
+Sale                               PASS rows 25 / 25
+SaleItem                           PASS rows 86 / 86
+SaleItemSimple                     PASS rows 0 / 0
+SaleReturn                         PASS rows 0 / 0
+SaleReturnItem                     PASS rows 0 / 0
+SaleReturnItemSimple               PASS rows 0 / 0
+SalesTaxFilingBatch                PASS rows 0 / 0
+SalesTaxFilingItem                 PASS rows 0 / 0
+ServiceItem                        PASS rows 0 / 0
+ServiceOrder                       PASS rows 0 / 0
+SimpleLot                          PASS rows 0 / 0
+StockAuditScanLog                  PASS rows 1 / 1
+StockAuditSession                  PASS rows 1 / 1
+StockAuditSnapshotItem             PASS rows 757 / 757
+StockBalance                       PASS rows 997 / 997
+StockItem                          PASS rows 2933 / 2933
+StockMovement                      PASS rows 1117 / 1117
+Subdistrict                        PASS rows 7436 / 7436
+Supplier                           PASS rows 12 / 12
+SupplierPayment                    PASS rows 0 / 0
+SupplierPaymentReceipt             PASS rows 0 / 0
+Unit                               PASS rows 13 / 13
+User                               PASS rows 190 / 190
+V2CustomerDeposit                  PASS rows 0 / 0
+V2StockAudit                       PASS rows 0 / 0
+V2StockAuditItem                   PASS rows 0 / 0
+WarrantyClaim                      PASS rows 0 / 0
+----------------------------------------
+Overall: PASS
+========================================
