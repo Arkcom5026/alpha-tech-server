@@ -1,6 +1,6 @@
 {
   "verifyVersion": "ALPHATECH-RECOVERY-VERIFY-V1",
-  "checkedAt": "2026-07-20T07:41:08.127Z",
+  "checkedAt": "2026-07-20T09:35:44.978Z",
   "schema": "public",
   "options": {
     "includeFingerprint": false,
@@ -82,7 +82,7 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 25252
+    "totalRows": 25319
   },
   "recovery": {
     "connection": {
@@ -160,7 +160,7 @@
       "V2StockAuditItem",
       "WarrantyClaim"
     ],
-    "totalRows": 25252
+    "totalRows": 25319
   },
   "comparison": {
     "overallPass": true,
@@ -168,8 +168,8 @@
       "totalTablesCompared": 70,
       "productionTables": 70,
       "recoveryTables": 70,
-      "productionRows": 25252,
-      "recoveryRows": 25252,
+      "productionRows": 25319,
+      "recoveryRows": 25319,
       "rowCountMismatches": 0,
       "columnMismatches": 0,
       "duplicatePkFailures": 0,
@@ -508,8 +508,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 194,
-          "recovery": 194,
+          "production": 195,
+          "recovery": 195,
           "passed": true
         },
         "columns": {
@@ -859,8 +859,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 34,
-          "recovery": 34,
+          "production": 43,
+          "recovery": 43,
           "passed": true
         },
         "columns": {
@@ -913,8 +913,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 34,
-          "recovery": 34,
+          "production": 43,
+          "recovery": 43,
           "passed": true
         },
         "columns": {
@@ -1237,8 +1237,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 4477,
-          "recovery": 4477,
+          "production": 4491,
+          "recovery": 4491,
           "passed": true
         },
         "columns": {
@@ -1345,8 +1345,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 49,
-          "recovery": 49,
+          "production": 58,
+          "recovery": 58,
           "passed": true
         },
         "columns": {
@@ -1372,8 +1372,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 134,
-          "recovery": 134,
+          "production": 146,
+          "recovery": 146,
           "passed": true
         },
         "columns": {
@@ -1777,8 +1777,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 1194,
-          "recovery": 1194,
+          "production": 1206,
+          "recovery": 1206,
           "passed": true
         },
         "columns": {
@@ -1939,8 +1939,8 @@
         "existsInProduction": true,
         "existsInRecovery": true,
         "rowCount": {
-          "production": 194,
-          "recovery": 194,
+          "production": 195,
+          "recovery": 195,
           "passed": true
         },
         "columns": {
