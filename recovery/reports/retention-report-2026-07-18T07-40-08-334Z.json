@@ -1,0 +1,65 @@
+{
+  "version": "ALPHATECH-RECOVERY-RETENTION-V1",
+  "createdAt": "2026-07-18T07:40:08.334Z",
+  "mode": "APPLY",
+  "ok": true,
+  "policy": {
+    "localDays": 3,
+    "offsiteDays": 7
+  },
+  "targets": [
+    {
+      "label": "local-backups",
+      "dir": "D:\\alpha-tech\\server\\backups",
+      "days": 3,
+      "cutoffAt": "2026-07-15T07:40:08.315Z",
+      "scannedFiles": 42,
+      "deleteCandidates": 4,
+      "deletedFiles": [
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T06-37-26-153Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T06-37-26-153Z.manifest.json",
+          "sizeBytes": 167282,
+          "mtimeMs": 1784097454248.4297,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T06-37-26-153Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T06-37-26-153Z.sql",
+          "sizeBytes": 8098151,
+          "mtimeMs": 1784097451020.9587,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.manifest.json",
+          "sizeBytes": 167283,
+          "mtimeMs": 1784101199570.6619,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-15_2026-07-15T07-39-53-767Z.sql",
+          "sizeBytes": 8121296,
+          "mtimeMs": 1784101197199.9407,
+          "dryRun": false
+        }
+      ],
+      "keptFiles": 38,
+      "failedFiles": [],
+      "ok": true
+    },
+    {
+      "label": "offsite-local-mirror",
+      "dir": "D:\\alpha-tech\\server\\recovery\\offsite",
+      "days": 7,
+      "cutoffAt": "2026-07-11T07:40:08.324Z",
+      "scannedFiles": 0,
+      "deleteCandidates": 0,
+      "deletedFiles": [],
+      "keptFiles": 0,
+      "failedFiles": [],
+      "ok": true
+    }
+  ]
+}

@@ -117,7 +117,6 @@ class ProductTemplateRepository {
         noSN: true,
         trackSerialNumber: true,
         templateProductId: true,
-        categoryId: true,
         productTypeId: true,
         productType: {
           select: {
