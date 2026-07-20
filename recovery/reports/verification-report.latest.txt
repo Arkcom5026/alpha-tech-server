@@ -2,7 +2,7 @@
 AlphaTech Integrity Verification
 ========================================
 Version       : ALPHATECH-RECOVERY-VERIFY-V1
-Checked At    : 2026-07-20T07:41:08.127Z
+Checked At    : 2026-07-20T09:35:44.978Z
 Overall       : PASS
 
 Production    : postgresql://postgres.dyumtqejejfrfcxtlfyi:***@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=20
@@ -12,8 +12,8 @@ Summary
   totalTablesCompared: 70
   productionTables: 70
   recoveryTables: 70
-  productionRows: 25252
-  recoveryRows: 25252
+  productionRows: 25319
+  recoveryRows: 25319
   rowCountMismatches: 0
   columnMismatches: 0
   duplicatePkFailures: 0
@@ -36,7 +36,7 @@ Category                           PASS rows 2 / 2
 CombinedBillingDocument            PASS rows 0 / 0
 CombinedSaleDocument               PASS rows 0 / 0
 CustomerDeposit                    PASS rows 0 / 0
-CustomerProfile                    PASS rows 194 / 194
+CustomerProfile                    PASS rows 195 / 195
 CustomerReceiptAllocations         PASS rows 3 / 3
 CustomerReceipts                   PASS rows 4 / 4
 DepositUsage                       PASS rows 0 / 0
@@ -49,9 +49,9 @@ Order                              PASS rows 0 / 0
 OrderOnline                        PASS rows 0 / 0
 OrderOnlineItem                    PASS rows 0 / 0
 PasswordResetToken                 PASS rows 9 / 9
-Payment                            PASS rows 34 / 34
+Payment                            PASS rows 43 / 43
 PaymentCodeCounter                 PASS rows 2 / 2
-PaymentItem                        PASS rows 34 / 34
+PaymentItem                        PASS rows 43 / 43
 Position                           PASS rows 8 / 8
 Product                            PASS rows 1912 / 1912
 ProductImage                       PASS rows 0 / 0
@@ -63,12 +63,12 @@ PurchaseOrder                      PASS rows 33 / 33
 PurchaseOrderItem                  PASS rows 117 / 117
 PurchaseOrderReceipt               PASS rows 33 / 33
 PurchaseOrderReceiptItem           PASS rows 117 / 117
-RefreshToken                       PASS rows 4477 / 4477
+RefreshToken                       PASS rows 4491 / 4491
 RefundTransaction                  PASS rows 0 / 0
 RepairJob                          PASS rows 0 / 0
 RepairPartItem                     PASS rows 0 / 0
-Sale                               PASS rows 49 / 49
-SaleItem                           PASS rows 134 / 134
+Sale                               PASS rows 58 / 58
+SaleItem                           PASS rows 146 / 146
 SaleItemSimple                     PASS rows 0 / 0
 SaleReturn                         PASS rows 0 / 0
 SaleReturnItem                     PASS rows 0 / 0
@@ -83,13 +83,13 @@ StockAuditSession                  PASS rows 1 / 1
 StockAuditSnapshotItem             PASS rows 757 / 757
 StockBalance                       PASS rows 1051 / 1051
 StockItem                          PASS rows 3149 / 3149
-StockMovement                      PASS rows 1194 / 1194
+StockMovement                      PASS rows 1206 / 1206
 Subdistrict                        PASS rows 7436 / 7436
 Supplier                           PASS rows 15 / 15
 SupplierPayment                    PASS rows 0 / 0
 SupplierPaymentReceipt             PASS rows 0 / 0
 Unit                               PASS rows 13 / 13
-User                               PASS rows 194 / 194
+User                               PASS rows 195 / 195
 V2CustomerDeposit                  PASS rows 0 / 0
 V2StockAudit                       PASS rows 0 / 0
 V2StockAuditItem                   PASS rows 0 / 0
