@@ -472,3 +472,135 @@
 [2026-07-17T09:34:23.935Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T09-34-23-925Z.json
 [2026-07-17T09:34:23.936Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T09-34-23-925Z.txt
 [2026-07-17T09:34:23.936Z] ✅ Overall: PASS
+[2026-07-17T15:34:23.137Z] ============================================================
+[2026-07-17T15:34:23.141Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-17T15:34:23.141Z] ============================================================
+[2026-07-17T15:34:24.053Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T15-34-24-051Z.json
+[2026-07-17T15:34:24.054Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T15-34-24-051Z.txt
+[2026-07-17T15:34:24.054Z] ✅ Overall: PASS
+[2026-07-17T19:39:48.903Z] ============================================================
+[2026-07-17T19:39:48.907Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-17T19:39:48.907Z] ============================================================
+[2026-07-17T19:39:49.784Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T19-39-49-781Z.json
+[2026-07-17T19:39:49.785Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T19-39-49-781Z.txt
+[2026-07-17T19:39:49.785Z] ✅ Overall: PASS
+[2026-07-17T21:34:23.062Z] ============================================================
+[2026-07-17T21:34:23.066Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-17T21:34:23.067Z] ============================================================
+[2026-07-17T21:34:24.032Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T21-34-24-030Z.json
+[2026-07-17T21:34:24.033Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-17T21-34-24-030Z.txt
+[2026-07-17T21:34:24.033Z] ✅ Overall: PASS
+[2026-07-18T01:39:51.889Z] ============================================================
+[2026-07-18T01:39:51.902Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T01:39:51.903Z] ============================================================
+[2026-07-18T01:39:53.553Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T01-39-53-543Z.json
+[2026-07-18T01:39:53.553Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T01-39-53-543Z.txt
+[2026-07-18T01:39:53.554Z] ✅ Overall: PASS
+[2026-07-18T03:34:23.089Z] ============================================================
+[2026-07-18T03:34:23.094Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T03:34:23.095Z] ============================================================
+[2026-07-18T03:34:23.945Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T03-34-23-935Z.json
+[2026-07-18T03:34:23.945Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T03-34-23-935Z.txt
+[2026-07-18T03:34:23.946Z] ✅ Overall: PASS
+[2026-07-18T04:56:58.325Z] ============================================================
+[2026-07-18T04:56:58.329Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T04:56:58.330Z] ============================================================
+[2026-07-18T04:56:59.200Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T04-56-59-198Z.json
+[2026-07-18T04:56:59.200Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T04-56-59-198Z.txt
+[2026-07-18T04:56:59.201Z] ✅ Overall: PASS
+[2026-07-18T07:39:49.152Z] ============================================================
+[2026-07-18T07:39:49.206Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T07:39:49.206Z] ============================================================
+[2026-07-18T07:39:50.932Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T07-39-50-930Z.json
+[2026-07-18T07:39:50.933Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T07-39-50-930Z.txt
+[2026-07-18T07:39:50.933Z] ✅ Overall: PASS
+[2026-07-18T09:34:23.700Z] ============================================================
+[2026-07-18T09:34:23.704Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T09:34:23.704Z] ============================================================
+[2026-07-18T09:34:25.363Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T09-34-25-361Z.json
+[2026-07-18T09:34:25.364Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T09-34-25-361Z.txt
+[2026-07-18T09:34:25.364Z] ✅ Overall: PASS
+[2026-07-18T13:39:49.169Z] ============================================================
+[2026-07-18T13:39:49.237Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T13:39:49.238Z] ============================================================
+[2026-07-18T13:39:50.165Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T13-39-50-155Z.json
+[2026-07-18T13:39:50.165Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T13-39-50-155Z.txt
+[2026-07-18T13:39:50.165Z] ✅ Overall: PASS
+[2026-07-18T15:34:22.507Z] ============================================================
+[2026-07-18T15:34:22.511Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T15:34:22.511Z] ============================================================
+[2026-07-18T15:34:23.404Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T15-34-23-402Z.json
+[2026-07-18T15:34:23.405Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T15-34-23-402Z.txt
+[2026-07-18T15:34:23.405Z] ✅ Overall: PASS
+[2026-07-18T19:39:48.892Z] ============================================================
+[2026-07-18T19:39:48.896Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T19:39:48.896Z] ============================================================
+[2026-07-18T19:39:49.776Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T19-39-49-767Z.json
+[2026-07-18T19:39:49.776Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T19-39-49-767Z.txt
+[2026-07-18T19:39:49.777Z] ✅ Overall: PASS
+[2026-07-18T21:34:22.477Z] ============================================================
+[2026-07-18T21:34:22.480Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-18T21:34:22.480Z] ============================================================
+[2026-07-18T21:34:23.453Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T21-34-23-444Z.json
+[2026-07-18T21:34:23.454Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-18T21-34-23-444Z.txt
+[2026-07-18T21:34:23.454Z] ✅ Overall: PASS
+[2026-07-19T03:34:22.599Z] ============================================================
+[2026-07-19T03:34:22.603Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T03:34:22.603Z] ============================================================
+[2026-07-19T03:34:23.510Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T03-34-23-508Z.json
+[2026-07-19T03:34:23.511Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T03-34-23-508Z.txt
+[2026-07-19T03:34:23.511Z] ✅ Overall: PASS
+[2026-07-19T07:39:49.954Z] ============================================================
+[2026-07-19T07:39:49.958Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T07:39:49.958Z] ============================================================
+[2026-07-19T07:39:50.812Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T07-39-50-802Z.json
+[2026-07-19T07:39:50.813Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T07-39-50-802Z.txt
+[2026-07-19T07:39:50.813Z] ✅ Overall: PASS
+[2026-07-19T09:34:22.924Z] ============================================================
+[2026-07-19T09:34:22.927Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T09:34:22.928Z] ============================================================
+[2026-07-19T09:34:23.875Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T09-34-23-874Z.json
+[2026-07-19T09:34:23.876Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T09-34-23-874Z.txt
+[2026-07-19T09:34:23.876Z] ✅ Overall: PASS
+[2026-07-19T13:39:49.958Z] ============================================================
+[2026-07-19T13:39:49.962Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T13:39:49.962Z] ============================================================
+[2026-07-19T13:39:50.889Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T13-39-50-886Z.json
+[2026-07-19T13:39:50.889Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T13-39-50-886Z.txt
+[2026-07-19T13:39:50.890Z] ✅ Overall: PASS
+[2026-07-19T15:34:28.838Z] ============================================================
+[2026-07-19T15:34:28.848Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T15:34:28.848Z] ============================================================
+[2026-07-19T15:34:29.824Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T15-34-29-814Z.json
+[2026-07-19T15:34:29.825Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T15-34-29-814Z.txt
+[2026-07-19T15:34:29.825Z] ✅ Overall: PASS
+[2026-07-19T19:39:49.431Z] ============================================================
+[2026-07-19T19:39:49.434Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T19:39:49.435Z] ============================================================
+[2026-07-19T19:39:50.336Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T19-39-50-327Z.json
+[2026-07-19T19:39:50.337Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T19-39-50-327Z.txt
+[2026-07-19T19:39:50.337Z] ✅ Overall: PASS
+[2026-07-19T21:34:22.632Z] ============================================================
+[2026-07-19T21:34:22.635Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-19T21:34:22.636Z] ============================================================
+[2026-07-19T21:34:23.510Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T21-34-23-509Z.json
+[2026-07-19T21:34:23.511Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-19T21-34-23-509Z.txt
+[2026-07-19T21:34:23.511Z] ✅ Overall: PASS
+[2026-07-20T01:39:49.929Z] ============================================================
+[2026-07-20T01:39:49.934Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-20T01:39:49.935Z] ============================================================
+[2026-07-20T01:39:50.818Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T01-39-50-808Z.json
+[2026-07-20T01:39:50.819Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T01-39-50-808Z.txt
+[2026-07-20T01:39:50.820Z] ✅ Overall: PASS
+[2026-07-20T03:34:22.722Z] ============================================================
+[2026-07-20T03:34:22.726Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-20T03:34:22.726Z] ============================================================
+[2026-07-20T03:34:23.571Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T03-34-23-562Z.json
+[2026-07-20T03:34:23.572Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T03-34-23-562Z.txt
+[2026-07-20T03:34:23.572Z] ✅ Overall: PASS
+[2026-07-20T07:39:49.951Z] ============================================================
+[2026-07-20T07:39:49.955Z] 🩺 AlphaTech Recovery Health Check ALPHATECH-RECOVERY-HEALTH-CHECK-V1
+[2026-07-20T07:39:49.955Z] ============================================================
+[2026-07-20T07:39:50.867Z] 🧾 JSON report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T07-39-50-858Z.json
+[2026-07-20T07:39:50.868Z] 🧾 TXT report: D:\alpha-tech\server\recovery\reports\health-check-2026-07-20T07-39-50-858Z.txt
+[2026-07-20T07:39:50.868Z] ✅ Overall: PASS

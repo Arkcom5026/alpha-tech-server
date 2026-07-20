@@ -1,0 +1,41 @@
+{
+  "uploadVersion": "ALPHATECH-RECOVERY-UPLOAD-V2-S3-COMPATIBLE",
+  "provider": "s3-compatible",
+  "uploadedAt": "2026-07-18T03:34:34.571Z",
+  "bucket": "saduaksabuy-recovery",
+  "endpoint": "https://8512ed1efcf4b85171877d165f6de85b.r2.cloudflarestorage.com",
+  "region": "auto",
+  "prefix": "alphatech-production",
+  "baseKey": "alphatech-production/2026-07-18/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF",
+  "source": {
+    "manifest": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.manifest.json",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.manifest.json",
+      "sizeBytes": 167301,
+      "sha256": "b3c4eb0e16ec6d7d1ffbc1ae5591cdad7d84b06e5f5815bd28a047b6b6a63838"
+    },
+    "sql": {
+      "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.sql",
+      "fileName": "alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.sql",
+      "sizeBytes": 9053288,
+      "sha256": "2ff0a7e7ad7ca060997502af4a5cea3500fe789916bd3520b14ac42b0cc6772c"
+    }
+  },
+  "uploaded": {
+    "manifest": {
+      "key": "alphatech-production/2026-07-18/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.manifest.json",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.manifest.json",
+      "sizeBytes": 167301,
+      "sha256": "b3c4eb0e16ec6d7d1ffbc1ae5591cdad7d84b06e5f5815bd28a047b6b6a63838",
+      "verified": true
+    },
+    "sql": {
+      "key": "alphatech-production/2026-07-18/P1-HARDENED-BACKUP-V6-TYPE-AWARE-GENERIC-SELF-REF/alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.sql",
+      "sourcePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-18_2026-07-18T03-34-27-950Z.sql",
+      "sizeBytes": 9053288,
+      "sha256": "2ff0a7e7ad7ca060997502af4a5cea3500fe789916bd3520b14ac42b0cc6772c",
+      "verified": true
+    }
+  },
+  "ok": true
+}
