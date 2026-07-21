@@ -78,12 +78,15 @@ if (typeof findUserByEmail !== 'function') {
 // ✅ verifyToken: single export (CommonJS)
 const verifyToken = require('../middlewares/verifyToken');
 
+// ⚠️ TEMPORARY: Auth trace middleware for refresh endpoint
+const { traceRefreshRequest, traceVerifyToken } = require('../middlewares/authTrace');
+
 // 🔐 Login / Register / Session
 router.post('/login', login);
 router.post('/register', register);
 
 // Remember Me / session persistence hooks
-router.post('/refresh', refreshSession);
+router.post('/refresh', traceRefreshRequest, refreshSession);
 router.post('/logout', logoutSession);
 
 // 👥 [SUB-EMPLOYEE CREATION LINK]: เจาะช่องเปิดท่อรับคำสั่งเพิ่มพนักงานย่อยฝั่งสาขา

@@ -16,7 +16,8 @@ const {
 } = require('../controllers/customerReceiptController');
 
 const verifyToken = require('../middlewares/verifyToken');
-router.use(verifyToken);
+const { traceVerifyToken } = require('../middlewares/authTrace');
+router.use(traceVerifyToken, verifyToken);
 
 // ============================================================
 // customerReceiptRoutes.js

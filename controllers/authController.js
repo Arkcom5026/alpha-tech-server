@@ -711,9 +711,19 @@ const resetPassword = async (req, res) => {
 };
 
 const refreshSession = async (req, res) => {
+  const _traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const _trace = (msg, data = {}) => {
+    console.log(`[AUTH-TRACE-BE] [${new Date().toISOString().slice(11, 23)}] [REFRESH:${_traceId}] ${msg}`, JSON.stringify(data));
+  };
+
   try {
     const rawRefreshToken = normalize(req.cookies?.[REFRESH_COOKIE_NAME]);
-    if (!rawRefreshToken) return res.status(401).json({ message: 'Refresh token not found' });
+    _trace('START', { hasCookie: !!rawRefreshToken });
+
+    if (!rawRefreshToken) {
+      _trace('NO_COOKIE');
+      return res.status(401).json({ message: 'Refresh token not found' });
+    }
 
     const tokenHash = sha256(rawRefreshToken);
     const existingToken = await prisma.refreshToken.findFirst({
@@ -729,33 +739,42 @@ const refreshSession = async (req, res) => {
     });
 
     if (!existingToken) {
+      _trace('TOKEN_NOT_FOUND');
       clearRefreshTokenCookie(res);
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
+    _trace('TOKEN_FOUND', { id: existingToken.id, revokedAt: existingToken.revokedAt, expiresAt: existingToken.expiresAt });
+
     if (existingToken.revokedAt) {
+      _trace('REUSE_DETECTED', { tokenId: existingToken.id, revokedAt: existingToken.revokedAt });
       await revokeRefreshTokenFamilyChain({ tokenId: existingToken.id });
       clearRefreshTokenCookie(res);
       return res.status(401).json({ message: 'Refresh token reuse detected. Please log in again.' });
     }
 
     if (existingToken.expiresAt <= new Date()) {
+      _trace('EXPIRED', { expiresAt: existingToken.expiresAt });
       clearRefreshTokenCookie(res);
       return res.status(401).json({ message: 'Session expired' });
     }
 
     const user = existingToken.user;
     if (!user || !user.enabled || !user.employeeProfile) {
+      _trace('USER_INVALID', { userId: user?.id, enabled: user?.enabled, hasProfile: !!user?.employeeProfile });
       clearRefreshTokenCookie(res);
       return res.status(401).json({ message: 'Session expired or not allowed' });
     }
 
     if (user.employeeProfile.active === false || user.employeeProfile.approved === false) {
+      _trace('PROFILE_INACTIVE', { active: user.employeeProfile.active, approved: user.employeeProfile.approved });
       clearRefreshTokenCookie(res);
       return res.status(403).json({ message: 'Session is no longer allowed' });
     }
 
     const rememberMe = existingToken.expiresAt.getTime() - existingToken.createdAt.getTime() > 24 * 60 * 60 * 1000;
+    _trace('ROTATING', { userId: user.id, rememberMe, oldTokenId: existingToken.id });
+
     const rotated = await prisma.$transaction(async (tx) => {
       const newTokenRecord = await createRefreshTokenRecord({ userId: user.id, rememberMe, req, tx });
       await tx.refreshToken.update({
@@ -765,9 +784,13 @@ const refreshSession = async (req, res) => {
       return newTokenRecord;
     });
 
+    _trace('ROTATED', { newTokenId: rotated.refreshToken.id, oldTokenId: existingToken.id });
+
     const profile = user.employeeProfile;
     const accessToken = buildToken(user);
     setRefreshTokenCookie(res, rotated.rawToken, rememberMe);
+
+    _trace('SUCCESS', { userId: user.id });
 
     return res.json({
       token: accessToken,
@@ -789,6 +812,7 @@ const refreshSession = async (req, res) => {
       },
     });
   } catch (error) {
+    _trace('ERROR', { message: error.message });
     clearRefreshTokenCookie(res);
     console.error('❌ refreshSession error:', error);
     return res.status(401).json({ message: 'Unable to refresh session' });
