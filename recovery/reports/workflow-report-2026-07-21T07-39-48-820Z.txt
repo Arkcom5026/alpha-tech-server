@@ -1,0 +1,21 @@
+========================================
+AlphaTech Recovery Workflow Report
+========================================
+Job ID     : 2026-07-21T07-39-48-820Z
+Mode       : backup-workflow
+Overall    : FAIL
+
+Steps
+----------------------------------------
+HEALTH_CHECK       PASS     1180ms
+BACKUP             PASS     10250ms
+VERIFY_BACKUP      PASS     0ms
+UPLOAD             PASS     4437ms
+R2_RETENTION       PASS     627ms
+RETENTION          PASS     175ms
+RESTORE_RECOVERY   FAIL     9841ms
+VERIFY_RECOVERY    PENDING  ms
+REPORT             RUNNING  ms
+----------------------------------------
+Exit Code: null
+========================================
