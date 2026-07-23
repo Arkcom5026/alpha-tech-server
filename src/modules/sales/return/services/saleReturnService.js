@@ -81,8 +81,8 @@ const completeSaleReturn = async ({ command, branchId, employeeId, actorRole }) 
       assertRefundProjection({
         command,
         projection,
-        validPaymentItemIds: new Set(
-          eligibility.paymentItems.map((item) => item.paymentItemId)
+        paymentItemsById: new Map(
+          eligibility.paymentItems.map((item) => [item.paymentItemId, item])
         ),
       });
 
@@ -181,6 +181,13 @@ const completeSaleReturn = async ({ command, branchId, employeeId, actorRole }) 
       requestHash: command.requestHash,
     });
     if (raceReplay) return raceReplay;
+    if (error?.code === 'P2034' || error?.code === 'P2002') {
+      throw new SaleReturnError(
+        409,
+        SaleReturnFailureCode.COMPLETION_CONFLICT,
+        'Return data changed concurrently; refresh eligibility and retry'
+      );
+    }
     throw error;
   }
 };

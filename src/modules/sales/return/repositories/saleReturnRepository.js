@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../lib/prisma');
+const { prisma, Prisma } = require('../../../../../lib/prisma');
 const { decimal } = require('../utils/saleReturnMoney');
 
 const saleReturnResultInclude = {
@@ -15,7 +15,15 @@ const findSaleForReturn = ({ saleId, branchId, client = prisma }) =>
       customer: true,
       payments: {
         where: { isCancelled: false },
-        include: { items: true },
+        include: {
+          items: {
+            include: {
+              refundTransactions: {
+                select: { amount: true },
+              },
+            },
+          },
+        },
         orderBy: { receivedAt: 'asc' },
       },
       items: {
@@ -47,7 +55,10 @@ const findEmployeeReturnAuthority = ({ employeeId, branchId, client = prisma }) 
   });
 
 const runSaleReturnTransaction = (work) =>
-  prisma.$transaction((tx) => work(tx), { timeout: 30000 });
+  prisma.$transaction((tx) => work(tx), {
+    timeout: 30000,
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  });
 
 const createSaleReturnHeader = ({
   client,
@@ -67,7 +78,7 @@ const createSaleReturnHeader = ({
     totalRefund: projection.eligibleTotal,
     refundedAmount: projection.actualRefundTotal,
     deductedAmount: projection.deductedAmount,
-    isFullyRefunded: true,
+    isFullyRefunded: projection.deductedAmount.eq(0),
     refundMethod: command.refunds[0]?.method || 'OTHER',
     status: 'COMPLETED',
     returnType: 'REFUND',
