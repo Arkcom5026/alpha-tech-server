@@ -59,6 +59,7 @@ model EmployeeProfile {
   repairJobs                        RepairJob[]
   sale                              Sale[]
   saleReturns                       SaleReturn[]
+  performedStockMovements           StockMovement[]
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -70,53 +71,54 @@ model EmployeeProfile {
 }
 
 model Branch {
-  id                      Int                       @id @default(autoincrement())
-  name                    String
-  address                 String
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  RBACEnabled             Boolean                   @default(true)
-  phone                   String?
-  subdistrictCode         String?
-  businessType            BusinessType              @default(GENERAL)
-  features                Json?
-  branchCode              String?                   @db.VarChar(5)
-  isHeadOffice            Boolean                   @default(false)
-  taxId                   String?                   @db.VarChar(13)
-  slug                    String?                   @unique
-  categoryId              Int                       @default(1)
-  barcodeCounter          BarcodeCounter[]
-  barcodeReceiptItem      BarcodeReceiptItem[]
-  category                Category                  @relation(fields: [categoryId], references: [id])
-  subdistrict             Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
-  branchPrices            BranchPrice[]
-  combinedBillingDocument CombinedBillingDocument[]
-  combinedSaleDocument    CombinedSaleDocument[]
-  customerDeposit         CustomerDeposit[]
-  customerReceipts        CustomerReceipt[]
-  employees               EmployeeProfile[]
-  inputTaxFilingBatches   InputTaxFilingBatch[]
-  orderOnline             OrderOnline[]
-  payment                 Payment[]
-  paymentCodeCounter      PaymentCodeCounter[]
-  productTypes            ProductType[]
-  pos                     PurchaseOrder[]
-  purchaseOrderReceipt    PurchaseOrderReceipt[]
-  refundTransaction       RefundTransaction[]
-  repairJobs              RepairJob[]
-  sale                    Sale[]
-  salesCompletionCommands SalesCompletionCommand[]
-  saleReturn              SaleReturn[]
-  salesTaxFilingBatches   SalesTaxFilingBatch[]
-  services                ServiceOrder[]
-  simpleLots              SimpleLot[]
-  stockAuditSession       StockAuditSession[]
-  stockBalances           StockBalance[]
-  stock                   StockItem[]
-  stockMovement           StockMovement[]
-  suppliers               Supplier[]
-  supplierPayment         SupplierPayment[]
-  v2StockAudits           V2StockAudit[]
+  id                           Int                           @id @default(autoincrement())
+  name                         String
+  address                      String
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  RBACEnabled                  Boolean                       @default(true)
+  phone                        String?
+  subdistrictCode              String?
+  businessType                 BusinessType                  @default(GENERAL)
+  features                     Json?
+  branchCode                   String?                       @db.VarChar(5)
+  isHeadOffice                 Boolean                       @default(false)
+  taxId                        String?                       @db.VarChar(13)
+  slug                         String?                       @unique
+  categoryId                   Int                           @default(1)
+  barcodeCounter               BarcodeCounter[]
+  barcodeReceiptItem           BarcodeReceiptItem[]
+  category                     Category                      @relation(fields: [categoryId], references: [id])
+  subdistrict                  Subdistrict?                  @relation(fields: [subdistrictCode], references: [code])
+  branchPrices                 BranchPrice[]
+  combinedBillingDocument      CombinedBillingDocument[]
+  combinedSaleDocument         CombinedSaleDocument[]
+  customerDeposit              CustomerDeposit[]
+  customerReceipts             CustomerReceipt[]
+  employees                    EmployeeProfile[]
+  inputTaxFilingBatches        InputTaxFilingBatch[]
+  orderOnline                  OrderOnline[]
+  payment                      Payment[]
+  paymentCodeCounter           PaymentCodeCounter[]
+  productTypes                 ProductType[]
+  pos                          PurchaseOrder[]
+  purchaseOrderReceipt         PurchaseOrderReceipt[]
+  refundTransaction            RefundTransaction[]
+  repairJobs                   RepairJob[]
+  sale                         Sale[]
+  salesCompletionCommands      SalesCompletionCommand[]
+  saleReturn                   SaleReturn[]
+  saleReturnCompletionCommands SaleReturnCompletionCommand[]
+  salesTaxFilingBatches        SalesTaxFilingBatch[]
+  services                     ServiceOrder[]
+  simpleLots                   SimpleLot[]
+  stockAuditSession            StockAuditSession[]
+  stockBalances                StockBalance[]
+  stock                        StockItem[]
+  stockMovement                StockMovement[]
+  suppliers                    Supplier[]
+  supplierPayment              SupplierPayment[]
+  v2StockAudits                V2StockAudit[]
 
   @@index([subdistrictCode])
 }
@@ -175,8 +177,8 @@ model ProductType {
   globalProductTypeId Int
 
   Product           Product[]
-  branch            Branch?           @relation(fields: [branchId], references: [id])
-  globalProductType GlobalProductType @relation(fields: [globalProductTypeId], references: [id])
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  globalProductType GlobalProductType  @relation(fields: [globalProductTypeId], references: [id])
   productTypeBrands ProductTypeBrand[]
 
   @@unique([branchId, globalProductTypeId, normalizedName])
@@ -282,24 +284,35 @@ model StockBalance {
 }
 
 model StockMovement {
-  id          Int               @id @default(autoincrement())
-  productId   Int
-  branchId    Int
-  qty         Decimal           @db.Decimal(12, 2)
-  type        StockMovementType
-  refType     String?
-  refId       Int?
-  note        String?
-  createdAt   DateTime          @default(now())
-  simpleLotId Int?
-  branch      Branch            @relation(fields: [branchId], references: [id])
-  product     Product           @relation(fields: [productId], references: [id])
-  simpleLots  SimpleLot?        @relation(fields: [simpleLotId], references: [id])
+  id                    Int               @id @default(autoincrement())
+  productId             Int
+  branchId              Int
+  qty                   Decimal           @db.Decimal(12, 2)
+  type                  StockMovementType
+  refType               String?
+  refId                 Int?
+  note                  String?
+  createdAt             DateTime          @default(now())
+  simpleLotId           Int?
+  stockItemId           Int?
+  previousStockStatus   StockStatus?
+  resultingStockStatus  StockStatus?
+  performedByEmployeeId Int?
+  occurredAt            DateTime          @default(now())
+  branch                Branch            @relation(fields: [branchId], references: [id])
+  product               Product           @relation(fields: [productId], references: [id])
+  simpleLots            SimpleLot?        @relation(fields: [simpleLotId], references: [id])
+  stockItem             StockItem?        @relation(fields: [stockItemId], references: [id])
+  performedBy           EmployeeProfile?  @relation(fields: [performedByEmployeeId], references: [id])
 
   @@index([branchId, createdAt])
   @@index([productId, createdAt])
   @@index([branchId, type, createdAt])
   @@index([productId, branchId, createdAt])
+  @@index([stockItemId, occurredAt])
+  @@index([simpleLotId, occurredAt])
+  @@index([branchId, type, occurredAt])
+  @@index([productId, branchId, occurredAt])
 }
 
 model ProductImage {
@@ -351,7 +364,8 @@ model StockItem {
   costPrice                  Decimal?                  @db.Decimal(12, 2)
   barcodeReceiptItem         BarcodeReceiptItem[]
   repairJobs                 RepairJob[]
-  saleItem                   SaleItem?
+  saleItems                  SaleItem[]
+  stockMovements             StockMovement[]
   stockAuditScanLog          StockAuditScanLog[]
   stockAuditSnapshotItem     StockAuditSnapshotItem[]
   branch                     Branch                    @relation(fields: [branchId], references: [id])
@@ -766,12 +780,14 @@ model SalesCompletionCommand {
 model SaleItem {
   id                  Int              @id @default(autoincrement())
   saleId              Int
-  stockItemId         Int              @unique
+  stockItemId         Int
   basePrice           Decimal          @db.Decimal(12, 2)
   vatAmount           Decimal          @db.Decimal(12, 2)
   price               Decimal          @db.Decimal(12, 2)
   discount            Decimal          @db.Decimal(12, 2)
   refundedAmount      Decimal          @default(0) @db.Decimal(12, 2)
+  returnedQuantity    Decimal          @default(0) @db.Decimal(12, 2)
+  lastReturnedAt      DateTime?
   remark              String?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
@@ -781,6 +797,8 @@ model SaleItem {
   sale                Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
   stockItem           StockItem        @relation(fields: [stockItemId], references: [id])
   returnItems         SaleReturnItem[]
+
+  @@index([stockItemId])
 }
 
 model SaleItemSimple {
@@ -800,6 +818,9 @@ model SaleItemSimple {
   documentDescription  String?
   documentPrefix       String?
   documentSuffix       String?
+  returnedQuantity     Decimal                @default(0) @db.Decimal(12, 2)
+  refundedAmount       Decimal                @default(0) @db.Decimal(12, 2)
+  lastReturnedAt       DateTime?
   product              Product                @relation(fields: [productId], references: [id])
   sale                 Sale                   @relation(fields: [saleId], references: [id], onDelete: Cascade)
   simpleLots           SimpleLot?             @relation(fields: [simpleLotId], references: [id])
@@ -835,16 +856,17 @@ model Payment {
 }
 
 model PaymentItem {
-  id            Int           @id @default(autoincrement())
-  paymentId     Int
-  amount        Decimal       @db.Decimal(12, 2)
-  note          String?
-  slipImage     String?
-  cardRef       String?
-  govImage      String?
-  createdAt     DateTime      @default(now())
-  paymentMethod PaymentMethod
-  payment       Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  id                 Int                 @id @default(autoincrement())
+  paymentId          Int
+  amount             Decimal             @db.Decimal(12, 2)
+  note               String?
+  slipImage          String?
+  cardRef            String?
+  govImage           String?
+  createdAt          DateTime            @default(now())
+  paymentMethod      PaymentMethod
+  payment            Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  refundTransactions RefundTransaction[]
 }
 
 model CombinedSaleDocument {
@@ -865,31 +887,40 @@ model CombinedSaleDocument {
 }
 
 model SaleReturn {
-  id                    Int                    @id @default(autoincrement())
-  code                  String                 @unique
+  id                    Int                          @id @default(autoincrement())
+  code                  String                       @unique
   saleId                Int
-  returnedAt            DateTime               @default(now())
+  returnedAt            DateTime                     @default(now())
   employeeId            Int
   refundedByEmployeeId  Int?
   branchId              Int
-  totalRefund           Decimal                @db.Decimal(12, 2)
+  totalRefund           Decimal                      @db.Decimal(12, 2)
   note                  String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  returnType            ReturnType             @default(REFUND)
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  returnType            ReturnType                   @default(REFUND)
   reason                String?
-  deductedAmount        Decimal                @default(0) @db.Decimal(12, 2)
-  isFullyRefunded       Boolean                @default(false)
-  refundedAmount        Decimal                @default(0) @db.Decimal(12, 2)
+  deductedAmount        Decimal                      @default(0) @db.Decimal(12, 2)
+  isFullyRefunded       Boolean                      @default(false)
+  refundedAmount        Decimal                      @default(0) @db.Decimal(12, 2)
   refundMethod          RefundMethod
-  status                SaleReturnStatus       @default(PENDING)
+  status                SaleReturnStatus             @default(PENDING)
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  stockRestoredAt       DateTime?
+  completedAt           DateTime?
   refundTransaction     RefundTransaction[]
-  branch                Branch                 @relation(fields: [branchId], references: [id])
-  employee              EmployeeProfile        @relation(fields: [employeeId], references: [id])
-  refundedBy            EmployeeProfile?       @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id])
-  sale                  Sale                   @relation(fields: [saleId], references: [id])
+  branch                Branch                       @relation(fields: [branchId], references: [id])
+  employee              EmployeeProfile              @relation(fields: [employeeId], references: [id])
+  refundedBy            EmployeeProfile?             @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id])
+  sale                  Sale                         @relation(fields: [saleId], references: [id])
   items                 SaleReturnItem[]
   saleReturnItemSimples SaleReturnItemSimple[]
+  completionCommand     SaleReturnCompletionCommand?
+
+  @@index([saleId, returnedAt])
+  @@index([branchId, returnedAt])
+  @@index([branchId, status, returnedAt])
 }
 
 model SaleReturnItem {
@@ -903,6 +934,10 @@ model SaleReturnItem {
   updatedAt    DateTime   @updatedAt
   saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
   saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+
+  @@unique([saleReturnId, saleItemId])
+  @@index([saleReturnId])
+  @@index([saleItemId])
 }
 
 model RefundTransaction {
@@ -915,9 +950,31 @@ model RefundTransaction {
   branchId             Int
   deducted             Decimal         @default(0) @db.Decimal(12, 2)
   method               RefundMethod
+  sourcePaymentItemId  Int?
+  referenceNo          String?
   branch               Branch          @relation(fields: [branchId], references: [id])
   refundedBy           EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id])
   saleReturn           SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  sourcePaymentItem    PaymentItem?    @relation(fields: [sourcePaymentItemId], references: [id], onDelete: Restrict)
+
+  @@index([saleReturnId])
+  @@index([sourcePaymentItemId])
+  @@index([branchId, refundedAt])
+}
+
+model SaleReturnCompletionCommand {
+  id           Int        @id @default(autoincrement())
+  branchId     Int
+  commandKey   String
+  requestHash  String
+  saleReturnId Int        @unique
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime   @default(now())
+  branch       Branch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([branchId, createdAt])
 }
 
 model SupplierPayment {
@@ -1118,12 +1175,17 @@ model SaleReturnItemSimple {
   saleReturnId     Int
   saleItemSimpleId Int
   refundAmount     Decimal        @db.Decimal(12, 2)
+  quantity         Decimal?       @db.Decimal(12, 2)
   reason           String?
   reasonCode       String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   saleItemSimple   SaleItemSimple @relation(fields: [saleItemSimpleId], references: [id])
   saleReturn       SaleReturn     @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+
+  @@unique([saleReturnId, saleItemSimpleId])
+  @@index([saleReturnId])
+  @@index([saleItemSimpleId])
 }
 
 model CustomerReceipt {
@@ -1573,6 +1635,8 @@ enum DepositStatus {
 enum SaleReturnStatus {
   PENDING
   APPROVED
+  STOCK_RESTORED
+  COMPLETED
   REJECTED
   REFUNDED
 }
