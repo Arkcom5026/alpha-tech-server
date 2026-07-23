@@ -1,19 +1,25 @@
 const express = require('express');
-const router = express.Router();
-const {
-  createSale,
-  getAllSales,
-  getSaleById,
-  markSaleAsPaid,
-  getAllSalesReturn,
-  searchPrintableSales,
-  updateSaleDocumentLinesController,
-} = require('../compatibility/saleLegacyCompatibilityController');
+const verifyToken = require('../../../../middlewares/verifyToken');
 const {
   completeSaleController,
 } = require('../completion/controllers/saleCompletionController');
-const verifyToken = require('../../../../middlewares/verifyToken');
+const {
+  createSale,
+} = require('../create/controllers/saleLegacyCreateController');
+const {
+  updateSaleDocumentLinesController,
+} = require('../documents/controllers/saleDocumentController');
+const {
+  getAllSales,
+  getAllSalesReturn,
+  getSaleById,
+  searchPrintableSales,
+} = require('../history/controllers/saleHistoryController');
+const {
+  markSaleAsPaid,
+} = require('../settlement/controllers/saleSettlementController');
 
+const router = express.Router();
 router.use(verifyToken);
 router.post('/complete', completeSaleController);
 router.post('/', createSale);
