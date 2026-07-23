@@ -1,5 +1,5 @@
-const { parseCompleteSaleCommand } = require('../contracts/completeSale.contract');
-const { completeSale } = require('../services/completeSale.service');
+const { validateSaleCompletionRequest } = require('../validators/saleCompletionValidator');
+const { completeSale } = require('../services/saleCompletionService');
 
 const completeSaleController = async (req, res) => {
   try {
@@ -8,7 +8,7 @@ const completeSaleController = async (req, res) => {
     if (!branchId || !employeeId) {
       return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch and employee are required' });
     }
-    const command = parseCompleteSaleCommand(req.body);
+    const command = validateSaleCompletionRequest(req.body);
     const result = await completeSale({ command, branchId, employeeId });
     return res.status(result.idempotency.replayed ? 200 : 201).json(result);
   } catch (error) {

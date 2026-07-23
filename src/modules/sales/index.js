@@ -1,11 +1,11 @@
 module.exports = {
   controllers: {
-    ...require('./controllers/activeSale.controller'),
-    ...require('./controllers/completeSale.controller'),
+    ...require('./compatibility/saleLegacyCompatibilityController'),
+    ...require('./completion/controllers/saleCompletionController'),
   },
-  contracts: require('./contracts/completeSale.contract'),
+  contracts: require('./completion/contracts/saleCompletionContract'),
   services: {
-    ...require('./services/completeSale.service'),
-    ...require('./services/paymentPosting.service'),
+    ...require('./completion/services/saleCompletionService'),
+    ...require('./completion/services/salePaymentPostingService'),
   },
 };

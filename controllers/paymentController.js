@@ -3,6 +3,10 @@
 
 // controllers/paymentController.js
 const { prisma, Prisma } = require('../lib/prisma');
+const {
+  projectSalePaymentStatus,
+  consumeDeposit,
+} = require('../src/modules/sales/completion/services/salePaymentPostingService');
 
 // Helpers & flags for Decimal-safe arithmetic
 const D = (v) => new Prisma.Decimal(typeof v === 'string' ? v : Number(v));
@@ -201,7 +205,7 @@ const createPayments = async (req, res) => {
       // 1) Ensure sale belongs to current branch & not cancelled
       const sale = await tx.sale.findFirst({
         where: { id: Number(saleId), branchId, status: { not: 'CANCELLED' } },
-        select: { id: true, totalAmount: true },
+        select: { id: true, totalAmount: true, customerId: true },
       });
       if (!sale) throw Object.assign(new Error('ไม่พบใบขายในสาขานี้'), { status: 404 });
 
@@ -239,6 +243,13 @@ const createPayments = async (req, res) => {
       // 5) Consume deposit atomically (from request items, schema has no FK on paymentItem)
       for (const p of normalizedPaymentItems) {
         if (p.paymentMethod === 'DEPOSIT' && p.customerDepositId) {
+          await consumeDeposit(tx, {
+            item: p,
+            sale,
+            paymentId: payment.id,
+            branchId,
+          });
+          continue;
           const depId = Number(p.customerDepositId);
           const inc = Number(p.amount) || 0;
 
@@ -270,7 +281,7 @@ const createPayments = async (req, res) => {
       }
 
       // 6) Recompute Sale AR fields (paidAmount + statusPayment + paid flags)
-      await recalcSalePaymentStatus(tx, sale.id);
+      await projectSalePaymentStatus(tx, sale.id);
 
       return { paymentId: payment.id, code };
     }, { timeout: 20000, maxWait: 20000 });
@@ -460,7 +471,7 @@ const cancelPayment = async (req, res) => {
         }
 
         // 3) Recompute Sale AR fields (paidAmount + statusPayment + paid flags)
-        await recalcSalePaymentStatus(tx, payment.saleId);
+        await projectSalePaymentStatus(tx, payment.saleId);
       },
       { timeout: 20000, maxWait: 20000 }
     );

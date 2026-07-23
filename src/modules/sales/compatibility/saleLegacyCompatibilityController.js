@@ -3,8 +3,9 @@
 
 const { prisma, Prisma } = require('../../../lib/prisma');
 const dayjs = require('dayjs');
-const { SALE_DOCUMENT_INCLUDE } = require('../contracts/saleDocument.include');
-const { updateSaleDocumentLines } = require('../services/saleDocument.service');
+const { SALE_DOCUMENT_INCLUDE } = require('../documents/contracts/saleDocumentContract');
+const { updateSaleDocumentLines } = require('../documents/services/saleDocumentService');
+const { projectSalePaymentStatus } = require('../completion/services/salePaymentPostingService');
 
 // --- Feature Flags (Backward-Compatible) ---
 const ENABLE_PAYMENT_AUTOCREATE = process.env.ENABLE_PAYMENT_AUTOCREATE === '1'; // สร้าง Payment อัตโนมัติเมื่อขายสด
@@ -623,15 +624,18 @@ const markSaleAsPaid = async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
+      const projection = await projectSalePaymentStatus(tx, saleId);
+      if (!projection.paid) {
+        throw Object.assign(new Error('Payment evidence is insufficient'), {
+          status: 409,
+          code: 'PAYMENT_EVIDENCE_INSUFFICIENT',
+        });
+      }
       await tx.sale.update({
         where: { id: saleId },
         data: {
-          paid: true,
-          paidAt: new Date(),
           soldAt: sale.soldAt || new Date(),
           status: 'COMPLETED',
-          statusPayment: 'PAID',
-          paidAmount: paidSum,
         },
       });
 
