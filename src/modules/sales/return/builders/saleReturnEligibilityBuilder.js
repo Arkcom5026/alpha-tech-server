@@ -32,6 +32,13 @@ const buildSaleReturnEligibility = (sale) => ({
     paymentItemId: item.id,
     paymentMethod: item.paymentMethod,
     amount: number(item.amount),
+    refundedAmount: (item.refundTransactions || [])
+      .reduce((total, refund) => total + number(refund.amount), 0),
+    remainingRefundableAmount: Math.max(
+      0,
+      number(item.amount) - (item.refundTransactions || [])
+        .reduce((total, refund) => total + number(refund.amount), 0)
+    ),
   }))),
 });
 
