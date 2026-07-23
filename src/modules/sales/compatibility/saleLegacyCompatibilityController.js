@@ -1,7 +1,7 @@
 // src/controllers/saleController.js
 // 🏛️ Clean Architecture Routing: Unified Premium Integration (Safe Emergency Rollback Edition)
 
-const { prisma, Prisma } = require('../../../lib/prisma');
+const { prisma, Prisma } = require('../../../../lib/prisma');
 const dayjs = require('dayjs');
 const { SALE_DOCUMENT_INCLUDE } = require('../documents/contracts/saleDocumentContract');
 const { updateSaleDocumentLines } = require('../documents/services/saleDocumentService');

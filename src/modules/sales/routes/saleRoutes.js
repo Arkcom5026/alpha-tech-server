@@ -12,7 +12,7 @@ const {
 const {
   completeSaleController,
 } = require('../completion/controllers/saleCompletionController');
-const verifyToken = require('../../../middlewares/verifyToken');
+const verifyToken = require('../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
 router.post('/complete', completeSaleController);
