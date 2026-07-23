@@ -11,8 +11,25 @@ const buildProductTraceSummary = ({ stockItem, returns, permissions }) => {
   const netSale = roundMoney(sumMoney(saleItems.map((item) => item.price)))
   const refundTotal = roundMoney(sumMoney((returns || []).map((item) => item.refundAmount))) || 0
   const netRevenueAfterRefund = netSale === null ? null : roundMoney(netSale - refundTotal)
-  const grossProfitBeforeRefund = netSale === null || cost === null ? null : roundMoney(netSale - cost)
-  const grossProfitAfterRefund = netRevenueAfterRefund === null || cost === null ? null : roundMoney(netRevenueAfterRefund - cost)
+  const returnedSaleItemIds = new Set(
+    (returns || [])
+      .map((item) => item.saleItemId)
+      .filter((saleItemId) => saleItemId !== null && saleItemId !== undefined)
+      .map(String)
+  )
+  const activeSaleCycleCount = saleItems.filter(
+    (item) => !returnedSaleItemIds.has(String(item.id))
+  ).length
+  const totalRecognizedCost = cost === null ? null : roundMoney(cost * saleItems.length)
+  const activeRecognizedCost = cost === null ? null : roundMoney(cost * activeSaleCycleCount)
+  const grossProfitBeforeRefund =
+    netSale === null || totalRecognizedCost === null
+      ? null
+      : roundMoney(netSale - totalRecognizedCost)
+  const grossProfitAfterRefund =
+    netRevenueAfterRefund === null || activeRecognizedCost === null
+      ? null
+      : roundMoney(netRevenueAfterRefund - activeRecognizedCost)
   return createProductTraceSummary({
     cost, saleBasePrice, saleDiscount, netSale, refundTotal, netRevenueAfterRefund,
     grossProfitBeforeRefund, grossProfitAfterRefund,
