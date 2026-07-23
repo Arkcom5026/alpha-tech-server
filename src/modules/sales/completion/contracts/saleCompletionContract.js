@@ -1,5 +1,9 @@
 const crypto = require('node:crypto');
-const { SalesError } = require('../errors/salesError');
+const { SaleCompletionError: SalesError } = require('./saleCompletionError');
+const {
+  isImmediateSalePaymentMethod,
+  normalizeSalePaymentMethod,
+} = require('../policies/salePaymentPolicy');
 
 const money = (value, field, { allowZero = true } = {}) => {
   const number = Number(value);
@@ -82,7 +86,7 @@ const parseCompleteSaleCommand = (body = {}) => {
   const paymentItems = (Array.isArray(payment.paymentItems) ? payment.paymentItems : [])
     .filter((item) => Number(item.amount) > 0)
     .map((item) => ({
-      paymentMethod: String(item.paymentMethod || '').toUpperCase() === 'CREDIT' ? 'CARD' : String(item.paymentMethod || '').toUpperCase(),
+      paymentMethod: normalizeSalePaymentMethod(item.paymentMethod),
       amount: money(item.amount, 'payment.amount', { allowZero: false }),
       note: item.note || null,
       slipImage: item.slipImage || null,
@@ -90,7 +94,7 @@ const parseCompleteSaleCommand = (body = {}) => {
       govImage: item.govImage || null,
       customerDepositId: item.customerDepositId == null ? null : Number(item.customerDepositId),
     }));
-  const immediate = paymentItems.filter((item) => ['CASH', 'TRANSFER', 'CARD'].includes(item.paymentMethod));
+  const immediate = paymentItems.filter((item) => isImmediateSalePaymentMethod(item.paymentMethod));
   if (mode === 'CREDIT' && immediate.length) {
     throw new SalesError(400, 'CREDIT_IMMEDIATE_PAYMENT_FORBIDDEN', 'Credit sale cannot include immediate cash, transfer, or card payment');
   }
