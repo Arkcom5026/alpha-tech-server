@@ -1,0 +1,51 @@
+{
+  "version": "ALPHATECH-RECOVERY-RETENTION-V1",
+  "createdAt": "2026-07-22T07:40:03.749Z",
+  "mode": "APPLY",
+  "ok": true,
+  "policy": {
+    "localDays": 3,
+    "offsiteDays": 7
+  },
+  "targets": [
+    {
+      "label": "local-backups",
+      "dir": "D:\\alpha-tech\\server\\backups",
+      "days": 3,
+      "cutoffAt": "2026-07-19T07:40:03.728Z",
+      "scannedFiles": 46,
+      "deleteCandidates": 2,
+      "deletedFiles": [
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-19_2026-07-19T07-39-55-078Z.manifest.json",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-19_2026-07-19T07-39-55-078Z.manifest.json",
+          "sizeBytes": 167306,
+          "mtimeMs": 1784446801083.311,
+          "dryRun": false
+        },
+        {
+          "filePath": "D:\\alpha-tech\\server\\backups\\alphatech_hardened_backup_v6_2026-07-19_2026-07-19T07-39-55-078Z.sql",
+          "fileName": "alphatech_hardened_backup_v6_2026-07-19_2026-07-19T07-39-55-078Z.sql",
+          "sizeBytes": 9153996,
+          "mtimeMs": 1784446798586.4548,
+          "dryRun": false
+        }
+      ],
+      "keptFiles": 44,
+      "failedFiles": [],
+      "ok": true
+    },
+    {
+      "label": "offsite-local-mirror",
+      "dir": "D:\\alpha-tech\\server\\recovery\\offsite",
+      "days": 7,
+      "cutoffAt": "2026-07-15T07:40:03.733Z",
+      "scannedFiles": 0,
+      "deleteCandidates": 0,
+      "deletedFiles": [],
+      "keptFiles": 0,
+      "failedFiles": [],
+      "ok": true
+    }
+  ]
+}

@@ -12,12 +12,14 @@ const {
   searchPrintableSales,
   updateSaleDocumentLinesController,
 } = require('../controllers/saleController');
+const { completeSaleController } = require('../src/modules/sales/controllers/completeSale.controller');
 
 const verifyToken = require('../middlewares/verifyToken');
 
 router.use(verifyToken);
 
 // ✅ POST /api/sales
+router.post('/complete', completeSaleController);
 router.post('/', createSale);
 
 // ✅ GET /api/sales
