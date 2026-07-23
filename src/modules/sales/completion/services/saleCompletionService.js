@@ -1,8 +1,14 @@
 const dayjs = require('dayjs');
-const { prisma, Prisma } = require('../../../../lib/prisma');
-const { SALE_DOCUMENT_INCLUDE } = require('../contracts/saleDocument.include');
-const { SalesError } = require('../errors/salesError');
-const { postPaymentEvidence } = require('./paymentPosting.service');
+const { Prisma } = require('../../../../../lib/prisma');
+const { SaleCompletionError: SalesError } = require('../contracts/saleCompletionError');
+const { postPaymentEvidence } = require('./salePaymentPostingService');
+const { stockConflict } = require('../policies/saleStockPolicy');
+const { assertSaleReplayHash } = require('../policies/saleIdempotencyPolicy');
+const {
+  findActiveSalePayments,
+  findCompletionCommand,
+  runCompletionTransaction,
+} = require('../repositories/saleCompletionRepository');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
 const SALE_CODE_MAX_RETRY = Math.max(0, Number(process.env.SALE_CODE_MAX_RETRY || 3));
@@ -20,21 +26,11 @@ const generateSaleCode = async (tx, branchId, attempt) => {
   return `${prefix}-${String(count + 1 + attempt).padStart(4, '0')}`;
 };
 
-const loadResult = async (branchId, commandKey, replayed = true) => {
-  const stored = await prisma.salesCompletionCommand.findUnique({
-    where: { branchId_commandKey: { branchId, commandKey } },
-    include: {
-      sale: {
-        include: SALE_DOCUMENT_INCLUDE,
-      },
-    },
-  });
+const loadVerifiedReplay = async ({ branchId, commandKey, requestHash, replayed = true }) => {
+  const stored = await findCompletionCommand({ branchId, commandKey });
   if (!stored) return null;
-  const payments = await prisma.payment.findMany({
-    where: { saleId: stored.saleId, isCancelled: false },
-    include: { items: true },
-    orderBy: { receivedAt: 'asc' },
-  });
+  assertSaleReplayHash({ storedHash: stored.requestHash, requestHash });
+  const payments = await findActiveSalePayments(stored.saleId);
   return canonicalResult(stored.sale, payments, replayed, commandKey);
 };
 
@@ -57,22 +53,17 @@ const canonicalResult = (sale, payments, replayed, commandKey) => ({
 });
 
 const completeSale = async ({ command, branchId, employeeId }) => {
-  const replay = await loadResult(branchId, command.commandKey);
-  if (replay) {
-    const existing = await prisma.salesCompletionCommand.findUnique({
-      where: { branchId_commandKey: { branchId, commandKey: command.commandKey } },
-      select: { requestHash: true },
-    });
-    if (existing.requestHash !== command.requestHash) {
-      throw new SalesError(409, 'IDEMPOTENCY_PAYLOAD_MISMATCH', 'commandId was already used with a different payload');
-    }
-    return replay;
-  }
+  const replay = await loadVerifiedReplay({
+    branchId,
+    commandKey: command.commandKey,
+    requestHash: command.requestHash,
+  });
+  if (replay) return replay;
 
   let lastError;
   for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt += 1) {
     try {
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await runCompletionTransaction(async (tx) => {
         const customer = command.sale.customerId
           ? await tx.customerProfile.findFirst({
               where: { id: command.sale.customerId },
@@ -89,7 +80,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
         });
         if (stockItems.length !== stockIds.length) {
           const available = new Set(stockItems.map((item) => item.id));
-          throw new SalesError(409, 'STOCK_CONFLICT', 'One or more stock items are no longer available', {
+          throw stockConflict('One or more stock items are no longer available', {
             unavailableStockItemIds: stockIds.filter((id) => !available.has(id)),
           });
         }
@@ -141,7 +132,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
           data: { status: 'SOLD', soldAt: new Date() },
         });
         if (changed.count !== stockIds.length) {
-          throw new SalesError(409, 'STOCK_CONFLICT', 'Stock changed during completion');
+          throw stockConflict('Stock changed during completion');
         }
         await tx.stockMovement.createMany({
           data: stockIds.map((stockId) => ({
@@ -169,13 +160,22 @@ const completeSale = async ({ command, branchId, employeeId }) => {
           },
         });
         return { saleId: sale.id, payments: posted.payments };
-      }, { timeout: 20000, maxWait: 20000 });
-      const final = await loadResult(branchId, command.commandKey, false);
+      });
+      const final = await loadVerifiedReplay({
+        branchId,
+        commandKey: command.commandKey,
+        requestHash: command.requestHash,
+        replayed: false,
+      });
       if (!final) throw new SalesError(500, 'COMPLETION_RESULT_MISSING', 'Completion committed but result could not be loaded');
       return final;
     } catch (error) {
       lastError = error;
-      const replayAfterRace = await loadResult(branchId, command.commandKey);
+      const replayAfterRace = await loadVerifiedReplay({
+        branchId,
+        commandKey: command.commandKey,
+        requestHash: command.requestHash,
+      });
       if (replayAfterRace) return replayAfterRace;
       if (error?.code === 'P2002' && String(error?.meta?.target || '').includes('code') && attempt < SALE_CODE_MAX_RETRY) continue;
       throw error;
@@ -184,4 +184,4 @@ const completeSale = async ({ command, branchId, employeeId }) => {
   throw lastError;
 };
 
-module.exports = { completeSale, loadResult, canonicalResult };
+module.exports = { completeSale, loadVerifiedReplay, canonicalResult };

@@ -1,11 +1,11 @@
-class SalesError extends Error {
+class SaleCompletionError extends Error {
   constructor(status, code, message, details) {
     super(message);
-    this.name = 'SalesError';
+    this.name = 'SaleCompletionError';
     this.status = status;
     this.code = code;
     this.details = details;
   }
 }
 
-module.exports = { SalesError };
+module.exports = { SaleCompletionError };

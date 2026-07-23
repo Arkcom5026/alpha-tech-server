@@ -1,5 +1,6 @@
-const { Prisma } = require('../../../../lib/prisma');
-const { SalesError } = require('../errors/salesError');
+const { Prisma } = require('../../../../../lib/prisma');
+const { SaleCompletionError: SalesError } = require('../contracts/saleCompletionError');
+const { assertDepositBalance } = require('../policies/saleDepositPolicy');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
 const n = (value) => Number(value || 0);
@@ -17,10 +18,11 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
   if (!deposit) {
     throw new SalesError(400, 'DEPOSIT_NOT_USABLE', 'Deposit is not active or does not belong to this branch and customer');
   }
-  const remaining = n(deposit.totalAmount) - n(deposit.usedAmount);
-  if (item.amount > remaining + 0.001) {
-    throw new SalesError(409, 'DEPOSIT_BALANCE_CONFLICT', 'Deposit balance is insufficient');
-  }
+  const remaining = assertDepositBalance({
+    amount: item.amount,
+    totalAmount: deposit.totalAmount,
+    usedAmount: deposit.usedAmount,
+  });
 
   const updated = await tx.customerDeposit.updateMany({
     where: { id: deposit.id, status: 'ACTIVE', usedAmount: deposit.usedAmount },
