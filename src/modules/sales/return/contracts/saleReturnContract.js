@@ -1,0 +1,17 @@
+const SALE_RETURN_ITEM_KIND = Object.freeze({
+  SERIALIZED: 'SERIALIZED',
+  SIMPLE: 'SIMPLE',
+});
+
+const SALE_RETURN_REFUND_METHOD = Object.freeze({
+  CASH: 'CASH',
+  TRANSFER: 'TRANSFER',
+  CARD: 'CARD',
+  STORE_CREDIT: 'STORE_CREDIT',
+  OTHER: 'OTHER',
+});
+
+module.exports = {
+  SALE_RETURN_ITEM_KIND,
+  SALE_RETURN_REFUND_METHOD,
+};
