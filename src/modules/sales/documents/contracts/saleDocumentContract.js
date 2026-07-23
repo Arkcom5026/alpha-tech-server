@@ -1,4 +1,4 @@
-// src/modules/sales/contracts/saleDocument.include.js
+// Canonical shared Sale document query contract.
 
 const SALE_DOCUMENT_INCLUDE = {
   branch: {

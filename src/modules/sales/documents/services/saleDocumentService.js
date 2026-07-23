@@ -1,4 +1,4 @@
-// src/modules/sales/services/saleDocument.service.js
+// Canonical Sale document mutation service.
 
 const normalizeDocumentLineText = (value) => {
   if (typeof value !== 'string') return null;
