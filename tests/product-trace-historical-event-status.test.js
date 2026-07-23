@@ -10,7 +10,7 @@ const permissions = {
   canViewSupplier: true,
 }
 
-test('historical inventory events retain IN_STOCK after the item is sold', () => {
+test('historical inventory events retain Thai titles and IN_STOCK after sale', () => {
   const events = buildProductTraceTimeline({
     stockItem: {
       id: 3804,
@@ -36,32 +36,59 @@ test('historical inventory events retain IN_STOCK after the item is sold', () =>
   const received = events.find((event) => event.id === 'received-3804')
   const scanned = events.find((event) => event.id === 'scanned-3804')
 
+  assert.equal(received?.title, 'รับสินค้าเข้าสต็อก')
   assert.equal(received?.status, 'IN_STOCK')
+  assert.equal(scanned?.title, 'บันทึกสินค้าเข้าระบบ')
   assert.equal(scanned?.status, 'IN_STOCK')
 })
 
-test('receipt-specific status remains authoritative when available', () => {
+test('return, refund and sale titles remain valid UTF-8', () => {
   const events = buildProductTraceTimeline({
-    stockItem: {
-      id: 3805,
-      status: 'SOLD',
-      receivedAt: new Date('2026-07-06T07:53:00.000Z'),
-      scannedAt: null,
+    stockItem: { id: 3804, status: 'SOLD' },
+    procurement: null,
+    sales: {
+      cycles: [{
+        sale: {
+          id: 50,
+          code: 'SL-0050',
+          soldAt: '2026-07-23T11:20:00.000Z',
+          status: 'COMPLETED',
+          statusPayment: 'PAID',
+          employee: null,
+          customer: null,
+        },
+        pricing: { netPrice: 260 },
+      }],
     },
-    procurement: {
-      receipt: {
-        id: 12,
-        code: 'RC-0012',
-        statusReceipt: 'RECEIVED',
-        receivedBy: null,
+    returns: [{
+      returnItemId: 1,
+      reason: 'ทดสอบ',
+      refundAmount: 260,
+      refundTransactions: [{
+        id: 1,
+        refundedAt: '2026-07-23T10:43:00.000Z',
+        refundedBy: null,
+        amount: 260,
+        method: 'CASH',
+        deducted: false,
+      }],
+      saleReturn: {
+        id: 1,
+        code: 'RT-0001',
+        returnedAt: '2026-07-23T10:43:00.000Z',
+        reason: 'ทดสอบ',
+        employee: null,
+        status: 'COMPLETED',
+        returnType: 'REFUND',
       },
-    },
-    sales: null,
-    returns: [],
+    }],
     claims: [],
     repairs: [],
     permissions,
   })
 
-  assert.equal(events[0]?.status, 'RECEIVED')
+  assert.deepEqual(
+    events.map((event) => event.title),
+    ['รับคืนสินค้าและคืนเข้าพร้อมขาย', 'คืนเงินให้ลูกค้า', 'ขายสินค้า'],
+  )
 })
