@@ -60,6 +60,9 @@ model EmployeeProfile {
   sale                              Sale[]
   saleReturns                       SaleReturn[]
   performedStockMovements           StockMovement[]
+  createdWarrantyClaims             WarrantyClaim[]             @relation("WarrantyClaimCreatedBy")
+  resolvedWarrantyClaims            WarrantyClaim[]             @relation("WarrantyClaimResolvedBy")
+  performedWarrantyClaimEvents      WarrantyClaimEvent[]
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -71,54 +74,56 @@ model EmployeeProfile {
 }
 
 model Branch {
-  id                           Int                           @id @default(autoincrement())
-  name                         String
-  address                      String
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
-  RBACEnabled                  Boolean                       @default(true)
-  phone                        String?
-  subdistrictCode              String?
-  businessType                 BusinessType                  @default(GENERAL)
-  features                     Json?
-  branchCode                   String?                       @db.VarChar(5)
-  isHeadOffice                 Boolean                       @default(false)
-  taxId                        String?                       @db.VarChar(13)
-  slug                         String?                       @unique
-  categoryId                   Int                           @default(1)
-  barcodeCounter               BarcodeCounter[]
-  barcodeReceiptItem           BarcodeReceiptItem[]
-  category                     Category                      @relation(fields: [categoryId], references: [id])
-  subdistrict                  Subdistrict?                  @relation(fields: [subdistrictCode], references: [code])
-  branchPrices                 BranchPrice[]
-  combinedBillingDocument      CombinedBillingDocument[]
-  combinedSaleDocument         CombinedSaleDocument[]
-  customerDeposit              CustomerDeposit[]
-  customerReceipts             CustomerReceipt[]
-  employees                    EmployeeProfile[]
-  inputTaxFilingBatches        InputTaxFilingBatch[]
-  orderOnline                  OrderOnline[]
-  payment                      Payment[]
-  paymentCodeCounter           PaymentCodeCounter[]
-  productTypes                 ProductType[]
-  pos                          PurchaseOrder[]
-  purchaseOrderReceipt         PurchaseOrderReceipt[]
-  refundTransaction            RefundTransaction[]
-  repairJobs                   RepairJob[]
-  sale                         Sale[]
-  salesCompletionCommands      SalesCompletionCommand[]
-  saleReturn                   SaleReturn[]
-  saleReturnCompletionCommands SaleReturnCompletionCommand[]
-  salesTaxFilingBatches        SalesTaxFilingBatch[]
-  services                     ServiceOrder[]
-  simpleLots                   SimpleLot[]
-  stockAuditSession            StockAuditSession[]
-  stockBalances                StockBalance[]
-  stock                        StockItem[]
-  stockMovement                StockMovement[]
-  suppliers                    Supplier[]
-  supplierPayment              SupplierPayment[]
-  v2StockAudits                V2StockAudit[]
+  id                              Int                              @id @default(autoincrement())
+  name                            String
+  address                         String
+  createdAt                       DateTime                         @default(now())
+  updatedAt                       DateTime                         @updatedAt
+  RBACEnabled                     Boolean                          @default(true)
+  phone                           String?
+  subdistrictCode                 String?
+  businessType                    BusinessType                     @default(GENERAL)
+  features                        Json?
+  branchCode                      String?                          @db.VarChar(5)
+  isHeadOffice                    Boolean                          @default(false)
+  taxId                           String?                          @db.VarChar(13)
+  slug                            String?                          @unique
+  categoryId                      Int                              @default(1)
+  barcodeCounter                  BarcodeCounter[]
+  barcodeReceiptItem              BarcodeReceiptItem[]
+  category                        Category                         @relation(fields: [categoryId], references: [id])
+  subdistrict                     Subdistrict?                     @relation(fields: [subdistrictCode], references: [code])
+  branchPrices                    BranchPrice[]
+  combinedBillingDocument         CombinedBillingDocument[]
+  combinedSaleDocument            CombinedSaleDocument[]
+  customerDeposit                 CustomerDeposit[]
+  customerReceipts                CustomerReceipt[]
+  employees                       EmployeeProfile[]
+  inputTaxFilingBatches           InputTaxFilingBatch[]
+  orderOnline                     OrderOnline[]
+  payment                         Payment[]
+  paymentCodeCounter              PaymentCodeCounter[]
+  productTypes                    ProductType[]
+  pos                             PurchaseOrder[]
+  purchaseOrderReceipt            PurchaseOrderReceipt[]
+  refundTransaction               RefundTransaction[]
+  repairJobs                      RepairJob[]
+  sale                            Sale[]
+  salesCompletionCommands         SalesCompletionCommand[]
+  saleReturn                      SaleReturn[]
+  saleReturnCompletionCommands    SaleReturnCompletionCommand[]
+  warrantyClaims                  WarrantyClaim[]
+  warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
+  salesTaxFilingBatches           SalesTaxFilingBatch[]
+  services                        ServiceOrder[]
+  simpleLots                      SimpleLot[]
+  stockAuditSession               StockAuditSession[]
+  stockBalances                   StockBalance[]
+  stock                           StockItem[]
+  stockMovement                   StockMovement[]
+  suppliers                       Supplier[]
+  supplierPayment                 SupplierPayment[]
+  v2StockAudits                   V2StockAudit[]
 
   @@index([subdistrictCode])
 }
@@ -373,6 +378,7 @@ model StockItem {
   purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
   scannedBy                  EmployeeProfile?          @relation(fields: [scannedByEmployeeId], references: [id])
   warrantyClaims             WarrantyClaim[]
+  replacementWarrantyClaims  WarrantyClaim[]           @relation("WarrantyClaimReplacementStockItem")
 
   @@unique([serialNumber, productId])
   @@index([branchId, status, productId])
@@ -433,6 +439,7 @@ model Supplier {
   bank                 Bank?                  @relation(fields: [bankId], references: [id])
   branch               Branch                 @relation(fields: [branchId], references: [id])
   supplierPayment      SupplierPayment[]
+  warrantyClaims       WarrantyClaim[]
 
   @@unique([branchId, name])
 }
@@ -924,16 +931,17 @@ model SaleReturn {
 }
 
 model SaleReturnItem {
-  id           Int        @id @default(autoincrement())
-  saleReturnId Int
-  saleItemId   Int
-  refundAmount Decimal    @db.Decimal(12, 2)
-  reason       String?
-  reasonCode   String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
-  saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  id             Int             @id @default(autoincrement())
+  saleReturnId   Int
+  saleItemId     Int
+  refundAmount   Decimal         @db.Decimal(12, 2)
+  reason         String?
+  reasonCode     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  saleItem       SaleItem        @relation(fields: [saleItemId], references: [id])
+  saleReturn     SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  warrantyClaims WarrantyClaim[]
 
   @@unique([saleReturnId, saleItemId])
   @@index([saleReturnId])
@@ -1436,14 +1444,83 @@ model RepairPartItem {
 }
 
 model WarrantyClaim {
-  id          Int         @id @default(autoincrement())
-  claimNo     String      @unique
-  stockItemId Int
-  status      StockStatus @default(CLAIMED)
-  reason      String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  stockItem   StockItem   @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  id                     Int                             @id @default(autoincrement())
+  branchId               Int
+  stockItemId            Int
+  supplierId             Int?
+  saleReturnItemId       Int?
+  previousClaimId        Int?
+  claimNo                String
+  status                 WarrantyClaimStatus             @default(DRAFT)
+  reason                 String
+  serviceProvider        String?
+  externalClaimRef       String?
+  trackingNumber         String?
+  resolution             WarrantyClaimResolution?
+  resolutionNote         String?
+  replacementStockItemId Int?
+  creditAmount           Decimal?                        @db.Decimal(12, 2)
+  openedAt               DateTime                        @default(now())
+  submittedAt            DateTime?
+  providerReceivedAt     DateTime?
+  resolvedAt             DateTime?
+  cancelledAt            DateTime?
+  createdByEmployeeId    Int?
+  resolvedByEmployeeId   Int?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+  branch                 Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  stockItem              StockItem                       @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
+  previousClaim          WarrantyClaim?                  @relation("WarrantyClaimHistory", fields: [previousClaimId], references: [id], onDelete: Restrict)
+  subsequentClaims       WarrantyClaim[]                 @relation("WarrantyClaimHistory")
+  replacementStockItem   StockItem?                      @relation("WarrantyClaimReplacementStockItem", fields: [replacementStockItemId], references: [id], onDelete: Restrict)
+  createdBy              EmployeeProfile?                @relation("WarrantyClaimCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  resolvedBy             EmployeeProfile?                @relation("WarrantyClaimResolvedBy", fields: [resolvedByEmployeeId], references: [id], onDelete: Restrict)
+  events                 WarrantyClaimEvent[]
+  completionCommand      WarrantyClaimCompletionCommand?
+
+  @@unique([branchId, claimNo])
+  @@index([stockItemId, openedAt])
+  @@index([supplierId, openedAt])
+  @@index([saleReturnItemId])
+  @@index([previousClaimId])
+  @@index([replacementStockItemId])
+  @@index([createdByEmployeeId])
+  @@index([resolvedByEmployeeId])
+  @@index([branchId, status, openedAt])
+}
+
+model WarrantyClaimEvent {
+  id                    Int                 @id @default(autoincrement())
+  warrantyClaimId       Int
+  status                WarrantyClaimStatus
+  note                  String?
+  occurredAt            DateTime            @default(now())
+  performedByEmployeeId Int?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+  warrantyClaim         WarrantyClaim       @relation(fields: [warrantyClaimId], references: [id], onDelete: Restrict)
+  performedBy           EmployeeProfile?    @relation(fields: [performedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([warrantyClaimId, occurredAt])
+  @@index([performedByEmployeeId, occurredAt])
+}
+
+model WarrantyClaimCompletionCommand {
+  id              Int           @id @default(autoincrement())
+  branchId        Int
+  commandKey      String
+  requestHash     String
+  warrantyClaimId Int           @unique
+  createdAt       DateTime      @default(now())
+  completedAt     DateTime      @default(now())
+  branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warrantyClaim   WarrantyClaim @relation(fields: [warrantyClaimId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([branchId, createdAt])
 }
 
 enum Role {
@@ -1608,6 +1685,35 @@ enum StockMovementType {
   UNRESERVE
   RETURN
   LOSS
+  CLAIM_OUT
+  CLAIM_RETURN
+  CLAIM_REPLACEMENT
+  CLAIM_WRITE_OFF
+}
+
+enum WarrantyClaimStatus {
+  DRAFT
+  SUBMITTED
+  IN_TRANSIT
+  RECEIVED_BY_PROVIDER
+  INSPECTING
+  APPROVED
+  REJECTED
+  REPAIRING
+  REPLACEMENT_PENDING
+  CREDIT_PENDING
+  RESOLVED
+  CANCELLED
+}
+
+enum WarrantyClaimResolution {
+  REPAIRED
+  REPLACED
+  CREDITED
+  REFUNDED
+  RETURNED_UNCHANGED
+  REJECTED
+  WRITTEN_OFF
 }
 
 enum ReceiptSource {
