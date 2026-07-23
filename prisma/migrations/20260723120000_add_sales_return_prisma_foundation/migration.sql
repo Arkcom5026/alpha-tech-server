@@ -1,3 +1,38 @@
+-- This migration is intentionally atomic.
+-- If any compatibility preflight or schema operation fails, PostgreSQL rolls back every change.
+BEGIN;
+
+-- Fail before changing schema if the expected source constraint is missing or legacy
+-- return rows would violate the new compound uniqueness invariants.
+DO $$
+BEGIN
+  IF to_regclass('public."SaleItem_stockItemId_key"') IS NULL THEN
+    RAISE EXCEPTION
+      'Expected unique index public."SaleItem_stockItemId_key" was not found; inspect schema drift before applying this migration';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "public"."SaleReturnItem"
+    GROUP BY "saleReturnId", "saleItemId"
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION
+      'Duplicate SaleReturnItem(saleReturnId, saleItemId) rows must be reconciled before applying this migration';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "public"."SaleReturnItemSimple"
+    GROUP BY "saleReturnId", "saleItemSimpleId"
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION
+      'Duplicate SaleReturnItemSimple(saleReturnId, saleItemSimpleId) rows must be reconciled before applying this migration';
+  END IF;
+END
+$$;
+
 -- Extend the return lifecycle without reinterpreting existing return statuses.
 ALTER TYPE "public"."SaleReturnStatus" ADD VALUE IF NOT EXISTS 'STOCK_RESTORED' BEFORE 'REJECTED';
 ALTER TYPE "public"."SaleReturnStatus" ADD VALUE IF NOT EXISTS 'COMPLETED' BEFORE 'REJECTED';
@@ -58,40 +93,41 @@ CREATE TABLE "public"."SaleReturnCompletionCommand" (
   CONSTRAINT "SaleReturnCompletionCommand_pkey" PRIMARY KEY ("id")
 );
 
--- Concurrent index creation minimizes write blocking on existing production tables.
-CREATE INDEX CONCURRENTLY "SaleItem_stockItemId_idx"
+-- Regular index creation is used inside the transaction so the migration is all-or-nothing.
+-- Run this migration during a controlled deployment window.
+CREATE INDEX "SaleItem_stockItemId_idx"
   ON "public"."SaleItem"("stockItemId");
-CREATE INDEX CONCURRENTLY "SaleReturnItem_saleReturnId_idx"
+CREATE INDEX "SaleReturnItem_saleReturnId_idx"
   ON "public"."SaleReturnItem"("saleReturnId");
-CREATE INDEX CONCURRENTLY "SaleReturnItem_saleItemId_idx"
+CREATE INDEX "SaleReturnItem_saleItemId_idx"
   ON "public"."SaleReturnItem"("saleItemId");
-CREATE UNIQUE INDEX CONCURRENTLY "SaleReturnItem_saleReturnId_saleItemId_key"
+CREATE UNIQUE INDEX "SaleReturnItem_saleReturnId_saleItemId_key"
   ON "public"."SaleReturnItem"("saleReturnId", "saleItemId");
-CREATE INDEX CONCURRENTLY "SaleReturnItemSimple_saleReturnId_idx"
+CREATE INDEX "SaleReturnItemSimple_saleReturnId_idx"
   ON "public"."SaleReturnItemSimple"("saleReturnId");
-CREATE INDEX CONCURRENTLY "SaleReturnItemSimple_saleItemSimpleId_idx"
+CREATE INDEX "SaleReturnItemSimple_saleItemSimpleId_idx"
   ON "public"."SaleReturnItemSimple"("saleItemSimpleId");
-CREATE UNIQUE INDEX CONCURRENTLY "SaleReturnItemSimple_saleReturnId_saleItemSimpleId_key"
+CREATE UNIQUE INDEX "SaleReturnItemSimple_saleReturnId_saleItemSimpleId_key"
   ON "public"."SaleReturnItemSimple"("saleReturnId", "saleItemSimpleId");
-CREATE INDEX CONCURRENTLY "StockMovement_stockItemId_occurredAt_idx"
+CREATE INDEX "StockMovement_stockItemId_occurredAt_idx"
   ON "public"."StockMovement"("stockItemId", "occurredAt");
-CREATE INDEX CONCURRENTLY "StockMovement_simpleLotId_occurredAt_idx"
+CREATE INDEX "StockMovement_simpleLotId_occurredAt_idx"
   ON "public"."StockMovement"("simpleLotId", "occurredAt");
-CREATE INDEX CONCURRENTLY "StockMovement_branchId_type_occurredAt_idx"
+CREATE INDEX "StockMovement_branchId_type_occurredAt_idx"
   ON "public"."StockMovement"("branchId", "type", "occurredAt");
-CREATE INDEX CONCURRENTLY "StockMovement_productId_branchId_occurredAt_idx"
+CREATE INDEX "StockMovement_productId_branchId_occurredAt_idx"
   ON "public"."StockMovement"("productId", "branchId", "occurredAt");
-CREATE INDEX CONCURRENTLY "SaleReturn_saleId_returnedAt_idx"
+CREATE INDEX "SaleReturn_saleId_returnedAt_idx"
   ON "public"."SaleReturn"("saleId", "returnedAt");
-CREATE INDEX CONCURRENTLY "SaleReturn_branchId_returnedAt_idx"
+CREATE INDEX "SaleReturn_branchId_returnedAt_idx"
   ON "public"."SaleReturn"("branchId", "returnedAt");
-CREATE INDEX CONCURRENTLY "SaleReturn_branchId_status_returnedAt_idx"
+CREATE INDEX "SaleReturn_branchId_status_returnedAt_idx"
   ON "public"."SaleReturn"("branchId", "status", "returnedAt");
-CREATE INDEX CONCURRENTLY "RefundTransaction_saleReturnId_idx"
+CREATE INDEX "RefundTransaction_saleReturnId_idx"
   ON "public"."RefundTransaction"("saleReturnId");
-CREATE INDEX CONCURRENTLY "RefundTransaction_sourcePaymentItemId_idx"
+CREATE INDEX "RefundTransaction_sourcePaymentItemId_idx"
   ON "public"."RefundTransaction"("sourcePaymentItemId");
-CREATE INDEX CONCURRENTLY "RefundTransaction_branchId_refundedAt_idx"
+CREATE INDEX "RefundTransaction_branchId_refundedAt_idx"
   ON "public"."RefundTransaction"("branchId", "refundedAt");
 CREATE UNIQUE INDEX "SaleReturnCompletionCommand_saleReturnId_key"
   ON "public"."SaleReturnCompletionCommand"("saleReturnId");
@@ -129,3 +165,5 @@ ALTER TABLE "public"."SaleReturnCompletionCommand"
   ADD CONSTRAINT "SaleReturnCompletionCommand_saleReturnId_fkey"
   FOREIGN KEY ("saleReturnId") REFERENCES "public"."SaleReturn"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
+
+COMMIT;
