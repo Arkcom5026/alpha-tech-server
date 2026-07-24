@@ -53,7 +53,9 @@ const productTraceInclude = {
       },
     },
   },
-  saleItems: { include: saleItemInclude, orderBy: { createdAt: 'asc' } },
+  // Load only the latest SaleItem for lifecycle determination
+  // Deterministic: highest id = most recent
+  saleItems: { include: saleItemInclude, orderBy: { id: 'desc' }, take: 1 },
   stockMovements: {
     include: { performedBy: { select: { id: true, name: true } } },
     orderBy: { occurredAt: 'asc' },

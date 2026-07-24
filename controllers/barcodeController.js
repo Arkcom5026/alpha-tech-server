@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 // server/controllers/barcodeController.js
 
 // 👉 Helper
@@ -226,7 +221,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           serialNumber: true,
           status: true,
           soldAt: true,
-          saleItems: { select: { id: true }, take: 1 },
+          saleItems: { select: { id: true }, orderBy: { id: 'desc' }, take: 1 },
           productId: true,
         },
       },
@@ -287,7 +282,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           serialNumber: true,
           status: true,
           soldAt: true,
-          saleItems: { select: { id: true }, take: 1 },
+          saleItems: { select: { id: true }, orderBy: { id: 'desc' }, take: 1 },
           purchaseOrderReceiptItemId: true,
           productId: true,
         },
@@ -820,8 +815,12 @@ const reprintBarcodes = async (req, res) => {
           serialNumber: true,
           status: true,
           soldAt: true,
-          saleItems: { select: { id: true }, take: 1 },
           productId: true,
+          saleItems: {
+            select: { id: true },
+            orderBy: { id: 'desc' },
+            take: 1,
+          },
         },
       },
       receiptItem: {
