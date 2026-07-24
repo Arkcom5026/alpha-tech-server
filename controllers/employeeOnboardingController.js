@@ -6,14 +6,37 @@ const { prisma } = require('../lib/prisma');
 
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
+const normalizeUpper = (value) => normalize(value).toUpperCase();
 const toPositiveInt = (value) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
+const canCreateEmployee = (actor = {}) => {
+  const systemRole = normalizeUpper(actor.role);
+  const employeeRole = normalizeUpper(actor.employeeRole || actor.v2Role);
+
+  return Boolean(
+    actor.isSuperAdmin
+    || systemRole === 'SUPERADMIN'
+    || systemRole === 'ADMIN'
+    || employeeRole === 'OWNER'
+    || employeeRole === 'MANAGER'
+  );
+};
+
 const addSubEmployee = async (req, res) => {
   try {
-    const branchId = toPositiveInt(req.user?.branchId || req.user?.employeeProfile?.branchId);
+    const actor = req.user || {};
+
+    if (!canCreateEmployee(actor)) {
+      return res.status(403).json({
+        code: 'EMPLOYEE_ONBOARDING_FORBIDDEN',
+        message: 'เฉพาะเจ้าของร้าน ผู้ดูแลระบบ หรือผู้จัดการร้านเท่านั้นที่เพิ่มพนักงานใหม่ได้',
+      });
+    }
+
+    const branchId = toPositiveInt(actor.branchId || actor.employeeProfile?.branchId);
     if (!branchId) {
       return res.status(403).json({
         code: 'EMPLOYEE_ONBOARDING_BRANCH_REQUIRED',
@@ -25,7 +48,7 @@ const addSubEmployee = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = normalize(req.body?.password);
     const phone = normalize(req.body?.phone) || null;
-    const v2Role = normalize(req.body?.v2Role).toUpperCase();
+    const v2Role = normalizeUpper(req.body?.v2Role);
     const positionId = toPositiveInt(req.body?.positionId);
 
     if (!name || !email || !password || !v2Role || !positionId) {
