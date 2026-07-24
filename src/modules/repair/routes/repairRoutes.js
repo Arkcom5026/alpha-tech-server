@@ -21,6 +21,12 @@ router.get(
 );
 
 router.get(
+  '/customers/:customerId/warranty-assets',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  repairController.listCustomerWarrantyAssets
+);
+
+router.get(
   '/jobs',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   repairController.listJobs
