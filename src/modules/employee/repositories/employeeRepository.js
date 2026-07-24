@@ -33,6 +33,8 @@ const findPositions = () => prisma.position.findMany({
 
 const createEmployeeTransaction = (callback) => prisma.$transaction(callback);
 
+const createEmployee = (callback) => prisma.$transaction(callback);
+
 module.exports = {
   findEmployees,
   findEmployeeById,
@@ -40,4 +42,5 @@ module.exports = {
   findPositionById,
   findPositions,
   createEmployeeTransaction,
+  createEmployee,
 };
