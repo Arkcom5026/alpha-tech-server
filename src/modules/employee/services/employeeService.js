@@ -1,8 +1,8 @@
 // @filename: src/modules/employee/services/employeeService.js
 // Employee domain service boundary.
-// This starts extracting business flow from legacy controllers without changing runtime contracts.
 
 const bcrypt = require('bcryptjs');
+const employeeRepository = require('../repositories/employeeRepository');
 
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
@@ -53,8 +53,8 @@ const createEmployee = async ({ prisma, actor, input }) => {
   }
 
   const [existingUser, position] = await Promise.all([
-    prisma.user.findUnique({ where: { email }, select: { id: true } }),
-    prisma.position.findUnique({ where: { id: positionId }, select: { id: true, name: true } }),
+    employeeRepository.findEmployeeUserByEmail(email),
+    employeeRepository.findPositionById(positionId),
   ]);
 
   if (existingUser) {
@@ -71,7 +71,7 @@ const createEmployee = async ({ prisma, actor, input }) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  return prisma.$transaction(async (tx) => {
+  return employeeRepository.createEmployee(async (tx) => {
     const user = await tx.user.create({
       data: {
         email,
