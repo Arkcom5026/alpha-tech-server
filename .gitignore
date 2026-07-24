@@ -9,3 +9,7 @@ recovery/reports/
 recovery/restore/
 recovery/scheduler/history/
 recovery/state/recovery-state.json
+
+# Backup and operational runtime artifacts
+backups/
+logs/
