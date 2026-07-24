@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
+const employeeOnboardingController = require('../controllers/employeeOnboardingController');
 
 const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
 const isProduction = process.env.NODE_ENV === 'production';
@@ -67,9 +68,13 @@ const login = ensureFn('login');
 const register = ensureFn('register');
 const refreshSession = ensureFn('refreshSession');
 const logoutSession = ensureFn('logoutSession');
-const addSubEmployee = ensureFn('addSubEmployee'); // 🟢 ดึงโมดูล Atomic เพิ่มพนักงานรายย่อยมาร่วมท่อขาย
+const addSubEmployee = employeeOnboardingController.addSubEmployee;
 const revokeSession = resolveHandler('revokeSession') || resolveHandler('logoutAllSessions') || resolveHandler('logoutAll');
 const findUserByEmail = resolveHandler('findUserByEmail');
+
+if (typeof addSubEmployee !== 'function') {
+  throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
+}
 
 if (typeof findUserByEmail !== 'function') {
   throw new Error(`[authRoutes] authController.findUserByEmail must be a function (got ${typeof findUserByEmail})`);
@@ -79,7 +84,7 @@ if (typeof findUserByEmail !== 'function') {
 const verifyToken = require('../middlewares/verifyToken');
 
 // ⚠️ TEMPORARY: Auth trace middleware for refresh endpoint
-const { traceRefreshRequest, traceVerifyToken } = require('../middlewares/authTrace');
+const { traceRefreshRequest } = require('../middlewares/authTrace');
 
 // 🔐 Login / Register / Session
 router.post('/login', login);
@@ -89,15 +94,14 @@ router.post('/register', register);
 router.post('/refresh', traceRefreshRequest, refreshSession);
 router.post('/logout', logoutSession);
 
-// 👥 [SUB-EMPLOYEE CREATION LINK]: เจาะช่องเปิดท่อรับคำสั่งเพิ่มพนักงานย่อยฝั่งสาขา
-// บังคับผ่าน Middleware 'verifyToken' เพื่อดักเช็กค่าแกะ branchId เสมอตามนโยบาย Multi-Tenancy
+// Canonical owner-created employee flow: one request creates an active employee.
 router.post('/add-sub-employee', verifyToken, addSubEmployee);
 
 if (typeof revokeSession === 'function') {
   router.post('/logout-all', verifyToken, revokeSession);
 }
 
-// 🔍 Find user by email (for employee approval)
+// Compatibility lookup only; no employee approval workflow is exposed in the UI.
 router.get('/users/find', verifyToken, findUserByEmail);
 
 // ✅ Current session / bootstrap auth
