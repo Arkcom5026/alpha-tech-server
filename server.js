@@ -36,6 +36,7 @@ const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const productRoutes = require('./routes/productRoutes');
 const { productTraceRoutes } = require('./src/modules/product/trace');
+const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
@@ -188,6 +189,11 @@ app.use('/api/products/template', templateProductSearchRoutes);
 app.use('/api/products/trace', productTraceRoutes);
 app.use('/api/products', productRoutes);
 
+// Repair + Warranty Claim (canonical path)
+app.use('/api/repairs', repairRoutes);
+// Backward compatibility for clients using the singular path
+app.use('/api/repair', repairRoutes);
+
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
@@ -251,7 +257,13 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
+  const parsedStatusCode = Number(err.statusCode);
+  const statusCode =
+    Number.isInteger(parsedStatusCode) &&
+    parsedStatusCode >= 400 &&
+    parsedStatusCode <= 599
+      ? parsedStatusCode
+      : 500;
 
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({
@@ -262,23 +274,28 @@ app.use((err, req, res, next) => {
     });
   }
 
-  if (status >= 400 && status < 500) {
-    return res.status(status).json({
+  if (statusCode >= 400 && statusCode < 500) {
+    return res.status(statusCode).json({
       ok: false,
       error: err.message || 'Bad Request',
+      code: err.code || null,
+      details: err.details || null,
       reqId: req.id,
     });
   }
 
   console.error('❌ Server Error', {
     reqId: req.id,
-    status,
+    statusCode,
+    errorStatus: err.status || 'error',
+    code: err.code || null,
     message: err.message,
     path: req.originalUrl,
     method: req.method,
+    stack: err.stack,
   });
 
-  return res.status(500).json({
+  return res.status(statusCode).json({
     ok: false,
     error: 'Internal Server Error',
     reqId: req.id,

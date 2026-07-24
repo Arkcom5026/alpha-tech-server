@@ -1,57 +1,148 @@
-// src/modules/repair/controllers/repairController.js
 const repairService = require('../services/repairService');
+const repairIntakeService = require('../services/repairIntakeService');
+const warrantyClaimService = require('../services/warrantyClaimService');
+const { resolveRepairActor } = require('../utils/repairActor');
 
 class RepairController {
-  /**
-   * เปิดใบสั่งงานซ่อมใหม่
-   */
+  async getIntakeContext(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairIntakeService.getContext(
+        actor,
+        req.params.lookup
+      );
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createJob(req, res, next) {
     try {
-      const { branchId } = req.user; // ดึงพิกัดสาขาจาก Token ผู้ใช้งานระบบ
-      const job = await repairService.createRepairJob(Number(branchId), req.body);
-      
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.createRepairJob(actor, req.body);
       res.status(201).json({
         success: true,
-        message: 'เปิดใบสั่งงานซ่อมเข้าสู่ระบบสาขาเรียบร้อยแล้ว',
-        data: job
+        message: 'เปิดใบรับซ่อมเรียบร้อยแล้ว',
+        data,
       });
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * เบิกอะไหล่สต็อกเข้าเคสงานซ่อม
-   */
-  async addParts(req, res, next) {
+  async listJobs(req, res, next) {
     try {
-      const { branchId } = req.user;
-      const { id } = req.params; // ID ของ RepairJob
-      const partItem = await repairService.addPartsToRepairJob(Number(branchId), Number(id), req.body);
-
-      res.status(200).json({
-        success: true,
-        message: 'เบิกจ่ายอะไหล่และหักยอดคลังสินค้าสำเร็จ',
-        data: partItem
-      });
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.listRepairJobs(actor, req.query);
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * อัปเดตสเตทและบันทึกโน้ตอาการช่าง
-   */
+  async getJob(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.getRepairJob(actor, req.params.id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateStatus(req, res, next) {
     try {
-      const { branchId } = req.user;
-      const { id } = req.params;
-      const updatedJob = await repairService.updateJobStatus(Number(branchId), Number(id), req.body);
-
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.updateJobStatus(
+        actor,
+        req.params.id,
+        req.body
+      );
       res.status(200).json({
         success: true,
-        message: 'ปรับปรุงสถานะและบันทึกความคืบหน้างานซ่อมเรียบร้อย',
-        data: updatedJob
+        message: 'อัปเดตสถานะงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addParts(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.addPartsToRepairJob(
+        actor,
+        req.params.id,
+        req.body
+      );
+      res.status(201).json({
+        success: true,
+        message: 'เบิกอะไหล่สำหรับงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async openWarrantyClaim(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await warrantyClaimService.openFromRepairJob(
+        actor,
+        req.params.id,
+        req.body
+      );
+      res.status(201).json({
+        success: true,
+        message: 'เปิดรายการเคลมจากใบงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listWarrantyClaims(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await warrantyClaimService.listWarrantyClaims(
+        actor,
+        req.query
+      );
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getWarrantyClaim(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await warrantyClaimService.getWarrantyClaim(
+        actor,
+        req.params.claimId
+      );
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateWarrantyClaimStatus(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await warrantyClaimService.updateStatus(
+        actor,
+        req.params.claimId,
+        req.body
+      );
+      res.status(200).json({
+        success: true,
+        message: 'อัปเดตสถานะเคลมเรียบร้อยแล้ว',
+        data,
       });
     } catch (error) {
       next(error);

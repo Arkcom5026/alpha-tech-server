@@ -1,0 +1,9 @@
+﻿npx : Environment variables loaded from .env
+At D:\alpha-tech\server\product-service-runtime-v4-transition\scripts\01-capture-safety-evidence.ps1:79 char:16
++     -Command { npx prisma validate } `
++                ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Environment variables loaded from .env:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Prisma schema loaded from prisma\schema.prisma
+The schema at prisma\schema.prisma is valid ≡ƒÜÇ

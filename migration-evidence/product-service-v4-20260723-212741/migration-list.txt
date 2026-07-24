@@ -1,0 +1,11 @@
+﻿
+Name                                               
+----                                               
+0_init                                             
+20260707072421_remove_product_category_relation    
+20260707195000_drop_product_type_slug              
+20260723090000_add_sales_completion_command        
+20260723120000_add_sales_return_prisma_foundation  
+20260723160000_add_warranty_claim_prisma_foundation
+
+

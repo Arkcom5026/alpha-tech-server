@@ -1,3 +1,15 @@
-node_modules
+﻿node_modules
 # Keep environment variables out of version control
 .env
+
+# Recovery runtime-generated artifacts
+recovery/jobs/
+recovery/logs/
+recovery/reports/
+recovery/restore/
+recovery/scheduler/history/
+recovery/state/recovery-state.json
+
+# Backup and operational runtime artifacts
+backups/
+logs/

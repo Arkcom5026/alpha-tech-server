@@ -1,0 +1,91 @@
+﻿D:\alpha-tech\server\prisma\schema.prisma:303: previousStockStatus   StockStatus?
+D:\alpha-tech\server\prisma\schema.prisma:304: resultingStockStatus  StockStatus?
+D:\alpha-tech\server\prisma\schema.prisma:358: status                     StockStatus               @default(IN_STOCK)
+D:\alpha-tech\server\prisma\schema.prisma:384: @@index([branchId, status, productId])
+D:\alpha-tech\server\prisma\schema.prisma:385: @@index([productId, status])
+D:\alpha-tech\server\prisma\schema.prisma:392: status    String             @default("PENDING")
+D:\alpha-tech\server\prisma\schema.prisma:461: status     PurchaseOrderStatus    @default(PENDING)
+D:\alpha-tech\server\prisma\schema.prisma:501: statusPayment            PaymentStatus              @default(UNPAID)
+D:\alpha-tech\server\prisma\schema.prisma:502: statusReceipt            ReceiptStatus              @default(PENDING)
+D:\alpha-tech\server\prisma\schema.prisma:527: status      InputTaxFilingStatus @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:537: @@index([status])
+D:\alpha-tech\server\prisma\schema.prisma:545: status      SalesTaxFilingStatus @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:555: @@index([status])
+D:\alpha-tech\server\prisma\schema.prisma:606: status          String
+D:\alpha-tech\server\prisma\schema.prisma:611: customerId      Int?
+D:\alpha-tech\server\prisma\schema.prisma:612: orderStatus     OrderStatus      @default(PENDING)
+D:\alpha-tech\server\prisma\schema.prisma:613: customer        CustomerProfile? @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:655: customerId  Int?
+D:\alpha-tech\server\prisma\schema.prisma:659: status      ServiceStatus    @default(RECEIVED)
+D:\alpha-tech\server\prisma\schema.prisma:666: customer    CustomerProfile? @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:708: status                 BarcodeStatus            @default(READY)
+D:\alpha-tech\server\prisma\schema.prisma:725: customerId                 Int?
+D:\alpha-tech\server\prisma\schema.prisma:744: status                     SaleStatus                  @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:749: statusPayment              PaymentStatus               @default(UNPAID)
+D:\alpha-tech\server\prisma\schema.prisma:756: customer                   CustomerProfile?            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+D:\alpha-tech\server\prisma\schema.prisma:766: @@index([branchId, statusPayment, soldAt])
+D:\alpha-tech\server\prisma\schema.prisma:767: @@index([branchId, statusPayment, dueDate])
+D:\alpha-tech\server\prisma\schema.prisma:914: status                SaleReturnStatus             @default(PENDING)
+D:\alpha-tech\server\prisma\schema.prisma:930: @@index([branchId, status, returnedAt])
+D:\alpha-tech\server\prisma\schema.prisma:933: model SaleReturnItem {
+D:\alpha-tech\server\prisma\schema.prisma:1007: statusPayment           PaymentStatus            @default(UNPAID)
+D:\alpha-tech\server\prisma\schema.prisma:1032: customerId            Int?
+D:\alpha-tech\server\prisma\schema.prisma:1035: status                OrderOnlineStatus @default(PENDING)
+D:\alpha-tech\server\prisma\schema.prisma:1045: statusPayment         PaymentStatus     @default(UNPAID)
+D:\alpha-tech\server\prisma\schema.prisma:1047: paymentSlipStatus     PaymentSlipStatus @default(NONE)
+D:\alpha-tech\server\prisma\schema.prisma:1053: customer              CustomerProfile?  @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:1075: customerId     Int
+D:\alpha-tech\server\prisma\schema.prisma:1082: status         CombinedBillingStatus @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:1085: customer       CustomerProfile       @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:1102: status        StockAuditStatus         @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:1108: @@index([branchId, status])
+D:\alpha-tech\server\prisma\schema.prisma:1118: expectedStatus StockStatus       @default(IN_STOCK)
+D:\alpha-tech\server\prisma\schema.prisma:1169: status             SimpleLotStatus           @default(ACTIVE)
+D:\alpha-tech\server\prisma\schema.prisma:1178: @@index([branchId, status])
+D:\alpha-tech\server\prisma\schema.prisma:1181: model SaleReturnItemSimple {
+D:\alpha-tech\server\prisma\schema.prisma:1203: customerId                   Int
+D:\alpha-tech\server\prisma\schema.prisma:1211: status                       CustomerReceiptStatus       @default(ACTIVE)
+D:\alpha-tech\server\prisma\schema.prisma:1222: customer                     CustomerProfile             @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:1225: @@index([customerId, receivedAt])
+D:\alpha-tech\server\prisma\schema.prisma:1226: @@index([status])
+D:\alpha-tech\server\prisma\schema.prisma:1323: customerId     Int?
+D:\alpha-tech\server\prisma\schema.prisma:1331: status         DepositStatus    @default(ACTIVE)
+D:\alpha-tech\server\prisma\schema.prisma:1334: customer       CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+D:\alpha-tech\server\prisma\schema.prisma:1337: @@index([customerId])
+D:\alpha-tech\server\prisma\schema.prisma:1359: customerId      Int
+D:\alpha-tech\server\prisma\schema.prisma:1364: customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+D:\alpha-tech\server\prisma\schema.prisma:1411: model RepairJob {
+D:\alpha-tech\server\prisma\schema.prisma:1415: customerId       Int
+D:\alpha-tech\server\prisma\schema.prisma:1417: deviceModel      String
+D:\alpha-tech\server\prisma\schema.prisma:1420: status           ServiceStatus    @default(RECEIVED)
+D:\alpha-tech\server\prisma\schema.prisma:1427: customer         CustomerProfile  @relation(fields: [customerId], references: [id])
+D:\alpha-tech\server\prisma\schema.prisma:1438: repairJobId Int
+D:\alpha-tech\server\prisma\schema.prisma:1443: repairJob   RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+D:\alpha-tech\server\prisma\schema.prisma:1446: model WarrantyClaim {
+D:\alpha-tech\server\prisma\schema.prisma:1451: saleReturnItemId       Int?
+D:\alpha-tech\server\prisma\schema.prisma:1454: status                 WarrantyClaimStatus             @default(DRAFT)
+D:\alpha-tech\server\prisma\schema.prisma:1475: saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
+D:\alpha-tech\server\prisma\schema.prisma:1487: @@index([saleReturnItemId])
+D:\alpha-tech\server\prisma\schema.prisma:1492: @@index([branchId, status, openedAt])
+D:\alpha-tech\server\prisma\schema.prisma:1495: model WarrantyClaimEvent {
+D:\alpha-tech\server\prisma\schema.prisma:1498: status                WarrantyClaimStatus
+D:\alpha-tech\server\prisma\schema.prisma:1511: model WarrantyClaimCompletionCommand {
+D:\alpha-tech\server\prisma\schema.prisma:1539: enum PurchaseOrderStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1548: enum OrderStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1556: enum StockStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1567: enum ServiceStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1575: enum ReceiptStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1581: enum PaymentStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1589: enum PaymentSlipStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1617: enum SaleStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1640: enum OrderOnlineStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1659: enum BarcodeStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1694: enum WarrantyClaimStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1735: enum DepositStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1741: enum SaleReturnStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1750: enum CombinedBillingStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1767: enum StockAuditStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1774: enum SimpleLotStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1780: enum CustomerReceiptStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1786: enum InputTaxFilingStatus {
+D:\alpha-tech\server\prisma\schema.prisma:1792: enum SalesTaxFilingStatus {

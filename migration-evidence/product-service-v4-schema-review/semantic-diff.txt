@@ -1,0 +1,77 @@
+﻿diff --git "a/.\\migration-evidence\\product-service-v4-schema-review\\current.schema.prisma" "b/.\\migration-evidence\\product-service-v4-schema-review\\candidate.schema.prisma"
+index c25532b..1d4871c 100644
+--- "a/.\\migration-evidence\\product-service-v4-schema-review\\current.schema.prisma"
++++ "b/.\\migration-evidence\\product-service-v4-schema-review\\candidate.schema.prisma"
+@@ -965,6 +965,7 @@ model SaleReturnItem {
+   updatedAt            DateTime        @updatedAt
+   saleItem             SaleItem        @relation(fields: [saleItemId], references: [id])
+   saleReturn           SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
++  legacyWarrantyClaims WarrantyClaim[] @relation("LegacyWarrantyClaimSaleReturnItem")
+ 
+   @@unique([saleReturnId, saleItemId])
+   @@index([saleReturnId])
+@@ -1440,7 +1441,7 @@ model RepairJob {
+   jobNo                  String
+   serviceCaseId          Int?
+   branchId               Int
+-  customerId             Int
++  customerId             Int?
+   stockItemId            Int?
+   status                 RepairJobStatus              @default(DRAFT)
+   reportedSymptoms       String
+@@ -1467,7 +1468,7 @@ model RepairJob {
+   updatedAt              DateTime                     @updatedAt
+   serviceCase            ServiceCase?                 @relation(fields: [serviceCaseId], references: [id], onDelete: Restrict)
+   branch                 Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+-  customer               CustomerProfile              @relation(fields: [customerId], references: [id], onDelete: Restrict)
++  customer               CustomerProfile?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+   stockItem              StockItem?                   @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+   technician             EmployeeProfile?             @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+   receivedBy             EmployeeProfile?             @relation("RepairJobReceivedBy", fields: [receivedByEmployeeId], references: [id], onDelete: Restrict)
+@@ -1794,9 +1795,11 @@ model WarrantyClaim {
+   branchId               Int
+   stockItemId            Int
+   supplierId             Int?
+-  repairJobId            Int
++  repairJobId            Int?
+   repairWorkItemId       Int?                            @unique
+   repairDiagnosisId      Int?
++  saleReturnItemId       Int? // LEGACY_READ_ONLY: preserved until evidence migration is proven
++  repairLinkState        WarrantyClaimRepairLinkState    @default(UNLINKED_LEGACY)
+   previousClaimId        Int?
+   claimNo                String
+   status                 WarrantyClaimStatus             @default(DRAFT)
+@@ -1822,9 +1825,10 @@ model WarrantyClaim {
+   branch                 Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+   stockItem              StockItem                       @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+   supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+-  repairJob              RepairJob                       @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
++  repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
+   repairWorkItem         RepairWorkItem?                 @relation(fields: [repairWorkItemId], references: [id], onDelete: Restrict)
+   repairDiagnosis        RepairDiagnosis?                @relation(fields: [repairDiagnosisId], references: [id], onDelete: Restrict)
++  legacySaleReturnItem   SaleReturnItem?                 @relation("LegacyWarrantyClaimSaleReturnItem", fields: [saleReturnItemId], references: [id], onDelete: Restrict)
+   previousClaim          WarrantyClaim?                  @relation("WarrantyClaimHistory", fields: [previousClaimId], references: [id], onDelete: Restrict)
+   subsequentClaims       WarrantyClaim[]                 @relation("WarrantyClaimHistory")
+   replacementStockItem   StockItem?                      @relation("WarrantyClaimReplacementStockItem", fields: [replacementStockItemId], references: [id], onDelete: Restrict)
+@@ -1839,6 +1843,8 @@ model WarrantyClaim {
+   @@index([supplierId, openedAt])
+   @@index([repairJobId, openedAt])
+   @@index([repairDiagnosisId])
++  @@index([saleReturnItemId])
++  @@index([repairLinkState, openedAt])
+   @@index([previousClaimId])
+   @@index([replacementStockItemId])
+   @@index([createdByEmployeeId])
+@@ -2443,6 +2449,12 @@ enum StockMovementType {
+   CLAIM_WRITE_OFF
+ }
+ 
++enum WarrantyClaimRepairLinkState {
++  UNLINKED_LEGACY
++  LINKED_VERIFIED
++  MANUAL_REVIEW_REQUIRED
++}
++
+ enum WarrantyClaimStatus {
+   DRAFT
+   SUBMITTED

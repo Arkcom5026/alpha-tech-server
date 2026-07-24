@@ -1,0 +1,14 @@
+
+// *** WARNING ***
+// 
+// These fields were enriched with `@map` information taken from the previous Prisma schema:
+//   - Model: "District", field: "createdAt"
+// 
+// These models were enriched with `@@map` information taken from the previous Prisma schema:
+//   - "CustomerReceiptAllocation"
+//   - "CustomerReceipt"
+// 
+// These tables contain row level security, which is not yet fully supported. Read more: https://pris.ly/d/row-level-security
+//   - "Product"
+//   - "ProductType"
+// 
