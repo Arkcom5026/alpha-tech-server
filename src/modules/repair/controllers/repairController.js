@@ -1,6 +1,7 @@
 const repairService = require('../services/repairService');
 const repairIntakeService = require('../services/repairIntakeService');
 const warrantyClaimService = require('../services/warrantyClaimService');
+const customerWarrantyAssetService = require('../services/customerWarrantyAssetService');
 const { resolveRepairActor } = require('../utils/repairActor');
 
 class RepairController {
@@ -11,6 +12,20 @@ class RepairController {
         actor,
         req.params.lookup
       );
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listCustomerWarrantyAssets(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await customerWarrantyAssetService.listForCustomer(
+        actor,
+        req.params.customerId
+      );
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

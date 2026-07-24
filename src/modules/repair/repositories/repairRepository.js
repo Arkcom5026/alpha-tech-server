@@ -217,6 +217,83 @@ class RepairRepository {
     });
   }
 
+  findCustomerWarrantyStockItems(branchId, customerId) {
+    return this.prisma.stockItem.findMany({
+      where: {
+        branchId: Number(branchId),
+        saleItems: {
+          some: {
+            sale: {
+              customerId: Number(customerId),
+              branchId: Number(branchId),
+            },
+          },
+        },
+        OR: [
+          { warrantyDays: { gt: 0 } },
+          { expiredAt: { not: null } },
+          { product: { warrantyDays: { gt: 0 } } },
+        ],
+      },
+      include: {
+        product: {
+          include: {
+            brand: true,
+            productType: true,
+          },
+        },
+        saleItems: {
+          where: {
+            sale: {
+              customerId: Number(customerId),
+              branchId: Number(branchId),
+            },
+          },
+          include: {
+            sale: true,
+          },
+          orderBy: {
+            sale: {
+              soldAt: 'desc',
+            },
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        soldAt: 'desc',
+      },
+    });
+  }
+
+  findCustomerWarrantySimpleItems(branchId, customerId) {
+    return this.prisma.saleItemSimple.findMany({
+      where: {
+        sale: {
+          customerId: Number(customerId),
+          branchId: Number(branchId),
+        },
+        product: {
+          warrantyDays: { gt: 0 },
+        },
+      },
+      include: {
+        product: {
+          include: {
+            brand: true,
+            productType: true,
+          },
+        },
+        sale: true,
+      },
+      orderBy: {
+        sale: {
+          soldAt: 'desc',
+        },
+      },
+    });
+  }
+
   findEmployee(employeeId) {
     return this.prisma.employeeProfile.findUnique({
       where: { id: Number(employeeId) },
