@@ -1,4 +1,4 @@
-const AppError = require('../../../../shared/errors/AppError');
+const AppError = require('../../../shared/errors/AppError');
 
 const RepairFailureCode = Object.freeze({
   INVALID_INPUT: 'REPAIR_INVALID_INPUT',

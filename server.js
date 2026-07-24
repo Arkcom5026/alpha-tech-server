@@ -257,7 +257,13 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
+  const parsedStatusCode = Number(err.statusCode);
+  const statusCode =
+    Number.isInteger(parsedStatusCode) &&
+    parsedStatusCode >= 400 &&
+    parsedStatusCode <= 599
+      ? parsedStatusCode
+      : 500;
 
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({
@@ -268,8 +274,8 @@ app.use((err, req, res, next) => {
     });
   }
 
-  if (status >= 400 && status < 500) {
-    return res.status(status).json({
+  if (statusCode >= 400 && statusCode < 500) {
+    return res.status(statusCode).json({
       ok: false,
       error: err.message || 'Bad Request',
       code: err.code || null,
@@ -280,13 +286,16 @@ app.use((err, req, res, next) => {
 
   console.error('❌ Server Error', {
     reqId: req.id,
-    status,
+    statusCode,
+    errorStatus: err.status || 'error',
+    code: err.code || null,
     message: err.message,
     path: req.originalUrl,
     method: req.method,
+    stack: err.stack,
   });
 
-  return res.status(500).json({
+  return res.status(statusCode).json({
     ok: false,
     error: 'Internal Server Error',
     reqId: req.id,

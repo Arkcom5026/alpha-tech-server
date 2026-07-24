@@ -149,10 +149,10 @@ const deleteStockItem = async (req, res) => {
 
     const found = await prisma.stockItem.findFirst({
       where: { id, branchId },
-      include: { saleItem: true },
+      include: { saleItems: { select: { id: true }, take: 1 } },
     });
     if (!found) return res.status(404).json({ message: 'ไม่พบรายการในสาขา' });
-    if (found.status !== 'IN_STOCK' || found.saleItem) {
+    if (found.status !== 'IN_STOCK' || (found.saleItems && found.saleItems.length > 0)) {
       return res.status(409).json({ message: 'ลบไม่ได้: สถานะไม่ใช่ IN_STOCK หรือมีการอ้างอิงการขายแล้ว' });
     }
 
