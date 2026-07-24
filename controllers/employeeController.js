@@ -1,106 +1,131 @@
-
 // ✅ @filename: server/controllers/employeeController.js
-// Unified Prisma import (singleton)
-const { prisma, Prisma } = require('../lib/prisma');
+const { prisma } = require('../lib/prisma');
 
-// --- helpers ---
-const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : parseInt(v, 10));
-// ⬇️ อนุญาต role เพิ่มเติม (superadmin/owner) และเขียนให้ยืดหยุ่นด้วย lowerCase
-const isStaffRole = (r) => new Set(['superadmin', 'owner', 'admin', 'manager', 'staff', 'employee']).has(String(r || '').toLowerCase());
+const toInt = (value) => (
+  value === undefined || value === null || value === ''
+    ? undefined
+    : parseInt(value, 10)
+);
 
-// ✅ Prisma Role enum mapper (P1)
-// Prisma enum Role (from schema): CUSTOMER | EMPLOYEE | ADMIN | SUPERADMIN
-// Inputs may arrive as lower-case, mixed, or legacy typos.
-const toPrismaRole = (r) => {
-  const raw = r;
-  const v = String(raw || '').trim();
-  const l = v.toLowerCase();
-  if (!l) return null;
+const normalizeRole = (role) => String(role || '').trim().toLowerCase();
+const isSuperAdmin = (actor = {}) => !!actor.isSuperAdmin || normalizeRole(actor.role) === 'superadmin';
+const isStaffRole = (role) => new Set(['superadmin', 'admin', 'employee']).has(normalizeRole(role));
 
-  // common typo
-  if (l === 'supperadmin') return 'SUPERADMIN';
-
-  // accept either lower/mixed
-  if (l === 'superadmin') return 'SUPERADMIN';
-  if (l === 'admin') return 'ADMIN';
-  if (l === 'employee') return 'EMPLOYEE';
-  if (l === 'customer') return 'CUSTOMER';
-
-  // accept already-uppercased enum
-  if (['CUSTOMER', 'EMPLOYEE', 'ADMIN', 'SUPERADMIN'].includes(v)) return v;
-
+const toPrismaRole = (role) => {
+  const normalized = normalizeRole(role);
+  if (normalized === 'supperadmin' || normalized === 'superadmin') return 'SUPERADMIN';
+  if (normalized === 'admin') return 'ADMIN';
+  if (normalized === 'employee') return 'EMPLOYEE';
+  if (normalized === 'customer') return 'CUSTOMER';
   return null;
 };
 
-// GET /employees (supports q/search, role, status, page, limit, branchId)
+const projectEmployeeStatus = (employee) => {
+  if (!employee?.approved) return 'pending';
+  return employee.active ? 'active' : 'inactive';
+};
+
+const statusWhere = (status) => {
+  switch (String(status || '').trim().toLowerCase()) {
+    case 'pending':
+      return { approved: false };
+    case 'active':
+      return { approved: true, active: true };
+    case 'inactive':
+      return { approved: true, active: false };
+    default:
+      return {};
+  }
+};
+
+const employeeProjection = (employee) => ({
+  id: employee.id,
+  userId: employee.userId,
+  name: employee.name,
+  phone: employee.phone,
+  positionId: employee.positionId,
+  branchId: employee.branchId,
+  approved: employee.approved,
+  active: employee.active,
+  status: projectEmployeeStatus(employee),
+  role: employee.user?.role ?? null,
+  email: employee.user?.email ?? null,
+  user: employee.user,
+  position: employee.position,
+  branch: employee.branch,
+});
+
+const resolveManagedBranchId = (actor, requestedBranchId) => {
+  if (isSuperAdmin(actor)) return toInt(requestedBranchId);
+
+  const actorBranchId = toInt(actor?.branchId);
+  const mainBranchId = toInt(process.env.MAIN_BRANCH_ID);
+  const isMainBranchEmployee = normalizeRole(actor?.role) === 'employee'
+    && actorBranchId
+    && mainBranchId
+    && actorBranchId === mainBranchId;
+
+  if (isMainBranchEmployee && toInt(requestedBranchId)) return toInt(requestedBranchId);
+  return actorBranchId;
+};
+
+// GET /employees
 const getAllEmployees = async (req, res) => {
   try {
     const actor = req.user || {};
     const actorBranchId = toInt(actor.branchId);
-    const actorRole = String(actor.role || '').toLowerCase();
-    const isSuper = !!actor?.isSuperAdmin || actorRole === 'superadmin';
-
-    const q = (req.query.q ?? req.query.search ?? '').toString().trim();
-    const roleRaw = (req.query.role ?? '').toString().trim(); // admin|employee (optional)
-    const role = roleRaw ? toPrismaRole(roleRaw) : null; // Prisma enum (ADMIN/EMPLOYEE/...) or null
-    const statusParam = (req.query.status ?? '').toString().trim().toLowerCase(); // active|inactive|pending (optional)
     const requestedBranchId = toInt(req.query.branchId);
-    const pageNum = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
-    const take = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100);
-    const skip = (pageNum - 1) * take;
+    const q = String(req.query.q ?? req.query.search ?? '').trim();
+    const role = req.query.role ? toPrismaRole(req.query.role) : null;
+    const status = String(req.query.status || '').trim().toLowerCase();
+    const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100);
+    const skip = (page - 1) * limit;
 
-    // Build where clause (branch-scoped unless superadmin; superadmin may pass branchId to filter)
-    const where = {
-      ...(isSuper ? (requestedBranchId ? { branchId: requestedBranchId } : {}) : { branchId: actorBranchId || -1 }),
-      ...(q
-        ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { phone: { contains: q, mode: 'insensitive' } },
-            { user: { email: { contains: q, mode: 'insensitive' } } },
-          ],
-        }
-        : {}),      ...(role ? { user: { role } } : {}),
-      ...(statusParam && statusParam !== 'all' ? { status: statusParam } : {}), // รองรับ field status ใน employeeProfile ถ้ามี
-    };
+    const filters = [];
 
+    if (isSuperAdmin(actor)) {
+      if (requestedBranchId) filters.push({ branchId: requestedBranchId });
+    } else {
+      filters.push({ branchId: actorBranchId || -1 });
+    }
+
+    if (q) {
+      filters.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { phone: { contains: q, mode: 'insensitive' } },
+          { user: { email: { contains: q, mode: 'insensitive' } } },
+          { user: { loginId: { contains: q, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (role) filters.push({ user: { role } });
+    if (status && status !== 'all') filters.push(statusWhere(status));
+
+    const where = filters.length ? { AND: filters } : {};
     const [itemsRaw, total] = await Promise.all([
       prisma.employeeProfile.findMany({
         where,
         include: { user: true, position: true, branch: true },
         orderBy: [{ name: 'asc' }, { id: 'asc' }],
         skip,
-        take,
+        take: limit,
       }),
       prisma.employeeProfile.count({ where }),
     ]);
 
-    // Normalize shape expected by FE
-    const items = itemsRaw.map((e) => ({
-      id: e.id,
-      userId: e.userId,
-      name: e.name,
-      phone: e.phone,
-      positionId: e.positionId,
-      branchId: e.branchId,
-      status: e.status ?? e.employeeStatus ?? 'active',
-      role: e.user?.role ?? null,
-      email: e.user?.email ?? null,
-      user: e.user,
-      position: e.position,
-      branch: e.branch,
-    }));
-
     return res.json({
-      items,
+      items: itemsRaw.map(employeeProjection),
       total,
-      page: pageNum,
-      limit: take,
-      pages: Math.max(1, Math.ceil(total / take)),
+      page,
+      limit,
+      pages: Math.max(1, Math.ceil(total / limit)),
     });
   } catch (error) {
     console.error('❌ getAllEmployees error:', error);
-    res.status(500).json({ error: 'Server error while fetching employees' });
+    return res.status(500).json({ message: 'ดึงรายชื่อพนักงานไม่สำเร็จ' });
   }
 };
 
@@ -111,354 +136,309 @@ const getEmployeesById = async (req, res) => {
     if (!id) return res.status(400).json({ message: 'id ไม่ถูกต้อง' });
 
     const actor = req.user || {};
-    const actorBranchId = toInt(actor.branchId);
-    const actorRole = String(actor.role || '').toLowerCase();
-    const isSuper = !!actor?.isSuperAdmin || actorRole === 'superadmin';
-    const scopeAll = String(req.query?.scope || '').toLowerCase() === 'all';
-
-    // superadmin (หรือ scope=all) มองเห็นทุกสาขา
-    const where = isSuper || scopeAll ? { id } : { id, branchId: actorBranchId || -1 };
+    const where = isSuperAdmin(actor)
+      ? { id }
+      : { id, branchId: toInt(actor.branchId) || -1 };
 
     const employee = await prisma.employeeProfile.findFirst({
       where,
       include: { user: true, position: true, branch: true },
     });
 
-    if (!employee) {
-      return res.status(404).json({ message: isSuper || scopeAll ? 'ไม่พบพนักงาน' : 'ไม่พบพนักงานในสาขานี้' });
-    }
-    res.json(employee);
-  } catch (err) {
-    console.error('❌ getEmployeeById error:', err);
-    res.status(500).json({ message: 'ดึงข้อมูลพนักงานไม่สำเร็จ' });
+    if (!employee) return res.status(404).json({ message: 'ไม่พบพนักงานในขอบเขตที่อนุญาต' });
+    return res.json(employeeProjection(employee));
+  } catch (error) {
+    console.error('❌ getEmployeeById error:', error);
+    return res.status(500).json({ message: 'ดึงข้อมูลพนักงานไม่สำเร็จ' });
   }
 };
 
-// POST /employees
+// POST /employees — direct creation by an authorized staff actor
 const createEmployees = async (req, res) => {
   try {
     const actor = req.user || {};
-    if (!isStaffRole(actor.role) && !actor.isSuperAdmin) return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
+    if (!isStaffRole(actor.role) && !actor.isSuperAdmin) {
+      return res.status(403).json({ message: 'FORBIDDEN_ROLE' });
+    }
 
-    const { userId, name, phone, positionId } = req.body;
-    let requestedBranchId = toInt(req.body?.branchId);
+    const userId = toInt(req.body?.userId);
+    const positionId = toInt(req.body?.positionId);
+    const branchId = resolveManagedBranchId(actor, req.body?.branchId);
+    const name = String(req.body?.name || '').trim();
+    const phone = req.body?.phone ? String(req.body.phone).trim() : null;
 
-    const MAIN_BRANCH_ID = toInt(process.env.MAIN_BRANCH_ID);
-    const isMainBranchAdmin = String(actor.role).toLowerCase() === 'employee' && actor.branchId === MAIN_BRANCH_ID;
-    const branchId = isMainBranchAdmin && requestedBranchId ? requestedBranchId : toInt(actor.branchId);
-
-    if (!userId || !name || !branchId || !positionId) {
+    if (!userId || !positionId || !branchId || !name) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' });
     }
 
-    const parsedUserId = toInt(userId);
-    const parsedPositionId = toInt(positionId);
-    if (!parsedUserId || !parsedPositionId) {
-      return res.status(400).json({ message: 'รหัสไม่ถูกต้อง' });
-    }
+    const employee = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { role: 'EMPLOYEE', enabled: true },
+      });
 
-    const newEmployee = await prisma.$transaction(async (tx) => {
-      // Promote user to employee role
-      await tx.user.update({ where: { id: parsedUserId }, data: { role: 'EMPLOYEE' } });
-
-
-      // Create employee profile
       return tx.employeeProfile.create({
         data: {
-          userId: parsedUserId,
+          userId,
           name,
-          phone: phone || null,
+          phone,
           branchId,
-          positionId: parsedPositionId,
+          positionId,
+          approved: true,
+          active: true,
         },
+        include: { user: true, position: true, branch: true },
       });
     }, { timeout: 15000 });
 
-    res.status(201).json(newEmployee);
-  } catch (err) {
-    console.error('❌ createEmployees error:', err);
-    const msg = err instanceof Error ? err.message : 'unknown error';
-    res.status(400).json({ message: 'สร้างพนักงานไม่สำเร็จ', error: msg });
+    return res.status(201).json(employeeProjection(employee));
+  } catch (error) {
+    console.error('❌ createEmployees error:', error);
+    return res.status(400).json({
+      message: 'สร้างพนักงานไม่สำเร็จ',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };
 
-// PATCH /employees/:id
+// PUT /employees/:id
 const updateEmployees = async (req, res) => {
   try {
     const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ message: 'id ไม่ถูกต้อง' });
+
     const actor = req.user || {};
-    const actorBranchId = toInt(actor.branchId);
-    const actorRole = String(actor.role || '').toLowerCase();
-    const isSuper = !!actor?.isSuperAdmin || actorRole === 'superadmin';
-
-    if (!id) return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
-
-    const { name, phone, positionId } = req.body;
-
-    // หา employee โดยไม่จำกัดสาขาก่อน แล้วค่อยตรวจสิทธิ์
     const current = await prisma.employeeProfile.findUnique({ where: { id } });
     if (!current) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
 
-    if (!isSuper && toInt(current.branchId) !== actorBranchId) {
+    if (!isSuperAdmin(actor) && toInt(current.branchId) !== toInt(actor.branchId)) {
       return res.status(403).json({ message: 'FORBIDDEN_BRANCH' });
     }
 
     const updated = await prisma.employeeProfile.update({
       where: { id },
       data: {
-        name: name ?? current.name,
-        phone: phone ?? current.phone,
-        positionId: positionId !== undefined ? toInt(positionId) : current.positionId,
+        name: req.body?.name !== undefined ? String(req.body.name).trim() : current.name,
+        phone: req.body?.phone !== undefined ? (req.body.phone || null) : current.phone,
+        positionId: req.body?.positionId !== undefined ? toInt(req.body.positionId) : current.positionId,
       },
+      include: { user: true, position: true, branch: true },
     });
 
-    res.json(updated);
-  } catch (err) {
-    console.error('❌ updateEmployees error:', err);
-    res.status(400).json({ message: 'แก้ไขพนักงานล้มเหลว', error: err?.message || String(err) });
+    return res.json(employeeProjection(updated));
+  } catch (error) {
+    console.error('❌ updateEmployees error:', error);
+    return res.status(400).json({ message: 'แก้ไขพนักงานล้มเหลว', error: error?.message || String(error) });
   }
 };
 
-// DELETE /employees/:id
-const deleteEmployees = async (req, res) => {
-  try {
-    const id = toInt(req.params.id);
-    const branchId = toInt(req.user?.branchId);
-    if (!id || !branchId) return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
+// DELETE /employees/:id — physical deletion is intentionally forbidden
+const deleteEmployees = async (_req, res) => res.status(405).json({
+  code: 'EMPLOYEE_HARD_DELETE_DISABLED',
+  message: 'ไม่อนุญาตให้ลบประวัติพนักงาน กรุณาเปลี่ยนสถานะเป็นไม่ใช้งานแทน',
+});
 
-    const found = await prisma.employeeProfile.findFirst({ where: { id, branchId } });
-    if (!found) return res.status(404).json({ message: 'ไม่พบพนักงานในสาขานี้' });
-
-    await prisma.employeeProfile.delete({ where: { id } });
-    res.status(204).end();
-  } catch (err) {
-    console.error('❌ deleteEmployees error:', err);
-    res.status(400).json({ message: 'ลบพนักงานไม่สำเร็จ', error: err?.message || String(err) });
-  }
-};
-
-// GET /users?role=user
+// GET /employees/users/by-role
 const getUsersByRole = async (req, res) => {
   try {
-    const roleRaw = String(req.query?.role || 'customer');
-    const role = toPrismaRole(roleRaw) || 'CUSTOMER';
-    
+    const role = toPrismaRole(req.query?.role || 'customer') || 'CUSTOMER';
     const users = await prisma.user.findMany({
       where: { role },
-      select: { id: true, email: true, name: true },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        email: true,
+        loginId: true,
+        role: true,
+        enabled: true,
+        employeeProfile: { select: { name: true } },
+      },
+      orderBy: { id: 'asc' },
     });
-    
-    res.json(users);
-  } catch (err) {
-    console.error('❌ getUsersByRole error:', err);
-    res.status(500).json({ message: 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้' });
+
+    return res.json(users.map((user) => ({
+      ...user,
+      name: user.employeeProfile?.name ?? null,
+    })));
+  } catch (error) {
+    console.error('❌ getUsersByRole error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้' });
   }
 };
 
-// POST /employees/approve  (รองรับ /employees/approve-employee ด้วย)
-function buildForbiddenMessage(actor) {
-  return {
-    message: 'FORBIDDEN_ROLE',
-    detail: {
-      role: actor?.role ?? null,
-      isSuperAdmin: !!actor?.isSuperAdmin,
-    },
-  };
-}
+const buildForbiddenMessage = (actor) => ({
+  message: 'FORBIDDEN_ROLE',
+  detail: { role: actor?.role ?? null, isSuperAdmin: !!actor?.isSuperAdmin },
+});
 
+// POST /employees/approve-employee
 const approveEmployee = async (req, res) => {
-  const { userId, positionId, role, branchId: requestedBranchId, name, phone } = req.body || {};
   try {
     const actor = req.user || {};
-    const actorRole = String(actor.role || '').toLowerCase();
-    const isSuper = !!actor?.isSuperAdmin || actorRole === 'superadmin';
-    const canApprove = isSuper || isStaffRole(actor.role);
-    if (!canApprove) return res.status(403).json(buildForbiddenMessage(actor));
-
-    const MAIN_BRANCH_ID = toInt(process.env.MAIN_BRANCH_ID);
-
-    // ✅ Branch selection rules (P1)
-    // - SuperAdmin: MUST provide requestedBranchId (because superadmin may not carry branchId in token)
-    // - Main-branch employee approver: may approve for other branch by passing requestedBranchId
-    // - Otherwise: always use actor.branchId
-    const actorBranchId = toInt(actor.branchId);
-    const requested = toInt(requestedBranchId);
-
-    let branchIdToUse = actorBranchId;
-    const isMainBranchEmployeeApprover = actorRole === 'employee' && actorBranchId === MAIN_BRANCH_ID;
-
-    if (isSuper) {
-      branchIdToUse = requested;
-    } else if (isMainBranchEmployeeApprover && requested) {
-      branchIdToUse = requested;
+    if (!isSuperAdmin(actor) && !isStaffRole(actor.role)) {
+      return res.status(403).json(buildForbiddenMessage(actor));
     }
 
-        const parsedUserId = toInt(userId);
-    const parsedPositionId = toInt(positionId);
-    if (!parsedUserId || !parsedPositionId || !branchIdToUse) {
-      return res.status(400).json({
-        message: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง',
-        detail: { userId, positionId, requestedBranchId, actorBranchId, branchIdToUse },
+    const userId = toInt(req.body?.userId);
+    const positionId = toInt(req.body?.positionId);
+    const branchId = resolveManagedBranchId(actor, req.body?.branchId);
+    const name = String(req.body?.name || '').trim();
+    const phone = req.body?.phone ? String(req.body.phone).trim() : null;
+    const requestedRole = req.body?.role ? toPrismaRole(req.body.role) : 'EMPLOYEE';
+
+    if (!userId || !positionId || !branchId || !name || !requestedRole) {
+      return res.status(400).json({ message: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง' });
+    }
+
+    const employee = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { role: requestedRole, enabled: true },
       });
-    }
 
-    await prisma.$transaction(async (tx) => {
-      // กันการอนุมัติซ้ำ (idempotent-ish)
-      const existing = await tx.employeeProfile.findFirst({ where: { userId: parsedUserId } });
-      if (!existing) {
-        const baseCreate = {
-          userId: parsedUserId,
-          branchId: branchIdToUse,
-          positionId: parsedPositionId,
+      return tx.employeeProfile.upsert({
+        where: { userId },
+        create: {
+          userId,
+          branchId,
+          positionId,
           name,
-          phone: phone || null,
-        };
-
-        // ✅ mark approved = active (รองรับทั้ง status / employeeStatus แล้วแต่ schema)
-        try {
-          await tx.employeeProfile.create({ data: { ...baseCreate, status: 'active' } });
-        } catch (e1) {
-          try {
-            await tx.employeeProfile.create({ data: { ...baseCreate, employeeStatus: 'active' } });
-          } catch (e2) {
-            await tx.employeeProfile.create({ data: baseCreate });
-          }
-        }
-      }
-
-
-      if (role) {
-        const nextRole = toPrismaRole(role);
-        if (!nextRole) throw new Error('INVALID_ROLE');
-        await tx.user.update({ where: { id: parsedUserId }, data: { role: nextRole } });
-      }
-
+          phone,
+          approved: true,
+          active: true,
+        },
+        update: {
+          branchId,
+          positionId,
+          name,
+          phone,
+          approved: true,
+          active: true,
+        },
+        include: { user: true, position: true, branch: true },
+      });
     }, { timeout: 15000 });
 
-    res.json({ message: '✅ อนุมัติพนักงานเรียบร้อยแล้ว' });
+    return res.json({
+      message: 'อนุมัติพนักงานเรียบร้อยแล้ว',
+      employee: employeeProjection(employee),
+    });
   } catch (error) {
     console.error('❌ approveEmployee error:', error);
-    res.status(500).json({ message: 'ไม่สามารถอนุมัติพนักงานได้' });
+    return res.status(500).json({ message: 'ไม่สามารถอนุมัติพนักงานได้' });
   }
 };
 
-// alias ให้ router เก่าที่เรียก /employees/approve-employee สามารถใช้ร่วมกันได้
 const approveEmployeeAlias = approveEmployee;
 
-// GET /positions
-const getAllPositions = async (req, res) => {
+const getAllPositions = async (_req, res) => {
   try {
     const positions = await prisma.position.findMany({ orderBy: { name: 'asc' } });
-    res.json(positions);
-  } catch (err) {
-    console.error('❌ getAllPositions error:', err);
-    res.status(500).json({ message: 'โหลดตำแหน่งล้มเหลว' });
+    return res.json(positions);
+  } catch (error) {
+    console.error('❌ getAllPositions error:', error);
+    return res.status(500).json({ message: 'โหลดตำแหน่งล้มเหลว' });
   }
 };
 
-// GET /branches/dropdowns  (for superadmin filter on Manage Roles)
-const getBranchDropdowns = async (req, res) => {
+const getBranchDropdowns = async (_req, res) => {
   try {
-    const rows = await prisma.branch.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } });
-    res.json(rows);
-  } catch (err) {
-    console.error('❌ getBranchDropdowns error:', err);
-    res.status(500).json({ message: 'โหลดสาขาล้มเหลว' });
+    const branches = await prisma.branch.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return res.json(branches);
+  } catch (error) {
+    console.error('❌ getBranchDropdowns error:', error);
+    return res.status(500).json({ message: 'โหลดสาขาล้มเหลว' });
   }
 };
 
-// PATCH /roles/users/:userId/role  — superadmin only; allow admin↔employee; forbid when employee status is 'pending'
+// PATCH /employees/roles/users/:userId/role
 const updateUserRole = async (req, res) => {
   try {
     const actor = req.user || {};
-    const meRole = String(actor.role || '').toLowerCase();
-    const isSuper = meRole === 'superadmin' || !!actor.isSuperAdmin;
-    if (!isSuper) return res.status(403).json({ message: 'FORBIDDEN' });
+    if (!isSuperAdmin(actor)) return res.status(403).json({ message: 'FORBIDDEN' });
 
     const userId = toInt(req.params.userId);
-    const desiredRaw = String(req.body?.role || '');
-    const desired = String(desiredRaw || '').toLowerCase();
-
-    const nextRole = toPrismaRole(desired);
+    const nextRole = toPrismaRole(req.body?.role);
+    if (!userId) return res.status(400).json({ message: 'userId ไม่ถูกต้อง' });
     if (!nextRole || !['ADMIN', 'EMPLOYEE'].includes(nextRole)) {
       return res.status(400).json({ message: 'Allowed roles: admin หรือ employee เท่านั้น' });
     }
 
-
-        if (!userId) return res.status(400).json({ message: 'userId ไม่ถูกต้อง' });
-
-    // ตรวจสอบผู้ใช้ปลายทาง
-    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
-    if (!target) return res.status(404).json({ message: 'ไม่พบผู้ใช้' });
-
-    const current = String(target.role || '').toLowerCase();
-    if (!['admin', 'employee'].includes(current)) {
-      return res.status(400).json({ message: 'ไม่สามารถเปลี่ยนบทบาทของผู้ใช้นี้ในหน้าจอนี้ได้' });
+    const profile = await prisma.employeeProfile.findUnique({ where: { userId } });
+    if (!profile) return res.status(404).json({ message: 'ไม่พบข้อมูลพนักงาน' });
+    if (!profile.approved || !profile.active) {
+      return res.status(400).json({ message: 'พนักงานต้องได้รับอนุมัติและอยู่ในสถานะใช้งานก่อนเปลี่ยน Role' });
     }
 
-    // ต้องเป็นพนักงานที่ได้รับอนุมัติแล้วเท่านั้น
-    const profile = await prisma.employeeProfile.findFirst({ where: { userId } });
-    const empStatus = String(profile?.status || profile?.employeeStatus || '').toLowerCase();
-    if (empStatus === 'pending') {
-      return res.status(400).json({ message: 'ผู้ใช้ยังไม่ได้รับอนุมัติพนักงาน' });
-    }
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { role: nextRole },
+    });
 
-        // อัปเดตบทบาท
-    const updated = await prisma.user.update({ where: { id: userId }, data: { role: nextRole } });
     return res.json({ message: 'Role updated', user: { id: updated.id, role: updated.role } });
-  } catch (err) {
-    console.error('[updateUserRole] error:', err);
+  } catch (error) {
+    console.error('[updateUserRole] error:', error);
     return res.status(500).json({ message: 'ไม่สามารถเปลี่ยน Role ได้' });
   }
 };
 
-// PATCH /employees/:id/status — toggle active/inactive (branch-scoped; forbid when pending)
+// PATCH /employees/:id/status
 const toggleEmployeeStatus = async (req, res) => {
   try {
     const id = toInt(req.params.id);
-    const actor = req.user || {};
-    const actorBranchId = toInt(actor.branchId);
-    const isSuper = !!actor?.isSuperAdmin || String(actor.role || '').toLowerCase() === 'superadmin';
-
     if (!id) return res.status(400).json({ message: 'id ไม่ถูกต้อง' });
 
-    // payload: { active: boolean }  หรือ  { status: 'active' | 'inactive' }
-    const bodyActive = req.body?.active;
-    const bodyStatus = String(req.body?.status || '').toLowerCase();
-    const nextActive = typeof bodyActive === 'boolean' ? bodyActive : bodyStatus === 'active';
-    const nextStatus = nextActive ? 'active' : 'inactive';
-
-    // หา employee และตรวจสาขา
-    const employee = await prisma.employeeProfile.findUnique({ where: { id }, include: { branch: true } });
+    const actor = req.user || {};
+    const employee = await prisma.employeeProfile.findUnique({ where: { id } });
     if (!employee) return res.status(404).json({ message: 'ไม่พบพนักงาน' });
-    if (!isSuper && toInt(employee.branchId) !== actorBranchId) {
+
+    if (!isSuperAdmin(actor) && toInt(employee.branchId) !== toInt(actor.branchId)) {
       return res.status(403).json({ message: 'FORBIDDEN_BRANCH' });
     }
 
-    const curStatus = String(employee.status || employee.employeeStatus || '').toLowerCase();
-    if (curStatus === 'pending') {
-      return res.status(400).json({ message: 'ไม่สามารถเปลี่ยนสถานะผู้ที่ยังรออนุมัติได้' });
+    let nextActive;
+    if (typeof req.body?.active === 'boolean') {
+      nextActive = req.body.active;
+    } else if (['active', 'inactive'].includes(normalizeRole(req.body?.status))) {
+      nextActive = normalizeRole(req.body.status) === 'active';
+    } else {
+      return res.status(400).json({ message: 'กรุณาระบุ active เป็น boolean หรือ status เป็น active/inactive' });
     }
 
-    // บาง schema ใช้ field ชื่อ status, บาง schema ใช้ employeeStatus
-    // พยายามอัปเดต status ก่อน ถ้า error ค่อย fallback ไป employeeStatus
-    let updated;
-    try {
-      updated = await prisma.employeeProfile.update({ where: { id }, data: { status: nextStatus } });
-    } catch (e1) {
-      try {
-        updated = await prisma.employeeProfile.update({ where: { id }, data: { employeeStatus: nextStatus } });
-      } catch (e2) {
-        // ทั้งสอง field ใช้ไม่ได้ — แจ้ง error กลับ
-        return res.status(400).json({ message: 'ไม่สามารถอัปเดตสถานะพนักงานได้' });
-      }
+    if (nextActive && !employee.approved) {
+      return res.status(409).json({
+        code: 'EMPLOYEE_NOT_APPROVED',
+        message: 'ไม่สามารถเปิดใช้งานพนักงานที่ยังไม่ได้รับอนุมัติ',
+      });
     }
 
-    return res.json({ message: 'อัปเดตสถานะสำเร็จ', employee: { id: updated.id, status: updated.status ?? updated.employeeStatus } });
-  } catch (err) {
-    console.error('❌ toggleEmployeeStatus error:', err);
-    res.status(500).json({ message: 'เปลี่ยนสถานะพนักงานล้มเหลว' });
+    const updated = await prisma.$transaction(async (tx) => {
+      const profile = await tx.employeeProfile.update({
+        where: { id },
+        data: { active: nextActive },
+        include: { user: true, position: true, branch: true },
+      });
+
+      await tx.user.update({
+        where: { id: employee.userId },
+        data: { enabled: nextActive },
+      });
+
+      return profile;
+    }, { timeout: 15000 });
+
+    return res.json({
+      message: nextActive ? 'เปิดใช้งานพนักงานสำเร็จ' : 'ปิดใช้งานพนักงานสำเร็จ',
+      employee: employeeProjection({
+        ...updated,
+        user: updated.user ? { ...updated.user, enabled: nextActive } : updated.user,
+      }),
+    });
+  } catch (error) {
+    console.error('❌ toggleEmployeeStatus error:', error);
+    return res.status(500).json({ message: 'เปลี่ยนสถานะพนักงานล้มเหลว' });
   }
 };
 
@@ -473,10 +453,9 @@ module.exports = {
   deleteEmployees,
   getUsersByRole,
   approveEmployee,
-  approveEmployeeAlias, // ⬅️ ใช้กับ path /employees/approve-employee ได้
+  approveEmployeeAlias,
   getAllPositions,
   getBranchDropdowns,
   updateUserRole,
   toggleEmployeeStatus,
 };
-
