@@ -12,9 +12,10 @@ const resolveCurrentCustody = (stockItem) => {
 const resolveLifecycleStage = (stockItem) => {
   if (stockItem?.repairJobs?.length) return 'AFTER_SALES_SERVICE'
   if (stockItem?.warrantyClaims?.length) return 'CLAIM'
-  // StockItem has one-to-many relation to SaleItem via saleItems[]
-  // Query loads latest SaleItem with orderBy: { id: 'desc' }, take: 1
-  const latestSaleItem = stockItem?.saleItems?.[0] ?? null
+
+  const saleItems = Array.isArray(stockItem?.saleItems) ? stockItem.saleItems : []
+  const latestSaleItem = saleItems.length ? saleItems[saleItems.length - 1] : null
+
   if (latestSaleItem?.returnItems?.length) return 'RETURNED'
   if (latestSaleItem?.sale) return 'SOLD'
   if (stockItem?.purchaseOrderReceiptItem) return 'RECEIVED'
