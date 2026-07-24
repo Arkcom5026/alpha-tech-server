@@ -11,6 +11,7 @@ const syntaxFiles = [
   'controllers/employeeController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
+  'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
@@ -53,6 +54,28 @@ assertContains(verifyToken, "'EMPLOYEE_NOT_APPROVED'", 'verifyToken approval gua
 assertContains(verifyToken, "'EMPLOYEE_INACTIVE'", 'verifyToken active guard');
 assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId projection');
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
+
+const employeeRoutes = read('routes/employeeRoutes.js');
+assertContains(
+  employeeRoutes,
+  'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
+  'employee approval compatibility endpoint'
+);
+assertContains(
+  employeeRoutes,
+  "canonicalEndpoint: '/api/auth/add-sub-employee'",
+  'canonical employee creation endpoint declaration'
+);
+assertNotContains(
+  employeeRoutes,
+  "router.post('/approve-employee', approveEmployee)",
+  'live employee approval handler'
+);
+
+const authController = read('controllers/authController.js');
+assertContains(authController, 'approved: true', 'owner-created employee auto approval');
+assertContains(authController, 'active: true', 'owner-created employee auto activation');
+assertContains(authController, 'enabled: true', 'owner-created employee user activation');
 
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
@@ -97,7 +120,7 @@ const schema = read('prisma/schema.prisma');
 const employeeProfileBlock = schema.match(/model\s+EmployeeProfile\s*\{[\s\S]*?\n\}/)?.[0] || '';
 assertContains(employeeProfileBlock, 'onDelete: Restrict', 'EmployeeProfile.user onDelete Restrict');
 assertContains(employeeProfileBlock, 'active', 'EmployeeProfile active lifecycle field');
-assertContains(employeeProfileBlock, 'approved', 'EmployeeProfile approved lifecycle field');
+assertContains(employeeProfileBlock, 'approved', 'EmployeeProfile approved compatibility field');
 
 if (process.exitCode) {
   console.error('\nEMPLOYEE LIFECYCLE VERIFICATION: FAIL');
