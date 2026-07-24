@@ -36,6 +36,7 @@ const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const productRoutes = require('./routes/productRoutes');
 const { productTraceRoutes } = require('./src/modules/product/trace');
+const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
@@ -188,6 +189,11 @@ app.use('/api/products/template', templateProductSearchRoutes);
 app.use('/api/products/trace', productTraceRoutes);
 app.use('/api/products', productRoutes);
 
+// Repair + Warranty Claim (canonical path)
+app.use('/api/repairs', repairRoutes);
+// Backward compatibility for clients using the singular path
+app.use('/api/repair', repairRoutes);
+
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
@@ -266,6 +272,8 @@ app.use((err, req, res, next) => {
     return res.status(status).json({
       ok: false,
       error: err.message || 'Bad Request',
+      code: err.code || null,
+      details: err.details || null,
       reqId: req.id,
     });
   }
