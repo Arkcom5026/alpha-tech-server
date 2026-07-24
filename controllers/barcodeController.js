@@ -226,7 +226,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           serialNumber: true,
           status: true,
           soldAt: true,
-          saleItem: { select: { id: true } },
+          saleItems: { select: { id: true }, take: 1 },
           productId: true,
         },
       },
@@ -287,7 +287,7 @@ const getBarcodesByReceiptId = async (req, res) => {
           serialNumber: true,
           status: true,
           soldAt: true,
-          saleItem: { select: { id: true } },
+          saleItems: { select: { id: true }, take: 1 },
           purchaseOrderReceiptItemId: true,
           productId: true,
         },
@@ -323,7 +323,7 @@ const getBarcodesByReceiptId = async (req, res) => {
       // ✅ Status source of truth: DB stockItem.status (direct) → fallback stockItem.status → null
       const stockItemStatus = b.stockItem?.status ?? siFallback?.status ?? null;
       const stockItemSoldAt = b.stockItem?.soldAt ?? siFallback?.soldAt ?? null;
-      const stockItemSaleItemId = b.stockItem?.saleItem?.id ?? siFallback?.saleItem?.id ?? null;
+      const stockItemSaleItemId = b.stockItem?.saleItems?.[0]?.id ?? siFallback?.saleItems?.[0]?.id ?? null;
 
       const kind = b.kind ?? (b.stockItemId ? 'SN' : b.simpleLotId ? 'LOT' : null);
 
@@ -818,6 +818,9 @@ const reprintBarcodes = async (req, res) => {
         select: {
           id: true,
           serialNumber: true,
+          status: true,
+          soldAt: true,
+          saleItems: { select: { id: true }, take: 1 },
           productId: true,
         },
       },
@@ -953,7 +956,7 @@ const reprintBarcodes = async (req, res) => {
         // StockItem truth (for scan/reprint UI)
         stockItemStatus: b.stockItem?.status ?? null,
         stockItemSoldAt: b.stockItem?.soldAt ?? null,
-        stockItemSaleItemId: b.stockItem?.saleItem?.id ?? null,
+        stockItemSaleItemId: b.stockItem?.saleItems?.[0]?.id ?? null,
         stockItemId,
         serialNumber,
         productId: p?.id ?? b.stockItem?.productId ?? b.receiptItem?.purchaseOrderItem?.productId ?? null,

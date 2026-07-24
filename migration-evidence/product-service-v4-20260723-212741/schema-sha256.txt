@@ -1,0 +1,8 @@
+﻿
+
+Algorithm : SHA256
+Hash      : 9E9AF43A45490B8CE695D608701B46BB620A5EF9072AB2F4E3058FE93E656C2E
+Path      : D:\alpha-tech\server\prisma\schema.prisma
+
+
+

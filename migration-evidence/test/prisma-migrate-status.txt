@@ -1,0 +1,13 @@
+﻿npx.cmd : Environment variables loaded from .env
+At line:1 char:11
++ $output = & npx prisma migrate status 2>&1
++           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Environment variables loaded from .env:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-0-ap-southeast-1.pooler.supabase.com:5432"
+
+6 migrations found in prisma/migrations
+
+Database schema is up to date!

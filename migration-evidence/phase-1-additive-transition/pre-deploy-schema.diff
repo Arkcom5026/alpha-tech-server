@@ -1,0 +1,52 @@
+﻿diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index e77706d..5776323 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -1429,6 +1429,8 @@ model RepairJob {
+   technician       EmployeeProfile? @relation(fields: [technicianId], references: [id])
+   partsUsed        RepairPartItem[]
+ 
++  warrantyClaims WarrantyClaim[]
++
+   @@index([branchId])
+   @@index([stockItemId])
+ }
+@@ -1450,6 +1452,8 @@ model WarrantyClaim {
+   supplierId             Int?
+   saleReturnItemId       Int?
+   previousClaimId        Int?
++  repairJobId            Int?
++  repairLinkState        WarrantyClaimRepairLinkState    @default(UNLINKED_LEGACY)
+   claimNo                String
+   status                 WarrantyClaimStatus             @default(DRAFT)
+   reason                 String
+@@ -1473,6 +1477,7 @@ model WarrantyClaim {
+   stockItem              StockItem                       @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+   supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+   saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
++  repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
+   previousClaim          WarrantyClaim?                  @relation("WarrantyClaimHistory", fields: [previousClaimId], references: [id], onDelete: Restrict)
+   subsequentClaims       WarrantyClaim[]                 @relation("WarrantyClaimHistory")
+   replacementStockItem   StockItem?                      @relation("WarrantyClaimReplacementStockItem", fields: [replacementStockItemId], references: [id], onDelete: Restrict)
+@@ -1485,6 +1490,8 @@ model WarrantyClaim {
+   @@index([stockItemId, openedAt])
+   @@index([supplierId, openedAt])
+   @@index([saleReturnItemId])
++  @@index([repairJobId, openedAt])
++  @@index([repairLinkState, openedAt])
+   @@index([previousClaimId])
+   @@index([replacementStockItemId])
+   @@index([createdByEmployeeId])
+@@ -1691,6 +1698,12 @@ enum StockMovementType {
+   CLAIM_WRITE_OFF
+ }
+ 
++enum WarrantyClaimRepairLinkState {
++  UNLINKED_LEGACY
++  LINKED_VERIFIED
++  MANUAL_REVIEW_REQUIRED
++}
++
+ enum WarrantyClaimStatus {
+   DRAFT
+   SUBMITTED

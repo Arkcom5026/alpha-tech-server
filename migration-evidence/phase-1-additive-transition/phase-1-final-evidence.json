@@ -1,0 +1,12 @@
+﻿{
+    "MigrationName":  "20260723_add_warranty_claim_repair_link_foundation",
+    "ReviewedSqlSha256":  "69A368958ECBD475254DFFDE18C5BE8CA868548F2D3FE1FF072C88626CA04CB0",
+    "MigrationSqlSha256":  "69A368958ECBD475254DFFDE18C5BE8CA868548F2D3FE1FF072C88626CA04CB0",
+    "SchemaValid":  true,
+    "MigrationApplied":  true,
+    "DatabaseSchemaAligned":  true,
+    "TotalClaims":  0,
+    "LegacyUnlinkedClaims":  0,
+    "ClaimsWithRepairJob":  0,
+    "InvalidVerifiedLinks":  0
+}
