@@ -1,51 +1,66 @@
 /* eslint-env node */
 
-// controllers/positionController.js (no zod validation)
+// controllers/positionController.js — branch-owned position runtime
 const { prisma, Prisma } = require('../lib/prisma');
 
-// ===== Helpers =====
-const toInt = (v, fallback = null) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
+const toInt = (value, fallback = null) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const normalize = (payload = {}) => {
-  const out = { ...payload };
-  if (typeof out.name === 'string') out.name = out.name.trim();
-  if (typeof out.description === 'string') {
-    const d = out.description.trim();
-    out.description = d.length ? d : null; // เก็บเป็น null ถ้าเป็นสตริงว่าง
+const requireBranchId = (req, res) => {
+  const branchId = toInt(req.user?.branchId);
+  if (!branchId) {
+    res.status(403).json({
+      code: 'BRANCH_CONTEXT_REQUIRED',
+      message: 'ไม่พบข้อมูลสาขาสำหรับบัญชีผู้ใช้นี้',
+    });
+    return null;
   }
-  if (typeof out.role === 'string') out.role = out.role.trim().toLowerCase();
-  return out;
+  return branchId;
 };
 
-// ตรวจสอบชื่อตำแหน่งซ้ำ (case-insensitive)
-const isNameTaken = async (name, excludeId = null) => {
-  if (!name) return false;
-  const where = excludeId
-    ? { name: { equals: name, mode: 'insensitive' }, NOT: { id: excludeId } }
-    : { name: { equals: name, mode: 'insensitive' } };
-  const existing = await prisma.position.findFirst({ where });
-  return !!existing;
+const normalizeText = (value) => (typeof value === 'string' ? value.trim() : value);
+
+const normalizeDescription = (value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 };
 
-// role ที่อนุญาตให้ใช้กับตำแหน่ง (อย่าใช้ superadmin/customer ที่ระดับตำแหน่ง)
-const ALLOWED_POSITION_ROLES = new Set(['admin', 'employee']);
-const validateRole = (role) => (role == null ? true : ALLOWED_POSITION_ROLES.has(String(role).toLowerCase()));
 const normalizeRoleField = (row = {}) => ({
   ...row,
   role: row.role ?? row.defaultRole ?? row.systemRole ?? null,
 });
 
-// ===== Controllers =====
+const isNameTaken = async ({ branchId, name, excludeId = null }) => {
+  if (!branchId || !name) return false;
+
+  const existing = await prisma.position.findFirst({
+    where: {
+      branchId,
+      name: { equals: name, mode: 'insensitive' },
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  return Boolean(existing);
+};
+
+const isUniqueConstraintError = (err) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+
 const listPositions = async (req, res) => {
   try {
-    // query: q/search, active (true/false), page, limit
-    const q = (req.query.q ?? req.query.search ?? '').toString().trim();
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
+    const q = String(req.query.q ?? req.query.search ?? '').trim();
     const { active, page = '1', limit = '20' } = req.query;
 
     const where = {
+      branchId,
       ...(active === 'true' ? { isActive: true } : {}),
       ...(active === 'false' ? { isActive: false } : {}),
       ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
@@ -65,10 +80,8 @@ const listPositions = async (req, res) => {
       prisma.position.count({ where }),
     ]);
 
-    const items = itemsRaw.map(normalizeRoleField);
-
     return res.json({
-      items,
+      items: itemsRaw.map(normalizeRoleField),
       meta: {
         page: pageNum,
         limit: take,
@@ -77,21 +90,22 @@ const listPositions = async (req, res) => {
       },
     });
   } catch (err) {
-    if (err instanceof Error) console.error('[listPositions] error:', err.message, err.stack);
-    else console.error('[listPositions] unknown error:', err);
+    console.error('[listPositions] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลตำแหน่งได้' });
   }
 };
 
 const getDropdowns = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
     const { active = 'true' } = req.query;
-    const where =
-      active === 'true'
-        ? { isActive: true }
-        : active === 'false'
-        ? { isActive: false }
-        : {};
+    const where = {
+      branchId,
+      ...(active === 'true' ? { isActive: true } : {}),
+      ...(active === 'false' ? { isActive: false } : {}),
+    };
 
     const items = await prisma.position.findMany({
       select: { id: true, name: true },
@@ -101,125 +115,150 @@ const getDropdowns = async (req, res) => {
 
     return res.json(items);
   } catch (err) {
-    if (err instanceof Error) console.error('[getDropdowns] error:', err.message, err.stack);
-    else console.error('[getDropdowns] unknown error:', err);
+    console.error('[getDropdowns] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถดึงรายการตำแหน่งได้' });
   }
 };
 
 const getById = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'รหัสไม่ถูกต้อง' });
 
-    const item = await prisma.position.findUnique({ where: { id } });
-    if (!item) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
+    const item = await prisma.position.findFirst({
+      where: { id, branchId },
+    });
 
+    if (!item) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
     return res.json(normalizeRoleField(item));
   } catch (err) {
-    if (err instanceof Error) console.error('[getById] error:', err.message, err.stack);
-    else console.error('[getById] unknown error:', err);
+    console.error('[getById] error:', err);
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 };
 
 const createPosition = async (req, res) => {
   try {
-    const body = normalize(req.body || {});
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
 
-    // ✅ Manual validation (no zod)
-    if (typeof body.name !== 'string' || body.name.length < 2) {
+    const name = normalizeText(req.body?.name);
+    const description = normalizeDescription(req.body?.description);
+
+    if (typeof name !== 'string' || name.length < 2) {
       return res.status(400).json({ error: 'ชื่อตำแหน่งต้องยาวอย่างน้อย 2 ตัวอักษร' });
     }
-    if (body.description != null && typeof body.description !== 'string') {
+    if (description != null && typeof description !== 'string') {
       return res.status(400).json({ error: 'รูปแบบคำอธิบายไม่ถูกต้อง' });
     }
-    if (Object.prototype.hasOwnProperty.call(body, 'role')) {
-      if (!validateRole(body.role)) {
-        return res.status(400).json({ error: 'role ที่อนุญาตคือ admin หรือ employee เท่านั้น' });
-      }
+
+    if (await isNameTaken({ branchId, name })) {
+      return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้วในสาขา' });
     }
 
-    // ป้องกันชื่อซ้ำแบบล่วงหน้า
-    if (await isNameTaken(body.name)) {
-      return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้ว' });
-    }
+    const created = await prisma.position.create({
+      data: {
+        name,
+        description,
+        branchId,
+        isActive: true,
+      },
+    });
 
-    const created = await prisma.position.create({ data: body });
     return res.status(201).json(normalizeRoleField(created));
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === 'P2002') {
-        return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้ว' });
-      }
+    if (isUniqueConstraintError(err)) {
+      return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้วในสาขา' });
     }
-    if (err instanceof Error) console.error('[createPosition] error:', err.message, err.stack);
-    else console.error('[createPosition] unknown error:', err);
+    console.error('[createPosition] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถสร้างตำแหน่งได้' });
   }
 };
 
-// รองรับ PATCH (อัปเดตบางส่วน)
 const updatePosition = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'รหัสไม่ถูกต้อง' });
 
-    const body = normalize(req.body || {});
+    const existing = await prisma.position.findFirst({
+      where: { id, branchId },
+    });
+    if (!existing) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
 
-    // ✅ Manual validation เฉพาะฟิลด์ที่ส่งมา
-    if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-      if (typeof body.name !== 'string' || body.name.length < 2) {
+    const data = {};
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'name')) {
+      const name = normalizeText(req.body.name);
+      if (typeof name !== 'string' || name.length < 2) {
         return res.status(400).json({ error: 'ชื่อตำแหน่งต้องยาวอย่างน้อย 2 ตัวอักษร' });
       }
+      if (await isNameTaken({ branchId, name, excludeId: id })) {
+        return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้วในสาขา' });
+      }
+      data.name = name;
     }
-    if (Object.prototype.hasOwnProperty.call(body, 'description')) {
-      if (body.description != null && typeof body.description !== 'string') {
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'description')) {
+      const description = normalizeDescription(req.body.description);
+      if (description != null && typeof description !== 'string') {
         return res.status(400).json({ error: 'รูปแบบคำอธิบายไม่ถูกต้อง' });
       }
+      data.description = description;
     }
-    if (Object.prototype.hasOwnProperty.call(body, 'isActive')) {
-      if (typeof body.isActive !== 'boolean') {
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isActive')) {
+      if (typeof req.body.isActive !== 'boolean') {
         return res.status(400).json({ error: 'รูปแบบ isActive ต้องเป็น boolean' });
       }
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'role')) {
-      if (!validateRole(body.role)) {
-        return res.status(400).json({ error: 'role ที่อนุญาตคือ admin หรือ employee เท่านั้น' });
-      }
+      data.isActive = req.body.isActive;
     }
 
-    // กัน name ซ้ำก่อนอัปเดต (หากผู้ใช้ส่ง name มา)
-    if (body.name && (await isNameTaken(body.name, id))) {
-      return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้ว' });
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'ไม่มีข้อมูลที่รองรับสำหรับการแก้ไข' });
     }
 
-    const updated = await prisma.position.update({ where: { id }, data: body });
+    const updated = await prisma.position.update({
+      where: { id },
+      data,
+    });
+
     return res.json(normalizeRoleField(updated));
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === 'P2002') {
-        return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้ว' });
-      }
+    if (isUniqueConstraintError(err)) {
+      return res.status(409).json({ error: 'ชื่อตำแหน่งนี้ถูกใช้แล้วในสาขา' });
     }
-    if (err instanceof Error) console.error('[updatePosition] error:', err.message, err.stack);
-    else console.error('[updatePosition] unknown error:', err);
+    console.error('[updatePosition] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถแก้ไขตำแหน่งได้' });
   }
 };
 
-// Soft delete/restore
 const toggleActive = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'รหัสไม่ถูกต้อง' });
 
-    const existing = await prisma.position.findUnique({ where: { id } });
+    const existing = await prisma.position.findFirst({
+      where: { id, branchId },
+    });
     if (!existing) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
 
-    // ถ้าจะปิดใช้งาน: ตรวจว่าไม่ได้ใช้อยู่กับ EmployeeProfile
     if (existing.isActive) {
-      const inUse = await prisma.employeeProfile.count({ where: { positionId: id } });
+      const inUse = await prisma.employeeProfile.count({
+        where: {
+          branchId,
+          positionId: id,
+        },
+      });
+
       if (inUse > 0) {
         return res.status(409).json({
           error: 'ไม่สามารถปิดใช้งานได้: มีพนักงานที่ยังผูกกับตำแหน่งนี้อยู่',
@@ -234,33 +273,45 @@ const toggleActive = async (req, res) => {
 
     return res.json(normalizeRoleField(updated));
   } catch (err) {
-    if (err instanceof Error) console.error('[toggleActive] error:', err.message, err.stack);
-    else console.error('[toggleActive] unknown error:', err);
+    console.error('[toggleActive] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถเปลี่ยนสถานะได้' });
   }
 };
 
-// (ออปชัน) Hard delete – แนะนำให้ปิดไว้ใน Production
 const hardDelete = async (req, res) => {
   try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return;
+
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ error: 'รหัสไม่ถูกต้อง' });
 
-    const inUse = await prisma.employeeProfile.count({ where: { positionId: id } });
+    const existing = await prisma.position.findFirst({
+      where: { id, branchId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'ไม่พบข้อมูลตำแหน่ง' });
+
+    const inUse = await prisma.employeeProfile.count({
+      where: {
+        branchId,
+        positionId: id,
+      },
+    });
+
     if (inUse > 0) {
-      return res.status(409).json({ error: 'ไม่สามารถลบได้: มีพนักงานที่ยังผูกกับตำแหน่งนี้อยู่' });
+      return res.status(409).json({
+        error: 'ไม่สามารถลบได้: มีพนักงานที่ยังผูกกับตำแหน่งนี้อยู่',
+      });
     }
 
     await prisma.position.delete({ where: { id } });
     return res.json({ message: 'ลบข้อมูลตำแหน่งแล้ว' });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === 'P2003') {
-        return res.status(409).json({ error: 'ไม่สามารถลบได้เนื่องจากมีการอ้างอิงอยู่' });
-      }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      return res.status(409).json({ error: 'ไม่สามารถลบได้เนื่องจากมีการอ้างอิงอยู่' });
     }
-    if (err instanceof Error) console.error('[hardDelete] error:', err.message, err.stack);
-    else console.error('[hardDelete] unknown error:', err);
+    console.error('[hardDelete] error:', err);
     return res.status(500).json({ error: 'ไม่สามารถลบตำแหน่งได้' });
   }
 };
@@ -272,5 +323,5 @@ module.exports = {
   createPosition,
   updatePosition,
   toggleActive,
-  hardDelete, // พิจารณาปิดใช้งานในโปรดักชัน
+  hardDelete,
 };

@@ -89,6 +89,7 @@ model Branch {
   taxId                           String?                          @db.VarChar(13)
   slug                            String?                          @unique
   categoryId                      Int                              @default(1)
+  banks                           Bank[]
   barcodeCounter                  BarcodeCounter[]
   barcodeReceiptItem              BarcodeReceiptItem[]
   category                        Category                         @relation(fields: [categoryId], references: [id])
@@ -104,6 +105,7 @@ model Branch {
   payment                         Payment[]
   paymentCodeCounter              PaymentCodeCounter[]
   productTypes                    ProductType[]
+  positions                       Position[]
   pos                             PurchaseOrder[]
   purchaseOrderReceipt            PurchaseOrderReceipt[]
   refundTransaction               RefundTransaction[]
@@ -446,11 +448,17 @@ model Supplier {
 
 model Bank {
   id        Int        @id @default(autoincrement())
-  name      String     @unique
+  name      String
+  branchId  Int?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   active    Boolean    @default(true)
+  branch    Branch?    @relation(fields: [branchId], references: [id], onDelete: Restrict)
   supplier  Supplier[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([branchId, active])
 }
 
 model PurchaseOrder {
@@ -1397,15 +1405,18 @@ model Subdistrict {
 
 model Position {
   id          Int               @id @default(autoincrement())
-  name        String            @unique
+  name        String
+  branchId    Int?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   description String?
   isActive    Boolean           @default(true)
+  branch      Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
   employees   EmployeeProfile[]
 
-  @@index([isActive])
-  @@index([name])
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([branchId, isActive])
 }
 
 model RepairJob {
