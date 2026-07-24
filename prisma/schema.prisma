@@ -49,7 +49,7 @@ model EmployeeProfile {
   createdCustomerReceipts           CustomerReceipt[]           @relation("CustomerReceiptCreatedBy")
   branch                            Branch?                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
   position                          Position?                   @relation(fields: [positionId], references: [id])
-  user                              User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                              User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
   inputTaxFilingBatches             InputTaxFilingBatch[]
   confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
   payment                           Payment[]
