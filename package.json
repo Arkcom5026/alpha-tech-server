@@ -6,6 +6,7 @@
     "dev": "nodemon server.js",
     "test": "node tests/customer-receipt-auth-regression.test.js",
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
+    "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
   },
