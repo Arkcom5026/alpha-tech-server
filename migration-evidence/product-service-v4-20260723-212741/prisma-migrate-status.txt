@@ -1,0 +1,13 @@
+﻿npx : Environment variables loaded from .env
+At D:\alpha-tech\server\product-service-runtime-v4-transition\scripts\01-capture-safety-evidence.ps1:74 char:16
++     -Command { npx prisma migrate status } `
++                ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Environment variables loaded from .env:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-0-ap-southeast-1.pooler.supabase.com:5432"
+
+6 migrations found in prisma/migrations
+
+Database schema is up to date!

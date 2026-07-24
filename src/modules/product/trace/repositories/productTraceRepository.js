@@ -53,7 +53,9 @@ const productTraceInclude = {
       },
     },
   },
-  saleItems: { include: saleItemInclude, orderBy: { createdAt: 'asc' } },
+  // Preserve complete sales history for the product timeline.
+  // createdAt plus id makes ordering deterministic when timestamps are equal.
+  saleItems: { include: saleItemInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   stockMovements: {
     include: { performedBy: { select: { id: true, name: true } } },
     orderBy: { occurredAt: 'asc' },

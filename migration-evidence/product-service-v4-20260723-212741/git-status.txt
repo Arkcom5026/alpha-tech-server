@@ -1,0 +1,70 @@
+﻿ D backups/alphatech_hardened_backup_v6_2026-07-20_2026-07-20T07-39-55-120Z.manifest.json
+ D backups/alphatech_hardened_backup_v6_2026-07-20_2026-07-20T07-39-55-120Z.sql
+ D backups/alphatech_hardened_backup_v6_2026-07-20_2026-07-20T09-34-28-106Z.manifest.json
+ D backups/alphatech_hardened_backup_v6_2026-07-20_2026-07-20T09-34-28-106Z.sql
+ M backups/backup.log
+ M logs/restore.log
+ M prisma/schema.prisma
+ M recovery/jobs/job.latest.json
+ M recovery/logs/health-check.log
+ M recovery/logs/retention.log
+ M recovery/logs/upload.log
+ M recovery/reports/health-check.latest.json
+ M recovery/reports/health-check.latest.txt
+ M recovery/reports/retention-report.latest.json
+ M recovery/reports/retention-report.latest.txt
+ M recovery/reports/upload-report.latest.json
+ M recovery/reports/upload-report.latest.txt
+ M recovery/reports/verification-report.latest.json
+ M recovery/reports/verification-report.latest.txt
+ M recovery/reports/verify.log
+ M recovery/reports/workflow-report.latest.json
+ M recovery/reports/workflow-report.latest.txt
+?? alpha-tech-product-service-data-safety-gate-v1/
+?? alpha-tech-product-service-runtime-v4-transition/
+?? backups/alphatech_hardened_backup_v6_2026-07-23_2026-07-23T07-39-54-919Z.manifest.json
+?? backups/alphatech_hardened_backup_v6_2026-07-23_2026-07-23T07-39-54-919Z.sql
+?? backups/alphatech_hardened_backup_v6_2026-07-23_2026-07-23T09-34-28-045Z.manifest.json
+?? backups/alphatech_hardened_backup_v6_2026-07-23_2026-07-23T09-34-28-045Z.sql
+?? migration-evidence/
+?? prisma-migrate-status.txt
+?? prisma/AGGREGATE-BOUNDARIES.md
+?? prisma/BACKEND-SLICE-PLAN.md
+?? prisma/CUSTODY-AND-TRACE.md
+?? prisma/DECISIONS.md
+?? prisma/DOMAIN-BLUEPRINT.md
+?? prisma/FRONTEND-PROJECTION-PLAN.md
+?? prisma/INTEGRATION-CONTRACT.md
+?? prisma/LIFECYCLE.md
+?? prisma/MIGRATION-PLAN.md
+?? prisma/PROCESS-ORCHESTRATION.md
+?? prisma/README.md
+?? prisma/RUNTIME-INVARIANTS.md
+?? prisma/SERVICE-CASE-LIFECYCLE.md
+?? prisma/SHA256SUMS.txt
+?? prisma/WORKFLOW-BOUNDARY.md
+?? product-service-runtime-v4-transition/
+?? recovery/jobs/job-2026-07-23T07-39-48-727Z.json
+?? recovery/jobs/job-2026-07-23T09-34-22-281Z.json
+?? recovery/logs/job-2026-07-23T07-39-48-727Z.log
+?? recovery/logs/job-2026-07-23T09-34-22-281Z.log
+?? recovery/reports/health-check-2026-07-23T07-39-49-932Z.json
+?? recovery/reports/health-check-2026-07-23T07-39-49-932Z.txt
+?? recovery/reports/health-check-2026-07-23T09-34-23-503Z.json
+?? recovery/reports/health-check-2026-07-23T09-34-23-503Z.txt
+?? recovery/reports/retention-report-2026-07-23T07-40-06-419Z.json
+?? recovery/reports/retention-report-2026-07-23T07-40-06-419Z.txt
+?? recovery/reports/retention-report-2026-07-23T09-34-37-502Z.json
+?? recovery/reports/retention-report-2026-07-23T09-34-37-502Z.txt
+?? recovery/reports/upload-report-2026-07-23T07-40-04-896Z.json
+?? recovery/reports/upload-report-2026-07-23T07-40-04-896Z.txt
+?? recovery/reports/upload-report-2026-07-23T09-34-36-759Z.json
+?? recovery/reports/upload-report-2026-07-23T09-34-36-759Z.txt
+?? recovery/reports/verification-report_2026-07-23T07-41-09-286Z.json
+?? recovery/reports/verification-report_2026-07-23T07-41-09-286Z.txt
+?? recovery/reports/verification-report_2026-07-23T09-35-38-439Z.json
+?? recovery/reports/verification-report_2026-07-23T09-35-38-439Z.txt
+?? recovery/reports/workflow-report-2026-07-23T07-39-48-727Z.json
+?? recovery/reports/workflow-report-2026-07-23T07-39-48-727Z.txt
+?? recovery/reports/workflow-report-2026-07-23T09-34-22-281Z.json
+?? recovery/reports/workflow-report-2026-07-23T09-34-22-281Z.txt

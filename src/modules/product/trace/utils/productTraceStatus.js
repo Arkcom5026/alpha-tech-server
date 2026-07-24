@@ -12,8 +12,12 @@ const resolveCurrentCustody = (stockItem) => {
 const resolveLifecycleStage = (stockItem) => {
   if (stockItem?.repairJobs?.length) return 'AFTER_SALES_SERVICE'
   if (stockItem?.warrantyClaims?.length) return 'CLAIM'
-  if (stockItem?.saleItem?.returnItems?.length) return 'RETURNED'
-  if (stockItem?.saleItem?.sale) return 'SOLD'
+
+  const saleItems = Array.isArray(stockItem?.saleItems) ? stockItem.saleItems : []
+  const latestSaleItem = saleItems.length ? saleItems[saleItems.length - 1] : null
+
+  if (latestSaleItem?.returnItems?.length) return 'RETURNED'
+  if (latestSaleItem?.sale) return 'SOLD'
   if (stockItem?.purchaseOrderReceiptItem) return 'RECEIVED'
   return 'REGISTERED'
 }

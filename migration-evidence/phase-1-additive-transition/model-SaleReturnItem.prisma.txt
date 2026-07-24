@@ -1,0 +1,17 @@
+﻿model SaleReturnItem {
+  id             Int             @id @default(autoincrement())
+  saleReturnId   Int
+  saleItemId     Int
+  refundAmount   Decimal         @db.Decimal(12, 2)
+  reason         String?
+  reasonCode     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  saleItem       SaleItem        @relation(fields: [saleItemId], references: [id])
+  saleReturn     SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  warrantyClaims WarrantyClaim[]
+
+  @@unique([saleReturnId, saleItemId])
+  @@index([saleReturnId])
+  @@index([saleItemId])
+}
