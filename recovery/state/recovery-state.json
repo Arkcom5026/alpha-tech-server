@@ -1,9 +1,0 @@
-{
-  "state": "SUCCESS",
-  "activeMode": "backup-only",
-  "lastQueuedAt": "2026-07-06T14:27:15.376Z",
-  "updatedAt": "2026-07-06T14:27:25.117Z",
-  "lastStartedAt": "2026-07-06T14:27:15.379Z",
-  "lastFinishedAt": "2026-07-06T14:27:25.117Z",
-  "lastExitCode": 0
-}
