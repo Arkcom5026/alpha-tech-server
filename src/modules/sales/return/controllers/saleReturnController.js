@@ -9,7 +9,7 @@ const {
 
 const buildActorContext = (req) => ({
   branchId: Number(req.user?.branchId),
-  employeeId: Number(req.user?.employeeId || req.user?.profileId),
+  employeeId: Number(req.user?.employeeId),
   actorRole: String(req.user?.role || ''),
 });
 
@@ -42,9 +42,9 @@ const completeSaleReturnController = async (req, res) => {
     const actor = buildActorContext(req);
     if (!actor.branchId || !actor.employeeId) {
       throw new SaleReturnError(
-        401,
+        403,
         SaleReturnFailureCode.ACTOR_REQUIRED,
-        'Branch and employee context are required'
+        'Canonical branch and employee context are required'
       );
     }
     const command = validateSaleReturnCommand(req.body);
