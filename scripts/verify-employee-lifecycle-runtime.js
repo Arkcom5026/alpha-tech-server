@@ -9,8 +9,10 @@ const root = path.resolve(__dirname, '..');
 const syntaxFiles = [
   'middlewares/verifyToken.js',
   'controllers/employeeController.js',
+  'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
+  'routes/authRoutes.js',
   'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
   'src/modules/product/create/controllers/productCreateController.js',
@@ -54,6 +56,7 @@ assertContains(verifyToken, "'EMPLOYEE_NOT_APPROVED'", 'verifyToken approval gua
 assertContains(verifyToken, "'EMPLOYEE_INACTIVE'", 'verifyToken active guard');
 assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId projection');
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
+assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
 const employeeRoutes = read('routes/employeeRoutes.js');
 assertContains(
@@ -72,10 +75,27 @@ assertNotContains(
   'live employee approval handler'
 );
 
-const authController = read('controllers/authController.js');
-assertContains(authController, 'approved: true', 'owner-created employee auto approval');
-assertContains(authController, 'active: true', 'owner-created employee auto activation');
-assertContains(authController, 'enabled: true', 'owner-created employee user activation');
+const authRoutes = read('routes/authRoutes.js');
+assertContains(
+  authRoutes,
+  "require('../controllers/employeeOnboardingController')",
+  'auth route canonical onboarding controller'
+);
+assertContains(
+  authRoutes,
+  "router.post('/add-sub-employee', verifyToken, addSubEmployee)",
+  'canonical onboarding route guard'
+);
+
+const employeeOnboarding = read('controllers/employeeOnboardingController.js');
+assertContains(employeeOnboarding, 'canCreateEmployee', 'employee onboarding authority guard');
+assertContains(employeeOnboarding, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
+assertContains(employeeOnboarding, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
+assertContains(employeeOnboarding, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
+assertContains(employeeOnboarding, 'positionId,', 'employee onboarding position assignment');
+assertContains(employeeOnboarding, 'approved: true', 'owner-created employee auto approval');
+assertContains(employeeOnboarding, 'active: true', 'owner-created employee auto activation');
+assertContains(employeeOnboarding, 'enabled: true', 'owner-created employee user activation');
 
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
@@ -121,6 +141,7 @@ const employeeProfileBlock = schema.match(/model\s+EmployeeProfile\s*\{[\s\S]*?\
 assertContains(employeeProfileBlock, 'onDelete: Restrict', 'EmployeeProfile.user onDelete Restrict');
 assertContains(employeeProfileBlock, 'active', 'EmployeeProfile active lifecycle field');
 assertContains(employeeProfileBlock, 'approved', 'EmployeeProfile approved compatibility field');
+assertContains(employeeProfileBlock, 'positionId', 'EmployeeProfile position relation field');
 
 if (process.exitCode) {
   console.error('\nEMPLOYEE LIFECYCLE VERIFICATION: FAIL');
