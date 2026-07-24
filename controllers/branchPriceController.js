@@ -1,38 +1,92 @@
-// 📦 controllers/branchPriceController.js — Prisma singleton, Decimal-safe, branch scope, robust date logic
-
+// 📦 controllers/branchPriceController.js — Prisma singleton, Decimal-safe, branch scope
 const { prisma, Prisma } = require('../lib/prisma');
 
-// Helpers
-const D = (v) => (v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v ?? 0));
-const toInt = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+const D = (value) => (
+  value instanceof Prisma.Decimal
+    ? value
+    : new Prisma.Decimal(value ?? 0)
+);
 
-// ⚙️ pick only provided fields for partial update (avoid overwriting with 0)
-const pickPriceUpdate = (src = {}) => {
-  const out = {};
-  if (src.costPrice !== undefined) out.costPrice = D(src.costPrice);
-  if (src.priceRetail !== undefined || src.retailPrice !== undefined) out.priceRetail = D(src.retailPrice ?? src.priceRetail);
-  if (src.priceWholesale !== undefined || src.wholesalePrice !== undefined) out.priceWholesale = D(src.wholesalePrice ?? src.priceWholesale);
-  if (src.priceTechnician !== undefined || src.technicianPrice !== undefined) out.priceTechnician = D(src.technicianPrice ?? src.priceTechnician);
-  if (src.priceOnline !== undefined) out.priceOnline = D(src.priceOnline);
-  if (src.effectiveDate !== undefined) out.effectiveDate = src.effectiveDate ? new Date(src.effectiveDate) : null;
-  if (src.expiredDate !== undefined) out.expiredDate = src.expiredDate ? new Date(src.expiredDate) : null;
-  if (src.note !== undefined) out.note = src.note || null;
-  if (typeof src.isActive === 'boolean') out.isActive = src.isActive;
-  return out;
+const toInt = (value) => (
+  value === undefined || value === null || value === ''
+    ? undefined
+    : Number(value)
+);
+
+const getBranchId = (req) => toInt(req.user?.branchId);
+const getEmployeeId = (req) => toInt(req.user?.employeeId);
+
+const requireWriteActor = (req, res) => {
+  const branchId = getBranchId(req);
+  const employeeId = getEmployeeId(req);
+
+  if (!branchId) {
+    res.status(403).json({
+      code: 'BRANCH_CONTEXT_REQUIRED',
+      error: 'ไม่พบสาขาของพนักงานผู้ทำรายการ',
+    });
+    return null;
+  }
+
+  if (!employeeId) {
+    res.status(403).json({
+      code: 'EMPLOYEE_CONTEXT_REQUIRED',
+      error: 'ไม่พบข้อมูลพนักงานผู้ทำรายการ',
+    });
+    return null;
+  }
+
+  return { branchId, employeeId };
+};
+
+const pickPriceUpdate = (source = {}) => {
+  const update = {};
+
+  if (source.costPrice !== undefined) update.costPrice = D(source.costPrice);
+  if (source.priceRetail !== undefined || source.retailPrice !== undefined) {
+    update.priceRetail = D(source.retailPrice ?? source.priceRetail);
+  }
+  if (source.priceWholesale !== undefined || source.wholesalePrice !== undefined) {
+    update.priceWholesale = D(source.wholesalePrice ?? source.priceWholesale);
+  }
+  if (source.priceTechnician !== undefined || source.technicianPrice !== undefined) {
+    update.priceTechnician = D(source.technicianPrice ?? source.priceTechnician);
+  }
+  if (source.priceOnline !== undefined) update.priceOnline = D(source.priceOnline);
+  if (source.effectiveDate !== undefined) {
+    update.effectiveDate = source.effectiveDate ? new Date(source.effectiveDate) : null;
+  }
+  if (source.expiredDate !== undefined) {
+    update.expiredDate = source.expiredDate ? new Date(source.expiredDate) : null;
+  }
+  if (source.note !== undefined) update.note = source.note || null;
+  if (typeof source.isActive === 'boolean') update.isActive = source.isActive;
+
+  return update;
+};
+
+const validateDateOrder = (effectiveDate, expiredDate) => {
+  const effective = effectiveDate ? new Date(effectiveDate) : null;
+  const expired = expiredDate ? new Date(expiredDate) : null;
+
+  return {
+    effective,
+    expired,
+    valid: !(effective && expired && expired < effective),
+  };
 };
 
 // GET /branch-prices/active/:productId
 const getActiveBranchPrice = async (req, res) => {
   try {
     const productId = toInt(req.params?.productId);
-    const branchId = toInt(req.user?.branchId);
+    const branchId = getBranchId(req);
     const now = new Date();
 
     if (!productId || !branchId) {
       return res.status(400).json({ message: 'productId หรือ branchId ไม่ถูกต้อง' });
     }
 
-    // ✅ effectiveDate <= now (หรือเป็น null) และ (expiredDate >= now หรือเป็น null)
     const price = await prisma.branchPrice.findFirst({
       where: {
         branchId,
@@ -48,39 +102,17 @@ const getActiveBranchPrice = async (req, res) => {
 
     if (!price) return res.status(404).json({ message: 'ไม่พบราคาที่ใช้งานได้' });
     return res.json(price);
-  } catch (err) {
-    console.error('❌ getActiveBranchPrice error:', err);
+  } catch (error) {
+    console.error('❌ getActiveBranchPrice error:', error);
     return res.status(500).json({ error: 'Server error' });
   }
 };
 
-/**
- * Runtime Branch Price Contract
- *
- * Source of Truth
- * --------------------
- * Quick Receive Runtime Session
- *
- * Required
- * --------------------
- * productId
- * costPrice
- * priceRetail
- *
- * Optional
- * --------------------
- * priceWholesale
- * priceTechnician
- * priceOnline
- *
- * Queue Item must never contain pricing.
- */
-
 // POST /branch-prices/upsert
 const upsertBranchPrice = async (req, res) => {
   try {
-    const branchId = toInt(req.user?.branchId);
-    const updatedBy = toInt(req.user?.id) || toInt(req.user?.employeeId);
+    const actor = requireWriteActor(req, res);
+    if (!actor) return undefined;
 
     const {
       productId,
@@ -93,14 +125,14 @@ const upsertBranchPrice = async (req, res) => {
       expiredDate,
       note,
       isActive,
-      // aliases (accept FE variations)
       retailPrice,
       wholesalePrice,
       technicianPrice,
     } = req.body || {};
 
-    if (!branchId || !productId) {
-      return res.status(400).json({ error: 'branchId หรือ productId ไม่ถูกต้อง' });
+    const productIdValue = toInt(productId);
+    if (!productIdValue) {
+      return res.status(400).json({ error: 'productId ไม่ถูกต้อง' });
     }
 
     if (costPrice === undefined || costPrice === null || Number(costPrice) <= 0) {
@@ -112,274 +144,244 @@ const upsertBranchPrice = async (req, res) => {
       return res.status(400).json({ error: 'กรุณาระบุราคาขายปลีก' });
     }
 
-    const pid = toInt(productId);
-    const eff = effectiveDate ? new Date(effectiveDate) : null;
-    const exp = expiredDate ? new Date(expiredDate) : null;
-
-    // ⛔ validate date order
-    if (eff && exp && exp < eff) {
+    const dates = validateDateOrder(effectiveDate, expiredDate);
+    if (!dates.valid) {
       return res.status(400).json({ error: 'expiredDate ต้องไม่เร็วกว่าหรือก่อน effectiveDate' });
     }
 
+    const pricePatch = pickPriceUpdate({
+      costPrice,
+      priceRetail,
+      priceWholesale,
+      priceTechnician,
+      priceOnline,
+      effectiveDate,
+      expiredDate,
+      note,
+      isActive,
+      retailPrice,
+      wholesalePrice,
+      technicianPrice,
+    });
+
     const result = await prisma.branchPrice.upsert({
       where: {
-        productId_branchId: { productId: pid, branchId },
+        productId_branchId: {
+          productId: productIdValue,
+          branchId: actor.branchId,
+        },
       },
       update: {
-        ...pickPriceUpdate({
-          costPrice,
-          priceRetail,
-          priceWholesale,
-          priceTechnician,
-          priceOnline,
-          effectiveDate,
-          expiredDate,
-          note,
-          isActive,
-          // aliases
-          retailPrice,
-          wholesalePrice,
-          technicianPrice,
-        }),
-        updatedBy,
+        ...pricePatch,
+        updatedBy: actor.employeeId,
       },
       create: {
-        productId: pid,
-        branchId,
+        productId: productIdValue,
+        branchId: actor.branchId,
         costPrice: D(costPrice),
-        priceRetail: D(retailPrice ?? priceRetail),
+        priceRetail: D(retailValue),
         priceWholesale: D(wholesalePrice ?? priceWholesale),
         priceTechnician: D(technicianPrice ?? priceTechnician),
         priceOnline: D(priceOnline),
-        effectiveDate: eff,
-        expiredDate: exp,
+        effectiveDate: dates.effective,
+        expiredDate: dates.expired,
         note: note || null,
         isActive: typeof isActive === 'boolean' ? isActive : true,
-        updatedBy,
+        updatedBy: actor.employeeId,
       },
     });
 
     return res.json(result);
-  } catch (err) {
-    console.error('❌ upsertBranchPrice error:', err);
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
-      return res.status(400).json({ error: 'อ้างอิง product/branch ไม่ถูกต้อง' });
+  } catch (error) {
+    console.error('❌ upsertBranchPrice error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      return res.status(400).json({ error: 'อ้างอิง product/branch/employee ไม่ถูกต้อง' });
     }
     return res.status(500).json({ error: 'ไม่สามารถบันทึกราคาได้' });
   }
 };
 
+const buildProductWhere = ({
+  branchId,
+  categoryId,
+  productTypeId,
+  productProfileId,
+  templateId,
+  productTemplateId,
+  productId,
+  searchText,
+  q,
+  includeInactive,
+}) => {
+  if (productProfileId) {
+    return { error: { error: 'UNSUPPORTED_LEGACY_FILTER', field: 'productProfileId' } };
+  }
+
+  const AND = [{ productType: { branchId } }];
+  const templateProductId = toInt(templateId ?? productTemplateId);
+
+  if (templateProductId) AND.push({ templateProductId });
+  if (productTypeId) AND.push({ productTypeId: toInt(productTypeId) });
+  if (productId) AND.push({ id: toInt(productId) });
+  if (categoryId) {
+    AND.push({
+      productType: {
+        branchId,
+        globalProductType: { categoryId: toInt(categoryId) },
+      },
+    });
+  }
+
+  const text = String(searchText ?? q ?? '').trim();
+  if (text) AND.push({ name: { contains: text, mode: 'insensitive' } });
+
+  const includeInactiveFlag = String(includeInactive).toLowerCase() === 'true'
+    || String(includeInactive) === '1';
+  if (!includeInactiveFlag) AND.push({ active: true });
+
+  return { where: { AND } };
+};
+
+const productSelect = {
+  id: true,
+  name: true,
+  mode: true,
+  active: true,
+  createdAt: true,
+  updatedAt: true,
+  templateProductId: true,
+  productType: {
+    select: {
+      id: true,
+      name: true,
+      globalProductType: {
+        select: {
+          categoryId: true,
+          category: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+  brand: { select: { id: true, name: true } },
+  unit: { select: { id: true, name: true } },
+  templateProduct: { select: { id: true, name: true } },
+};
+
+const projectProductsWithPrices = async (products, branchId) => {
+  const productIds = products.map((product) => product.id);
+  const prices = productIds.length
+    ? await prisma.branchPrice.findMany({
+        where: { branchId, productId: { in: productIds } },
+      })
+    : [];
+
+  const priceMap = new Map(prices.map((price) => [price.productId, price]));
+
+  return products.map((product) => ({
+    product: {
+      ...product,
+      categoryId: product.productType?.globalProductType?.categoryId ?? null,
+      category: product.productType?.globalProductType?.category ?? null,
+      model: null,
+      description: null,
+      spec: null,
+      templateId: product.templateProductId ?? null,
+      template: product.templateProduct || null,
+    },
+    branchPrice: priceMap.get(product.id) || null,
+  }));
+};
+
 // GET /branch-prices
 const getBranchPricesByBranch = async (req, res) => {
   try {
-    const branchId = toInt(req.user?.branchId);
-    const {
-      categoryId,
-      productTypeId,
-      productProfileId,
-      templateId,
-      productTemplateId,
-      searchText,
-    } = req.query || {};
-
+    const branchId = getBranchId(req);
     if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-    if (productProfileId) {
-      return res.status(400).json({ error: 'UNSUPPORTED_LEGACY_FILTER', field: 'productProfileId' });
-    }
-    if (!searchText && !categoryId && !productTypeId && !templateId && !productTemplateId) {
-      return res.json([]);
-    }
 
-    const whereAND = [{ productType: { branchId } }];
-    const templateProductId = toInt(templateId ?? productTemplateId);
-    if (templateProductId) whereAND.push({ templateProductId });
-    if (productTypeId) whereAND.push({ productTypeId: toInt(productTypeId) });
-    if (categoryId) {
-      whereAND.push({
-        productType: {
-          branchId,
-          globalProductType: { categoryId: toInt(categoryId) },
-        },
-      });
-    }
+    const hasFilter = req.query?.searchText
+      || req.query?.categoryId
+      || req.query?.productTypeId
+      || req.query?.templateId
+      || req.query?.productTemplateId;
 
-    const q = String(searchText || '').trim();
-    if (q) whereAND.push({ name: { contains: q, mode: 'insensitive' } });
+    if (!hasFilter) return res.json([]);
+
+    const built = buildProductWhere({ branchId, ...req.query, includeInactive: false });
+    if (built.error) return res.status(400).json(built.error);
 
     const products = await prisma.product.findMany({
-      where: { active: true, AND: whereAND },
+      where: built.where,
       orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        mode: true,
-        active: true,
-        templateProductId: true,
-        productType: {
-          select: {
-            id: true,
-            name: true,
-            globalProductType: {
-              select: {
-                categoryId: true,
-                category: { select: { id: true, name: true } },
-              },
-            },
-          },
-        },
-        brand: { select: { id: true, name: true } },
-        unit: { select: { id: true, name: true } },
-        templateProduct: { select: { id: true, name: true } },
-      },
+      select: productSelect,
     });
 
-    const productIds = products.map((p) => p.id);
-    const prices = productIds.length
-      ? await prisma.branchPrice.findMany({ where: { branchId, productId: { in: productIds } } })
-      : [];
-    const priceMap = new Map(prices.map((row) => [row.productId, row]));
-
-    const result = products.map((product) => ({
-      product: {
-        ...product,
-        categoryId: product.productType?.globalProductType?.categoryId ?? null,
-        category: product.productType?.globalProductType?.category ?? null,
-        model: null,
-        description: null,
-        spec: null,
-        templateId: product.templateProductId ?? null,
-        template: product.templateProduct || null,
-      },
-      branchPrice: priceMap.get(product.id) || null,
-    }));
-
-    return res.json(result);
-  } catch (err) {
-    console.error('❌ getBranchPricesByBranch error:', err);
+    return res.json(await projectProductsWithPrices(products, branchId));
+  } catch (error) {
+    console.error('❌ getBranchPricesByBranch error:', error);
     return res.status(500).json({ error: 'ไม่สามารถโหลดรายการราคาได้' });
   }
 };
 
-// GET /branch-prices/products — Operational Product + BranchPrice
+// GET /branch-prices/products
 const getAllProductsWithBranchPrice = async (req, res) => {
   try {
-    const branchId = toInt(req.user?.branchId);
+    const branchId = getBranchId(req);
+    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
+
     const {
-      categoryId,
-      productTypeId,
-      productProfileId,
-      templateId,
-      productTemplateId,
-      productId,
-      searchText,
-      q,
-      includeInactive,
       page,
       pageSize,
       sort,
       withMeta,
+      ...filters
     } = req.query || {};
 
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-    if (productProfileId) {
-      return res.status(400).json({ error: 'UNSUPPORTED_LEGACY_FILTER', field: 'productProfileId' });
-    }
+    const hasAnyFilter = filters.searchText
+      || filters.q
+      || filters.categoryId
+      || filters.productTypeId
+      || filters.templateId
+      || filters.productTemplateId
+      || filters.productId;
 
-    const hasAnyFilter = !!searchText || !!q || !!categoryId || !!productTypeId || !!templateId || !!productTemplateId || !!productId;
     if (!hasAnyFilter && !page && !pageSize) return res.json([]);
 
-    const whereAND = [{ productType: { branchId } }];
-    const templateProductId = toInt(templateId ?? productTemplateId);
-    if (templateProductId) whereAND.push({ templateProductId });
-    if (productTypeId) whereAND.push({ productTypeId: toInt(productTypeId) });
-    if (categoryId) {
-      whereAND.push({
-        productType: {
-          branchId,
-          globalProductType: { categoryId: toInt(categoryId) },
-        },
-      });
-    }
-    if (productId) whereAND.push({ id: toInt(productId) });
-
-    const text = String(searchText ?? q ?? '').trim();
-    if (text) whereAND.push({ name: { contains: text, mode: 'insensitive' } });
-
-    const includeInactiveFlag = String(includeInactive).toLowerCase() === 'true' || String(includeInactive) === '1';
-    if (!includeInactiveFlag) whereAND.push({ active: true });
-    const where = { AND: whereAND };
+    const built = buildProductWhere({ branchId, ...filters });
+    if (built.error) return res.status(400).json(built.error);
 
     const allowedSortFields = new Set(['name', 'id', 'createdAt', 'updatedAt']);
     let orderBy = { name: 'asc' };
+
     if (sort && typeof sort === 'string') {
-      const [field, dir] = String(sort).split(':');
+      const [field, direction] = String(sort).split(':');
       if (allowedSortFields.has(field)) {
-        orderBy = { [field]: String(dir).toLowerCase() === 'desc' ? 'desc' : 'asc' };
+        orderBy = { [field]: String(direction).toLowerCase() === 'desc' ? 'desc' : 'asc' };
       }
     }
 
-    const cap = 200;
     const currentPage = Math.max(0, toInt(page) || 0);
-    const size = Math.min(cap, Math.max(0, toInt(pageSize) || 0));
+    const size = Math.min(200, Math.max(0, toInt(pageSize) || 0));
     const usePaging = currentPage > 0 && size > 0;
-    const total = usePaging ? await prisma.product.count({ where }) : undefined;
+    const total = usePaging ? await prisma.product.count({ where: built.where }) : undefined;
 
     const products = await prisma.product.findMany({
-      where,
+      where: built.where,
       orderBy,
-      select: {
-        id: true,
-        name: true,
-        mode: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
-        templateProductId: true,
-        productType: {
-          select: {
-            id: true,
-            name: true,
-            globalProductType: {
-              select: {
-                categoryId: true,
-                category: { select: { id: true, name: true } },
-              },
-            },
-          },
-        },
-        brand: { select: { id: true, name: true } },
-        unit: { select: { id: true, name: true } },
-        templateProduct: { select: { id: true, name: true } },
-      },
+      select: productSelect,
       ...(usePaging ? { skip: (currentPage - 1) * size, take: size } : {}),
     });
 
-    const productIds = products.map((p) => p.id);
-    const prices = productIds.length
-      ? await prisma.branchPrice.findMany({ where: { branchId, productId: { in: productIds } } })
-      : [];
-    const priceMap = new Map(prices.map((row) => [row.productId, row]));
-
-    const items = products.map((product) => ({
-      product: {
-        ...product,
-        categoryId: product.productType?.globalProductType?.categoryId ?? null,
-        category: product.productType?.globalProductType?.category ?? null,
-        model: null,
-        description: null,
-        spec: null,
-        templateId: product.templateProductId ?? null,
-        template: product.templateProduct || null,
-      },
-      branchPrice: priceMap.get(product.id) || null,
-    }));
-
+    const items = await projectProductsWithPrices(products, branchId);
     if (usePaging && typeof total === 'number') res.set('X-Total-Count', String(total));
+
     const wantMeta = String(withMeta).toLowerCase() === 'true' || String(withMeta) === '1';
-    if (wantMeta && usePaging) return res.json({ items, total, page: currentPage, pageSize: size });
+    if (wantMeta && usePaging) {
+      return res.json({ items, total, page: currentPage, pageSize: size });
+    }
+
     return res.json(items);
-  } catch (err) {
-    console.error('❌ getAllProductsWithBranchPrice error:', err);
+  } catch (error) {
+    console.error('❌ getAllProductsWithBranchPrice error:', error);
     return res.status(500).json({ error: 'ไม่สามารถโหลดรายการสินค้าได้' });
   }
 };
@@ -387,55 +389,55 @@ const getAllProductsWithBranchPrice = async (req, res) => {
 // PATCH /branch-prices/bulk
 const updateMultipleBranchPrices = async (req, res) => {
   try {
-    const branchId = toInt(req.user?.branchId);
-    const updatedBy = toInt(req.user?.id) || toInt(req.user?.employeeId);
+    const actor = requireWriteActor(req, res);
+    if (!actor) return undefined;
+
     const updates = Array.isArray(req.body) ? req.body : [];
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'ไม่มีข้อมูลอัปเดต' });
+    }
 
-    if (!branchId) return res.status(401).json({ error: 'unauthorized' });
-    if (updates.length === 0) return res.status(400).json({ error: 'ไม่มีข้อมูลอัปเดต' });
-
-    const ops = updates
+    const operations = updates
       .map((item) => {
-        const pid = toInt(item?.product?.id || item?.productId);
-        if (!pid) return null;
+        const productId = toInt(item?.product?.id || item?.productId);
+        if (!productId) return null;
 
-        // validate date order if both provided
-        const eff = item?.effectiveDate ? new Date(item.effectiveDate) : undefined;
-        const exp = item?.expiredDate ? new Date(item.expiredDate) : undefined;
-        if (eff && exp && exp < eff) {
-          // skip invalid item; alternatively could throw
-          return null;
-        }
-
-        const patch = pickPriceUpdate(item);
-        patch.updatedBy = updatedBy;
+        const dates = validateDateOrder(item?.effectiveDate, item?.expiredDate);
+        if (!dates.valid) return null;
 
         return prisma.branchPrice.upsert({
-          where: { productId_branchId: { productId: pid, branchId } },
-          update: patch,
+          where: {
+            productId_branchId: {
+              productId,
+              branchId: actor.branchId,
+            },
+          },
+          update: {
+            ...pickPriceUpdate(item),
+            updatedBy: actor.employeeId,
+          },
           create: {
-            productId: pid,
-            branchId,
+            productId,
+            branchId: actor.branchId,
             costPrice: D(item.costPrice),
             priceRetail: D(item.retailPrice ?? item.priceRetail),
             priceWholesale: D(item.wholesalePrice ?? item.priceWholesale),
             priceTechnician: D(item.technicianPrice ?? item.priceTechnician),
             priceOnline: D(item.priceOnline),
-            effectiveDate: item?.effectiveDate ? new Date(item.effectiveDate) : null,
-            expiredDate: item?.expiredDate ? new Date(item.expiredDate) : null,
+            effectiveDate: dates.effective,
+            expiredDate: dates.expired,
             note: item.note || null,
             isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
-            updatedBy,
+            updatedBy: actor.employeeId,
           },
         });
       })
       .filter(Boolean);
 
-    await prisma.$transaction(ops, { timeout: 30000 });
-
-    return res.json({ updated: ops.length });
-  } catch (err) {
-    console.error('❌ updateMultipleBranchPrices error:', err);
+    await prisma.$transaction(operations, { timeout: 30000 });
+    return res.json({ updated: operations.length });
+  } catch (error) {
+    console.error('❌ updateMultipleBranchPrices error:', error);
     return res.status(500).json({ error: 'อัปเดตราคาไม่สำเร็จ' });
   }
 };
@@ -447,5 +449,3 @@ module.exports = {
   getAllProductsWithBranchPrice,
   updateMultipleBranchPrices,
 };
-
-
