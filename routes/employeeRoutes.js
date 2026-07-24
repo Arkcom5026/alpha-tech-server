@@ -8,7 +8,6 @@ const {
   updateEmployees,
   deleteEmployees,
   getUsersByRole,
-  approveEmployee,
   getAllPositions,
   updateUserRole,
   getBranchDropdowns,
@@ -25,7 +24,14 @@ router.get('/positions', getAllPositions);
 router.get('/branches/dropdowns', requireAdmin.superadmin, getBranchDropdowns);
 router.patch('/roles/users/:userId/role', requireAdmin.superadmin, updateUserRole);
 router.get('/users/by-role', getUsersByRole);
-router.post('/approve-employee', approveEmployee);
+
+// Employee approval workflow is deprecated.
+// Partner-created employees are created active and approved in one atomic flow.
+router.post('/approve-employee', (_req, res) => res.status(410).json({
+  code: 'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
+  message: 'ขั้นตอนอนุมัติพนักงานถูกยกเลิก กรุณาเพิ่มพนักงานผ่านหน้าสร้างบัญชีพนักงานโดยตรง',
+  canonicalEndpoint: '/api/auth/add-sub-employee',
+}));
 
 router.get('/', getAllEmployees);
 router.post('/', createEmployees);
