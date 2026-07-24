@@ -16,8 +16,7 @@ const getBranchId = (req) =>
 const getEmployeeId = (req) =>
   req.employee?.id ||
   req.user?.employeeId ||
-  req.user?.activeProfileId ||
-  req.user?.id
+  null
 
 const sendError = (res, error, fallback = 'PRODUCT_CREATE_RUNTIME_ERROR') => {
   const status = error?.status || error?.statusCode || 500
@@ -29,6 +28,33 @@ const sendError = (res, error, fallback = 'PRODUCT_CREATE_RUNTIME_ERROR') => {
     code: error?.code || fallback,
     message: error?.message || fallback,
   })
+}
+
+const requireEmployeeContext = (req, res) => {
+  const branchId = getBranchId(req)
+  const employeeId = getEmployeeId(req)
+
+  if (!branchId) {
+    res.status(403).json({
+      success: false,
+      error: 'BRANCH_CONTEXT_REQUIRED',
+      code: 'BRANCH_CONTEXT_REQUIRED',
+      message: 'ไม่พบสาขาของพนักงานผู้ทำรายการ',
+    })
+    return null
+  }
+
+  if (!employeeId) {
+    res.status(403).json({
+      success: false,
+      error: 'EMPLOYEE_CONTEXT_REQUIRED',
+      code: 'EMPLOYEE_CONTEXT_REQUIRED',
+      message: 'ไม่พบข้อมูลพนักงานผู้ทำรายการ',
+    })
+    return null
+  }
+
+  return { branchId, employeeId }
 }
 
 const getDropdowns = async (req, res) => {
@@ -77,9 +103,12 @@ const getExistingModels = async (req, res) => {
 
 const createLocalProduct = async (req, res) => {
   try {
+    const actor = requireEmployeeContext(req, res)
+    if (!actor) return undefined
+
     const result = await productCreateService.createLocalOperationalProduct({
-      branchId: getBranchId(req),
-      employeeId: getEmployeeId(req),
+      branchId: actor.branchId,
+      employeeId: actor.employeeId,
       data: req.body || {},
     })
     return res.status(201).json(result)
