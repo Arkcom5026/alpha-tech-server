@@ -25,12 +25,15 @@ const generateCombinedBillingCode = async (tx, branchId) => {
 const createCombinedBillingDocument = async (req, res) => {
   try {
     const branchId = toInt(req.user?.branchId);
-    const employeeId = toInt(req.user?.employeeId || req.user?.id);
+    const employeeId = toInt(req.user?.employeeId);
     const saleIds = Array.isArray(req.body?.saleIds) ? req.body.saleIds.map((x) => Number(x)).filter(Number.isFinite) : [];
     const note = (req.body?.note || '').toString();
 
-    if (!branchId || !employeeId) {
-      return res.status(401).json({ error: 'Unauthorized: missing branch/employee context' });
+    if (!branchId) {
+      return res.status(401).json({ code: 'BRANCH_CONTEXT_REQUIRED', error: 'Unauthorized: missing branch context' });
+    }
+    if (!employeeId) {
+      return res.status(403).json({ code: 'EMPLOYEE_CONTEXT_REQUIRED', error: 'Employee profile context is required' });
     }
     if (saleIds.length === 0) {
       return res.status(400).json({ error: 'กรุณาเลือกรายการขายอย่างน้อย 1 รายการ' });
