@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
 const {
   createSupplierPayment,
   getAllSupplierPayments,
@@ -13,26 +12,34 @@ const {
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
-// ✅ สร้างรายการชำระเงินใหม่
-router.post('/', createSupplierPayment);
+const requireSupplierPaymentActor = (req, res, next) => {
+  const branchId = Number(req.user?.branchId);
+  const employeeId = Number(req.user?.employeeId);
+
+  if (!Number.isInteger(branchId) || branchId <= 0) {
+    return res.status(403).json({
+      code: 'BRANCH_CONTEXT_REQUIRED',
+      message: 'ไม่พบสาขาของพนักงานผู้ทำรายการ',
+    });
+  }
+
+  if (!Number.isInteger(employeeId) || employeeId <= 0) {
+    return res.status(403).json({
+      code: 'EMPLOYEE_CONTEXT_REQUIRED',
+      message: 'ไม่พบข้อมูลพนักงานผู้ทำรายการ',
+    });
+  }
+
+  return next();
+};
+
+// สร้างรายการชำระเงินใหม่ ต้องมี EmployeeProfile และสาขาจาก DB authority
+router.post('/', requireSupplierPaymentActor, createSupplierPayment);
 
 router.get('/advance', getAdvancePaymentsBySupplier);
-
-// ✅ ดูรายการชำระเงินทั้งหมดของ Supplier รายใดรายหนึ่ง
 router.get('/by-supplier/:supplierId', getSupplierPaymentsBySupplier);
-
-// ✅ ดูรายการชำระเงินทั้งหมด
 router.get('/', getAllSupplierPayments);
-
-// ✅ ดูการชำระของ PO เดียว
 router.get('/by-po/:poId', getSupplierPaymentsByPO);
-
-// ✅ ลบรายการชำระเงิน
 router.delete('/:id', deleteSupplierPayment);
 
-
-
 module.exports = router;
-
-
-
