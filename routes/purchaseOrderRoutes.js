@@ -8,6 +8,9 @@ const {
 const {
   getPurchaseOrderById,
 } = require('../src/modules/procurement/purchaseOrder/query/detail/purchaseOrderDetailController');
+const {
+  getPurchaseOrdersBySupplierHandler,
+} = require('../src/modules/procurement/purchaseOrder/query/bySupplier/purchaseOrderBySupplierController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
@@ -15,7 +18,6 @@ const {
   updatePurchaseOrder,
   deletePurchaseOrder,
   updatePurchaseOrderStatus,
-  getPurchaseOrdersBySupplier,
   createPurchaseOrderWithAdvance,
 } = require('../controllers/purchaseOrderController');
 
@@ -30,7 +32,8 @@ router.use(verifyToken);
 
 router.get('/', getPurchaseOrderList);
 router.post('/', createPurchaseOrder);
-router.get('/by-supplier', getPurchaseOrdersBySupplier);
+router.get('/by-supplier/:supplierId', getPurchaseOrdersBySupplierHandler);
+router.get('/by-supplier', getPurchaseOrdersBySupplierHandler);
 router.post('/with-advance', createPurchaseOrderWithAdvance);
 
 router.get('/eligible-for-receipt', getEligiblePurchaseOrders);
