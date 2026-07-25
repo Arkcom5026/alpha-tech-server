@@ -35,15 +35,17 @@ Understand the workflow
 → Identify legacy files touched by that workflow
 → Map responsibility
 → Reuse or create module capability only when safe
-→ Make legacy controller thinner over time
+→ Cut over runtime after capability coverage
+→ Verify repository references
+→ Remove legacy in a dedicated assignment
 → Keep every intermediate state deployable
 ```
 
 Do not move code just because it is old.
 
-Do not delete code just because a new module exists.
+Do not delete code merely because a new module exists.
 
-Do not perform broad rewrite while a workflow is still being recovered or verified.
+Do not keep stale legacy protection rules after verified runtime evidence proves the module is canonical.
 
 ## 2. Backend Migration Boot Rule
 
@@ -61,16 +63,14 @@ Before writing code, the Task must be able to answer:
 
 ```txt
 - Which workflow is being advanced?
-- Which legacy entrypoint currently serves production?
+- Which entrypoint currently serves production?
 - Which module capability already exists?
-- Is this a feature patch, verification patch, or migration patch?
+- Is this a feature patch, verification patch, migration patch, or deletion patch?
 - What must not be refactored?
 - What is the rollback risk?
 ```
 
 ## 3. Migration Stages
-
-Use these labels in assignments and reports.
 
 ### LEGACY
 
@@ -117,7 +117,9 @@ Legacy route may remain as backward-compatible alias.
 
 ```txt
 Module implementation is the canonical runtime.
-Legacy path has zero runtime dependency and can be deprecated or removed through a dedicated deletion assignment.
+Legacy implementation has zero active runtime authority.
+Compatibility mounts may remain temporarily.
+Legacy files may be removed through a dedicated deletion assignment after verification.
 ```
 
 ## 4. Global Safe Migration Protocol
@@ -130,8 +132,8 @@ For every migration:
 3. Identify canonical target module.
 4. Search references/imports.
 5. Redirect one call path at a time.
-6. Verify runtime behavior.
-7. Update docs.
+6. Verify repository state and runtime evidence separately.
+7. Update docs and stale protection rules.
 8. Only then consider deleting legacy code.
 ```
 
@@ -139,12 +141,14 @@ Deletion requires explicit proof:
 
 ```txt
 - zero runtime imports/requires
-- no route mounted
-- no script/test dependency
-- no frontend call depends on old endpoint
-- verification report committed
+- no legacy route mounted as authority
+- no script/test dependency that mutates or imports the legacy file
+- no frontend call depends on a removed endpoint
+- verification evidence committed or recorded
 - ROLE-ARCH approval
 ```
+
+Historical documentation references do not count as runtime dependencies, but stale docs must be updated before deletion so they do not restore obsolete authority.
 
 ## 5. Domain Migration Matrix
 
@@ -153,7 +157,7 @@ Deletion requires explicit proof:
 ### Current Stage
 
 ```txt
-HYBRID
+MODULE-CANONICAL
 ```
 
 ### Production Entry
@@ -161,23 +165,41 @@ HYBRID
 ```txt
 server.js
 → /api/products
-→ routes/productRoutes.js
-→ controllers/productController.js
-```
-
-### Module Entry / Target
-
-```txt
-src/modules/product/
-  controllers/
-  repositories/
-  routes/
-  services/
+→ routes/productRoutes.js                 compatibility mount only
+→ src/modules/product/routes/productModuleRoutes.js
+→ Product-owned capability slices
 ```
 
 ### Canonical Runtime Pieces
 
 ```txt
+Product Router:
+src/modules/product/routes/productModuleRoutes.js
+
+Query:
+src/modules/product/query/
+
+Create:
+src/modules/product/create/
+
+Update:
+src/modules/product/update/
+
+Status / Lifecycle:
+src/modules/product/status/
+
+Delete Policy:
+src/modules/product/delete/
+
+Image Delete:
+src/modules/product/imageDelete/
+
+Pricing:
+src/modules/product/pricing/
+
+Migrate To Simple:
+src/modules/product/migrateToSimple/
+
 Template Search:
 src/modules/product/routes/templateProductSearchRoutes.js
 src/modules/product/controllers/templateProductSearchController.js
@@ -188,13 +210,27 @@ Template Clone:
 src/modules/product/services/productTemplateEngine/
 ```
 
-### Legacy Runtime Pieces
+### Compatibility Pieces
 
 ```txt
 routes/productRoutes.js
-controllers/productController.js
-src/modules/product/services/productCloneService.js
 ```
+
+This file may remain as a stable server wiring alias. It must contain no Product business logic and must only export the module router.
+
+### Deprecated Legacy Pieces
+
+```txt
+controllers/productController.js
+tools/apply-mission-b-controller-adapter-fix.js
+ffff
+```
+
+`controllers/productController.js` has no active Product route dependency after cutover.
+
+`tools/apply-mission-b-controller-adapter-fix.js` is obsolete because it rewrites a deprecated controller and could accidentally restore legacy authority.
+
+`ffff` is historical diff evidence and must not be treated as executable authority.
 
 ### Current Understanding
 
@@ -205,37 +241,49 @@ Template Catalog = QuickStock search and clone source only
 Operational Product Catalog = branch runtime surfaces only
 ```
 
-Operational product branch isolation usually uses:
+Operational Product branch isolation uses:
 
 ```txt
-product.productType.branchId = req.user.branchId
+product.productType.branchId = current branchId
 ```
 
 ### Safe Migration Direction
 
 ```txt
-routes/productRoutes.js remains production entrypoint
-controllers/productController.js becomes adapter over time
-productTemplateEngine remains canonical clone engine
-Product search/runtime mapping should gradually move into module services
+Keep routes/productRoutes.js as compatibility mount while server wiring remains unchanged.
+Keep productModuleRoutes.js as canonical route authority.
+Do not restore logic to controllers/productController.js.
+Delete obsolete patch tools and historical accidental artifacts after reference verification.
+Remove controllers/productController.js only in a dedicated legacy-removal commit.
+Keep productTemplateEngine as canonical clone engine.
 ```
 
 ### Protected / Do Not Delete
 
 ```txt
-routes/productRoutes.js
-controllers/productController.js
-src/modules/product/services/productCloneService.js
+src/modules/product/routes/productModuleRoutes.js
+src/modules/product/query/
+src/modules/product/create/
+src/modules/product/update/
+src/modules/product/status/
+src/modules/product/delete/
+src/modules/product/imageDelete/
+src/modules/product/pricing/
+src/modules/product/migrateToSimple/
+src/modules/product/services/productTemplateEngine/
+routes/productRoutes.js   while server.js imports this compatibility path
 ```
 
-The legacy clone service may be duplicate, but do not delete until dependency verification proves zero runtime dependency.
+`controllers/productController.js` is no longer protected by architecture doctrine. Its deletion is blocked only until repository cleanup and final verification complete.
 
-### Next Migration Opportunities
+### Next Migration Steps
 
 ```txt
-- Move route-local create-from-template handler out of routes/productRoutes.js.
-- Decide whether /api/products/pos/create-from-template is still needed after QuickStock /existing verification.
-- Extract mapRuntimeProductForPos into module mapper when Product runtime is touched again.
+1. Remove obsolete Product controller patch tool.
+2. Remove accidental historical diff artifact if confirmed non-runtime.
+3. Repeat repository-wide reference verification.
+4. Remove controllers/productController.js in a dedicated commit.
+5. Preserve routes/productRoutes.js compatibility mount unless server mount is separately changed.
 ```
 
 ## QuickStock Domain
@@ -340,30 +388,8 @@ controllers/stockItemController.js
 ### Migration Target
 
 ```txt
-src/modules/stock/           (future target, not yet canonical)
-src/modules/inventory/       (possible future target if chosen by architecture)
-```
-
-### Current Understanding
-
-Stock runtime is shared by multiple workflows:
-
-```txt
-QuickStock receive
-PO Receipt receive/commit
-Sales createSale
-Stock Dashboard
-Stock Audit
-```
-
-Core models:
-
-```txt
-StockItem
-SimpleLot
-StockBalance
-StockMovement
-BarcodeReceiptItem
+src/modules/stock/           future target, not yet canonical
+src/modules/inventory/       possible future target if chosen by architecture
 ```
 
 ### Safe Migration Direction
@@ -372,15 +398,6 @@ Do not start Stock migration as a standalone cleanup project.
 
 Migrate only when a workflow touching stock requires change.
 
-Preferred future extraction:
-
-```txt
-StockMutationService
-StockBalanceService
-StockMovementService
-StockProjectionService
-```
-
 ### Protected / Do Not Delete
 
 ```txt
@@ -388,14 +405,6 @@ routes/stockRoutes.js
 controllers/stockController.js
 routes/stockItemRoutes.js
 controllers/stockItemController.js
-```
-
-### Next Migration Opportunities
-
-```txt
-- Extract stock balance upsert logic when repeated across QuickStock, PO Receipt, and Sales.
-- Extract StockMovement write helpers when stock movement behavior is standardized.
-- Keep dashboard read-only as projection surface.
 ```
 
 ## Procurement / Purchase Order Domain
@@ -427,41 +436,12 @@ Receipt helper endpoints
 → controllers/purchaseOrderReceiptController.js
 ```
 
-### Current Understanding
-
-This domain is the clearest example of approved incremental migration:
-
-```txt
-One endpoint moved to module
-Remaining endpoints stay legacy
-Route remains stable
-No rewrite
-```
-
 ### Safe Migration Direction
 
 ```txt
 routes/purchaseOrderRoutes.js remains stable facade
 Move one operation at a time into src/modules/procurement
 Keep endpoint contracts stable for FE
-```
-
-### Protected / Do Not Delete
-
-```txt
-routes/purchaseOrderRoutes.js
-controllers/purchaseOrderController.js
-controllers/purchaseOrderReceiptController.js
-src/modules/procurement/controllers/procurementController.js
-src/modules/procurement/services/purchaseOrderService.js
-```
-
-### Next Migration Opportunities
-
-```txt
-- Move createPurchaseOrder only when PO create workflow is being actively changed.
-- Move update/status flow only when status lifecycle is being fixed.
-- Do not mix PO migration with QuickStock Mission B unless directly required.
 ```
 
 ## Purchase Receipt Domain
@@ -480,50 +460,9 @@ LEGACY / HYBRID-READY
 → controllers/purchaseOrderReceiptController.js
 ```
 
-### Related Controller
-
-```txt
-controllers/purchaseOrderReceiptItemController.js
-```
-
-### Current Understanding
-
-PO Receipt coordinates formal receiving:
-
-```txt
-PurchaseOrderReceipt
-PurchaseOrderReceiptItem
-BarcodeReceiptItem
-StockItem / SimpleLot
-StockBalance
-Supplier payable / credit
-Finalize / commit
-Barcode print status
-```
-
-### Safe Migration Direction
-
 Move receipt runtime only when formal PO receiving workflow is being improved.
 
 Do not merge QuickStock and PO Receipt yet.
-
-They can share lower-level helpers later.
-
-### Protected / Do Not Delete
-
-```txt
-routes/purchaseOrderReceiptRoutes.js
-controllers/purchaseOrderReceiptController.js
-controllers/purchaseOrderReceiptItemController.js
-```
-
-### Next Migration Opportunities
-
-```txt
-- Extract barcode generation service.
-- Extract receipt commit service.
-- Share stock mutation helpers with QuickStock after both flows are verified.
-```
 
 ## Sales Domain
 
@@ -533,226 +472,48 @@ controllers/purchaseOrderReceiptItemController.js
 HYBRID
 ```
 
-### Production Entry
+Sales migration remains workflow-driven and is not changed by Product becoming MODULE-CANONICAL.
+
+## 6. Doctrine Conflict Resolution
+
+When a document says “do not delete” but verified runtime and dependency evidence show the old authority is no longer active:
 
 ```txt
-/api/sales
-/api/sale-orders  (backward compatibility)
-→ routes/saleRoutes.js
-→ controllers/saleController.js
+Runtime truth wins
+→ update the stale rule
+→ preserve any still-active compatibility facade
+→ repeat zero-reference verification
+→ delete only the obsolete implementation
 ```
 
-### Module Pieces Already Used
+Do not confuse:
 
 ```txt
-src/modules/sales/contracts/saleDocument.include.js
-src/modules/sales/services/saleDocument.service.js
+Compatibility path still mounted
 ```
 
-### Current Understanding
-
-Sales controller is still the main production runtime.
-
-It handles:
+with:
 
 ```txt
-Sale validation
-Money/VAT validation
-StockItem availability
-Sale creation
-StockItem SOLD update
-StockMovement SALE rows
-Payment optional autocreate
-Document line update through module service
+Legacy implementation still authoritative
 ```
 
-### Safe Migration Direction
+For Product, `routes/productRoutes.js` remains mounted as a compatibility path, while `controllers/productController.js` is no longer authoritative.
 
-Do not rewrite saleController broadly.
+## 7. Verification Boundaries
 
-Move document-specific logic first because module service already exists.
+Repository verification may prove:
+- route wiring
+- imports/requires
+- public exports
+- stale docs/tools
+- commit ancestry
 
-Move stock mutation into shared Stock service only after stock helper is canonical.
+Repository verification does not prove:
+- npm/build success
+- Prisma generation/migration
+- database behavior
+- HTTP runtime behavior
+- operational end-to-end behavior
 
-### Protected / Do Not Delete
-
-```txt
-routes/saleRoutes.js
-controllers/saleController.js
-src/modules/sales/contracts/saleDocument.include.js
-src/modules/sales/services/saleDocument.service.js
-```
-
-### Next Migration Opportunities
-
-```txt
-- Extract SaleStockService when stock mutation helpers are ready.
-- Extract SaleMoneyValidation only when sale pricing/tax workflow is being changed.
-- Keep /api/sale-orders alias until FE/backward dependency is verified zero.
-```
-
-## BranchPrice Domain
-
-### Current Stage
-
-```txt
-LEGACY / SHARED RUNTIME
-```
-
-### Production Entry
-
-```txt
-/api/branch-prices
-→ routes/branchPriceRoutes.js
-→ controllers/branchPriceController.js
-```
-
-### Current Understanding
-
-BranchPrice is shared by Product, QuickStock, Online/POS product search, and pricing management.
-
-Runtime Branch Price Contract:
-
-```txt
-Source of Truth for Quick Receive = Quick Receive Runtime Session
-Required = productId, costPrice, priceRetail
-Optional = priceWholesale, priceTechnician, priceOnline
-Queue item must never contain pricing
-```
-
-### Safe Migration Direction
-
-Do not move BranchPrice during Mission B verification.
-
-If repeated price upsert logic appears, extract a module service later:
-
-```txt
-src/modules/pricing/services/branchPriceService.js
-```
-
-or
-
-```txt
-src/modules/product/services/branchPriceRuntimeService.js
-```
-
-Architecture decision required before choosing final module location.
-
-### Protected / Do Not Delete
-
-```txt
-routes/branchPriceRoutes.js
-controllers/branchPriceController.js
-```
-
-## Auth / Employee Context
-
-### Current Stage
-
-```txt
-HYBRID CONTEXT
-```
-
-### Current Canonical Source
-
-```txt
-middlewares/verifyToken.js
-→ req.user
-```
-
-### New/Hybrid Context
-
-Some module guards support:
-
-```txt
-req.employee
-```
-
-But `verifyToken.js` currently creates `req.user`, not guaranteed `req.employee`.
-
-### Safe Migration Direction
-
-New module code must use fallback pattern:
-
-```js
-const branchId = req.employee?.branchId || req.user?.branchId
-const employeeId = req.employee?.id || req.user?.employeeId || req.user?.id
-```
-
-Do not assume `req.employee` exists unless assigned middleware creates it.
-
-### Next Migration Opportunities
-
-```txt
-- Create a shared employee-context middleware if repeated guards diverge.
-- Standardize req.employee only through a dedicated auth/context assignment.
-```
-
-## 6. Mission B Migration State
-
-Mission B currently should not trigger more migration before end-to-end verification.
-
-Current best path:
-
-```txt
-/api/products/template/search
-→ /api/quick-stock/existing
-→ productTemplateEngine clone if needed
-→ BranchPrice runtime upsert
-→ Stock runtime writes
-→ Product visible in branch runtime
-```
-
-Migration status for Mission B:
-
-```txt
-Template Search: MODULE-FIRST
-QuickStock Commit: MODULE-FIRST
-Product Clone: MODULE-CANONICAL inside productTemplateEngine
-Product Operational Search: LEGACY/HYBRID via productController
-BranchPrice: LEGACY shared runtime
-Stock write: MODULE-FIRST through QuickStock, shared legacy concepts/models
-Product List visibility: LEGACY via productController
-```
-
-Next Mission B step:
-
-```txt
-ASSIGNMENT-017 — End-to-End Runtime Verification
-```
-
-Not another implementation or migration patch.
-
-## 7. Assignment Template Requirement
-
-Every backend assignment must include this block:
-
-```txt
-Migration Classification:
-- Stage:
-- Production entrypoint:
-- Module target:
-- Workflow checkpoint:
-- Files allowed:
-- Files forbidden:
-- Refactor allowed: YES/NO
-- Deletion allowed: YES/NO
-- Verification report path:
-```
-
-If the assignment lacks this block, the receiving Task must pause and ask ROLE-ARCH.
-
-## 8. Living Document Rule
-
-Update this file whenever:
-
-```txt
-- A legacy endpoint moves to module runtime.
-- A module becomes canonical.
-- A legacy file becomes deletion candidate.
-- A dependency search proves a file is unused.
-- A workflow chooses a new canonical path.
-- A backward-compatible alias is removed.
-```
-
-This file is part of backend boot knowledge and must stay current.
+Those require Runtime Gate and Operational Gate evidence separately.
