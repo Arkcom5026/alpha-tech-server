@@ -117,6 +117,7 @@ model Branch {
   warrantyClaims                  WarrantyClaim[]
   warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
   salesTaxFilingBatches           SalesTaxFilingBatch[]
+  taxDocuments                    TaxDocument[]
   services                        ServiceOrder[]
   simpleLots                      SimpleLot[]
   stockAuditSession               StockAuditSession[]
@@ -1885,15 +1886,38 @@ enum TaxPeriodStatus {
 // ============================================================
 
 model TaxDocument {
-  id           String             @id @default(cuid())
-  documentType TaxDocumentType
-  status       TaxLifecycleStatus @default(DRAFT)
-  version      Int                @default(1)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  branchId            Int
+  documentNumber      String?
+  documentType        TaxDocumentType
+  status              TaxLifecycleStatus @default(DRAFT)
+  version             Int                @default(1)
+  validatedAt         DateTime?
+  issuedAt            DateTime?
+  reportedAt          DateTime?
+  lockedAt            DateTime?
+  cancelledAt         DateTime?
+  archivedAt          DateTime?
+  replacementOfId     String?
+  cancelledDocumentId String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
-  sources TaxDocumentSource[]
-  events  TaxDocumentEvent[]
+  branch                Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  replacementOf         TaxDocument?        @relation("TaxDocumentReplacement", fields: [replacementOfId], references: [id], onDelete: Restrict)
+  replacements          TaxDocument[]       @relation("TaxDocumentReplacement")
+  cancelledDocument     TaxDocument?        @relation("TaxDocumentCancellation", fields: [cancelledDocumentId], references: [id], onDelete: Restrict)
+  cancellationDocuments TaxDocument[]       @relation("TaxDocumentCancellation")
+  sources               TaxDocumentSource[]
+  events                TaxDocumentEvent[]
+
+  @@unique([branchId, documentNumber])
+  @@index([status])
+  @@index([issuedAt])
+  @@index([branchId, status])
+  @@index([documentType, status])
+  @@index([replacementOfId])
+  @@index([cancelledDocumentId])
 }
 
 model TaxDocumentSource {
@@ -1916,6 +1940,7 @@ model TaxDocumentEvent {
   eventType     TaxEventType
   performedBy   String?
   performedAt   DateTime     @default(now())
+  metadata      Json?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
