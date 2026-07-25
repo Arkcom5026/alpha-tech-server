@@ -10,6 +10,7 @@ const readyToSellController = require('../src/modules/product/readyToSell/contro
 const productDuplicatePreviewRoutes = require('../src/modules/product/duplicatePreview/routes/productDuplicatePreviewRoutes')
 const productMaintenanceController = require('../src/modules/product/maintenance/controllers/productMaintenanceController')
 const productPricingController = require('../src/modules/product/pricing/controllers/productPricingController')
+const productMediaController = require('../src/modules/product/media/controllers/productMediaController')
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
@@ -38,7 +39,7 @@ router.get('/:id/delete-check', productController.getProductDeleteCheck)
 router.patch('/:id/archive', productController.archiveProduct)
 router.get('/:id', operationalProductRuntimeController.getProductPosById)
 router['delete']('/:id', productController.deleteProduct)
-router['delete']('/:id/images', productController.deleteProductImage)
+router['delete']('/:id/images', productMediaController.deleteProductImage)
 router.post('/:id/migrate-to-simple', productController.migrateSnToSimple)
 
 router.get('/:productId/prices', productPricingController.getProductPrices)
