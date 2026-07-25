@@ -1818,3 +1818,63 @@ enum SalesTaxFilingStatus {
   SUBMITTED
   VOIDED
 }
+
+// ============================================================
+// TAX AUTHORITY FOUNDATION
+// Step 3.1 — Enum Foundation
+// ============================================================
+
+enum TaxDocumentType {
+  TAX_INVOICE
+  ABBREVIATED_TAX_INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  REPLACEMENT
+  VOID
+}
+
+enum TaxLifecycleStatus {
+  DRAFT
+  VALIDATED
+  ISSUED
+  REPORTED
+  LOCKED
+  CANCELLED
+  REPLACED
+  ARCHIVED
+}
+
+enum TaxSourceType {
+  SALE
+  SALE_RETURN
+  PURCHASE_RECEIPT
+  REPAIR
+  WARRANTY_CLAIM
+  MANUAL
+}
+
+enum TaxEventType {
+  CREATED
+  VALIDATED
+  ISSUED
+  REPORTED
+  LOCKED
+  CANCELLED
+  REPLACED
+  ARCHIVED
+}
+
+enum TaxLedgerType {
+  OUTPUT_VAT
+  INPUT_VAT
+  OUTPUT_VAT_ADJUSTMENT
+  INPUT_VAT_ADJUSTMENT
+}
+
+enum TaxPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+  SUBMITTED
+  REOPENED
+}

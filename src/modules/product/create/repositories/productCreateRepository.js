@@ -44,7 +44,6 @@ const dedupeProductTypes = (items = []) => {
       return
     }
 
-    // Prefer the active row, then the lower id as the stable canonical dropdown value.
     if (!existing.active && item.active) {
       byKey.set(key, item)
       return
@@ -283,6 +282,25 @@ const listUnits = async () => {
   })
 }
 
+const listAllBrands = async ({ includeInactive = false } = {}) => {
+  return prisma.brand.findMany({
+    where: includeInactive ? {} : { active: true },
+    select: { id: true, name: true, active: true },
+    orderBy: { name: 'asc' },
+  })
+}
+
+const listProductTypeBrandMappings = async ({ productTypeIds = [] } = {}) => {
+  const ids = productTypeIds.map(toInt).filter(Boolean)
+  if (!ids.length) return []
+
+  return prisma.productTypeBrand.findMany({
+    where: { productTypeId: { in: ids } },
+    select: { productTypeId: true, brandId: true },
+    orderBy: [{ productTypeId: 'asc' }, { brandId: 'asc' }],
+  })
+}
+
 const listBrandsForProductType = async ({ branchId, productTypeId, includeInactive = false } = {}) => {
   const brId = toInt(branchId)
   const ptId = toInt(productTypeId)
@@ -424,6 +442,8 @@ module.exports = {
   listTemplateProductTypes,
   listBranchProductTypes,
   listUnits,
+  listAllBrands,
+  listProductTypeBrandMappings,
   listBrandsForProductType,
   listExistingModels,
   createOperationalProduct,
