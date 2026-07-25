@@ -1909,6 +1909,7 @@ model TaxDocument {
   cancelledDocument     TaxDocument?        @relation("TaxDocumentCancellation", fields: [cancelledDocumentId], references: [id], onDelete: Restrict)
   cancellationDocuments TaxDocument[]       @relation("TaxDocumentCancellation")
   sources               TaxDocumentSource[]
+  snapshot              TaxSnapshot?
   events                TaxDocumentEvent[]
 
   @@unique([branchId, documentNumber])
@@ -1948,4 +1949,54 @@ model TaxDocumentEvent {
 
   @@index([taxDocumentId, performedAt])
   @@index([eventType, performedAt])
+}
+
+// ============================================================
+// TAX AUTHORITY FOUNDATION
+// Step 3.3 — Immutable Tax Snapshot
+// ============================================================
+
+model TaxSnapshot {
+  id            String @id @default(cuid())
+  taxDocumentId String @unique
+
+  sellerName   String
+  sellerTaxId  String?
+  buyerName    String?
+  buyerTaxId   String?
+  currencyCode String
+  exchangeRate Decimal @default(1)
+
+  subtotal   Decimal @db.Decimal(18, 2)
+  vatTotal   Decimal @db.Decimal(18, 2)
+  grandTotal Decimal @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taxDocument TaxDocument       @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+  items       TaxSnapshotItem[]
+}
+
+model TaxSnapshotItem {
+  id             String  @id @default(cuid())
+  snapshotId     String
+  lineNo         Int
+  description    String
+  quantity       Decimal @db.Decimal(18, 4)
+  unitPrice      Decimal @db.Decimal(18, 2)
+  discountAmount Decimal @db.Decimal(18, 2)
+  taxBase        Decimal @db.Decimal(18, 2)
+  vatRate        Decimal @db.Decimal(5, 2)
+  vatAmount      Decimal @db.Decimal(18, 2)
+  grandTotal     Decimal @db.Decimal(18, 2)
+  productCode    String?
+  unitName       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshot TaxSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+
+  @@index([snapshotId, lineNo])
 }
