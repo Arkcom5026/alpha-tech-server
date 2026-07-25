@@ -1934,6 +1934,7 @@ model TaxDocumentSource {
 
   taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
 
+  @@unique([taxDocumentId, sourceType, sourceId])
   @@index([taxDocumentId])
   @@index([sourceType, sourceId])
 }
@@ -2001,7 +2002,7 @@ model TaxSnapshotItem {
 
   snapshot TaxSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
 
-  @@index([snapshotId, lineNo])
+  @@unique([snapshotId, lineNo])
 }
 
 // ============================================================
