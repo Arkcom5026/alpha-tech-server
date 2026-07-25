@@ -23,10 +23,12 @@ const {
 const {
   updatePurchaseOrderStatusHandler,
 } = require('../src/modules/procurement/purchaseOrder/status/purchaseOrderStatusController');
-
-// Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
-  deletePurchaseOrder,
+  deletePurchaseOrderHandler,
+} = require('../src/modules/procurement/purchaseOrder/delete/purchaseOrderDeleteController');
+
+// Legacy handler retained temporarily while its boundary is reviewed.
+const {
   createPurchaseOrderWithAdvance,
 } = require('../controllers/purchaseOrderController');
 
@@ -47,7 +49,7 @@ router.post('/with-advance', createPurchaseOrderWithAdvance);
 router.get('/eligible-for-receipt', getEligiblePurchaseOrdersForReceipt);
 router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
 router.put('/:id', updatePurchaseOrderHandler);
-router.delete('/:id', deletePurchaseOrder);
+router.delete('/:id', deletePurchaseOrderHandler);
 router.get('/:id', getPurchaseOrderById);
 router.patch('/:id/status', updatePurchaseOrderStatusHandler);
 
