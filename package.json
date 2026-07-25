@@ -10,6 +10,7 @@
     "verify:tax-sale-completion": "node scripts/verify-tax-sale-completion-integration.js",
     "verify:tax-document-lifecycle": "node scripts/verify-tax-document-lifecycle.js",
     "verify:tax-document-lifecycle-persistence": "node scripts/verify-tax-document-lifecycle-persistence.js",
+    "verify:tax-authority-submission-contract": "node scripts/verify-tax-authority-submission-contract.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
