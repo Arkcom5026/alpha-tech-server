@@ -9,6 +9,7 @@ const operationalProductRuntimeController = require('../src/modules/product/runt
 const readyToSellController = require('../src/modules/product/readyToSell/controllers/readyToSellController')
 const productDuplicatePreviewRoutes = require('../src/modules/product/duplicatePreview/routes/productDuplicatePreviewRoutes')
 const productMaintenanceController = require('../src/modules/product/maintenance/controllers/productMaintenanceController')
+const productPricingController = require('../src/modules/product/pricing/controllers/productPricingController')
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
@@ -40,24 +41,9 @@ router['delete']('/:id', productController.deleteProduct)
 router['delete']('/:id/images', productController.deleteProductImage)
 router.post('/:id/migrate-to-simple', productController.migrateSnToSimple)
 
-let productPriceController = null
-try {
-  productPriceController = require('../controllers/productPriceController')
-} catch (_e) {
-  productPriceController = null
-}
-
-if (productPriceController) {
-  router.get('/:productId/prices', productPriceController.getProductPrices)
-  router.put('/:productId/prices', productPriceController.updateProductPrices)
-  router.post('/:productId/prices', productPriceController.addProductPrice)
-  router['delete']('/:productId/prices/:priceId', productPriceController.deleteProductPrice)
-} else {
-  const notImplemented = (_req, res) => res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED' })
-  router.get('/:productId/prices', notImplemented)
-  router.put('/:productId/prices', notImplemented)
-  router.post('/:productId/prices', notImplemented)
-  router['delete']('/:productId/prices/:priceId', notImplemented)
-}
+router.get('/:productId/prices', productPricingController.getProductPrices)
+router.put('/:productId/prices', productPricingController.updateProductPrices)
+router.post('/:productId/prices', productPricingController.addProductPrice)
+router['delete']('/:productId/prices/:priceId', productPricingController.deleteProductPrice)
 
 module.exports = router
