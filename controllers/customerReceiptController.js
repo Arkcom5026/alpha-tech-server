@@ -157,7 +157,7 @@ const normalizeSaleItemForPrint = (saleItem) => {
     saleItem?.subtotal ??
     saleItem?.netAmount ??
     saleItem?.grandTotal ??
-    (Number(unitPriceIncVat || 0) * Number(quantity || 0));
+    Number(unitPriceIncVat || 0) * Number(quantity || 0);
 
   return {
     ...saleItem,
@@ -190,7 +190,9 @@ const normalizeSaleItemForPrint = (saleItem) => {
     unitPrice:
       unitPriceIncVat != null ? roundMoney(unitPriceIncVat) : roundMoney(saleItem?.unitPrice),
     unitPriceIncVat:
-      unitPriceIncVat != null ? roundMoney(unitPriceIncVat) : roundMoney(saleItem?.unitPriceIncVat),
+      unitPriceIncVat != null
+        ? roundMoney(unitPriceIncVat)
+        : roundMoney(saleItem?.unitPriceIncVat),
     price: saleItem?.price != null ? roundMoney(saleItem.price) : roundMoney(unitPriceIncVat),
     amount: amount != null ? roundMoney(amount) : 0,
     totalAmount: amount != null ? roundMoney(amount) : roundMoney(saleItem?.totalAmount),
@@ -261,8 +263,22 @@ const buildSaleAllocationCandidate = (sale) => {
   };
 };
 
+const branchAddressInclude = {
+  subdistrict: {
+    include: {
+      district: {
+        include: {
+          province: true,
+        },
+      },
+    },
+  },
+};
+
 const receiptInclude = {
-  branch: true,
+  branch: {
+    include: branchAddressInclude,
+  },
   customer: true,
   createdByEmployeeProfile: true,
   cancelledByEmployeeProfile: true,
@@ -270,6 +286,9 @@ const receiptInclude = {
     include: {
       sale: {
         include: {
+          branch: {
+            include: branchAddressInclude,
+          },
           items: {
             include: {
               stockItem: {
@@ -457,10 +476,7 @@ const recalculateSalePaymentState = async (tx, saleId) => {
 const sendError = (res, error, fallbackMessage) => {
   const statusCode = error?.statusCode || 500;
 
-  if (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2025'
-  ) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
     return res.status(404).json({
       success: false,
       message: error?.message || 'ไม่พบข้อมูลที่ต้องการ',
@@ -669,8 +685,19 @@ const allocateCustomerReceipt = async (req, res) => {
           sale: {
             include: {
               items: {
-            include: {
-              stockItem: {
+                include: {
+                  stockItem: {
+                    include: {
+                      product: {
+                        include: {
+                          unit: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              simpleItems: {
                 include: {
                   product: {
                     include: {
@@ -679,17 +706,6 @@ const allocateCustomerReceipt = async (req, res) => {
                   },
                 },
               },
-            },
-          },
-          simpleItems: {
-            include: {
-              product: {
-                include: {
-                  unit: true,
-                },
-              },
-            },
-          },
             },
           },
           createdByEmployeeProfile: true,
@@ -777,27 +793,27 @@ const cancelCustomerReceipt = async (req, res) => {
               sale: {
                 include: {
                   items: {
-            include: {
-              stockItem: {
-                include: {
-                  product: {
                     include: {
-                      unit: true,
+                      stockItem: {
+                        include: {
+                          product: {
+                            include: {
+                              unit: true,
+                            },
+                          },
+                        },
+                      },
                     },
                   },
-                },
-              },
-            },
-          },
-          simpleItems: {
-            include: {
-              product: {
-                include: {
-                  unit: true,
-                },
-              },
-            },
-          },
+                  simpleItems: {
+                    include: {
+                      product: {
+                        include: {
+                          unit: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -977,9 +993,7 @@ const searchCustomerReceipts = async (req, res) => {
     const status = asNullableString(req.query?.status);
     const customerId = toInt(req.query?.customerId);
     const rawPaymentMethod = asNullableString(req.query?.paymentMethod);
-    const paymentMethod = rawPaymentMethod
-      ? normalizePaymentMethod(rawPaymentMethod)
-      : null;
+    const paymentMethod = rawPaymentMethod ? normalizePaymentMethod(rawPaymentMethod) : null;
     const fromDate = asDateOrNull(req.query?.fromDate);
     const toDate = asDateOrNull(req.query?.toDate);
     const page = Math.max(1, Number(req.query?.page) || 1);
@@ -1239,6 +1253,3 @@ module.exports = {
   searchCustomerReceipts,
   searchAllocationCandidates,
 };
-
-
-
