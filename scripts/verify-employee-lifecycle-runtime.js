@@ -9,12 +9,16 @@ const root = path.resolve(__dirname, '..');
 const syntaxFiles = [
   'middlewares/verifyToken.js',
   'controllers/employeeController.js',
-  'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'routes/authRoutes.js',
   'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
+  'src/modules/employee/controllers/employeeController.js',
+  'src/modules/employee/services/employeeService.js',
+  'src/modules/employee/repositories/employeeRepository.js',
+  'src/modules/employee/policies/employeeAuthorityPolicy.js',
+  'src/modules/employee/validators/employeeValidator.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -56,7 +60,7 @@ assertContains(verifyToken, "'EMPLOYEE_NOT_APPROVED'", 'verifyToken approval gua
 assertContains(verifyToken, "'EMPLOYEE_INACTIVE'", 'verifyToken active guard');
 assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId projection');
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
-assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
+assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole compatibility projection');
 
 const employeeRoutes = read('routes/employeeRoutes.js');
 assertContains(
@@ -78,8 +82,13 @@ assertNotContains(
 const authRoutes = read('routes/authRoutes.js');
 assertContains(
   authRoutes,
-  "require('../controllers/employeeOnboardingController')",
-  'auth route canonical onboarding controller'
+  "require('../src/modules/employee/controllers/employeeController')",
+  'auth route module employee controller'
+);
+assertNotContains(
+  authRoutes,
+  'employeeOnboardingController',
+  'legacy employee onboarding controller import'
 );
 assertContains(
   authRoutes,
@@ -87,15 +96,23 @@ assertContains(
   'canonical onboarding route guard'
 );
 
-const employeeOnboarding = read('controllers/employeeOnboardingController.js');
-assertContains(employeeOnboarding, 'canCreateEmployee', 'employee onboarding authority guard');
-assertContains(employeeOnboarding, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
-assertContains(employeeOnboarding, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
-assertContains(employeeOnboarding, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
-assertContains(employeeOnboarding, 'positionId,', 'employee onboarding position assignment');
-assertContains(employeeOnboarding, 'approved: true', 'owner-created employee auto approval');
-assertContains(employeeOnboarding, 'active: true', 'owner-created employee auto activation');
-assertContains(employeeOnboarding, 'enabled: true', 'owner-created employee user activation');
+const employeeController = read('src/modules/employee/controllers/employeeController.js');
+assertContains(employeeController, 'employeeService.createEmployee', 'module employee service delegation');
+assertContains(employeeController, 'EMPLOYEE_BRANCH_REQUIRED', 'employee branch-required response');
+assertContains(employeeController, 'positionId:', 'employee position response');
+assertContains(employeeController, 'role: created.user.role', 'employee system-role response');
+assertNotContains(employeeController, 'v2Role', 'module employee controller v2Role dependency');
+
+const employeeService = read('src/modules/employee/services/employeeService.js');
+assertContains(employeeService, 'canManageEmployees(actor)', 'employee authority policy use');
+assertContains(employeeService, 'validateCreateEmployeeInput(input)', 'employee validator use');
+assertContains(employeeService, 'findPositionByIdForBranch', 'branch-owned employee position lookup');
+assertContains(employeeService, "role: 'EMPLOYEE'", 'employee system role assignment');
+assertNotContains(employeeService, 'v2Role', 'employee service v2Role dependency');
+
+const employeeRepository = read('src/modules/employee/repositories/employeeRepository.js');
+assertContains(employeeRepository, 'where: { id, branchId }', 'branch-owned position repository guard');
+assertContains(employeeRepository, 'prisma.$transaction', 'employee repository transaction boundary');
 
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
