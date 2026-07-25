@@ -1878,3 +1878,49 @@ enum TaxPeriodStatus {
   SUBMITTED
   REOPENED
 }
+
+// ============================================================
+// TAX AUTHORITY FOUNDATION
+// Step 3.2A — Core Aggregate Skeleton
+// ============================================================
+
+model TaxDocument {
+  id           String             @id @default(cuid())
+  documentType TaxDocumentType
+  status       TaxLifecycleStatus @default(DRAFT)
+  version      Int                @default(1)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  sources TaxDocumentSource[]
+  events  TaxDocumentEvent[]
+}
+
+model TaxDocumentSource {
+  id            String        @id @default(cuid())
+  taxDocumentId String
+  sourceType    TaxSourceType
+  sourceId      String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+
+  @@index([taxDocumentId])
+  @@index([sourceType, sourceId])
+}
+
+model TaxDocumentEvent {
+  id            String       @id @default(cuid())
+  taxDocumentId String
+  eventType     TaxEventType
+  performedBy   String?
+  performedAt   DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+
+  @@index([taxDocumentId, performedAt])
+  @@index([eventType, performedAt])
+}
