@@ -14,10 +14,12 @@ const {
 const {
   getEligiblePurchaseOrdersForReceipt,
 } = require('../src/modules/procurement/purchaseOrder/query/eligibleForReceipt/purchaseOrderEligibleForReceiptController');
+const {
+  createPurchaseOrderHandler,
+} = require('../src/modules/procurement/purchaseOrder/create/purchaseOrderCreateController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
-  createPurchaseOrder,
   updatePurchaseOrder,
   deletePurchaseOrder,
   updatePurchaseOrderStatus,
@@ -33,7 +35,7 @@ const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.get('/', getPurchaseOrderList);
-router.post('/', createPurchaseOrder);
+router.post('/', createPurchaseOrderHandler);
 router.get('/by-supplier/:supplierId', getPurchaseOrdersBySupplierHandler);
 router.get('/by-supplier', getPurchaseOrdersBySupplierHandler);
 router.post('/with-advance', createPurchaseOrderWithAdvance);
