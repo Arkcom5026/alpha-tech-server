@@ -20,11 +20,13 @@ const {
 const {
   updatePurchaseOrderHandler,
 } = require('../src/modules/procurement/purchaseOrder/update/purchaseOrderUpdateController');
+const {
+  updatePurchaseOrderStatusHandler,
+} = require('../src/modules/procurement/purchaseOrder/status/purchaseOrderStatusController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
   deletePurchaseOrder,
-  updatePurchaseOrderStatus,
   createPurchaseOrderWithAdvance,
 } = require('../controllers/purchaseOrderController');
 
@@ -47,6 +49,6 @@ router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
 router.put('/:id', updatePurchaseOrderHandler);
 router.delete('/:id', deletePurchaseOrder);
 router.get('/:id', getPurchaseOrderById);
-router.patch('/:id/status', updatePurchaseOrderStatus);
+router.patch('/:id/status', updatePurchaseOrderStatusHandler);
 
 module.exports = router;
