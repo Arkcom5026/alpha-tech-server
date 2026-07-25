@@ -17,10 +17,12 @@ const {
 const {
   createPurchaseOrderHandler,
 } = require('../src/modules/procurement/purchaseOrder/create/purchaseOrderCreateController');
+const {
+  updatePurchaseOrderHandler,
+} = require('../src/modules/procurement/purchaseOrder/update/purchaseOrderUpdateController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
-  updatePurchaseOrder,
   deletePurchaseOrder,
   updatePurchaseOrderStatus,
   createPurchaseOrderWithAdvance,
@@ -42,7 +44,7 @@ router.post('/with-advance', createPurchaseOrderWithAdvance);
 
 router.get('/eligible-for-receipt', getEligiblePurchaseOrdersForReceipt);
 router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
-router.put('/:id', updatePurchaseOrder);
+router.put('/:id', updatePurchaseOrderHandler);
 router.delete('/:id', deletePurchaseOrder);
 router.get('/:id', getPurchaseOrderById);
 router.patch('/:id/status', updatePurchaseOrderStatus);
