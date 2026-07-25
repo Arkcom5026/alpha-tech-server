@@ -54,6 +54,11 @@ const {
 } = require('./application/taxAuthoritySubmissionRuntime');
 
 const {
+  TaxAuthoritySubmissionDispatcherError,
+  createTaxAuthoritySubmissionDispatcher,
+} = require('./application/taxAuthoritySubmissionDispatcher');
+
+const {
   TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
   TAX_DOCUMENT_STATUSES,
   TaxDocumentLifecycleTransitionError,
@@ -70,6 +75,20 @@ const {
   assertCanEnqueue,
   assertCanRetry,
 } = require('./policies/taxAuthoritySubmissionPolicy');
+
+const {
+  TaxAuthorityProviderError,
+  assertTaxAuthorityProvider,
+} = require('./providers/taxAuthorityProvider');
+
+const {
+  createMockTaxAuthorityProvider,
+} = require('./providers/mockTaxAuthorityProvider');
+
+const {
+  TaxAuthoritySubmissionQueueError,
+  createTaxAuthoritySubmissionQueue,
+} = require('./queue/taxAuthoritySubmissionQueue');
 
 const {
   createPrismaTaxDocumentPublisher,
@@ -90,7 +109,10 @@ module.exports = {
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_STATUSES,
   TAX_DOCUMENT_TYPES,
+  TaxAuthorityProviderError,
   TaxAuthoritySubmissionContractError,
+  TaxAuthoritySubmissionDispatcherError,
+  TaxAuthoritySubmissionQueueError,
   TaxAuthoritySubmissionRuntimeError,
   TaxAuthoritySubmissionTransitionError,
   TaxDocumentContractError,
@@ -104,14 +126,18 @@ module.exports = {
   assertCanEnqueue,
   assertCanIssue,
   assertCanRetry,
+  assertTaxAuthorityProvider,
   buildTaxDocumentDraft,
   cancelDocument,
   cancelSubmission,
   createCreditNote,
   createDebitNote,
+  createMockTaxAuthorityProvider,
   createPrismaTaxDocumentLifecyclePersistence,
   createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
+  createTaxAuthoritySubmissionDispatcher,
+  createTaxAuthoritySubmissionQueue,
   enqueueSubmission,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
