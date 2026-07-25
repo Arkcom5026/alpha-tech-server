@@ -89,8 +89,9 @@ POST /api/quick-stock/existing
 → StockBalance upsert
 
 GET /api/products/pos/search or Product List runtime
-→ routes/productRoutes.js
-→ controllers/productController.js
+→ routes/productRoutes.js (compatibility mount only)
+→ src/modules/product/routes/productModuleRoutes.js
+→ Product-owned query/controller/service/repository slices
 → Operational Product visible in current branch
 ```
 
@@ -125,6 +126,15 @@ Product Runtime List/Search
 Module-first / canonical:
 
 ```txt
+src/modules/product/routes/productModuleRoutes.js
+src/modules/product/query/
+src/modules/product/create/
+src/modules/product/update/
+src/modules/product/status/
+src/modules/product/delete/
+src/modules/product/imageDelete/
+src/modules/product/pricing/
+src/modules/product/migrateToSimple/
 src/modules/product/routes/templateProductSearchRoutes.js
 src/modules/product/controllers/templateProductSearchController.js
 src/modules/product/services/templateProductSearchService.js
@@ -135,26 +145,42 @@ src/modules/quickStock/controllers/quickStockController.js
 src/modules/quickStock/services/QuickStockService.js
 ```
 
-Legacy / hybrid runtime:
+Compatibility / adjacent runtime:
 
 ```txt
-routes/productRoutes.js
-controllers/productController.js
-routes/branchPriceRoutes.js
+routes/productRoutes.js             compatibility mount only
+routes/branchPriceRoutes.js         separate BranchPrice API surface
 controllers/branchPriceController.js
 routes/stockItemRoutes.js
 controllers/stockItemController.js
 ```
 
+Deprecated Product legacy implementation:
+
+```txt
+controllers/productController.js
+```
+
+This file has zero active Product route dependency after the Product Module Runtime cutover. It must not be restored as a runtime authority. Removal is permitted only after repository reference verification and dedicated deletion review.
+
 ### Migration Implication
 
-Mission B is not currently blocked by missing migration.
+Product runtime is now MODULE-CANONICAL.
+
+```txt
+routes/productRoutes.js
+→ compatibility mount only
+→ src/modules/product/routes/productModuleRoutes.js
+→ Product-owned runtime slices
+```
 
 The backend already has a strong module-first runtime through QuickStock `/existing`.
 
 Do not create a new parallel stock flow.
 
-Do not rewrite Product / BranchPrice / Stock controllers before B-07 verification.
+Do not restore Product runtime logic to `controllers/productController.js`.
+
+BranchPrice and Stock remain separate domains and must be migrated only through their own workflow-driven assignments.
 
 ### Current Next Assignment
 
@@ -181,11 +207,10 @@ After B-07 passes, decide:
 ```txt
 - Is /api/products/pos/create-from-template still needed?
 - Should it be marked temporary compatibility endpoint?
-- Should route-local handler move into module or be deprecated?
-- Is productController mapping ready for extraction?
+- Can routes/productRoutes.js be replaced by a direct server mount in a later cleanup?
 ```
 
-No deletion until dependency verification is complete.
+Legacy Product controller deletion is governed by repository reference verification, not by the old rule that Product must remain hybrid indefinitely.
 
 ## 4. Future Mission Mapping Template
 
@@ -228,8 +253,10 @@ Good assignment shape:
 ```txt
 Mission B / B-07
 Verify QuickStock existing receive creates branch operational product, BranchPrice, and stock from Template selection.
-No refactor allowed.
+No unrelated refactor allowed.
 ```
+
+A migration assignment is valid when it removes a verified legacy authority without changing the operational contract.
 
 ## 6. Relationship To Other Maps
 
@@ -245,7 +272,7 @@ MISSION_MAP.md     = How Mission crosses all of the above
 
 MISSION_MAP is the top-level workflow lens.
 
-If MISSION_MAP conflicts with a lower-level map, stop and update the stale document rather than guessing.
+If MISSION_MAP conflicts with verified runtime evidence, update the stale document. Documentation must follow runtime truth; stale protection rules must not override a completed, verified cutover.
 
 ## 7. Living Document Rule
 
@@ -258,4 +285,5 @@ Update this file whenever:
 - A Mission crosses a new domain.
 - A verification report changes the workflow status.
 - A compatibility endpoint becomes deprecated.
+- A module becomes canonical and legacy protection rules become stale.
 ```
