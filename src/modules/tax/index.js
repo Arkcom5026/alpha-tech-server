@@ -13,6 +13,12 @@ const {
 } = require('./contracts/createTaxDocumentCommand');
 
 const {
+  TAX_DOCUMENT_LIFECYCLE_ACTIONS,
+  TaxDocumentLifecycleContractError,
+  normalizeTaxDocumentLifecycleCommand,
+} = require('./contracts/taxDocumentLifecycleCommand');
+
+const {
   buildTaxDocumentDraft,
   stableHash,
 } = require('./factories/taxDocumentFactory');
@@ -27,21 +33,52 @@ const {
 } = require('./application/saleTaxProjectionRuntimeService');
 
 const {
+  TaxDocumentLifecycleRuntimeError,
+  cancelDocument,
+  createCreditNote,
+  createDebitNote,
+  issueDocument,
+} = require('./application/taxDocumentLifecycleRuntime');
+
+const {
+  TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
+  TAX_DOCUMENT_STATUSES,
+  TaxDocumentLifecycleTransitionError,
+  assertCanCancel,
+  assertCanCreateAdjustment,
+  assertCanIssue,
+} = require('./policies/taxDocumentLifecyclePolicy');
+
+const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
+  TAX_DOCUMENT_LIFECYCLE_ACTIONS,
+  TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
   TAX_DOCUMENT_SOURCE_TYPES,
+  TAX_DOCUMENT_STATUSES,
   TAX_DOCUMENT_TYPES,
   TaxDocumentContractError,
+  TaxDocumentLifecycleContractError,
+  TaxDocumentLifecycleRuntimeError,
+  TaxDocumentLifecycleTransitionError,
+  assertCanCancel,
+  assertCanCreateAdjustment,
+  assertCanIssue,
   buildTaxDocumentDraft,
+  cancelDocument,
+  createCreditNote,
+  createDebitNote,
   createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
+  issueDocument,
   normalizeTaxDocumentCommand,
+  normalizeTaxDocumentLifecycleCommand,
   projectCompletedSaleToTaxDocument,
   resolveTaxDocumentType,
   stableHash,
