@@ -8,13 +8,24 @@ const root = path.resolve(__dirname, '..');
 
 const syntaxFiles = [
   'middlewares/verifyToken.js',
-  'controllers/employeeController.js',
-  'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'routes/authRoutes.js',
-  'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
+  'server.js',
+  'src/modules/employee/routes/employeeRoutes.js',
+  'src/modules/employee/query/list/listEmployeeController.js',
+  'src/modules/employee/query/detail/detailEmployeeController.js',
+  'src/modules/employee/query/usersByRole/usersByRoleController.js',
+  'src/modules/employee/create/createEmployeeController.js',
+  'src/modules/employee/update/updateEmployeeController.js',
+  'src/modules/employee/status/statusEmployeeController.js',
+  'src/modules/employee/role/updateEmployeeRoleController.js',
+  'src/modules/employee/lookup/positions/positionLookupController.js',
+  'src/modules/employee/lookup/branches/branchLookupController.js',
+  'src/modules/employee/onboarding/onboardEmployeeController.js',
+  'src/modules/employee/onboarding/onboardEmployeeService.js',
+  'src/modules/employee/onboarding/onboardEmployeeRepository.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -58,7 +69,19 @@ assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId pro
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
 assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
-const employeeRoutes = read('routes/employeeRoutes.js');
+const server = read('server.js');
+assertContains(
+  server,
+  "require('./src/modules/employee/routes/employeeRoutes')",
+  'server employee module route cutover'
+);
+assertNotContains(
+  server,
+  "require('./routes/employeeRoutes')",
+  'server legacy employee route reference'
+);
+
+const employeeRoutes = read('src/modules/employee/routes/employeeRoutes.js');
 assertContains(
   employeeRoutes,
   'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
@@ -78,8 +101,13 @@ assertNotContains(
 const authRoutes = read('routes/authRoutes.js');
 assertContains(
   authRoutes,
+  "require('../src/modules/employee/onboarding/onboardEmployeeController')",
+  'auth route module onboarding controller'
+);
+assertNotContains(
+  authRoutes,
   "require('../controllers/employeeOnboardingController')",
-  'auth route canonical onboarding controller'
+  'auth route legacy onboarding controller reference'
 );
 assertContains(
   authRoutes,
@@ -87,15 +115,18 @@ assertContains(
   'canonical onboarding route guard'
 );
 
-const employeeOnboarding = read('controllers/employeeOnboardingController.js');
+const employeeOnboarding = read('src/modules/employee/onboarding/onboardEmployeeService.js');
 assertContains(employeeOnboarding, 'canCreateEmployee', 'employee onboarding authority guard');
 assertContains(employeeOnboarding, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
 assertContains(employeeOnboarding, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
 assertContains(employeeOnboarding, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
 assertContains(employeeOnboarding, 'positionId,', 'employee onboarding position assignment');
-assertContains(employeeOnboarding, 'approved: true', 'owner-created employee auto approval');
-assertContains(employeeOnboarding, 'active: true', 'owner-created employee auto activation');
-assertContains(employeeOnboarding, 'enabled: true', 'owner-created employee user activation');
+assertContains(employeeOnboarding, 'v2Role,', 'employee onboarding compatibility role assignment');
+
+const employeeOnboardingRepository = read('src/modules/employee/onboarding/onboardEmployeeRepository.js');
+assertContains(employeeOnboardingRepository, 'approved: true', 'owner-created employee auto approval');
+assertContains(employeeOnboardingRepository, 'active: true', 'owner-created employee auto activation');
+assertContains(employeeOnboardingRepository, 'enabled: true', 'owner-created employee user activation');
 
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
