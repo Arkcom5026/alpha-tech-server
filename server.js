@@ -34,7 +34,7 @@ const productTemplateRoutes = require('./src/modules/productTemplate/routes/prod
 const productProfileRoutes = require('./routes/productProfileRoutes');
 const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
-const productRoutes = require('./routes/productRoutes');
+const productModuleRoutes = require('./src/modules/product/routes/productModuleRoutes');
 const { productTraceRoutes } = require('./src/modules/product/trace');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
@@ -187,7 +187,7 @@ app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products/template', templateProductSearchRoutes);
 app.use('/api/products/trace', productTraceRoutes);
-app.use('/api/products', productRoutes);
+app.use('/api/products', productModuleRoutes);
 
 // Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
