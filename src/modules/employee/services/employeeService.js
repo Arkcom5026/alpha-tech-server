@@ -3,70 +3,49 @@
 
 const bcrypt = require('bcryptjs');
 const employeeRepository = require('../repositories/employeeRepository');
-
-const normalize = (value) => String(value || '').trim();
-const normalizeEmail = (value) => normalize(value).toLowerCase();
-const normalizeUpper = (value) => normalize(value).toUpperCase();
+const { canManageEmployees } = require('../policies/employeeAuthorityPolicy');
+const { validateCreateEmployeeInput } = require('../validators/employeeValidator');
 
 const toPositiveInt = (value) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-const canCreateEmployee = (actor = {}) => {
-  const systemRole = normalizeUpper(actor.role);
-  const employeeRole = normalizeUpper(actor.employeeRole);
-
-  return Boolean(
-    actor.isSuperAdmin
-      || systemRole === 'SUPERADMIN'
-      || systemRole === 'ADMIN'
-      || employeeRole === 'OWNER'
-      || employeeRole === 'MANAGER'
-  );
+const createDomainError = (code) => {
+  const error = new Error(code);
+  error.code = code;
+  return error;
 };
 
-const createEmployee = async ({ prisma, actor, input }) => {
-  if (!canCreateEmployee(actor)) {
-    const error = new Error('EMPLOYEE_CREATE_FORBIDDEN');
-    error.code = 'EMPLOYEE_CREATE_FORBIDDEN';
-    throw error;
+const createEmployee = async ({ actor, input }) => {
+  if (!canManageEmployees(actor)) {
+    throw createDomainError('EMPLOYEE_CREATE_FORBIDDEN');
   }
 
   const branchId = toPositiveInt(actor.branchId || actor.employeeProfile?.branchId);
-  const name = normalize(input.name);
-  const email = normalizeEmail(input.email);
-  const password = normalize(input.password);
-  const phone = normalize(input.phone) || null;
-  const positionId = toPositiveInt(input.positionId);
-
-  if (!name || !email || !password || !positionId) {
-    const error = new Error('EMPLOYEE_FIELDS_REQUIRED');
-    error.code = 'EMPLOYEE_FIELDS_REQUIRED';
-    throw error;
+  if (!branchId) {
+    throw createDomainError('EMPLOYEE_BRANCH_REQUIRED');
   }
 
-  if (password.length < 6) {
-    const error = new Error('EMPLOYEE_PASSWORD_TOO_SHORT');
-    error.code = 'EMPLOYEE_PASSWORD_TOO_SHORT';
-    throw error;
-  }
+  const {
+    name,
+    email,
+    password,
+    phone,
+    positionId,
+  } = validateCreateEmployeeInput(input);
 
   const [existingUser, position] = await Promise.all([
     employeeRepository.findEmployeeUserByEmail(email),
-    employeeRepository.findPositionById(positionId),
+    employeeRepository.findPositionByIdForBranch(positionId, branchId),
   ]);
 
   if (existingUser) {
-    const error = new Error('EMPLOYEE_EMAIL_ALREADY_EXISTS');
-    error.code = 'EMPLOYEE_EMAIL_ALREADY_EXISTS';
-    throw error;
+    throw createDomainError('EMPLOYEE_EMAIL_ALREADY_EXISTS');
   }
 
   if (!position) {
-    const error = new Error('EMPLOYEE_POSITION_NOT_FOUND');
-    error.code = 'EMPLOYEE_POSITION_NOT_FOUND';
-    throw error;
+    throw createDomainError('EMPLOYEE_POSITION_NOT_FOUND');
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
