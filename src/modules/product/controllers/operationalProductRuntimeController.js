@@ -1,5 +1,4 @@
 const {
-  createLocalOperationalProduct: createLocalOperationalProductService,
   createOperationalProductFromTemplate: createOperationalProductFromTemplateService,
   findOperationalProductById,
   findOperationalProductByTemplateId,
@@ -9,6 +8,9 @@ const {
   getReadyToSell: getReadyToSellService,
   getReadyToSellStructuredDetails: getReadyToSellStructuredDetailsService,
 } = require('../services/operationalProductRuntimeService')
+const {
+  createLocalOperationalProductForLegacyRuntime,
+} = require('../create/services/productCreateCompatibilityService')
 
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return undefined
@@ -18,8 +20,9 @@ const toInt = (value) => {
 
 const createLocalOperationalProduct = async (req, res) => {
   try {
-    const result = await createLocalOperationalProductService({
+    const result = await createLocalOperationalProductForLegacyRuntime({
       branchId: req.user?.branchId,
+      employeeId: req.employee?.id || req.user?.employeeId || null,
       data: req.body || {},
     })
 
