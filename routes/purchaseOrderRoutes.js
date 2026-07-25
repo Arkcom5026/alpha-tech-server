@@ -5,10 +5,12 @@ const router = express.Router();
 const {
   getPurchaseOrderList,
 } = require('../src/modules/procurement/purchaseOrder/query/list/purchaseOrderListController');
+const {
+  getPurchaseOrderById,
+} = require('../src/modules/procurement/purchaseOrder/query/detail/purchaseOrderDetailController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
-  getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
   deletePurchaseOrder,
