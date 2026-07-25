@@ -118,6 +118,7 @@ model Branch {
   warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
   salesTaxFilingBatches           SalesTaxFilingBatch[]
   taxDocuments                    TaxDocument[]
+  taxLedgerEntries                TaxLedgerEntry[]
   services                        ServiceOrder[]
   simpleLots                      SimpleLot[]
   stockAuditSession               StockAuditSession[]
@@ -1910,6 +1911,7 @@ model TaxDocument {
   cancellationDocuments TaxDocument[]       @relation("TaxDocumentCancellation")
   sources               TaxDocumentSource[]
   snapshot              TaxSnapshot?
+  ledgerEntries         TaxLedgerEntry[]
   events                TaxDocumentEvent[]
 
   @@unique([branchId, documentNumber])
@@ -1999,4 +2001,33 @@ model TaxSnapshotItem {
   snapshot TaxSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
 
   @@index([snapshotId, lineNo])
+}
+
+// ============================================================
+// TAX ACCOUNTING FOUNDATION
+// Step 3.4A — Tax Ledger
+// ============================================================
+
+model TaxLedgerEntry {
+  id            String        @id @default(cuid())
+  taxDocumentId String
+  branchId      Int
+  ledgerType    TaxLedgerType
+  postingDate   DateTime
+  effectiveDate DateTime
+  reportingDate DateTime?
+  taxBase       Decimal       @db.Decimal(18, 2)
+  vatAmount     Decimal       @db.Decimal(18, 2)
+  totalAmount   Decimal       @db.Decimal(18, 2)
+  version       Int           @default(1)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+  branch      Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([taxDocumentId, ledgerType])
+  @@index([branchId, postingDate])
+  @@index([ledgerType, postingDate])
+  @@index([reportingDate])
 }
