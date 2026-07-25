@@ -39,7 +39,7 @@ const { productTraceRoutes } = require('./src/modules/product/trace');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
-const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
+const purchaseOrderModuleRoutes = require('./src/modules/procurement/purchaseOrder/routes/purchaseOrderModuleRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
 const stockItemRoutes = require('./routes/stockItemRoutes');
@@ -194,7 +194,7 @@ app.use('/api/repairs', repairRoutes);
 // Backward compatibility for clients using the singular path
 app.use('/api/repair', repairRoutes);
 
-app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/purchase-orders', purchaseOrderModuleRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
