@@ -71,8 +71,8 @@ const verifyProjectionContract = () => {
   assert.equal(draft.document.status, 'DRAFT');
   assert.equal(draft.source.sourceType, 'SALE');
   assert.equal(draft.source.sourceId, '501');
-  assert.equal(draft.snapshot.totalAmount, 1070);
-  assert.equal(draft.snapshot.vatAmount, 70);
+  assert.equal(draft.snapshot.totalAmount, '1070.00');
+  assert.equal(draft.snapshot.vatAmount, '70.00');
   assert.equal(draft.event.metadata.commandKey, 'sale-complete-501');
   assert.equal(Object.isFrozen(draft), true);
 };
