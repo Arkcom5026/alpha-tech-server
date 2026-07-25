@@ -17,6 +17,11 @@ const {
   stableHash,
 } = require('./factories/taxDocumentFactory');
 
+const {
+  projectCompletedSaleToTaxDocument,
+  resolveTaxDocumentType,
+} = require('./projections/saleTaxDocumentProjection');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
@@ -27,5 +32,7 @@ module.exports = {
   isTaxDocumentSourceType,
   isTaxDocumentType,
   normalizeTaxDocumentCommand,
+  projectCompletedSaleToTaxDocument,
+  resolveTaxDocumentType,
   stableHash,
 };
