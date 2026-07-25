@@ -7,34 +7,21 @@ const productExistingModelPreviewRoutes = require('../src/modules/product/routes
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productController.getProductDropdowns)
-router.get('/online/search', productController.getProductsForOnline)
-router.get('/online/detail/:id', productController.getProductOnlineById)
+router.get('/online/search', operationalProductRuntimeController.getProductsForOnline)
+router.get('/online/detail/:id', operationalProductRuntimeController.getProductOnlineById)
 
 router.use(verifyToken)
 
 router.get('/dropdowns', productController.getProductDropdowns)
 router.use('/duplicate-preview', productExistingModelPreviewRoutes)
-router.get('/pos/search', productController.getProductsForPos)
-router.get('/pos/runtime-by-template/:templateProductId', productController.getOperationalProductByTemplateId)
+router.get('/pos/search', operationalProductRuntimeController.getProductsForPos)
+router.get('/pos/runtime-by-template/:templateProductId', operationalProductRuntimeController.getOperationalProductByTemplateId)
 router.post('/pos/create-local', operationalProductRuntimeController.createLocalOperationalProduct)
 router.post('/pos/create-from-template', operationalProductRuntimeController.createOperationalProductFromTemplate)
-router.get('/pos/:id', productController.getProductPosById)
+router.get('/pos/:id', operationalProductRuntimeController.getProductPosById)
 
-if (typeof productController.getReadyToSell === 'function') {
-  router.get('/ready-to-sell', productController.getReadyToSell)
-} else {
-  router.get('/ready-to-sell', (_req, res) =>
-    res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL' })
-  )
-}
-
-if (typeof productController.getReadyToSellStructuredDetails === 'function') {
-  router.get('/ready-to-sell/structured/:productId', productController.getReadyToSellStructuredDetails)
-} else {
-  router.get('/ready-to-sell/structured/:productId', (_req, res) =>
-    res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED_READY_TO_SELL_DETAILS' })
-  )
-}
+router.get('/ready-to-sell', operationalProductRuntimeController.getReadyToSell)
+router.get('/ready-to-sell/structured/:productId', operationalProductRuntimeController.getReadyToSellStructuredDetails)
 
 router.get('/', productController.getAllProducts)
 router.post('/', productController.createProduct)
@@ -43,7 +30,7 @@ router.post('/:id/disable', productController.disableProduct)
 router.post('/:id/enable', productController.enableProduct)
 router.get('/:id/delete-check', productController.getProductDeleteCheck)
 router.patch('/:id/archive', productController.archiveProduct)
-router.get('/:id', productController.getProductPosById)
+router.get('/:id', operationalProductRuntimeController.getProductPosById)
 router['delete']('/:id', productController.deleteProduct)
 router['delete']('/:id/images', productController.deleteProductImage)
 router.post('/:id/migrate-to-simple', productController.migrateSnToSimple)
