@@ -13,6 +13,7 @@
     "verify:tax-authority-submission-contract": "node scripts/verify-tax-authority-submission-contract.js",
     "verify:tax-authority-submission-runtime": "node scripts/verify-tax-authority-submission-runtime.js",
     "verify:tax-authority-provider-queue": "node scripts/verify-tax-authority-provider-queue.js",
+    "verify:tax-authority-submission-persistence": "node scripts/verify-tax-authority-submission-persistence.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
@@ -24,9 +25,7 @@
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dayjs": "^1.11.13",
-    "dotenv": "^16.5.0",
+    "cors": "^4.18.2",
     "express": "^4.18.2",
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.3",
