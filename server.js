@@ -34,10 +34,8 @@ const productTemplateRoutes = require('./src/modules/productTemplate/routes/prod
 const productProfileRoutes = require('./routes/productProfileRoutes');
 const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
-const productRoutes = require('./routes/productRoutes');
-const { productTraceRoutes } = require('./src/modules/product/trace');
+const { mountProductModule } = require('./src/modules/product');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
-const templateProductSearchRoutes = require('./src/modules/product/templateSearch/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
@@ -72,11 +70,6 @@ const stockRoutes = require('./routes/stockRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
-
-// 🟢 FIXED: แก้ตำแหน่งเพื่อให้เข้าถึงโฟลเดอร์ src/modules ได้อย่างถูกต้องตามรูปโครงสร้างในเครื่อง
-const quickStockRoutes = require('./src/modules/product/quickStock/routes/quickStockRoutes');
-const productCreateRoutes = require('./src/modules/product/create/routes/productCreateRoutes');
-
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -185,9 +178,7 @@ app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
-app.use('/api/products/template', templateProductSearchRoutes);
-app.use('/api/products/trace', productTraceRoutes);
-app.use('/api/products', productRoutes);
+mountProductModule(app);
 
 // Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
@@ -199,9 +190,6 @@ app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
-
-app.use('/api/quick-stock', quickStockRoutes);
-app.use('/api/product-create', productCreateRoutes);
 
 // Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
