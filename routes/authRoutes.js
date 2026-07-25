@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
-const employeeOnboardingController = require('../controllers/employeeOnboardingController');
+const employeeOnboardingController = require('../src/modules/employee/onboarding/onboardEmployeeController');
 
 const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
 const isProduction = process.env.NODE_ENV === 'production';
