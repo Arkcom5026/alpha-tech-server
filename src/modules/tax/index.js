@@ -99,6 +99,11 @@ const {
   createPrismaTaxDocumentLifecyclePersistence,
 } = require('./infrastructure/prismaTaxDocumentLifecyclePersistence');
 
+const {
+  TaxAuthoritySubmissionPersistenceError,
+  createPrismaTaxAuthoritySubmissionPersistence,
+} = require('./infrastructure/prismaTaxAuthoritySubmissionPersistence');
+
 module.exports = {
   TAX_AUTHORITY_SUBMISSION_ACTIONS,
   TAX_AUTHORITY_SUBMISSION_EVENT_TYPES,
@@ -112,6 +117,7 @@ module.exports = {
   TaxAuthorityProviderError,
   TaxAuthoritySubmissionContractError,
   TaxAuthoritySubmissionDispatcherError,
+  TaxAuthoritySubmissionPersistenceError,
   TaxAuthoritySubmissionQueueError,
   TaxAuthoritySubmissionRuntimeError,
   TaxAuthoritySubmissionTransitionError,
@@ -133,6 +139,7 @@ module.exports = {
   createCreditNote,
   createDebitNote,
   createMockTaxAuthorityProvider,
+  createPrismaTaxAuthoritySubmissionPersistence,
   createPrismaTaxDocumentLifecyclePersistence,
   createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
