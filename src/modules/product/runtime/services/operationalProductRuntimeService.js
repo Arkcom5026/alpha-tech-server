@@ -1,1 +1,3 @@
-module.exports = require('../../services/operationalProductRuntimeService')
+const runtimeService = require('../../services/operationalProductRuntimeService')
+
+module.exports = runtimeService
