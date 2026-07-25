@@ -9,6 +9,7 @@
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.test.js",
     "verify:tax-sale-completion": "node scripts/verify-tax-sale-completion-integration.js",
     "verify:tax-document-lifecycle": "node scripts/verify-tax-document-lifecycle.js",
+    "verify:tax-document-lifecycle-persistence": "node scripts/verify-tax-document-lifecycle-persistence.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
@@ -32,7 +33,7 @@
     "nodemailer": "^6.10.1",
     "pg": "^8.22.0",
     "socket.io": "^4.8.3",
-    "streamifier": "^1.0.1",
+    "streamifier": "^0.1.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
