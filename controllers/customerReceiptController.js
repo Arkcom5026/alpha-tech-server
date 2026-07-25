@@ -157,7 +157,7 @@ const normalizeSaleItemForPrint = (saleItem) => {
     saleItem?.subtotal ??
     saleItem?.netAmount ??
     saleItem?.grandTotal ??
-    (Number(unitPriceIncVat || 0) * Number(quantity || 0));
+    Number(unitPriceIncVat || 0) * Number(quantity || 0);
 
   return {
     ...saleItem,
@@ -190,7 +190,9 @@ const normalizeSaleItemForPrint = (saleItem) => {
     unitPrice:
       unitPriceIncVat != null ? roundMoney(unitPriceIncVat) : roundMoney(saleItem?.unitPrice),
     unitPriceIncVat:
-      unitPriceIncVat != null ? roundMoney(unitPriceIncVat) : roundMoney(saleItem?.unitPriceIncVat),
+      unitPriceIncVat != null
+        ? roundMoney(unitPriceIncVat)
+        : roundMoney(saleItem?.unitPriceIncVat),
     price: saleItem?.price != null ? roundMoney(saleItem.price) : roundMoney(unitPriceIncVat),
     amount: amount != null ? roundMoney(amount) : 0,
     totalAmount: amount != null ? roundMoney(amount) : roundMoney(saleItem?.totalAmount),
@@ -433,83 +435,107 @@ const ensureEmployeeBelongsToBranchOrThrow = async (tx, { employeeProfileId, bra
     where: {
       id: employeeProfileId,
       branchId,
-      active: true,
     },
     select: { id: true },
   });
 
   if (!employeeProfile) {
-    const error = new Error('พนักงานไม่มีสิทธิ์ทำรายการในสาขานี้');
-    error.statusCode = 403;
+    const error = new Error('ไม่พบพนักงานผู้ทำรายการในสาขานี้');
+    error.statusCode = 404;
     throw error;
   }
 };
 
-const parseSearchFilters = (query = {}) => {
-  const page = Math.max(toInt(query.page) || 1, 1);
-  const limit = Math.min(Math.max(toInt(query.limit) || DEFAULT_SEARCH_LIMIT, 1), MAX_SEARCH_LIMIT);
-  const keyword = asNullableString(query.keyword);
-  const status = asNullableString(query.status)?.toUpperCase();
-  const customerId = toInt(query.customerId);
-  const paymentMethod = normalizePaymentMethod(query.paymentMethod);
-  const fromDate = asDateOrNull(query.fromDate);
-  const toDate = asDateOrNull(query.toDate);
+const recalculateSalePaymentState = async (tx, saleId) => {
+  const sale = await tx.sale.findUnique({
+    where: { id: saleId },
+    select: {
+      id: true,
+      totalAmount: true,
+      paidAmount: true,
+    },
+  });
 
-  if (toDate) {
-    toDate.setHours(23, 59, 59, 999);
+  if (!sale) return null;
+
+  const nextPaidAmount = roundMoney(sale.paidAmount || 0);
+  const nextStatusPayment = deriveSalePaymentStatus({
+    totalAmount: sale.totalAmount,
+    paidAmount: nextPaidAmount,
+  });
+
+  return tx.sale.update({
+    where: { id: saleId },
+    data: {
+      paidAmount: nextPaidAmount,
+      statusPayment: nextStatusPayment,
+    },
+  });
+};
+
+const sendError = (res, error, fallbackMessage) => {
+  const statusCode = error?.statusCode || 500;
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    return res.status(404).json({
+      success: false,
+      message: error?.message || 'ไม่พบข้อมูลที่ต้องการ',
+    });
   }
 
-  return {
-    page,
-    limit,
-    keyword,
-    status,
-    customerId,
-    paymentMethod,
-    fromDate,
-    toDate,
-  };
+  const message = error?.message || fallbackMessage || 'เกิดข้อผิดพลาดภายในระบบ';
+
+  return res.status(statusCode).json({
+    success: false,
+    message,
+  });
 };
 
 const createCustomerReceipt = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const employeeProfileId = ensureEmployeeContext(req, res);
-  if (!employeeProfileId) return;
-
-  const customerId = toInt(req.body?.customerId);
-  const totalAmount = roundMoney(req.body?.totalAmount);
-  const paymentMethod = normalizePaymentMethod(req.body?.paymentMethod);
-  const receivedAt = asDateOrNull(req.body?.receivedAt) || new Date();
-  const note = asNullableString(req.body?.note);
-
-  if (!customerId) {
-    return res.status(400).json({ success: false, message: 'กรุณาเลือกลูกค้า' });
-  }
-
-  if (!isPositiveMoney(totalAmount)) {
-    return res.status(400).json({ success: false, message: 'ยอดรับชำระต้องมากกว่า 0' });
-  }
-
-  if (!paymentMethod) {
-    return res.status(400).json({ success: false, message: 'วิธีรับชำระไม่ถูกต้อง' });
-  }
-
   try {
-    const created = await prisma.$transaction(async (tx) => {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const employeeProfileId = ensureEmployeeContext(req, res);
+    if (!employeeProfileId) return;
+
+    const customerId = toInt(req.body?.customerId);
+    const totalAmount = roundMoney(req.body?.totalAmount);
+    const receivedAt = asDateOrNull(req.body?.receivedAt) || new Date();
+    const rawPaymentMethod = asNullableString(req.body?.paymentMethod);
+    const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
+    const referenceNo = asNullableString(req.body?.referenceNo);
+    const note = asNullableString(req.body?.note);
+
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุ customerId ให้ถูกต้อง' });
+    }
+
+    if (!isPositiveMoney(totalAmount)) {
+      return res.status(400).json({ success: false, message: 'totalAmount ต้องมากกว่า 0' });
+    }
+
+    if (!rawPaymentMethod) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุ paymentMethod' });
+    }
+
+    if (!paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentMethod ไม่ถูกต้อง',
+      });
+    }
+
+    const createdReceipt = await prisma.$transaction(async (tx) => {
       await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
 
       const customer = await tx.customerProfile.findFirst({
-        where: {
-          id: customerId,
-          branchId,
-        },
+        where: { id: customerId },
         select: { id: true },
       });
 
       if (!customer) {
-        const error = new Error('ไม่พบลูกค้าในสาขาปัจจุบัน');
+        const error = new Error('ไม่พบข้อมูลลูกค้าที่ต้องการรับชำระ');
         error.statusCode = 404;
         throw error;
       }
@@ -521,12 +547,14 @@ const createCustomerReceipt = async (req, res) => {
           code,
           branchId,
           customerId,
-          totalAmount: new Prisma.Decimal(totalAmount),
-          allocatedAmount: new Prisma.Decimal(0),
-          remainingAmount: new Prisma.Decimal(totalAmount),
-          paymentMethod,
           receivedAt,
+          totalAmount,
+          allocatedAmount: 0,
+          remainingAmount: totalAmount,
+          paymentMethod,
+          referenceNo,
           note,
+          status: RECEIPT_STATUS.ACTIVE,
           createdByEmployeeProfileId: employeeProfileId,
         },
         include: receiptInclude,
@@ -536,446 +564,692 @@ const createCustomerReceipt = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'สร้างรายการรับชำระเรียบร้อยแล้ว',
-      data: buildReceiptResponse(created),
+      data: buildReceiptResponse(createdReceipt),
     });
   } catch (error) {
-    const statusCode = error?.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถสร้างรายการรับชำระได้',
-    });
+    console.error('❌ [createCustomerReceipt] error:', error);
+    return sendError(res, error, 'ไม่สามารถสร้างรายการรับชำระได้');
   }
 };
 
 const getCustomerReceiptById = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const receiptId = toInt(req.params?.id);
-  if (!receiptId) {
-    return res.status(400).json({ success: false, message: 'เลขที่รายการรับชำระไม่ถูกต้อง' });
-  }
-
   try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const receiptId = toInt(req.params?.id);
+
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ success: false, message: 'receiptId ไม่ถูกต้อง' });
+    }
+
+    const receipt = await findReceiptOrThrow(prisma, { receiptId, branchId });
+
+    return res.status(200).json({
+      success: true,
+      data: buildReceiptResponse(receipt),
+    });
+  } catch (error) {
+    console.error('❌ [getCustomerReceiptById] error:', error);
+    return sendError(res, error, 'ไม่สามารถดึงรายละเอียดรายการรับชำระได้');
+  }
+};
+
+const allocateCustomerReceipt = async (req, res) => {
+  try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const employeeProfileId = ensureEmployeeContext(req, res);
+    if (!employeeProfileId) return;
+
+    const receiptId = toInt(req.params?.id);
+    const saleId = toInt(req.body?.saleId);
+    const amount = roundMoney(req.body?.amount);
+    const note = asNullableString(req.body?.note);
+
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ success: false, message: 'receiptId ไม่ถูกต้อง' });
+    }
+
+    if (!Number.isInteger(saleId) || saleId <= 0) {
+      return res.status(400).json({ success: false, message: 'saleId ไม่ถูกต้อง' });
+    }
+
+    if (!isPositiveMoney(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: 'จำนวนเงินที่ตัดชำระต้องมากกว่า 0',
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
+
+      const receipt = await findReceiptOrThrow(tx, { receiptId, branchId });
+
+      if (receipt.status === RECEIPT_STATUS.CANCELLED) {
+        const error = new Error('ไม่สามารถตัดชำระได้ เนื่องจากรายการรับชำระถูกยกเลิกแล้ว');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (
+        receipt.status === RECEIPT_STATUS.FULLY_ALLOCATED ||
+        roundMoney(receipt.remainingAmount) <= 0
+      ) {
+        const error = new Error('ใบรับชำระนี้ถูกตัดครบแล้ว');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const currentRemainingAmount = roundMoney(receipt.remainingAmount);
+
+      if (amount > currentRemainingAmount) {
+        const error = new Error('จำนวนเงินที่ตัดชำระมากกว่ายอดคงเหลือของใบรับชำระ');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const sale = await findSaleOrThrow(tx, { saleId, branchId });
+
+      if (receipt.customerId !== sale.customerId) {
+        const error = new Error('ไม่สามารถตัดชำระข้ามลูกค้าได้');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const saleOutstandingAmount = getSaleOutstandingAmount(sale);
+
+      if (saleOutstandingAmount <= 0) {
+        const error = new Error('บิลนี้ถูกชำระครบแล้ว');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (amount > saleOutstandingAmount) {
+        const error = new Error('จำนวนเงินที่ตัดชำระมากกว่ายอดค้างชำระของบิล');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const allocation = await tx.customerReceiptAllocation.create({
+        data: {
+          receiptId,
+          saleId,
+          amount,
+          note,
+          createdByEmployeeProfileId: employeeProfileId,
+        },
+        include: {
+          sale: {
+            include: {
+              items: {
+                include: {
+                  stockItem: {
+                    include: {
+                      product: {
+                        include: {
+                          unit: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              simpleItems: {
+                include: {
+                  product: {
+                    include: {
+                      unit: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          createdByEmployeeProfile: true,
+        },
+      });
+
+      const nextReceiptAllocatedAmount = roundMoney(
+        roundMoney(receipt.allocatedAmount || 0) + amount
+      );
+      const nextReceiptRemainingAmount = roundMoney(currentRemainingAmount - amount);
+
+      await tx.customerReceipt.update({
+        where: { id: receiptId },
+        data: {
+          allocatedAmount: nextReceiptAllocatedAmount,
+          remainingAmount: nextReceiptRemainingAmount,
+          status:
+            nextReceiptRemainingAmount <= 0
+              ? RECEIPT_STATUS.FULLY_ALLOCATED
+              : RECEIPT_STATUS.ACTIVE,
+        },
+      });
+
+      const nextSalePaidAmount = roundMoney(roundMoney(sale.paidAmount || 0) + amount);
+      await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          paidAmount: nextSalePaidAmount,
+          statusPayment: deriveSalePaymentStatus({
+            totalAmount: sale.totalAmount,
+            paidAmount: nextSalePaidAmount,
+          }),
+        },
+      });
+
+      const freshReceipt = await findReceiptOrThrow(tx, { receiptId, branchId });
+
+      return {
+        allocation: {
+          ...allocation,
+          amount: roundMoney(allocation.amount),
+          sale: normalizeAllocationSale(allocation.sale),
+        },
+        receipt: buildReceiptResponse(freshReceipt),
+      };
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'ตัดชำระจากใบรับเงินเรียบร้อยแล้ว',
+      data: result,
+    });
+  } catch (error) {
+    console.error('❌ [allocateCustomerReceipt] error:', error);
+    return sendError(res, error, 'ไม่สามารถตัดชำระจากใบรับเงินได้');
+  }
+};
+
+const cancelCustomerReceipt = async (req, res) => {
+  try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const employeeProfileId = ensureEmployeeContext(req, res);
+    if (!employeeProfileId) return;
+
+    const receiptId = toInt(req.params?.id);
+    const cancelReason = asNullableString(req.body?.cancelReason);
+
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ success: false, message: 'receiptId ไม่ถูกต้อง' });
+    }
+
+    const cancelledReceipt = await prisma.$transaction(async (tx) => {
+      await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
+
+      const receipt = await tx.customerReceipt.findFirst({
+        where: {
+          id: receiptId,
+          branchId,
+        },
+        include: {
+          allocations: {
+            include: {
+              sale: {
+                include: {
+                  items: {
+                    include: {
+                      stockItem: {
+                        include: {
+                          product: {
+                            include: {
+                              unit: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  simpleItems: {
+                    include: {
+                      product: {
+                        include: {
+                          unit: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { id: 'asc' },
+          },
+        },
+      });
+
+      if (!receipt) {
+        const error = new Error('ไม่พบรายการรับชำระที่ต้องการยกเลิก');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (receipt.status === RECEIPT_STATUS.CANCELLED) {
+        const error = new Error('รายการรับชำระนี้ถูกยกเลิกไปแล้ว');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      for (const allocation of receipt.allocations) {
+        const currentSalePaidAmount = roundMoney(allocation.sale?.paidAmount || 0);
+        const nextSalePaidAmount = roundMoney(
+          currentSalePaidAmount - roundMoney(allocation.amount)
+        );
+
+        await tx.sale.update({
+          where: { id: allocation.saleId },
+          data: {
+            paidAmount: nextSalePaidAmount < 0 ? 0 : nextSalePaidAmount,
+          },
+        });
+
+        await recalculateSalePaymentState(tx, allocation.saleId);
+      }
+
+      await tx.customerReceiptAllocation.deleteMany({
+        where: { receiptId },
+      });
+
+      const updatedReceipt = await tx.customerReceipt.update({
+        where: { id: receiptId },
+        data: {
+          status: RECEIPT_STATUS.CANCELLED,
+          allocatedAmount: 0,
+          remainingAmount: roundMoney(receipt.totalAmount),
+          cancelledAt: new Date(),
+          cancelledByEmployeeProfileId: employeeProfileId,
+          cancelReason,
+        },
+        include: receiptInclude,
+      });
+
+      return updatedReceipt;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'ยกเลิกรายการรับชำระเรียบร้อยแล้ว',
+      data: buildReceiptResponse(cancelledReceipt),
+    });
+  } catch (error) {
+    console.error('❌ [cancelCustomerReceipt] error:', error);
+    return sendError(res, error, 'ไม่สามารถยกเลิกรายการรับชำระได้');
+  }
+};
+
+const searchCustomersForReceipt = async (req, res) => {
+  try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const mode = String(req.query?.mode || 'NAME').trim().toUpperCase();
+    const keyword = asNullableString(req.query?.keyword);
+    const limit = Math.min(
+      MAX_SEARCH_LIMIT,
+      Math.max(1, Number(req.query?.limit) || DEFAULT_SEARCH_LIMIT)
+    );
+
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุคำค้นลูกค้า',
+      });
+    }
+
+    const normalizedKeyword = String(keyword).trim();
+    const digitsOnlyKeyword = normalizedKeyword.replace(/\D/g, '');
+
+    const where =
+      mode === 'PHONE'
+        ? {
+            user: {
+              loginId: {
+                contains: digitsOnlyKeyword || normalizedKeyword,
+                mode: 'insensitive',
+              },
+            },
+          }
+        : {
+            OR: [
+              {
+                name: {
+                  contains: normalizedKeyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                companyName: {
+                  contains: normalizedKeyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                taxId: {
+                  contains: normalizedKeyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                user: {
+                  loginId: {
+                    contains: digitsOnlyKeyword || normalizedKeyword,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            ],
+          };
+
+    const rows = await prisma.customerProfile.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        companyName: true,
+        taxId: true,
+        user: {
+          select: {
+            loginId: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+    });
+
+    const items = rows.map((item) => ({
+      id: item.id,
+      customerCode: null,
+      name: item.name || null,
+      companyName: item.companyName || null,
+      phone: item.user?.loginId || null,
+      email: item.user?.email || null,
+      taxId: item.taxId || null,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        items,
+      },
+    });
+  } catch (error) {
+    console.error('❌ [searchCustomersForReceipt] error:', error);
+    return sendError(res, error, 'ไม่สามารถค้นหาข้อมูลลูกค้าได้');
+  }
+};
+
+const searchCustomerReceipts = async (req, res) => {
+  try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const keyword = asNullableString(req.query?.keyword);
+    const status = asNullableString(req.query?.status);
+    const customerId = toInt(req.query?.customerId);
+    const rawPaymentMethod = asNullableString(req.query?.paymentMethod);
+    const paymentMethod = rawPaymentMethod ? normalizePaymentMethod(rawPaymentMethod) : null;
+    const fromDate = asDateOrNull(req.query?.fromDate);
+    const toDate = asDateOrNull(req.query?.toDate);
+    const page = Math.max(1, Number(req.query?.page) || 1);
+    const limit = Math.min(
+      MAX_SEARCH_LIMIT,
+      Math.max(1, Number(req.query?.limit) || DEFAULT_SEARCH_LIMIT)
+    );
+    const skip = (page - 1) * limit;
+
+    const where = { branchId };
+
+    if (status) where.status = status;
+    if (Number.isInteger(customerId) && customerId > 0) where.customerId = customerId;
+
+    if (rawPaymentMethod && !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentMethod ไม่ถูกต้อง',
+      });
+    }
+
+    if (paymentMethod) where.paymentMethod = paymentMethod;
+
+    if (fromDate || toDate) {
+      where.receivedAt = {};
+      if (fromDate) where.receivedAt.gte = fromDate;
+      if (toDate) {
+        const endOfDay = new Date(toDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        where.receivedAt.lte = endOfDay;
+      }
+    }
+
+    if (keyword) {
+      where.OR = [
+        {
+          code: {
+            contains: keyword,
+            mode: 'insensitive',
+          },
+        },
+        {
+          referenceNo: {
+            contains: keyword,
+            mode: 'insensitive',
+          },
+        },
+        {
+          note: {
+            contains: keyword,
+            mode: 'insensitive',
+          },
+        },
+        {
+          customer: {
+            OR: [
+              {
+                name: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                companyName: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                taxId: {
+                  contains: keyword,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          },
+        },
+      ];
+    }
+
+    const [total, items] = await prisma.$transaction([
+      prisma.customerReceipt.count({ where }),
+      prisma.customerReceipt.findMany({
+        where,
+        include: receiptListInclude,
+        orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        items: items.map(buildReceiptResponse),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('❌ [searchCustomerReceipts] error:', error);
+    return sendError(res, error, 'ไม่สามารถค้นหารายการรับชำระได้');
+  }
+};
+
+const searchAllocationCandidates = async (req, res) => {
+  try {
+    const branchId = ensureBranchContext(req, res);
+    if (!branchId) return;
+
+    const receiptId = toInt(req.params?.id);
+    const keyword = asNullableString(req.query?.keyword);
+    const fromDate = asDateOrNull(req.query?.fromDate);
+    const toDate = asDateOrNull(req.query?.toDate);
+    const limit = Math.min(
+      MAX_CANDIDATE_LIMIT,
+      Math.max(1, Number(req.query?.limit) || DEFAULT_CANDIDATE_LIMIT)
+    );
+
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ success: false, message: 'receiptId ไม่ถูกต้อง' });
+    }
+
     const receipt = await prisma.customerReceipt.findFirst({
       where: {
         id: receiptId,
         branchId,
       },
-      include: receiptInclude,
+      select: {
+        id: true,
+        customerId: true,
+        status: true,
+        remainingAmount: true,
+      },
     });
 
     if (!receipt) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการรับชำระที่ต้องการ' });
     }
 
-    return res.json({
-      success: true,
-      data: buildReceiptResponse(receipt),
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถโหลดรายละเอียดรายการรับชำระได้',
-    });
-  }
-};
+    if (receipt.status === RECEIPT_STATUS.CANCELLED) {
+      return res.status(400).json({
+        success: false,
+        message: 'รายการรับชำระนี้ถูกยกเลิกแล้ว',
+      });
+    }
 
-const searchCustomerReceipts = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
+    const where = {
+      branchId,
+      customerId: receipt.customerId,
+      OR: [
+        { statusPayment: SALE_PAYMENT_STATUS_MAP.UNPAID },
+        { statusPayment: SALE_PAYMENT_STATUS_MAP.PARTIALLY_PAID },
+      ],
+    };
 
-  const filters = parseSearchFilters(req.query);
-  const where = {
-    branchId,
-    ...(filters.keyword
-      ? {
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) where.createdAt.gte = fromDate;
+      if (toDate) {
+        const endOfDay = new Date(toDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        where.createdAt.lte = endOfDay;
+      }
+    }
+
+    if (keyword) {
+      where.AND = [
+        {
           OR: [
-            { code: { contains: filters.keyword, mode: 'insensitive' } },
-            { customer: { name: { contains: filters.keyword, mode: 'insensitive' } } },
-            { customer: { companyName: { contains: filters.keyword, mode: 'insensitive' } } },
+            {
+              code: {
+                contains: keyword,
+                mode: 'insensitive',
+              },
+            },
+            {
+              note: {
+                contains: keyword,
+                mode: 'insensitive',
+              },
+            },
+            {
+              customer: {
+                OR: [
+                  {
+                    name: {
+                      contains: keyword,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    companyName: {
+                      contains: keyword,
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
+            },
           ],
-        }
-      : {}),
-    ...(filters.status ? { status: filters.status } : {}),
-    ...(filters.customerId ? { customerId: filters.customerId } : {}),
-    ...(filters.paymentMethod ? { paymentMethod: filters.paymentMethod } : {}),
-    ...(filters.fromDate || filters.toDate
-      ? {
-          receivedAt: {
-            ...(filters.fromDate ? { gte: filters.fromDate } : {}),
-            ...(filters.toDate ? { lte: filters.toDate } : {}),
-          },
-        }
-      : {}),
-  };
-
-  try {
-    const [items, total] = await prisma.$transaction([
-      prisma.customerReceipt.findMany({
-        where,
-        include: receiptListInclude,
-        orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
-      }),
-      prisma.customerReceipt.count({ where }),
-    ]);
-
-    return res.json({
-      success: true,
-      data: {
-        items: items.map(buildReceiptResponse),
-        pagination: {
-          total,
-          page: filters.page,
-          limit: filters.limit,
-          totalPages: Math.max(Math.ceil(total / filters.limit), 1),
         },
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถค้นหารายการรับชำระได้',
-    });
-  }
-};
+      ];
+    }
 
-const searchCustomerProfiles = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const keyword = asNullableString(req.query?.keyword);
-  const mode = asNullableString(req.query?.mode)?.toUpperCase() || 'NAME';
-
-  if (!keyword) {
-    return res.status(400).json({ success: false, message: 'กรุณากรอกคำค้นลูกค้า' });
-  }
-
-  const where = {
-    branchId,
-    ...(mode === 'PHONE'
-      ? {
-          OR: [
-            { phone: { contains: keyword } },
-            { user: { loginId: { contains: keyword } } },
-          ],
-        }
-      : {
-          OR: [
-            { name: { contains: keyword, mode: 'insensitive' } },
-            { companyName: { contains: keyword, mode: 'insensitive' } },
-          ],
-        }),
-  };
-
-  try {
-    const items = await prisma.customerProfile.findMany({
+    const items = await prisma.sale.findMany({
       where,
-      include: {
-        user: {
-          select: {
-            loginId: true,
-          },
-        },
+      select: {
+        id: true,
+        code: true,
+        createdAt: true,
+        dueDate: true,
+        totalAmount: true,
+        paidAmount: true,
+        statusPayment: true,
+        note: true,
+        customerId: true,
+        customer: true,
+        employee: true,
       },
-      orderBy: [{ companyName: 'asc' }, { name: 'asc' }],
-      take: 50,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
     });
 
-    return res.json({ success: true, data: { items } });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถค้นหาลูกค้าได้',
-    });
-  }
-};
-
-const getAllocationCandidates = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const receiptId = toInt(req.params?.id);
-  if (!receiptId) {
-    return res.status(400).json({ success: false, message: 'เลขที่รายการรับชำระไม่ถูกต้อง' });
-  }
-
-  const page = Math.max(toInt(req.query?.page) || 1, 1);
-  const limit = Math.min(
-    Math.max(toInt(req.query?.limit) || DEFAULT_CANDIDATE_LIMIT, 1),
-    MAX_CANDIDATE_LIMIT
-  );
-
-  try {
-    const receipt = await findReceiptOrThrow(prisma, { receiptId, branchId });
-    const remainingAmount = roundMoney(receipt.remainingAmount);
-
-    const [sales, total] = await prisma.$transaction([
-      prisma.sale.findMany({
-        where: {
-          branchId,
-          customerId: receipt.customerId,
-          status: 'COMPLETED',
-          statusPayment: {
-            in: [SALE_PAYMENT_STATUS_MAP.UNPAID, SALE_PAYMENT_STATUS_MAP.PARTIALLY_PAID],
-          },
-        },
-        include: {
-          customer: true,
-        },
-        orderBy: [{ soldAt: 'asc' }, { id: 'asc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.sale.count({
-        where: {
-          branchId,
-          customerId: receipt.customerId,
-          status: 'COMPLETED',
-          statusPayment: {
-            in: [SALE_PAYMENT_STATUS_MAP.UNPAID, SALE_PAYMENT_STATUS_MAP.PARTIALLY_PAID],
-          },
-        },
-      }),
-    ]);
-
-    const candidates = sales
+    const normalizedItems = items
       .map(buildSaleAllocationCandidate)
-      .filter((sale) => sale.outstandingAmount > 0);
+      .filter((item) => item.outstandingAmount > 0);
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: {
-        receipt: buildReceiptResponse(receipt),
-        items: candidates,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.max(Math.ceil(total / limit), 1),
+        receipt: {
+          id: receipt.id,
+          customerId: receipt.customerId,
+          status: receipt.status,
+          remainingAmount: roundMoney(receipt.remainingAmount),
         },
-        summary: {
-          receiptRemainingAmount: remainingAmount,
-          candidateOutstandingAmount: roundMoney(
-            candidates.reduce((sum, sale) => sum + sale.outstandingAmount, 0)
-          ),
-        },
+        items: normalizedItems,
       },
     });
   } catch (error) {
-    const statusCode = error?.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถโหลดบิลค้างชำระได้',
-    });
-  }
-};
-
-const allocateCustomerReceipt = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const employeeProfileId = ensureEmployeeContext(req, res);
-  if (!employeeProfileId) return;
-
-  const receiptId = toInt(req.params?.id);
-  const saleId = toInt(req.body?.saleId);
-  const amount = roundMoney(req.body?.amount);
-  const note = asNullableString(req.body?.note);
-
-  if (!receiptId || !saleId) {
-    return res.status(400).json({ success: false, message: 'ข้อมูลรายการรับชำระหรือบิลขายไม่ถูกต้อง' });
-  }
-
-  if (!isPositiveMoney(amount)) {
-    return res.status(400).json({ success: false, message: 'ยอดตัดชำระต้องมากกว่า 0' });
-  }
-
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
-
-      const receipt = await findReceiptOrThrow(tx, { receiptId, branchId });
-      if (receipt.status === RECEIPT_STATUS.CANCELLED) {
-        const error = new Error('ไม่สามารถตัดชำระจากรายการที่ยกเลิกแล้ว');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      const sale = await findSaleOrThrow(tx, { saleId, branchId });
-      if (sale.customerId !== receipt.customerId) {
-        const error = new Error('บิลขายและรายการรับชำระต้องเป็นลูกค้ารายเดียวกัน');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      const outstandingAmount = getSaleOutstandingAmount(sale);
-      if (outstandingAmount <= 0) {
-        const error = new Error('บิลขายนี้ชำระครบแล้ว');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      if (amount > roundMoney(receipt.remainingAmount)) {
-        const error = new Error('ยอดตัดชำระมากกว่ายอดคงเหลือของรายการรับชำระ');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      if (amount > outstandingAmount) {
-        const error = new Error('ยอดตัดชำระมากกว่ายอดค้างของบิลขาย');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      await tx.customerReceiptAllocation.create({
-        data: {
-          customerReceiptId: receiptId,
-          saleId,
-          amount: new Prisma.Decimal(amount),
-          note,
-          createdByEmployeeProfileId: employeeProfileId,
-        },
-      });
-
-      const nextAllocatedAmount = roundMoney(receipt.allocatedAmount + amount);
-      const nextRemainingAmount = computeRemainingAmount({
-        totalAmount: receipt.totalAmount,
-        allocatedAmount: nextAllocatedAmount,
-      });
-      const nextReceiptStatus =
-        nextRemainingAmount <= 0 ? RECEIPT_STATUS.FULLY_ALLOCATED : RECEIPT_STATUS.ACTIVE;
-
-      const nextPaidAmount = roundMoney(sale.paidAmount + amount);
-      const nextSalePaymentStatus = deriveSalePaymentStatus({
-        totalAmount: sale.totalAmount,
-        paidAmount: nextPaidAmount,
-      });
-
-      await tx.customerReceipt.update({
-        where: { id: receiptId },
-        data: {
-          allocatedAmount: new Prisma.Decimal(nextAllocatedAmount),
-          remainingAmount: new Prisma.Decimal(nextRemainingAmount),
-          status: nextReceiptStatus,
-        },
-      });
-
-      await tx.sale.update({
-        where: { id: saleId },
-        data: {
-          paidAmount: new Prisma.Decimal(nextPaidAmount),
-          statusPayment: nextSalePaymentStatus,
-        },
-      });
-
-      const updatedReceipt = await findReceiptOrThrow(tx, { receiptId, branchId });
-
-      return {
-        receipt: buildReceiptResponse(updatedReceipt),
-        sale: buildSaleAllocationCandidate({
-          ...sale,
-          paidAmount: nextPaidAmount,
-          statusPayment: nextSalePaymentStatus,
-        }),
-      };
-    });
-
-    return res.json({
-      success: true,
-      message: 'ตัดชำระจากใบรับเงินเรียบร้อยแล้ว',
-      data: result,
-    });
-  } catch (error) {
-    const statusCode = error?.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถตัดชำระได้',
-    });
-  }
-};
-
-const cancelCustomerReceipt = async (req, res) => {
-  const branchId = ensureBranchContext(req, res);
-  if (!branchId) return;
-
-  const employeeProfileId = ensureEmployeeContext(req, res);
-  if (!employeeProfileId) return;
-
-  const receiptId = toInt(req.params?.id);
-  const reason = asNullableString(req.body?.reason || req.body?.note);
-
-  if (!receiptId) {
-    return res.status(400).json({ success: false, message: 'เลขที่รายการรับชำระไม่ถูกต้อง' });
-  }
-
-  if (!reason) {
-    return res.status(400).json({ success: false, message: 'กรุณาระบุเหตุผลที่ยกเลิกรายการรับชำระ' });
-  }
-
-  try {
-    const updatedReceipt = await prisma.$transaction(async (tx) => {
-      await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
-
-      const receipt = await findReceiptOrThrow(tx, { receiptId, branchId });
-      if (receipt.status === RECEIPT_STATUS.CANCELLED) {
-        const error = new Error('รายการรับชำระนี้ถูกยกเลิกแล้ว');
-        error.statusCode = 409;
-        throw error;
-      }
-
-      for (const allocation of receipt.allocations || []) {
-        const sale = await findSaleOrThrow(tx, { saleId: allocation.saleId, branchId });
-        const nextPaidAmount = Math.max(roundMoney(sale.paidAmount - allocation.amount), 0);
-        const nextSalePaymentStatus = deriveSalePaymentStatus({
-          totalAmount: sale.totalAmount,
-          paidAmount: nextPaidAmount,
-        });
-
-        await tx.sale.update({
-          where: { id: sale.id },
-          data: {
-            paidAmount: new Prisma.Decimal(nextPaidAmount),
-            statusPayment: nextSalePaymentStatus,
-          },
-        });
-      }
-
-      await tx.customerReceipt.update({
-        where: { id: receiptId },
-        data: {
-          status: RECEIPT_STATUS.CANCELLED,
-          cancelledAt: new Date(),
-          cancelledByEmployeeProfileId: employeeProfileId,
-          cancelReason: reason,
-        },
-      });
-
-      return findReceiptOrThrow(tx, { receiptId, branchId });
-    });
-
-    return res.json({
-      success: true,
-      message: 'ยกเลิกรายการรับชำระเรียบร้อยแล้ว',
-      data: buildReceiptResponse(updatedReceipt),
-    });
-  } catch (error) {
-    const statusCode = error?.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error?.message || 'ไม่สามารถยกเลิกรายการรับชำระได้',
-    });
+    console.error('❌ [searchAllocationCandidates] error:', error);
+    return sendError(res, error, 'ไม่สามารถค้นหารายการบิลที่ใช้ตัดชำระได้');
   }
 };
 
 module.exports = {
   createCustomerReceipt,
   getCustomerReceiptById,
-  searchCustomerReceipts,
-  searchCustomerProfiles,
-  getAllocationCandidates,
   allocateCustomerReceipt,
   cancelCustomerReceipt,
+  searchCustomersForReceipt,
+  searchCustomerReceipts,
+  searchAllocationCandidates,
 };
