@@ -41,7 +41,7 @@ const resolveTaxDocumentType = (sale) => {
     return TAX_DOCUMENT_TYPES.TAX_INVOICE;
   }
 
-  return TAX_DOCUMENT_TYPES.RECEIPT_TAX_INVOICE;
+  return TAX_DOCUMENT_TYPES.ABBREVIATED_TAX_INVOICE;
 };
 
 const projectCompletedSaleToTaxDocument = ({
