@@ -119,6 +119,7 @@ model Branch {
   salesTaxFilingBatches           SalesTaxFilingBatch[]
   taxDocuments                    TaxDocument[]
   taxLedgerEntries                TaxLedgerEntry[]
+  taxPeriods                      TaxPeriod[]
   services                        ServiceOrder[]
   simpleLots                      SimpleLot[]
   stockAuditSession               StockAuditSession[]
@@ -2012,6 +2013,7 @@ model TaxLedgerEntry {
   id            String        @id @default(cuid())
   taxDocumentId String
   branchId      Int
+  taxPeriodId   String?
   ledgerType    TaxLedgerType
   postingDate   DateTime
   effectiveDate DateTime
@@ -2025,9 +2027,39 @@ model TaxLedgerEntry {
 
   taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
   branch      Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  taxPeriod   TaxPeriod?  @relation(fields: [taxPeriodId], references: [id], onDelete: Restrict)
 
   @@unique([taxDocumentId, ledgerType])
   @@index([branchId, postingDate])
   @@index([ledgerType, postingDate])
   @@index([reportingDate])
+  @@index([taxPeriodId])
+  @@index([taxPeriodId, ledgerType])
+}
+
+// ============================================================
+// TAX ACCOUNTING FOUNDATION
+// Step 3.4B — Tax Period
+// ============================================================
+
+model TaxPeriod {
+  id          String          @id @default(cuid())
+  branchId    Int
+  periodCode  String
+  startDate   DateTime
+  endDate     DateTime
+  status      TaxPeriodStatus @default(OPEN)
+  closedAt    DateTime?
+  submittedAt DateTime?
+  reopenedAt  DateTime?
+  lockedAt    DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  branch        Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  ledgerEntries TaxLedgerEntry[]
+
+  @@unique([branchId, periodCode])
+  @@index([branchId, status])
+  @@index([startDate, endDate])
 }
