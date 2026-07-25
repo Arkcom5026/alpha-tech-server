@@ -53,6 +53,11 @@ const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
+const {
+  TaxDocumentLifecyclePersistenceError,
+  createPrismaTaxDocumentLifecyclePersistence,
+} = require('./infrastructure/prismaTaxDocumentLifecyclePersistence');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_LIFECYCLE_ACTIONS,
@@ -62,6 +67,7 @@ module.exports = {
   TAX_DOCUMENT_TYPES,
   TaxDocumentContractError,
   TaxDocumentLifecycleContractError,
+  TaxDocumentLifecyclePersistenceError,
   TaxDocumentLifecycleRuntimeError,
   TaxDocumentLifecycleTransitionError,
   assertCanCancel,
@@ -71,6 +77,7 @@ module.exports = {
   cancelDocument,
   createCreditNote,
   createDebitNote,
+  createPrismaTaxDocumentLifecyclePersistence,
   createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
   isTaxDocumentDirection,
