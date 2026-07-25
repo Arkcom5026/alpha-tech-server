@@ -1,7 +1,6 @@
 const express = require('express')
 const router = express.Router()
 
-const productController = require('../controllers/productController')
 const productCatalogController = require('../src/modules/product/catalog/controllers/productCatalogController')
 const productCreateLegacyCompatibilityController = require('../src/modules/product/create/controllers/productCreateLegacyCompatibilityController')
 const productCreateDropdownCompatibilityController = require('../src/modules/product/create/controllers/productCreateDropdownCompatibilityController')
@@ -12,6 +11,7 @@ const productMaintenanceController = require('../src/modules/product/maintenance
 const productPricingController = require('../src/modules/product/pricing/controllers/productPricingController')
 const productMediaController = require('../src/modules/product/media/controllers/productMediaController')
 const productLifecycleController = require('../src/modules/product/lifecycle/controllers/productLifecycleController')
+const productStockModeMigrationController = require('../src/modules/product/stockModeMigration/controllers/productStockModeMigrationController')
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
@@ -41,7 +41,7 @@ router.patch('/:id/archive', productLifecycleController.archiveProduct)
 router.get('/:id', operationalProductRuntimeController.getProductPosById)
 router['delete']('/:id', productLifecycleController.deleteProduct)
 router['delete']('/:id/images', productMediaController.deleteProductImage)
-router.post('/:id/migrate-to-simple', productController.migrateSnToSimple)
+router.post('/:id/migrate-to-simple', productStockModeMigrationController.migrateSnToSimple)
 
 router.get('/:productId/prices', productPricingController.getProductPrices)
 router.put('/:productId/prices', productPricingController.updateProductPrices)
