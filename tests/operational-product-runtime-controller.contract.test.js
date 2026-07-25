@@ -41,6 +41,13 @@ const loadController = (serviceOverrides) => {
 const run = async () => {
   let localInput = null
   let templateInput = null
+  let posSearchInput = null
+  let runtimeLookupInput = null
+  let posDetailInput = null
+  let onlineSearchInput = null
+  let onlineDetailInput = null
+  let readyInput = null
+  let readyDetailInput = null
 
   const controller = loadController({
     createLocalOperationalProduct: async (input) => {
@@ -50,6 +57,34 @@ const run = async () => {
     createOperationalProductFromTemplate: async (input) => {
       templateInput = input
       return { success: true, created: true, statusCode: 201, product: { id: 202 } }
+    },
+    findOperationalProductsForPOS: async (input) => {
+      posSearchInput = input
+      return [{ id: 1 }]
+    },
+    findOperationalProductByTemplateId: async (input) => {
+      runtimeLookupInput = input
+      return { success: true, exists: true }
+    },
+    findOperationalProductById: async (input) => {
+      posDetailInput = input
+      return { id: 2 }
+    },
+    findOperationalProductsForOnline: async (input) => {
+      onlineSearchInput = input
+      return [{ id: 3 }]
+    },
+    findOperationalProductOnlineById: async (input) => {
+      onlineDetailInput = input
+      return { id: 4 }
+    },
+    getReadyToSell: async (input) => {
+      readyInput = input
+      return { items: [] }
+    },
+    getReadyToSellStructuredDetails: async (input) => {
+      readyDetailInput = input
+      return { items: [] }
     },
   })
 
@@ -89,6 +124,143 @@ const run = async () => {
       product: { id: 202 },
     })
     assert.equal('statusCode' in res.state.payload, false)
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getProductsForPos(
+      {
+        user: { branchId: 5 },
+        query: {
+          searchText: 'ssd',
+          take: '20',
+          page: '2',
+          productTypeId: '8',
+          brandId: '3',
+          readyOnly: 'true',
+          hasPrice: 'true',
+          activeOnly: 'false',
+          includeInactive: '1',
+          mode: 'SIMPLE',
+          simpleOnly: '1',
+        },
+      },
+      res
+    )
+
+    assert.deepEqual(posSearchInput, {
+      branchId: 5,
+      search: 'ssd',
+      take: '20',
+      page: '2',
+      productTypeId: '8',
+      brandId: '3',
+      readyOnly: 'true',
+      hasPrice: 'true',
+      activeOnly: 'false',
+      includeInactive: '1',
+      mode: 'SIMPLE',
+      simpleOnly: '1',
+    })
+    assert.deepEqual(res.state.payload, [{ id: 1 }])
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getOperationalProductByTemplateId(
+      { user: { branchId: 5 }, params: { templateProductId: '77' }, query: {} },
+      res
+    )
+    assert.deepEqual(runtimeLookupInput, { branchId: 5, templateProductId: '77' })
+    assert.deepEqual(res.state.payload, { success: true, exists: true })
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getProductPosById(
+      { user: { branchId: 5 }, params: { id: '12' } },
+      res
+    )
+    assert.deepEqual(posDetailInput, { branchId: 5, productId: '12' })
+    assert.deepEqual(res.state.payload, { id: 2 })
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getProductsForOnline(
+      {
+        user: {},
+        query: {
+          branchId: '6',
+          search: 'mouse',
+          take: '10',
+          size: '15',
+          page: '1',
+          productTypeId: '2',
+          brandId: '4',
+          readyOnly: 'true',
+          hasPrice: 'true',
+          mode: 'STRUCTURED',
+          simpleOnly: '0',
+        },
+      },
+      res
+    )
+    assert.deepEqual(onlineSearchInput, {
+      branchId: 6,
+      search: 'mouse',
+      take: '10',
+      size: '15',
+      page: '1',
+      productTypeId: '2',
+      brandId: '4',
+      readyOnly: 'true',
+      hasPrice: 'true',
+      mode: 'STRUCTURED',
+      simpleOnly: '0',
+    })
+    assert.deepEqual(res.state.payload, [{ id: 3 }])
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getProductOnlineById(
+      { user: {}, query: { branchId: '6' }, params: { id: '99' } },
+      res
+    )
+    assert.deepEqual(onlineDetailInput, { branchId: 6, productId: '99' })
+    assert.deepEqual(res.state.payload, { id: 4 })
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getReadyToSell(
+      {
+        user: { branchId: 5 },
+        query: { q: 'abc', search: 'x', searchText: 'y', mode: 'SIMPLE', page: '2', pageSize: '25' },
+      },
+      res
+    )
+    assert.deepEqual(readyInput, {
+      branchId: 5,
+      q: 'abc',
+      search: 'x',
+      searchText: 'y',
+      mode: 'SIMPLE',
+      page: '2',
+      pageSize: '25',
+    })
+    assert.deepEqual(res.state.payload, { items: [] })
+  }
+
+  {
+    const res = makeResponse()
+    await controller.getReadyToSellStructuredDetails(
+      { user: { branchId: 5 }, params: { productId: '45' }, query: { q: 'SN001' } },
+      res
+    )
+    assert.deepEqual(readyDetailInput, { branchId: 5, productId: '45', q: 'SN001' })
+    assert.deepEqual(res.state.payload, { items: [] })
   }
 
   {
