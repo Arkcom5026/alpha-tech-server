@@ -34,10 +34,8 @@ const productTemplateRoutes = require('./src/modules/productTemplate/routes/prod
 const productProfileRoutes = require('./routes/productProfileRoutes');
 const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
-const productRoutes = require('./routes/productRoutes');
-const { productTraceRoutes } = require('./src/modules/product/trace');
+const { mountProductModule } = require('./src/modules/product');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
-const templateProductSearchRoutes = require('./src/modules/product/routes/templateProductSearchRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
@@ -72,11 +70,6 @@ const stockRoutes = require('./routes/stockRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
-
-// 🟢 FIXED: แก้ตำแหน่งเพื่อให้เข้าถึงโฟลเดอร์ src/modules ได้อย่างถูกต้องตามรูปโครงสร้างในเครื่อง
-const quickStockRoutes = require('./src/modules/product/quickStock/routes/quickStockRoutes');
-const productCreateRoutes = require('./src/modules/product/create/routes/productCreateRoutes');
-
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -185,9 +178,7 @@ app.use('/api/product-profiles', productProfileRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
-app.use('/api/products/template', templateProductSearchRoutes);
-app.use('/api/products/trace', productTraceRoutes);
-app.use('/api/products', productRoutes);
+mountProductModule(app);
 
 // Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
@@ -199,9 +190,6 @@ app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
-
-app.use('/api/quick-stock', quickStockRoutes);
-app.use('/api/product-create', productCreateRoutes);
 
 // Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
@@ -220,90 +208,45 @@ app.use('/api/purchase-reports', purchaseReportRoutes);
 app.use('/api/input-tax-reports', inputTaxReportRoutes);
 app.use('/api/combined-billing', combinedBillingRoutes);
 app.use('/api/sales-reports', salesReportRoutes);
-app.use('/api/upload-slips', uploadSlipRoutes);
+app.use('/api/upload-slip', uploadSlipRoutes);
 app.use('/api/stock-audit', stockAuditRoutes);
-app.use('/api/stock/dashboard', stockRoutes);
-app.use('/api/finance', financeRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/address', addressRoutes);
 app.use('/api/locations', locationsRoutes);
-app.use('/api/receipts/simple', receiptSimpleRoutes);
-app.use('/api/po-receipts/simple', purchaseOrderReceiptSimpleRoutes);
+app.use('/api/receipts-simple', receiptSimpleRoutes);
+app.use('/api/purchase-order-receipts-simple', purchaseOrderReceiptSimpleRoutes);
 app.use('/api/quick-receipts', quickReceiptRoutes);
-
+app.use('/api/stocks', stockRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/upload-product', uploadProductRoutes);
 
 if (simpleStockRoutes) {
-  app.use('/api/simple', simpleStockRoutes);
-  console.log('✅ SIMPLE routes mounted at /api/simple');
+  app.use('/api/simple-stock', simpleStockRoutes);
 }
-
-// ===================== Public =====================
-app.get('/', (req, res) => {
-  res.send('Hello from alpha-tech-server!');
-});
-
-app.get('/healthz', (req, res) => {
-  res.json({ ok: true, ts: new Date().toISOString() });
-});
 
 // ===================== Errors =====================
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
-    error: 'Not Found',
-    path: req.originalUrl,
-    reqId: req.id,
+    error: 'NOT_FOUND',
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
-app.use((err, req, res, next) => {
-  const parsedStatusCode = Number(err.statusCode);
-  const statusCode =
-    Number.isInteger(parsedStatusCode) &&
-    parsedStatusCode >= 400 &&
-    parsedStatusCode <= 599
-      ? parsedStatusCode
-      : 500;
-
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({
-      ok: false,
-      error: 'CORS Forbidden',
-      origin: req.headers.origin || null,
-      reqId: req.id,
-    });
-  }
-
-  if (statusCode >= 400 && statusCode < 500) {
-    return res.status(statusCode).json({
-      ok: false,
-      error: err.message || 'Bad Request',
-      code: err.code || null,
-      details: err.details || null,
-      reqId: req.id,
-    });
-  }
-
-  console.error('❌ Server Error', {
-    reqId: req.id,
-    statusCode,
-    errorStatus: err.status || 'error',
-    code: err.code || null,
-    message: err.message,
-    path: req.originalUrl,
-    method: req.method,
-    stack: err.stack,
-  });
-
-  return res.status(statusCode).json({
+app.use((err, req, res, _next) => {
+  console.error('❌ Unhandled error:', err);
+  const status = err?.status || err?.statusCode || 500;
+  res.status(status).json({
     ok: false,
-    error: 'Internal Server Error',
-    reqId: req.id,
+    error: err?.code || 'INTERNAL_SERVER_ERROR',
+    message: err?.message || 'Internal server error',
+    requestId: req.id,
   });
 });
 
-// ===================== Start =====================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+module.exports = app;
