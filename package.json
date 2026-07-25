@@ -7,6 +7,7 @@
     "test": "node tests/customer-receipt-auth-regression.test.js",
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.test.js",
+    "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
