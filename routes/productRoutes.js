@@ -6,6 +6,7 @@ const productCatalogController = require('../src/modules/product/catalog/control
 const productCreateLegacyCompatibilityController = require('../src/modules/product/create/controllers/productCreateLegacyCompatibilityController')
 const productCreateDropdownCompatibilityController = require('../src/modules/product/create/controllers/productCreateDropdownCompatibilityController')
 const operationalProductRuntimeController = require('../src/modules/product/runtime/controllers/operationalProductRuntimeController')
+const readyToSellController = require('../src/modules/product/readyToSell/controllers/readyToSellController')
 const productExistingModelPreviewRoutes = require('../src/modules/product/routes/productExistingModelPreviewRoutes')
 const verifyToken = require('../middlewares/verifyToken')
 
@@ -23,8 +24,8 @@ router.post('/pos/create-local', operationalProductRuntimeController.createLocal
 router.post('/pos/create-from-template', operationalProductRuntimeController.createOperationalProductFromTemplate)
 router.get('/pos/:id', operationalProductRuntimeController.getProductPosById)
 
-router.get('/ready-to-sell', operationalProductRuntimeController.getReadyToSell)
-router.get('/ready-to-sell/structured/:productId', operationalProductRuntimeController.getReadyToSellStructuredDetails)
+router.get('/ready-to-sell', readyToSellController.getReadyToSellProducts)
+router.get('/ready-to-sell/structured/:productId', readyToSellController.getStructuredReadyToSellDetails)
 
 router.get('/', productCatalogController.getAllProducts)
 router.post('/', productCreateLegacyCompatibilityController.createProduct)
