@@ -27,11 +27,6 @@ const {
   deletePurchaseOrderHandler,
 } = require('../src/modules/procurement/purchaseOrder/delete/purchaseOrderDeleteController');
 
-// Legacy handler retained temporarily while its boundary is reviewed.
-const {
-  createPurchaseOrderWithAdvance,
-} = require('../controllers/purchaseOrderController');
-
 // Receiving-owned projection remains outside Purchase Order migration scope.
 const {
   getPurchaseOrderDetailById,
@@ -44,7 +39,10 @@ router.get('/', getPurchaseOrderList);
 router.post('/', createPurchaseOrderHandler);
 router.get('/by-supplier/:supplierId', getPurchaseOrdersBySupplierHandler);
 router.get('/by-supplier', getPurchaseOrdersBySupplierHandler);
-router.post('/with-advance', createPurchaseOrderWithAdvance);
+
+// Compatibility alias: the historical endpoint never supported applying advance payments.
+// Keep the URL stable while routing creation through the canonical Purchase Order capability.
+router.post('/with-advance', createPurchaseOrderHandler);
 
 router.get('/eligible-for-receipt', getEligiblePurchaseOrdersForReceipt);
 router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
