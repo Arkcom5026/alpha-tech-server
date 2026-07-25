@@ -19,6 +19,12 @@ const {
 } = require('./contracts/taxDocumentLifecycleCommand');
 
 const {
+  TAX_AUTHORITY_SUBMISSION_ACTIONS,
+  TaxAuthoritySubmissionContractError,
+  normalizeTaxAuthoritySubmissionCommand,
+} = require('./contracts/taxAuthoritySubmissionCommand');
+
+const {
   buildTaxDocumentDraft,
   stableHash,
 } = require('./factories/taxDocumentFactory');
@@ -59,12 +65,14 @@ const {
 } = require('./infrastructure/prismaTaxDocumentLifecyclePersistence');
 
 module.exports = {
+  TAX_AUTHORITY_SUBMISSION_ACTIONS,
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_LIFECYCLE_ACTIONS,
   TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_STATUSES,
   TAX_DOCUMENT_TYPES,
+  TaxAuthoritySubmissionContractError,
   TaxDocumentContractError,
   TaxDocumentLifecycleContractError,
   TaxDocumentLifecyclePersistenceError,
@@ -84,6 +92,7 @@ module.exports = {
   isTaxDocumentSourceType,
   isTaxDocumentType,
   issueDocument,
+  normalizeTaxAuthoritySubmissionCommand,
   normalizeTaxDocumentCommand,
   normalizeTaxDocumentLifecycleCommand,
   projectCompletedSaleToTaxDocument,
