@@ -5,6 +5,16 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
+const employeeModuleRoot = path.join(root, 'src/modules/employee');
+
+const walkJavaScriptFiles = (directory) => fs.readdirSync(directory, { withFileTypes: true })
+  .flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return walkJavaScriptFiles(absolutePath);
+    return entry.isFile() && entry.name.endsWith('.js') ? [absolutePath] : [];
+  });
+
+const relative = (absolutePath) => path.relative(root, absolutePath).replaceAll('\\', '/');
 
 const syntaxFiles = [
   'middlewares/verifyToken.js',
@@ -13,22 +23,16 @@ const syntaxFiles = [
   'routes/authRoutes.js',
   'routes/supplierPaymentRoutes.js',
   'server.js',
-  'src/modules/employee/routes/employeeRoutes.js',
-  'src/modules/employee/query/list/listEmployeeController.js',
-  'src/modules/employee/query/detail/detailEmployeeController.js',
-  'src/modules/employee/query/usersByRole/usersByRoleController.js',
-  'src/modules/employee/create/createEmployeeController.js',
-  'src/modules/employee/update/updateEmployeeController.js',
-  'src/modules/employee/status/statusEmployeeController.js',
-  'src/modules/employee/role/updateEmployeeRoleController.js',
-  'src/modules/employee/lookup/positions/positionLookupController.js',
-  'src/modules/employee/lookup/branches/branchLookupController.js',
-  'src/modules/employee/onboarding/onboardEmployeeController.js',
-  'src/modules/employee/onboarding/onboardEmployeeService.js',
-  'src/modules/employee/onboarding/onboardEmployeeRepository.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
+  ...walkJavaScriptFiles(employeeModuleRoot).map(relative),
+];
+
+const legacyFiles = [
+  'controllers/employeeController.js',
+  'controllers/employeeOnboardingController.js',
+  'routes/employeeRoutes.js',
 ];
 
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -50,7 +54,7 @@ const assertNotContains = (source, value, label) => {
   else pass(label);
 };
 
-for (const relativePath of syntaxFiles) {
+for (const relativePath of [...new Set(syntaxFiles)]) {
   const absolutePath = path.join(root, relativePath);
   try {
     execFileSync(process.execPath, ['--check', absolutePath], { stdio: 'pipe' });
@@ -58,6 +62,11 @@ for (const relativePath of syntaxFiles) {
   } catch (error) {
     fail(`syntax ${relativePath}: ${error.stderr?.toString().trim() || error.message}`);
   }
+}
+
+for (const relativePath of legacyFiles) {
+  if (fs.existsSync(path.join(root, relativePath))) fail(`legacy file still exists: ${relativePath}`);
+  else pass(`legacy file removed: ${relativePath}`);
 }
 
 const verifyToken = read('middlewares/verifyToken.js');
@@ -73,46 +82,48 @@ const server = read('server.js');
 assertContains(
   server,
   "require('./src/modules/employee/routes/employeeRoutes')",
-  'server employee module route cutover'
+  'server employee module route cutover',
 );
 assertNotContains(
   server,
   "require('./routes/employeeRoutes')",
-  'server legacy employee route reference'
+  'server legacy employee route reference',
 );
 
 const employeeRoutes = read('src/modules/employee/routes/employeeRoutes.js');
-assertContains(
-  employeeRoutes,
-  'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
-  'employee approval compatibility endpoint'
-);
+assertContains(employeeRoutes, "router.get('/', getAllEmployees)", 'employee list route');
+assertContains(employeeRoutes, "router.post('/', createEmployeeController)", 'employee create route');
+assertContains(employeeRoutes, "router.get('/:id', getEmployeesById)", 'employee detail route');
+assertContains(employeeRoutes, "router.put('/:id', updateEmployeeController)", 'employee update route');
+assertContains(employeeRoutes, "router.patch('/:id/status', toggleEmployeeStatus)", 'employee status route');
+assertContains(employeeRoutes, "router.delete('/:id', deleteEmployee)", 'employee delete compatibility route');
+assertContains(employeeRoutes, 'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED', 'employee approval compatibility endpoint');
 assertContains(
   employeeRoutes,
   "canonicalEndpoint: '/api/auth/add-sub-employee'",
-  'canonical employee creation endpoint declaration'
+  'canonical employee creation endpoint declaration',
 );
 assertNotContains(
   employeeRoutes,
   "router.post('/approve-employee', approveEmployee)",
-  'live employee approval handler'
+  'live employee approval handler',
 );
 
 const authRoutes = read('routes/authRoutes.js');
 assertContains(
   authRoutes,
   "require('../src/modules/employee/onboarding/onboardEmployeeController')",
-  'auth route module onboarding controller'
+  'auth route module onboarding controller',
 );
 assertNotContains(
   authRoutes,
   "require('../controllers/employeeOnboardingController')",
-  'auth route legacy onboarding controller reference'
+  'auth route legacy onboarding controller reference',
 );
 assertContains(
   authRoutes,
   "router.post('/add-sub-employee', verifyToken, addSubEmployee)",
-  'canonical onboarding route guard'
+  'canonical onboarding route guard',
 );
 
 const employeeOnboarding = read('src/modules/employee/onboarding/onboardEmployeeService.js');
@@ -128,11 +139,15 @@ assertContains(employeeOnboardingRepository, 'approved: true', 'owner-created em
 assertContains(employeeOnboardingRepository, 'active: true', 'owner-created employee auto activation');
 assertContains(employeeOnboardingRepository, 'enabled: true', 'owner-created employee user activation');
 
+const deleteController = read('src/modules/employee/delete/deleteEmployeeController.js');
+assertContains(deleteController, "code: 'EMPLOYEE_HARD_DELETE_DISABLED'", 'employee hard-delete guard');
+assertContains(deleteController, 'status(405)', 'employee hard-delete HTTP contract');
+
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
   combinedBilling,
   'req.user?.employeeId || req.user?.id',
-  'combined billing User.id employee fallback'
+  'combined billing User.id employee fallback',
 );
 
 const productCreate = read('src/modules/product/create/controllers/productCreateController.js');
@@ -143,28 +158,28 @@ const quickStock = read('src/modules/product/quickStock/controllers/quickStockCo
 assertNotContains(
   quickStock,
   'req.user?.employeeId || req.user?.id',
-  'quick stock User.id employee fallback'
+  'quick stock User.id employee fallback',
 );
 
 const branchPrice = read('controllers/branchPriceController.js');
 assertNotContains(
   branchPrice,
   'toInt(req.user?.id) || toInt(req.user?.employeeId)',
-  'branch price User.id updatedBy precedence'
+  'branch price User.id updatedBy precedence',
 );
 
 const saleReturn = read('src/modules/sales/return/controllers/saleReturnController.js');
 assertNotContains(
   saleReturn,
   'req.user?.employeeId || req.user?.profileId',
-  'sale return profileId employee fallback'
+  'sale return profileId employee fallback',
 );
 
 const supplierPaymentRoutes = read('routes/supplierPaymentRoutes.js');
 assertContains(
   supplierPaymentRoutes,
   'requireSupplierPaymentActor',
-  'supplier payment actor route guard'
+  'supplier payment actor route guard',
 );
 
 const schema = read('prisma/schema.prisma');
