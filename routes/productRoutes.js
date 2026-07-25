@@ -5,7 +5,7 @@ const productController = require('../controllers/productController')
 const productCatalogController = require('../src/modules/product/catalog/controllers/productCatalogController')
 const productCreateLegacyCompatibilityController = require('../src/modules/product/create/controllers/productCreateLegacyCompatibilityController')
 const productCreateDropdownCompatibilityController = require('../src/modules/product/create/controllers/productCreateDropdownCompatibilityController')
-const operationalProductRuntimeController = require('../src/modules/product/controllers/operationalProductRuntimeController')
+const operationalProductRuntimeController = require('../src/modules/product/runtime/controllers/operationalProductRuntimeController')
 const productExistingModelPreviewRoutes = require('../src/modules/product/routes/productExistingModelPreviewRoutes')
 const verifyToken = require('../middlewares/verifyToken')
 
