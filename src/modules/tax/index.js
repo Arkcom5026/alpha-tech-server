@@ -47,6 +47,13 @@ const {
 } = require('./application/taxDocumentLifecycleRuntime');
 
 const {
+  TaxAuthoritySubmissionRuntimeError,
+  cancelSubmission,
+  enqueueSubmission,
+  retrySubmission,
+} = require('./application/taxAuthoritySubmissionRuntime');
+
+const {
   TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
   TAX_DOCUMENT_STATUSES,
   TaxDocumentLifecycleTransitionError,
@@ -54,6 +61,15 @@ const {
   assertCanCreateAdjustment,
   assertCanIssue,
 } = require('./policies/taxDocumentLifecyclePolicy');
+
+const {
+  TAX_AUTHORITY_SUBMISSION_EVENT_TYPES,
+  TAX_AUTHORITY_SUBMISSION_STATUSES,
+  TaxAuthoritySubmissionTransitionError,
+  assertCanCancelSubmission,
+  assertCanEnqueue,
+  assertCanRetry,
+} = require('./policies/taxAuthoritySubmissionPolicy');
 
 const {
   createPrismaTaxDocumentPublisher,
@@ -66,6 +82,8 @@ const {
 
 module.exports = {
   TAX_AUTHORITY_SUBMISSION_ACTIONS,
+  TAX_AUTHORITY_SUBMISSION_EVENT_TYPES,
+  TAX_AUTHORITY_SUBMISSION_STATUSES,
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_LIFECYCLE_ACTIONS,
   TAX_DOCUMENT_LIFECYCLE_EVENT_TYPES,
@@ -73,21 +91,28 @@ module.exports = {
   TAX_DOCUMENT_STATUSES,
   TAX_DOCUMENT_TYPES,
   TaxAuthoritySubmissionContractError,
+  TaxAuthoritySubmissionRuntimeError,
+  TaxAuthoritySubmissionTransitionError,
   TaxDocumentContractError,
   TaxDocumentLifecycleContractError,
   TaxDocumentLifecyclePersistenceError,
   TaxDocumentLifecycleRuntimeError,
   TaxDocumentLifecycleTransitionError,
   assertCanCancel,
+  assertCanCancelSubmission,
   assertCanCreateAdjustment,
+  assertCanEnqueue,
   assertCanIssue,
+  assertCanRetry,
   buildTaxDocumentDraft,
   cancelDocument,
+  cancelSubmission,
   createCreditNote,
   createDebitNote,
   createPrismaTaxDocumentLifecyclePersistence,
   createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
+  enqueueSubmission,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
@@ -97,5 +122,6 @@ module.exports = {
   normalizeTaxDocumentLifecycleCommand,
   projectCompletedSaleToTaxDocument,
   resolveTaxDocumentType,
+  retrySubmission,
   stableHash,
 };
