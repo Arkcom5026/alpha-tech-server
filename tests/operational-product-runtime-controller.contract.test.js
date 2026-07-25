@@ -97,6 +97,7 @@ const run = async () => {
 
     assert.deepEqual(localInput, {
       branchId: 7,
+      employeeId: null,
       data: { name: 'Local Product' },
     })
     assert.equal(res.state.statusCode, 201)
