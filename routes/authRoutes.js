@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
-const employeeOnboardingController = require('../controllers/employeeOnboardingController');
+const employeeController = require('../src/modules/employee/controllers/employeeController');
 
 const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
 const isProduction = process.env.NODE_ENV === 'production';
@@ -68,12 +68,12 @@ const login = ensureFn('login');
 const register = ensureFn('register');
 const refreshSession = ensureFn('refreshSession');
 const logoutSession = ensureFn('logoutSession');
-const addSubEmployee = employeeOnboardingController.addSubEmployee;
+const addSubEmployee = employeeController.addEmployee;
 const revokeSession = resolveHandler('revokeSession') || resolveHandler('logoutAllSessions') || resolveHandler('logoutAll');
 const findUserByEmail = resolveHandler('findUserByEmail');
 
 if (typeof addSubEmployee !== 'function') {
-  throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
+  throw new Error('[authRoutes] employeeController.addEmployee must be a function');
 }
 
 if (typeof findUserByEmail !== 'function') {
