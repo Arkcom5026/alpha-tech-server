@@ -1,5 +1,6 @@
 const assert = require('assert/strict');
 const {
+  TAX_DOCUMENT_LIFECYCLE_ACTIONS,
   issueDocument,
   createPrismaTaxDocumentLifecyclePersistence,
 } = require('../src/modules/tax');
@@ -83,6 +84,7 @@ const createFakeTransactionClient = () => {
 };
 
 const command = {
+  action: TAX_DOCUMENT_LIFECYCLE_ACTIONS.ISSUE,
   taxDocumentId: 'tax-doc-1',
   expectedVersion: 1,
   commandKey: 'issue-tax-doc-1',
