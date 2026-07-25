@@ -8,6 +8,7 @@ const productCreateDropdownCompatibilityController = require('../src/modules/pro
 const operationalProductRuntimeController = require('../src/modules/product/runtime/controllers/operationalProductRuntimeController')
 const readyToSellController = require('../src/modules/product/readyToSell/controllers/readyToSellController')
 const productDuplicatePreviewRoutes = require('../src/modules/product/duplicatePreview/routes/productDuplicatePreviewRoutes')
+const productMaintenanceController = require('../src/modules/product/maintenance/controllers/productMaintenanceController')
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
@@ -29,7 +30,7 @@ router.get('/ready-to-sell/structured/:productId', readyToSellController.getStru
 
 router.get('/', productCatalogController.getAllProducts)
 router.post('/', productCreateLegacyCompatibilityController.createProduct)
-router.patch('/:id', productController.updateProduct)
+router.patch('/:id', productMaintenanceController.updateProduct)
 router.post('/:id/disable', productController.disableProduct)
 router.post('/:id/enable', productController.enableProduct)
 router.get('/:id/delete-check', productController.getProductDeleteCheck)
