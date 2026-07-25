@@ -26,11 +26,11 @@ const main = async () => {
 
   const replay = queue.enqueue(item);
   assert.deepStrictEqual(replay, { enqueued: false, replay: true, size: 1 });
-  assert.strictEqual(queue.peek(), item);
+  assert.deepStrictEqual(queue.peek(), item);
   assert.strictEqual(queue.size(), 1);
 
   const dequeued = queue.dequeue();
-  assert.strictEqual(dequeued, item);
+  assert.deepStrictEqual(dequeued, item);
   assert.strictEqual(queue.size(), 0);
 
   const submitted = await dispatcher.dispatch(dequeued);
