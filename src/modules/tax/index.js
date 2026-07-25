@@ -26,12 +26,17 @@ const {
   createSaleTaxProjectionRuntime,
 } = require('./application/saleTaxProjectionRuntimeService');
 
+const {
+  createPrismaTaxDocumentPublisher,
+} = require('./infrastructure/prismaTaxDocumentPublisher');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
   TaxDocumentContractError,
   buildTaxDocumentDraft,
+  createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
