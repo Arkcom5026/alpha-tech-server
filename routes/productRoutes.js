@@ -2,65 +2,9 @@ const express = require('express')
 const router = express.Router()
 
 const productController = require('../controllers/productController')
+const operationalProductRuntimeController = require('../src/modules/product/controllers/operationalProductRuntimeController')
 const productExistingModelPreviewRoutes = require('../src/modules/product/routes/productExistingModelPreviewRoutes')
 const verifyToken = require('../middlewares/verifyToken')
-const {
-  createLocalOperationalProduct: createLocalOperationalProductService,
-  createOperationalProductFromTemplate: createOperationalProductFromTemplateService,
-} = require('../src/modules/product/services/operationalProductRuntimeService')
-
-const createLocalOperationalProduct = async (req, res) => {
-  try {
-    const result = await createLocalOperationalProductService({
-      branchId: req.user?.branchId,
-      data: req.body || {},
-    })
-
-    return res.status(201).json(result)
-  } catch (error) {
-    console.error('createLocalOperationalProduct error:', error)
-    const status = error?.status || error?.statusCode || 500
-    return res.status(status).json({
-      success: false,
-      error: error?.code || error?.message || 'CREATE_LOCAL_OPERATIONAL_PRODUCT_FAILED',
-    })
-  }
-}
-
-const createOperationalProductFromTemplate = async (req, res) => {
-  try {
-    const result = await createOperationalProductFromTemplateService({
-      branchId: req.user?.branchId,
-      templateProductId: req.body?.templateProductId,
-    })
-
-    const status = result.statusCode || (result.created ? 201 : 200)
-    const { statusCode, ...payload } = result
-
-    return res.status(status).json(payload)
-  } catch (error) {
-    console.error('createOperationalProductFromTemplate error:', error)
-
-    const code = error?.code || error?.message
-    if (
-      code === 'BRANCH_ID_MISSING' ||
-      code === 'TEMPLATE_PRODUCT_ID_MISSING' ||
-      code === 'TEMPLATE_BRANCH_NOT_FOUND' ||
-      code === 'TEMPLATE_PRODUCT_NOT_FOUND' ||
-      code === 'PRODUCT_TYPE_NOT_FOUND_IN_BRANCH'
-    ) {
-      return res.status(error?.status || error?.statusCode || 400).json({
-        success: false,
-        error: code,
-      })
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: 'CREATE_OPERATIONAL_PRODUCT_FROM_TEMPLATE_FAILED',
-    })
-  }
-}
 
 router.get('/online/dropdowns', productController.getProductDropdowns)
 router.get('/online/search', productController.getProductsForOnline)
@@ -72,8 +16,8 @@ router.get('/dropdowns', productController.getProductDropdowns)
 router.use('/duplicate-preview', productExistingModelPreviewRoutes)
 router.get('/pos/search', productController.getProductsForPos)
 router.get('/pos/runtime-by-template/:templateProductId', productController.getOperationalProductByTemplateId)
-router.post('/pos/create-local', createLocalOperationalProduct)
-router.post('/pos/create-from-template', createOperationalProductFromTemplate)
+router.post('/pos/create-local', operationalProductRuntimeController.createLocalOperationalProduct)
+router.post('/pos/create-from-template', operationalProductRuntimeController.createOperationalProductFromTemplate)
 router.get('/pos/:id', productController.getProductPosById)
 
 if (typeof productController.getReadyToSell === 'function') {
