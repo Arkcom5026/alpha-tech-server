@@ -567,27 +567,37 @@ model SalesTaxFilingBatch {
 }
 
 model SalesTaxFilingItem {
-  id        Int                 @id @default(autoincrement())
-  batchId   Int
-  saleId    Int
-  createdAt DateTime            @default(now())
-  batch     SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sale      Sale                @relation(fields: [saleId], references: [id])
+  id               Int                 @id @default(autoincrement())
+  batchId          Int
+  saleId           Int
+  taxDocumentId    String?
+  migratedAt       DateTime?
+  migrationVersion Int?
+  createdAt        DateTime            @default(now())
+  batch            SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sale             Sale                @relation(fields: [saleId], references: [id])
+  taxDocument      TaxDocument?        @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, saleId])
   @@index([saleId])
+  @@index([taxDocumentId])
 }
 
 model InputTaxFilingItem {
   id                     Int                  @id @default(autoincrement())
   batchId                Int
   purchaseOrderReceiptId Int
+  taxDocumentId          String?
+  migratedAt             DateTime?
+  migrationVersion       Int?
   createdAt              DateTime             @default(now())
   batch                  InputTaxFilingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
   receipt                PurchaseOrderReceipt @relation(fields: [purchaseOrderReceiptId], references: [id])
+  taxDocument            TaxDocument?         @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, purchaseOrderReceiptId])
   @@index([purchaseOrderReceiptId])
+  @@index([taxDocumentId])
 }
 
 model PurchaseOrderReceiptItem {
@@ -1905,15 +1915,17 @@ model TaxDocument {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  branch                Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  replacementOf         TaxDocument?        @relation("TaxDocumentReplacement", fields: [replacementOfId], references: [id], onDelete: Restrict)
-  replacements          TaxDocument[]       @relation("TaxDocumentReplacement")
-  cancelledDocument     TaxDocument?        @relation("TaxDocumentCancellation", fields: [cancelledDocumentId], references: [id], onDelete: Restrict)
-  cancellationDocuments TaxDocument[]       @relation("TaxDocumentCancellation")
+  branch                Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  replacementOf         TaxDocument?         @relation("TaxDocumentReplacement", fields: [replacementOfId], references: [id], onDelete: Restrict)
+  replacements          TaxDocument[]        @relation("TaxDocumentReplacement")
+  cancelledDocument     TaxDocument?         @relation("TaxDocumentCancellation", fields: [cancelledDocumentId], references: [id], onDelete: Restrict)
+  cancellationDocuments TaxDocument[]        @relation("TaxDocumentCancellation")
   sources               TaxDocumentSource[]
   snapshot              TaxSnapshot?
   ledgerEntries         TaxLedgerEntry[]
   events                TaxDocumentEvent[]
+  salesTaxFilingItems   SalesTaxFilingItem[]
+  inputTaxFilingItems   InputTaxFilingItem[]
 
   @@unique([branchId, documentNumber])
   @@index([status])
