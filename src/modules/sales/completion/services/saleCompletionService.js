@@ -9,6 +9,10 @@ const {
   findCompletionCommand,
   runCompletionTransaction,
 } = require('../repositories/saleCompletionRepository');
+const {
+  createPrismaTaxDocumentPublisher,
+  createSaleTaxProjectionRuntime,
+} = require('../../../tax');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
 const SALE_CODE_MAX_RETRY = Math.max(0, Number(process.env.SALE_CODE_MAX_RETRY || 3));
@@ -159,6 +163,17 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             saleId: sale.id,
           },
         });
+
+        const taxProjectionRuntime = createSaleTaxProjectionRuntime({
+          publisher: createPrismaTaxDocumentPublisher({ db: tx }),
+        });
+        await taxProjectionRuntime.projectAndPublishCompletedSale({
+          sale,
+          commandKey: command.commandKey,
+          correlationId: command.commandKey,
+          occurredAt: sale.createdAt,
+        });
+
         return { saleId: sale.id, payments: posted.payments };
       });
       const final = await loadVerifiedReplay({
