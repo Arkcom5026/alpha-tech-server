@@ -22,16 +22,15 @@ const findEmployeeUserByEmail = (email) => prisma.user.findUnique({
   select: { id: true },
 });
 
-const findPositionById = (id) => prisma.position.findUnique({
-  where: { id },
-  select: { id: true, name: true },
+const findPositionByIdForBranch = (id, branchId) => prisma.position.findFirst({
+  where: { id, branchId },
+  select: { id: true, name: true, branchId: true },
 });
 
-const findPositions = () => prisma.position.findMany({
+const findPositions = ({ branchId } = {}) => prisma.position.findMany({
+  where: branchId ? { branchId } : undefined,
   orderBy: { name: 'asc' },
 });
-
-const createEmployeeTransaction = (callback) => prisma.$transaction(callback);
 
 const createEmployee = (callback) => prisma.$transaction(callback);
 
@@ -39,8 +38,7 @@ module.exports = {
   findEmployees,
   findEmployeeById,
   findEmployeeUserByEmail,
-  findPositionById,
+  findPositionByIdForBranch,
   findPositions,
-  createEmployeeTransaction,
   createEmployee,
 };
