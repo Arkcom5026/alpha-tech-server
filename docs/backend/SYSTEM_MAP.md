@@ -10,10 +10,10 @@ This map is broader than `RUNTIME_MAP.md`.
 
 ## 1. Backend Operating Model
 
-P1 backend is a live production-style system using a hybrid architecture:
+P1 backend is a live production-style system using a mixed architecture while domains migrate independently.
 
 ```txt
-Legacy Production Runtime
+Legacy / Compatibility Surface
   server.js
   routes/
   controllers/
@@ -21,7 +21,7 @@ Legacy Production Runtime
   lib/
   prisma/
 
-New Module Runtime
+Module Runtime
   src/modules/product/
   src/modules/quickStock/
 ```
@@ -35,8 +35,11 @@ Keep production runtime stable
 → Add/repair workflow capability
 → Reuse new module when safe
 → Extract responsibility gradually
+→ Cut over only after capability coverage
 → Keep every intermediate state deployable
 ```
+
+A domain may become MODULE-CANONICAL even while the overall backend remains mixed.
 
 ## 2. Server Entry Point
 
@@ -62,7 +65,7 @@ app.use('/api/branch-prices', branchPriceRoutes)
 app.use('/api/stock/dashboard', stockRoutes)
 ```
 
-The backend already mixes legacy routes and new module routes in `server.js`. This confirms Hybrid Migration is the current production reality.
+`productRoutes` remains the server import name for compatibility, but its runtime authority is now the Product module router.
 
 ## 3. Shared Infrastructure
 
@@ -142,7 +145,7 @@ Important separation:
 /api/products/template/search  = Template Catalog search from T01
 /api/products/pos/search       = Operational Product search for current branch
 /api/products/pos/runtime-by-template/:templateProductId = branch operational lookup by template identity
-/api/products/pos/create-from-template = temporary/direct create-from-template endpoint
+/api/products/pos/create-from-template = compatibility/direct create-from-template endpoint
 ```
 
 ### Quick Receive / Stock / Procurement
@@ -190,79 +193,106 @@ Important separation:
 
 ## 5. Product Runtime Map
 
-### `routes/productRoutes.js`
+### Active route chain
 
-Responsibility:
-- Main production product API route.
-- Public online product routes before `verifyToken`.
-- Protected POS/runtime product routes after `router.use(verifyToken)`.
+```txt
+server.js
+→ /api/products
+→ routes/productRoutes.js
+→ src/modules/product/routes/productModuleRoutes.js
+→ Product-owned controllers/services/repositories
+```
+
+`routes/productRoutes.js` is a compatibility mount only. It must not regain endpoint logic.
+
+### Product Module Router
+
+Canonical file:
+
+```txt
+src/modules/product/routes/productModuleRoutes.js
+```
+
+Responsibilities:
+- Preserves public online routes before authentication.
+- Applies `verifyToken` to protected Product runtime routes.
+- Composes Product-owned capability slices.
+- Preserves existing external endpoint paths.
 
 Important routes:
 
 ```txt
-GET  /api/products/online/dropdowns
-GET  /api/products/online/search
-GET  /api/products/online/detail/:id
-
-GET  /api/products/dropdowns
-GET  /api/products/pos/search
-GET  /api/products/pos/runtime-by-template/:templateProductId
-POST /api/products/pos/create-from-template
-GET  /api/products/pos/:id
-GET  /api/products/ready-to-sell
-GET  /api/products/ready-to-sell/structured/:productId
-GET  /api/products
-POST /api/products
-PATCH /api/products/:id
-POST /api/products/:id/disable
-POST /api/products/:id/enable
-GET  /api/products/:id/delete-check
-PATCH /api/products/:id/archive
+GET    /api/products/online/dropdowns
+GET    /api/products/online/search
+GET    /api/products/online/detail/:id
+GET    /api/products/dropdowns
+GET    /api/products/pos/search
+GET    /api/products/pos/runtime-by-template/:templateProductId
+POST   /api/products/pos/create-local
+POST   /api/products/pos/create-from-template
+GET    /api/products/pos/:id
+GET    /api/products/ready-to-sell
+GET    /api/products/ready-to-sell/structured/:productId
+GET    /api/products
+POST   /api/products
+PATCH  /api/products/:id
+POST   /api/products/:id/disable
+POST   /api/products/:id/enable
+GET    /api/products/:id/delete-check
+PATCH  /api/products/:id/archive
 DELETE /api/products/:id
+DELETE /api/products/:id/images
+POST   /api/products/:id/migrate-to-simple
+GET    /api/products/:productId/prices
+PUT    /api/products/:productId/prices
+POST   /api/products/:productId/prices
+DELETE /api/products/:productId/prices/:priceId
 ```
 
-Important note:
-- `POST /api/products/pos/create-from-template` currently has route-local handler logic.
-- It was added as a blocker-removal endpoint, but Mission B may prefer `/api/quick-stock/existing` as the true end-to-end workflow path.
-
-### `controllers/productController.js`
-
-Responsibility:
-- Main legacy production product controller.
-- Owns Product List, POS search, Online search, runtime product mapping, product CRUD, archive/delete safety, and some ready-to-sell behavior.
-
-Important doctrine already present:
+### Product capability ownership
 
 ```txt
-Runtime Catalog Separation:
-Product List / Online / POS operational catalog must show Operational Product for the branch.
-Template Product is reserved for QuickStock search / clone source.
+src/modules/product/query/
+src/modules/product/create/
+src/modules/product/update/
+src/modules/product/status/
+src/modules/product/delete/
+src/modules/product/imageDelete/
+src/modules/product/pricing/
+src/modules/product/migrateToSimple/
 ```
 
-Important functions:
+Each capability owns its HTTP → Controller → Service → Repository → Prisma path.
+
+### Deprecated legacy Product controller
 
 ```txt
-getAllProducts
-getProductsForPos
-getOperationalProductByTemplateId
-getProductsForOnline
-mapRuntimeProductForPos
-createProduct
-updateProduct
-disableProduct / enableProduct
-archiveProduct / deleteProduct
-getProductDeleteCheck
+controllers/productController.js
 ```
+
+Status:
+- Not imported by the active Product route.
+- Not an approved runtime authority.
+- Retained only until repository reference verification and dedicated legacy removal complete.
+
+Do not patch or restore this file for new Product behavior.
 
 ### Product runtime behavior
 
-Operational product query usually scopes by:
+Operational Product queries scope by:
 
 ```txt
 product.productType.branchId = current branchId
 ```
 
 This is the core branch isolation rule.
+
+Runtime Catalog Separation remains mandatory:
+
+```txt
+Product List / Online / POS operational catalog = Operational Product for the branch
+Template Product = QuickStock search / clone source
+```
 
 ## 6. Template Product Search Map
 
@@ -324,7 +354,7 @@ Canonical clone engine:
 src/modules/product/services/productTemplateEngine/
 ```
 
-### Engine sequence
+Engine sequence:
 
 ```txt
 validateTemplate
@@ -337,23 +367,7 @@ validateTemplate
 → afterCloneHooks
 ```
 
-### Key files
-
-```txt
-index.js
-productCloneService.js
-validateTemplate.js
-cloneProductType.js
-cloneBrandMapping.js
-cloneProduct.js
-cloneImages.js
-cloneBranchPrice.js
-afterCloneHooks.js
-constants.js
-```
-
-### Engine responsibilities
-
+Engine responsibilities:
 - Validate Template Branch and Template Product.
 - Ensure target branch has matching ProductType.
 - Copy ProductTypeBrand mapping safely.
@@ -364,9 +378,7 @@ constants.js
 - Run post-clone hooks.
 - Support external transaction for QuickStock / PO / Receive runtime.
 
-### Canonical rule
-
-Use:
+Canonical rule:
 
 ```js
 const { cloneProductFromTemplate } = require('../../product/services/productTemplateEngine')
@@ -376,231 +388,59 @@ Avoid creating new clone logic outside this engine.
 
 ## 8. QuickStock Runtime Map
 
-### `src/modules/quickStock/routes/quickStockRoutes.js`
-
-Mounted at:
+Canonical active files:
 
 ```txt
-/api/quick-stock
+src/modules/quickStock/routes/quickStockRoutes.js
+src/modules/quickStock/controllers/quickStockController.js
+src/modules/quickStock/services/QuickStockService.js
 ```
 
-Endpoints:
+Main Mission B candidate:
 
 ```txt
-POST /api/quick-stock/quick-enroll
-POST /api/quick-stock/all-in-one
 POST /api/quick-stock/existing
+→ quickStockController.quickStockExistingReceive
+→ QuickStockService.quickReceiveExistingProduct
+→ productTemplateEngine.cloneProductFromTemplate if needed
+→ BranchPrice upsert
+→ StockItem / SimpleLot
+→ StockMovement
+→ StockBalance
 ```
 
-Uses:
-- `verifyToken`
-- Hybrid employee context guard
-
-### `src/modules/quickStock/controllers/quickStockController.js`
-
-Important methods:
-
-```txt
-quickStockInAllInOne
-quickStockExistingReceive
-```
-
-`quickStockExistingReceive` is the main Mission B candidate because it accepts an existing Product id OR Template Product id and lets service auto-clone when needed.
-
-Controller contract requires:
-
-```txt
-productId
-costPrice
-priceRetail
-queue via barcodes/items
-```
-
-Queue item must not contain pricing fields.
-
-### `src/modules/quickStock/services/QuickStockService.js`
-
-Canonical active QuickStock service.
-
-Important method:
-
-```txt
-quickReceiveExistingProduct(data, currentBranchId, employeeId)
-```
-
-Runtime flow:
-
-```txt
-normalize queue
-→ validate duplicate barcode outside transaction
-→ validate duplicate serial outside transaction
-→ derive runtime price payload from form
-→ transaction begin
-→ find operational product in current branch
-→ if missing, cloneProductFromTemplate(templateProductId, branchId)
-→ upsert BranchPrice from runtime form price
-→ write stock item or simple lot
-→ write stock movement
-→ upsert stock balance
-→ return productId/productName/qty/trace
-```
-
-This is currently the strongest backend path for Mission B end-to-end completion.
-
-### `src/modules/quickStock/services/QuickStockService_Runtime_SafeTransaction.js`
-
-Older safety/reference implementation.
-
-Use as reference only unless assigned.
+Older safety/reference implementations must not be treated as canonical unless verified.
 
 ## 9. BranchPrice Runtime Map
 
-### `routes/branchPriceRoutes.js`
-
-Mounted at:
+Separate API surface:
 
 ```txt
 /api/branch-prices
+→ routes/branchPriceRoutes.js
+→ controllers/branchPriceController.js
 ```
 
-Protected by `verifyToken`.
+This does not replace Product-owned `/api/products/:productId/prices` endpoints. The two surfaces must preserve their existing contracts until a dedicated BranchPrice consolidation assignment is approved.
 
-Routes:
+## 10. Migration Authority Rule
+
+Runtime evidence outranks stale documentation.
+
+When verified runtime has completed a cutover:
 
 ```txt
-GET  /api/branch-prices/me/:productId
-POST /api/branch-prices
-GET  /api/branch-prices/by-branch
-GET  /api/branch-prices/all-products
-PUT  /api/branch-prices/bulk-update
-GET  /api/branch-prices/profile-by-slug/:slug
+Update maps and protection rules
+→ prohibit restoration of the old authority
+→ perform zero-reference verification
+→ remove legacy only in a dedicated commit
 ```
 
-### `controllers/branchPriceController.js`
+A historical rule such as “do not delete the Product controller” expires once:
+- Module capability coverage is complete.
+- Runtime cutover is committed.
+- Active route imports are zero.
+- Script/test/document dependencies are cleaned.
+- Verification evidence is recorded.
 
-Responsibility:
-- Reads active BranchPrice for current branch/product.
-- Upserts BranchPrice.
-- Supports branch scoped price management.
-
-Runtime Branch Price Contract:
-
-```txt
-Source of Truth: Quick Receive Runtime Session
-Required: productId, costPrice, priceRetail
-Optional: priceWholesale, priceTechnician, priceOnline
-Queue item must never contain pricing.
-```
-
-This matches QuickStock existing receive behavior.
-
-## 10. Auth / Context Map
-
-### Context objects
-
-Current backend has two context styles:
-
-```txt
-Legacy: req.user
-New/hybrid: req.employee
-```
-
-`verifyToken` creates `req.user`.
-Some new module guards also check `req.employee`, but `verifyToken.js` currently does not create `req.employee` by itself.
-
-Therefore module guards often support both:
-
-```txt
-req.user.role / req.user.profileType / req.user.branchId
-req.employee.role / req.employee.branchId
-```
-
-Important risk:
-- New module code must not assume `req.employee` always exists unless another middleware creates it.
-- Prefer fallback pattern:
-
-```js
-const branchId = req.employee?.branchId || req.user?.branchId
-const employeeId = req.employee?.id || req.user?.employeeId || req.user?.id
-```
-
-## 11. Canonical vs Legacy / Duplicate Map
-
-### Canonical for Template Clone
-
-```txt
-src/modules/product/services/productTemplateEngine/
-```
-
-### Legacy / duplicate clone service
-
-```txt
-src/modules/product/services/productCloneService.js
-```
-
-Current search shows references to both clone service names. Do not delete legacy clone service until a dedicated dependency verification assignment proves zero runtime dependency.
-
-Safe deletion protocol:
-
-```txt
-Identify canonical
-→ Search all imports/requires
-→ Redirect references one file at a time
-→ Verify runtime and tests
-→ Confirm zero dependency
-→ Delete legacy file
-```
-
-## 12. Mission B Current Backend Understanding
-
-Mission B should proceed as workflow verification, not more feature construction.
-
-Current checkpoint status:
-
-```txt
-B-01 Template Search                 Ready
-B-02 Template Selection              Ready
-B-03 Operational Lookup              Ready / FE prepared
-B-04 Clone/Create Operational Product Engine exists
-B-05 BranchPrice Ready               Clone default + runtime upsert exists
-B-06 Stock Intake                    QuickReceive runtime exists
-B-07 End-to-End Runtime Verification NEXT
-```
-
-## 13. Recommended Next Backend Reads
-
-For broader backend mapping, future Tasks should inspect these next:
-
-```txt
-routes/stockRoutes.js
-controllers/stockController.js
-routes/stockItemRoutes.js
-controllers/stockItemController.js
-routes/purchaseOrderRoutes.js
-controllers/purchaseOrderController.js
-routes/purchaseOrderReceiptRoutes.js
-controllers/purchaseOrderReceiptController.js
-routes/quickReceiptRoutes.js
-controllers/quickReceiptController.js
-routes/saleRoutes.js
-controllers/saleController.js
-prisma/schema.prisma
-```
-
-## 14. Backend Rules for Future Assignments
-
-Every backend assignment must clearly state:
-
-```txt
-Mission
-Workflow checkpoint
-Runtime path being affected
-Legacy files allowed
-Module files allowed
-Files forbidden
-Whether this is feature recovery, verification, or migration
-Rollback risk
-Verification report path
-```
-
-If an assignment does not clearly say whether it is a production-runtime patch or migration patch, the Task must stop and ask ROLE-ARCH.
+Repository Review does not certify local build, runtime, database, or operational behavior.
