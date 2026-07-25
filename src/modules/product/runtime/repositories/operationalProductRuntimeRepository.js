@@ -1,1 +1,3 @@
-module.exports = require('../../repositories/operationalProductRuntimeRepository')
+const runtimeRepository = require('../../repositories/operationalProductRuntimeRepository')
+
+module.exports = runtimeRepository
