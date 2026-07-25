@@ -11,6 +11,9 @@ const {
 const {
   getPurchaseOrdersBySupplierHandler,
 } = require('../src/modules/procurement/purchaseOrder/query/bySupplier/purchaseOrderBySupplierController');
+const {
+  getEligiblePurchaseOrdersForReceipt,
+} = require('../src/modules/procurement/purchaseOrder/query/eligibleForReceipt/purchaseOrderEligibleForReceiptController');
 
 // Legacy handlers retained temporarily for capabilities not yet migrated.
 const {
@@ -21,9 +24,8 @@ const {
   createPurchaseOrderWithAdvance,
 } = require('../controllers/purchaseOrderController');
 
-// Receipt-owned helper endpoints remain outside Purchase Order migration scope.
+// Receiving-owned projection remains outside Purchase Order migration scope.
 const {
-  getEligiblePurchaseOrders,
   getPurchaseOrderDetailById,
 } = require('../controllers/purchaseOrderReceiptController');
 
@@ -36,7 +38,7 @@ router.get('/by-supplier/:supplierId', getPurchaseOrdersBySupplierHandler);
 router.get('/by-supplier', getPurchaseOrdersBySupplierHandler);
 router.post('/with-advance', createPurchaseOrderWithAdvance);
 
-router.get('/eligible-for-receipt', getEligiblePurchaseOrders);
+router.get('/eligible-for-receipt', getEligiblePurchaseOrdersForReceipt);
 router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
 router.put('/:id', updatePurchaseOrder);
 router.delete('/:id', deletePurchaseOrder);
