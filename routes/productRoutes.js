@@ -7,7 +7,7 @@ const productCreateLegacyCompatibilityController = require('../src/modules/produ
 const productCreateDropdownCompatibilityController = require('../src/modules/product/create/controllers/productCreateDropdownCompatibilityController')
 const operationalProductRuntimeController = require('../src/modules/product/runtime/controllers/operationalProductRuntimeController')
 const readyToSellController = require('../src/modules/product/readyToSell/controllers/readyToSellController')
-const productExistingModelPreviewRoutes = require('../src/modules/product/routes/productExistingModelPreviewRoutes')
+const productDuplicatePreviewRoutes = require('../src/modules/product/duplicatePreview/routes/productDuplicatePreviewRoutes')
 const verifyToken = require('../middlewares/verifyToken')
 
 router.get('/online/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
@@ -17,7 +17,7 @@ router.get('/online/detail/:id', operationalProductRuntimeController.getProductO
 router.use(verifyToken)
 
 router.get('/dropdowns', productCreateDropdownCompatibilityController.getProductDropdowns)
-router.use('/duplicate-preview', productExistingModelPreviewRoutes)
+router.use('/duplicate-preview', productDuplicatePreviewRoutes)
 router.get('/pos/search', operationalProductRuntimeController.getProductsForPos)
 router.get('/pos/runtime-by-template/:templateProductId', operationalProductRuntimeController.getOperationalProductByTemplateId)
 router.post('/pos/create-local', operationalProductRuntimeController.createLocalOperationalProduct)
