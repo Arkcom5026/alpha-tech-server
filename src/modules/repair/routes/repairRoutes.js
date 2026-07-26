@@ -29,6 +29,7 @@ router.post('/jobs/:id/estimates', allowRepairRoles(...OPERATION_ROLES), repairC
 router.patch('/jobs/:id/estimates/:estimateId/decision', allowRepairRoles(...OPERATION_ROLES), repairController.decideEstimate);
 
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
+router.get('/jobs/:id/parts/summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getPartUsageSummary);
 router.post('/jobs/:id/parts', allowRepairRoles(...OPERATION_ROLES), repairController.addParts);
 router.post('/jobs/:id/parts/:partItemId/reversal', allowRepairRoles(...OPERATION_ROLES), repairController.reversePartUsage);
 router.post('/jobs/:id/warranty-claims', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.openWarrantyClaim);
