@@ -20,6 +20,8 @@ router.get('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController
 router.get('/jobs/:id', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getJob);
 router.post('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.createJob);
 router.patch('/jobs/:id/status', allowRepairRoles(...OPERATION_ROLES), repairController.updateStatus);
+router.get('/jobs/:id/completion-readiness', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getCompletionReadiness);
+router.put('/jobs/:id/completion-checklist', allowRepairRoles(...OPERATION_ROLES), repairController.recordCompletionChecklist);
 
 router.get('/jobs/:id/diagnoses', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listDiagnoses);
 router.post('/jobs/:id/diagnoses', allowRepairRoles(...OPERATION_ROLES), repairController.recordDiagnosis);
