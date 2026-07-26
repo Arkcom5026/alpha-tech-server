@@ -4,6 +4,7 @@ const repairHandoverService = require('../services/repairHandoverService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
 const repairIntakeService = require('../services/repairIntakeService');
+const repairPartReversalService = require('../services/repairPartReversalService');
 const warrantyClaimService = require('../services/warrantyClaimService');
 const customerWarrantyAssetService = require('../services/customerWarrantyAssetService');
 const { resolveRepairActor } = require('../utils/repairActor');
@@ -124,6 +125,23 @@ class RepairController {
       const actor = resolveRepairActor(req.user);
       const data = await repairService.addPartsToRepairJob(actor, req.params.id, req.body);
       res.status(201).json({ success: true, message: 'เบิกอะไหล่สำหรับงานซ่อมเรียบร้อยแล้ว', data });
+    } catch (error) { next(error); }
+  }
+
+  async reversePartUsage(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairPartReversalService.reversePartUsage(
+        actor,
+        req.params.id,
+        req.params.partItemId,
+        req.body
+      );
+      res.status(200).json({
+        success: true,
+        message: 'คืนอะไหล่เข้าสต็อกจากใบงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
     } catch (error) { next(error); }
   }
 
