@@ -44,6 +44,7 @@ function mapRepairJob(job) {
     customerName: customerName(job.customer),
     stockItemId: job.stockItemId,
     stockItem: mapStockIdentity(job.stockItem),
+    serviceAssetId: job.serviceAssetId || null,
     deviceModel: job.deviceModel,
     reportedSymptoms: job.reportedSymptoms,
     technicianNotes: job.technicianNotes,
@@ -69,6 +70,7 @@ function mapRepairJob(job) {
       claimNo: claim.claimNo,
       status: claim.status,
       repairLinkState: claim.repairLinkState,
+      serviceAssetId: claim.serviceAssetId || null,
       supplierId: claim.supplierId,
       supplierName: claim.supplier?.name || null,
       openedAt: claim.openedAt,
@@ -86,6 +88,7 @@ function mapWarrantyClaim(claim) {
     branchId: claim.branchId,
     stockItemId: claim.stockItemId,
     stockItem: mapStockIdentity(claim.stockItem),
+    serviceAssetId: claim.serviceAssetId || null,
     repairJobId: claim.repairJobId,
     repairJob: claim.repairJob
       ? {
@@ -94,6 +97,7 @@ function mapWarrantyClaim(claim) {
           status: claim.repairJob.status,
           customerId: claim.repairJob.customerId,
           customerName: customerName(claim.repairJob.customer),
+          serviceAssetId: claim.repairJob.serviceAssetId || null,
         }
       : null,
     repairLinkState: claim.repairLinkState,
