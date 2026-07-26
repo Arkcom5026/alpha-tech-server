@@ -42,6 +42,10 @@ const {
 } = require('./application/taxLedgerPeriodAssignmentService');
 
 const {
+  createTaxPeriodCreationService,
+} = require('./application/taxPeriodCreationService');
+
+const {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   resolveSaleTaxProjectionDecision,
@@ -54,6 +58,14 @@ const {
   periodContainsDate,
   resolveTaxPeriodDate,
 } = require('./policies/taxPeriodResolutionPolicy');
+
+const {
+  TAX_PERIOD_INITIAL_STATUS,
+  assertTaxPeriodReplay,
+  buildMonthlyTaxPeriodBoundary,
+  normalizeCreateMonthlyTaxPeriodCommand,
+  sameBoundary,
+} = require('./policies/taxPeriodCreationPolicy');
 
 const {
   createPrismaTaxDocumentPublisher,
@@ -71,28 +83,38 @@ const {
   createPrismaTaxLedgerPeriodAssignmentRepository,
 } = require('./infrastructure/prismaTaxLedgerPeriodAssignmentRepository');
 
+const {
+  createPrismaTaxPeriodCreationRepository,
+} = require('./infrastructure/prismaTaxPeriodCreationRepository');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
   TAX_LEDGER_TYPES,
   TAX_PERIOD_ASSIGNABLE_STATUSES,
+  TAX_PERIOD_INITIAL_STATUS,
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
   assertTaxPeriodCandidate,
+  assertTaxPeriodReplay,
+  buildMonthlyTaxPeriodBoundary,
   buildTaxDocumentDraft,
   createPrismaTaxDocumentPublisher,
   createPrismaTaxLedgerPeriodAssignmentRepository,
   createPrismaTaxLedgerPublisher,
+  createPrismaTaxPeriodCreationRepository,
   createPrismaTaxPeriodResolver,
   createSaleTaxProjectionRuntime,
   createTaxDocumentLedgerPublicationRuntime,
   createTaxLedgerPeriodAssignmentService,
+  createTaxPeriodCreationService,
   isAssignableTaxPeriodStatus,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
+  normalizeCreateMonthlyTaxPeriodCommand,
   normalizeTaxDocumentCommand,
   periodContainsDate,
   projectCompletedSaleToTaxDocument,
@@ -102,5 +124,6 @@ module.exports = {
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
   resolveTaxPeriodDate,
+  sameBoundary,
   stableHash,
 };
