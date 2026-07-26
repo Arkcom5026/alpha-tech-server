@@ -3,6 +3,7 @@ const verifyToken = require('../../../../middlewares/verifyToken');
 const repairController = require('../controllers/repairController');
 const repairWorkLogController = require('../controllers/repairWorkLogController');
 const repairPartReservationController = require('../controllers/repairPartReservationController');
+const repairCustomerNotificationController = require('../controllers/repairCustomerNotificationController');
 const {
   loadRepairEmployeeContext,
   allowRepairRoles,
@@ -60,6 +61,8 @@ router.post('/jobs/:id/payments', allowRepairRoles(...OPERATION_ROLES), repairCo
 router.get('/jobs/:id/invoices', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listInvoices);
 router.post('/jobs/:id/invoices', allowRepairRoles(...OPERATION_ROLES), repairController.issueInvoice);
 
+router.get('/jobs/:id/customer-notifications', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairCustomerNotificationController.get);
+router.post('/jobs/:id/customer-notifications', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairCustomerNotificationController.record);
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
 router.get('/jobs/:id/parts/summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getPartUsageSummary);
 router.get('/jobs/:id/parts/reservations', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairPartReservationController.list);
