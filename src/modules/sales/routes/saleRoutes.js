@@ -4,11 +4,13 @@ const { completeSaleController } = require('../completion/controllers/saleComple
 const { createSale } = require('../create/controllers/saleLegacyCreateController');
 const { updateSaleDocumentLinesController } = require('../documents/controllers/saleDocumentController');
 const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = require('../history/controllers/saleHistoryController');
+const { searchSaleItemsController } = require('../item-search/controllers/saleItemSearchController');
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
+router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
 router.use('/returns', saleReturnRoutes);
 router.post('/', createSale);
