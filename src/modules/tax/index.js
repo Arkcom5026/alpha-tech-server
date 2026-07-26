@@ -27,6 +27,12 @@ const {
 } = require('./application/saleTaxProjectionRuntimeService');
 
 const {
+  SALE_TAX_PROJECTION_ACTIONS,
+  SALE_TAX_TREATMENTS,
+  resolveSaleTaxProjectionDecision,
+} = require('./policies/saleTaxProjectionGateway');
+
+const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
@@ -34,6 +40,8 @@ module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
+  SALE_TAX_PROJECTION_ACTIONS,
+  SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
   buildTaxDocumentDraft,
   createPrismaTaxDocumentPublisher,
@@ -43,6 +51,7 @@ module.exports = {
   isTaxDocumentType,
   normalizeTaxDocumentCommand,
   projectCompletedSaleToTaxDocument,
+  resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
   stableHash,
 };
