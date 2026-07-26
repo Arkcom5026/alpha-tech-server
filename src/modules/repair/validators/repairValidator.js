@@ -40,6 +40,33 @@ function optionalText(value, maxLength = 2000) {
   return normalized || null;
 }
 
+function optionalDate(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      `${fieldName} ต้องเป็นวันที่ที่ถูกต้อง`,
+      400,
+      { field: fieldName }
+    );
+  }
+  return parsed;
+}
+
+function textList(value, fieldName, maxItems = 30) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > maxItems) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      `${fieldName} ต้องเป็นรายการไม่เกิน ${maxItems} รายการ`,
+      400,
+      { field: fieldName }
+    );
+  }
+  return value.map((item) => optionalText(item, 255)).filter(Boolean);
+}
+
 function positiveInt(value, fieldName, { optional = false } = {}) {
   if ((value === undefined || value === null || value === '') && optional) return null;
   const parsed = Number(value);
@@ -88,8 +115,23 @@ function validateLookup(rawLookup) {
 function validateCreateRepairJob(payload = {}) {
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
+    serviceAssetId: positiveInt(payload.serviceAssetId, 'serviceAssetId', { optional: true }),
     stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
-    deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
+    deviceType: optionalText(payload.deviceType, 255),
+    brandName: optionalText(payload.brandName, 255),
+    modelName: optionalText(payload.modelName, 255),
+    serialNumber: optionalText(payload.serialNumber, 255),
+    customerAssetTag: optionalText(payload.customerAssetTag, 255),
+    color: optionalText(payload.color, 120),
+    assetDescription: optionalText(payload.assetDescription, 2000),
+    accessories: textList(payload.accessories, 'accessories'),
+    physicalCondition: optionalText(payload.physicalCondition, 4000),
+    accessInstructions: optionalText(payload.accessInstructions, 2000),
+    purchaseSource: optionalText(payload.purchaseSource, 255),
+    purchaseDate: optionalDate(payload.purchaseDate, 'purchaseDate'),
+    externalWarrantyUntil: optionalDate(payload.externalWarrantyUntil, 'externalWarrantyUntil'),
+    externalWarrantyNote: optionalText(payload.externalWarrantyNote, 2000),
+    deviceModel: requiredText(payload.deviceModel || payload.modelName, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
     estimatedCost: nonNegativeMoney(payload.estimatedCost, 'estimatedCost', 0),
