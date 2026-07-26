@@ -20,9 +20,7 @@ function httpError(status, code, message, details) {
 }
 
 function positiveInteger(value, field, required = true) {
-  if ((value === undefined || value === null || value === '') && !required) {
-    return null;
-  }
+  if ((value === undefined || value === null || value === '') && !required) return null;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw httpError(400, 'INVALID_DEVICE_INTAKE_INPUT', `${field} ต้องเป็นจำนวนเต็มมากกว่า 0`, { field });
@@ -33,8 +31,7 @@ function positiveInteger(value, field, required = true) {
 function optionalText(value, maxLength = 2000) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
-  if (!text) return null;
-  return text.slice(0, maxLength);
+  return text ? text.slice(0, maxLength) : null;
 }
 
 function booleanValue(value, fallback = false) {
@@ -110,6 +107,21 @@ function normalizePayload(raw = {}) {
   };
 }
 
+function normalizeIdentityPart(value) {
+  return String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function buildDeviceFingerprint(snapshot, stockItemId) {
+  let authority;
+  if (stockItemId) authority = `STOCK:${stockItemId}`;
+  else if (snapshot.imei) authority = `IMEI:${normalizeIdentityPart(snapshot.imei)}`;
+  else if (snapshot.serialNumber) {
+    authority = `SERIAL:${normalizeIdentityPart(snapshot.brand)}:${normalizeIdentityPart(snapshot.model)}:${normalizeIdentityPart(snapshot.serialNumber)}`;
+  } else if (snapshot.barcode) authority = `BARCODE:${normalizeIdentityPart(snapshot.barcode)}`;
+  else authority = `UNIDENTIFIED:${crypto.randomUUID()}`;
+  return crypto.createHash('sha256').update(authority).digest('hex');
+}
+
 function buildIntakeNo(branchId) {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -149,8 +161,27 @@ class CreateDeviceIntakeService {
         barcode: payload.snapshot.barcode || stockItem?.barcode || null,
       };
 
+      const fingerprint = buildDeviceFingerprint(snapshot, payload.stockItemId);
+      let device = await repo.findDevice({ stockItemId: payload.stockItemId, fingerprint });
+      if (device) {
+        device = await repo.updateDeviceIdentity(device.id, {
+          customerId: payload.customerId,
+          ...snapshot,
+        });
+      } else {
+        device = await repo.createDevice({
+          branchId,
+          customerId: payload.customerId,
+          stockItemId: payload.stockItemId,
+          fingerprint,
+          ...snapshot,
+        });
+      }
+      await repo.ensureOwnership(device.id, payload.customerId, employeeId);
+
       const intake = await repo.createIntake({
         intakeNo: buildIntakeNo(branchId),
+        deviceId: device.id,
         branchId,
         customerId: payload.customerId,
         stockItemId: payload.stockItemId,
@@ -173,11 +204,12 @@ class CreateDeviceIntakeService {
         employeeId,
         ipAddress: optionalText(requestContext.ipAddress, 80),
         userAgent: optionalText(requestContext.userAgent, 1000),
-        metadata: { purpose: payload.purpose },
+        metadata: { purpose: payload.purpose, deviceId: device.id },
       });
 
       return {
-        contractVersion: 'device-intake.v1',
+        contractVersion: 'device-intake.v2',
+        device,
         intake,
         snapshot: createdSnapshot,
         condition: createdCondition,
@@ -191,3 +223,4 @@ class CreateDeviceIntakeService {
 module.exports = new CreateDeviceIntakeService();
 module.exports.CreateDeviceIntakeService = CreateDeviceIntakeService;
 module.exports.normalizePayload = normalizePayload;
+module.exports.buildDeviceFingerprint = buildDeviceFingerprint;
