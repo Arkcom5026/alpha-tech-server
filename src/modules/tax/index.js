@@ -33,6 +33,10 @@ const {
 } = require('./application/saleTaxProjectionRuntimeService');
 
 const {
+  createTaxDocumentLedgerPublicationRuntime,
+} = require('./application/taxDocumentLedgerPublicationRuntimeService');
+
+const {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   resolveSaleTaxProjectionDecision,
@@ -58,6 +62,7 @@ module.exports = {
   createPrismaTaxDocumentPublisher,
   createPrismaTaxLedgerPublisher,
   createSaleTaxProjectionRuntime,
+  createTaxDocumentLedgerPublicationRuntime,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
