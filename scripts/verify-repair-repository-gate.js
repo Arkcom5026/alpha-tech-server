@@ -39,6 +39,7 @@ function run() {
     'scripts/verify-repair-management-alert.js',
     'scripts/verify-repair-management-brief.js',
     'scripts/verify-repair-executive-summary.js',
+    'scripts/verify-repair-contract-boundary-audit.js',
     'scripts/verify-repair-e2e-completion-audit.js',
   ];
 
@@ -153,6 +154,14 @@ function run() {
     'Repair executive summary verifier: PASS',
   ]);
 
+  requireSource('scripts/verify-repair-contract-boundary-audit.js', [
+    'assertNotContains',
+    "require('../repositories/",
+    'mutationLines',
+    'RepairFailureCode.EMPLOYEE_CONTEXT_REQUIRED',
+    'Repair contract and boundary audit: PASS',
+  ]);
+
   requireSource('scripts/verify-repair-e2e-completion-audit.js', [
     "app.use('/api/repairs', repairRoutes)",
     "app.use('/api/repair', repairRoutes)",
@@ -173,6 +182,7 @@ function run() {
     'verify:repair-management-alert',
     'verify:repair-management-brief',
     'verify:repair-executive-summary',
+    'verify:repair-contract-boundary-audit',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
     'verify:repair-complete',
@@ -190,6 +200,7 @@ function run() {
     'verify:repair-management-alert',
     'verify:repair-management-brief',
     'verify:repair-executive-summary',
+    'verify:repair-contract-boundary-audit',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
   ]) {
