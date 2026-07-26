@@ -163,6 +163,7 @@ class CreateDeviceIntakeService {
 
       const fingerprint = buildDeviceFingerprint(snapshot, payload.stockItemId);
       let device = await repo.findDevice({ stockItemId: payload.stockItemId, fingerprint });
+      const isNewDevice = !device;
       if (device) {
         device = await repo.updateDeviceIdentity(device.id, {
           customerId: payload.customerId,
@@ -198,6 +199,38 @@ class CreateDeviceIntakeService {
         repo.createConsent(intake.id, payload.consent),
       ]);
 
+      if (isNewDevice) {
+        await repo.createPassportEvent({
+          deviceId: device.id,
+          branchId,
+          eventType: 'DEVICE_CREATED',
+          sourceType: 'DEVICE',
+          sourceId: device.id,
+          title: 'สร้างประวัติอุปกรณ์',
+          description: `${snapshot.brand || ''} ${snapshot.model}`.trim(),
+          actorType: 'EMPLOYEE',
+          actorEmployeeId: employeeId,
+          customerVisible: false,
+          metadata: { fingerprintAuthority: payload.stockItemId ? 'STOCK_ITEM' : 'IDENTITY' },
+          occurredAt: device.createdAt || new Date(),
+        });
+      }
+
+      await repo.createPassportEvent({
+        deviceId: device.id,
+        branchId,
+        eventType: 'DEVICE_INTAKE_CREATED',
+        sourceType: 'DEVICE_INTAKE',
+        sourceId: intake.id,
+        title: 'รับอุปกรณ์เข้าระบบ',
+        description: payload.reportedSymptoms,
+        actorType: 'EMPLOYEE',
+        actorEmployeeId: employeeId,
+        customerVisible: true,
+        metadata: { purpose: payload.purpose, intakeNo: intake.intakeNo },
+        occurredAt: intake.createdAt || new Date(),
+      });
+
       await repo.createAudit(intake.id, {
         action: 'INTAKE_CREATED',
         actorType: 'EMPLOYEE',
@@ -208,7 +241,7 @@ class CreateDeviceIntakeService {
       });
 
       return {
-        contractVersion: 'device-intake.v2',
+        contractVersion: 'device-intake.v3',
         device,
         intake,
         snapshot: createdSnapshot,
