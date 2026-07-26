@@ -23,6 +23,12 @@ const {
 } = require('./projections/saleTaxDocumentProjection');
 
 const {
+  TAX_LEDGER_TYPES,
+  projectTaxDocumentDraftToLedgerEntry,
+  resolveLedgerType,
+} = require('./projections/taxLedgerEntryProjection');
+
+const {
   createSaleTaxProjectionRuntime,
 } = require('./application/saleTaxProjectionRuntimeService');
 
@@ -40,6 +46,7 @@ module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
+  TAX_LEDGER_TYPES,
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
@@ -51,6 +58,8 @@ module.exports = {
   isTaxDocumentType,
   normalizeTaxDocumentCommand,
   projectCompletedSaleToTaxDocument,
+  projectTaxDocumentDraftToLedgerEntry,
+  resolveLedgerType,
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
   stableHash,
