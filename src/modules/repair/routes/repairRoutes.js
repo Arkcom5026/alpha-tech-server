@@ -2,6 +2,9 @@ const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const repairController = require('../controllers/repairController');
 const {
+  getIntakeContext,
+} = require('../query/intake-context/intakeContextController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -17,7 +20,7 @@ router.use(loadRepairEmployeeContext);
 router.get(
   '/intake-context/:lookup',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.getIntakeContext
+  getIntakeContext
 );
 
 router.get(
