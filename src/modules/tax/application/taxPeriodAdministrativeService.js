@@ -3,8 +3,11 @@ const {
 } = require('../contracts/createTaxDocumentCommand');
 const {
   TAX_PERIOD_STATUSES,
-  projectTaxPeriodAvailableActions,
 } = require('../policies/taxPeriodLifecyclePolicy');
+const {
+  projectTaxPeriodAdministrativeCollection,
+  projectTaxPeriodAdministrativeResponse,
+} = require('../projections/taxPeriodAdministrativeProjection');
 const {
   createTaxPeriodAvailabilityService,
 } = require('./taxPeriodAvailabilityService');
@@ -16,12 +19,6 @@ const {
 } = require('../infrastructure/prismaTaxPeriodAdministrativeRepository');
 
 const TAX_PERIOD_STATUS_VALUES = Object.freeze(Object.values(TAX_PERIOD_STATUSES));
-
-const projectAdministrativeTaxPeriod = (taxPeriod) =>
-  Object.freeze({
-    ...taxPeriod,
-    availableActions: projectTaxPeriodAvailableActions(taxPeriod.status),
-  });
 
 const requirePositiveInteger = (value, code, message) => {
   const resolved = Number(value);
@@ -93,7 +90,10 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
       );
     }
 
-    return Object.freeze({ branchId, taxPeriod: projectAdministrativeTaxPeriod(taxPeriod) });
+    return Object.freeze({
+      branchId,
+      taxPeriod: projectTaxPeriodAdministrativeResponse(taxPeriod),
+    });
   };
 
   const getPeriodSummary = async (input = {}) => {
@@ -123,7 +123,7 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
       total: Object.values(countsByStatus).reduce((sum, count) => sum + count, 0),
       countsByStatus: Object.freeze(countsByStatus),
       currentPeriod: result.currentPeriod
-        ? projectAdministrativeTaxPeriod(result.currentPeriod)
+        ? projectTaxPeriodAdministrativeResponse(result.currentPeriod)
         : null,
     });
   };
@@ -149,8 +149,13 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
       toDate,
       statuses: normalizeStatuses(input.statuses),
     });
+    const projectedPeriods = projectTaxPeriodAdministrativeCollection(periods);
 
-    return Object.freeze({ branchId, count: periods.length, periods: Object.freeze(periods) });
+    return Object.freeze({
+      branchId,
+      count: projectedPeriods.length,
+      periods: projectedPeriods,
+    });
   };
 
   return Object.freeze({
@@ -167,7 +172,6 @@ module.exports = {
   createTaxPeriodAdministrativeService,
   normalizeStatuses,
   parseOptionalDate,
-  projectAdministrativeTaxPeriod,
   requirePositiveInteger,
   requireTaxPeriodId,
 };
