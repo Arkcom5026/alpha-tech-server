@@ -7,6 +7,9 @@ const {
 } = require('../contracts/repairError');
 const { mapRepairJob } = require('../mappers/repairMapper');
 const { mapServiceAsset } = require('../mappers/serviceAssetMapper');
+const { estimateHistory } = require('./repairEstimateService');
+const { latestApprovedEstimate } = require('./repairFinancialSummaryService');
+const { paymentHistory, calculateSettlement } = require('./repairSettlementService');
 
 const TERMINAL_CLAIM_STATUSES = new Set(['RESOLVED', 'CANCELLED']);
 
@@ -21,6 +24,31 @@ function handoverMetadata(metadata) {
     return {};
   }
   return metadata;
+}
+
+function assertFinanciallyReadyForHandover(job, metadata) {
+  const approvedEstimate = latestApprovedEstimate(job.id, estimateHistory(metadata));
+  if (!approvedEstimate) return null;
+
+  const payments = paymentHistory(metadata).filter(
+    (payment) =>
+      Number(payment.repairJobId) === Number(job.id) &&
+      payment.status !== 'VOIDED'
+  );
+  const settlement = calculateSettlement({ job, approvedEstimate, payments });
+  if (settlement.status !== 'SETTLED') {
+    throw new RepairError(
+      RepairFailureCode.REPAIR_SETTLEMENT_REQUIRED,
+      'ต้องชำระยอดงานซ่อมให้ครบก่อนส่งคืนเครื่องให้ลูกค้า',
+      409,
+      {
+        approvedTotal: settlement.approvedTotal,
+        paidTotal: settlement.paidTotal,
+        outstandingBalance: settlement.outstandingBalance,
+      }
+    );
+  }
+  return settlement;
 }
 
 class RepairHandoverService {
@@ -98,10 +126,12 @@ class RepairHandoverService {
           repairJob: mapRepairJob(job),
           serviceAsset: mapServiceAsset(asset),
           handover: existingHandover,
+          settlement: existingHandover.settlement || null,
           idempotent: true,
         };
       }
 
+      const settlement = assertFinanciallyReadyForHandover(job, existingMetadata);
       const handedOverAt = new Date();
       const handover = {
         repairJobId: job.id,
@@ -109,6 +139,7 @@ class RepairHandoverService {
         handedOverAt: handedOverAt.toISOString(),
         handedOverByEmployeeId: actor.employeeId,
         note: payload.note,
+        settlement,
       };
 
       const updatedAsset = await assetRepo.updateServiceAsset(asset.id, {
@@ -123,6 +154,7 @@ class RepairHandoverService {
         repairJob: mapRepairJob(job),
         serviceAsset: mapServiceAsset(updatedAsset),
         handover,
+        settlement,
         idempotent: false,
       };
     });
@@ -132,3 +164,4 @@ class RepairHandoverService {
 module.exports = new RepairHandoverService();
 module.exports.RepairHandoverService = RepairHandoverService;
 module.exports.activeWarrantyClaims = activeWarrantyClaims;
+module.exports.assertFinanciallyReadyForHandover = assertFinanciallyReadyForHandover;
