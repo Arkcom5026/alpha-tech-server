@@ -14,7 +14,7 @@ const {
 function jobFixture(status = 'RECEIVED') {
   return {
     id: 31,
-    jobNo: 'RP-31',
+    jobNo: 'RE-4-20260727-TEST0031',
     branchId: 4,
     customerId: 7,
     customer: { name: 'Customer' },
@@ -40,16 +40,16 @@ test('status repository keeps lookup branch-safe and update scoped by job id', a
   const repo = new UpdateRepairJobStatusRepository({
     repairJob: {
       findFirst(args) { findArgs = args; return Promise.resolve(null); },
-      update(args) { updateArgs = args; return Promise.resolve(jobFixture('DIAGNOSING')); },
+      update(args) { updateArgs = args; return Promise.resolve(jobFixture('IN_PROGRESS')); },
     },
   });
 
   await repo.findJob('4', '31');
-  await repo.updateJob('31', { status: 'DIAGNOSING' });
+  await repo.updateJob('31', { status: 'IN_PROGRESS' });
 
   assert.deepEqual(findArgs.where, { id: 31, branchId: 4 });
   assert.deepEqual(updateArgs.where, { id: 31 });
-  assert.deepEqual(updateArgs.data, { status: 'DIAGNOSING' });
+  assert.deepEqual(updateArgs.data, { status: 'IN_PROGRESS' });
 });
 
 test('status service validates job id before transaction access', async () => {
@@ -59,7 +59,7 @@ test('status service validates job id before transaction access', async () => {
   });
 
   await assert.rejects(
-    () => service.execute({ branchId: 4 }, 'bad', { status: 'DIAGNOSING' }),
+    () => service.execute({ branchId: 4 }, 'bad', { status: 'IN_PROGRESS' }),
     (error) => error.code === RepairFailureCode.INVALID_INPUT
   );
   assert.equal(called, false);
@@ -81,7 +81,7 @@ test('status service applies transition and maps updated job', async () => {
       assert.equal(id, 31);
       updateData = data;
       return Promise.resolve({
-        ...jobFixture('DIAGNOSING'),
+        ...jobFixture('IN_PROGRESS'),
         technicianNotes: 'ตรวจสอบแล้ว',
         technician: { id: 9, name: 'Tech', phone: null },
       });
@@ -94,15 +94,15 @@ test('status service applies transition and maps updated job', async () => {
   const result = await service.execute(
     { branchId: 4 },
     31,
-    { status: 'diagnosing', technicianId: 9, technicianNotes: ' ตรวจสอบแล้ว ' }
+    { status: 'in_progress', technicianId: 9, technicianNotes: ' ตรวจสอบแล้ว ' }
   );
 
   assert.deepEqual(updateData, {
-    status: 'DIAGNOSING',
+    status: 'IN_PROGRESS',
     technicianNotes: 'ตรวจสอบแล้ว',
     technicianId: 9,
   });
-  assert.equal(result.status, 'DIAGNOSING');
+  assert.equal(result.status, 'IN_PROGRESS');
   assert.equal(result.technician.id, 9);
 });
 
@@ -113,7 +113,7 @@ test('status service preserves not-found and technician scope failures', async (
     },
   });
   await assert.rejects(
-    () => notFound.execute({ branchId: 4 }, 99, { status: 'DIAGNOSING' }),
+    () => notFound.execute({ branchId: 4 }, 99, { status: 'IN_PROGRESS' }),
     (error) => error.code === RepairFailureCode.REPAIR_JOB_NOT_FOUND
   );
 
@@ -129,7 +129,7 @@ test('status service preserves not-found and technician scope failures', async (
     () => invalidTechnician.execute(
       { branchId: 4 },
       31,
-      { status: 'DIAGNOSING', technicianId: 9 }
+      { status: 'IN_PROGRESS', technicianId: 9 }
     ),
     (error) => error.code === RepairFailureCode.TECHNICIAN_NOT_FOUND
   );
