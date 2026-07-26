@@ -9,6 +9,10 @@ const checks = Object.freeze([
     name: 'Sale tax projection gateway',
     script: 'scripts/verify-tax-sale-projection-gateway.js',
   },
+  {
+    name: 'Tax document publisher branch isolation',
+    script: 'scripts/verify-tax-document-publisher-branch-isolation.js',
+  },
 ]);
 
 const runCheck = ({ name, script }) => {
