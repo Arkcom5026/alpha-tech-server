@@ -4,22 +4,22 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  getReceiptBarcodeSummaries,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
   getReceiptsReadyToPay,
-  createQuickReceipt,
   generateReceiptBarcodes,
   printReceipt,
   commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
 
 const createPurchaseReceiptController = require('../src/modules/procurement/receipt/create/createPurchaseReceiptController');
+const createQuickReceiptController = require('../src/modules/procurement/receipt/quick/createQuickReceiptController');
 const updatePurchaseReceiptNoteController = require('../src/modules/procurement/receipt/update-note/updatePurchaseReceiptNoteController');
 const deletePurchaseReceiptController = require('../src/modules/procurement/receipt/delete/deletePurchaseReceiptController');
 const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
 const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
 const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
+const listReceiptBarcodeSummariesController = require('../src/modules/procurement/receipt/barcode/summary/listReceiptBarcodeSummariesController');
 const updateReceiptItemController = require('../src/modules/procurement/receipt/item/update/updateReceiptItemController');
 
 const verifyToken = require('../middlewares/verifyToken');
@@ -28,10 +28,10 @@ router.use(verifyToken);
 router.post('/', createPurchaseReceiptController.handle);
 router.get('/', listPurchaseReceiptsController.handle);
 router.get('/ready-to-pay', getReceiptsReadyToPay);
-router.get('/with-barcode-status', getReceiptBarcodeSummaries);
-router.get('/summaries', getReceiptBarcodeSummaries);
-router.get('/receipt-barcode-summaries', getReceiptBarcodeSummaries);
-router.post('/quick-receipts', createQuickReceipt);
+router.get('/with-barcode-status', listReceiptBarcodeSummariesController.handle);
+router.get('/summaries', listReceiptBarcodeSummariesController.handle);
+router.get('/receipt-barcode-summaries', listReceiptBarcodeSummariesController.handle);
+router.post('/quick-receipts', createQuickReceiptController.handle);
 router.get('/:id', getPurchaseReceiptController.handle);
 router.get('/:receiptId/items', listReceiptItemsController.handle);
 
