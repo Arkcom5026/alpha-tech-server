@@ -124,6 +124,20 @@ It enforces the following repository invariants:
 - Mutation routes must carry an approved role policy. Intake creation and warranty-claim intake retain their explicitly approved intake authority; other operational mutations require `OWNER` or `MANAGER`.
 - Repair failures remain typed through `RepairError`, `RepairFailureCode`, HTTP status, and optional details.
 
+## Module isolation authority
+
+The module isolation audit is registered as:
+
+- `npm run verify:repair-module-isolation`
+
+Its repository rules are:
+
+- Repair source files must not import another feature module under `src/modules/*` directly.
+- Repair must not import legacy controllers, routes, or services outside its own module boundary.
+- Cross-domain Product, Stock, Customer, Supplier, Sale, and Employee data is read or mutated through Prisma relations owned by `repairRepository.js`; ownership is not transferred to another module controller or service.
+- Direct Prisma ownership is restricted to `repairRepository.js` and the approved employee-context boundary in `repairAuthorization.js`.
+- Any future change to those direct Prisma owners must be an explicit architecture decision rather than an accidental import.
+
 ## Verification authority
 
 ### Gate A — Repository Gate
@@ -131,11 +145,12 @@ It enforces the following repository invariants:
 Repository completion is represented by:
 
 - `npm run verify:repair-contract-boundary-audit`
+- `npm run verify:repair-module-isolation`
 - `npm run verify:repair-repository-gate`
 - `npm run verify:repair-e2e-completion-audit`
 - `npm run verify:repair-complete`
 
-Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
+Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, module isolation, direct Prisma ownership, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
 
 ### Gate B — Runtime Gate
 
@@ -163,6 +178,7 @@ Repository completion must never be reported as Operational PASS.
 - Repository implementation: complete for the recorded scope
 - Repository verification wiring: complete
 - Contract and boundary audit wiring: complete
+- Module isolation audit wiring: complete
 - Runtime verification: deferred
 - Operational verification: deferred
 
