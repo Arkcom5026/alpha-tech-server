@@ -47,9 +47,12 @@ function Get-PrismaDeclarations {
     $text = $Content.Substring($start, ($end - $start) + 1).Trim()
 
     $declarations += [pscustomobject]@{
-      Kind = $match.Groups['kind'].Value
-      Name = $match.Groups['name'].Value
-      Text = $text
+      Kind      = $match.Groups['kind'].Value
+      Name      = $match.Groups['name'].Value
+      Text      = $text
+      Start     = $start
+      OpenBrace = $openBrace
+      End       = $end
     }
   }
 
@@ -61,6 +64,34 @@ function Normalize-PrismaDeclaration {
 
   $withoutComments = [regex]::Replace($Text, '(?m)^\s*//.*(?:\r?\n|$)', '')
   return [regex]::Replace($withoutComments.Trim(), '\s+', ' ')
+}
+
+function Get-PrismaEnumMembers {
+  param([Parameter(Mandatory = $true)][string]$DeclarationText)
+
+  $openBrace = $DeclarationText.IndexOf('{')
+  $closeBrace = $DeclarationText.LastIndexOf('}')
+
+  if ($openBrace -lt 0 -or $closeBrace -le $openBrace) {
+    throw 'Invalid Prisma enum declaration.'
+  }
+
+  $body = $DeclarationText.Substring($openBrace + 1, $closeBrace - $openBrace - 1)
+  $members = @()
+
+  foreach ($line in ($body -split "`r?`n")) {
+    $trimmed = $line.Trim()
+
+    if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('//')) {
+      continue
+    }
+
+    if ($trimmed -match '^(?<name>[A-Za-z_][A-Za-z0-9_]*)\b') {
+      $members += $Matches['name']
+    }
+  }
+
+  return @($members | Select-Object -Unique)
 }
 
 function Invoke-PrismaValidation {
@@ -111,6 +142,7 @@ if ($workingTree.Count -gt 0) {
 
 $schema = Get-Content $schemaPath -Raw
 $candidate = Get-Content $candidatePath -Raw
+$lineEnding = if ($schema.Contains("`r`n")) { "`r`n" } else { "`n" }
 
 $schemaDeclarations = @(Get-PrismaDeclarations -Content $schema -SourceLabel $schemaPath)
 $candidateDeclarations = @(Get-PrismaDeclarations -Content $candidate -SourceLabel $candidatePath)
@@ -129,8 +161,10 @@ foreach ($declaration in $schemaDeclarations) {
 }
 
 $candidateNames = @{}
-$missing = @()
-$identical = @()
+$missingDeclarations = @()
+$identicalDeclarations = @()
+$compatibleEnums = @()
+$enumMemberAdditions = @()
 $conflicts = @()
 
 foreach ($declaration in $candidateDeclarations) {
@@ -140,57 +174,108 @@ foreach ($declaration in $candidateDeclarations) {
   $candidateNames[$declaration.Name] = $true
 
   if (-not $schemaByName.ContainsKey($declaration.Name)) {
-    $missing += $declaration
+    $missingDeclarations += $declaration
     continue
   }
 
   $existing = $schemaByName[$declaration.Name]
-  $sameKind = $existing.Kind -eq $declaration.Kind
+
+  if ($existing.Kind -ne $declaration.Kind) {
+    $conflicts += [pscustomobject]@{
+      Name          = $declaration.Name
+      ExistingKind  = $existing.Kind
+      CandidateKind = $declaration.Kind
+      Reason        = 'declaration kind mismatch'
+    }
+    continue
+  }
+
+  if ($declaration.Kind -eq 'enum') {
+    $existingMembers = @(Get-PrismaEnumMembers -DeclarationText $existing.Text)
+    $candidateMembers = @(Get-PrismaEnumMembers -DeclarationText $declaration.Text)
+    $missingMembers = @($candidateMembers | Where-Object { $_ -notin $existingMembers })
+
+    if ($missingMembers.Count -eq 0) {
+      $compatibleEnums += [pscustomobject]@{
+        Name            = $declaration.Name
+        ExistingMembers = $existingMembers
+      }
+    }
+    else {
+      $enumMemberAdditions += [pscustomobject]@{
+        Name           = $declaration.Name
+        Declaration    = $existing
+        MissingMembers = $missingMembers
+      }
+    }
+
+    continue
+  }
+
   $sameDefinition = (Normalize-PrismaDeclaration $existing.Text) -eq (Normalize-PrismaDeclaration $declaration.Text)
 
-  if ($sameKind -and $sameDefinition) {
-    $identical += $declaration
+  if ($sameDefinition) {
+    $identicalDeclarations += $declaration
   }
   else {
     $conflicts += [pscustomobject]@{
-      Name = $declaration.Name
-      ExistingKind = $existing.Kind
+      Name          = $declaration.Name
+      ExistingKind  = $existing.Kind
       CandidateKind = $declaration.Kind
+      Reason        = 'model definition mismatch'
     }
   }
 }
 
 Write-Host ''
 Write-Host '=== TAX PRISMA FOUNDATION PLAN ===' -ForegroundColor Cyan
-Write-Host "Repository : $repoRoot"
-Write-Host "Branch     : $branch"
-Write-Host "Missing    : $($missing.Count)"
-Write-Host "Identical  : $($identical.Count)"
-Write-Host "Conflicts  : $($conflicts.Count)"
+Write-Host "Repository            : $repoRoot"
+Write-Host "Branch                : $branch"
+Write-Host "Missing declarations : $($missingDeclarations.Count)"
+Write-Host "Identical models     : $($identicalDeclarations.Count)"
+Write-Host "Compatible enums     : $($compatibleEnums.Count)"
+Write-Host "Enum merges          : $($enumMemberAdditions.Count)"
+Write-Host "Conflicts            : $($conflicts.Count)"
 
-if ($identical.Count -gt 0) {
+if ($identicalDeclarations.Count -gt 0) {
   Write-Host ''
-  Write-Host 'Already present with identical definitions:' -ForegroundColor Yellow
-  $identical | ForEach-Object { Write-Host "  - $($_.Kind) $($_.Name)" }
+  Write-Host 'Already present with identical model definitions:' -ForegroundColor Yellow
+  $identicalDeclarations | ForEach-Object { Write-Host "  - model $($_.Name)" }
 }
 
-if ($missing.Count -gt 0) {
+if ($compatibleEnums.Count -gt 0) {
+  Write-Host ''
+  Write-Host 'Existing enums already satisfy candidate requirements:' -ForegroundColor Yellow
+  $compatibleEnums | ForEach-Object { Write-Host "  - enum $($_.Name)" }
+}
+
+if ($enumMemberAdditions.Count -gt 0) {
+  Write-Host ''
+  Write-Host 'Enum members eligible for additive merge:' -ForegroundColor Green
+  foreach ($enumMerge in $enumMemberAdditions) {
+    Write-Host "  ~ enum $($enumMerge.Name)"
+    $enumMerge.MissingMembers | ForEach-Object { Write-Host "      + $_" }
+  }
+}
+
+if ($missingDeclarations.Count -gt 0) {
   Write-Host ''
   Write-Host 'Declarations eligible for deterministic installation:' -ForegroundColor Green
-  $missing | ForEach-Object { Write-Host "  + $($_.Kind) $($_.Name)" }
+  $missingDeclarations | ForEach-Object { Write-Host "  + $($_.Kind) $($_.Name)" }
 }
 
 if ($conflicts.Count -gt 0) {
   Write-Host ''
   Write-Host 'Conflicting declarations:' -ForegroundColor Red
   $conflicts | ForEach-Object {
-    Write-Host "  ! $($_.Name) (schema=$($_.ExistingKind), candidate=$($_.CandidateKind))"
+    Write-Host "  ! $($_.Name) (schema=$($_.ExistingKind), candidate=$($_.CandidateKind), reason=$($_.Reason))"
   }
 
   throw 'Tax Prisma foundation installation blocked. Resolve conflicting declarations before applying changes.'
 }
 
-if ($missing.Count -eq 0) {
+$changeCount = $missingDeclarations.Count + $enumMemberAdditions.Count
+if ($changeCount -eq 0) {
   Write-Host ''
   Write-Host 'Tax Prisma foundation is already installed. No changes made.' -ForegroundColor Green
   exit 0
@@ -205,10 +290,20 @@ if (-not $Apply) {
 }
 
 Copy-Item $schemaPath $backupPath -Force
+$nextSchema = $schema
 
-$separator = "`r`n`r`n"
-$blocksToAppend = ($missing | ForEach-Object { $_.Text }) -join $separator
-$nextSchema = $schema.TrimEnd() + $separator + $blocksToAppend + "`r`n"
+foreach ($enumMerge in ($enumMemberAdditions | Sort-Object { $_.Declaration.End } -Descending)) {
+  $insertion = ($enumMerge.MissingMembers | ForEach-Object { "  $_" }) -join $lineEnding
+  $insertion = $insertion + $lineEnding
+  $insertAt = $enumMerge.Declaration.End
+  $nextSchema = $nextSchema.Insert($insertAt, $insertion)
+}
+
+if ($missingDeclarations.Count -gt 0) {
+  $separator = $lineEnding + $lineEnding
+  $blocksToAppend = ($missingDeclarations | ForEach-Object { $_.Text }) -join $separator
+  $nextSchema = $nextSchema.TrimEnd() + $separator + $blocksToAppend + $lineEnding
+}
 
 try {
   Set-Content -Path $schemaPath -Value $nextSchema -Encoding utf8
@@ -225,7 +320,8 @@ catch {
 Write-Host ''
 Write-Host 'Tax Prisma foundation installed deterministically.' -ForegroundColor Green
 Write-Host "Backup: $backupPath"
-Write-Host "Added declarations: $($missing.Count)"
+Write-Host "Added declarations : $($missingDeclarations.Count)"
+Write-Host "Merged enums       : $($enumMemberAdditions.Count)"
 Write-Host 'Next commands:'
 Write-Host '  npx prisma format'
 Write-Host '  npx prisma validate'
