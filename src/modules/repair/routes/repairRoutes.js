@@ -17,6 +17,9 @@ const {
   createRepairJob,
 } = require('../create/createRepairJobController');
 const {
+  updateRepairJobStatus,
+} = require('../status/updateRepairJobStatusController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -62,7 +65,7 @@ router.post(
 router.patch(
   '/jobs/:id/status',
   allowRepairRoles(...OPERATION_ROLES),
-  repairController.updateStatus
+  updateRepairJobStatus
 );
 
 router.post(
