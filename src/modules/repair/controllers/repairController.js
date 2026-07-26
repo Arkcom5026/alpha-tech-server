@@ -3,6 +3,7 @@ const repairCompletionService = require('../services/repairCompletionService');
 const repairHandoverService = require('../services/repairHandoverService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
+const repairFinancialSummaryService = require('../services/repairFinancialSummaryService');
 const repairIntakeService = require('../services/repairIntakeService');
 const repairPartReversalService = require('../services/repairPartReversalService');
 const repairPartUsageSummaryService = require('../services/repairPartUsageSummaryService');
@@ -106,6 +107,15 @@ class RepairController {
         message: data.status === 'APPROVED' ? 'ลูกค้าอนุมัติใบเสนอราคาแล้ว' : 'ลูกค้าปฏิเสธใบเสนอราคาแล้ว',
         data,
       });
+    } catch (error) { next(error); }
+  }
+
+  async getFinancialSummary(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairFinancialSummaryService.getSummary(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
 
