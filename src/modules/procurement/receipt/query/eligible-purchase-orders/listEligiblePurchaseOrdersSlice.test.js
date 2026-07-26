@@ -36,9 +36,9 @@ test('repository preserves branch scope, eligible statuses, projection, and orde
   });
 });
 
-test('service rejects missing branch authority', async () => {
+test('service rejects missing branch authority', () => {
   const service = new ListEligiblePurchaseOrdersService({ findMany: async () => [] });
-  await assert.rejects(
+  assert.throws(
     () => service.execute({ branchId: undefined }),
     (error) => error instanceof EligiblePurchaseOrdersQueryError && error.code === 'UNAUTHORIZED'
   );
