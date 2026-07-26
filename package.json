@@ -39,9 +39,10 @@
     "verify:repair-management-brief": "node scripts/verify-repair-management-brief.js",
     "verify:repair-executive-summary": "node scripts/verify-repair-executive-summary.js",
     "verify:repair-contract-boundary-audit": "node scripts/verify-repair-contract-boundary-audit.js",
+    "verify:repair-module-isolation": "node scripts/verify-repair-module-isolation.js",
     "verify:repair-repository-gate": "node scripts/verify-repair-repository-gate.js",
     "verify:repair-e2e-completion-audit": "node scripts/verify-repair-e2e-completion-audit.js",
-    "verify:repair-complete": "npm run verify:service-asset-repair-intake && npm run verify:repair-job-service-asset-integration && npm run verify:warranty-claim-service-asset-lifecycle && npm run verify:repair-financial-milestone && npm run verify:repair-after-service-milestone && npm run verify:repair-operational-intelligence && npm run verify:repair-dashboard && npm run verify:repair-operational-risk && npm run verify:repair-operational-decision && npm run verify:repair-management-snapshot && npm run verify:repair-management-alert && npm run verify:repair-management-brief && npm run verify:repair-executive-summary && npm run verify:repair-contract-boundary-audit && npm run verify:repair-repository-gate && npm run verify:repair-e2e-completion-audit",
+    "verify:repair-complete": "npm run verify:service-asset-repair-intake && npm run verify:repair-job-service-asset-integration && npm run verify:warranty-claim-service-asset-lifecycle && npm run verify:repair-financial-milestone && npm run verify:repair-after-service-milestone && npm run verify:repair-operational-intelligence && npm run verify:repair-dashboard && npm run verify:repair-operational-risk && npm run verify:repair-operational-decision && npm run verify:repair-management-snapshot && npm run verify:repair-management-alert && npm run verify:repair-management-brief && npm run verify:repair-executive-summary && npm run verify:repair-contract-boundary-audit && npm run verify:repair-module-isolation && npm run verify:repair-repository-gate && npm run verify:repair-e2e-completion-audit",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
