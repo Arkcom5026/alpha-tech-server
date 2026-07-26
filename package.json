@@ -21,6 +21,7 @@
     "verify:repair-job-customer-handover": "node scripts/verify-repair-job-customer-handover.js",
     "verify:repair-diagnosis-foundation": "node scripts/verify-repair-diagnosis-foundation.js",
     "verify:repair-estimate-customer-approval": "node scripts/verify-repair-estimate-customer-approval.js",
+    "verify:repair-execution-authorization-guard": "node scripts/verify-repair-execution-authorization-guard.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
