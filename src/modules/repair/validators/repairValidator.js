@@ -6,6 +6,14 @@ const {
   WARRANTY_CLAIM_RESOLUTIONS,
 } = require('../contracts/repairContract');
 
+const REPAIR_DIAGNOSIS_CONCLUSIONS = Object.freeze([
+  'REPAIRABLE',
+  'WARRANTY_CLAIM',
+  'NO_FAULT_FOUND',
+  'NOT_REPAIRABLE',
+  'NEEDS_FURTHER_INSPECTION',
+]);
+
 function requiredText(value, fieldName, maxLength = 2000) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) {
@@ -156,6 +164,26 @@ function validateRepairHandover(payload = {}) {
   };
 }
 
+function validateRepairDiagnosis(payload = {}) {
+  const conclusion = requiredText(payload.conclusion, 'ผลสรุปการตรวจ', 80).toUpperCase();
+  if (!REPAIR_DIAGNOSIS_CONCLUSIONS.includes(conclusion)) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      'ผลสรุปการตรวจไม่อยู่ในค่าที่ระบบรองรับ',
+      400,
+      { conclusion, allowed: REPAIR_DIAGNOSIS_CONCLUSIONS }
+    );
+  }
+
+  return {
+    conclusion,
+    findings: requiredText(payload.findings, 'ผลการตรวจพบ', 4000),
+    rootCause: optionalText(payload.rootCause, 4000),
+    recommendedAction: requiredText(payload.recommendedAction, 'แนวทางดำเนินการ', 4000),
+    note: optionalText(payload.note, 4000),
+  };
+}
+
 function validateAddPart(payload = {}) {
   const qtyUsed = positiveInt(payload.qtyUsed, 'qtyUsed');
   return {
@@ -224,10 +252,12 @@ function validateListQuery(query = {}) {
 }
 
 module.exports = {
+  REPAIR_DIAGNOSIS_CONCLUSIONS,
   validateLookup,
   validateCreateRepairJob,
   validateRepairStatusUpdate,
   validateRepairHandover,
+  validateRepairDiagnosis,
   validateAddPart,
   validateOpenWarrantyClaim,
   validateClaimStatusUpdate,
