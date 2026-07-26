@@ -12,6 +12,7 @@
     "verify:tax-document-publisher-branch-isolation": "node scripts/verify-tax-document-publisher-branch-isolation.js",
     "verify:tax-ledger-entry-projection": "node scripts/verify-tax-ledger-entry-projection.js",
     "verify:tax-ledger-publisher": "node scripts/verify-tax-ledger-publisher.js",
+    "verify:tax-document-ledger-publication-runtime": "node scripts/verify-tax-document-ledger-publication-runtime.js",
     "verify:tax-projection-foundation": "node scripts/verify-tax-projection-foundation.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
