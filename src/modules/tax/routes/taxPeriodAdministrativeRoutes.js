@@ -31,5 +31,9 @@ router.use(verifyToken, requireTaxPeriodAdministrator);
 router.get('/periods', controller.listPeriods);
 router.post('/periods/ensure', controller.ensureMonthlyPeriod);
 router.post('/periods/readiness', controller.ensureOperationalReadiness);
+router.post('/periods/:taxPeriodId/close', controller.closePeriod);
+router.post('/periods/:taxPeriodId/lock', controller.lockPeriod);
+router.post('/periods/:taxPeriodId/submit', controller.submitPeriod);
+router.post('/periods/:taxPeriodId/reopen', controller.reopenPeriod);
 
 module.exports = router;
