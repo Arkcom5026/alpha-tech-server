@@ -45,7 +45,7 @@ test('rejects unsupported purpose and missing device model', () => {
   );
 });
 
-test('resolves device and creates intake evidence in one transaction', async () => {
+test('resolves device and creates passport events in one transaction', async () => {
   const calls = [];
   const txRepo = {
     findCustomerById: async (id) => ({ id }),
@@ -65,7 +65,7 @@ test('resolves device and creates intake evidence in one transaction', async () 
     },
     createDevice: async (data) => {
       calls.push(['device', data]);
-      return { id: 51, ...data };
+      return { id: 51, createdAt: new Date('2026-01-01'), ...data };
     },
     updateDeviceIdentity: async () => {
       throw new Error('must not update a new device');
@@ -74,9 +74,13 @@ test('resolves device and creates intake evidence in one transaction', async () 
       calls.push(['ownership', deviceId, customerId, employeeId]);
       return { id: 61 };
     },
+    createPassportEvent: async (data) => {
+      calls.push(['passportEvent', data]);
+      return { id: calls.length, ...data };
+    },
     createIntake: async (data) => {
       calls.push(['intake', data]);
-      return { id: 101, ...data };
+      return { id: 101, createdAt: new Date('2026-01-02'), ...data };
     },
     createSnapshot: async (id, data) => ({ id: 201, deviceIntakeId: id, ...data }),
     createCondition: async (id, data) => ({ id: 301, deviceIntakeId: id, ...data }),
@@ -110,7 +114,7 @@ test('resolves device and creates intake evidence in one transaction', async () 
     { ipAddress: '127.0.0.1', userAgent: 'test' }
   );
 
-  assert.equal(result.contractVersion, 'device-intake.v2');
+  assert.equal(result.contractVersion, 'device-intake.v3');
   assert.equal(result.device.id, 51);
   assert.equal(result.intake.deviceId, 51);
   assert.equal(result.intake.status, 'AWAITING_CUSTOMER_CONFIRMATION');
@@ -118,5 +122,6 @@ test('resolves device and creates intake evidence in one transaction', async () 
   assert.equal(result.snapshot.serialNumber, 'SN-11');
   assert.equal(calls[0][0], 'transaction');
   assert.ok(calls.some(([name]) => name === 'ownership'));
+  assert.equal(calls.filter(([name]) => name === 'passportEvent').length, 2);
   assert.ok(calls.some(([name]) => name === 'audit'));
 });
