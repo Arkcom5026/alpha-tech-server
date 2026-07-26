@@ -1,5 +1,3 @@
-const prisma = require('../../../../database/prisma/client');
-
 const repairJobDetailInclude = {
   branch: true,
   customer: { include: { user: true } },
@@ -30,12 +28,19 @@ const repairJobDetailInclude = {
 };
 
 class RepairJobDetailRepository {
-  constructor(client = prisma) {
-    this.prisma = client;
+  constructor(client = null) {
+    this.client = client;
+  }
+
+  getPrisma() {
+    if (!this.client) {
+      this.client = require('../../../../database/prisma/client');
+    }
+    return this.client;
   }
 
   findById(branchId, repairJobId) {
-    return this.prisma.repairJob.findFirst({
+    return this.getPrisma().repairJob.findFirst({
       where: {
         id: Number(repairJobId),
         branchId: Number(branchId),
