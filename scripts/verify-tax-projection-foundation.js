@@ -25,6 +25,10 @@ const checks = Object.freeze([
     name: 'Tax document ledger publication runtime',
     script: 'scripts/verify-tax-document-ledger-publication-runtime.js',
   },
+  {
+    name: 'Sale tax ledger runtime wiring',
+    script: 'scripts/verify-tax-sale-ledger-runtime-wiring.js',
+  },
 ]);
 
 const runCheck = ({ name, script }) => {
