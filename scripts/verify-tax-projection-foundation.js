@@ -17,6 +17,10 @@ const checks = Object.freeze([
     name: 'Tax ledger entry projection',
     script: 'scripts/verify-tax-ledger-entry-projection.js',
   },
+  {
+    name: 'Tax ledger publisher',
+    script: 'scripts/verify-tax-ledger-publisher.js',
+  },
 ]);
 
 const runCheck = ({ name, script }) => {
