@@ -1,7 +1,16 @@
 const repairRepository = require('../repositories/repairRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const {
   buildDailyManagementBrief,
 } = require('./repairManagementBriefService');
+const {
+  buildRepairCostAnalytics,
+  reconciliationHistory,
+  toMoney,
+} = require('./repairCostAnalyticsService');
+const { estimateHistory } = require('./repairEstimateService');
+const { workLogHistory } = require('./repairWorkLogService');
+const { partReservationHistory } = require('./repairPartReservationService');
 
 const EXECUTIVE_SUMMARY_CONTRACT_VERSION = 'repair-executive-summary.v1';
 
@@ -74,7 +83,71 @@ function buildExecutiveNarrative(score, band, brief) {
     : `ภาพรวมงานซ่อมยังแข็งแรง คะแนนสุขภาพ ${score}/100 แต่มีบางรายการที่ควรติดตาม`;
 }
 
-function buildExecutiveSummaryProjection(jobs, now = new Date(), baseline = null) {
+function buildFinancialExecutiveProjection(analytics = []) {
+  const totals = analytics.reduce(
+    (sum, item) => {
+      sum.revenue += Number(item.revenue?.approvedTotal || 0);
+      sum.grossCost += Number(item.cost?.grossCostBasis || item.cost?.actualCostBasis || 0);
+      sum.warrantyRecovery += Number(item.warrantyRecovery?.totalRecoveryAmount || 0);
+      sum.netCost += Number(item.cost?.netCostBasis || item.cost?.actualCostBasis || 0);
+      sum.grossContribution += Number(item.profitability?.estimatedGrossContribution || 0);
+      sum.netContribution += Number(
+        item.profitability?.estimatedNetContribution
+          ?? item.profitability?.estimatedGrossContribution
+          ?? 0
+      );
+      sum.lossMakingJobs += item.profitability?.lossMaking ? 1 : 0;
+      sum.recoveryJobs += Number(item.warrantyRecovery?.totalRecoveryAmount || 0) > 0 ? 1 : 0;
+      return sum;
+    },
+    {
+      revenue: 0,
+      grossCost: 0,
+      warrantyRecovery: 0,
+      netCost: 0,
+      grossContribution: 0,
+      netContribution: 0,
+      lossMakingJobs: 0,
+      recoveryJobs: 0,
+    }
+  );
+
+  const revenue = toMoney(totals.revenue);
+  const grossCost = toMoney(totals.grossCost);
+  const warrantyRecovery = toMoney(totals.warrantyRecovery);
+  const netCost = toMoney(totals.netCost);
+  const grossContribution = toMoney(totals.grossContribution);
+  const netContribution = toMoney(totals.netContribution);
+
+  return {
+    currency: 'THB',
+    repairJobCount: analytics.length,
+    revenue,
+    grossCost,
+    warrantyRecovery,
+    netCost,
+    grossContribution,
+    netContribution,
+    grossMarginPercent: revenue > 0
+      ? Number(((grossContribution / revenue) * 100).toFixed(2))
+      : 0,
+    netMarginPercent: revenue > 0
+      ? Number(((netContribution / revenue) * 100).toFixed(2))
+      : 0,
+    recoveryRatePercent: grossCost > 0
+      ? Number(((warrantyRecovery / grossCost) * 100).toFixed(2))
+      : 0,
+    recoveryJobs: totals.recoveryJobs,
+    lossMakingJobs: totals.lossMakingJobs,
+  };
+}
+
+function buildExecutiveSummaryProjection(
+  jobs,
+  now = new Date(),
+  baseline = null,
+  financial = null
+) {
   const brief = buildDailyManagementBrief(jobs, now, baseline);
   const healthScore = buildHealthScore(brief.kpis);
   const healthBand = buildHealthBand(healthScore);
@@ -90,6 +163,7 @@ function buildExecutiveSummaryProjection(jobs, now = new Date(), baseline = null
     trend: brief.trend,
     dimensions: buildHealthDimensions(brief.kpis),
     kpis: brief.kpis,
+    financial,
     priorityFocus: buildPriorityFocus(brief),
     escalationQueue: brief.escalationQueue.slice(0, 5),
     alertDigest: brief.alertDigest.slice(0, 5),
@@ -110,7 +184,39 @@ class RepairExecutiveSummaryService {
       limit,
       offset: 0,
     });
-    return buildExecutiveSummaryProjection(jobs);
+
+    const assetRepository = new ServiceAssetRepository(this.repository.prisma);
+    const assetCache = new Map();
+    const analytics = [];
+
+    for (const job of jobs) {
+      if (!job.serviceAssetId) continue;
+      const key = Number(job.serviceAssetId);
+      let asset = assetCache.get(key);
+      if (!asset) {
+        asset = await assetRepository.findServiceAsset(actor.branchId, key);
+        if (asset) assetCache.set(key, asset);
+      }
+      if (!asset) continue;
+
+      analytics.push(
+        buildRepairCostAnalytics({
+          job,
+          estimates: estimateHistory(asset.metadata),
+          parts: job.partsUsed || [],
+          workLogs: workLogHistory(asset.metadata),
+          partReservations: partReservationHistory(asset.metadata),
+          claimReconciliations: reconciliationHistory(asset.metadata),
+        })
+      );
+    }
+
+    return buildExecutiveSummaryProjection(
+      jobs,
+      new Date(),
+      null,
+      buildFinancialExecutiveProjection(analytics)
+    );
   }
 }
 
@@ -122,4 +228,5 @@ module.exports.buildHealthBand = buildHealthBand;
 module.exports.buildHealthDimensions = buildHealthDimensions;
 module.exports.buildPriorityFocus = buildPriorityFocus;
 module.exports.buildExecutiveNarrative = buildExecutiveNarrative;
+module.exports.buildFinancialExecutiveProjection = buildFinancialExecutiveProjection;
 module.exports.buildExecutiveSummaryProjection = buildExecutiveSummaryProjection;
