@@ -1,0 +1,120 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Syntax, Prisma, Tests and Startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alpha_tech_ci
+      JWT_SECRET: github-actions-test-secret
+      PORT: 3000
+      CORS_ALLOW_ALL: "true"
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: alpha_tech_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d alpha_tech_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          find . \
+            -path './node_modules' -prune -o \
+            -path './generated' -prune -o \
+            -name '*.js' -print0 | \
+          xargs -0 -n1 node --check
+
+      - name: Run backend tests
+        run: npm test
+
+      - name: Start backend
+        shell: bash
+        run: |
+          npm start > backend-startup.log 2>&1 &
+          echo $! > backend.pid
+
+      - name: Verify backend startup
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            if ! kill -0 "$(cat backend.pid)" 2>/dev/null; then
+              echo "Backend process exited unexpectedly"
+              cat backend-startup.log
+              exit 1
+            fi
+
+            status_code="$(curl --silent --output /dev/null \
+              --write-out '%{http_code}' \
+              http://127.0.0.1:3000/__ci-startup-check || true)"
+
+            if [ "$status_code" != "000" ]; then
+              echo "Backend responded with HTTP $status_code"
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          echo "Backend did not respond within the startup window"
+          cat backend-startup.log
+          exit 1
+
+      - name: Show backend log
+        if: always()
+        run: cat backend-startup.log || true
+
+      - name: Stop backend
+        if: always()
+        shell: bash
+        run: |
+          if [ -f backend.pid ]; then
+            kill "$(cat backend.pid)" 2>/dev/null || true
+          fi
