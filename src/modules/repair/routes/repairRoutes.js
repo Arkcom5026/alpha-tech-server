@@ -1,6 +1,7 @@
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const repairController = require('../controllers/repairController');
+const repairWorkLogController = require('../controllers/repairWorkLogController');
 const {
   loadRepairEmployeeContext,
   allowRepairRoles,
@@ -48,6 +49,10 @@ router.post('/jobs/:id/diagnoses', allowRepairRoles(...OPERATION_ROLES), repairC
 router.get('/jobs/:id/estimates', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listEstimates);
 router.post('/jobs/:id/estimates', allowRepairRoles(...OPERATION_ROLES), repairController.createEstimate);
 router.patch('/jobs/:id/estimates/:estimateId/decision', allowRepairRoles(...OPERATION_ROLES), repairController.decideEstimate);
+
+router.get('/jobs/:id/work-logs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairWorkLogController.list);
+router.post('/jobs/:id/work-logs', allowRepairRoles(...OPERATION_ROLES), repairWorkLogController.record);
+
 router.get('/jobs/:id/financial-summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getFinancialSummary);
 router.get('/jobs/:id/settlement', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getSettlement);
 router.post('/jobs/:id/payments', allowRepairRoles(...OPERATION_ROLES), repairController.recordPayment);
