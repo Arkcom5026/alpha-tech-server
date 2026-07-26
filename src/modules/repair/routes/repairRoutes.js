@@ -23,6 +23,9 @@ const {
   addRepairPart,
 } = require('../parts/addRepairPartController');
 const {
+  openWarrantyClaim,
+} = require('../claim/open/openWarrantyClaimController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -80,7 +83,7 @@ router.post(
 router.post(
   '/jobs/:id/warranty-claims',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.openWarrantyClaim
+  openWarrantyClaim
 );
 
 router.get(
