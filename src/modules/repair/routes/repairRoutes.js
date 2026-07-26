@@ -5,6 +5,9 @@ const {
   getIntakeContext,
 } = require('../query/intake-context/intakeContextController');
 const {
+  listCustomerWarrantyAssets,
+} = require('../query/customer-warranty-assets/customerWarrantyAssetsController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -26,7 +29,7 @@ router.get(
 router.get(
   '/customers/:customerId/warranty-assets',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.listCustomerWarrantyAssets
+  listCustomerWarrantyAssets
 );
 
 router.get(
