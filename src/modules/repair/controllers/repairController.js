@@ -6,6 +6,9 @@ const repairHandoverService = require('../services/repairHandoverService');
 const repairWarrantyService = require('../services/repairWarrantyService');
 const repairRepeatLinkService = require('../services/repairRepeatLinkService');
 const repairAssetTimelineService = require('../services/repairAssetTimelineService');
+const repairOperationalIntelligenceService = require('../services/repairOperationalIntelligenceService');
+const repairCostAnalyticsService = require('../services/repairCostAnalyticsService');
+const repairRepeatFailureAnalyticsService = require('../services/repairRepeatFailureAnalyticsService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
 const repairFinancialSummaryService = require('../services/repairFinancialSummaryService');
@@ -125,6 +128,42 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairAssetTimelineService.getForRepairJob(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getOperationalIntelligence(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairOperationalIntelligenceService.getJobIntelligence(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getOperationalDashboard(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairOperationalIntelligenceService.getDashboard(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getCostAnalytics(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairCostAnalyticsService.getForRepairJob(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getRepeatFailureAnalytics(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairRepeatFailureAnalyticsService.getForRepairJob(actor, req.params.id);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
