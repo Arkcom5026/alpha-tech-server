@@ -21,10 +21,12 @@ function verifyPaymentContract() {
   assert.equal(payment.reference, 'TX-001');
   assert.equal(payment.note, 'ชำระส่วนที่เหลือ');
 
-  assert.throws(
-    () => validateRepairPayment({ amount: 0, method: 'CASH' }),
-    (error) => error.code === RepairFailureCode.REPAIR_PAYMENT_AMOUNT_INVALID
-  );
+  for (const amount of [0, -1, '-0.01']) {
+    assert.throws(
+      () => validateRepairPayment({ amount, method: 'CASH' }),
+      (error) => error.code === RepairFailureCode.REPAIR_PAYMENT_AMOUNT_INVALID
+    );
+  }
   assert.throws(
     () => validateRepairPayment({ amount: 100, method: 'CRYPTO' }),
     (error) => error.code === RepairFailureCode.REPAIR_PAYMENT_METHOD_INVALID
@@ -74,6 +76,7 @@ function verifyRuntimeWiring() {
 
   assert.match(serviceSource, /repairPayments/);
   assert.match(serviceSource, /latestApprovedEstimate/);
+  assert.match(serviceSource, /amount\.greaterThan\(0\)/);
   assert.match(serviceSource, /REPAIR_PAYMENT_EXCEEDS_OUTSTANDING/);
   assert.match(controllerSource, /recordPayment/);
   assert.match(controllerSource, /getSettlement/);
