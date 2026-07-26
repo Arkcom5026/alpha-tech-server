@@ -31,7 +31,7 @@ function paymentHistory(metadata) {
 
 function validateRepairPayment(payload = {}) {
   const amount = decimal(payload.amount);
-  if (!amount.isPositive()) {
+  if (!amount.greaterThan(0)) {
     throw new RepairError(
       RepairFailureCode.REPAIR_PAYMENT_AMOUNT_INVALID,
       'ยอดรับชำระต้องมากกว่า 0',
