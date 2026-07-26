@@ -15,6 +15,7 @@
     "verify:tax-authority-provider-queue": "node scripts/verify-tax-authority-provider-queue.js",
     "verify:tax-authority-submission-persistence": "node scripts/verify-tax-authority-submission-persistence.js",
     "verify:service-asset-repair-intake": "node scripts/verify-service-asset-repair-intake.js",
+    "verify:repair-job-service-asset-integration": "node scripts/verify-repair-job-service-asset-integration.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
