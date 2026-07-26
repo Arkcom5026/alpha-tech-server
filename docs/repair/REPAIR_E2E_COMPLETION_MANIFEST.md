@@ -108,17 +108,34 @@ Every route is protected by token verification and repair employee context loadi
 - Health dimensions
 - Priority focus
 
+## Contract and boundary authority
+
+The final contract and boundary audit is registered as:
+
+- `npm run verify:repair-contract-boundary-audit`
+
+It enforces the following repository invariants:
+
+- Routes depend on controllers and authorization middleware, not services, repositories, or Prisma directly.
+- Controllers delegate to feature services and must not access repositories or Prisma directly.
+- Services must not depend on controllers, routes, or HTTP authorization middleware.
+- The Repair repository must not depend upward on services, controllers, or routes.
+- Direct Prisma access in `repairAuthorization.js` is an explicit infrastructure exception used only to establish trusted employee and branch context before runtime authorization.
+- Mutation routes must carry an approved role policy. Intake creation and warranty-claim intake retain their explicitly approved intake authority; other operational mutations require `OWNER` or `MANAGER`.
+- Repair failures remain typed through `RepairError`, `RepairFailureCode`, HTTP status, and optional details.
+
 ## Verification authority
 
 ### Gate A — Repository Gate
 
 Repository completion is represented by:
 
+- `npm run verify:repair-contract-boundary-audit`
 - `npm run verify:repair-repository-gate`
 - `npm run verify:repair-e2e-completion-audit`
 - `npm run verify:repair-complete`
 
-Gate A validates file ownership, route/controller/service exposure, contract tokens, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
+Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
 
 ### Gate B — Runtime Gate
 
@@ -145,6 +162,7 @@ Repository completion must never be reported as Operational PASS.
 
 - Repository implementation: complete for the recorded scope
 - Repository verification wiring: complete
+- Contract and boundary audit wiring: complete
 - Runtime verification: deferred
 - Operational verification: deferred
 
