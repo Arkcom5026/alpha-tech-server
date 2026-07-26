@@ -12,6 +12,10 @@ const EXECUTION_AUTHORIZATION_TYPES = Object.freeze([
 ]);
 
 const ACTIVE_CLAIM_STATUSES = new Set(CLAIM_ACTIVE_STATUSES);
+const EXECUTION_ELIGIBLE_CLAIM_LINK_STATES = new Set([
+  'LINKED',
+  'LINKED_VERIFIED',
+]);
 
 function metadataObject(metadata) {
   return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -32,7 +36,7 @@ function activeWarrantyClaim(job) {
   return (
     (job.warrantyClaims || []).find(
       (claim) =>
-        claim.repairLinkState === 'LINKED' &&
+        EXECUTION_ELIGIBLE_CLAIM_LINK_STATES.has(claim.repairLinkState) &&
         ACTIVE_CLAIM_STATUSES.has(claim.status)
     ) || null
   );
@@ -94,6 +98,7 @@ function assertRepairExecutionAuthorized({
 
 module.exports = {
   EXECUTION_AUTHORIZATION_TYPES,
+  EXECUTION_ELIGIBLE_CLAIM_LINK_STATES,
   assertRepairExecutionAuthorized,
   approvedEstimateForJob,
   activeWarrantyClaim,
