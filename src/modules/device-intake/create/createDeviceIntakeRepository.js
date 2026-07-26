@@ -11,16 +11,6 @@ class CreateDeviceIntakeRepository {
     );
   }
 
-  findCustomer(branchId, customerId) {
-    return this.prisma.customerProfile.findFirst({
-      where: {
-        id: Number(customerId),
-        repairJobs: { some: { branchId: Number(branchId) } },
-      },
-      select: { id: true },
-    });
-  }
-
   findCustomerById(customerId) {
     return this.prisma.customerProfile.findUnique({
       where: { id: Number(customerId) },
@@ -58,11 +48,14 @@ class CreateDeviceIntakeRepository {
   }
 
   async createSnapshot(deviceIntakeId, snapshot) {
+    const specification = snapshot.specification
+      ? JSON.stringify(snapshot.specification)
+      : null;
     const rows = await this.prisma.$queryRaw`
       INSERT INTO "DeviceIntakeSnapshot"
         ("deviceIntakeId", "deviceType", "brand", "model", "serialNumber", "imei", "barcode", "color", "capacity", "specification", "createdAt")
       VALUES
-        (${deviceIntakeId}, ${snapshot.deviceType}, ${snapshot.brand}, ${snapshot.model}, ${snapshot.serialNumber}, ${snapshot.imei}, ${snapshot.barcode}, ${snapshot.color}, ${snapshot.capacity}, ${snapshot.specification}, NOW())
+        (${deviceIntakeId}, ${snapshot.deviceType}, ${snapshot.brand}, ${snapshot.model}, ${snapshot.serialNumber}, ${snapshot.imei}, ${snapshot.barcode}, ${snapshot.color}, ${snapshot.capacity}, ${specification}::jsonb, NOW())
       RETURNING *
     `;
     return rows[0];
@@ -106,11 +99,12 @@ class CreateDeviceIntakeRepository {
   }
 
   async createAudit(deviceIntakeId, audit) {
+    const metadata = audit.metadata ? JSON.stringify(audit.metadata) : null;
     const rows = await this.prisma.$queryRaw`
       INSERT INTO "DeviceIntakeAudit"
         ("deviceIntakeId", "action", "actorType", "employeeId", "ipAddress", "userAgent", "metadata", "occurredAt")
       VALUES
-        (${deviceIntakeId}, ${audit.action}, ${audit.actorType}, ${audit.employeeId}, ${audit.ipAddress}, ${audit.userAgent}, ${audit.metadata}, NOW())
+        (${deviceIntakeId}, ${audit.action}, ${audit.actorType}, ${audit.employeeId}, ${audit.ipAddress}, ${audit.userAgent}, ${metadata}::jsonb, NOW())
       RETURNING "id", "action", "actorType", "employeeId", "occurredAt"
     `;
     return rows[0];
