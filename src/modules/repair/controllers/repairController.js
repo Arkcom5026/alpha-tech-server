@@ -3,6 +3,7 @@ const repairCompletionService = require('../services/repairCompletionService');
 const repairCompletionChecklistService = require('../services/repairCompletionChecklistService');
 const repairCompletionReadinessService = require('../services/repairCompletionReadinessService');
 const repairHandoverService = require('../services/repairHandoverService');
+const repairWarrantyService = require('../services/repairWarrantyService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
 const repairFinancialSummaryService = require('../services/repairFinancialSummaryService');
@@ -82,6 +83,27 @@ class RepairController {
       const actor = resolveRepairActor(req.user);
       const data = await repairCompletionChecklistService.record(actor, req.params.id, req.body);
       res.status(200).json({ success: true, message: 'บันทึกผลตรวจสอบก่อนปิดงานเรียบร้อยแล้ว', data });
+    } catch (error) { next(error); }
+  }
+
+  async listRepairWarranties(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairWarrantyService.listForRepairJob(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async issueRepairWarranty(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairWarrantyService.issueForRepairJob(actor, req.params.id, req.body);
+      res.status(data.idempotent ? 200 : 201).json({
+        success: true,
+        message: data.idempotent ? 'มีข้อมูลรับประกันงานซ่อมที่ใช้งานอยู่แล้ว' : 'เริ่มรับประกันงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
     } catch (error) { next(error); }
   }
 
