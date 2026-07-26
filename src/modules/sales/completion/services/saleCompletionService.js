@@ -10,8 +10,8 @@ const {
   runCompletionTransaction,
 } = require('../repositories/saleCompletionRepository');
 const {
-  createPrismaTaxDocumentPublisher,
   createSaleTaxProjectionRuntime,
+  publishDocumentAndLedgerInTransaction,
 } = require('../../../tax');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
@@ -165,7 +165,14 @@ const completeSale = async ({ command, branchId, employeeId }) => {
         });
 
         const taxProjectionRuntime = createSaleTaxProjectionRuntime({
-          publisher: createPrismaTaxDocumentPublisher({ db: tx }),
+          publisher: {
+            publish: (draft) => publishDocumentAndLedgerInTransaction({
+              tx,
+              draft,
+              postingDate: sale.createdAt,
+              effectiveDate: sale.createdAt,
+            }),
+          },
         });
         await taxProjectionRuntime.projectAndPublishCompletedSale({
           sale,
