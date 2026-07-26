@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const repairRepository = require('../repositories/repairRepository');
 const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
-const { activeRepairWarranty } = require('./repairWarrantyService');
+const { activeRepairWarrantyForJob } = require('./repairWarrantyService');
 
 function metadataObject(metadata) {
   return metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
@@ -43,6 +43,25 @@ class RepairRepeatLinkService {
       if (!currentJob || !previousJob) {
         throw new RepairError(RepairFailureCode.REPAIR_JOB_NOT_FOUND, 'ไม่พบใบงานซ่อมในสาขานี้', 404);
       }
+      if (Number(currentJob.id) === Number(previousJob.id)) {
+        throw new RepairError(RepairFailureCode.INVALID_INPUT, 'ไม่สามารถเชื่อมใบงานเข้าหาตัวเองได้', 400);
+      }
+      if (previousJob.status !== 'COMPLETED') {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'ใบงานก่อนหน้าต้องปิดเป็น COMPLETED ก่อนเชื่อมเป็นงานซ่อมซ้ำ',
+          409,
+          { previousRepairJobId: previousJob.id, previousStatus: previousJob.status }
+        );
+      }
+      if (new Date(previousJob.createdAt) >= new Date(currentJob.createdAt)) {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'previousRepairJobId ต้องเป็นใบงานที่เกิดก่อนใบงานปัจจุบัน',
+          409,
+          { previousRepairJobId: previousJob.id, repairJobId: currentJob.id }
+        );
+      }
       if (!currentJob.serviceAssetId || !previousJob.serviceAssetId) {
         throw new RepairError(RepairFailureCode.SERVICE_ASSET_REQUIRED, 'ใบงานซ่อมทั้งสองต้องเชื่อมกับอุปกรณ์บริการ', 409);
       }
@@ -52,9 +71,6 @@ class RepairRepeatLinkService {
           'ใบงานซ่อมซ้ำต้องเป็นอุปกรณ์บริการเดียวกัน',
           409
         );
-      }
-      if (Number(currentJob.id) === Number(previousJob.id)) {
-        throw new RepairError(RepairFailureCode.INVALID_INPUT, 'ไม่สามารถเชื่อมใบงานเข้าหาตัวเองได้', 400);
       }
 
       const assetRepository = new ServiceAssetRepository(repo.prisma);
@@ -68,7 +84,11 @@ class RepairRepeatLinkService {
       const existing = history.find((link) => Number(link.repairJobId) === Number(currentJob.id));
       if (existing) return { link: existing, idempotent: true };
 
-      const activeWarranty = activeRepairWarranty(metadata);
+      const previousJobWarranty = activeRepairWarrantyForJob(
+        metadata,
+        previousJob.id,
+        currentJob.createdAt
+      );
       const link = {
         id: crypto.randomUUID(),
         repairJobId: currentJob.id,
@@ -78,8 +98,9 @@ class RepairRepeatLinkService {
         serviceAssetId: asset.id,
         reason: optionalText(rawPayload.reason, 4000),
         symptomsComparison: optionalText(rawPayload.symptomsComparison, 4000),
-        underRepairWarranty: Boolean(activeWarranty),
-        repairWarrantyId: activeWarranty?.id || null,
+        underRepairWarranty: Boolean(previousJobWarranty),
+        repairWarrantyId: previousJobWarranty?.id || null,
+        warrantyOriginRepairJobId: previousJobWarranty?.repairJobId || null,
         linkedByEmployeeId: actor.employeeId,
         linkedAt: new Date().toISOString(),
       };
