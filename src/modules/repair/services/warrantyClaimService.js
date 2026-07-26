@@ -1,4 +1,5 @@
 const repairRepository = require('../repositories/repairRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const {
   validateOpenWarrantyClaim,
   validateClaimStatusUpdate,
@@ -41,6 +42,12 @@ function claimTimestampData(nextStatus, now) {
   }
 }
 
+function assetStatusForClaim(nextStatus) {
+  return ['RESOLVED', 'CANCELLED'].includes(nextStatus)
+    ? 'IN_SERVICE'
+    : 'IN_CLAIM';
+}
+
 class WarrantyClaimService {
   constructor(repository = repairRepository) {
     this.repository = repository;
@@ -54,6 +61,14 @@ class WarrantyClaimService {
         const job = await repo.findRepairJob(actor.branchId, repairJobId);
         assertRepairCanOpenClaim(job);
         assertNoActiveClaimForJob(job);
+
+        if (!job.serviceAssetId) {
+          throw new RepairError(
+            RepairFailureCode.SERVICE_ASSET_REQUIRED,
+            'ใบงานซ่อมต้องเชื่อมกับอุปกรณ์บริการก่อนเปิดเคลม',
+            409
+          );
+        }
 
         const sourceSupplierId = inferSourceSupplierId(job.stockItem);
         const selectedSupplierId = payload.supplierId || sourceSupplierId || null;
@@ -88,10 +103,24 @@ class WarrantyClaimService {
           }
         }
 
+        const assetRepo = new ServiceAssetRepository(repo.prisma);
+        const asset = await assetRepo.findServiceAsset(
+          actor.branchId,
+          job.serviceAssetId
+        );
+        if (!asset) {
+          throw new RepairError(
+            RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+            'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+            404
+          );
+        }
+
         const claim = await repo.createWarrantyClaim(
           {
             branchId: actor.branchId,
             stockItemId: job.stockItemId,
+            serviceAssetId: job.serviceAssetId,
             supplierId: selectedSupplierId,
             repairJobId: job.id,
             repairLinkState: 'LINKED_VERIFIED',
@@ -110,10 +139,15 @@ class WarrantyClaimService {
             metadata: {
               source: 'REPAIR_JOB',
               repairJobId: job.id,
+              serviceAssetId: job.serviceAssetId,
               repairLinkState: 'LINKED_VERIFIED',
             },
           }
         );
+
+        await assetRepo.updateServiceAsset(job.serviceAssetId, {
+          status: 'IN_CLAIM',
+        });
 
         return mapWarrantyClaim(claim);
       });
@@ -232,9 +266,17 @@ class WarrantyClaimService {
           metadata: {
             previousStatus: claim.status,
             resolution: payload.resolution,
+            serviceAssetId: claim.serviceAssetId,
           },
         }
       );
+
+      if (claim.serviceAssetId) {
+        const assetRepo = new ServiceAssetRepository(repo.prisma);
+        await assetRepo.updateServiceAsset(claim.serviceAssetId, {
+          status: assetStatusForClaim(payload.status),
+        });
+      }
 
       return mapWarrantyClaim(updated);
     });
@@ -243,3 +285,4 @@ class WarrantyClaimService {
 
 module.exports = new WarrantyClaimService();
 module.exports.WarrantyClaimService = WarrantyClaimService;
+module.exports.assetStatusForClaim = assetStatusForClaim;
