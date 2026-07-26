@@ -1,5 +1,3 @@
-
-
 // purchaseOrderReceiptRoutes.js
 
 const express = require('express');
@@ -7,7 +5,6 @@ const router = express.Router();
 
 const {
   createPurchaseOrderReceipt,
-  getAllPurchaseOrderReceipts,
   getPurchaseOrderReceiptById,
   updatePurchaseOrderReceipt,
   deletePurchaseOrderReceipt,
@@ -22,12 +19,13 @@ const {
   commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
 
+const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
+
 // ✅ Receipt items endpoints (bridge to REST-style routes)
 const {
   updateReceiptItem,
   getReceiptItemsByReceiptId,
 } = require('../controllers/purchaseOrderReceiptItemController');
-
 
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
@@ -35,9 +33,8 @@ router.use(verifyToken);
 // 📥 POST - สร้างใบรับสินค้าใหม่ (PO)
 router.post('/', createPurchaseOrderReceipt);
 
-
 // 📄 GET - รายการใบรับสินค้าทั้งหมด (ตามสาขา)
-router.get('/', getAllPurchaseOrderReceipts);
+router.get('/', listPurchaseReceiptsController.handle);
 
 // 💰 GET - ดึงใบรับสินค้าที่รอการชำระเงิน (ใช้ยอดจริงจากสินค้าในใบรับ)
 router.get('/ready-to-pay', getReceiptsReadyToPay);
@@ -97,8 +94,3 @@ router.post('/:id/print', printReceipt);
 router.post('/:id/commit', commitReceipt);
 
 module.exports = router;
-
-
-
-
-
