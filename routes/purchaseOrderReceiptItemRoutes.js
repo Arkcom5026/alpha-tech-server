@@ -1,19 +1,17 @@
 // purchaseOrderReceiptItemRoutes.js
 const express = require('express');
 const router = express.Router();
-const {
-  addReceiptItem,
-  getPOItemsByPOId,
-  updateReceiptItem,
-} = require('../controllers/purchaseOrderReceiptItemController');
+const { getPOItemsByPOId } = require('../controllers/purchaseOrderReceiptItemController');
+const addReceiptItemController = require('../src/modules/procurement/receipt/item/add/addReceiptItemController');
+const updateReceiptItemController = require('../src/modules/procurement/receipt/item/update/updateReceiptItemController');
 const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
 const deleteReceiptItemController = require('../src/modules/procurement/receipt/item/delete/deleteReceiptItemController');
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
-router.post('/', addReceiptItem);
-router.put('/update', updateReceiptItem);
-router.patch('/update', updateReceiptItem);
+router.post('/', addReceiptItemController.handle);
+router.put('/update', updateReceiptItemController.handle);
+router.patch('/update', updateReceiptItemController.handle);
 router.get('/by-receipt/:receiptId', listReceiptItemsController.handle);
 
 router.delete('/:id', deleteReceiptItemController.handle);
