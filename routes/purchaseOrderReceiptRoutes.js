@@ -4,7 +4,6 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  createPurchaseOrderReceipt,
   updatePurchaseOrderReceipt,
   deletePurchaseOrderReceipt,
   getReceiptBarcodeSummaries,
@@ -18,6 +17,7 @@ const {
   commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
 
+const createPurchaseReceiptController = require('../src/modules/procurement/receipt/create/createPurchaseReceiptController');
 const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
 const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
 const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
@@ -29,7 +29,7 @@ const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
 // 📥 POST - สร้างใบรับสินค้าใหม่ (PO)
-router.post('/', createPurchaseOrderReceipt);
+router.post('/', createPurchaseReceiptController.handle);
 
 // 📄 GET - รายการใบรับสินค้าทั้งหมด (ตามสาขา)
 router.get('/', listPurchaseReceiptsController.handle);
