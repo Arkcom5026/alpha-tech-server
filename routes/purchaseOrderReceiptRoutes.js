@@ -5,10 +5,7 @@ const router = express.Router();
 
 const {
   finalizeReceiptController,
-  markPurchaseOrderReceiptAsPrinted,
   getReceiptsReadyToPay,
-  generateReceiptBarcodes,
-  printReceipt,
   commitReceipt,
 } = require('../controllers/purchaseOrderReceiptController');
 
@@ -20,6 +17,9 @@ const listPurchaseReceiptsController = require('../src/modules/procurement/recei
 const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
 const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
 const listReceiptBarcodeSummariesController = require('../src/modules/procurement/receipt/barcode/summary/listReceiptBarcodeSummariesController');
+const generateReceiptBarcodesController = require('../src/modules/procurement/receipt/barcode/generate/generateReceiptBarcodesController');
+const markReceiptPrintedController = require('../src/modules/procurement/receipt/barcode/printed/markReceiptPrintedController');
+const printReceiptController = require('../src/modules/procurement/receipt/barcode/print/printReceiptController');
 const updateReceiptItemController = require('../src/modules/procurement/receipt/item/update/updateReceiptItemController');
 
 const verifyToken = require('../middlewares/verifyToken');
@@ -48,9 +48,9 @@ router.put('/:id', updatePurchaseReceiptNoteController.handle);
 router.delete('/:id', deletePurchaseReceiptController.handle);
 router.post('/:id/finalize', finalizeReceiptController);
 router.patch('/:id/finalize', finalizeReceiptController);
-router.patch('/:id/printed', markPurchaseOrderReceiptAsPrinted);
-router.post('/:id/generate-barcodes', generateReceiptBarcodes);
-router.post('/:id/print', printReceipt);
+router.patch('/:id/printed', markReceiptPrintedController.handle);
+router.post('/:id/generate-barcodes', generateReceiptBarcodesController.handle);
+router.post('/:id/print', printReceiptController.handle);
 router.post('/:id/commit', commitReceipt);
 
 module.exports = router;
