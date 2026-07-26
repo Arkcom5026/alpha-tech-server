@@ -7,6 +7,7 @@ const repairWarrantyService = require('../services/repairWarrantyService');
 const repairRepeatLinkService = require('../services/repairRepeatLinkService');
 const repairAssetTimelineService = require('../services/repairAssetTimelineService');
 const repairOperationalIntelligenceService = require('../services/repairOperationalIntelligenceService');
+const repairOperationalRiskService = require('../services/repairOperationalRiskService');
 const repairCostAnalyticsService = require('../services/repairCostAnalyticsService');
 const repairRepeatFailureAnalyticsService = require('../services/repairRepeatFailureAnalyticsService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
@@ -146,6 +147,15 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairOperationalIntelligenceService.getDashboard(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getOperationalRiskDashboard(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairOperationalRiskService.getDashboard(actor, req.query);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
