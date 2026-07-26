@@ -63,6 +63,44 @@ class UpdateRepairJobStatusRepository {
       include: repairJobDetailInclude,
     });
   }
+
+  async createTimelineEvent(event) {
+    const rows = await this.prisma.$queryRaw`
+      INSERT INTO "RepairJobEvent"
+        (
+          "repairJobId",
+          "eventType",
+          "fromStatus",
+          "toStatus",
+          "customerVisible",
+          "customerTitle",
+          "customerMessage",
+          "internalNote",
+          "performedByEmployeeId",
+          "metadata",
+          "occurredAt",
+          "createdAt"
+        )
+      VALUES
+        (
+          ${Number(event.repairJobId)},
+          ${event.eventType},
+          ${event.fromStatus},
+          ${event.toStatus},
+          ${Boolean(event.customerVisible)},
+          ${event.customerTitle},
+          ${event.customerMessage},
+          ${event.internalNote},
+          ${event.performedByEmployeeId ? Number(event.performedByEmployeeId) : null},
+          ${JSON.stringify(event.metadata || {})}::jsonb,
+          NOW(),
+          NOW()
+        )
+      RETURNING "id", "repairJobId", "eventType", "occurredAt"
+    `;
+
+    return rows[0] || null;
+  }
 }
 
 module.exports = new UpdateRepairJobStatusRepository();
