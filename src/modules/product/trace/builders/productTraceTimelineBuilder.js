@@ -6,7 +6,7 @@ const {
 const { toIsoString, compareOccurredAt } = require('../utils/productTraceDate')
 const { roundMoney } = require('../utils/productTraceMoney')
 
-const buildProductTraceTimeline = ({ stockItem, procurement, sales, returns, claims, repairs, permissions }) => {
+const buildProductTraceTimeline = ({ stockItem, procurement, sales, simpleSales, returns, simpleReturns, claims, repairs, permissions }) => {
   const events = []
   if (stockItem.receivedAt) events.push(createProductTraceTimelineEvent({
     id: `received-${stockItem.id}`, type: ProductTraceEventType.PRODUCT_RECEIVED,
@@ -25,16 +25,29 @@ const buildProductTraceTimeline = ({ stockItem, procurement, sales, returns, cla
     actor: stockItem.scannedBy ? { id: stockItem.scannedBy.id, name: stockItem.scannedBy.name || '-' } : null,
     status: 'IN_STOCK', metadata: { locationCode: stockItem.locationCode || null },
   }))
-  for (const cycle of sales?.cycles || (sales ? [sales] : [])) {
-    events.push(createProductTraceTimelineEvent({
-      id: `sold-${cycle.sale.id}-${stockItem.id}`, type: ProductTraceEventType.PRODUCT_SOLD,
-      category: ProductTraceEventCategory.SALES, occurredAt: cycle.sale.soldAt, title: 'ขายสินค้า',
-      document: { type: 'SALE', id: cycle.sale.id, code: cycle.sale.code }, actor: cycle.sale.employee,
-      amount: permissions.canViewFinancials ? cycle.pricing?.netPrice ?? null : null,
-      status: cycle.sale.status,
-      metadata: { customerName: cycle.sale.customer?.companyName || cycle.sale.customer?.name || null, paymentStatus: cycle.sale.statusPayment },
-    }))
-  }
+
+  for (const cycle of sales?.cycles || (sales ? [sales] : [])) events.push(createProductTraceTimelineEvent({
+    id: `sold-${cycle.sale.id}-${stockItem.id}`, type: ProductTraceEventType.PRODUCT_SOLD,
+    category: ProductTraceEventCategory.SALES, occurredAt: cycle.sale.soldAt, title: 'ขายสินค้า',
+    document: { type: 'SALE', id: cycle.sale.id, code: cycle.sale.code }, actor: cycle.sale.employee,
+    amount: permissions.canViewFinancials ? cycle.pricing?.netPrice ?? null : null,
+    status: cycle.sale.status,
+    metadata: { customerName: cycle.sale.customer?.companyName || cycle.sale.customer?.name || null, paymentStatus: cycle.sale.statusPayment },
+  }))
+
+  for (const item of simpleSales || []) events.push(createProductTraceTimelineEvent({
+    id: `sold-simple-${item.id}`,
+    type: ProductTraceEventType.PRODUCT_SOLD_SIMPLE,
+    category: ProductTraceEventCategory.SALES,
+    occurredAt: item.sale?.soldAt || item.createdAt,
+    title: 'ขายสินค้าแบบจำนวน',
+    document: item.sale ? { type: 'SALE', id: item.sale.id, code: item.sale.code } : null,
+    actor: item.sale?.employee || null,
+    amount: permissions.canViewFinancials ? item.price ?? null : null,
+    status: item.sale?.status || null,
+    metadata: { simpleLotId: item.simpleLotId || null, quantity: item.quantity },
+  }))
+
   for (const item of returns || []) {
     const saleReturn = item.saleReturn
     if (!saleReturn) continue
@@ -46,27 +59,32 @@ const buildProductTraceTimeline = ({ stockItem, procurement, sales, returns, cla
       actor: saleReturn.employee, amount: permissions.canViewFinancials ? item.refundAmount : null,
       status: saleReturn.status, metadata: { returnType: saleReturn.returnType, resultingStockStatus: 'IN_STOCK' },
     }))
-    for (const refund of item.refundTransactions || []) events.push(createProductTraceTimelineEvent({
-      id: `refund-${refund.id}`, type: ProductTraceEventType.PRODUCT_REFUNDED,
-      category: ProductTraceEventCategory.RETURN, occurredAt: refund.refundedAt,
-      title: 'คืนเงินให้ลูกค้า', document: { type: 'SALE_RETURN', id: saleReturn.id, code: saleReturn.code },
-      actor: refund.refundedBy, amount: permissions.canViewFinancials ? refund.amount : null,
-      status: saleReturn.status, metadata: { method: refund.method, deducted: refund.deducted },
-    }))
   }
+
+  for (const item of simpleReturns || []) events.push(createProductTraceTimelineEvent({
+    id: `returned-simple-${item.id}`,
+    type: ProductTraceEventType.PRODUCT_RETURNED_SIMPLE,
+    category: ProductTraceEventCategory.RETURN,
+    occurredAt: item.saleReturn?.returnedAt || item.createdAt,
+    title: 'คืนสินค้าจำนวน',
+    document: item.saleReturn ? { type: 'SALE_RETURN', id: item.saleReturn.id, code: item.saleReturn.code } : null,
+    amount: permissions.canViewFinancials ? item.refundAmount : null,
+    status: item.saleReturn?.status || null,
+    metadata: { saleItemSimpleId: item.saleItemSimpleId, quantity: item.quantity },
+  }))
+
   for (const claim of claims || []) events.push(createProductTraceTimelineEvent({
     id: `claim-${claim.id}`, type: ProductTraceEventType.PRODUCT_CLAIM_CREATED,
     category: ProductTraceEventCategory.CLAIM, occurredAt: claim.createdAt, title: 'เปิดเคลมสินค้า',
     description: claim.reason, document: { type: 'WARRANTY_CLAIM', id: claim.id, code: claim.claimNo }, status: claim.status,
   }))
-  for (const repair of repairs || []) {
-    events.push(createProductTraceTimelineEvent({
-      id: `repair-created-${repair.id}`, type: ProductTraceEventType.PRODUCT_REPAIR_RECEIVED,
-      category: ProductTraceEventCategory.REPAIR, occurredAt: repair.createdAt, title: 'รับสินค้าเข้าซ่อม',
-      description: repair.reportedSymptoms, document: { type: 'REPAIR_JOB', id: repair.id, code: repair.jobNo },
-      actor: repair.technician, amount: permissions.canViewFinancials ? repair.estimatedCost : null, status: repair.status,
-    }))
-  }
+  for (const repair of repairs || []) events.push(createProductTraceTimelineEvent({
+    id: `repair-created-${repair.id}`, type: ProductTraceEventType.PRODUCT_REPAIR_RECEIVED,
+    category: ProductTraceEventCategory.REPAIR, occurredAt: repair.createdAt, title: 'รับสินค้าเข้าซ่อม',
+    description: repair.reportedSymptoms, document: { type: 'REPAIR_JOB', id: repair.id, code: repair.jobNo },
+    actor: repair.technician, amount: permissions.canViewFinancials ? repair.estimatedCost : null, status: repair.status,
+  }))
+
   return events.map((event) => ({ ...event, amount: roundMoney(event.amount) })).sort(compareOccurredAt)
 }
 
