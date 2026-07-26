@@ -16,6 +16,7 @@ router.use(loadRepairEmployeeContext);
 
 router.get('/intake-context/:lookup', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getIntakeContext);
 router.get('/customers/:customerId/warranty-assets', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listCustomerWarrantyAssets);
+router.get('/dashboard', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getOperationalDashboard);
 router.get('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listJobs);
 router.get('/jobs/:id', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getJob);
 router.post('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.createJob);
@@ -26,6 +27,9 @@ router.get('/jobs/:id/repair-warranties', allowRepairRoles(...READ_AND_INTAKE_RO
 router.post('/jobs/:id/repair-warranties', allowRepairRoles(...OPERATION_ROLES), repairController.issueRepairWarranty);
 router.post('/jobs/:id/repeat-repair-link', allowRepairRoles(...OPERATION_ROLES), repairController.linkRepeatRepair);
 router.get('/jobs/:id/asset-timeline', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getAssetTimeline);
+router.get('/jobs/:id/operational-intelligence', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getOperationalIntelligence);
+router.get('/jobs/:id/cost-analytics', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getCostAnalytics);
+router.get('/jobs/:id/repeat-failure-analytics', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getRepeatFailureAnalytics);
 
 router.get('/jobs/:id/diagnoses', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listDiagnoses);
 router.post('/jobs/:id/diagnoses', allowRepairRoles(...OPERATION_ROLES), repairController.recordDiagnosis);
