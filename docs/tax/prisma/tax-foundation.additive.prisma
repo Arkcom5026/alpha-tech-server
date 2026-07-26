@@ -1,0 +1,281 @@
+// Alpha-Tech Tax Platform — Slice 3 additive Prisma foundation
+// Append this block to prisma/schema.prisma at Local.
+// Do not remove or rename any existing model, enum, field, index, or relation.
+
+// -----------------------------------------------------------------------------
+// Tax enums
+// -----------------------------------------------------------------------------
+
+enum TaxDirection {
+  OUTPUT
+  INPUT
+}
+
+enum TaxSourceType {
+  SALE
+  SALE_RETURN
+  PURCHASE_RECEIPT
+  REPAIR_JOB
+  EXPENSE
+}
+
+enum TaxCandidateStatus {
+  DISCOVERED
+  ELIGIBLE
+  INELIGIBLE
+  REVIEW_REQUIRED
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+enum TaxDocumentType {
+  TAX_INVOICE
+  RECEIPT_TAX_INVOICE
+  ABBREVIATED_TAX_INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  INPUT_TAX_INVOICE
+}
+
+enum TaxDocumentStatus {
+  DRAFT
+  ISSUED
+  VOIDED
+  REPLACED
+}
+
+enum TaxPartyRole {
+  ISSUER
+  RECIPIENT
+}
+
+enum TaxLedgerEntryType {
+  ORIGINAL
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum TaxPeriodStatus {
+  OPEN
+  REVIEW
+  CLOSED
+  REOPENED
+}
+
+// -----------------------------------------------------------------------------
+// Tax candidate and eligibility evidence
+// -----------------------------------------------------------------------------
+
+model TaxCandidate {
+  id                Int                @id @default(autoincrement())
+  sourceType        TaxSourceType
+  sourceId          String
+  direction         TaxDirection
+  branchId          Int
+  status            TaxCandidateStatus @default(DISCOVERED)
+  sourceOccurredAt  DateTime
+  discoveredAt      DateTime           @default(now())
+  evaluatedAt       DateTime?
+  convertedAt       DateTime?
+  policyVersion     String?
+  eligibilityReason String?
+  sourceVersion     String?
+  sourceHash        String?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  document TaxDocument?
+
+  @@unique([sourceType, sourceId, direction])
+  @@index([branchId, direction, sourceOccurredAt])
+  @@index([status, discoveredAt])
+  @@index([branchId, status, sourceOccurredAt])
+}
+
+// -----------------------------------------------------------------------------
+// Immutable tax-document authority
+// -----------------------------------------------------------------------------
+
+model TaxDocument {
+  id                      Int               @id @default(autoincrement())
+  candidateId             Int?              @unique
+  branchId                Int
+  direction               TaxDirection
+  documentType            TaxDocumentType
+  status                  TaxDocumentStatus @default(DRAFT)
+  documentNumber          String?
+  externalDocumentNumber  String?
+  documentDate            DateTime
+  issuedAt                DateTime?
+  voidedAt                DateTime?
+  replacedAt              DateTime?
+  replacementDocumentId   Int?
+  replacesDocumentId      Int?
+  sourceType              TaxSourceType
+  sourceId                String
+  currencyCode            String            @default("THB") @db.VarChar(3)
+  subtotalAmount          Decimal           @db.Decimal(14, 2)
+  discountAmount          Decimal           @default(0) @db.Decimal(14, 2)
+  taxableAmount           Decimal           @db.Decimal(14, 2)
+  exemptAmount            Decimal           @default(0) @db.Decimal(14, 2)
+  vatAmount               Decimal           @db.Decimal(14, 2)
+  totalAmount             Decimal           @db.Decimal(14, 2)
+  snapshotContractVersion Int               @default(1)
+  sourceVersion           String?
+  sourceHash              String?
+  documentHash            String?
+  note                    String?
+  metadata                Json?
+  createdByEmployeeId     Int?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  candidate           TaxCandidate?              @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  parties             TaxDocumentPartySnapshot[]
+  items               TaxDocumentItemSnapshot[]
+  ledgerEntries       TaxLedgerEntry[]
+  replacementDocument TaxDocument?               @relation("TaxDocumentReplacement", fields: [replacementDocumentId], references: [id], onDelete: Restrict)
+  replacedDocuments   TaxDocument[]               @relation("TaxDocumentReplacement")
+  replacesDocument    TaxDocument?                @relation("TaxDocumentReplaces", fields: [replacesDocumentId], references: [id], onDelete: Restrict)
+  correctionDocuments TaxDocument[]               @relation("TaxDocumentReplaces")
+
+  @@unique([branchId, documentNumber])
+  @@unique([sourceType, sourceId, documentType, direction])
+  @@index([branchId, direction, documentDate])
+  @@index([branchId, status, documentDate])
+  @@index([sourceType, sourceId])
+  @@index([replacementDocumentId])
+  @@index([replacesDocumentId])
+}
+
+model TaxDocumentPartySnapshot {
+  id               Int          @id @default(autoincrement())
+  taxDocumentId    Int
+  role             TaxPartyRole
+  legalName        String
+  taxId            String?
+  branchCode       String?
+  isHeadOffice     Boolean?
+  addressLine      String?
+  subdistrict      String?
+  district         String?
+  province         String?
+  postalCode       String?
+  countryCode      String        @default("TH") @db.VarChar(2)
+  phone            String?
+  email            String?
+  sourceEntityType String?
+  sourceEntityId   String?
+  snapshotHash     String?
+  createdAt        DateTime      @default(now())
+
+  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([taxDocumentId, role])
+  @@index([taxId, branchCode])
+}
+
+model TaxDocumentItemSnapshot {
+  id               Int      @id @default(autoincrement())
+  taxDocumentId    Int
+  lineNumber       Int
+  sourceItemType   String?
+  sourceItemId     String?
+  productId        Int?
+  description      String
+  quantity         Decimal  @default(1) @db.Decimal(14, 4)
+  unitName         String?
+  unitPrice        Decimal  @db.Decimal(14, 2)
+  discountAmount   Decimal  @default(0) @db.Decimal(14, 2)
+  taxableAmount    Decimal  @db.Decimal(14, 2)
+  vatRate          Decimal  @db.Decimal(7, 4)
+  vatAmount        Decimal  @db.Decimal(14, 2)
+  totalAmount      Decimal  @db.Decimal(14, 2)
+  taxClassification String?
+  snapshotHash     String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([taxDocumentId, lineNumber])
+  @@index([sourceItemType, sourceItemId])
+  @@index([productId])
+}
+
+// -----------------------------------------------------------------------------
+// Numbering, ledger, and period foundation
+// -----------------------------------------------------------------------------
+
+model TaxNumberSequence {
+  id             Int             @id @default(autoincrement())
+  branchId       Int
+  documentType   TaxDocumentType
+  year           Int
+  prefix         String?
+  lastNumber     Int             @default(0)
+  paddingLength  Int             @default(6)
+  version        Int             @default(1)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([branchId, documentType, year])
+  @@index([branchId, year])
+}
+
+model TaxPeriod {
+  id              Int             @id @default(autoincrement())
+  branchId        Int
+  year            Int
+  month           Int
+  status          TaxPeriodStatus @default(OPEN)
+  openedAt        DateTime        @default(now())
+  reviewStartedAt DateTime?
+  closedAt        DateTime?
+  reopenedAt      DateTime?
+  closedByEmployeeId Int?
+  reopenedByEmployeeId Int?
+  note            String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  ledgerEntries TaxLedgerEntry[]
+
+  @@unique([branchId, year, month])
+  @@index([branchId, status, year, month])
+}
+
+model TaxLedgerEntry {
+  id                 Int                @id @default(autoincrement())
+  taxDocumentId      Int
+  taxPeriodId        Int?
+  branchId           Int
+  direction          TaxDirection
+  entryType          TaxLedgerEntryType @default(ORIGINAL)
+  effectiveDate      DateTime
+  taxableAmount      Decimal            @db.Decimal(14, 2)
+  vatAmount          Decimal            @db.Decimal(14, 2)
+  totalAmount        Decimal            @db.Decimal(14, 2)
+  sourceEntryId      Int?
+  reversalOfEntryId  Int?
+  registrationKey    String             @unique
+  registeredByEmployeeId Int?
+  registeredAt       DateTime           @default(now())
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+
+  taxDocument    TaxDocument    @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+  taxPeriod      TaxPeriod?      @relation(fields: [taxPeriodId], references: [id], onDelete: Restrict)
+  sourceEntry    TaxLedgerEntry? @relation("TaxLedgerSource", fields: [sourceEntryId], references: [id], onDelete: Restrict)
+  derivedEntries TaxLedgerEntry[] @relation("TaxLedgerSource")
+  reversalOf     TaxLedgerEntry? @relation("TaxLedgerReversal", fields: [reversalOfEntryId], references: [id], onDelete: Restrict)
+  reversals      TaxLedgerEntry[] @relation("TaxLedgerReversal")
+
+  @@index([branchId, direction, effectiveDate])
+  @@index([taxPeriodId, direction])
+  @@index([taxDocumentId])
+  @@index([sourceEntryId])
+  @@index([reversalOfEntryId])
+}
