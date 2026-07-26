@@ -29,6 +29,7 @@ const requireTaxPeriodAdministrator = (req, res, next) => {
 router.use(verifyToken, requireTaxPeriodAdministrator);
 
 router.get('/periods', controller.listPeriods);
+router.get('/periods/:taxPeriodId', controller.getPeriodDetail);
 router.post('/periods/ensure', controller.ensureMonthlyPeriod);
 router.post('/periods/readiness', controller.ensureOperationalReadiness);
 router.post('/periods/:taxPeriodId/close', controller.closePeriod);
