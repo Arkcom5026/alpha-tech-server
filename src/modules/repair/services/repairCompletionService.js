@@ -1,4 +1,5 @@
 const repairRepository = require('../repositories/repairRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { validateRepairStatusUpdate } = require('../validators/repairValidator');
 const {
   RepairError,
@@ -10,6 +11,7 @@ const {
 const {
   assertRepairCanComplete,
 } = require('../policies/repairCompletionPolicy');
+const { buildCompletionReadiness } = require('./repairCompletionReadinessService');
 const { mapRepairJob } = require('../mappers/repairMapper');
 
 class RepairCompletionService {
@@ -42,6 +44,32 @@ class RepairCompletionService {
       assertRepairTransition(job.status, payload.status);
       assertRepairCanComplete(job);
 
+      if (!job.serviceAssetId) {
+        throw new RepairError(
+          RepairFailureCode.SERVICE_ASSET_REQUIRED,
+          'ใบงานซ่อมต้องเชื่อมกับอุปกรณ์บริการก่อนปิดงาน',
+          409
+        );
+      }
+      const assetRepository = new ServiceAssetRepository(repo.prisma);
+      const asset = await assetRepository.findServiceAsset(actor.branchId, job.serviceAssetId);
+      if (!asset) {
+        throw new RepairError(
+          RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+          'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+          404
+        );
+      }
+      const readiness = buildCompletionReadiness({ ...job, metadata: asset.metadata });
+      if (!readiness.readyForCompletion) {
+        throw new RepairError(
+          RepairFailureCode.REPAIR_COMPLETION_READINESS_REQUIRED,
+          'งานซ่อมยังไม่ผ่านรายการตรวจสอบก่อนปิดงาน',
+          409,
+          readiness.requirements
+        );
+      }
+
       if (payload.technicianId) {
         const technician = await repo.findEmployee(payload.technicianId);
         if (
@@ -65,7 +93,10 @@ class RepairCompletionService {
         ...(payload.technicianId ? { technicianId: payload.technicianId } : {}),
       });
 
-      return mapRepairJob(updated);
+      return {
+        repairJob: mapRepairJob(updated),
+        completionReadiness: readiness,
+      };
     });
   }
 }
