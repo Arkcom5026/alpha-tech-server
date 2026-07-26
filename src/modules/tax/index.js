@@ -38,6 +38,10 @@ const {
 } = require('./application/taxDocumentLedgerPublicationRuntimeService');
 
 const {
+  createTaxLedgerPeriodAssignmentService,
+} = require('./application/taxLedgerPeriodAssignmentService');
+
+const {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   resolveSaleTaxProjectionDecision,
@@ -63,6 +67,10 @@ const {
   createPrismaTaxPeriodResolver,
 } = require('./infrastructure/prismaTaxPeriodResolver');
 
+const {
+  createPrismaTaxLedgerPeriodAssignmentRepository,
+} = require('./infrastructure/prismaTaxLedgerPeriodAssignmentRepository');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
@@ -75,10 +83,12 @@ module.exports = {
   assertTaxPeriodCandidate,
   buildTaxDocumentDraft,
   createPrismaTaxDocumentPublisher,
+  createPrismaTaxLedgerPeriodAssignmentRepository,
   createPrismaTaxLedgerPublisher,
   createPrismaTaxPeriodResolver,
   createSaleTaxProjectionRuntime,
   createTaxDocumentLedgerPublicationRuntime,
+  createTaxLedgerPeriodAssignmentService,
   isAssignableTaxPeriodStatus,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
