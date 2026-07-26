@@ -19,8 +19,8 @@ test('rejects invalid and repeated repair transitions with transition context', 
   assert.throws(
     () => assertRepairTransition('COMPLETED', 'IN_PROGRESS'),
     (error) => {
-      assert.equal(error.code, 'INVALID_REPAIR_TRANSITION');
-      assert.equal(error.status, 409);
+      assert.equal(error.code, 'REPAIR_INVALID_TRANSITION');
+      assert.equal(error.status, 'fail');
       assert.deepEqual(error.details, {
         currentStatus: 'COMPLETED',
         nextStatus: 'IN_PROGRESS',
@@ -32,7 +32,7 @@ test('rejects invalid and repeated repair transitions with transition context', 
 
   assert.throws(
     () => assertRepairTransition('RECEIVED', 'RECEIVED'),
-    { code: 'INVALID_REPAIR_TRANSITION' }
+    { code: 'REPAIR_INVALID_TRANSITION' }
   );
 });
 
@@ -47,14 +47,14 @@ test('allows every declared claim transition', () => {
 test('rejects terminal, unknown and skipped claim transitions', () => {
   assert.throws(
     () => assertClaimTransition('RESOLVED', 'DRAFT'),
-    { code: 'INVALID_CLAIM_TRANSITION', status: 409 }
+    { code: 'WARRANTY_INVALID_TRANSITION', status: 'fail' }
   );
   assert.throws(
     () => assertClaimTransition('UNKNOWN', 'SUBMITTED'),
-    { code: 'INVALID_CLAIM_TRANSITION' }
+    { code: 'WARRANTY_INVALID_TRANSITION' }
   );
   assert.throws(
     () => assertClaimTransition('DRAFT', 'RESOLVED'),
-    { code: 'INVALID_CLAIM_TRANSITION' }
+    { code: 'WARRANTY_INVALID_TRANSITION' }
   );
 });
