@@ -74,6 +74,35 @@ function run() {
   assert.strictEqual(projection.counters.byAction.CONTACT_CUSTOMER, 1);
   assert.strictEqual(projection.counters.byAction.NONE, 1);
 
+  assert.deepStrictEqual(Object.keys(projection.managerSummary), [
+    'activeJobs',
+    'actionableJobs',
+    'criticalJobs',
+    'overdueJobs',
+    'slaAtRiskJobs',
+    'unassignedJobs',
+    'customerContactJobs',
+    'partsFollowUpJobs',
+    'actionableRate',
+    'slaOverdueRate',
+    'attention',
+    'topActions',
+  ]);
+  assert.strictEqual(projection.managerSummary.activeJobs, 2);
+  assert.strictEqual(projection.managerSummary.actionableJobs, 2);
+  assert.strictEqual(projection.managerSummary.criticalJobs, 2);
+  assert.strictEqual(projection.managerSummary.unassignedJobs, 1);
+  assert.strictEqual(projection.managerSummary.customerContactJobs, 1);
+  assert.strictEqual(projection.managerSummary.attention, 'IMMEDIATE');
+  assert.ok(Array.isArray(projection.managerSummary.topActions));
+
+  const emptyProjection = buildOperationalDecisionProjection([], now);
+  assert.strictEqual(emptyProjection.counters.total, 0);
+  assert.strictEqual(emptyProjection.managerSummary.activeJobs, 0);
+  assert.strictEqual(emptyProjection.managerSummary.actionableJobs, 0);
+  assert.strictEqual(emptyProjection.managerSummary.attention, 'NORMAL');
+  assert.deepStrictEqual(emptyProjection.priorityQueue, []);
+
   const controllerSource = source('src/modules/repair/controllers/repairController.js');
   const routeSource = source('src/modules/repair/routes/repairRoutes.js');
   const serviceSource = source('src/modules/repair/services/repairOperationalDecisionService.js');
@@ -82,6 +111,8 @@ function run() {
   assert.ok(controllerSource.includes('getOperationalDecisionDashboard'));
   assert.ok(routeSource.includes("router.get('/dashboard/decisions'"));
   assert.ok(serviceSource.includes('repair-operational-decision.v1'));
+  assert.ok(serviceSource.includes('buildManagerSummary'));
+  assert.ok(serviceSource.includes('managerSummary'));
   assert.ok(serviceSource.includes('buildOperationalDecisionProjection'));
 
   console.log('Repair operational decision verifier: PASS');
