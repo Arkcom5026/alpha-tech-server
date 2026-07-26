@@ -77,7 +77,7 @@ test('rejects creation when customer does not exist', async () => {
     customerId: 20,
     deviceModel: 'Notebook',
     reportedSymptoms: 'No power',
-  }), { code: 'CUSTOMER_NOT_FOUND', status: 404 });
+  }), { code: 'REPAIR_CUSTOMER_NOT_FOUND', status: 'fail' });
 });
 
 test('requires manager role for customer mismatch override', async () => {
@@ -103,7 +103,7 @@ test('requires manager role for customer mismatch override', async () => {
       reportedSymptoms: 'No power',
       allowCustomerOverride: true,
     }
-  ), { code: 'STOCK_ITEM_CUSTOMER_MISMATCH', status: 409 });
+  ), { code: 'REPAIR_STOCK_ITEM_CUSTOMER_MISMATCH', status: 'fail' });
 });
 
 test('maps get and list results and keeps branch scope', async () => {
@@ -151,7 +151,7 @@ test('updates valid status and rejects missing job', async () => {
   }));
   await assert.rejects(() => missing.updateJobStatus(actor, 404, { status: 'IN_PROGRESS' }), {
     code: 'REPAIR_JOB_NOT_FOUND',
-    status: 404,
+    status: 'fail',
   });
 });
 
@@ -191,7 +191,7 @@ test('rejects insufficient part stock before any write', async () => {
 
   await assert.rejects(() => service.addPartsToRepairJob(actor, 100, { productId: 30, qtyUsed: 2 }),
     (error) => {
-      assert.equal(error.code, 'PART_STOCK_INSUFFICIENT');
+      assert.equal(error.code, 'REPAIR_PART_STOCK_INSUFFICIENT');
       assert.deepEqual(error.details, { available: 1, requested: 2 });
       return true;
     });
