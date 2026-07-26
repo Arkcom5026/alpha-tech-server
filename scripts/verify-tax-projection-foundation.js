@@ -21,6 +21,10 @@ const checks = Object.freeze([
     name: 'Tax ledger publisher',
     script: 'scripts/verify-tax-ledger-publisher.js',
   },
+  {
+    name: 'Tax document ledger publication runtime',
+    script: 'scripts/verify-tax-document-ledger-publication-runtime.js',
+  },
 ]);
 
 const runCheck = ({ name, script }) => {
