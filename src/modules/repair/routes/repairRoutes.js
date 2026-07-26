@@ -1,6 +1,5 @@
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
-const repairController = require('../controllers/repairController');
 const {
   getIntakeContext,
 } = require('../query/intake-context/intakeContextController');
@@ -31,6 +30,9 @@ const {
 const {
   getWarrantyClaim,
 } = require('../claim/query/detail/getWarrantyClaimController');
+const {
+  updateWarrantyClaimStatus,
+} = require('../claim/status/updateWarrantyClaimStatusController');
 const {
   loadRepairEmployeeContext,
   allowRepairRoles,
@@ -107,7 +109,7 @@ router.get(
 router.patch(
   '/warranty-claims/:claimId/status',
   allowRepairRoles(...OPERATION_ROLES),
-  repairController.updateWarrantyClaimStatus
+  updateWarrantyClaimStatus
 );
 
 module.exports = router;
