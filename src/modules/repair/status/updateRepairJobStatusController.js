@@ -1,5 +1,5 @@
 const updateRepairJobStatusService = require('./updateRepairJobStatusService');
-const { resolveRepairActor } = require('../../utils/repairActor');
+const { resolveRepairActor } = require('../utils/repairActor');
 
 async function updateRepairJobStatus(req, res, next) {
   try {
