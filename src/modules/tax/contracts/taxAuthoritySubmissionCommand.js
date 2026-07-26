@@ -9,6 +9,7 @@ class TaxAuthoritySubmissionContractError extends Error {
 
 const TAX_AUTHORITY_SUBMISSION_ACTIONS = Object.freeze({
   ENQUEUE: 'ENQUEUE',
+  CLAIM: 'CLAIM',
   RETRY: 'RETRY',
   CANCEL: 'CANCEL',
 });
@@ -120,6 +121,14 @@ const normalizeTaxAuthoritySubmissionCommand = (input, expectedAction) => {
       input.reason === null || input.reason === undefined
         ? null
         : requireNonEmptyString(input.reason, 'reason'),
+    workerId:
+      input.workerId === null || input.workerId === undefined
+        ? null
+        : requireNonEmptyString(input.workerId, 'workerId'),
+    leaseUntil:
+      input.leaseUntil === null || input.leaseUntil === undefined
+        ? null
+        : normalizeOccurredAt(input.leaseUntil),
   });
 };
 
