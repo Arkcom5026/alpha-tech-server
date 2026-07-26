@@ -28,11 +28,52 @@ function buildAlertDigest(alertProjection) {
     .sort((a, b) => ALERT_PRIORITY[a.severity] - ALERT_PRIORITY[b.severity] || b.count - a.count || a.code.localeCompare(b.code));
 }
 
-function buildDailyManagementBrief(jobs, now = new Date()) {
-  const alertProjection = buildManagementAlertProjection(jobs, now);
+function buildManagementKpiSnapshot(alertProjection) {
   const summary = alertProjection.managerSummary;
+  const activeJobs = Math.max(summary.activeJobs, 1);
+  return {
+    activeJobs: summary.activeJobs,
+    actionableJobs: summary.actionableJobs,
+    criticalJobs: summary.criticalJobs,
+    overdueJobs: summary.overdueJobs,
+    unassignedJobs: summary.unassignedJobs,
+    escalationJobs: alertProjection.counters.escalationJobs,
+    actionableRate: summary.actionableRate,
+    slaOverdueRate: summary.slaOverdueRate,
+    assignmentCoverageRate: Number(((summary.activeJobs - summary.unassignedJobs) / activeJobs).toFixed(2)),
+    escalationRate: Number((alertProjection.counters.escalationJobs / activeJobs).toFixed(2)),
+  };
+}
+
+function buildTrendProjection(current, baseline = null) {
+  if (!baseline || typeof baseline !== 'object') {
+    return {
+      available: false,
+      direction: 'STABLE',
+      deltas: {},
+    };
+  }
+
+  const fields = ['activeJobs', 'actionableJobs', 'criticalJobs', 'overdueJobs', 'unassignedJobs', 'escalationJobs'];
+  const deltas = Object.fromEntries(fields.map((field) => [
+    field,
+    Number(current[field] || 0) - Number(baseline[field] || 0),
+  ]));
+  const deterioration = deltas.criticalJobs + deltas.overdueJobs + deltas.unassignedJobs + deltas.escalationJobs;
+  const direction = deterioration > 0 ? 'WORSENING' : deterioration < 0 ? 'IMPROVING' : 'STABLE';
+
+  return {
+    available: true,
+    direction,
+    deltas,
+  };
+}
+
+function buildDailyManagementBrief(jobs, now = new Date(), baseline = null) {
+  const alertProjection = buildManagementAlertProjection(jobs, now);
   const alertDigest = buildAlertDigest(alertProjection);
   const escalationQueue = alertProjection.escalationQueue.slice(0, 10);
+  const kpis = buildManagementKpiSnapshot(alertProjection);
 
   return {
     contractVersion: MANAGEMENT_BRIEF_CONTRACT_VERSION,
@@ -40,13 +81,15 @@ function buildDailyManagementBrief(jobs, now = new Date()) {
     headline: buildHeadline(alertProjection),
     attention: alertProjection.attention,
     overview: {
-      activeJobs: summary.activeJobs,
-      actionableJobs: summary.actionableJobs,
-      criticalJobs: summary.criticalJobs,
-      overdueJobs: summary.overdueJobs,
-      unassignedJobs: summary.unassignedJobs,
-      escalationJobs: alertProjection.counters.escalationJobs,
+      activeJobs: kpis.activeJobs,
+      actionableJobs: kpis.actionableJobs,
+      criticalJobs: kpis.criticalJobs,
+      overdueJobs: kpis.overdueJobs,
+      unassignedJobs: kpis.unassignedJobs,
+      escalationJobs: kpis.escalationJobs,
     },
+    kpis,
+    trend: buildTrendProjection(kpis, baseline),
     alertCounters: alertProjection.counters,
     alertDigest,
     escalationQueue,
@@ -77,4 +120,6 @@ module.exports.RepairManagementBriefService = RepairManagementBriefService;
 module.exports.MANAGEMENT_BRIEF_CONTRACT_VERSION = MANAGEMENT_BRIEF_CONTRACT_VERSION;
 module.exports.buildHeadline = buildHeadline;
 module.exports.buildAlertDigest = buildAlertDigest;
+module.exports.buildManagementKpiSnapshot = buildManagementKpiSnapshot;
+module.exports.buildTrendProjection = buildTrendProjection;
 module.exports.buildDailyManagementBrief = buildDailyManagementBrief;
