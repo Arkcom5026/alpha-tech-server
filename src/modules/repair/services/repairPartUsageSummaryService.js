@@ -1,15 +1,22 @@
 const { Prisma } = require('@prisma/client');
 const repairPartUsageRepository = require('../repositories/repairPartUsageRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
+const { partReversalHistory } = require('./repairPartReversalService');
 
 function toDecimal(value) {
   return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value || 0);
 }
 
-function calculateActualPartUsageSummary(repairJobId, parts = [], calculatedAt = new Date()) {
+function calculateActualPartUsageSummary(
+  repairJobId,
+  parts = [],
+  reversals = [],
+  calculatedAt = new Date()
+) {
   let totalQuantity = 0;
   let totalAmount = new Prisma.Decimal(0);
 
@@ -42,18 +49,46 @@ function calculateActualPartUsageSummary(repairJobId, parts = [], calculatedAt =
       partItemId: Number(part.id),
       productId: Number(part.productId),
       productName: part.product?.name || null,
+      status: 'INSTALLED',
       quantity,
       unitPrice: unitPrice.toFixed(2),
       lineAmount: lineAmount.toFixed(2),
     };
   });
 
+  const reversalLines = reversals
+    .filter((item) => Number(item.repairJobId) === Number(repairJobId))
+    .map((item) => ({
+      partItemId: Number(item.partItemId),
+      productId: Number(item.productId),
+      productName: item.productName || null,
+      status: 'REVERSED',
+      quantity: Number(item.quantity || 0),
+      unitPrice: Number(item.unitPrice || 0).toFixed(2),
+      lineAmount: Number(item.amount || 0).toFixed(2),
+      reason: item.reason || null,
+      reversedByEmployeeId: item.reversedByEmployeeId || null,
+      reversedAt: item.reversedAt || null,
+    }));
+
+  const reversedQuantity = reversalLines.reduce(
+    (sum, item) => sum + Number(item.quantity || 0),
+    0
+  );
+  const reversedAmount = reversalLines.reduce(
+    (sum, item) => sum + Number(item.lineAmount || 0),
+    0
+  );
+
   return {
     repairJobId: Number(repairJobId),
     lines,
+    reversals: reversalLines,
     totals: {
       actualPartQuantity: totalQuantity,
       actualPartAmount: totalAmount.toFixed(2),
+      reversedPartQuantity: reversedQuantity,
+      reversedPartAmount: Number(reversedAmount.toFixed(2)).toFixed(2),
     },
     calculatedAt: calculatedAt.toISOString(),
   };
@@ -75,7 +110,25 @@ class RepairPartUsageSummaryService {
     }
 
     const parts = await this.repository.listPartUsage(job.id);
-    return calculateActualPartUsageSummary(job.id, parts);
+    let reversals = [];
+
+    if (job.serviceAssetId) {
+      const assetRepository = new ServiceAssetRepository(this.repository.prisma);
+      const asset = await assetRepository.findServiceAsset(
+        actor.branchId,
+        job.serviceAssetId
+      );
+      if (!asset) {
+        throw new RepairError(
+          RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+          'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+          404
+        );
+      }
+      reversals = partReversalHistory(asset.metadata);
+    }
+
+    return calculateActualPartUsageSummary(job.id, parts, reversals);
   }
 }
 
