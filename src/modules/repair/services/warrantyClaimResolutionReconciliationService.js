@@ -42,6 +42,13 @@ function assertReplacementEligible(claim, replacement) {
       404
     );
   }
+  if (Number(replacement.id) === Number(claim.stockItemId)) {
+    throw new RepairError(
+      RepairFailureCode.CONFLICT,
+      'สินค้าทดแทนต้องไม่ใช่ Stock Item เดียวกับสินค้าต้นทาง',
+      409
+    );
+  }
   if (Number(replacement.branchId) !== Number(claim.branchId)) {
     throw new RepairError(
       RepairFailureCode.STOCK_ITEM_NOT_FOUND,
@@ -76,6 +83,43 @@ class WarrantyClaimResolutionReconciliationService {
         payload.replacementStockItemId
       );
       assertReplacementEligible(claim, replacement);
+
+      const linkedAsset = await repo.prisma.serviceAsset.findFirst({
+        where: {
+          sourceStockItemId: Number(replacement.id),
+          id: { not: Number(asset.id) },
+        },
+        select: { id: true, assetNo: true },
+      });
+      if (linkedAsset) {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'สินค้าทดแทนถูกเชื่อมกับอุปกรณ์บริการรายการอื่นแล้ว',
+          409,
+          {
+            replacementStockItemId: replacement.id,
+            serviceAssetId: linkedAsset.id,
+            assetNo: linkedAsset.assetNo,
+          }
+        );
+      }
+
+      const decremented = await repo.prisma.stockBalance.updateMany({
+        where: {
+          productId: Number(replacement.productId),
+          branchId: Number(claim.branchId),
+          quantity: { gte: 1 },
+        },
+        data: { quantity: { decrement: 1 } },
+      });
+      if (decremented.count !== 1) {
+        throw new RepairError(
+          RepairFailureCode.PART_STOCK_INSUFFICIENT,
+          'ยอดคงเหลือของสินค้าทดแทนไม่เพียงพอหรือถูกใช้งานพร้อมกัน',
+          409,
+          { productId: replacement.productId, requested: 1 }
+        );
+      }
     }
 
     if (originalStockItem) {
@@ -111,7 +155,7 @@ class WarrantyClaimResolutionReconciliationService {
       await repo.createStockMovement({
         productId: replacement.productId,
         branchId: claim.branchId,
-        qty: 0,
+        qty: -1,
         type: 'CLAIM_REPLACEMENT',
         refType: 'WARRANTY_CLAIM_REPLACEMENT',
         refId: claim.id,
@@ -136,6 +180,7 @@ class WarrantyClaimResolutionReconciliationService {
       replacementStockItemId: replacement?.id || null,
       replacementPreviousStatus: replacement?.status || null,
       replacementResultingStatus: replacement ? 'SOLD' : null,
+      replacementStockQuantityChange: replacement ? -1 : 0,
       creditAmount:
         payload.creditAmount === null || payload.creditAmount === undefined
           ? null
