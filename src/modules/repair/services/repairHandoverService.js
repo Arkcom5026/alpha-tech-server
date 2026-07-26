@@ -138,14 +138,25 @@ class RepairHandoverService {
         repairJobNo: job.jobNo,
         handedOverAt: handedOverAt.toISOString(),
         handedOverByEmployeeId: actor.employeeId,
+        receiver: {
+          name: payload.receiverName,
+          phone: payload.receiverPhone,
+          relation: payload.receiverRelation,
+          identityReference: payload.identityReference,
+        },
+        signatureRef: payload.signatureRef,
         note: payload.note,
         settlement,
       };
 
+      const handoverHistory = Array.isArray(existingMetadata.customerHandovers)
+        ? existingMetadata.customerHandovers
+        : [];
       const updatedAsset = await assetRepo.updateServiceAsset(asset.id, {
         status: 'RETURNED_TO_CUSTOMER',
         metadata: {
           ...existingMetadata,
+          customerHandovers: [...handoverHistory, handover],
           lastCustomerHandover: handover,
         },
       });
