@@ -1,4 +1,5 @@
 const repairService = require('../services/repairService');
+const repairHandoverService = require('../services/repairHandoverService');
 const repairIntakeService = require('../services/repairIntakeService');
 const warrantyClaimService = require('../services/warrantyClaimService');
 const customerWarrantyAssetService = require('../services/customerWarrantyAssetService');
@@ -77,6 +78,26 @@ class RepairController {
       res.status(200).json({
         success: true,
         message: 'อัปเดตสถานะงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async handoverToCustomer(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairHandoverService.handoverToCustomer(
+        actor,
+        req.params.id,
+        req.body
+      );
+      res.status(200).json({
+        success: true,
+        message: data.idempotent
+          ? 'เครื่องถูกส่งคืนลูกค้าแล้ว'
+          : 'ส่งคืนเครื่องให้ลูกค้าเรียบร้อยแล้ว',
         data,
       });
     } catch (error) {
