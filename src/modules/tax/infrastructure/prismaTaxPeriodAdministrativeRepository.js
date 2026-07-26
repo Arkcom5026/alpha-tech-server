@@ -6,7 +6,8 @@ const requireAdministrativeClient = (db) => {
   if (
     !db?.taxPeriod ||
     typeof db.taxPeriod.findMany !== 'function' ||
-    typeof db.taxPeriod.findFirst !== 'function'
+    typeof db.taxPeriod.findFirst !== 'function' ||
+    typeof db.taxPeriod.groupBy !== 'function'
   ) {
     throw new TaxDocumentContractError(
       'INVALID_TAX_PERIOD_ADMINISTRATIVE_CLIENT',
@@ -56,7 +57,36 @@ const createPrismaTaxPeriodAdministrativeRepository = ({ db }) => {
       select: selectTaxPeriod,
     });
 
-  return Object.freeze({ findByIdAndBranch, list });
+  const summarize = async ({ branchId, referenceDate }) => {
+    const [groups, currentPeriod] = await Promise.all([
+      client.taxPeriod.groupBy({
+        by: ['status'],
+        where: { branchId },
+        _count: { _all: true },
+      }),
+      client.taxPeriod.findFirst({
+        where: {
+          branchId,
+          startDate: { lte: referenceDate },
+          endDate: { gte: referenceDate },
+        },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+        select: selectTaxPeriod,
+      }),
+    ]);
+
+    return Object.freeze({
+      statusGroups: Object.freeze(
+        groups.map((group) => Object.freeze({
+          status: group.status,
+          count: group._count._all,
+        })),
+      ),
+      currentPeriod,
+    });
+  };
+
+  return Object.freeze({ findByIdAndBranch, list, summarize });
 };
 
 module.exports = {
