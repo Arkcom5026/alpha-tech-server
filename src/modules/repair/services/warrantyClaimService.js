@@ -22,9 +22,29 @@ const {
 } = require('../policies/repairTransitionPolicy');
 const { createWarrantyClaimNo } = require('../utils/repairCode');
 const { mapWarrantyClaim } = require('../mappers/repairMapper');
+const { repeatRepairLinks } = require('./repairRepeatLinkService');
 
 function isPrismaUniqueConflict(error) {
   return error && error.code === 'P2002';
+}
+
+function metadataObject(metadata) {
+  return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? metadata
+    : {};
+}
+
+function claimEscalationHistory(metadata) {
+  const history = metadataObject(metadata).repairClaimEscalations;
+  return Array.isArray(history) ? history : [];
+}
+
+function repeatContextForJob(metadata, repairJobId) {
+  return (
+    repeatRepairLinks(metadata)
+      .filter((link) => Number(link.repairJobId) === Number(repairJobId))
+      .sort((a, b) => new Date(b.linkedAt) - new Date(a.linkedAt))[0] || null
+  );
 }
 
 function claimTimestampData(nextStatus, now) {
@@ -116,6 +136,12 @@ class WarrantyClaimService {
           );
         }
 
+        const assetMetadata = metadataObject(asset.metadata);
+        const repeatContext = repeatContextForJob(assetMetadata, job.id);
+        const claimSource = repeatContext?.underRepairWarranty
+          ? 'REPEAT_REPAIR_UNDER_REPAIR_WARRANTY'
+          : 'REPAIR_JOB';
+
         const claim = await repo.createWarrantyClaim(
           {
             branchId: actor.branchId,
@@ -137,16 +163,42 @@ class WarrantyClaimService {
             note: payload.note || 'สร้างรายการเคลมจากใบงานซ่อม',
             performedByEmployeeId: actor.employeeId,
             metadata: {
-              source: 'REPAIR_JOB',
+              source: claimSource,
               repairJobId: job.id,
               serviceAssetId: job.serviceAssetId,
               repairLinkState: 'LINKED_VERIFIED',
+              repeatRepairLinkId: repeatContext?.id || null,
+              previousRepairJobId: repeatContext?.previousRepairJobId || null,
+              underRepairWarranty: Boolean(repeatContext?.underRepairWarranty),
+              repairWarrantyId: repeatContext?.repairWarrantyId || null,
             },
           }
         );
 
+        const escalation = {
+          warrantyClaimId: claim.id,
+          claimNo: claim.claimNo,
+          repairJobId: job.id,
+          repairJobNo: job.jobNo,
+          serviceAssetId: job.serviceAssetId,
+          source: claimSource,
+          repeatRepairLinkId: repeatContext?.id || null,
+          previousRepairJobId: repeatContext?.previousRepairJobId || null,
+          previousRepairJobNo: repeatContext?.previousRepairJobNo || null,
+          underRepairWarranty: Boolean(repeatContext?.underRepairWarranty),
+          repairWarrantyId: repeatContext?.repairWarrantyId || null,
+          escalatedByEmployeeId: actor.employeeId,
+          escalatedAt: new Date().toISOString(),
+        };
+        const escalationHistory = claimEscalationHistory(assetMetadata);
+
         await assetRepo.updateServiceAsset(job.serviceAssetId, {
           status: 'IN_CLAIM',
+          metadata: {
+            ...assetMetadata,
+            repairClaimEscalations: [...escalationHistory, escalation],
+            latestRepairClaimEscalation: escalation,
+          },
         });
 
         return mapWarrantyClaim(claim);
@@ -286,3 +338,5 @@ class WarrantyClaimService {
 module.exports = new WarrantyClaimService();
 module.exports.WarrantyClaimService = WarrantyClaimService;
 module.exports.assetStatusForClaim = assetStatusForClaim;
+module.exports.claimEscalationHistory = claimEscalationHistory;
+module.exports.repeatContextForJob = repeatContextForJob;
