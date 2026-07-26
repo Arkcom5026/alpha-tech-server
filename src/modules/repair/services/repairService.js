@@ -1,4 +1,5 @@
 const repairRepository = require('../repositories/repairRepository');
+const serviceAssetService = require('./serviceAssetService');
 const {
   validateCreateRepairJob,
   validateRepairStatusUpdate,
@@ -20,14 +21,16 @@ const {
 } = require('../policies/repairTransitionPolicy');
 const { createRepairJobNo } = require('../utils/repairCode');
 const { mapRepairJob } = require('../mappers/repairMapper');
+const { mapServiceAsset } = require('../mappers/serviceAssetMapper');
 
 function isPrismaUniqueConflict(error) {
   return error && error.code === 'P2002';
 }
 
 class RepairService {
-  constructor(repository = repairRepository) {
+  constructor(repository = repairRepository, assetService = serviceAssetService) {
     this.repository = repository;
+    this.assetService = assetService;
   }
 
   async createRepairJob(actor, rawPayload) {
@@ -72,11 +75,19 @@ class RepairService {
           }
         }
 
+        const serviceAsset = await this.assetService.resolveForRepairIntake(
+          repo,
+          actor,
+          payload,
+          stockItem
+        );
+
         const created = await repo.createRepairJob({
           jobNo: createRepairJobNo(actor.branchId),
           branchId: actor.branchId,
           customerId: payload.customerId,
           stockItemId: payload.stockItemId,
+          serviceAssetId: serviceAsset.id,
           deviceModel: payload.deviceModel,
           reportedSymptoms: payload.reportedSymptoms,
           technicianNotes: payload.technicianNotes,
@@ -86,7 +97,11 @@ class RepairService {
           status: 'RECEIVED',
         });
 
-        return mapRepairJob(created);
+        return {
+          ...mapRepairJob(created),
+          serviceAssetId: serviceAsset.id,
+          serviceAsset: mapServiceAsset(serviceAsset),
+        };
       });
 
     try {
@@ -99,7 +114,7 @@ class RepairService {
         if (isPrismaUniqueConflict(retryError)) {
           throw new RepairError(
             RepairFailureCode.CONFLICT,
-            'ไม่สามารถสร้างเลขใบงานซ่อมที่ไม่ซ้ำได้ กรุณาลองใหม่',
+            'ไม่สามารถสร้างเลขใบงานซ่อมหรืออุปกรณ์บริการที่ไม่ซ้ำได้ กรุณาลองใหม่',
             409
           );
         }
