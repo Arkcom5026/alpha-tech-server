@@ -55,6 +55,10 @@ const {
 } = require('./application/taxPeriodLifecycleService');
 
 const {
+  createTaxPeriodOperationalReadinessService,
+} = require('./application/taxPeriodOperationalReadinessService');
+
+const {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   resolveSaleTaxProjectionDecision,
@@ -81,6 +85,17 @@ const {
   normalizeEnsureTaxPeriodCommand,
   requireAvailabilityDate,
 } = require('./policies/taxPeriodAvailabilityPolicy');
+
+const {
+  DEFAULT_MONTHS_AHEAD,
+  MAX_MONTHS_AHEAD,
+  buildReadinessTargets,
+  monthStartUtc,
+  normalizeBranchIds,
+  normalizeMonthsAhead,
+  normalizeTaxPeriodOperationalReadinessCommand,
+  requireReferenceDate,
+} = require('./policies/taxPeriodOperationalReadinessPolicy');
 
 const {
   TAX_PERIOD_STATUSES,
@@ -115,6 +130,8 @@ const {
 } = require('./infrastructure/prismaTaxPeriodLifecycleRepository');
 
 module.exports = {
+  DEFAULT_MONTHS_AHEAD,
+  MAX_MONTHS_AHEAD,
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
@@ -132,6 +149,7 @@ module.exports = {
   assertTaxPeriodReplay,
   assertTaxPeriodTransition,
   buildMonthlyTaxPeriodBoundary,
+  buildReadinessTargets,
   buildTaxDocumentDraft,
   buildTaxPeriodLifecycleUpdate,
   createPrismaTaxDocumentPublisher,
@@ -146,19 +164,25 @@ module.exports = {
   createTaxPeriodAvailabilityService,
   createTaxPeriodCreationService,
   createTaxPeriodLifecycleService,
+  createTaxPeriodOperationalReadinessService,
   isAssignableTaxPeriodStatus,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
+  monthStartUtc,
+  normalizeBranchIds,
   normalizeCreateMonthlyTaxPeriodCommand,
   normalizeEnsureTaxPeriodCommand,
+  normalizeMonthsAhead,
   normalizeTaxDocumentCommand,
   normalizeTaxPeriodLifecycleCommand,
+  normalizeTaxPeriodOperationalReadinessCommand,
   periodContainsDate,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
   publishDocumentAndLedgerInTransaction,
   requireAvailabilityDate,
+  requireReferenceDate,
   resolveLedgerType,
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
