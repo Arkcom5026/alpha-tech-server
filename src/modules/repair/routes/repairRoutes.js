@@ -13,6 +13,12 @@ const OPERATION_ROLES = ['OWNER', 'MANAGER'];
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
+router.use((req, res, next) => {
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
 
 router.get('/intake-context/:lookup', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getIntakeContext);
 router.get('/customers/:customerId/warranty-assets', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listCustomerWarrantyAssets);
