@@ -34,6 +34,7 @@ const {
 
 const {
   createTaxDocumentLedgerPublicationRuntime,
+  publishDocumentAndLedgerInTransaction,
 } = require('./application/taxDocumentLedgerPublicationRuntimeService');
 
 const {
@@ -69,6 +70,7 @@ module.exports = {
   normalizeTaxDocumentCommand,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
+  publishDocumentAndLedgerInTransaction,
   resolveLedgerType,
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
