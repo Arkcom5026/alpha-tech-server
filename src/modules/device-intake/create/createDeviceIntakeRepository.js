@@ -36,13 +36,84 @@ class CreateDeviceIntakeRepository {
     });
   }
 
+  async findDevice({ stockItemId, fingerprint }) {
+    const rows = await this.prisma.$queryRaw`
+      SELECT "id", "branchId", "currentOwnerCustomerId", "stockItemId", "fingerprint",
+             "deviceType", "brand", "model", "serialNumber", "imei", "barcode", "status",
+             "createdAt", "updatedAt"
+      FROM "Device"
+      WHERE (${stockItemId}::INTEGER IS NOT NULL AND "stockItemId" = ${stockItemId})
+         OR "fingerprint" = ${fingerprint}
+      ORDER BY CASE WHEN "stockItemId" = ${stockItemId} THEN 0 ELSE 1 END
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  }
+
+  async createDevice(data) {
+    const rows = await this.prisma.$queryRaw`
+      INSERT INTO "Device"
+        ("branchId", "currentOwnerCustomerId", "stockItemId", "fingerprint", "deviceType", "brand", "model", "serialNumber", "imei", "barcode", "status", "createdAt", "updatedAt")
+      VALUES
+        (${data.branchId}, ${data.customerId}, ${data.stockItemId}, ${data.fingerprint}, ${data.deviceType}, ${data.brand}, ${data.model}, ${data.serialNumber}, ${data.imei}, ${data.barcode}, 'ACTIVE', NOW(), NOW())
+      RETURNING *
+    `;
+    return rows[0];
+  }
+
+  async updateDeviceIdentity(deviceId, data) {
+    const rows = await this.prisma.$queryRaw`
+      UPDATE "Device"
+      SET "currentOwnerCustomerId" = ${data.customerId},
+          "deviceType" = COALESCE(${data.deviceType}, "deviceType"),
+          "brand" = COALESCE(${data.brand}, "brand"),
+          "model" = COALESCE(${data.model}, "model"),
+          "serialNumber" = COALESCE(${data.serialNumber}, "serialNumber"),
+          "imei" = COALESCE(${data.imei}, "imei"),
+          "barcode" = COALESCE(${data.barcode}, "barcode"),
+          "updatedAt" = NOW()
+      WHERE "id" = ${Number(deviceId)}
+      RETURNING *
+    `;
+    return rows[0];
+  }
+
+  async ensureOwnership(deviceId, customerId, employeeId) {
+    const activeRows = await this.prisma.$queryRaw`
+      SELECT "id", "customerId"
+      FROM "DeviceOwnershipHistory"
+      WHERE "deviceId" = ${Number(deviceId)} AND "endedAt" IS NULL
+      ORDER BY "startedAt" DESC
+      LIMIT 1
+    `;
+    const active = activeRows[0] || null;
+    if (active && Number(active.customerId) === Number(customerId)) return active;
+
+    if (active) {
+      await this.prisma.$executeRaw`
+        UPDATE "DeviceOwnershipHistory"
+        SET "endedAt" = NOW()
+        WHERE "id" = ${Number(active.id)}
+      `;
+    }
+
+    const rows = await this.prisma.$queryRaw`
+      INSERT INTO "DeviceOwnershipHistory"
+        ("deviceId", "customerId", "ownershipType", "sourceType", "createdByEmployeeId", "startedAt", "createdAt")
+      VALUES
+        (${Number(deviceId)}, ${Number(customerId)}, 'CUSTOMER', 'DEVICE_INTAKE', ${Number(employeeId)}, NOW(), NOW())
+      RETURNING *
+    `;
+    return rows[0];
+  }
+
   async createIntake(data) {
     const rows = await this.prisma.$queryRaw`
       INSERT INTO "DeviceIntake"
-        ("intakeNo", "branchId", "customerId", "stockItemId", "purpose", "status", "reportedSymptoms", "createdByEmployeeId", "createdAt", "updatedAt")
+        ("intakeNo", "deviceId", "branchId", "customerId", "stockItemId", "purpose", "status", "reportedSymptoms", "createdByEmployeeId", "createdAt", "updatedAt")
       VALUES
-        (${data.intakeNo}, ${data.branchId}, ${data.customerId}, ${data.stockItemId}, ${data.purpose}, ${data.status}, ${data.reportedSymptoms}, ${data.createdByEmployeeId}, NOW(), NOW())
-      RETURNING "id", "intakeNo", "branchId", "customerId", "stockItemId", "purpose", "status", "reportedSymptoms", "createdByEmployeeId", "createdAt", "updatedAt"
+        (${data.intakeNo}, ${data.deviceId}, ${data.branchId}, ${data.customerId}, ${data.stockItemId}, ${data.purpose}, ${data.status}, ${data.reportedSymptoms}, ${data.createdByEmployeeId}, NOW(), NOW())
+      RETURNING "id", "intakeNo", "deviceId", "branchId", "customerId", "stockItemId", "purpose", "status", "reportedSymptoms", "createdByEmployeeId", "createdAt", "updatedAt"
     `;
     return rows[0];
   }
