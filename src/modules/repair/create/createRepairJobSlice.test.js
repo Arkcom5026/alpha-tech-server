@@ -12,7 +12,7 @@ const { RepairFailureCode } = require('../contracts/repairError');
 function createdJob(data = {}) {
   return {
     id: 41,
-    jobNo: data.jobNo || 'RP-010101-0001',
+    jobNo: data.jobNo || 'RE-3-20260727-TEST0001',
     branchId: data.branchId || 3,
     customerId: data.customerId || 8,
     customer: { name: 'ลูกค้าทดสอบ' },
@@ -113,7 +113,7 @@ test('create service validates customer and creates a RECEIVED branch-owned job'
   assert.equal(written.customerId, 8);
   assert.equal(written.status, 'RECEIVED');
   assert.equal(written.deviceModel, 'Notebook');
-  assert.match(written.jobNo, /^RP-/);
+  assert.match(written.jobNo, /^RE-3-/);
   assert.equal(result.id, 41);
   assert.equal(result.estimatedCost, 500);
 });
