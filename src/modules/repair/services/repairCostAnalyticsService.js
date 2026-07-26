@@ -3,6 +3,7 @@ const ServiceAssetRepository = require('../repositories/serviceAssetRepository')
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
 const { estimateHistory } = require('./repairEstimateService');
 const { workLogHistory, calculateLaborSummary } = require('./repairWorkLogService');
+const { partReservationHistory } = require('./repairPartReservationService');
 const { calculateRepairFinancialSummary } = require('./repairFinancialSummaryService');
 
 function toMoney(value) {
@@ -16,6 +17,7 @@ function buildRepairCostAnalytics({
   estimates = [],
   parts = [],
   workLogs = [],
+  partReservations = [],
   calculatedAt = new Date(),
 }) {
   const financial = calculateRepairFinancialSummary({ job, estimates, parts, calculatedAt });
@@ -29,7 +31,25 @@ function buildRepairCostAnalytics({
     workLogs.filter((item) => Number(item.repairJobId) === Number(job.id))
   );
   const actualLaborAmount = toMoney(laborSummary.actualLaborCost);
-  const actualCostBasis = toMoney(actualPartAmount + actualLaborAmount);
+  const operationalLossItems = partReservations.filter(
+    (item) =>
+      Number(item.repairJobId) === Number(job.id) &&
+      ['LOST', 'DAMAGED'].includes(item.status)
+  );
+  const lostPartAmount = toMoney(
+    operationalLossItems
+      .filter((item) => item.status === 'LOST')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  );
+  const damagedPartAmount = toMoney(
+    operationalLossItems
+      .filter((item) => item.status === 'DAMAGED')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  );
+  const operationalLossAmount = toMoney(lostPartAmount + damagedPartAmount);
+  const actualCostBasis = toMoney(
+    actualPartAmount + actualLaborAmount + operationalLossAmount
+  );
   const estimatedGrossContribution = toMoney(approvedTotal - actualCostBasis);
   const grossMarginPercent = approvedTotal > 0
     ? Number(((estimatedGrossContribution / approvedTotal) * 100).toFixed(2))
@@ -49,12 +69,27 @@ function buildRepairCostAnalytics({
     cost: {
       actualPartAmount,
       actualLaborAmount,
+      lostPartAmount,
+      damagedPartAmount,
+      operationalLossAmount,
       actualCostBasis,
       laborCostAvailable: laborSummary.entries > 0,
       labor: laborSummary,
-      note: laborSummary.entries > 0
-        ? 'ต้นทุนจริงรวมอะไหล่และแรงงานจาก Work Log ของช่าง'
-        : 'ยังไม่มี Work Log ของช่าง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
+      operationalLossItems: operationalLossItems.map((item) => ({
+        reservationId: item.id,
+        productId: item.productId,
+        productName: item.productName || null,
+        status: item.status,
+        quantity: Number(item.quantity || 0),
+        amount: toMoney(item.amount),
+        reason: item.resolutionReason || null,
+        resolvedAt: item.resolvedAt || null,
+      })),
+      note: operationalLossAmount > 0
+        ? 'ต้นทุนจริงรวมอะไหล่ติดตั้ง แรงงาน และอะไหล่ที่สูญหายหรือเสียหาย'
+        : laborSummary.entries > 0
+          ? 'ต้นทุนจริงรวมอะไหล่และแรงงานจาก Work Log ของช่าง'
+          : 'ยังไม่มี Work Log ของช่าง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
     },
     profitability: {
       estimatedGrossContribution,
@@ -66,9 +101,11 @@ function buildRepairCostAnalytics({
     variance: {
       partVariance: toMoney(actualPartAmount - quotedPartAmount),
       laborVariance: toMoney(actualLaborAmount - quotedLaborAmount),
+      operationalLossVariance: operationalLossAmount,
       totalCostVariance: toMoney(actualCostBasis - (quotedPartAmount + quotedLaborAmount)),
       actualPartOverEstimate: actualPartAmount > quotedPartAmount,
       actualLaborOverEstimate: actualLaborAmount > quotedLaborAmount,
+      hasOperationalLoss: operationalLossAmount > 0,
     },
     source: financial,
     calculatedAt: calculatedAt.toISOString(),
@@ -98,6 +135,7 @@ class RepairCostAnalyticsService {
       estimates: estimateHistory(asset.metadata),
       parts: job.partsUsed || [],
       workLogs: workLogHistory(asset.metadata),
+      partReservations: partReservationHistory(asset.metadata),
     });
   }
 }
