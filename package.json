@@ -24,6 +24,7 @@
     "verify:repair-execution-authorization-guard": "node scripts/verify-repair-execution-authorization-guard.js",
     "verify:repair-part-usage-reversal": "node scripts/verify-repair-part-usage-reversal.js",
     "verify:repair-actual-part-usage-summary": "node scripts/verify-repair-actual-part-usage-summary.js",
+    "verify:repair-financial-summary": "node scripts/verify-repair-financial-summary.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
