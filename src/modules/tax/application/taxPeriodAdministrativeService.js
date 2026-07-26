@@ -3,6 +3,7 @@ const {
 } = require('../contracts/createTaxDocumentCommand');
 const {
   TAX_PERIOD_STATUSES,
+  projectTaxPeriodAvailableActions,
 } = require('../policies/taxPeriodLifecyclePolicy');
 const {
   createTaxPeriodAvailabilityService,
@@ -15,6 +16,12 @@ const {
 } = require('../infrastructure/prismaTaxPeriodAdministrativeRepository');
 
 const TAX_PERIOD_STATUS_VALUES = Object.freeze(Object.values(TAX_PERIOD_STATUSES));
+
+const projectAdministrativeTaxPeriod = (taxPeriod) =>
+  Object.freeze({
+    ...taxPeriod,
+    availableActions: projectTaxPeriodAvailableActions(taxPeriod.status),
+  });
 
 const requirePositiveInteger = (value, code, message) => {
   const resolved = Number(value);
@@ -86,7 +93,7 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
       );
     }
 
-    return Object.freeze({ branchId, taxPeriod: Object.freeze({ ...taxPeriod }) });
+    return Object.freeze({ branchId, taxPeriod: projectAdministrativeTaxPeriod(taxPeriod) });
   };
 
   const getPeriodSummary = async (input = {}) => {
@@ -116,7 +123,7 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
       total: Object.values(countsByStatus).reduce((sum, count) => sum + count, 0),
       countsByStatus: Object.freeze(countsByStatus),
       currentPeriod: result.currentPeriod
-        ? Object.freeze({ ...result.currentPeriod })
+        ? projectAdministrativeTaxPeriod(result.currentPeriod)
         : null,
     });
   };
@@ -160,6 +167,7 @@ module.exports = {
   createTaxPeriodAdministrativeService,
   normalizeStatuses,
   parseOptionalDate,
+  projectAdministrativeTaxPeriod,
   requirePositiveInteger,
   requireTaxPeriodId,
 };
