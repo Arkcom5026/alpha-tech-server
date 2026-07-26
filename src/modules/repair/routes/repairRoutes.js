@@ -30,6 +30,7 @@ router.patch('/jobs/:id/estimates/:estimateId/decision', allowRepairRoles(...OPE
 
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
 router.post('/jobs/:id/parts', allowRepairRoles(...OPERATION_ROLES), repairController.addParts);
+router.post('/jobs/:id/parts/:partItemId/reversal', allowRepairRoles(...OPERATION_ROLES), repairController.reversePartUsage);
 router.post('/jobs/:id/warranty-claims', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.openWarrantyClaim);
 router.get('/warranty-claims', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listWarrantyClaims);
 router.get('/warranty-claims/:claimId', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getWarrantyClaim);
