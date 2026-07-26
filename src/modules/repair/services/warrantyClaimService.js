@@ -9,20 +9,17 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
-const {
-  inferSourceSupplierId,
-} = require('../policies/repairIntakePolicy');
+const { inferSourceSupplierId } = require('../policies/repairIntakePolicy');
 const {
   assertRepairCanOpenClaim,
   assertNoActiveClaimForJob,
   assertResolutionRequirements,
 } = require('../policies/warrantyClaimPolicy');
-const {
-  assertClaimTransition,
-} = require('../policies/repairTransitionPolicy');
+const { assertClaimTransition } = require('../policies/repairTransitionPolicy');
 const { createWarrantyClaimNo } = require('../utils/repairCode');
 const { mapWarrantyClaim } = require('../mappers/repairMapper');
 const { repeatRepairLinks } = require('./repairRepeatLinkService');
+const warrantyClaimResolutionReconciliationService = require('./warrantyClaimResolutionReconciliationService');
 
 function isPrismaUniqueConflict(error) {
   return error && error.code === 'P2002';
@@ -223,6 +220,10 @@ class WarrantyClaimService {
     }
   }
 
+  async openForRepairJob(actor, repairJobId, rawPayload) {
+    return this.openFromRepairJob(actor, repairJobId, rawPayload);
+  }
+
   async getWarrantyClaim(actor, warrantyClaimId) {
     const claim = await this.repository.findWarrantyClaim(
       actor.branchId,
@@ -282,6 +283,20 @@ class WarrantyClaimService {
         }
       }
 
+      const assetRepo = claim.serviceAssetId
+        ? new ServiceAssetRepository(repo.prisma)
+        : null;
+      const asset = assetRepo
+        ? await assetRepo.findServiceAsset(actor.branchId, claim.serviceAssetId)
+        : null;
+      if (claim.serviceAssetId && !asset) {
+        throw new RepairError(
+          RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+          'ไม่พบอุปกรณ์บริการของรายการเคลม',
+          404
+        );
+      }
+
       const now = new Date();
       const updated = await repo.updateWarrantyClaim(
         claim.id,
@@ -319,19 +334,39 @@ class WarrantyClaimService {
             previousStatus: claim.status,
             resolution: payload.resolution,
             serviceAssetId: claim.serviceAssetId,
+            replacementStockItemId: payload.replacementStockItemId || null,
+            creditAmount: payload.creditAmount,
           },
         }
       );
 
-      if (claim.serviceAssetId) {
-        const assetRepo = new ServiceAssetRepository(repo.prisma);
+      let reconciliation = null;
+      if (payload.status === 'RESOLVED' && assetRepo && asset) {
+        reconciliation =
+          await warrantyClaimResolutionReconciliationService.reconcile({
+            repo,
+            assetRepo,
+            actor,
+            claim,
+            payload,
+            updatedClaim: updated,
+            asset,
+          });
+      } else if (assetRepo) {
         await assetRepo.updateServiceAsset(claim.serviceAssetId, {
           status: assetStatusForClaim(payload.status),
         });
       }
 
-      return mapWarrantyClaim(updated);
+      return {
+        warrantyClaim: mapWarrantyClaim(updated),
+        reconciliation,
+      };
     });
+  }
+
+  async updateWarrantyClaimStatus(actor, warrantyClaimId, rawPayload) {
+    return this.updateStatus(actor, warrantyClaimId, rawPayload);
   }
 }
 
