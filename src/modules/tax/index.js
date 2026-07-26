@@ -33,6 +33,7 @@ const {
 } = require('./application/saleTaxProjectionRuntimeService');
 
 const {
+  applyTaxPeriodResolution,
   createTaxDocumentLedgerPublicationRuntime,
   publishDocumentAndLedgerInTransaction,
 } = require('./application/taxDocumentLedgerPublicationRuntimeService');
@@ -115,6 +116,7 @@ module.exports = {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
+  applyTaxPeriodResolution,
   assertTaxPeriodCandidate,
   assertTaxPeriodReplay,
   assertTaxPeriodTransition,
