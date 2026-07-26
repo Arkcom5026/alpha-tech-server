@@ -14,6 +14,8 @@ const {
   createPrismaTaxPeriodAdministrativeRepository,
 } = require('../infrastructure/prismaTaxPeriodAdministrativeRepository');
 
+const TAX_PERIOD_STATUS_VALUES = Object.freeze(Object.values(TAX_PERIOD_STATUSES));
+
 const requirePositiveInteger = (value, code, message) => {
   const resolved = Number(value);
   if (!Number.isInteger(resolved) || resolved <= 0) {
@@ -48,7 +50,7 @@ const normalizeStatuses = (value) => {
   const statuses = (Array.isArray(value) ? value : String(value).split(','))
     .map((status) => String(status).trim().toUpperCase())
     .filter(Boolean);
-  const invalid = statuses.filter((status) => !TAX_PERIOD_STATUSES.includes(status));
+  const invalid = statuses.filter((status) => !TAX_PERIOD_STATUS_VALUES.includes(status));
   if (invalid.length > 0) {
     throw new TaxDocumentContractError(
       'INVALID_TAX_PERIOD_ADMINISTRATIVE_STATUS',
@@ -87,6 +89,38 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
     return Object.freeze({ branchId, taxPeriod: Object.freeze({ ...taxPeriod }) });
   };
 
+  const getPeriodSummary = async (input = {}) => {
+    const branchId = requirePositiveInteger(
+      input.branchId,
+      'INVALID_TAX_PERIOD_ADMINISTRATIVE_BRANCH',
+      'Tax period administration requires a positive branchId',
+    );
+    const referenceDate =
+      parseOptionalDate(
+        input.referenceDate,
+        'INVALID_TAX_PERIOD_ADMINISTRATIVE_REFERENCE_DATE',
+      ) || new Date();
+    const result = await repository.summarize({ branchId, referenceDate });
+    const countsByStatus = TAX_PERIOD_STATUS_VALUES.reduce(
+      (counts, status) => ({ ...counts, [status]: 0 }),
+      {},
+    );
+
+    for (const group of result.statusGroups) {
+      countsByStatus[group.status] = group.count;
+    }
+
+    return Object.freeze({
+      branchId,
+      referenceDate,
+      total: Object.values(countsByStatus).reduce((sum, count) => sum + count, 0),
+      countsByStatus: Object.freeze(countsByStatus),
+      currentPeriod: result.currentPeriod
+        ? Object.freeze({ ...result.currentPeriod })
+        : null,
+    });
+  };
+
   const listPeriods = async (input = {}) => {
     const branchId = requirePositiveInteger(
       input.branchId,
@@ -116,11 +150,13 @@ const createTaxPeriodAdministrativeService = ({ db }) => {
     ensureMonthlyPeriod,
     ensureOperationalReadiness,
     getPeriodDetail,
+    getPeriodSummary,
     listPeriods,
   });
 };
 
 module.exports = {
+  TAX_PERIOD_STATUS_VALUES,
   createTaxPeriodAdministrativeService,
   normalizeStatuses,
   parseOptionalDate,
