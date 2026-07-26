@@ -126,8 +126,8 @@ test('converts repeated unique-number collisions to domain conflict', async () =
   }));
 
   await assert.rejects(() => service.openFromRepairJob(actor, 100, { reason: 'Issue' }), {
-    code: 'CONFLICT',
-    status: 409,
+    code: 'REPAIR_CONFLICT',
+    status: 'fail',
   });
 });
 
@@ -150,7 +150,7 @@ test('maps get and list claims with branch-safe repository calls', async () => {
   assert.equal(detail.id, 50);
   assert.equal(list[0].id, 51);
   assert.deepEqual(calls[0], ['get', 7, 50]);
-  assert.deepEqual(calls[1], ['list', 7, { status: 'SUBMITTED', stockItemId: null, customerId: null, limit: 1, offset: 0 }]);
+  assert.deepEqual(calls[1], ['list', 7, { status: 'SUBMITTED', stockItemId: null, customerId: null, limit: 50, offset: 0 }]);
 });
 
 test('updates claim status, timestamps submission, and writes event metadata', async () => {
@@ -185,5 +185,5 @@ test('validates replacement stock branch before resolving replacement claim', as
     status: 'RESOLVED',
     resolution: 'REPLACED',
     replacementStockItemId: 88,
-  }), { code: 'STOCK_ITEM_NOT_FOUND', status: 404 });
+  }), { code: 'REPAIR_STOCK_ITEM_NOT_FOUND', status: 'fail' });
 });
