@@ -1,5 +1,8 @@
-// Alpha-Tech Tax Platform — Slice 3 additive Prisma foundation
-// Append this block to prisma/schema.prisma at Local.
+// Alpha-Tech Tax Platform — Slice 3 Prisma foundation declaration source
+// This file is consumed by scripts/tax/install-tax-prisma-foundation.ps1.
+// The installer audits every top-level model and enum by declaration name,
+// installs only missing declarations, and blocks on incompatible collisions.
+// Do not append this file to prisma/schema.prisma manually.
 // Do not remove or rename any existing model, enum, field, index, or relation.
 
 // -----------------------------------------------------------------------------
@@ -178,25 +181,25 @@ model TaxDocumentPartySnapshot {
 }
 
 model TaxDocumentItemSnapshot {
-  id               Int      @id @default(autoincrement())
-  taxDocumentId    Int
-  lineNumber       Int
-  sourceItemType   String?
-  sourceItemId     String?
-  productId        Int?
-  description      String
-  quantity         Decimal  @default(1) @db.Decimal(14, 4)
-  unitName         String?
-  unitPrice        Decimal  @db.Decimal(14, 2)
-  discountAmount   Decimal  @default(0) @db.Decimal(14, 2)
-  taxableAmount    Decimal  @db.Decimal(14, 2)
-  vatRate          Decimal  @db.Decimal(7, 4)
-  vatAmount        Decimal  @db.Decimal(14, 2)
-  totalAmount      Decimal  @db.Decimal(14, 2)
+  id                Int      @id @default(autoincrement())
+  taxDocumentId     Int
+  lineNumber        Int
+  sourceItemType    String?
+  sourceItemId      String?
+  productId         Int?
+  description       String
+  quantity          Decimal  @default(1) @db.Decimal(14, 4)
+  unitName          String?
+  unitPrice         Decimal  @db.Decimal(14, 2)
+  discountAmount    Decimal  @default(0) @db.Decimal(14, 2)
+  taxableAmount     Decimal  @db.Decimal(14, 2)
+  vatRate           Decimal  @db.Decimal(7, 4)
+  vatAmount         Decimal  @db.Decimal(14, 2)
+  totalAmount       Decimal  @db.Decimal(14, 2)
   taxClassification String?
-  snapshotHash     String?
-  metadata         Json?
-  createdAt        DateTime @default(now())
+  snapshotHash      String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
 
   taxDocument TaxDocument @relation(fields: [taxDocumentId], references: [id], onDelete: Cascade)
 
@@ -210,36 +213,36 @@ model TaxDocumentItemSnapshot {
 // -----------------------------------------------------------------------------
 
 model TaxNumberSequence {
-  id             Int             @id @default(autoincrement())
-  branchId       Int
-  documentType   TaxDocumentType
-  year           Int
-  prefix         String?
-  lastNumber     Int             @default(0)
-  paddingLength  Int             @default(6)
-  version        Int             @default(1)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id            Int             @id @default(autoincrement())
+  branchId      Int
+  documentType  TaxDocumentType
+  year          Int
+  prefix        String?
+  lastNumber    Int             @default(0)
+  paddingLength Int             @default(6)
+  version       Int             @default(1)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@unique([branchId, documentType, year])
   @@index([branchId, year])
 }
 
 model TaxPeriod {
-  id              Int             @id @default(autoincrement())
-  branchId        Int
-  year            Int
-  month           Int
-  status          TaxPeriodStatus @default(OPEN)
-  openedAt        DateTime        @default(now())
-  reviewStartedAt DateTime?
-  closedAt        DateTime?
-  reopenedAt      DateTime?
-  closedByEmployeeId Int?
+  id                   Int             @id @default(autoincrement())
+  branchId             Int
+  year                 Int
+  month                Int
+  status               TaxPeriodStatus @default(OPEN)
+  openedAt             DateTime        @default(now())
+  reviewStartedAt      DateTime?
+  closedAt             DateTime?
+  reopenedAt           DateTime?
+  closedByEmployeeId   Int?
   reopenedByEmployeeId Int?
-  note            String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  note                 String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   ledgerEntries TaxLedgerEntry[]
 
@@ -248,23 +251,23 @@ model TaxPeriod {
 }
 
 model TaxLedgerEntry {
-  id                 Int                @id @default(autoincrement())
-  taxDocumentId      Int
-  taxPeriodId        Int?
-  branchId           Int
-  direction          TaxDirection
-  entryType          TaxLedgerEntryType @default(ORIGINAL)
-  effectiveDate      DateTime
-  taxableAmount      Decimal            @db.Decimal(14, 2)
-  vatAmount          Decimal            @db.Decimal(14, 2)
-  totalAmount        Decimal            @db.Decimal(14, 2)
-  sourceEntryId      Int?
-  reversalOfEntryId  Int?
-  registrationKey    String             @unique
+  id                     Int                @id @default(autoincrement())
+  taxDocumentId          Int
+  taxPeriodId            Int?
+  branchId               Int
+  direction              TaxDirection
+  entryType              TaxLedgerEntryType @default(ORIGINAL)
+  effectiveDate          DateTime
+  taxableAmount          Decimal            @db.Decimal(14, 2)
+  vatAmount              Decimal            @db.Decimal(14, 2)
+  totalAmount            Decimal            @db.Decimal(14, 2)
+  sourceEntryId          Int?
+  reversalOfEntryId      Int?
+  registrationKey        String             @unique
   registeredByEmployeeId Int?
-  registeredAt       DateTime           @default(now())
-  metadata           Json?
-  createdAt          DateTime           @default(now())
+  registeredAt           DateTime           @default(now())
+  metadata               Json?
+  createdAt              DateTime           @default(now())
 
   taxDocument    TaxDocument    @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
   taxPeriod      TaxPeriod?      @relation(fields: [taxPeriodId], references: [id], onDelete: Restrict)
