@@ -47,6 +47,7 @@ function run() {
     'src/modules/repair/services/warrantyClaimService.js',
     'src/modules/repair/services/repairExecutiveSummaryService.js',
     'scripts/verify-repair-repository-gate.js',
+    'docs/repair/REPAIR_E2E_COMPLETION_MANIFEST.md',
   ];
 
   for (const file of requiredFiles) {
@@ -119,6 +120,15 @@ function run() {
     'allowRepairRoles',
     'branchId',
     'role',
+  ]);
+
+  requireTokens('docs/repair/REPAIR_E2E_COMPLETION_MANIFEST.md', [
+    'HTTP -> repairRoutes -> repairController -> repair services -> repairRepository -> Prisma',
+    'Gate A — Repository Gate',
+    'Gate B — Runtime Gate',
+    'Gate C — Operational Gate',
+    'Repository completion must never be reported as Runtime PASS',
+    'Files from unrelated tasks must not be introduced into this branch',
   ]);
 
   const packageJson = JSON.parse(read('package.json'));
