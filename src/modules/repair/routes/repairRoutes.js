@@ -28,6 +28,8 @@ router.get('/jobs/:id/estimates', allowRepairRoles(...READ_AND_INTAKE_ROLES), re
 router.post('/jobs/:id/estimates', allowRepairRoles(...OPERATION_ROLES), repairController.createEstimate);
 router.patch('/jobs/:id/estimates/:estimateId/decision', allowRepairRoles(...OPERATION_ROLES), repairController.decideEstimate);
 router.get('/jobs/:id/financial-summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getFinancialSummary);
+router.get('/jobs/:id/settlement', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getSettlement);
+router.post('/jobs/:id/payments', allowRepairRoles(...OPERATION_ROLES), repairController.recordPayment);
 
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
 router.get('/jobs/:id/parts/summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getPartUsageSummary);
