@@ -22,8 +22,8 @@ test('validates customer id before repository access', async () => {
   });
 
   await assert.rejects(() => service.listForCustomer(actor, '0'), {
-    code: 'INVALID_INPUT',
-    status: 400,
+    code: 'REPAIR_INVALID_INPUT',
+    status: 'fail',
   });
   assert.equal(called, false);
 });
@@ -37,8 +37,8 @@ test('returns customer-not-found failure before loading warranty assets', async 
   });
 
   await assert.rejects(() => service.listForCustomer(actor, 20), {
-    code: 'CUSTOMER_NOT_FOUND',
-    status: 404,
+    code: 'REPAIR_CUSTOMER_NOT_FOUND',
+    status: 'fail',
   });
   assert.equal(assetCalls, 0);
 });
