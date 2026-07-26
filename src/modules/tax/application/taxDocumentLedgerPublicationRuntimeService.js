@@ -25,6 +25,26 @@ const requireTransactionAuthority = (db) => {
   return db;
 };
 
+const requireTransactionClient = (tx) => {
+  const requiredModels = [
+    'taxDocument',
+    'taxDocumentSource',
+    'taxDocumentEvent',
+    'taxLedgerEntry',
+  ];
+  const missingModels = requiredModels.filter((modelName) => !tx?.[modelName]);
+
+  if (missingModels.length > 0) {
+    throw new TaxDocumentContractError(
+      'INVALID_TAX_PUBLICATION_TRANSACTION_CLIENT',
+      'Tax publication requires an active Prisma transaction client',
+      { missingModels },
+    );
+  }
+
+  return tx;
+};
+
 const requireDraft = (draft) => {
   if (!draft?.document || !draft?.source || !draft?.snapshot || !draft?.event) {
     throw new TaxDocumentContractError(
@@ -36,52 +56,58 @@ const requireDraft = (draft) => {
   return draft;
 };
 
+const publishDocumentAndLedgerInTransaction = async ({
+  tx,
+  draft,
+  postingDate = null,
+  effectiveDate = null,
+}) => {
+  const transactionClient = requireTransactionClient(tx);
+  const resolvedDraft = requireDraft(draft);
+  const documentPublisher = createPrismaTaxDocumentPublisher({ db: transactionClient });
+  const ledgerPublisher = createPrismaTaxLedgerPublisher({ db: transactionClient });
+
+  const documentPublication = await documentPublisher.publish(resolvedDraft);
+  const taxDocument = documentPublication?.taxDocument;
+
+  if (!taxDocument?.id) {
+    throw new TaxDocumentContractError(
+      'TAX_DOCUMENT_PUBLICATION_RESULT_MISSING',
+      'Tax document publication must return the persisted tax document',
+    );
+  }
+
+  const ledgerEntryDraft = projectTaxDocumentDraftToLedgerEntry({
+    taxDocument,
+    draft: resolvedDraft,
+    postingDate,
+    effectiveDate,
+  });
+
+  const ledgerPublication = await ledgerPublisher.publish(ledgerEntryDraft);
+
+  return Object.freeze({
+    documentPublication,
+    ledgerEntryDraft,
+    ledgerPublication,
+  });
+};
+
 const createTaxDocumentLedgerPublicationRuntime = ({ db }) => {
   const transactionAuthority = requireTransactionAuthority(db);
 
-  const publishDocumentAndLedger = async ({
-    draft,
-    postingDate = null,
-    effectiveDate = null,
-  }) => {
-    const resolvedDraft = requireDraft(draft);
-
-    return transactionAuthority.$transaction(async (tx) => {
-      const documentPublisher = createPrismaTaxDocumentPublisher({ db: tx });
-      const ledgerPublisher = createPrismaTaxLedgerPublisher({ db: tx });
-
-      const documentPublication = await documentPublisher.publish(resolvedDraft);
-      const taxDocument = documentPublication?.taxDocument;
-
-      if (!taxDocument?.id) {
-        throw new TaxDocumentContractError(
-          'TAX_DOCUMENT_PUBLICATION_RESULT_MISSING',
-          'Tax document publication must return the persisted tax document',
-        );
-      }
-
-      const ledgerEntryDraft = projectTaxDocumentDraftToLedgerEntry({
-        taxDocument,
-        draft: resolvedDraft,
-        postingDate,
-        effectiveDate,
-      });
-
-      const ledgerPublication = await ledgerPublisher.publish(ledgerEntryDraft);
-
-      return Object.freeze({
-        documentPublication,
-        ledgerEntryDraft,
-        ledgerPublication,
-      });
-    });
-  };
+  const publishDocumentAndLedger = async (input) =>
+    transactionAuthority.$transaction((tx) =>
+      publishDocumentAndLedgerInTransaction({ tx, ...input }),
+    );
 
   return Object.freeze({ publishDocumentAndLedger });
 };
 
 module.exports = {
   createTaxDocumentLedgerPublicationRuntime,
+  publishDocumentAndLedgerInTransaction,
   requireDraft,
   requireTransactionAuthority,
+  requireTransactionClient,
 };
