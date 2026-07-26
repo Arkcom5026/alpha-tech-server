@@ -2,12 +2,25 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { createServiceAssetNo } = require('../utils/serviceAssetCode');
 
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim();
   return normalized || null;
+}
+
+function repositoryFor(repo) {
+  if (
+    repo?.findServiceAsset &&
+    repo?.findServiceAssetBySourceStockItem &&
+    repo?.createServiceAsset &&
+    repo?.updateServiceAsset
+  ) {
+    return repo;
+  }
+  return new ServiceAssetRepository(repo?.prisma);
 }
 
 function assertAssetAuthority(asset, actor, customerId) {
@@ -53,7 +66,8 @@ function stockAssetData(actor, customerId, stockItem) {
     customerId,
     sourceStockItemId: stockItem.id,
     productId: stockItem.productId || stockItem.product?.id || null,
-    productTypeId: stockItem.product?.productTypeId || stockItem.product?.productType?.id || null,
+    productTypeId:
+      stockItem.product?.productTypeId || stockItem.product?.productType?.id || null,
     brandId: stockItem.product?.brandId || stockItem.product?.brand?.id || null,
     createdByEmployeeId: actor.employeeId || null,
     source: 'SOLD_BY_BRANCH',
@@ -63,7 +77,11 @@ function stockAssetData(actor, customerId, stockItem) {
       stockItem.product?.name ||
       'อุปกรณ์',
     brandNameSnapshot: stockItem.product?.brand?.name || null,
-    modelName: stockItem.product?.name || stockItem.serialNumber || stockItem.barcode || 'ไม่ระบุรุ่น',
+    modelName:
+      stockItem.product?.name ||
+      stockItem.serialNumber ||
+      stockItem.barcode ||
+      'ไม่ระบุรุ่น',
     serialNumber: normalizeText(stockItem.serialNumber),
     description: normalizeText(stockItem.product?.description),
     purchaseDate: stockItem.soldAt || null,
@@ -119,35 +137,41 @@ function externalAssetData(actor, payload) {
 
 class ServiceAssetService {
   async resolveForRepairIntake(repo, actor, payload, stockItem = null) {
+    const assetRepo = repositoryFor(repo);
+
     if (payload.serviceAssetId) {
-      const selected = await repo.findServiceAsset(
+      const selected = await assetRepo.findServiceAsset(
         actor.branchId,
         payload.serviceAssetId
       );
       assertAssetAuthority(selected, actor, payload.customerId);
 
       if (selected.status !== 'IN_SERVICE') {
-        return repo.updateServiceAsset(selected.id, { status: 'IN_SERVICE' });
+        return assetRepo.updateServiceAsset(selected.id, { status: 'IN_SERVICE' });
       }
       return selected;
     }
 
     if (stockItem) {
-      const existing = await repo.findServiceAssetBySourceStockItem(stockItem.id);
+      const existing = await assetRepo.findServiceAssetBySourceStockItem(
+        stockItem.id
+      );
       if (existing) {
         assertAssetAuthority(existing, actor, payload.customerId);
         if (existing.status !== 'IN_SERVICE') {
-          return repo.updateServiceAsset(existing.id, { status: 'IN_SERVICE' });
+          return assetRepo.updateServiceAsset(existing.id, {
+            status: 'IN_SERVICE',
+          });
         }
         return existing;
       }
 
-      return repo.createServiceAsset(
+      return assetRepo.createServiceAsset(
         stockAssetData(actor, payload.customerId, stockItem)
       );
     }
 
-    return repo.createServiceAsset(externalAssetData(actor, payload));
+    return assetRepo.createServiceAsset(externalAssetData(actor, payload));
   }
 }
 
