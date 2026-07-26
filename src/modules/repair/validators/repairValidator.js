@@ -13,6 +13,13 @@ const REPAIR_DIAGNOSIS_CONCLUSIONS = Object.freeze([
   'NOT_REPAIRABLE',
   'NEEDS_FURTHER_INSPECTION',
 ]);
+const REPAIR_ESTIMATE_ITEM_TYPES = Object.freeze([
+  'LABOR',
+  'PART',
+  'SERVICE',
+  'OTHER',
+]);
+const REPAIR_ESTIMATE_DECISIONS = Object.freeze(['APPROVED', 'REJECTED']);
 
 function requiredText(value, fieldName, maxLength = 2000) {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -100,7 +107,7 @@ function nonNegativeMoney(value, fieldName, defaultValue = 0) {
       { field: fieldName }
     );
   }
-  return parsed;
+  return Number(parsed.toFixed(2));
 }
 
 function booleanValue(value, defaultValue = false) {
@@ -150,18 +157,15 @@ function validateCreateRepairJob(payload = {}) {
 }
 
 function validateRepairStatusUpdate(payload = {}) {
-  const status = requiredText(payload.status, 'status', 60).toUpperCase();
   return {
-    status,
+    status: requiredText(payload.status, 'status', 60).toUpperCase(),
     technicianId: positiveInt(payload.technicianId, 'technicianId', { optional: true }),
     technicianNotes: optionalText(payload.technicianNotes, 4000),
   };
 }
 
 function validateRepairHandover(payload = {}) {
-  return {
-    note: optionalText(payload.note, 4000),
-  };
+  return { note: optionalText(payload.note, 4000) };
 }
 
 function validateRepairDiagnosis(payload = {}) {
@@ -174,7 +178,6 @@ function validateRepairDiagnosis(payload = {}) {
       { conclusion, allowed: REPAIR_DIAGNOSIS_CONCLUSIONS }
     );
   }
-
   return {
     conclusion,
     findings: requiredText(payload.findings, 'ผลการตรวจพบ', 4000),
@@ -184,11 +187,64 @@ function validateRepairDiagnosis(payload = {}) {
   };
 }
 
+function validateRepairEstimate(payload = {}) {
+  if (!Array.isArray(payload.items) || payload.items.length < 1 || payload.items.length > 50) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      'รายการเสนอราคาต้องมีอย่างน้อย 1 รายการและไม่เกิน 50 รายการ',
+      400,
+      { field: 'items' }
+    );
+  }
+  const items = payload.items.map((item, index) => {
+    const type = requiredText(item?.type, `items[${index}].type`, 40).toUpperCase();
+    if (!REPAIR_ESTIMATE_ITEM_TYPES.includes(type)) {
+      throw new RepairError(
+        RepairFailureCode.INVALID_INPUT,
+        'ประเภทรายการเสนอราคาไม่อยู่ในค่าที่ระบบรองรับ',
+        400,
+        { index, type, allowed: REPAIR_ESTIMATE_ITEM_TYPES }
+      );
+    }
+    const quantity = positiveInt(item.quantity ?? 1, `items[${index}].quantity`);
+    const unitPrice = nonNegativeMoney(item.unitPrice, `items[${index}].unitPrice`);
+    return {
+      type,
+      description: requiredText(item.description, `items[${index}].description`, 500),
+      quantity,
+      unitPrice,
+      amount: Number((quantity * unitPrice).toFixed(2)),
+    };
+  });
+  return {
+    diagnosisId: requiredText(payload.diagnosisId, 'diagnosisId', 100),
+    items,
+    note: optionalText(payload.note, 4000),
+    validUntil: optionalDate(payload.validUntil, 'validUntil'),
+  };
+}
+
+function validateRepairEstimateDecision(payload = {}) {
+  const decision = requiredText(payload.decision, 'decision', 40).toUpperCase();
+  if (!REPAIR_ESTIMATE_DECISIONS.includes(decision)) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      'ผลการตัดสินใจต้องเป็น APPROVED หรือ REJECTED',
+      400,
+      { decision }
+    );
+  }
+  return {
+    decision,
+    decidedByName: optionalText(payload.decidedByName, 255),
+    note: optionalText(payload.note, 4000),
+  };
+}
+
 function validateAddPart(payload = {}) {
-  const qtyUsed = positiveInt(payload.qtyUsed, 'qtyUsed');
   return {
     productId: positiveInt(payload.productId, 'productId'),
-    qtyUsed,
+    qtyUsed: positiveInt(payload.qtyUsed, 'qtyUsed'),
   };
 }
 
@@ -208,7 +264,6 @@ function validateClaimStatusUpdate(payload = {}) {
   const resolution = payload.resolution
     ? requiredText(payload.resolution, 'resolution', 80).toUpperCase()
     : null;
-
   if (resolution && !WARRANTY_CLAIM_RESOLUTIONS.includes(resolution)) {
     throw new RepairError(
       RepairFailureCode.INVALID_INPUT,
@@ -217,7 +272,6 @@ function validateClaimStatusUpdate(payload = {}) {
       { resolution }
     );
   }
-
   return {
     status,
     note: optionalText(payload.note, 4000),
@@ -226,11 +280,7 @@ function validateClaimStatusUpdate(payload = {}) {
     serviceProvider: optionalText(payload.serviceProvider, 255),
     resolution,
     resolutionNote: optionalText(payload.resolutionNote, 4000),
-    replacementStockItemId: positiveInt(
-      payload.replacementStockItemId,
-      'replacementStockItemId',
-      { optional: true }
-    ),
+    replacementStockItemId: positiveInt(payload.replacementStockItemId, 'replacementStockItemId', { optional: true }),
     creditAmount:
       payload.creditAmount === undefined || payload.creditAmount === null
         ? null
@@ -241,7 +291,6 @@ function validateClaimStatusUpdate(payload = {}) {
 function validateListQuery(query = {}) {
   const parsedLimit = Number(query.limit || 50);
   const parsedOffset = Number(query.offset || 0);
-
   return {
     status: query.status ? String(query.status).trim().toUpperCase() : null,
     stockItemId: positiveInt(query.stockItemId, 'stockItemId', { optional: true }),
@@ -253,11 +302,15 @@ function validateListQuery(query = {}) {
 
 module.exports = {
   REPAIR_DIAGNOSIS_CONCLUSIONS,
+  REPAIR_ESTIMATE_ITEM_TYPES,
+  REPAIR_ESTIMATE_DECISIONS,
   validateLookup,
   validateCreateRepairJob,
   validateRepairStatusUpdate,
   validateRepairHandover,
   validateRepairDiagnosis,
+  validateRepairEstimate,
+  validateRepairEstimateDecision,
   validateAddPart,
   validateOpenWarrantyClaim,
   validateClaimStatusUpdate,
