@@ -44,6 +44,14 @@ const {
 } = require('./policies/saleTaxProjectionGateway');
 
 const {
+  TAX_PERIOD_ASSIGNABLE_STATUSES,
+  assertTaxPeriodCandidate,
+  isAssignableTaxPeriodStatus,
+  periodContainsDate,
+  resolveTaxPeriodDate,
+} = require('./policies/taxPeriodResolutionPolicy');
+
+const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
@@ -51,28 +59,38 @@ const {
   createPrismaTaxLedgerPublisher,
 } = require('./infrastructure/prismaTaxLedgerPublisher');
 
+const {
+  createPrismaTaxPeriodResolver,
+} = require('./infrastructure/prismaTaxPeriodResolver');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
   TAX_DOCUMENT_TYPES,
   TAX_LEDGER_TYPES,
+  TAX_PERIOD_ASSIGNABLE_STATUSES,
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
+  assertTaxPeriodCandidate,
   buildTaxDocumentDraft,
   createPrismaTaxDocumentPublisher,
   createPrismaTaxLedgerPublisher,
+  createPrismaTaxPeriodResolver,
   createSaleTaxProjectionRuntime,
   createTaxDocumentLedgerPublicationRuntime,
+  isAssignableTaxPeriodStatus,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
   normalizeTaxDocumentCommand,
+  periodContainsDate,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
   publishDocumentAndLedgerInTransaction,
   resolveLedgerType,
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
+  resolveTaxPeriodDate,
   stableHash,
 };
