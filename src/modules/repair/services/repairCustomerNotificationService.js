@@ -106,7 +106,7 @@ function validateNotification(payload = {}) {
   };
 }
 
-function buildNotificationProjection(job, notifications) {
+function buildNotificationProjection(job, asset, notifications) {
   const successful = notifications
     .filter((item) => READY_FOR_PICKUP_OUTCOMES.has(item.outcome))
     .sort((a, b) => new Date(b.notifiedAt) - new Date(a.notifiedAt));
@@ -114,16 +114,22 @@ function buildNotificationProjection(job, notifications) {
     (a, b) => new Date(b.notifiedAt) - new Date(a.notifiedAt)
   )[0] || null;
   const latestSuccessful = successful[0] || null;
+  const handedOver = asset?.status === 'RETURNED_TO_CUSTOMER';
 
   return {
     repairJobId: job.id,
     repairJobNo: job.jobNo,
     repairStatus: job.status,
-    readyForPickup: job.status === 'COMPLETED' && Boolean(latestSuccessful),
+    serviceAssetStatus: asset?.status || null,
+    handedOver,
+    readyForPickup:
+      job.status === 'COMPLETED' && !handedOver && Boolean(latestSuccessful),
     customerNotified: Boolean(latestSuccessful),
     latestNotification: latest,
     latestSuccessfulNotification: latestSuccessful,
-    expectedPickupAt: latestSuccessful?.expectedPickupAt || null,
+    expectedPickupAt: handedOver
+      ? null
+      : latestSuccessful?.expectedPickupAt || null,
     notifications,
   };
 }
@@ -166,7 +172,7 @@ class RepairCustomerNotificationService {
     const notifications = notificationHistory(asset.metadata)
       .filter((item) => Number(item.repairJobId) === Number(job.id))
       .sort((a, b) => new Date(a.notifiedAt) - new Date(b.notifiedAt));
-    return buildNotificationProjection(job, notifications);
+    return buildNotificationProjection(job, asset, notifications);
   }
 
   async record(actor, repairJobId, rawPayload) {
@@ -179,6 +185,14 @@ class RepairCustomerNotificationService {
           'ต้องปิดงานซ่อมเป็น COMPLETED ก่อนบันทึกการแจ้งพร้อมรับเครื่อง',
           409,
           { currentStatus: job.status, requiredStatus: 'COMPLETED' }
+        );
+      }
+      if (asset.status === 'RETURNED_TO_CUSTOMER') {
+        throw new RepairError(
+          RepairFailureCode.REPAIR_JOB_NOT_READY_FOR_HANDOVER,
+          'ไม่สามารถบันทึกการแจ้งพร้อมรับเครื่องหลังส่งคืนเครื่องให้ลูกค้าแล้ว',
+          409,
+          { serviceAssetStatus: asset.status }
         );
       }
 
@@ -213,6 +227,7 @@ class RepairCustomerNotificationService {
             repairJobId: job.id,
             readyForPickup: READY_FOR_PICKUP_OUTCOMES.has(payload.outcome),
             customerNotified: READY_FOR_PICKUP_OUTCOMES.has(payload.outcome),
+            handedOver: false,
             expectedPickupAt: notification.expectedPickupAt,
             notificationId: notification.id,
             updatedAt: notifiedAt,
@@ -223,7 +238,7 @@ class RepairCustomerNotificationService {
       const notifications = nextHistory
         .filter((item) => Number(item.repairJobId) === Number(job.id))
         .sort((a, b) => new Date(a.notifiedAt) - new Date(b.notifiedAt));
-      return buildNotificationProjection(job, notifications);
+      return buildNotificationProjection(job, asset, notifications);
     });
   }
 }
@@ -232,6 +247,7 @@ module.exports = new RepairCustomerNotificationService();
 module.exports.RepairCustomerNotificationService = RepairCustomerNotificationService;
 module.exports.NOTIFICATION_CHANNELS = NOTIFICATION_CHANNELS;
 module.exports.NOTIFICATION_OUTCOMES = NOTIFICATION_OUTCOMES;
+module.exports.READY_FOR_PICKUP_OUTCOMES = READY_FOR_PICKUP_OUTCOMES;
 module.exports.notificationHistory = notificationHistory;
 module.exports.buildNotificationProjection = buildNotificationProjection;
 module.exports.validateNotification = validateNotification;
