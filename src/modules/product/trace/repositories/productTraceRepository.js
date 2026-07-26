@@ -28,6 +28,15 @@ const saleItemInclude = {
   },
 }
 
+const simpleSaleInclude = {
+  sale: {
+    include: {
+      employee: { select: { id: true, name: true } },
+      customer: { include: { user: { select: { id: true, email: true, loginId: true } } } },
+    },
+  },
+}
+
 const productTraceInclude = {
   product: {
     include: {
@@ -44,18 +53,15 @@ const productTraceInclude = {
       receipt: {
         include: {
           supplier: true,
-          purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } },
+          purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } } },
           receivedBy: { select: { id: true, name: true } },
         },
       },
-      purchaseOrderItem: {
-        include: { purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } } },
-      },
+      purchaseOrderItem: { include: { purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } } } },
     },
   },
-  // Preserve complete sales history for the product timeline.
-  // createdAt plus id makes ordering deterministic when timestamps are equal.
   saleItems: { include: saleItemInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+  saleItemsSimple: { include: simpleSaleInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   stockMovements: {
     include: { performedBy: { select: { id: true, name: true } } },
     orderBy: { occurredAt: 'asc' },
