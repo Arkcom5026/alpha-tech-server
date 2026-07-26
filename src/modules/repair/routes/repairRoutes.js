@@ -31,6 +31,7 @@ router.get('/dashboard/decisions', allowRepairRoles(...READ_AND_INTAKE_ROLES), r
 router.get('/dashboard/alerts', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getManagementAlertDashboard);
 router.get('/dashboard/brief', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getManagementDailyBrief);
 router.get('/dashboard/executive-summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getExecutiveSummary);
+router.get('/dashboard/suppliers', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getSupplierIntelligence);
 router.get('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listJobs);
 router.get('/jobs/:id', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getJob);
 router.post('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.createJob);
