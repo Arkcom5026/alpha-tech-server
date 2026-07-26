@@ -31,7 +31,9 @@
     "verify:repair-financial-milestone": "node scripts/verify-repair-financial-milestone.js",
     "verify:repair-after-service-milestone": "node scripts/verify-repair-after-service-milestone.js",
     "verify:repair-operational-intelligence": "node scripts/verify-repair-operational-intelligence.js",
-    "verify:repair-complete": "npm run verify:service-asset-repair-intake && npm run verify:repair-job-service-asset-integration && npm run verify:warranty-claim-service-asset-lifecycle && npm run verify:repair-financial-milestone && npm run verify:repair-after-service-milestone && npm run verify:repair-operational-intelligence",
+    "verify:repair-dashboard": "node scripts/verify-repair-dashboard-contract.js",
+    "verify:repair-operational-risk": "node scripts/verify-repair-operational-risk.js",
+    "verify:repair-complete": "npm run verify:service-asset-repair-intake && npm run verify:repair-job-service-asset-integration && npm run verify:warranty-claim-service-asset-lifecycle && npm run verify:repair-financial-milestone && npm run verify:repair-after-service-milestone && npm run verify:repair-operational-intelligence && npm run verify:repair-dashboard && npm run verify:repair-operational-risk",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
