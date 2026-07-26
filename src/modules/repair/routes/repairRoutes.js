@@ -29,6 +29,9 @@ const {
   listWarrantyClaims,
 } = require('../claim/query/list/listWarrantyClaimsController');
 const {
+  getWarrantyClaim,
+} = require('../claim/query/detail/getWarrantyClaimController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -98,7 +101,7 @@ router.get(
 router.get(
   '/warranty-claims/:claimId',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.getWarrantyClaim
+  getWarrantyClaim
 );
 
 router.patch(
