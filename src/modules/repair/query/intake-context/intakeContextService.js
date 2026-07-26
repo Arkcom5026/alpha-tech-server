@@ -13,7 +13,14 @@ class IntakeContextService {
 
   async execute(actor, rawLookup) {
     const lookup = validateLookup(rawLookup);
-    const stockItem = await this.repository.findByLookup(actor.branchId, lookup);
+    const findByLookup =
+      this.repository.findByLookup || this.repository.findStockItemForIntake;
+
+    const stockItem = await findByLookup.call(
+      this.repository,
+      actor.branchId,
+      lookup
+    );
 
     if (!stockItem) {
       throw new RepairError(
