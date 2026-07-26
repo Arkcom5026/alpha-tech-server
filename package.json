@@ -17,6 +17,7 @@
     "verify:service-asset-repair-intake": "node scripts/verify-service-asset-repair-intake.js",
     "verify:repair-job-service-asset-integration": "node scripts/verify-repair-job-service-asset-integration.js",
     "verify:warranty-claim-service-asset-lifecycle": "node scripts/verify-warranty-claim-service-asset-lifecycle.js",
+    "verify:repair-job-customer-handover": "node scripts/verify-repair-job-customer-handover.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
@@ -38,7 +39,7 @@
     "nodemailer": "^6.10.1",
     "pg": "^8.22.0",
     "socket.io": "^4.8.3",
-    "streamifier": "^1.0.1",
+    "streamifier": "^0.1.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
