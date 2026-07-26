@@ -36,6 +36,7 @@ const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const { mountProductModule } = require('./src/modules/product');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
+const deviceIntakeRoutes = require('./src/modules/device-intake/routes/deviceIntakeRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
@@ -179,6 +180,9 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 mountProductModule(app);
+
+// Device Intake Authority (canonical path)
+app.use('/api/device-intakes', deviceIntakeRoutes);
 
 // Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
