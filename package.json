@@ -29,6 +29,7 @@
     "verify:repair-handover-settlement-guard": "node scripts/verify-repair-handover-settlement-guard.js",
     "verify:repair-invoice-boundary": "node scripts/verify-repair-invoice-boundary.js",
     "verify:repair-financial-milestone": "node scripts/verify-repair-financial-milestone.js",
+    "verify:repair-after-service-milestone": "node scripts/verify-repair-after-service-milestone.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
