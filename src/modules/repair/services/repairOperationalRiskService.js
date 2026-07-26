@@ -5,11 +5,13 @@ const {
   hoursBetween,
 } = require('./repairOperationalIntelligenceService');
 
+const OPERATIONAL_RISK_CONTRACT_VERSION = 'repair-operational-risk.v1';
 const RISK_LEVEL = Object.freeze({
   INFO: 'INFO',
   WARNING: 'WARNING',
   CRITICAL: 'CRITICAL',
 });
+const RISK_PRIORITY = Object.freeze({ CRITICAL: 0, WARNING: 1, INFO: 2 });
 
 function metadataObject(metadata) {
   return metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
@@ -52,12 +54,7 @@ function buildJobOperationalRisks(job, now = new Date()) {
   const staleHours = lastOperationalAt ? hoursBetween(lastOperationalAt, now) : null;
 
   if (ACTIVE_STATUSES.has(job.status) && !job.technicianId) {
-    risks.push(riskItem(
-      job,
-      'UNASSIGNED_ACTIVE_JOB',
-      RISK_LEVEL.CRITICAL,
-      'งานที่ยังดำเนินการอยู่แต่ยังไม่มีช่างรับผิดชอบ'
-    ));
+    risks.push(riskItem(job, 'UNASSIGNED_ACTIVE_JOB', RISK_LEVEL.CRITICAL, 'งานที่ยังดำเนินการอยู่แต่ยังไม่มีช่างรับผิดชอบ'));
   }
 
   if (ACTIVE_STATUSES.has(job.status) && staleHours != null && staleHours >= 48) {
@@ -93,13 +90,11 @@ function buildJobOperationalRisks(job, now = new Date()) {
   if (sla.thresholdHours != null && sla.ageHours != null) {
     const remainingHours = Number((sla.thresholdHours - sla.ageHours).toFixed(2));
     if (!sla.overdue && remainingHours >= 0 && remainingHours <= 12) {
-      risks.push(riskItem(
-        job,
-        'SLA_AT_RISK',
-        RISK_LEVEL.WARNING,
-        'งานใกล้เกิน SLA',
-        { remainingHours, thresholdHours: sla.thresholdHours, ageHours: sla.ageHours }
-      ));
+      risks.push(riskItem(job, 'SLA_AT_RISK', RISK_LEVEL.WARNING, 'งานใกล้เกิน SLA', {
+        remainingHours,
+        thresholdHours: sla.thresholdHours,
+        ageHours: sla.ageHours,
+      }));
     }
     if (sla.overdue) {
       risks.push(riskItem(
@@ -115,30 +110,76 @@ function buildJobOperationalRisks(job, now = new Date()) {
   const metadata = metadataObject(job.metadata);
   const repeatRepairLinks = Array.isArray(metadata.repeatRepairLinks) ? metadata.repeatRepairLinks : [];
   if (repeatRepairLinks.length > 0) {
-    risks.push(riskItem(
-      job,
-      'REPEAT_REPAIR_RISK',
-      RISK_LEVEL.WARNING,
-      'ใบงานมีความสัมพันธ์กับงานซ่อมซ้ำ',
-      { repeatRepairLinkCount: repeatRepairLinks.length }
-    ));
+    risks.push(riskItem(job, 'REPEAT_REPAIR_RISK', RISK_LEVEL.WARNING, 'ใบงานมีความสัมพันธ์กับงานซ่อมซ้ำ', {
+      repeatRepairLinkCount: repeatRepairLinks.length,
+    }));
   }
 
-  if (Array.isArray(job.warrantyClaims) && job.warrantyClaims.some((claim) => !['RESOLVED', 'REJECTED', 'CANCELLED'].includes(claim.status))) {
-    risks.push(riskItem(
-      job,
-      'ACTIVE_WARRANTY_CLAIM_RISK',
-      RISK_LEVEL.WARNING,
-      'ใบงานมีรายการเคลมที่ยังไม่สิ้นสุด',
-      { activeClaimCount: job.warrantyClaims.filter((claim) => !['RESOLVED', 'REJECTED', 'CANCELLED'].includes(claim.status)).length }
-    ));
+  const activeClaims = Array.isArray(job.warrantyClaims)
+    ? job.warrantyClaims.filter((claim) => !['RESOLVED', 'REJECTED', 'CANCELLED'].includes(claim.status))
+    : [];
+  if (activeClaims.length > 0) {
+    risks.push(riskItem(job, 'ACTIVE_WARRANTY_CLAIM_RISK', RISK_LEVEL.WARNING, 'ใบงานมีรายการเคลมที่ยังไม่สิ้นสุด', {
+      activeClaimCount: activeClaims.length,
+    }));
   }
 
   return risks;
 }
 
+function countBy(items, selector) {
+  return items.reduce((result, item) => {
+    const key = selector(item) || 'UNKNOWN';
+    result[key] = (result[key] || 0) + 1;
+    return result;
+  }, {});
+}
+
+function buildActionQueue(items) {
+  const grouped = new Map();
+  for (const item of items) {
+    const key = Number(item.repairJobId);
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        repairJobId: item.repairJobId,
+        repairJobNo: item.repairJobNo,
+        status: item.status,
+        technicianId: item.technicianId,
+        customerId: item.customerId,
+        highestLevel: item.level,
+        riskCodes: [],
+        riskCount: 0,
+      });
+    }
+    const row = grouped.get(key);
+    row.riskCodes.push(item.code);
+    row.riskCount += 1;
+    if (RISK_PRIORITY[item.level] < RISK_PRIORITY[row.highestLevel]) row.highestLevel = item.level;
+  }
+
+  return [...grouped.values()]
+    .map((row) => ({ ...row, riskCodes: [...new Set(row.riskCodes)].sort() }))
+    .sort((a, b) => RISK_PRIORITY[a.highestLevel] - RISK_PRIORITY[b.highestLevel] || b.riskCount - a.riskCount || Number(a.repairJobId) - Number(b.repairJobId));
+}
+
+function buildHealthProjection(jobs, counters) {
+  const activeJobs = jobs.filter((job) => ACTIVE_STATUSES.has(job.status)).length;
+  const denominator = Math.max(activeJobs, 1);
+  const penalty = Math.min(100, Math.round(((counters.critical * 20) + (counters.warning * 8) + (counters.info * 2)) / denominator));
+  const score = Math.max(0, 100 - penalty);
+  return {
+    score,
+    grade: score >= 85 ? 'HEALTHY' : score >= 60 ? 'WATCH' : 'AT_RISK',
+    activeJobs,
+    criticalRiskRate: Number((counters.critical / denominator).toFixed(2)),
+    warningRiskRate: Number((counters.warning / denominator).toFixed(2)),
+  };
+}
+
 function buildOperationalRiskProjection(jobs, now = new Date()) {
   const items = jobs.flatMap((job) => buildJobOperationalRisks(job, now));
+  items.sort((a, b) => RISK_PRIORITY[a.level] - RISK_PRIORITY[b.level] || Number(a.repairJobId) - Number(b.repairJobId));
+
   const counters = {
     total: items.length,
     info: items.filter((item) => item.level === RISK_LEVEL.INFO).length,
@@ -147,12 +188,17 @@ function buildOperationalRiskProjection(jobs, now = new Date()) {
     affectedJobs: new Set(items.map((item) => Number(item.repairJobId))).size,
   };
 
-  const priority = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-  items.sort((a, b) => priority[a.level] - priority[b.level] || Number(a.repairJobId) - Number(b.repairJobId));
-
   return {
+    contractVersion: OPERATIONAL_RISK_CONTRACT_VERSION,
     generatedAt: now.toISOString(),
     counters,
+    health: buildHealthProjection(jobs, counters),
+    breakdown: {
+      byCode: countBy(items, (item) => item.code),
+      byStatus: countBy(items, (item) => item.status),
+      byLevel: countBy(items, (item) => item.level),
+    },
+    actionQueue: buildActionQueue(items),
     items,
   };
 }
@@ -177,7 +223,11 @@ class RepairOperationalRiskService {
 
 module.exports = new RepairOperationalRiskService();
 module.exports.RepairOperationalRiskService = RepairOperationalRiskService;
+module.exports.OPERATIONAL_RISK_CONTRACT_VERSION = OPERATIONAL_RISK_CONTRACT_VERSION;
 module.exports.RISK_LEVEL = RISK_LEVEL;
+module.exports.RISK_PRIORITY = RISK_PRIORITY;
 module.exports.latestOperationalAt = latestOperationalAt;
 module.exports.buildJobOperationalRisks = buildJobOperationalRisks;
+module.exports.buildActionQueue = buildActionQueue;
+module.exports.buildHealthProjection = buildHealthProjection;
 module.exports.buildOperationalRiskProjection = buildOperationalRiskProjection;
