@@ -24,6 +24,8 @@ router.get('/jobs/:id/completion-readiness', allowRepairRoles(...READ_AND_INTAKE
 router.put('/jobs/:id/completion-checklist', allowRepairRoles(...OPERATION_ROLES), repairController.recordCompletionChecklist);
 router.get('/jobs/:id/repair-warranties', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listRepairWarranties);
 router.post('/jobs/:id/repair-warranties', allowRepairRoles(...OPERATION_ROLES), repairController.issueRepairWarranty);
+router.post('/jobs/:id/repeat-repair-link', allowRepairRoles(...OPERATION_ROLES), repairController.linkRepeatRepair);
+router.get('/jobs/:id/asset-timeline', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getAssetTimeline);
 
 router.get('/jobs/:id/diagnoses', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listDiagnoses);
 router.post('/jobs/:id/diagnoses', allowRepairRoles(...OPERATION_ROLES), repairController.recordDiagnosis);
