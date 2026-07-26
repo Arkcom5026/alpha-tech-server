@@ -12,8 +12,8 @@ const {
 
 test('validateLookup trims valid values and rejects empty or oversized lookup', () => {
   assert.equal(validateLookup('  BC-100  '), 'BC-100');
-  assert.throws(() => validateLookup(''), { code: 'INVALID_LOOKUP', status: 400 });
-  assert.throws(() => validateLookup('x'.repeat(161)), { code: 'INVALID_LOOKUP' });
+  assert.throws(() => validateLookup(''), { code: 'REPAIR_INVALID_LOOKUP', status: 'fail' });
+  assert.throws(() => validateLookup('x'.repeat(161)), { code: 'REPAIR_INVALID_LOOKUP' });
 });
 
 test('validateCreateRepairJob normalizes identifiers, money, text and override flag', () => {
@@ -43,14 +43,14 @@ test('validateCreateRepairJob normalizes identifiers, money, text and override f
 });
 
 test('validateCreateRepairJob rejects invalid identifiers, missing text and negative money', () => {
-  assert.throws(() => validateCreateRepairJob({}), { code: 'INVALID_INPUT', status: 400 });
+  assert.throws(() => validateCreateRepairJob({}), { code: 'REPAIR_INVALID_INPUT', status: 'fail' });
   assert.throws(
     () => validateCreateRepairJob({ customerId: 1, deviceModel: 'M', reportedSymptoms: 'S', depositPaid: -1 }),
-    { code: 'INVALID_INPUT' }
+    { code: 'REPAIR_INVALID_INPUT' }
   );
   assert.throws(
     () => validateCreateRepairJob({ customerId: 1.5, deviceModel: 'M', reportedSymptoms: 'S' }),
-    { code: 'INVALID_INPUT' }
+    { code: 'REPAIR_INVALID_INPUT' }
   );
 });
 
@@ -64,7 +64,7 @@ test('validateRepairStatusUpdate uppercases status and normalizes optional field
 
 test('validateAddPart requires positive integer product and quantity', () => {
   assert.deepEqual(validateAddPart({ productId: '4', qtyUsed: '2' }), { productId: 4, qtyUsed: 2 });
-  assert.throws(() => validateAddPart({ productId: 4, qtyUsed: 0 }), { code: 'INVALID_INPUT' });
+  assert.throws(() => validateAddPart({ productId: 4, qtyUsed: 0 }), { code: 'REPAIR_INVALID_INPUT' });
 });
 
 test('validateOpenWarrantyClaim trims text and supports optional supplier data', () => {
@@ -92,7 +92,7 @@ test('validateClaimStatusUpdate normalizes supported resolutions and rejects unk
 
   assert.throws(
     () => validateClaimStatusUpdate({ status: 'resolved', resolution: 'unknown' }),
-    { code: 'INVALID_INPUT', status: 400 }
+    { code: 'REPAIR_INVALID_INPUT', status: 'fail' }
   );
 });
 
