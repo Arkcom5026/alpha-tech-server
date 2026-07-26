@@ -42,6 +42,7 @@ function run() {
     'scripts/verify-repair-contract-boundary-audit.js',
     'scripts/verify-repair-module-isolation.js',
     'scripts/verify-repair-api-contract-integrity.js',
+    'scripts/verify-repair-workflow-integrity.js',
     'scripts/verify-repair-e2e-completion-audit.js',
   ];
 
@@ -182,6 +183,15 @@ function run() {
     'Repair API contract integrity audit: PASS',
   ]);
 
+  requireSource('scripts/verify-repair-workflow-integrity.js', [
+    'assertRepairTransition(job.status, payload.status)',
+    'assertRepairExecutionAuthorized({',
+    'assertRepairCanComplete(job)',
+    'RepairFailureCode.ACTIVE_CLAIM_BLOCKS_HANDOVER',
+    'assertClaimTransition(claim.status, payload.status)',
+    'Repair workflow integrity audit: PASS',
+  ]);
+
   requireSource('scripts/verify-repair-e2e-completion-audit.js', [
     "app.use('/api/repairs', repairRoutes)",
     "app.use('/api/repair', repairRoutes)",
@@ -205,6 +215,7 @@ function run() {
     'verify:repair-contract-boundary-audit',
     'verify:repair-module-isolation',
     'verify:repair-api-contract-integrity',
+    'verify:repair-workflow-integrity',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
     'verify:repair-complete',
@@ -225,6 +236,7 @@ function run() {
     'verify:repair-contract-boundary-audit',
     'verify:repair-module-isolation',
     'verify:repair-api-contract-integrity',
+    'verify:repair-workflow-integrity',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
   ]) {
