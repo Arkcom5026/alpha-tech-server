@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const repairRepository = require('../repositories/repairRepository');
 const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { validateRepairHandover } = require('../validators/repairValidator');
@@ -10,6 +11,10 @@ const { mapServiceAsset } = require('../mappers/serviceAssetMapper');
 const { estimateHistory } = require('./repairEstimateService');
 const { latestApprovedEstimate } = require('./repairFinancialSummaryService');
 const { paymentHistory, calculateSettlement } = require('./repairSettlementService');
+const {
+  notificationHistory,
+  READY_FOR_PICKUP_OUTCOMES,
+} = require('./repairCustomerNotificationService');
 
 const TERMINAL_CLAIM_STATUSES = new Set(['RESOLVED', 'CANCELLED']);
 
@@ -49,6 +54,14 @@ function assertFinanciallyReadyForHandover(job, metadata) {
     );
   }
   return settlement;
+}
+
+function hasSuccessfulCustomerNotification(metadata, repairJobId) {
+  return notificationHistory(metadata).some(
+    (item) =>
+      Number(item.repairJobId) === Number(repairJobId) &&
+      READY_FOR_PICKUP_OUTCOMES.has(item.outcome)
+  );
 }
 
 class RepairHandoverService {
@@ -127,6 +140,8 @@ class RepairHandoverService {
           serviceAsset: mapServiceAsset(asset),
           handover: existingHandover,
           settlement: existingHandover.settlement || null,
+          customerNotification:
+            existingMetadata.latestRepairCustomerNotification || null,
           idempotent: true,
         };
       }
@@ -152,12 +167,48 @@ class RepairHandoverService {
       const handoverHistory = Array.isArray(existingMetadata.customerHandovers)
         ? existingMetadata.customerHandovers
         : [];
+      const notifications = notificationHistory(existingMetadata);
+      let customerNotification = existingMetadata.latestRepairCustomerNotification || null;
+      let nextNotifications = notifications;
+
+      if (!hasSuccessfulCustomerNotification(existingMetadata, job.id)) {
+        customerNotification = {
+          id: crypto.randomUUID(),
+          repairJobId: job.id,
+          repairJobNo: job.jobNo,
+          channel: 'IN_PERSON',
+          outcome: 'CONTACTED',
+          recipient: payload.receiverName,
+          messageSummary: 'ผู้รับเครื่องมารับทราบผลซ่อมและรับมอบเครื่องที่ร้าน',
+          note: payload.note,
+          expectedPickupAt: handedOverAt.toISOString(),
+          externalReference: payload.signatureRef,
+          notifiedByEmployeeId: actor.employeeId,
+          notifiedAt: handedOverAt.toISOString(),
+          readyForPickup: false,
+          createdFromHandover: true,
+        };
+        nextNotifications = [...notifications, customerNotification];
+      }
+
       const updatedAsset = await assetRepo.updateServiceAsset(asset.id, {
         status: 'RETURNED_TO_CUSTOMER',
         metadata: {
           ...existingMetadata,
           customerHandovers: [...handoverHistory, handover],
           lastCustomerHandover: handover,
+          repairCustomerNotifications: nextNotifications,
+          latestRepairCustomerNotification: customerNotification,
+          repairPickupReadiness: {
+            repairJobId: job.id,
+            readyForPickup: false,
+            customerNotified: true,
+            handedOver: true,
+            expectedPickupAt: null,
+            notificationId: customerNotification?.id || null,
+            handedOverAt: handedOverAt.toISOString(),
+            updatedAt: handedOverAt.toISOString(),
+          },
         },
       });
 
@@ -166,6 +217,7 @@ class RepairHandoverService {
         serviceAsset: mapServiceAsset(updatedAsset),
         handover,
         settlement,
+        customerNotification,
         idempotent: false,
       };
     });
@@ -176,3 +228,4 @@ module.exports = new RepairHandoverService();
 module.exports.RepairHandoverService = RepairHandoverService;
 module.exports.activeWarrantyClaims = activeWarrantyClaims;
 module.exports.assertFinanciallyReadyForHandover = assertFinanciallyReadyForHandover;
+module.exports.hasSuccessfulCustomerNotification = hasSuccessfulCustomerNotification;
