@@ -4,8 +4,6 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  updatePurchaseOrderReceipt,
-  deletePurchaseOrderReceipt,
   getReceiptBarcodeSummaries,
   finalizeReceiptController,
   markPurchaseOrderReceiptAsPrinted,
@@ -18,6 +16,8 @@ const {
 } = require('../controllers/purchaseOrderReceiptController');
 
 const createPurchaseReceiptController = require('../src/modules/procurement/receipt/create/createPurchaseReceiptController');
+const updatePurchaseReceiptNoteController = require('../src/modules/procurement/receipt/update-note/updatePurchaseReceiptNoteController');
+const deletePurchaseReceiptController = require('../src/modules/procurement/receipt/delete/deletePurchaseReceiptController');
 const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
 const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
 const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
@@ -63,11 +63,11 @@ router.patch('/:receiptId/items/:itemId', (req, res) => {
   return updateReceiptItem(req, res);
 });
 
-// ✏️ PUT - แก้ไขใบรับสินค้า
-router.put('/:id', updatePurchaseOrderReceipt);
+// ✏️ PUT - แก้ไขหมายเหตุใบรับสินค้า
+router.put('/:id', updatePurchaseReceiptNoteController.handle);
 
 // 🗑️ DELETE - ลบใบรับสินค้า
-router.delete('/:id', deletePurchaseOrderReceipt);
+router.delete('/:id', deletePurchaseReceiptController.handle);
 
 // ✅ FINALIZE (idempotent): รองรับทั้ง POST และ PATCH เพื่อความเข้ากันได้ย้อนหลัง
 router.post('/:id/finalize', finalizeReceiptController);
