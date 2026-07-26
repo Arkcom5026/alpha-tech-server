@@ -1,5 +1,6 @@
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
+const deviceIntakeRoutes = require('../../device-intake/routes/deviceIntakeRoutes');
 const {
   getIntakeContext,
 } = require('../query/intake-context/intakeContextController');
@@ -51,6 +52,9 @@ const OPERATION_ROLES = ['OWNER', 'MANAGER'];
 
 // Customer-safe endpoint. It must remain before the staff authentication middleware.
 router.get('/public/tracking/:token', getPublicRepairTracking);
+
+// Transitional compatibility mount until server.js exposes /api/device-intakes directly.
+router.use('/device-intakes', deviceIntakeRoutes);
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
