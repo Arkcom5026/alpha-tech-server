@@ -24,6 +24,7 @@ function run() {
     'src/modules/repair/services/repairOperationalIntelligenceService.js',
     'src/modules/repair/services/repairOperationalRiskService.js',
     'src/modules/repair/services/repairOperationalDecisionService.js',
+    'src/modules/repair/services/repairManagementAlertService.js',
     'src/modules/repair/services/repairCostAnalyticsService.js',
     'src/modules/repair/services/repairRepeatFailureAnalyticsService.js',
     'src/modules/repair/controllers/repairController.js',
@@ -33,6 +34,7 @@ function run() {
     'scripts/verify-repair-operational-risk.js',
     'scripts/verify-repair-operational-decision.js',
     'scripts/verify-repair-management-snapshot.js',
+    'scripts/verify-repair-management-alert.js',
   ];
 
   for (const file of requiredFiles) {
@@ -43,6 +45,7 @@ function run() {
     "router.get('/dashboard'",
     "router.get('/dashboard/risks'",
     "router.get('/dashboard/decisions'",
+    "router.get('/dashboard/alerts'",
     '/jobs/:id/operational-intelligence',
     '/jobs/:id/cost-analytics',
     '/jobs/:id/repeat-failure-analytics',
@@ -52,6 +55,7 @@ function run() {
     'getOperationalDashboard',
     'getOperationalRiskDashboard',
     'getOperationalDecisionDashboard',
+    'getManagementAlertDashboard',
     'getOperationalIntelligence',
     'getCostAnalytics',
     'getRepeatFailureAnalytics',
@@ -73,11 +77,25 @@ function run() {
     'priorityQueue',
   ]);
 
+  requireSource('src/modules/repair/services/repairManagementAlertService.js', [
+    'MANAGEMENT_ALERT_CONTRACT_VERSION',
+    'buildManagementAlerts',
+    'buildEscalationQueue',
+    'escalationQueue',
+    'topActions',
+  ]);
+
   requireSource('scripts/verify-repair-management-snapshot.js', [
     'buildDashboardProjection',
     'buildOperationalRiskProjection',
     'buildOperationalDecisionProjection',
     'Repair management snapshot verifier: PASS',
+  ]);
+
+  requireSource('scripts/verify-repair-management-alert.js', [
+    'buildManagementAlertProjection',
+    'NO_IMMEDIATE_MANAGEMENT_ACTION',
+    'Repair management alert verifier: PASS',
   ]);
 
   const packageJson = JSON.parse(read('package.json'));
@@ -88,6 +106,7 @@ function run() {
     'verify:repair-operational-risk',
     'verify:repair-operational-decision',
     'verify:repair-management-snapshot',
+    'verify:repair-management-alert',
     'verify:repair-repository-gate',
     'verify:repair-complete',
   ];
@@ -101,6 +120,7 @@ function run() {
     'verify:repair-operational-risk',
     'verify:repair-operational-decision',
     'verify:repair-management-snapshot',
+    'verify:repair-management-alert',
     'verify:repair-repository-gate',
   ]) {
     assert.ok(scripts['verify:repair-complete'].includes(`npm run ${child}`), `verify:repair-complete missing ${child}`);
