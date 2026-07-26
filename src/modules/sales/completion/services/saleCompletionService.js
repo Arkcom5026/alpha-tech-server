@@ -52,6 +52,126 @@ const canonicalResult = (sale, payments, replayed, commandKey) => ({
   idempotency: { commandId: commandKey, replayed },
 });
 
+const productInventoryBehavior = (product) => {
+  const config = product?.productConfig && typeof product.productConfig === 'object'
+    ? product.productConfig
+    : {};
+  const explicit = String(config.inventoryBehavior || config.stockBehavior || '').toUpperCase();
+  if (explicit === 'NON_STOCK' || explicit === 'NONE' || explicit === 'SERVICE') return 'NON_STOCK';
+  if (config.inventoryTracked === false || config.trackInventory === false || config.stockTracking === false) {
+    return 'NON_STOCK';
+  }
+  return 'TRACKED';
+};
+
+const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
+  const stockLines = items.filter((item) => item.lineType === 'STOCK_ITEM');
+  const simpleLines = items.filter((item) => item.lineType === 'SIMPLE');
+  const stockIds = stockLines.map((item) => item.stockItemId);
+
+  const stockItems = stockIds.length
+    ? await tx.stockItem.findMany({
+        where: { id: { in: stockIds }, branchId, status: 'IN_STOCK' },
+        select: { id: true, productId: true },
+      })
+    : [];
+  if (stockItems.length !== stockIds.length) {
+    const available = new Set(stockItems.map((item) => item.id));
+    throw stockConflict('One or more stock items are no longer available', {
+      unavailableStockItemIds: stockIds.filter((id) => !available.has(id)),
+    });
+  }
+
+  const simpleProductIds = [...new Set(simpleLines.map((item) => item.productId))];
+  const products = simpleProductIds.length
+    ? await tx.product.findMany({
+        where: { id: { in: simpleProductIds }, active: true, mode: 'SIMPLE' },
+        select: { id: true, mode: true, productConfig: true },
+      })
+    : [];
+  if (products.length !== simpleProductIds.length) {
+    const valid = new Set(products.map((product) => product.id));
+    throw new SalesError(400, 'SIMPLE_PRODUCT_NOT_SELLABLE', 'One or more simple products are inactive or not SIMPLE', {
+      productIds: simpleProductIds.filter((id) => !valid.has(id)),
+    });
+  }
+
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const trackedSimpleLines = simpleLines.filter(
+    (line) => productInventoryBehavior(productById.get(line.productId)) === 'TRACKED'
+  );
+  const nonStockSimpleLines = simpleLines.filter(
+    (line) => productInventoryBehavior(productById.get(line.productId)) === 'NON_STOCK'
+  );
+
+  const missingLotLines = trackedSimpleLines.filter((line) => !line.simpleLotId);
+  if (missingLotLines.length) {
+    throw new SalesError(400, 'SIMPLE_LOT_REQUIRED', 'Tracked simple products require simpleLotId', {
+      lineIds: missingLotLines.map((line) => line.lineId),
+    });
+  }
+
+  const lotIds = [...new Set(trackedSimpleLines.map((line) => line.simpleLotId))];
+  const lots = lotIds.length
+    ? await tx.simpleLot.findMany({
+        where: { id: { in: lotIds }, branchId },
+        select: { id: true, productId: true, branchId: true, qtyRemaining: true },
+      })
+    : [];
+  const lotById = new Map(lots.map((lot) => [lot.id, lot]));
+
+  const requiredByLot = new Map();
+  for (const line of trackedSimpleLines) {
+    const lot = lotById.get(line.simpleLotId);
+    if (!lot || lot.productId !== line.productId) {
+      throw new SalesError(400, 'SIMPLE_LOT_MISMATCH', 'Simple lot does not belong to the selected product and branch', {
+        lineId: line.lineId,
+        productId: line.productId,
+        simpleLotId: line.simpleLotId,
+      });
+    }
+    requiredByLot.set(line.simpleLotId, (requiredByLot.get(line.simpleLotId) || 0) + line.quantity);
+  }
+  for (const [lotId, required] of requiredByLot.entries()) {
+    if (Number(lotById.get(lotId)?.qtyRemaining || 0) + 0.0001 < required) {
+      throw stockConflict('Simple lot quantity is no longer available', { simpleLotId: lotId, required });
+    }
+  }
+
+  const trackedProductIds = [...new Set(trackedSimpleLines.map((line) => line.productId))];
+  const balances = trackedProductIds.length
+    ? await tx.stockBalance.findMany({
+        where: { branchId, productId: { in: trackedProductIds } },
+        select: { id: true, productId: true, quantity: true, reserved: true },
+      })
+    : [];
+  const balanceByProduct = new Map(balances.map((balance) => [balance.productId, balance]));
+  const requiredByProduct = new Map();
+  for (const line of trackedSimpleLines) {
+    requiredByProduct.set(line.productId, (requiredByProduct.get(line.productId) || 0) + line.quantity);
+  }
+  for (const [productId, required] of requiredByProduct.entries()) {
+    const balance = balanceByProduct.get(productId);
+    const available = Number(balance?.quantity || 0) - Number(balance?.reserved || 0);
+    if (!balance || available + 0.0001 < required) {
+      throw stockConflict('Simple product quantity is no longer available', { productId, required, available });
+    }
+  }
+
+  return {
+    stockLines,
+    simpleLines,
+    trackedSimpleLines,
+    nonStockSimpleLines,
+    stockItems,
+    stockIds,
+    productById,
+    lotById,
+    requiredByLot,
+    requiredByProduct,
+  };
+};
+
 const completeSale = async ({ command, branchId, employeeId }) => {
   const replay = await loadVerifiedReplay({
     branchId,
@@ -63,7 +183,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
   let lastError;
   for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt += 1) {
     try {
-      const result = await runCompletionTransaction(async (tx) => {
+      await runCompletionTransaction(async (tx) => {
         const customer = command.sale.customerId
           ? await tx.customerProfile.findFirst({
               where: { id: command.sale.customerId },
@@ -73,24 +193,20 @@ const completeSale = async ({ command, branchId, employeeId }) => {
         if (command.sale.customerId && !customer) {
           throw new SalesError(400, 'CUSTOMER_NOT_FOUND', 'Customer not found');
         }
-        const stockIds = command.sale.items.map((item) => item.stockItemId);
-        const stockItems = await tx.stockItem.findMany({
-          where: { id: { in: stockIds }, branchId, status: 'IN_STOCK' },
-          select: { id: true, productId: true },
+
+        const evidence = await prepareMixedSaleEvidence({
+          tx,
+          items: command.sale.items,
+          branchId,
         });
-        if (stockItems.length !== stockIds.length) {
-          const available = new Set(stockItems.map((item) => item.id));
-          throw stockConflict('One or more stock items are no longer available', {
-            unavailableStockItemIds: stockIds.filter((id) => !available.has(id)),
-          });
-        }
-        const productByStock = new Map(stockItems.map((item) => [item.id, item.productId]));
+        const productByStock = new Map(evidence.stockItems.map((item) => [item.id, item.productId]));
         const code = await generateSaleCode(tx, branchId, attempt);
         const dueDate = command.sale.isCredit && Number.isInteger(customer?.paymentTerms)
           ? dayjs().add(customer.paymentTerms, 'day').toDate()
           : null;
         const saleType = command.sale.saleType ||
           (customer?.type === 'GOVERNMENT' ? 'GOVERNMENT' : customer?.type === 'ORGANIZATION' ? 'WHOLESALE' : 'NORMAL');
+
         const sale = await tx.sale.create({
           data: {
             code,
@@ -112,8 +228,8 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             paidAmount: D(0),
             statusPayment: 'UNPAID',
             officialDocumentNumber: command.sale.isCredit && command.sale.deliveryNoteMode === 'PRINT' ? `DN-${code}` : null,
-            items: {
-              create: command.sale.items.map((item) => ({
+            items: evidence.stockLines.length ? {
+              create: evidence.stockLines.map((item) => ({
                 stockItemId: item.stockItemId,
                 basePrice: D(item.basePrice),
                 vatAmount: D(item.vatAmount),
@@ -124,27 +240,79 @@ const completeSale = async ({ command, branchId, employeeId }) => {
                 documentDescription: item.documentDescription,
                 documentSuffix: item.documentSuffix,
               })),
-            },
+            } : undefined,
+            simpleItems: evidence.simpleLines.length ? {
+              create: evidence.simpleLines.map((item) => ({
+                productId: item.productId,
+                simpleLotId: item.simpleLotId,
+                quantity: D(item.quantity),
+                basePrice: D(item.basePrice),
+                vatAmount: D(item.vatAmount),
+                price: D(item.price),
+                discount: D(item.discount),
+                remark: item.remark,
+                documentPrefix: item.documentPrefix,
+                documentDescription: item.documentDescription,
+                documentSuffix: item.documentSuffix,
+              })),
+            } : undefined,
           },
         });
-        const changed = await tx.stockItem.updateMany({
-          where: { id: { in: stockIds }, branchId, status: 'IN_STOCK' },
-          data: { status: 'SOLD', soldAt: new Date() },
-        });
-        if (changed.count !== stockIds.length) {
-          throw stockConflict('Stock changed during completion');
+
+        if (evidence.stockIds.length) {
+          const changed = await tx.stockItem.updateMany({
+            where: { id: { in: evidence.stockIds }, branchId, status: 'IN_STOCK' },
+            data: { status: 'SOLD', soldAt: new Date() },
+          });
+          if (changed.count !== evidence.stockIds.length) {
+            throw stockConflict('Stock changed during completion');
+          }
         }
-        await tx.stockMovement.createMany({
-          data: stockIds.map((stockId) => ({
-            productId: productByStock.get(stockId),
+
+        for (const [lotId, required] of evidence.requiredByLot.entries()) {
+          const changed = await tx.simpleLot.updateMany({
+            where: { id: lotId, branchId, qtyRemaining: { gte: D(required) } },
+            data: { qtyRemaining: { decrement: D(required) } },
+          });
+          if (changed.count !== 1) throw stockConflict('Simple lot changed during completion', { simpleLotId: lotId });
+        }
+
+        for (const [productId, required] of evidence.requiredByProduct.entries()) {
+          const changed = await tx.stockBalance.updateMany({
+            where: { productId, branchId, quantity: { gte: D(required) } },
+            data: { quantity: { decrement: D(required) } },
+          });
+          if (changed.count !== 1) throw stockConflict('Simple stock balance changed during completion', { productId });
+        }
+
+        const movements = [
+          ...evidence.stockLines.map((line) => ({
+            productId: productByStock.get(line.stockItemId),
             branchId,
             type: 'SALE',
-            qty: -1,
+            qty: D(-1),
+            stockItemId: line.stockItemId,
+            refType: 'SALE',
+            refId: sale.id,
+            performedByEmployeeId: employeeId,
             note: `Sale ${code}`,
           })),
-        });
+          ...evidence.trackedSimpleLines.map((line) => ({
+            productId: line.productId,
+            branchId,
+            type: 'SALE',
+            qty: D(-line.quantity),
+            simpleLotId: line.simpleLotId,
+            refType: 'SALE',
+            refId: sale.id,
+            performedByEmployeeId: employeeId,
+            note: `Sale ${code}`,
+          })),
+        ];
+        if (movements.length) await tx.stockMovement.createMany({ data: movements });
+
         const paymentCode = `PM-C-${sale.id}-${command.requestHash.slice(0, 12)}`;
-        const posted = await postPaymentEvidence(tx, {
+        await postPaymentEvidence(tx, {
           sale: { ...sale, customerId: command.sale.customerId },
           branchId,
           employeeId,
@@ -159,8 +327,8 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             saleId: sale.id,
           },
         });
-        return { saleId: sale.id, payments: posted.payments };
       });
+
       const final = await loadVerifiedReplay({
         branchId,
         commandKey: command.commandKey,
@@ -184,4 +352,10 @@ const completeSale = async ({ command, branchId, employeeId }) => {
   throw lastError;
 };
 
-module.exports = { completeSale, loadVerifiedReplay, canonicalResult };
+module.exports = {
+  completeSale,
+  loadVerifiedReplay,
+  canonicalResult,
+  productInventoryBehavior,
+  prepareMixedSaleEvidence,
+};

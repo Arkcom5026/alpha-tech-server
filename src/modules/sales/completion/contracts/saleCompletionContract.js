@@ -13,6 +13,22 @@ const money = (value, field, { allowZero = true } = {}) => {
   return Math.round(number * 100) / 100;
 };
 
+const positiveQuantity = (value, field) => {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new SalesError(400, 'SALE_VALIDATION_FAILED', `Invalid ${field}`);
+  }
+  return Math.round(number * 100) / 100;
+};
+
+const positiveInteger = (value, field) => {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new SalesError(400, 'SALE_VALIDATION_FAILED', `Invalid ${field}`);
+  }
+  return number;
+};
+
 const stable = (value) => {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
@@ -22,6 +38,47 @@ const stable = (value) => {
     }, {});
   }
   return value;
+};
+
+const normalizeLineType = (item = {}) => {
+  const explicit = String(item.lineType || item.kind || '').trim().toUpperCase();
+  if (['STOCK_ITEM', 'SERIALIZED', 'STRUCTURED', 'SN'].includes(explicit)) return 'STOCK_ITEM';
+  if (['SIMPLE', 'LOT', 'NON_STOCK', 'SERVICE'].includes(explicit)) return 'SIMPLE';
+  return item.stockItemId ? 'STOCK_ITEM' : 'SIMPLE';
+};
+
+const normalizeSaleLine = (item, index) => {
+  const lineType = normalizeLineType(item);
+  const common = {
+    lineId: String(item.lineId || `${lineType}-${index + 1}`),
+    lineType,
+    basePrice: money(item.basePrice, `items[${index}].basePrice`),
+    vatAmount: money(item.vatAmount, `items[${index}].vatAmount`),
+    price: money(item.price, `items[${index}].price`),
+    discount: money(item.discount || 0, `items[${index}].discount`),
+    remark: item.remark || null,
+    documentPrefix: item.documentPrefix ?? null,
+    documentDescription: item.documentDescription ?? null,
+    documentSuffix: item.documentSuffix ?? null,
+  };
+
+  if (lineType === 'STOCK_ITEM') {
+    return {
+      ...common,
+      stockItemId: positiveInteger(item.stockItemId, `items[${index}].stockItemId`),
+      productId: item.productId == null ? null : positiveInteger(item.productId, `items[${index}].productId`),
+      quantity: 1,
+      simpleLotId: null,
+    };
+  }
+
+  return {
+    ...common,
+    stockItemId: null,
+    productId: positiveInteger(item.productId, `items[${index}].productId`),
+    quantity: positiveQuantity(item.quantity == null ? 1 : item.quantity, `items[${index}].quantity`),
+    simpleLotId: item.simpleLotId == null ? null : positiveInteger(item.simpleLotId, `items[${index}].simpleLotId`),
+  };
 };
 
 const parseCompleteSaleCommand = (body = {}) => {
@@ -36,29 +93,22 @@ const parseCompleteSaleCommand = (body = {}) => {
   if (!['CASH', 'CREDIT'].includes(mode)) {
     throw new SalesError(400, 'INVALID_SALE_MODE', 'mode must be CASH or CREDIT');
   }
-  const items = Array.isArray(sale.items) ? sale.items : [];
+
+  const items = Array.isArray(sale.lines) ? sale.lines : (Array.isArray(sale.items) ? sale.items : []);
   if (!items.length) throw new SalesError(400, 'SALE_ITEMS_REQUIRED', 'At least one sale item is required');
 
-  const stockIds = items.map((item) => Number(item.stockItemId));
-  if (stockIds.some((id) => !Number.isInteger(id) || id <= 0)) {
-    throw new SalesError(400, 'STOCK_ITEM_REQUIRED', 'Every item requires a valid stockItemId');
-  }
+  const normalizedItems = items.map(normalizeSaleLine);
+  const stockIds = normalizedItems
+    .filter((item) => item.lineType === 'STOCK_ITEM')
+    .map((item) => item.stockItemId);
   if (new Set(stockIds).size !== stockIds.length) {
     throw new SalesError(400, 'DUPLICATE_STOCK_ITEM', 'The same stock item cannot be sold twice');
   }
 
-  const normalizedItems = items.map((item) => ({
-    stockItemId: Number(item.stockItemId),
-    productId: item.productId == null ? null : Number(item.productId),
-    basePrice: money(item.basePrice, 'item.basePrice'),
-    vatAmount: money(item.vatAmount, 'item.vatAmount'),
-    price: money(item.price, 'item.price'),
-    discount: money(item.discount || 0, 'item.discount'),
-    remark: item.remark || null,
-    documentPrefix: item.documentPrefix ?? null,
-    documentDescription: item.documentDescription ?? null,
-    documentSuffix: item.documentSuffix ?? null,
-  }));
+  const lineIds = normalizedItems.map((item) => item.lineId);
+  if (new Set(lineIds).size !== lineIds.length) {
+    throw new SalesError(400, 'DUPLICATE_SALE_LINE', 'Every sale line requires a unique lineId');
+  }
 
   const totalBeforeDiscount = money(sale.totalBeforeDiscount, 'totalBeforeDiscount');
   const totalDiscount = money(sale.totalDiscount || 0, 'totalDiscount');
@@ -132,4 +182,4 @@ const parseCompleteSaleCommand = (body = {}) => {
   return command;
 };
 
-module.exports = { parseCompleteSaleCommand };
+module.exports = { parseCompleteSaleCommand, normalizeLineType, normalizeSaleLine };

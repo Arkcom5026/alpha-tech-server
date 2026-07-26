@@ -33,6 +33,32 @@ const normalizePayment = (payment) => {
   return normalized;
 };
 
+const normalizeLineMoney = (item) => {
+  const normalized = { ...item };
+  for (const key of ['quantity', 'basePrice', 'vatAmount', 'price', 'discount', 'unitCost', 'refundedAmount']) {
+    if (key in normalized && normalized[key] != null) normalized[key] = toNum(normalized[key]);
+  }
+  return normalized;
+};
+
+const projectSaleLines = (sale) => {
+  const stockItems = Array.isArray(sale?.items)
+    ? sale.items.map((item) => ({
+        ...normalizeLineMoney(item),
+        lineType: 'STOCK_ITEM',
+      }))
+    : [];
+
+  const simpleItems = Array.isArray(sale?.simpleItems)
+    ? sale.simpleItems.map((item) => ({
+        ...normalizeLineMoney(item),
+        lineType: 'SIMPLE',
+      }))
+    : [];
+
+  return [...stockItems, ...simpleItems];
+};
+
 const normalizeSaleMoney = (sale) => {
   if (!NORMALIZE_DECIMAL_TO_NUMBER || !sale) return sale;
   const normalized = { ...sale };
@@ -40,23 +66,12 @@ const normalizeSaleMoney = (sale) => {
     if (key in normalized && normalized[key] != null) normalized[key] = toNum(normalized[key]);
   }
   if (Array.isArray(normalized.items)) {
-    normalized.items = normalized.items.map((item) => {
-      const next = { ...item };
-      for (const key of ['basePrice', 'vatAmount', 'price', 'discount', 'refundedAmount']) {
-        if (key in next && next[key] != null) next[key] = toNum(next[key]);
-      }
-      return next;
-    });
+    normalized.items = normalized.items.map(normalizeLineMoney);
   }
   if (Array.isArray(normalized.simpleItems)) {
-    normalized.simpleItems = normalized.simpleItems.map((item) => {
-      const next = { ...item };
-      for (const key of ['quantity', 'basePrice', 'vatAmount', 'price', 'discount', 'unitCost']) {
-        if (key in next && next[key] != null) next[key] = toNum(next[key]);
-      }
-      return next;
-    });
+    normalized.simpleItems = normalized.simpleItems.map(normalizeLineMoney);
   }
+  normalized.saleLines = projectSaleLines(normalized);
   if (Array.isArray(normalized.payments)) {
     normalized.payments = normalized.payments.map(normalizePayment);
   }
@@ -67,6 +82,7 @@ module.exports = {
   NORMALIZE_DECIMAL_TO_NUMBER,
   normalizeSaleMoney,
   resolveCanonicalTotalAmount,
+  projectSaleLines,
   round2,
   toLocalRange,
   toNum,

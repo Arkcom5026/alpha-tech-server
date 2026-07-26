@@ -1,5 +1,24 @@
 const { number } = require('../utils/saleReturnMoney');
 
+const projectReturnLines = (saleReturn) => [
+  ...(saleReturn.items || []).map((item) => ({
+    lineType: 'STOCK_ITEM',
+    saleReturnItemId: item.id,
+    saleItemId: item.saleItemId,
+    quantity: item.quantity,
+    refundAmount: item.refundAmount,
+    reason: item.reason || null,
+  })),
+  ...(saleReturn.saleReturnItemSimples || []).map((item) => ({
+    lineType: 'SIMPLE',
+    saleReturnItemId: item.id,
+    saleItemSimpleId: item.saleItemSimpleId,
+    quantity: item.quantity,
+    refundAmount: item.refundAmount,
+    reason: item.reason || null,
+  })),
+];
+
 const mapSaleReturnResult = ({ saleReturn, commandId, replayed }) => ({
   saleReturnId: saleReturn.id,
   code: saleReturn.code,
@@ -16,6 +35,7 @@ const mapSaleReturnResult = ({ saleReturn, commandId, replayed }) => ({
   },
   items: saleReturn.items || [],
   simpleItems: saleReturn.saleReturnItemSimples || [],
+  returnLines: projectReturnLines(saleReturn),
   refunds: saleReturn.refundTransaction || [],
   idempotency: { commandId, replayed },
 });
@@ -26,4 +46,4 @@ const mapSaleReturnError = (error) => ({
   details: error.details,
 });
 
-module.exports = { mapSaleReturnResult, mapSaleReturnError };
+module.exports = { mapSaleReturnResult, projectReturnLines, mapSaleReturnError };
