@@ -1,15 +1,36 @@
 const { prisma } = require('../../../../lib/prisma');
 const {
+  TaxDocumentContractError,
+} = require('../contracts/createTaxDocumentCommand');
+const {
   createTaxPeriodAdministrativeService,
 } = require('../application/taxPeriodAdministrativeService');
 
 const service = createTaxPeriodAdministrativeService({ db: prisma });
 
-const forwardAdministrativeError = (error, next) => {
-  if (error?.name === 'TaxDocumentContractError' && !error.statusCode) {
-    error.statusCode = error.code?.includes('NOT_FOUND') ? 404 : 400;
-  }
-  return next(error);
+const CONFLICT_CODES = new Set([
+  'TAX_PERIOD_BOUNDARY_OVERLAP',
+  'TAX_PERIOD_CODE_CONFLICT',
+  'TAX_PERIOD_CREATION_CONFLICT',
+  'TAX_PERIOD_LIFECYCLE_CONFLICT',
+  'TAX_PERIOD_TRANSITION_FORBIDDEN',
+  'TAX_PERIOD_NOT_AVAILABLE',
+]);
+
+const NOT_FOUND_CODES = new Set([
+  'TAX_PERIOD_NOT_FOUND',
+  'TAX_LEDGER_ENTRY_NOT_FOUND',
+]);
+
+const mapAdministrativeError = (error) => {
+  if (!(error instanceof TaxDocumentContractError)) return error;
+  if (Number.isInteger(error.statusCode)) return error;
+
+  if (NOT_FOUND_CODES.has(error.code)) error.statusCode = 404;
+  else if (CONFLICT_CODES.has(error.code)) error.statusCode = 409;
+  else error.statusCode = 400;
+
+  return error;
 };
 
 const ensureMonthlyPeriod = async (req, res, next) => {
@@ -17,7 +38,7 @@ const ensureMonthlyPeriod = async (req, res, next) => {
     const result = await service.ensureMonthlyPeriod(req.body);
     return res.status(result.created ? 201 : 200).json({ ok: true, data: result });
   } catch (error) {
-    return forwardAdministrativeError(error, next);
+    return next(mapAdministrativeError(error));
   }
 };
 
@@ -26,7 +47,7 @@ const ensureOperationalReadiness = async (req, res, next) => {
     const result = await service.ensureOperationalReadiness(req.body);
     return res.status(200).json({ ok: true, data: result });
   } catch (error) {
-    return forwardAdministrativeError(error, next);
+    return next(mapAdministrativeError(error));
   }
 };
 
@@ -40,13 +61,13 @@ const listPeriods = async (req, res, next) => {
     });
     return res.status(200).json({ ok: true, data: result });
   } catch (error) {
-    return forwardAdministrativeError(error, next);
+    return next(mapAdministrativeError(error));
   }
 };
 
 module.exports = {
   ensureMonthlyPeriod,
   ensureOperationalReadiness,
-  forwardAdministrativeError,
   listPeriods,
+  mapAdministrativeError,
 };
