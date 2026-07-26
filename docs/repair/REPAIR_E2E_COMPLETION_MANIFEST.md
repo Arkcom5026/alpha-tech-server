@@ -138,6 +138,22 @@ Its repository rules are:
 - Direct Prisma ownership is restricted to `repairRepository.js` and the approved employee-context boundary in `repairAuthorization.js`.
 - Any future change to those direct Prisma owners must be an explicit architecture decision rather than an accidental import.
 
+## API response integrity authority
+
+The API contract integrity audit is registered as:
+
+- `npm run verify:repair-api-contract-integrity`
+
+Its repository rules are:
+
+- Every exposed route resolves to one unique Repair controller handler.
+- Every successful response uses the stable `{ success: true, data }` envelope; mutation responses also include an operation message.
+- Read endpoints return HTTP `200` and all Repair `GET` routes receive `Cache-Control: no-store` at the router boundary.
+- Creation endpoints return HTTP `201`.
+- Approved idempotent creation flows distinguish initial creation (`201`) from replay (`200`) and provide replay-aware messages.
+- State updates and reversals return HTTP `200`.
+- Errors are delegated through `next(error)` and remain typed through `RepairError`, `RepairFailureCode`, status, and optional details.
+
 ## Verification authority
 
 ### Gate A — Repository Gate
@@ -146,11 +162,12 @@ Repository completion is represented by:
 
 - `npm run verify:repair-contract-boundary-audit`
 - `npm run verify:repair-module-isolation`
+- `npm run verify:repair-api-contract-integrity`
 - `npm run verify:repair-repository-gate`
 - `npm run verify:repair-e2e-completion-audit`
 - `npm run verify:repair-complete`
 
-Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, module isolation, direct Prisma ownership, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
+Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, module isolation, direct Prisma ownership, response envelopes, HTTP status policy, query cache policy, idempotent response behavior, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
 
 ### Gate B — Runtime Gate
 
@@ -179,6 +196,7 @@ Repository completion must never be reported as Operational PASS.
 - Repository verification wiring: complete
 - Contract and boundary audit wiring: complete
 - Module isolation audit wiring: complete
+- API response integrity audit wiring: complete
 - Runtime verification: deferred
 - Operational verification: deferred
 
