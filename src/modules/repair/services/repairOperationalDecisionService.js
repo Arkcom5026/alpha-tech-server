@@ -93,6 +93,42 @@ function buildOperationalDecision(job, now = new Date()) {
   };
 }
 
+function buildManagerSummary(jobs, decisions, actionable) {
+  const activeJobs = jobs.filter((job) => ACTIVE_STATUSES.has(job.status));
+  const overdueJobs = decisions.filter((item) => item.sla.overdue);
+  const atRiskJobs = decisions.filter((item) => item.riskCodes.includes('SLA_AT_RISK'));
+  const unassignedJobs = decisions.filter((item) => item.action === DECISION_ACTION.ASSIGN_TECHNICIAN);
+  const customerContactJobs = decisions.filter((item) => item.action === DECISION_ACTION.CONTACT_CUSTOMER);
+  const partsFollowUpJobs = decisions.filter((item) => item.action === DECISION_ACTION.FOLLOW_UP_PARTS);
+  const criticalJobs = actionable.filter((item) => item.highestRiskLevel === 'CRITICAL');
+  const denominator = Math.max(activeJobs.length, 1);
+
+  return {
+    activeJobs: activeJobs.length,
+    actionableJobs: actionable.length,
+    criticalJobs: criticalJobs.length,
+    overdueJobs: overdueJobs.length,
+    slaAtRiskJobs: atRiskJobs.length,
+    unassignedJobs: unassignedJobs.length,
+    customerContactJobs: customerContactJobs.length,
+    partsFollowUpJobs: partsFollowUpJobs.length,
+    actionableRate: Number((actionable.length / denominator).toFixed(2)),
+    slaOverdueRate: Number((overdueJobs.length / denominator).toFixed(2)),
+    attention: criticalJobs.length > 0
+      ? 'IMMEDIATE'
+      : actionable.length > 0
+        ? 'REQUIRED'
+        : 'NORMAL',
+    topActions: Object.entries(actionable.reduce((result, item) => {
+      result[item.action] = (result[item.action] || 0) + 1;
+      return result;
+    }, {}))
+      .map(([action, count]) => ({ action, count }))
+      .sort((a, b) => b.count - a.count || a.action.localeCompare(b.action))
+      .slice(0, 5),
+  };
+}
+
 function buildOperationalDecisionProjection(jobs, now = new Date()) {
   const decisions = jobs.map((job) => buildOperationalDecision(job, now));
   const actionable = decisions.filter((item) => ![DECISION_ACTION.NONE, DECISION_ACTION.MONITOR].includes(item.action));
@@ -113,6 +149,7 @@ function buildOperationalDecisionProjection(jobs, now = new Date()) {
     contractVersion: DECISION_CONTRACT_VERSION,
     generatedAt: now.toISOString(),
     counters,
+    managerSummary: buildManagerSummary(jobs, decisions, actionable),
     priorityQueue: actionable,
     decisions,
   };
@@ -141,4 +178,5 @@ module.exports.RepairOperationalDecisionService = RepairOperationalDecisionServi
 module.exports.DECISION_CONTRACT_VERSION = DECISION_CONTRACT_VERSION;
 module.exports.DECISION_ACTION = DECISION_ACTION;
 module.exports.buildOperationalDecision = buildOperationalDecision;
+module.exports.buildManagerSummary = buildManagerSummary;
 module.exports.buildOperationalDecisionProjection = buildOperationalDecisionProjection;
