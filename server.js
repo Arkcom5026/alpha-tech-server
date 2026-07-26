@@ -78,6 +78,7 @@ const taxPeriodAdministrativeRoutes = require('./src/modules/tax/routes/taxPerio
 const quickStockRoutes = require('./src/modules/product/quickStock/routes/quickStockRoutes');
 const productCreateRoutes = require('./src/modules/product/create/routes/productCreateRoutes');
 
+
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
 try {
@@ -91,10 +92,15 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
+  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
+
+  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
+
+  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -102,7 +108,7 @@ const allowedOrigins = [
 const allowedOriginRegexes = [
   /^https:\/\/alpha-tech-client-[a-z0-9-]+\.vercel\.app$/i,
   /^https:\/\/alpha-tech-client-git-[a-z0-9-]+-arkcoms-projects\.vercel\.app$/i,
-  /.*arkcoms-projects\.vercel\.app$/i,
+  /.*arkcoms-projects\.vercel\.app$/i
 ];
 
 const normalizeOrigin = (value) => {
@@ -112,18 +118,30 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
+
   const o = normalizeOrigin(origin);
-  if (!o) return true;
+  if (!o) return true; 
+
+  // 1. ตรวจสอบจาก Array รายชื่อโดเมนหลัก (เปรียบเทียบหลังผ่านการ Normalize แล้ว)
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
+
+  // 2. ตรวจสอบผ่านระบบ Regex (สำหรับ Vercel Preview/Branch URL)
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
 
 const corsOptions = {
   origin(origin, callback) {
+    // โหมดข้ามการตรวจสิทธิ์หากตั้งค่าไว้ใน Environment
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
+
+    // 🟢 FIXED: คืนค่าสิทธิ์ผ่านฉลุยทันทีเมื่อตรวจสอบแล้วว่า Origin ปลอดภัยและมาจากระบบหลักจริง
+    if (!origin || isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    // บันทึกข้อผิดพลาดกรณีพบ Origin แปลกปลอมที่ไม่ได้รับอนุญาต
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -149,6 +167,7 @@ app.options('*', cors(corsOptions));
 morgan.token('reqId', (req) => req.id);
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms - reqId=:reqId'));
 
+// ⚠️ TEMPORARY: Auth trace middleware
 const { traceRequest } = require('./middlewares/authTrace');
 app.use('/api', traceRequest);
 
@@ -170,16 +189,24 @@ app.use('/api/product-templates', productTemplateRoutes);
 app.use('/api/products/template', templateProductSearchRoutes);
 app.use('/api/products/trace', productTraceRoutes);
 app.use('/api/products', productRoutes);
+
+// Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
+// Backward compatibility for clients using the singular path
 app.use('/api/repair', repairRoutes);
+
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
+
 app.use('/api/quick-stock', quickStockRoutes);
 app.use('/api/product-create', productCreateRoutes);
+
+// Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
+// Backward-compat (old path)
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
 app.use('/api/refunds', refundRoutes);
@@ -205,6 +232,7 @@ app.use('/api/receipts/simple', receiptSimpleRoutes);
 app.use('/api/po-receipts/simple', purchaseOrderReceiptSimpleRoutes);
 app.use('/api/quick-receipts', quickReceiptRoutes);
 app.use('/api/tax', taxPeriodAdministrativeRoutes);
+
 
 if (simpleStockRoutes) {
   app.use('/api/simple', simpleStockRoutes);
@@ -233,7 +261,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   const parsedStatusCode = Number(err.statusCode);
   const statusCode =
-    Number.isInteger(parsedStatusCode) && parsedStatusCode >= 400 && parsedStatusCode <= 599
+    Number.isInteger(parsedStatusCode) &&
+    parsedStatusCode >= 400 &&
+    parsedStatusCode <= 599
       ? parsedStatusCode
       : 500;
 
