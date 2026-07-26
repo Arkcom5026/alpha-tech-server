@@ -165,7 +165,14 @@ function validateRepairStatusUpdate(payload = {}) {
 }
 
 function validateRepairHandover(payload = {}) {
-  return { note: optionalText(payload.note, 4000) };
+  return {
+    receiverName: requiredText(payload.receiverName, 'ชื่อผู้รับเครื่อง', 255),
+    receiverPhone: optionalText(payload.receiverPhone, 80),
+    receiverRelation: optionalText(payload.receiverRelation, 120),
+    signatureRef: requiredText(payload.signatureRef, 'หลักฐานลายเซ็นผู้รับเครื่อง', 1000),
+    identityReference: optionalText(payload.identityReference, 255),
+    note: optionalText(payload.note, 4000),
+  };
 }
 
 function validateRepairDiagnosis(payload = {}) {
