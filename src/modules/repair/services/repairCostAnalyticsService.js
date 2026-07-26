@@ -12,12 +12,54 @@ function toMoney(value) {
   return Number(parsed.toFixed(2));
 }
 
+function reconciliationHistory(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+  return Array.isArray(metadata.warrantyClaimReconciliations)
+    ? metadata.warrantyClaimReconciliations
+    : [];
+}
+
+function calculateWarrantyRecovery(job, reconciliations = []) {
+  const items = reconciliations.filter(
+    (item) => Number(item.repairJobId) === Number(job.id)
+  );
+
+  const creditRecoveryAmount = toMoney(
+    items
+      .filter((item) => ['CREDITED', 'REFUNDED'].includes(item.resolution))
+      .reduce((sum, item) => sum + Number(item.creditAmount || 0), 0)
+  );
+
+  const replacementRecoveryAmount = toMoney(
+    items
+      .filter((item) => item.resolution === 'REPLACED')
+      .reduce((sum, item) => sum + Number(item.replacementCostRecovery || 0), 0)
+  );
+
+  const otherRecoveryAmount = toMoney(
+    items.reduce((sum, item) => sum + Number(item.supplierCompensationAmount || 0), 0)
+  );
+
+  const totalRecoveryAmount = toMoney(
+    creditRecoveryAmount + replacementRecoveryAmount + otherRecoveryAmount
+  );
+
+  return {
+    items,
+    creditRecoveryAmount,
+    replacementRecoveryAmount,
+    otherRecoveryAmount,
+    totalRecoveryAmount,
+  };
+}
+
 function buildRepairCostAnalytics({
   job,
   estimates = [],
   parts = [],
   workLogs = [],
   partReservations = [],
+  claimReconciliations = [],
   calculatedAt = new Date(),
 }) {
   const financial = calculateRepairFinancialSummary({ job, estimates, parts, calculatedAt });
@@ -47,12 +89,20 @@ function buildRepairCostAnalytics({
       .reduce((sum, item) => sum + Number(item.amount || 0), 0)
   );
   const operationalLossAmount = toMoney(lostPartAmount + damagedPartAmount);
-  const actualCostBasis = toMoney(
+  const grossCostBasis = toMoney(
     actualPartAmount + actualLaborAmount + operationalLossAmount
   );
-  const estimatedGrossContribution = toMoney(approvedTotal - actualCostBasis);
+  const warrantyRecovery = calculateWarrantyRecovery(job, claimReconciliations);
+  const netCostBasis = toMoney(
+    Math.max(grossCostBasis - warrantyRecovery.totalRecoveryAmount, 0)
+  );
+  const estimatedGrossContribution = toMoney(approvedTotal - grossCostBasis);
+  const estimatedNetContribution = toMoney(approvedTotal - netCostBasis);
   const grossMarginPercent = approvedTotal > 0
     ? Number(((estimatedGrossContribution / approvedTotal) * 100).toFixed(2))
+    : 0;
+  const netMarginPercent = approvedTotal > 0
+    ? Number(((estimatedNetContribution / approvedTotal) * 100).toFixed(2))
     : 0;
 
   return {
@@ -72,7 +122,9 @@ function buildRepairCostAnalytics({
       lostPartAmount,
       damagedPartAmount,
       operationalLossAmount,
-      actualCostBasis,
+      actualCostBasis: grossCostBasis,
+      grossCostBasis,
+      netCostBasis,
       laborCostAvailable: laborSummary.entries > 0,
       labor: laborSummary,
       operationalLossItems: operationalLossItems.map((item) => ({
@@ -85,27 +137,41 @@ function buildRepairCostAnalytics({
         reason: item.resolutionReason || null,
         resolvedAt: item.resolvedAt || null,
       })),
-      note: operationalLossAmount > 0
-        ? 'ต้นทุนจริงรวมอะไหล่ติดตั้ง แรงงาน และอะไหล่ที่สูญหายหรือเสียหาย'
-        : laborSummary.entries > 0
-          ? 'ต้นทุนจริงรวมอะไหล่และแรงงานจาก Work Log ของช่าง'
-          : 'ยังไม่มี Work Log ของช่าง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
+      note: warrantyRecovery.totalRecoveryAmount > 0
+        ? 'ต้นทุนสุทธิหักมูลค่าที่กู้คืนได้จากการเคลมแล้ว'
+        : operationalLossAmount > 0
+          ? 'ต้นทุนจริงรวมอะไหล่ติดตั้ง แรงงาน และอะไหล่ที่สูญหายหรือเสียหาย'
+          : laborSummary.entries > 0
+            ? 'ต้นทุนจริงรวมอะไหล่และแรงงานจาก Work Log ของช่าง'
+            : 'ยังไม่มี Work Log ของช่าง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
+    },
+    warrantyRecovery: {
+      creditRecoveryAmount: warrantyRecovery.creditRecoveryAmount,
+      replacementRecoveryAmount: warrantyRecovery.replacementRecoveryAmount,
+      otherRecoveryAmount: warrantyRecovery.otherRecoveryAmount,
+      totalRecoveryAmount: warrantyRecovery.totalRecoveryAmount,
+      recoveryCount: warrantyRecovery.items.length,
+      recoveries: warrantyRecovery.items,
     },
     profitability: {
       estimatedGrossContribution,
       grossMarginPercent,
-      lossMaking: estimatedGrossContribution < 0,
-      breakEven: estimatedGrossContribution === 0,
-      profitable: estimatedGrossContribution > 0,
+      estimatedNetContribution,
+      netMarginPercent,
+      lossMaking: estimatedNetContribution < 0,
+      breakEven: estimatedNetContribution === 0,
+      profitable: estimatedNetContribution > 0,
     },
     variance: {
       partVariance: toMoney(actualPartAmount - quotedPartAmount),
       laborVariance: toMoney(actualLaborAmount - quotedLaborAmount),
       operationalLossVariance: operationalLossAmount,
-      totalCostVariance: toMoney(actualCostBasis - (quotedPartAmount + quotedLaborAmount)),
+      warrantyRecoveryVariance: toMoney(-warrantyRecovery.totalRecoveryAmount),
+      totalCostVariance: toMoney(netCostBasis - (quotedPartAmount + quotedLaborAmount)),
       actualPartOverEstimate: actualPartAmount > quotedPartAmount,
       actualLaborOverEstimate: actualLaborAmount > quotedLaborAmount,
       hasOperationalLoss: operationalLossAmount > 0,
+      hasWarrantyRecovery: warrantyRecovery.totalRecoveryAmount > 0,
     },
     source: financial,
     calculatedAt: calculatedAt.toISOString(),
@@ -136,6 +202,7 @@ class RepairCostAnalyticsService {
       parts: job.partsUsed || [],
       workLogs: workLogHistory(asset.metadata),
       partReservations: partReservationHistory(asset.metadata),
+      claimReconciliations: reconciliationHistory(asset.metadata),
     });
   }
 }
@@ -143,4 +210,6 @@ class RepairCostAnalyticsService {
 module.exports = new RepairCostAnalyticsService();
 module.exports.RepairCostAnalyticsService = RepairCostAnalyticsService;
 module.exports.buildRepairCostAnalytics = buildRepairCostAnalytics;
+module.exports.calculateWarrantyRecovery = calculateWarrantyRecovery;
+module.exports.reconciliationHistory = reconciliationHistory;
 module.exports.toMoney = toMoney;
