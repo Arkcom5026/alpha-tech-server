@@ -85,6 +85,23 @@ const ensureOperationalReadiness = async (req, res, next) => {
   }
 };
 
+const getPeriodDetail = async (req, res, next) => {
+  try {
+    const administrator = resolveTaxAdministratorScope(req.user);
+    const branchId = assertBranchScope({
+      administrator,
+      branchId: req.query.branchId,
+    });
+    const result = await service.getPeriodDetail({
+      taxPeriodId: req.params.taxPeriodId,
+      branchId,
+    });
+    return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    return next(mapAdministrativeError(error));
+  }
+};
+
 const listPeriods = async (req, res, next) => {
   try {
     const administrator = resolveTaxAdministratorScope(req.user);
@@ -132,6 +149,7 @@ module.exports = {
   closePeriod,
   ensureMonthlyPeriod,
   ensureOperationalReadiness,
+  getPeriodDetail,
   listPeriods,
   lockPeriod,
   mapAdministrativeError,
