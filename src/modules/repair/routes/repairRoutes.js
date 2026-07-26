@@ -2,6 +2,7 @@ const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const repairController = require('../controllers/repairController');
 const repairWorkLogController = require('../controllers/repairWorkLogController');
+const repairPartReservationController = require('../controllers/repairPartReservationController');
 const {
   loadRepairEmployeeContext,
   allowRepairRoles,
@@ -61,6 +62,9 @@ router.post('/jobs/:id/invoices', allowRepairRoles(...OPERATION_ROLES), repairCo
 
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
 router.get('/jobs/:id/parts/summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getPartUsageSummary);
+router.get('/jobs/:id/parts/reservations', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairPartReservationController.list);
+router.post('/jobs/:id/parts/reservations', allowRepairRoles(...OPERATION_ROLES), repairPartReservationController.reserve);
+router.patch('/jobs/:id/parts/reservations/:reservationId', allowRepairRoles(...OPERATION_ROLES), repairPartReservationController.resolve);
 router.post('/jobs/:id/parts', allowRepairRoles(...OPERATION_ROLES), repairController.addParts);
 router.post('/jobs/:id/parts/:partItemId/reversal', allowRepairRoles(...OPERATION_ROLES), repairController.reversePartUsage);
 router.post('/jobs/:id/warranty-claims', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.openWarrantyClaim);
