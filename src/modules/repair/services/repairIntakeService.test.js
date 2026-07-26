@@ -54,8 +54,8 @@ test('rejects invalid lookup before calling repository', async () => {
   });
 
   await assert.rejects(() => service.getContext({ branchId: 7 }, '   '), {
-    code: 'INVALID_LOOKUP',
-    status: 400,
+    code: 'REPAIR_INVALID_LOOKUP',
+    status: 'fail',
   });
   assert.equal(called, false);
 });
@@ -70,8 +70,8 @@ test('returns branch-safe not-found failure with normalized lookup details', asy
   await assert.rejects(
     () => service.getContext({ branchId: 7 }, ' SN-404 '),
     (error) => {
-      assert.equal(error.code, 'STOCK_ITEM_NOT_FOUND');
-      assert.equal(error.status, 404);
+      assert.equal(error.code, 'REPAIR_STOCK_ITEM_NOT_FOUND');
+      assert.equal(error.status, 'fail');
       assert.deepEqual(error.details, { lookup: 'SN-404' });
       return true;
     }
