@@ -3,7 +3,11 @@ const {
 } = require('../contracts/createTaxDocumentCommand');
 
 const requireAdministrativeClient = (db) => {
-  if (!db?.taxPeriod || typeof db.taxPeriod.findMany !== 'function') {
+  if (
+    !db?.taxPeriod ||
+    typeof db.taxPeriod.findMany !== 'function' ||
+    typeof db.taxPeriod.findFirst !== 'function'
+  ) {
     throw new TaxDocumentContractError(
       'INVALID_TAX_PERIOD_ADMINISTRATIVE_CLIENT',
       'Tax period administration requires a Prisma taxPeriod client',
@@ -31,6 +35,15 @@ const selectTaxPeriod = {
 const createPrismaTaxPeriodAdministrativeRepository = ({ db }) => {
   const client = requireAdministrativeClient(db);
 
+  const findByIdAndBranch = async ({ taxPeriodId, branchId }) =>
+    client.taxPeriod.findFirst({
+      where: {
+        id: taxPeriodId,
+        branchId,
+      },
+      select: selectTaxPeriod,
+    });
+
   const list = async ({ branchId, fromDate = null, toDate = null, statuses = [] }) =>
     client.taxPeriod.findMany({
       where: {
@@ -43,7 +56,7 @@ const createPrismaTaxPeriodAdministrativeRepository = ({ db }) => {
       select: selectTaxPeriod,
     });
 
-  return Object.freeze({ list });
+  return Object.freeze({ findByIdAndBranch, list });
 };
 
 module.exports = {
