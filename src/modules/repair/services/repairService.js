@@ -1,4 +1,5 @@
 const repairRepository = require('../repositories/repairRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const serviceAssetService = require('./serviceAssetService');
 const {
   validateCreateRepairJob,
@@ -19,12 +20,48 @@ const {
 const {
   assertRepairTransition,
 } = require('../policies/repairTransitionPolicy');
+const {
+  assertRepairExecutionAuthorized,
+} = require('../policies/repairExecutionAuthorizationPolicy');
 const { createRepairJobNo } = require('../utils/repairCode');
 const { mapRepairJob } = require('../mappers/repairMapper');
 const { mapServiceAsset } = require('../mappers/serviceAssetMapper');
 
 function isPrismaUniqueConflict(error) {
   return error && error.code === 'P2002';
+}
+
+function executionAuthorizationPayload(rawPayload = {}) {
+  return {
+    authorizationType: String(rawPayload.authorizationType || '')
+      .trim()
+      .toUpperCase(),
+    reason:
+      rawPayload.authorizationReason === undefined ||
+      rawPayload.authorizationReason === null
+        ? null
+        : String(rawPayload.authorizationReason).trim() || null,
+  };
+}
+
+async function loadExecutionAsset(repo, actor, job) {
+  if (!job.serviceAssetId) {
+    throw new RepairError(
+      RepairFailureCode.SERVICE_ASSET_REQUIRED,
+      'ใบงานซ่อมต้องเชื่อมกับอุปกรณ์บริการก่อนเริ่มดำเนินงาน',
+      409
+    );
+  }
+  const assetRepo = new ServiceAssetRepository(repo.prisma);
+  const asset = await assetRepo.findServiceAsset(actor.branchId, job.serviceAssetId);
+  if (!asset) {
+    throw new RepairError(
+      RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+      'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+      404
+    );
+  }
+  return asset;
 }
 
 class RepairService {
@@ -143,6 +180,7 @@ class RepairService {
 
   async updateJobStatus(actor, repairJobId, rawPayload) {
     const payload = validateRepairStatusUpdate(rawPayload);
+    const authorization = executionAuthorizationPayload(rawPayload);
 
     return this.repository.transaction(async (repo) => {
       const job = await repo.findRepairJob(actor.branchId, repairJobId);
@@ -155,6 +193,15 @@ class RepairService {
       }
 
       assertRepairTransition(job.status, payload.status);
+
+      if (payload.status === 'IN_PROGRESS') {
+        const asset = await loadExecutionAsset(repo, actor, job);
+        assertRepairExecutionAuthorized({
+          job,
+          asset,
+          ...authorization,
+        });
+      }
 
       if (payload.technicianId) {
         const technician = await repo.findEmployee(payload.technicianId);
@@ -185,6 +232,7 @@ class RepairService {
 
   async addPartsToRepairJob(actor, repairJobId, rawPayload) {
     const payload = validateAddPart(rawPayload);
+    const authorization = executionAuthorizationPayload(rawPayload);
 
     return this.repository.transaction(async (repo) => {
       const job = await repo.findRepairJob(actor.branchId, repairJobId);
@@ -203,6 +251,13 @@ class RepairService {
           409
         );
       }
+
+      const asset = await loadExecutionAsset(repo, actor, job);
+      assertRepairExecutionAuthorized({
+        job,
+        asset,
+        ...authorization,
+      });
 
       const product = await repo.findProduct(payload.productId);
       if (!product || !product.active) {
@@ -283,3 +338,4 @@ class RepairService {
 
 module.exports = new RepairService();
 module.exports.RepairService = RepairService;
+module.exports.executionAuthorizationPayload = executionAuthorizationPayload;
