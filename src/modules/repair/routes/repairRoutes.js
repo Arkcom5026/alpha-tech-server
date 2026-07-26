@@ -50,6 +50,18 @@ router.patch(
   repairController.updateStatus
 );
 
+router.get(
+  '/jobs/:id/diagnoses',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  repairController.listDiagnoses
+);
+
+router.post(
+  '/jobs/:id/diagnoses',
+  allowRepairRoles(...OPERATION_ROLES),
+  repairController.recordDiagnosis
+);
+
 router.post(
   '/jobs/:id/handover',
   allowRepairRoles(...OPERATION_ROLES),
