@@ -51,6 +51,12 @@ router.patch(
 );
 
 router.post(
+  '/jobs/:id/handover',
+  allowRepairRoles(...OPERATION_ROLES),
+  repairController.handoverToCustomer
+);
+
+router.post(
   '/jobs/:id/parts',
   allowRepairRoles(...OPERATION_ROLES),
   repairController.addParts
