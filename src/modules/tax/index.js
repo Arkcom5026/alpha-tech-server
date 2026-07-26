@@ -98,6 +98,14 @@ const {
 } = require('./policies/taxPeriodOperationalReadinessPolicy');
 
 const {
+  BRANCH_TAX_ADMIN_ROLES,
+  GLOBAL_TAX_ADMIN_ROLES,
+  assertBranchScope,
+  assertReadinessBranchScope,
+  resolveTaxAdministratorScope,
+} = require('./policies/taxPeriodAdministrativeBranchScopePolicy');
+
+const {
   TAX_PERIOD_STATUSES,
   TAX_PERIOD_TRANSITIONS,
   assertTaxPeriodTransition,
@@ -130,7 +138,9 @@ const {
 } = require('./infrastructure/prismaTaxPeriodLifecycleRepository');
 
 module.exports = {
+  BRANCH_TAX_ADMIN_ROLES,
   DEFAULT_MONTHS_AHEAD,
+  GLOBAL_TAX_ADMIN_ROLES,
   MAX_MONTHS_AHEAD,
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
@@ -144,6 +154,8 @@ module.exports = {
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
   applyTaxPeriodResolution,
+  assertBranchScope,
+  assertReadinessBranchScope,
   assertTaxPeriodAvailable,
   assertTaxPeriodCandidate,
   assertTaxPeriodReplay,
@@ -185,6 +197,7 @@ module.exports = {
   requireReferenceDate,
   resolveLedgerType,
   resolveSaleTaxProjectionDecision,
+  resolveTaxAdministratorScope,
   resolveTaxDocumentType,
   resolveTaxPeriodDate,
   sameBoundary,
