@@ -37,6 +37,7 @@ const {
   createTrackingAccess,
   rotateTrackingAccess,
   revokeTrackingAccess,
+  getPublicRepairTracking,
 } = require('../customer-access/repairTrackingAccessController');
 const {
   loadRepairEmployeeContext,
@@ -47,6 +48,9 @@ const router = express.Router();
 
 const READ_AND_INTAKE_ROLES = ['OWNER', 'MANAGER', 'CASHIER'];
 const OPERATION_ROLES = ['OWNER', 'MANAGER'];
+
+// Customer-safe endpoint. It must remain before the staff authentication middleware.
+router.get('/public/tracking/:token', getPublicRepairTracking);
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
