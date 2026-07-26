@@ -150,6 +150,12 @@ function validateRepairStatusUpdate(payload = {}) {
   };
 }
 
+function validateRepairHandover(payload = {}) {
+  return {
+    note: optionalText(payload.note, 4000),
+  };
+}
+
 function validateAddPart(payload = {}) {
   const qtyUsed = positiveInt(payload.qtyUsed, 'qtyUsed');
   return {
@@ -221,6 +227,7 @@ module.exports = {
   validateLookup,
   validateCreateRepairJob,
   validateRepairStatusUpdate,
+  validateRepairHandover,
   validateAddPart,
   validateOpenWarrantyClaim,
   validateClaimStatusUpdate,
