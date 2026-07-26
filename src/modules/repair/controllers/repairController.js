@@ -4,6 +4,7 @@ const repairHandoverService = require('../services/repairHandoverService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
 const repairFinancialSummaryService = require('../services/repairFinancialSummaryService');
+const repairSettlementService = require('../services/repairSettlementService');
 const repairIntakeService = require('../services/repairIntakeService');
 const repairPartReversalService = require('../services/repairPartReversalService');
 const repairPartUsageSummaryService = require('../services/repairPartUsageSummaryService');
@@ -116,6 +117,23 @@ class RepairController {
       const data = await repairFinancialSummaryService.getSummary(actor, req.params.id);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async getSettlement(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairSettlementService.getSettlement(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
+  async recordPayment(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairSettlementService.recordPayment(actor, req.params.id, req.body);
+      res.status(201).json({ success: true, message: 'บันทึกรับชำระงานซ่อมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
