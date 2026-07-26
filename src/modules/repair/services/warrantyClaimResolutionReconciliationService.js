@@ -66,6 +66,12 @@ function assertReplacementEligible(claim, replacement) {
   }
 }
 
+function replacementRecoveryValue(replacement) {
+  const costPrice = Number(replacement?.costPrice || 0);
+  if (!Number.isFinite(costPrice) || costPrice < 0) return 0;
+  return Number(costPrice.toFixed(2));
+}
+
 class WarrantyClaimResolutionReconciliationService {
   async reconcile({ repo, assetRepo, actor, claim, payload, updatedClaim, asset }) {
     if (payload.status !== 'RESOLVED') return null;
@@ -169,6 +175,7 @@ class WarrantyClaimResolutionReconciliationService {
 
     const assetMetadata = metadataObject(asset.metadata);
     const history = reconciliationHistory(assetMetadata);
+    const replacementCostRecovery = replacementRecoveryValue(replacement);
     const reconciliation = {
       warrantyClaimId: claim.id,
       claimNo: claim.claimNo,
@@ -181,10 +188,12 @@ class WarrantyClaimResolutionReconciliationService {
       replacementPreviousStatus: replacement?.status || null,
       replacementResultingStatus: replacement ? 'SOLD' : null,
       replacementStockQuantityChange: replacement ? -1 : 0,
+      replacementCostRecovery,
       creditAmount:
         payload.creditAmount === null || payload.creditAmount === undefined
           ? null
           : Number(payload.creditAmount),
+      supplierCompensationAmount: 0,
       serviceAssetStatus: assetStatusForResolution(resolution),
       reconciledByEmployeeId: actor.employeeId,
       reconciledAt: resolvedAtIso,
@@ -225,3 +234,4 @@ module.exports.reconciliationHistory = reconciliationHistory;
 module.exports.stockStatusForOriginal = stockStatusForOriginal;
 module.exports.assetStatusForResolution = assetStatusForResolution;
 module.exports.assertReplacementEligible = assertReplacementEligible;
+module.exports.replacementRecoveryValue = replacementRecoveryValue;
