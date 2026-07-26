@@ -8,6 +8,7 @@ const repairRepeatLinkService = require('../services/repairRepeatLinkService');
 const repairAssetTimelineService = require('../services/repairAssetTimelineService');
 const repairOperationalIntelligenceService = require('../services/repairOperationalIntelligenceService');
 const repairOperationalRiskService = require('../services/repairOperationalRiskService');
+const repairOperationalDecisionService = require('../services/repairOperationalDecisionService');
 const repairCostAnalyticsService = require('../services/repairCostAnalyticsService');
 const repairRepeatFailureAnalyticsService = require('../services/repairRepeatFailureAnalyticsService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
@@ -161,6 +162,15 @@ class RepairController {
     } catch (error) { next(error); }
   }
 
+  async getOperationalDecisionDashboard(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairOperationalDecisionService.getDashboard(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
   async getCostAnalytics(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
@@ -288,14 +298,14 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairService.addPartsToRepairJob(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'เบิกอะไหล่สำหรับงานซ่อมเรียบร้อยแล้ว', data });
+      res.status(201).json({ success: true, message: 'เพิ่มอะไหล่ในงานซ่อมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
   async getPartUsageSummary(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await repairPartUsageSummaryService.getActualUsageSummary(actor, req.params.id);
+      const data = await repairPartUsageSummaryService.getSummary(actor, req.params.id);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
@@ -304,32 +314,23 @@ class RepairController {
   async reversePartUsage(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await repairPartReversalService.reversePartUsage(
-        actor,
-        req.params.id,
-        req.params.partItemId,
-        req.body
-      );
-      res.status(200).json({
-        success: true,
-        message: 'คืนอะไหล่เข้าสต็อกจากใบงานซ่อมเรียบร้อยแล้ว',
-        data,
-      });
+      const data = await repairPartReversalService.reverse(actor, req.params.id, req.params.partItemId, req.body);
+      res.status(200).json({ success: true, message: 'ย้อนรายการใช้อะไหล่เรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
   async openWarrantyClaim(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await warrantyClaimService.openFromRepairJob(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'เปิดรายการเคลมจากใบงานซ่อมเรียบร้อยแล้ว', data });
+      const data = await warrantyClaimService.openClaim(actor, req.params.id, req.body);
+      res.status(201).json({ success: true, message: 'เปิดรายการเคลมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
   async listWarrantyClaims(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await warrantyClaimService.listWarrantyClaims(actor, req.query);
+      const data = await warrantyClaimService.listClaims(actor, req.query);
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -337,7 +338,7 @@ class RepairController {
   async getWarrantyClaim(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await warrantyClaimService.getWarrantyClaim(actor, req.params.claimId);
+      const data = await warrantyClaimService.getClaim(actor, req.params.claimId);
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -352,3 +353,4 @@ class RepairController {
 }
 
 module.exports = new RepairController();
+module.exports.RepairController = RepairController;
