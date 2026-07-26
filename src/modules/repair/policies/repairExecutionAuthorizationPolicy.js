@@ -2,6 +2,7 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
+const { CLAIM_ACTIVE_STATUSES } = require('../contracts/repairContract');
 const { estimateHistory } = require('../services/repairEstimateService');
 
 const EXECUTION_AUTHORIZATION_TYPES = Object.freeze([
@@ -10,16 +11,7 @@ const EXECUTION_AUTHORIZATION_TYPES = Object.freeze([
   'NO_CHARGE',
 ]);
 
-const ACTIVE_CLAIM_STATUSES = new Set([
-  'DRAFT',
-  'SUBMITTED',
-  'IN_TRANSIT',
-  'PROVIDER_RECEIVED',
-  'IN_REVIEW',
-  'WAITING_PARTS',
-  'REPAIRING',
-  'REPLACEMENT_PENDING',
-]);
+const ACTIVE_CLAIM_STATUSES = new Set(CLAIM_ACTIVE_STATUSES);
 
 function metadataObject(metadata) {
   return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -28,20 +20,30 @@ function metadataObject(metadata) {
 }
 
 function approvedEstimateForJob(metadata, repairJobId) {
-  return estimateHistory(metadataObject(metadata))
-    .filter((item) => Number(item.repairJobId) === Number(repairJobId))
-    .reverse()
-    .find((item) => item.status === 'APPROVED') || null;
+  return (
+    estimateHistory(metadataObject(metadata))
+      .filter((item) => Number(item.repairJobId) === Number(repairJobId))
+      .reverse()
+      .find((item) => item.status === 'APPROVED') || null
+  );
 }
 
 function activeWarrantyClaim(job) {
-  return (job.warrantyClaims || []).find(
-    (claim) =>
-      claim.repairLinkState === 'LINKED' && ACTIVE_CLAIM_STATUSES.has(claim.status)
-  ) || null;
+  return (
+    (job.warrantyClaims || []).find(
+      (claim) =>
+        claim.repairLinkState === 'LINKED' &&
+        ACTIVE_CLAIM_STATUSES.has(claim.status)
+    ) || null
+  );
 }
 
-function assertRepairExecutionAuthorized({ job, asset, authorizationType, reason }) {
+function assertRepairExecutionAuthorized({
+  job,
+  asset,
+  authorizationType,
+  reason,
+}) {
   if (!EXECUTION_AUTHORIZATION_TYPES.includes(authorizationType)) {
     throw new RepairError(
       RepairFailureCode.REPAIR_EXECUTION_AUTHORIZATION_REQUIRED,
@@ -72,7 +74,11 @@ function assertRepairExecutionAuthorized({ job, asset, authorizationType, reason
         409
       );
     }
-    return { type: authorizationType, warrantyClaimId: claim.id, reason: reason || null };
+    return {
+      type: authorizationType,
+      warrantyClaimId: claim.id,
+      reason: reason || null,
+    };
   }
 
   if (!reason) {
