@@ -9,6 +9,7 @@ const repairAssetTimelineService = require('../services/repairAssetTimelineServi
 const repairOperationalIntelligenceService = require('../services/repairOperationalIntelligenceService');
 const repairOperationalRiskService = require('../services/repairOperationalRiskService');
 const repairOperationalDecisionService = require('../services/repairOperationalDecisionService');
+const repairManagementAlertService = require('../services/repairManagementAlertService');
 const repairCostAnalyticsService = require('../services/repairCostAnalyticsService');
 const repairRepeatFailureAnalyticsService = require('../services/repairRepeatFailureAnalyticsService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
@@ -171,6 +172,15 @@ class RepairController {
     } catch (error) { next(error); }
   }
 
+  async getManagementAlertDashboard(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairManagementAlertService.getDashboard(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
   async getCostAnalytics(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
@@ -298,7 +308,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairService.addPartsToRepairJob(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'เพิ่มอะไหล่ในงานซ่อมเรียบร้อยแล้ว', data });
+      res.status(201).json({ success: true, message: 'บันทึกอะไหล่ที่ใช้ในงานซ่อมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
@@ -315,15 +325,19 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairPartReversalService.reverse(actor, req.params.id, req.params.partItemId, req.body);
-      res.status(200).json({ success: true, message: 'ย้อนรายการใช้อะไหล่เรียบร้อยแล้ว', data });
+      res.status(200).json({ success: true, message: 'ยกเลิกการใช้อะไหล่เรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
   async openWarrantyClaim(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await warrantyClaimService.openClaim(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'เปิดรายการเคลมเรียบร้อยแล้ว', data });
+      const data = await warrantyClaimService.openFromRepairJob(actor, req.params.id, req.body);
+      res.status(data.idempotent ? 200 : 201).json({
+        success: true,
+        message: data.idempotent ? 'มีงานเคลมที่เชื่อมกับใบงานนี้แล้ว' : 'เปิดงานเคลมจากใบงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
     } catch (error) { next(error); }
   }
 
@@ -331,6 +345,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.listClaims(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -339,6 +354,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.getClaim(actor, req.params.claimId);
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -347,7 +363,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.updateStatus(actor, req.params.claimId, req.body);
-      res.status(200).json({ success: true, message: 'อัปเดตสถานะเคลมเรียบร้อยแล้ว', data });
+      res.status(200).json({ success: true, message: 'อัปเดตสถานะงานเคลมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 }
