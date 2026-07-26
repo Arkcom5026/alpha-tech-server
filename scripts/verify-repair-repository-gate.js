@@ -39,6 +39,7 @@ function run() {
     'scripts/verify-repair-management-alert.js',
     'scripts/verify-repair-management-brief.js',
     'scripts/verify-repair-executive-summary.js',
+    'scripts/verify-repair-e2e-completion-audit.js',
   ];
 
   for (const file of requiredFiles) {
@@ -152,6 +153,15 @@ function run() {
     'Repair executive summary verifier: PASS',
   ]);
 
+  requireSource('scripts/verify-repair-e2e-completion-audit.js', [
+    "app.use('/api/repairs', repairRoutes)",
+    "app.use('/api/repair', repairRoutes)",
+    'requireOrderedTokens',
+    'loadRepairEmployeeContext',
+    'allowRepairRoles',
+    'Repair E2E completion audit: PASS',
+  ]);
+
   const packageJson = JSON.parse(read('package.json'));
   const scripts = packageJson.scripts || {};
   const requiredScripts = [
@@ -164,6 +174,7 @@ function run() {
     'verify:repair-management-brief',
     'verify:repair-executive-summary',
     'verify:repair-repository-gate',
+    'verify:repair-e2e-completion-audit',
     'verify:repair-complete',
   ];
   for (const script of requiredScripts) {
@@ -180,6 +191,7 @@ function run() {
     'verify:repair-management-brief',
     'verify:repair-executive-summary',
     'verify:repair-repository-gate',
+    'verify:repair-e2e-completion-audit',
   ]) {
     assert.ok(scripts['verify:repair-complete'].includes(`npm run ${child}`), `verify:repair-complete missing ${child}`);
   }
