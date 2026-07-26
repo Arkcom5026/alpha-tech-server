@@ -18,11 +18,8 @@ const {
   createPurchaseOrderWithAdvance,
 } = require('../controllers/purchaseOrderController');
 
-// ⚪ ตัวช่วยระบบตรวจรับสินค้า ยึดของเดิมไว้ก่อน
-const {
-  getEligiblePurchaseOrders,
-  getPurchaseOrderDetailById,
-} = require('../controllers/purchaseOrderReceiptController');
+const listEligiblePurchaseOrdersController = require('../src/modules/procurement/receipt/query/eligible-purchase-orders/listEligiblePurchaseOrdersController');
+const getReceiptPurchaseOrderController = require('../src/modules/procurement/receipt/query/purchase-order-detail/getReceiptPurchaseOrderController');
 
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
@@ -34,8 +31,8 @@ router.get('/by-supplier', getPurchaseOrdersBySupplier);
 router.post('/with-advance', createPurchaseOrderWithAdvance);
 
 // ✅ ตัวเสริมฝั่งตรวจรับใบสั่งซื้อ
-router.get('/eligible-for-receipt', getEligiblePurchaseOrders);
-router.get('/:id/detail-for-receipt', getPurchaseOrderDetailById);
+router.get('/eligible-for-receipt', listEligiblePurchaseOrdersController.handle);
+router.get('/:id/detail-for-receipt', getReceiptPurchaseOrderController.handle);
 router.put('/:id', updatePurchaseOrder);
 router.delete('/:id', deletePurchaseOrder);
 router.get('/:id', getPurchaseOrderById);
