@@ -13,6 +13,10 @@ const checks = Object.freeze([
     name: 'Tax document publisher branch isolation',
     script: 'scripts/verify-tax-document-publisher-branch-isolation.js',
   },
+  {
+    name: 'Tax ledger entry projection',
+    script: 'scripts/verify-tax-ledger-entry-projection.js',
+  },
 ]);
 
 const runCheck = ({ name, script }) => {
