@@ -12,6 +12,7 @@ const repairOperationalDecisionService = require('../services/repairOperationalD
 const repairManagementAlertService = require('../services/repairManagementAlertService');
 const repairManagementBriefService = require('../services/repairManagementBriefService');
 const repairExecutiveSummaryService = require('../services/repairExecutiveSummaryService');
+const repairSupplierIntelligenceService = require('../services/repairSupplierIntelligenceService');
 const repairCostAnalyticsService = require('../services/repairCostAnalyticsService');
 const repairRepeatFailureAnalyticsService = require('../services/repairRepeatFailureAnalyticsService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
@@ -201,6 +202,15 @@ class RepairController {
     } catch (error) { next(error); }
   }
 
+  async getSupplierIntelligence(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairSupplierIntelligenceService.getDashboard(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
+    } catch (error) { next(error); }
+  }
+
   async getCostAnalytics(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
@@ -287,14 +297,18 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await repairSettlementService.recordPayment(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'บันทึกรับชำระงานซ่อมเรียบร้อยแล้ว', data });
+      res.status(data.idempotent ? 200 : 201).json({
+        success: true,
+        message: data.idempotent ? 'พบรายการรับชำระเดิมแล้ว' : 'บันทึกรับชำระงานซ่อมเรียบร้อยแล้ว',
+        data,
+      });
     } catch (error) { next(error); }
   }
 
   async listInvoices(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await repairInvoiceService.listInvoices(actor, req.params.id);
+      const data = await repairInvoiceService.listForRepairJob(actor, req.params.id);
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
@@ -303,10 +317,10 @@ class RepairController {
   async issueInvoice(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await repairInvoiceService.issueInvoice(actor, req.params.id, req.body);
+      const data = await repairInvoiceService.issue(actor, req.params.id, req.body);
       res.status(data.idempotent ? 200 : 201).json({
         success: true,
-        message: data.idempotent ? 'ใบแจ้งค่าซ่อมถูกออกไว้แล้ว' : 'ออกใบแจ้งค่าซ่อมเรียบร้อยแล้ว',
+        message: data.idempotent ? 'พบใบแจ้งหนี้เดิมแล้ว' : 'ออกใบแจ้งหนี้งานซ่อมเรียบร้อยแล้ว',
         data,
       });
     } catch (error) { next(error); }
@@ -315,28 +329,8 @@ class RepairController {
   async handoverToCustomer(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
-      const data = await repairHandoverService.handoverToCustomer(actor, req.params.id, req.body);
-      res.status(200).json({
-        success: true,
-        message: data.idempotent ? 'เครื่องถูกส่งคืนลูกค้าแล้ว' : 'ส่งคืนเครื่องให้ลูกค้าเรียบร้อยแล้ว',
-        data,
-      });
-    } catch (error) { next(error); }
-  }
-
-  async addParts(req, res, next) {
-    try {
-      const actor = resolveRepairActor(req.user);
-      const data = await repairService.addPartsToRepairJob(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'บันทึกอะไหล่ที่ใช้ในงานซ่อมเรียบร้อยแล้ว', data });
-    } catch (error) { next(error); }
-  }
-
-  async reversePartUsage(req, res, next) {
-    try {
-      const actor = resolveRepairActor(req.user);
-      const data = await repairPartReversalService.reverse(actor, req.params.id, req.params.partItemId, req.body);
-      res.status(200).json({ success: true, message: 'ยกเลิกการใช้อะไหล่เรียบร้อยแล้ว', data });
+      const data = await repairHandoverService.handover(actor, req.params.id, req.body);
+      res.status(200).json({ success: true, message: 'ส่งมอบเครื่องให้ลูกค้าเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
@@ -349,11 +343,27 @@ class RepairController {
     } catch (error) { next(error); }
   }
 
+  async addParts(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairService.addRepairPart(actor, req.params.id, req.body);
+      res.status(201).json({ success: true, message: 'เพิ่มอะไหล่ในงานซ่อมเรียบร้อยแล้ว', data });
+    } catch (error) { next(error); }
+  }
+
+  async reversePartUsage(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairPartReversalService.reverse(actor, req.params.id, req.params.partItemId, req.body);
+      res.status(200).json({ success: true, message: 'ย้อนกลับการใช้อะไหล่เรียบร้อยแล้ว', data });
+    } catch (error) { next(error); }
+  }
+
   async openWarrantyClaim(req, res, next) {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.openForRepairJob(actor, req.params.id, req.body);
-      res.status(201).json({ success: true, message: 'เปิดงานเคลมจากใบงานซ่อมเรียบร้อยแล้ว', data });
+      res.status(201).json({ success: true, message: 'เปิดรายการเคลมจากใบงานซ่อมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 
@@ -361,6 +371,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.listWarrantyClaims(actor, req.query);
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -369,6 +380,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.getWarrantyClaim(actor, req.params.claimId);
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
@@ -377,7 +389,7 @@ class RepairController {
     try {
       const actor = resolveRepairActor(req.user);
       const data = await warrantyClaimService.updateWarrantyClaimStatus(actor, req.params.claimId, req.body);
-      res.status(200).json({ success: true, message: 'อัปเดตสถานะงานเคลมเรียบร้อยแล้ว', data });
+      res.status(200).json({ success: true, message: 'อัปเดตสถานะรายการเคลมเรียบร้อยแล้ว', data });
     } catch (error) { next(error); }
   }
 }
