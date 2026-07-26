@@ -20,12 +20,10 @@ const {
 
 const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
 const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
+const listReceiptItemsController = require('../src/modules/procurement/receipt/query/items/listReceiptItemsController');
 
 // ✅ Receipt items endpoints (bridge to REST-style routes)
-const {
-  updateReceiptItem,
-  getReceiptItemsByReceiptId,
-} = require('../controllers/purchaseOrderReceiptItemController');
+const { updateReceiptItem } = require('../controllers/purchaseOrderReceiptItemController');
 
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
@@ -52,12 +50,7 @@ router.post('/quick-receipts', createQuickReceipt);
 router.get('/:id', getPurchaseReceiptController.handle);
 
 // ✅ REST-style items (preferred) — keeps FE stable
-// List items of a receipt
-router.get('/:receiptId/items', (req, res) => {
-  // reuse existing controller which expects :receiptId in params
-  req.params.receiptId = req.params.receiptId;
-  return getReceiptItemsByReceiptId(req, res);
-});
+router.get('/:receiptId/items', listReceiptItemsController.handle);
 
 // Update a single receipt item (maps to legacy update body)
 router.patch('/:receiptId/items/:itemId', (req, res) => {
