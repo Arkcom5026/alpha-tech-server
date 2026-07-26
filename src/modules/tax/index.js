@@ -46,6 +46,10 @@ const {
 } = require('./application/taxPeriodCreationService');
 
 const {
+  createTaxPeriodLifecycleService,
+} = require('./application/taxPeriodLifecycleService');
+
+const {
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   resolveSaleTaxProjectionDecision,
@@ -68,6 +72,14 @@ const {
 } = require('./policies/taxPeriodCreationPolicy');
 
 const {
+  TAX_PERIOD_STATUSES,
+  TAX_PERIOD_TRANSITIONS,
+  assertTaxPeriodTransition,
+  buildTaxPeriodLifecycleUpdate,
+  normalizeTaxPeriodLifecycleCommand,
+} = require('./policies/taxPeriodLifecyclePolicy');
+
+const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
@@ -87,6 +99,10 @@ const {
   createPrismaTaxPeriodCreationRepository,
 } = require('./infrastructure/prismaTaxPeriodCreationRepository');
 
+const {
+  createPrismaTaxPeriodLifecycleRepository,
+} = require('./infrastructure/prismaTaxPeriodLifecycleRepository');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
@@ -94,28 +110,35 @@ module.exports = {
   TAX_LEDGER_TYPES,
   TAX_PERIOD_ASSIGNABLE_STATUSES,
   TAX_PERIOD_INITIAL_STATUS,
+  TAX_PERIOD_STATUSES,
+  TAX_PERIOD_TRANSITIONS,
   SALE_TAX_PROJECTION_ACTIONS,
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
   assertTaxPeriodCandidate,
   assertTaxPeriodReplay,
+  assertTaxPeriodTransition,
   buildMonthlyTaxPeriodBoundary,
   buildTaxDocumentDraft,
+  buildTaxPeriodLifecycleUpdate,
   createPrismaTaxDocumentPublisher,
   createPrismaTaxLedgerPeriodAssignmentRepository,
   createPrismaTaxLedgerPublisher,
   createPrismaTaxPeriodCreationRepository,
+  createPrismaTaxPeriodLifecycleRepository,
   createPrismaTaxPeriodResolver,
   createSaleTaxProjectionRuntime,
   createTaxDocumentLedgerPublicationRuntime,
   createTaxLedgerPeriodAssignmentService,
   createTaxPeriodCreationService,
+  createTaxPeriodLifecycleService,
   isAssignableTaxPeriodStatus,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
   isTaxDocumentType,
   normalizeCreateMonthlyTaxPeriodCommand,
   normalizeTaxDocumentCommand,
+  normalizeTaxPeriodLifecycleCommand,
   periodContainsDate,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
