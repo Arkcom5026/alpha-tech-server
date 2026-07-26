@@ -42,6 +42,10 @@ const {
   createPrismaTaxDocumentPublisher,
 } = require('./infrastructure/prismaTaxDocumentPublisher');
 
+const {
+  createPrismaTaxLedgerPublisher,
+} = require('./infrastructure/prismaTaxLedgerPublisher');
+
 module.exports = {
   TAX_DOCUMENT_DIRECTIONS,
   TAX_DOCUMENT_SOURCE_TYPES,
@@ -52,6 +56,7 @@ module.exports = {
   TaxDocumentContractError,
   buildTaxDocumentDraft,
   createPrismaTaxDocumentPublisher,
+  createPrismaTaxLedgerPublisher,
   createSaleTaxProjectionRuntime,
   isTaxDocumentDirection,
   isTaxDocumentSourceType,
