@@ -1,5 +1,9 @@
 const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
+const {
+  getCustomerStatus,
+  buildCustomerTimeline,
+} = require('../customer-timeline/repairCustomerTimelinePolicy');
 
 const DEFAULT_EXPIRY_DAYS = 90;
 
@@ -14,46 +18,13 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function mapCustomerStatus(status) {
-  const map = {
-    RECEIVED: {
-      code: 'RECEIVED',
-      label: 'ร้านรับอุปกรณ์แล้ว',
-      stage: 1,
-    },
-    IN_PROGRESS: {
-      code: 'IN_PROGRESS',
-      label: 'กำลังตรวจสอบหรือดำเนินการ',
-      stage: 2,
-    },
-    WAITING_PARTS: {
-      code: 'WAITING_PARTS',
-      label: 'กำลังรออะไหล่',
-      stage: 3,
-    },
-    COMPLETED: {
-      code: 'READY',
-      label: 'ดำเนินการเสร็จแล้ว กรุณาติดต่อร้าน',
-      stage: 4,
-    },
-    CANCELLED: {
-      code: 'CANCELLED',
-      label: 'ยุติการดำเนินงาน',
-      stage: 0,
-    },
-  };
-
-  return map[status] || {
-    code: 'IN_PROGRESS',
-    label: 'กำลังดำเนินการ',
-    stage: 2,
-  };
-}
-
-function toPublicProjection(job) {
+function toPublicProjection(job, events) {
   const product = job.stockItem?.product;
+  const timeline = buildCustomerTimeline(job, events);
+  const currentStatus = getCustomerStatus(job.status);
+
   return {
-    contractVersion: 'repair-customer-tracking.v1',
+    contractVersion: 'repair-customer-tracking.v2',
     repair: {
       jobNo: job.jobNo,
       device: {
@@ -65,7 +36,13 @@ function toPublicProjection(job) {
         barcode: job.stockItem?.barcode || null,
       },
       reportedSymptoms: job.reportedSymptoms,
-      status: mapCustomerStatus(job.status),
+      status: {
+        code: currentStatus.code,
+        label: currentStatus.title,
+        message: currentStatus.message,
+        stage: currentStatus.stage,
+      },
+      timeline,
       estimate: {
         amount: Number(job.estimatedCost || 0),
         currency: 'THB',
@@ -134,13 +111,17 @@ async function getPublicTracking(token) {
     throw createHttpError(404, 'TRACKING_ACCESS_NOT_FOUND', 'ลิงก์ติดตามงานไม่ถูกต้องหรือหมดอายุ');
   }
 
-  const job = await repository.getPublicRepairProjection(access.repairJobId);
+  const [job, events] = await Promise.all([
+    repository.getPublicRepairProjection(access.repairJobId),
+    repository.listCustomerVisibleTimelineEvents(access.repairJobId),
+  ]);
+
   if (!job) {
     throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบข้อมูลงานซ่อม');
   }
 
   await repository.touch(access.id);
-  return toPublicProjection(job);
+  return toPublicProjection(job, events);
 }
 
 module.exports = {
