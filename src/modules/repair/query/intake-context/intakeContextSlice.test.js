@@ -79,8 +79,9 @@ test('slice service calls slice repository and maps intake context', async () =>
   const result = await service.execute({ branchId: 3 }, '  BC-11  ');
 
   assert.deepEqual(received, { branchId: 3, lookup: 'BC-11' });
-  assert.equal(result.stockItem.id, 11);
-  assert.equal(result.stockItem.barcode, 'BC-11');
+  assert.equal(result.identity.id, 11);
+  assert.equal(result.identity.barcode, 'BC-11');
+  assert.equal(result.recommendedActions[0].type, 'CREATE_REPAIR_JOB');
 });
 
 test('slice service preserves domain not-found contract', async () => {
