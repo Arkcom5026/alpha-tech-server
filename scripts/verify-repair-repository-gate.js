@@ -41,6 +41,7 @@ function run() {
     'scripts/verify-repair-executive-summary.js',
     'scripts/verify-repair-contract-boundary-audit.js',
     'scripts/verify-repair-module-isolation.js',
+    'scripts/verify-repair-api-contract-integrity.js',
     'scripts/verify-repair-e2e-completion-audit.js',
   ];
 
@@ -58,6 +59,8 @@ function run() {
     '/jobs/:id/operational-intelligence',
     '/jobs/:id/cost-analytics',
     '/jobs/:id/repeat-failure-analytics',
+    "if (req.method === 'GET')",
+    "res.setHeader('Cache-Control', 'no-store')",
   ]);
 
   requireSource('src/modules/repair/controllers/repairController.js', [
@@ -171,6 +174,14 @@ function run() {
     'Repair module isolation verifier: PASS',
   ]);
 
+  requireSource('scripts/verify-repair-api-contract-integrity.js', [
+    'extractMethod',
+    'data.idempotent ? 200 : 201',
+    "if (req.method === 'GET')",
+    'class RepairError extends AppError',
+    'Repair API contract integrity audit: PASS',
+  ]);
+
   requireSource('scripts/verify-repair-e2e-completion-audit.js', [
     "app.use('/api/repairs', repairRoutes)",
     "app.use('/api/repair', repairRoutes)",
@@ -193,6 +204,7 @@ function run() {
     'verify:repair-executive-summary',
     'verify:repair-contract-boundary-audit',
     'verify:repair-module-isolation',
+    'verify:repair-api-contract-integrity',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
     'verify:repair-complete',
@@ -212,6 +224,7 @@ function run() {
     'verify:repair-executive-summary',
     'verify:repair-contract-boundary-audit',
     'verify:repair-module-isolation',
+    'verify:repair-api-contract-integrity',
     'verify:repair-repository-gate',
     'verify:repair-e2e-completion-audit',
   ]) {
