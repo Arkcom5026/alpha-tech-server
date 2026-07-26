@@ -53,7 +53,7 @@ const productTraceInclude = {
       receipt: {
         include: {
           supplier: true,
-          purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } } },
+          purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } },
           receivedBy: { select: { id: true, name: true } },
         },
       },
