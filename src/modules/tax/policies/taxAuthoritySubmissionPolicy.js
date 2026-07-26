@@ -19,6 +19,7 @@ const TAX_AUTHORITY_SUBMISSION_STATUSES = Object.freeze({
 
 const TAX_AUTHORITY_SUBMISSION_EVENT_TYPES = Object.freeze({
   ENQUEUED: 'ENQUEUED',
+  CLAIMED: 'CLAIMED',
   RETRY_QUEUED: 'RETRY_QUEUED',
   CANCELLED: 'CANCELLED',
 });
@@ -35,6 +36,9 @@ const assertStatus = (status, allowedStatuses, action) => {
 
 const assertCanEnqueue = (status) =>
   assertStatus(status, [TAX_AUTHORITY_SUBMISSION_STATUSES.DRAFT], 'enqueue');
+
+const assertCanClaim = (status) =>
+  assertStatus(status, [TAX_AUTHORITY_SUBMISSION_STATUSES.QUEUED], 'claim');
 
 const assertCanRetry = (status) =>
   assertStatus(status, [TAX_AUTHORITY_SUBMISSION_STATUSES.FAILED], 'retry');
@@ -54,6 +58,7 @@ module.exports = {
   TAX_AUTHORITY_SUBMISSION_STATUSES,
   TaxAuthoritySubmissionTransitionError,
   assertCanCancelSubmission,
+  assertCanClaim,
   assertCanEnqueue,
   assertCanRetry,
 };
