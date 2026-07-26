@@ -14,6 +14,10 @@ const {
   createPrismaTaxLedgerPublisher,
 } = require('../infrastructure/prismaTaxLedgerPublisher');
 
+const {
+  createPrismaTaxPeriodResolver,
+} = require('../infrastructure/prismaTaxPeriodResolver');
+
 const requireTransactionAuthority = (db) => {
   if (!db || typeof db.$transaction !== 'function') {
     throw new TaxDocumentContractError(
@@ -31,6 +35,7 @@ const requireTransactionClient = (tx) => {
     'taxDocumentSource',
     'taxDocumentEvent',
     'taxLedgerEntry',
+    'taxPeriod',
   ];
   const missingModels = requiredModels.filter((modelName) => !tx?.[modelName]);
 
@@ -56,6 +61,13 @@ const requireDraft = (draft) => {
   return draft;
 };
 
+const applyTaxPeriodResolution = ({ ledgerEntryDraft, resolution }) =>
+  Object.freeze({
+    ...ledgerEntryDraft,
+    taxPeriodId: resolution.taxPeriod.id,
+    reportingDate: resolution.periodDate,
+  });
+
 const publishDocumentAndLedgerInTransaction = async ({
   tx,
   draft,
@@ -66,6 +78,7 @@ const publishDocumentAndLedgerInTransaction = async ({
   const resolvedDraft = requireDraft(draft);
   const documentPublisher = createPrismaTaxDocumentPublisher({ db: transactionClient });
   const ledgerPublisher = createPrismaTaxLedgerPublisher({ db: transactionClient });
+  const periodResolver = createPrismaTaxPeriodResolver({ db: transactionClient });
 
   const documentPublication = await documentPublisher.publish(resolvedDraft);
   const taxDocument = documentPublication?.taxDocument;
@@ -77,17 +90,25 @@ const publishDocumentAndLedgerInTransaction = async ({
     );
   }
 
-  const ledgerEntryDraft = projectTaxDocumentDraftToLedgerEntry({
+  const unassignedLedgerEntryDraft = projectTaxDocumentDraftToLedgerEntry({
     taxDocument,
     draft: resolvedDraft,
     postingDate,
     effectiveDate,
   });
 
+  const taxPeriodResolution = await periodResolver.resolveForLedgerEntry(
+    unassignedLedgerEntryDraft,
+  );
+  const ledgerEntryDraft = applyTaxPeriodResolution({
+    ledgerEntryDraft: unassignedLedgerEntryDraft,
+    resolution: taxPeriodResolution,
+  });
   const ledgerPublication = await ledgerPublisher.publish(ledgerEntryDraft);
 
   return Object.freeze({
     documentPublication,
+    taxPeriodResolution,
     ledgerEntryDraft,
     ledgerPublication,
   });
@@ -105,6 +126,7 @@ const createTaxDocumentLedgerPublicationRuntime = ({ db }) => {
 };
 
 module.exports = {
+  applyTaxPeriodResolution,
   createTaxDocumentLedgerPublicationRuntime,
   publishDocumentAndLedgerInTransaction,
   requireDraft,
