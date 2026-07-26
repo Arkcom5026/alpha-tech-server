@@ -1,5 +1,7 @@
 const repairRepository = require('../repositories/repairRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
+const { partReservationHistory } = require('./repairPartReservationService');
 
 const REQUIRED_CHECKS = Object.freeze([
   'DIAGNOSIS_CONFIRMED',
@@ -22,13 +24,24 @@ function getCompletionChecklist(job) {
 }
 
 function buildCompletionReadiness(job) {
+  const metadata = normalizeMetadata(job?.metadata);
   const checklist = getCompletionChecklist(job);
   const checks = checklist?.checks || {};
   const missingChecks = REQUIRED_CHECKS.filter((key) => checks[key] !== true);
   const technicianVerified = Boolean(checklist?.technicianVerifiedAt);
   const qcPassed = checklist?.qcResult === 'PASSED';
   const finalReportReady = Boolean(checklist?.finalReport?.summary);
-  const ready = missingChecks.length === 0 && technicianVerified && qcPassed && finalReportReady;
+  const openPartReservations = partReservationHistory(metadata).filter(
+    (item) =>
+      Number(item.repairJobId) === Number(job.id) && item.status === 'RESERVED'
+  );
+  const partsReconciled = openPartReservations.length === 0;
+  const ready =
+    missingChecks.length === 0 &&
+    technicianVerified &&
+    qcPassed &&
+    finalReportReady &&
+    partsReconciled;
 
   return {
     repairJobId: Number(job.id),
@@ -41,6 +54,14 @@ function buildCompletionReadiness(job) {
       technicianVerified,
       qcPassed,
       finalReportReady,
+      partsReconciled,
+      openPartReservations: openPartReservations.map((item) => ({
+        reservationId: item.id,
+        productId: item.productId,
+        productName: item.productName || null,
+        quantity: Number(item.quantity || 0),
+        reservedAt: item.reservedAt || null,
+      })),
     },
     readyForCompletion: ready,
   };
@@ -60,7 +81,26 @@ class RepairCompletionReadinessService {
         404
       );
     }
-    return buildCompletionReadiness(job);
+    if (!job.serviceAssetId) {
+      throw new RepairError(
+        RepairFailureCode.SERVICE_ASSET_REQUIRED,
+        'ใบงานซ่อมต้องเชื่อมกับอุปกรณ์บริการก่อนตรวจความพร้อมปิดงาน',
+        409
+      );
+    }
+    const assetRepository = new ServiceAssetRepository(this.repository.prisma);
+    const asset = await assetRepository.findServiceAsset(
+      actor.branchId,
+      job.serviceAssetId
+    );
+    if (!asset) {
+      throw new RepairError(
+        RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+        'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+        404
+      );
+    }
+    return buildCompletionReadiness({ ...job, metadata: asset.metadata });
   }
 }
 
