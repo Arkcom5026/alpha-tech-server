@@ -107,6 +107,22 @@ class CreateDeviceIntakeRepository {
     return rows[0];
   }
 
+  async createPassportEvent(data) {
+    const metadata = data.metadata ? JSON.stringify(data.metadata) : null;
+    const rows = await this.prisma.$queryRaw`
+      INSERT INTO "DevicePassportEvent"
+        ("deviceId", "branchId", "eventType", "sourceType", "sourceId", "title", "description",
+         "actorType", "actorEmployeeId", "customerVisible", "metadata", "occurredAt", "createdAt")
+      VALUES
+        (${data.deviceId}, ${data.branchId}, ${data.eventType}, ${data.sourceType}, ${data.sourceId},
+         ${data.title}, ${data.description}, ${data.actorType}, ${data.actorEmployeeId},
+         ${data.customerVisible}, ${metadata}::jsonb, ${data.occurredAt}, NOW())
+      ON CONFLICT DO NOTHING
+      RETURNING *
+    `;
+    return rows[0] || null;
+  }
+
   async createIntake(data) {
     const rows = await this.prisma.$queryRaw`
       INSERT INTO "DeviceIntake"
