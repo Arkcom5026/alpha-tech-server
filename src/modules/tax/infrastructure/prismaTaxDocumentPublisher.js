@@ -29,6 +29,24 @@ const toPerformedBy = (value) => {
   return String(value);
 };
 
+const assertReplayBranch = ({ draft, existingTaxDocument }) => {
+  if (!existingTaxDocument) return;
+
+  if (existingTaxDocument.branchId !== draft.document.branchId) {
+    throw new TaxDocumentContractError(
+      'TAX_DOCUMENT_SOURCE_BRANCH_MISMATCH',
+      'Tax document source is already owned by another branch',
+      {
+        sourceType: draft.source.sourceType,
+        sourceId: draft.source.sourceId,
+        requestedBranchId: draft.document.branchId,
+        existingBranchId: existingTaxDocument.branchId,
+        taxDocumentId: existingTaxDocument.id,
+      },
+    );
+  }
+};
+
 const createPrismaTaxDocumentPublisher = ({ db }) => {
   const tx = requireTransactionClient(db);
 
@@ -57,6 +75,11 @@ const createPrismaTaxDocumentPublisher = ({ db }) => {
           },
         },
       },
+    });
+
+    assertReplayBranch({
+      draft,
+      existingTaxDocument: existingSource?.taxDocument || null,
     });
 
     if (existingSource?.taxDocument) {
@@ -116,5 +139,6 @@ const createPrismaTaxDocumentPublisher = ({ db }) => {
 };
 
 module.exports = {
+  assertReplayBranch,
   createPrismaTaxDocumentPublisher,
 };
