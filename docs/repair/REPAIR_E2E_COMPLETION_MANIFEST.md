@@ -154,6 +154,24 @@ Its repository rules are:
 - State updates and reversals return HTTP `200`.
 - Errors are delegated through `next(error)` and remain typed through `RepairError`, `RepairFailureCode`, status, and optional details.
 
+## Workflow integrity authority
+
+The workflow integrity audit is registered as:
+
+- `npm run verify:repair-workflow-integrity`
+
+Its repository rules are:
+
+- Repair and warranty-claim state changes must pass their explicit transition policies.
+- `COMPLETED` and `CANCELLED` repair states remain terminal.
+- Entering execution requires service-asset context and approved execution authorization.
+- Part usage is blocked for terminal jobs and remains subject to execution authorization.
+- Completion must pass transition validation, active-claim blocking, and the completion-readiness checklist.
+- Customer handover requires a completed job, no active claim, a linked service asset, and full settlement whenever an approved estimate exists.
+- Handover replay remains idempotent and must not duplicate handover history.
+- Warranty claims begin in `DRAFT`, place the service asset in `IN_CLAIM`, follow claim transition policy, enforce resolution requirements, and return the asset to service only after a terminal claim state.
+- Direct `RECEIVED` or `WAITING_PARTS` to `COMPLETED` remains allowed only because the dedicated completion service still enforces all completion guards; the generic status service cannot bypass that boundary.
+
 ## Verification authority
 
 ### Gate A — Repository Gate
@@ -163,11 +181,12 @@ Repository completion is represented by:
 - `npm run verify:repair-contract-boundary-audit`
 - `npm run verify:repair-module-isolation`
 - `npm run verify:repair-api-contract-integrity`
+- `npm run verify:repair-workflow-integrity`
 - `npm run verify:repair-repository-gate`
 - `npm run verify:repair-e2e-completion-audit`
 - `npm run verify:repair-complete`
 
-Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, module isolation, direct Prisma ownership, response envelopes, HTTP status policy, query cache policy, idempotent response behavior, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
+Gate A validates file ownership, route/controller/service exposure, layer direction, mutation authority, module isolation, direct Prisma ownership, response envelopes, HTTP status policy, query cache policy, idempotent response behavior, workflow transitions, completion guards, claim blocking, settlement and handover guards, typed failure contracts, server mounting, actor authorization wiring, milestone verifier registration, and final E2E command composition.
 
 ### Gate B — Runtime Gate
 
@@ -197,6 +216,7 @@ Repository completion must never be reported as Operational PASS.
 - Contract and boundary audit wiring: complete
 - Module isolation audit wiring: complete
 - API response integrity audit wiring: complete
+- Workflow integrity audit wiring: complete
 - Runtime verification: deferred
 - Operational verification: deferred
 
