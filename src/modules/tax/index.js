@@ -29,6 +29,12 @@ const {
 } = require('./projections/taxLedgerEntryProjection');
 
 const {
+  TAX_PERIOD_ADMINISTRATIVE_RESPONSE_VERSION,
+  projectTaxPeriodAdministrativeCollection,
+  projectTaxPeriodAdministrativeResponse,
+} = require('./projections/taxPeriodAdministrativeProjection');
+
+const {
   createSaleTaxProjectionRuntime,
 } = require('./application/saleTaxProjectionRuntimeService');
 
@@ -149,6 +155,7 @@ module.exports = {
   TAX_DOCUMENT_TYPES,
   TAX_LEDGER_TYPES,
   TAX_PERIOD_ACTION_BY_TARGET_STATUS,
+  TAX_PERIOD_ADMINISTRATIVE_RESPONSE_VERSION,
   TAX_PERIOD_ASSIGNABLE_STATUSES,
   TAX_PERIOD_INITIAL_STATUS,
   TAX_PERIOD_STATUSES,
@@ -195,6 +202,8 @@ module.exports = {
   periodContainsDate,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
+  projectTaxPeriodAdministrativeCollection,
+  projectTaxPeriodAdministrativeResponse,
   projectTaxPeriodAvailableActions,
   publishDocumentAndLedgerInTransaction,
   requireAvailabilityDate,
