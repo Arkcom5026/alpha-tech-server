@@ -26,6 +26,7 @@ function run() {
     'src/modules/repair/services/repairOperationalDecisionService.js',
     'src/modules/repair/services/repairManagementAlertService.js',
     'src/modules/repair/services/repairManagementBriefService.js',
+    'src/modules/repair/services/repairExecutiveSummaryService.js',
     'src/modules/repair/services/repairCostAnalyticsService.js',
     'src/modules/repair/services/repairRepeatFailureAnalyticsService.js',
     'src/modules/repair/controllers/repairController.js',
@@ -37,6 +38,7 @@ function run() {
     'scripts/verify-repair-management-snapshot.js',
     'scripts/verify-repair-management-alert.js',
     'scripts/verify-repair-management-brief.js',
+    'scripts/verify-repair-executive-summary.js',
   ];
 
   for (const file of requiredFiles) {
@@ -49,6 +51,7 @@ function run() {
     "router.get('/dashboard/decisions'",
     "router.get('/dashboard/alerts'",
     "router.get('/dashboard/brief'",
+    "router.get('/dashboard/executive-summary'",
     '/jobs/:id/operational-intelligence',
     '/jobs/:id/cost-analytics',
     '/jobs/:id/repeat-failure-analytics',
@@ -60,6 +63,7 @@ function run() {
     'getOperationalDecisionDashboard',
     'getManagementAlertDashboard',
     'getManagementDailyBrief',
+    'getExecutiveSummary',
     'getOperationalIntelligence',
     'getCostAnalytics',
     'getRepeatFailureAnalytics',
@@ -102,6 +106,20 @@ function run() {
     'trend',
   ]);
 
+  requireSource('src/modules/repair/services/repairExecutiveSummaryService.js', [
+    'EXECUTIVE_SUMMARY_CONTRACT_VERSION',
+    'repair-executive-summary.v1',
+    'buildHealthScore',
+    'buildHealthBand',
+    'buildHealthDimensions',
+    'buildPriorityFocus',
+    'HEALTHY',
+    'WATCH',
+    'CRITICAL',
+    'priorityFocus',
+    'healthScore',
+  ]);
+
   requireSource('scripts/verify-repair-management-snapshot.js', [
     'buildDashboardProjection',
     'buildOperationalRiskProjection',
@@ -126,6 +144,14 @@ function run() {
     'Repair management brief verifier: PASS',
   ]);
 
+  requireSource('scripts/verify-repair-executive-summary.js', [
+    'buildHealthScore',
+    'buildExecutiveSummaryProjection',
+    'MAINTAIN_OPERATIONAL_HEALTH',
+    'RESOLVE_CRITICAL_JOBS',
+    'Repair executive summary verifier: PASS',
+  ]);
+
   const packageJson = JSON.parse(read('package.json'));
   const scripts = packageJson.scripts || {};
   const requiredScripts = [
@@ -136,6 +162,7 @@ function run() {
     'verify:repair-management-snapshot',
     'verify:repair-management-alert',
     'verify:repair-management-brief',
+    'verify:repair-executive-summary',
     'verify:repair-repository-gate',
     'verify:repair-complete',
   ];
@@ -151,6 +178,7 @@ function run() {
     'verify:repair-management-snapshot',
     'verify:repair-management-alert',
     'verify:repair-management-brief',
+    'verify:repair-executive-summary',
     'verify:repair-repository-gate',
   ]) {
     assert.ok(scripts['verify:repair-complete'].includes(`npm run ${child}`), `verify:repair-complete missing ${child}`);
