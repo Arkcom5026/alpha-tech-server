@@ -6,18 +6,14 @@ const {
   assertTaxPeriodTransition,
   buildTaxPeriodLifecycleUpdate,
   normalizeTaxPeriodLifecycleCommand,
-  projectTaxPeriodAvailableActions,
 } = require('../policies/taxPeriodLifecyclePolicy');
+const {
+  projectTaxPeriodAdministrativeResponse,
+} = require('../projections/taxPeriodAdministrativeProjection');
 
 const {
   createPrismaTaxPeriodLifecycleRepository,
 } = require('../infrastructure/prismaTaxPeriodLifecycleRepository');
-
-const projectLifecycleTaxPeriod = (taxPeriod) =>
-  Object.freeze({
-    ...taxPeriod,
-    availableActions: projectTaxPeriodAvailableActions(taxPeriod.status),
-  });
 
 const createTaxPeriodLifecycleService = ({ db }) => {
   const repository = createPrismaTaxPeriodLifecycleRepository({ db });
@@ -46,7 +42,8 @@ const createTaxPeriodLifecycleService = ({ db }) => {
       return Object.freeze({
         transitioned: false,
         replayed: true,
-        taxPeriod: projectLifecycleTaxPeriod(current),
+        previousStatus: current.status,
+        taxPeriod: projectTaxPeriodAdministrativeResponse(current),
       });
     }
 
@@ -61,7 +58,7 @@ const createTaxPeriodLifecycleService = ({ db }) => {
       transitioned: true,
       replayed: false,
       previousStatus: current.status,
-      taxPeriod: projectLifecycleTaxPeriod(taxPeriod),
+      taxPeriod: projectTaxPeriodAdministrativeResponse(taxPeriod),
     });
   };
 
@@ -70,5 +67,4 @@ const createTaxPeriodLifecycleService = ({ db }) => {
 
 module.exports = {
   createTaxPeriodLifecycleService,
-  projectLifecycleTaxPeriod,
 };
