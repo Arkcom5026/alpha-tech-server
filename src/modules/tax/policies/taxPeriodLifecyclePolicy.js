@@ -18,6 +18,33 @@ const TAX_PERIOD_TRANSITIONS = Object.freeze({
   SUBMITTED: Object.freeze([]),
 });
 
+const TAX_PERIOD_ACTION_BY_TARGET_STATUS = Object.freeze({
+  CLOSED: 'CLOSE',
+  LOCKED: 'LOCK',
+  SUBMITTED: 'SUBMIT',
+  REOPENED: 'REOPEN',
+});
+
+const projectTaxPeriodAvailableActions = (currentStatus) => {
+  const targets = TAX_PERIOD_TRANSITIONS[currentStatus];
+  if (!targets) {
+    throw new TaxDocumentContractError(
+      'INVALID_TAX_PERIOD_CURRENT_STATUS',
+      'Tax period current status is invalid',
+      { currentStatus },
+    );
+  }
+
+  return Object.freeze(
+    targets.map((targetStatus) =>
+      Object.freeze({
+        action: TAX_PERIOD_ACTION_BY_TARGET_STATUS[targetStatus],
+        targetStatus,
+      }),
+    ),
+  );
+};
+
 const requireLifecycleDate = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -88,9 +115,11 @@ const buildTaxPeriodLifecycleUpdate = ({ targetStatus, occurredAt }) => {
 };
 
 module.exports = {
+  TAX_PERIOD_ACTION_BY_TARGET_STATUS,
   TAX_PERIOD_STATUSES,
   TAX_PERIOD_TRANSITIONS,
   assertTaxPeriodTransition,
   buildTaxPeriodLifecycleUpdate,
   normalizeTaxPeriodLifecycleCommand,
+  projectTaxPeriodAvailableActions,
 };
