@@ -27,6 +27,7 @@ router.post('/jobs/:id/diagnoses', allowRepairRoles(...OPERATION_ROLES), repairC
 router.get('/jobs/:id/estimates', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listEstimates);
 router.post('/jobs/:id/estimates', allowRepairRoles(...OPERATION_ROLES), repairController.createEstimate);
 router.patch('/jobs/:id/estimates/:estimateId/decision', allowRepairRoles(...OPERATION_ROLES), repairController.decideEstimate);
+router.get('/jobs/:id/financial-summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getFinancialSummary);
 
 router.post('/jobs/:id/handover', allowRepairRoles(...OPERATION_ROLES), repairController.handoverToCustomer);
 router.get('/jobs/:id/parts/summary', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getPartUsageSummary);
