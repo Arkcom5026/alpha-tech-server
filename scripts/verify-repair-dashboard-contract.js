@@ -8,6 +8,7 @@ const {
   buildSlaProjection,
 } = require('../src/modules/repair/services/repairOperationalIntelligenceService');
 const {
+  OPERATIONAL_RISK_CONTRACT_VERSION,
   buildOperationalRiskProjection,
 } = require('../src/modules/repair/services/repairOperationalRiskService');
 
@@ -82,9 +83,15 @@ function run() {
   assert.strictEqual(sla.overdue, true);
 
   const riskProjection = buildOperationalRiskProjection(jobs, now);
+  assert.strictEqual(riskProjection.contractVersion, OPERATIONAL_RISK_CONTRACT_VERSION);
   assert.ok(riskProjection.generatedAt);
   assert.ok(riskProjection.counters.total > 0);
   assert.ok(riskProjection.counters.critical > 0);
+  assert.ok(riskProjection.health.score >= 0 && riskProjection.health.score <= 100);
+  assert.ok(['HEALTHY', 'WATCH', 'AT_RISK'].includes(riskProjection.health.grade));
+  assert.ok(riskProjection.breakdown.byCode.UNASSIGNED_ACTIVE_JOB >= 1);
+  assert.ok(Array.isArray(riskProjection.actionQueue));
+  assert.ok(riskProjection.actionQueue.length > 0);
   assert.ok(riskProjection.items.some((item) => item.code === 'UNASSIGNED_ACTIVE_JOB'));
   assert.ok(riskProjection.items.some((item) => item.code === 'SLA_OVERDUE'));
 
@@ -95,7 +102,10 @@ function run() {
   assert.ok(controllerSource.includes("require('../services/repairOperationalRiskService')"));
   assert.ok(controllerSource.includes('getOperationalRiskDashboard'));
   assert.ok(routeSource.includes("router.get('/dashboard/risks'"));
+  assert.ok(riskServiceSource.includes('OPERATIONAL_RISK_CONTRACT_VERSION'));
   assert.ok(riskServiceSource.includes('buildOperationalRiskProjection'));
+  assert.ok(riskServiceSource.includes('buildActionQueue'));
+  assert.ok(riskServiceSource.includes('buildHealthProjection'));
   assert.ok(riskServiceSource.includes('UNASSIGNED_ACTIVE_JOB'));
   assert.ok(riskServiceSource.includes('SLA_AT_RISK'));
   assert.ok(riskServiceSource.includes('SLA_OVERDUE'));
