@@ -28,6 +28,14 @@ class RepairPartUsageRepository {
     });
   }
 
+  listPartUsage(repairJobId) {
+    return this.prisma.repairPartItem.findMany({
+      where: { repairJobId: Number(repairJobId) },
+      include: { product: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
   restoreStock(branchId, productId, quantity) {
     return this.prisma.stockBalance.update({
       where: {
