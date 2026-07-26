@@ -19,6 +19,7 @@ router.get('/customers/:customerId/warranty-assets', allowRepairRoles(...READ_AN
 router.get('/dashboard', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getOperationalDashboard);
 router.get('/dashboard/risks', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getOperationalRiskDashboard);
 router.get('/dashboard/decisions', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getOperationalDecisionDashboard);
+router.get('/dashboard/alerts', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getManagementAlertDashboard);
 router.get('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.listJobs);
 router.get('/jobs/:id', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.getJob);
 router.post('/jobs', allowRepairRoles(...READ_AND_INTAKE_ROLES), repairController.createJob);
