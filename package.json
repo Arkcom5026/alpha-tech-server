@@ -26,6 +26,7 @@
     "verify:repair-actual-part-usage-summary": "node scripts/verify-repair-actual-part-usage-summary.js",
     "verify:repair-financial-summary": "node scripts/verify-repair-financial-summary.js",
     "verify:repair-settlement-foundation": "node scripts/verify-repair-settlement-foundation.js",
+    "verify:repair-handover-settlement-guard": "node scripts/verify-repair-handover-settlement-guard.js",
     "verify:employee-lifecycle": "node scripts/verify-employee-lifecycle-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow"
