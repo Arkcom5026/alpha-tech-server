@@ -4,6 +4,8 @@ const repairCompletionChecklistService = require('../services/repairCompletionCh
 const repairCompletionReadinessService = require('../services/repairCompletionReadinessService');
 const repairHandoverService = require('../services/repairHandoverService');
 const repairWarrantyService = require('../services/repairWarrantyService');
+const repairRepeatLinkService = require('../services/repairRepeatLinkService');
+const repairAssetTimelineService = require('../services/repairAssetTimelineService');
 const repairDiagnosisService = require('../services/repairDiagnosisService');
 const repairEstimateService = require('../services/repairEstimateService');
 const repairFinancialSummaryService = require('../services/repairFinancialSummaryService');
@@ -104,6 +106,27 @@ class RepairController {
         message: data.idempotent ? 'มีข้อมูลรับประกันงานซ่อมที่ใช้งานอยู่แล้ว' : 'เริ่มรับประกันงานซ่อมเรียบร้อยแล้ว',
         data,
       });
+    } catch (error) { next(error); }
+  }
+
+  async linkRepeatRepair(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairRepeatLinkService.link(actor, req.params.id, req.body);
+      res.status(data.idempotent ? 200 : 201).json({
+        success: true,
+        message: data.idempotent ? 'ใบงานซ่อมซ้ำถูกเชื่อมไว้แล้ว' : 'เชื่อมโยงงานซ่อมซ้ำเรียบร้อยแล้ว',
+        data,
+      });
+    } catch (error) { next(error); }
+  }
+
+  async getAssetTimeline(req, res, next) {
+    try {
+      const actor = resolveRepairActor(req.user);
+      const data = await repairAssetTimelineService.getForRepairJob(actor, req.params.id);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ success: true, data });
     } catch (error) { next(error); }
   }
 
