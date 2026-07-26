@@ -5,7 +5,6 @@ const router = express.Router();
 
 const {
   createPurchaseOrderReceipt,
-  getPurchaseOrderReceiptById,
   updatePurchaseOrderReceipt,
   deletePurchaseOrderReceipt,
   getReceiptBarcodeSummaries,
@@ -20,6 +19,7 @@ const {
 } = require('../controllers/purchaseOrderReceiptController');
 
 const listPurchaseReceiptsController = require('../src/modules/procurement/receipt/query/list/listPurchaseReceiptsController');
+const getPurchaseReceiptController = require('../src/modules/procurement/receipt/query/detail/getPurchaseReceiptController');
 
 // ✅ Receipt items endpoints (bridge to REST-style routes)
 const {
@@ -49,7 +49,7 @@ router.get('/receipt-barcode-summaries', getReceiptBarcodeSummaries);
 router.post('/quick-receipts', createQuickReceipt);
 
 // 🔍 GET - ดูรายละเอียดใบรับสินค้า
-router.get('/:id', getPurchaseOrderReceiptById);
+router.get('/:id', getPurchaseReceiptController.handle);
 
 // ✅ REST-style items (preferred) — keeps FE stable
 // List items of a receipt
