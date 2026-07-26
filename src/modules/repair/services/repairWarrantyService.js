@@ -34,11 +34,35 @@ function repairWarrantyHistory(metadata) {
   return Array.isArray(history) ? history : [];
 }
 
-function activeRepairWarranty(metadata, at = new Date()) {
+function warrantyIsActive(warranty, at = new Date()) {
   const now = at instanceof Date ? at : new Date(at);
-  return repairWarrantyHistory(metadata)
-    .filter((warranty) => warranty.status === 'ACTIVE' && new Date(warranty.expiresAt) >= now)
-    .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0] || null;
+  const expiresAt = new Date(warranty?.expiresAt);
+  return (
+    warranty?.status === 'ACTIVE' &&
+    !Number.isNaN(now.getTime()) &&
+    !Number.isNaN(expiresAt.getTime()) &&
+    expiresAt >= now
+  );
+}
+
+function activeRepairWarrantyForJob(metadata, repairJobId, at = new Date()) {
+  return (
+    repairWarrantyHistory(metadata)
+      .filter(
+        (warranty) =>
+          Number(warranty.repairJobId) === Number(repairJobId) &&
+          warrantyIsActive(warranty, at)
+      )
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0] || null
+  );
+}
+
+function activeRepairWarranty(metadata, at = new Date()) {
+  return (
+    repairWarrantyHistory(metadata)
+      .filter((warranty) => warrantyIsActive(warranty, at))
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0] || null
+  );
 }
 
 class RepairWarrantyService {
@@ -66,7 +90,7 @@ class RepairWarrantyService {
       repairJobId: job.id,
       repairJobNo: job.jobNo,
       warranties,
-      activeWarranty: activeRepairWarranty(asset.metadata),
+      activeWarranty: activeRepairWarrantyForJob(asset.metadata, job.id),
     };
   }
 
@@ -145,5 +169,7 @@ class RepairWarrantyService {
 module.exports = new RepairWarrantyService();
 module.exports.RepairWarrantyService = RepairWarrantyService;
 module.exports.repairWarrantyHistory = repairWarrantyHistory;
+module.exports.warrantyIsActive = warrantyIsActive;
+module.exports.activeRepairWarrantyForJob = activeRepairWarrantyForJob;
 module.exports.activeRepairWarranty = activeRepairWarranty;
 module.exports.positiveWarrantyDays = positiveWarrantyDays;
