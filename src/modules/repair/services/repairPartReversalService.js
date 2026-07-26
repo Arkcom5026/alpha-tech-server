@@ -1,4 +1,5 @@
 const repairPartUsageRepository = require('../repositories/repairPartUsageRepository');
+const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const {
   RepairError,
   RepairFailureCode,
@@ -9,6 +10,18 @@ const TERMINAL_REPAIR_STATUSES = Object.freeze([
   'RETURNED_TO_CUSTOMER',
   'CANCELLED',
 ]);
+
+function metadataObject(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return {};
+  }
+  return metadata;
+}
+
+function partReversalHistory(metadata) {
+  const history = metadataObject(metadata).repairPartReversals;
+  return Array.isArray(history) ? history : [];
+}
 
 function validatePartReversal(payload = {}) {
   const reason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
@@ -64,6 +77,46 @@ class RepairPartReversalService {
         );
       }
 
+      const reversedAt = new Date().toISOString();
+      const reversal = {
+        repairJobId: job.id,
+        repairJobNo: job.jobNo,
+        partItemId: part.id,
+        productId: part.productId,
+        productName: part.product?.name || null,
+        quantity: Number(part.qtyUsed),
+        unitPrice: Number(part.unitPrice),
+        amount: Number((Number(part.qtyUsed) * Number(part.unitPrice)).toFixed(2)),
+        reason: payload.reason,
+        reversedByEmployeeId: actor.employeeId,
+        reversedAt,
+      };
+
+      if (job.serviceAssetId) {
+        const assetRepo = new ServiceAssetRepository(repo.prisma);
+        const asset = await assetRepo.findServiceAsset(
+          actor.branchId,
+          job.serviceAssetId
+        );
+        if (!asset) {
+          throw new RepairError(
+            RepairFailureCode.SERVICE_ASSET_NOT_FOUND,
+            'ไม่พบอุปกรณ์บริการของใบงานซ่อม',
+            404
+          );
+        }
+
+        const metadata = metadataObject(asset.metadata);
+        const history = partReversalHistory(metadata);
+        await assetRepo.updateServiceAsset(asset.id, {
+          metadata: {
+            ...metadata,
+            repairPartReversals: [...history, reversal],
+            latestRepairPartReversal: reversal,
+          },
+        });
+      }
+
       await repo.restoreStock(actor.branchId, part.productId, part.qtyUsed);
       await repo.createStockMovement({
         productId: part.productId,
@@ -78,12 +131,8 @@ class RepairPartReversalService {
       await repo.deletePartUsage(part.id);
 
       return {
-        repairJobId: job.id,
-        partItemId: part.id,
-        productId: part.productId,
-        productName: part.product?.name || null,
-        qtyRestored: Number(part.qtyUsed),
-        reason: payload.reason,
+        ...reversal,
+        qtyRestored: reversal.quantity,
       };
     });
   }
@@ -92,4 +141,6 @@ class RepairPartReversalService {
 module.exports = new RepairPartReversalService();
 module.exports.RepairPartReversalService = RepairPartReversalService;
 module.exports.validatePartReversal = validatePartReversal;
+module.exports.metadataObject = metadataObject;
+module.exports.partReversalHistory = partReversalHistory;
 module.exports.TERMINAL_REPAIR_STATUSES = TERMINAL_REPAIR_STATUSES;
