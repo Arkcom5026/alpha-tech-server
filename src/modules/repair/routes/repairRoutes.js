@@ -8,6 +8,12 @@ const {
   listCustomerWarrantyAssets,
 } = require('../query/customer-warranty-assets/customerWarrantyAssetsController');
 const {
+  listRepairJobs,
+} = require('../query/list-jobs/listRepairJobsController');
+const {
+  getRepairJobDetail,
+} = require('../query/job-detail/repairJobDetailController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -35,13 +41,13 @@ router.get(
 router.get(
   '/jobs',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.listJobs
+  listRepairJobs
 );
 
 router.get(
   '/jobs/:id',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  repairController.getJob
+  getRepairJobDetail
 );
 
 router.post(
