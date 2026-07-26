@@ -34,6 +34,11 @@ const {
   updateWarrantyClaimStatus,
 } = require('../claim/status/updateWarrantyClaimStatusController');
 const {
+  createTrackingAccess,
+  rotateTrackingAccess,
+  revokeTrackingAccess,
+} = require('../customer-access/repairTrackingAccessController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -74,6 +79,24 @@ router.post(
   '/jobs',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   createRepairJob
+);
+
+router.post(
+  '/jobs/:id/tracking-access',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  createTrackingAccess
+);
+
+router.post(
+  '/jobs/:id/tracking-access/rotate',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  rotateTrackingAccess
+);
+
+router.delete(
+  '/jobs/:id/tracking-access',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  revokeTrackingAccess
 );
 
 router.patch(
