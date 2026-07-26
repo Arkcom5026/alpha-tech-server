@@ -2,6 +2,7 @@ const repairRepository = require('../repositories/repairRepository');
 const ServiceAssetRepository = require('../repositories/serviceAssetRepository');
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
 const { estimateHistory } = require('./repairEstimateService');
+const { workLogHistory, calculateLaborSummary } = require('./repairWorkLogService');
 const { calculateRepairFinancialSummary } = require('./repairFinancialSummaryService');
 
 function toMoney(value) {
@@ -10,7 +11,13 @@ function toMoney(value) {
   return Number(parsed.toFixed(2));
 }
 
-function buildRepairCostAnalytics({ job, estimates = [], parts = [], calculatedAt = new Date() }) {
+function buildRepairCostAnalytics({
+  job,
+  estimates = [],
+  parts = [],
+  workLogs = [],
+  calculatedAt = new Date(),
+}) {
   const financial = calculateRepairFinancialSummary({ job, estimates, parts, calculatedAt });
   const approvedTotal = toMoney(financial.settlement.approvedTotal);
   const quotedPartAmount = toMoney(financial.comparison.quotedPartAmount);
@@ -18,8 +25,12 @@ function buildRepairCostAnalytics({ job, estimates = [], parts = [], calculatedA
   const quotedLaborAmount = toMoney(financial.approvedEstimate?.breakdown?.labor);
   const quotedServiceAmount = toMoney(financial.approvedEstimate?.breakdown?.service);
   const quotedOtherAmount = toMoney(financial.approvedEstimate?.breakdown?.other);
-  const estimatedGrossContribution = toMoney(approvedTotal - actualPartAmount);
-  const actualCostBasis = actualPartAmount;
+  const laborSummary = calculateLaborSummary(
+    workLogs.filter((item) => Number(item.repairJobId) === Number(job.id))
+  );
+  const actualLaborAmount = toMoney(laborSummary.actualLaborCost);
+  const actualCostBasis = toMoney(actualPartAmount + actualLaborAmount);
+  const estimatedGrossContribution = toMoney(approvedTotal - actualCostBasis);
   const grossMarginPercent = approvedTotal > 0
     ? Number(((estimatedGrossContribution / approvedTotal) * 100).toFixed(2))
     : 0;
@@ -37,9 +48,13 @@ function buildRepairCostAnalytics({ job, estimates = [], parts = [], calculatedA
     },
     cost: {
       actualPartAmount,
+      actualLaborAmount,
       actualCostBasis,
-      laborCostAvailable: false,
-      note: 'ยังไม่มีฐานต้นทุนแรงงานจริง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
+      laborCostAvailable: laborSummary.entries > 0,
+      labor: laborSummary,
+      note: laborSummary.entries > 0
+        ? 'ต้นทุนจริงรวมอะไหล่และแรงงานจาก Work Log ของช่าง'
+        : 'ยังไม่มี Work Log ของช่าง จึงใช้ต้นทุนอะไหล่จริงเป็น cost basis ขั้นต่ำ',
     },
     profitability: {
       estimatedGrossContribution,
@@ -50,7 +65,10 @@ function buildRepairCostAnalytics({ job, estimates = [], parts = [], calculatedA
     },
     variance: {
       partVariance: toMoney(actualPartAmount - quotedPartAmount),
+      laborVariance: toMoney(actualLaborAmount - quotedLaborAmount),
+      totalCostVariance: toMoney(actualCostBasis - (quotedPartAmount + quotedLaborAmount)),
       actualPartOverEstimate: actualPartAmount > quotedPartAmount,
+      actualLaborOverEstimate: actualLaborAmount > quotedLaborAmount,
     },
     source: financial,
     calculatedAt: calculatedAt.toISOString(),
@@ -79,6 +97,7 @@ class RepairCostAnalyticsService {
       job,
       estimates: estimateHistory(asset.metadata),
       parts: job.partsUsed || [],
+      workLogs: workLogHistory(asset.metadata),
     });
   }
 }
