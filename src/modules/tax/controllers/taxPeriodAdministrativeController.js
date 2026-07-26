@@ -6,12 +6,19 @@ const {
   createTaxPeriodAdministrativeService,
 } = require('../application/taxPeriodAdministrativeService');
 const {
+  createTaxPeriodLifecycleService,
+} = require('../application/taxPeriodLifecycleService');
+const {
+  TAX_PERIOD_STATUSES,
+} = require('../policies/taxPeriodLifecyclePolicy');
+const {
   assertBranchScope,
   assertReadinessBranchScope,
   resolveTaxAdministratorScope,
 } = require('../policies/taxPeriodAdministrativeBranchScopePolicy');
 
 const service = createTaxPeriodAdministrativeService({ db: prisma });
+const lifecycleService = createTaxPeriodLifecycleService({ db: prisma });
 
 const CONFLICT_CODES = new Set([
   'TAX_PERIOD_BOUNDARY_OVERLAP',
@@ -97,9 +104,38 @@ const listPeriods = async (req, res, next) => {
   }
 };
 
+const transitionPeriodTo = (targetStatus) => async (req, res, next) => {
+  try {
+    const administrator = resolveTaxAdministratorScope(req.user);
+    const branchId = assertBranchScope({
+      administrator,
+      branchId: req.body?.branchId,
+    });
+    const result = await lifecycleService.transitionPeriod({
+      taxPeriodId: req.params.taxPeriodId,
+      branchId,
+      targetStatus,
+      occurredAt: req.body?.occurredAt,
+    });
+    return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    return next(mapAdministrativeError(error));
+  }
+};
+
+const closePeriod = transitionPeriodTo(TAX_PERIOD_STATUSES.CLOSED);
+const lockPeriod = transitionPeriodTo(TAX_PERIOD_STATUSES.LOCKED);
+const submitPeriod = transitionPeriodTo(TAX_PERIOD_STATUSES.SUBMITTED);
+const reopenPeriod = transitionPeriodTo(TAX_PERIOD_STATUSES.REOPENED);
+
 module.exports = {
+  closePeriod,
   ensureMonthlyPeriod,
   ensureOperationalReadiness,
   listPeriods,
+  lockPeriod,
   mapAdministrativeError,
+  reopenPeriod,
+  submitPeriod,
+  transitionPeriodTo,
 };
