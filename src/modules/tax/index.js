@@ -43,6 +43,10 @@ const {
 } = require('./application/taxLedgerPeriodAssignmentService');
 
 const {
+  createTaxPeriodAvailabilityService,
+} = require('./application/taxPeriodAvailabilityService');
+
+const {
   createTaxPeriodCreationService,
 } = require('./application/taxPeriodCreationService');
 
@@ -71,6 +75,12 @@ const {
   normalizeCreateMonthlyTaxPeriodCommand,
   sameBoundary,
 } = require('./policies/taxPeriodCreationPolicy');
+
+const {
+  assertTaxPeriodAvailable,
+  normalizeEnsureTaxPeriodCommand,
+  requireAvailabilityDate,
+} = require('./policies/taxPeriodAvailabilityPolicy');
 
 const {
   TAX_PERIOD_STATUSES,
@@ -117,6 +127,7 @@ module.exports = {
   SALE_TAX_TREATMENTS,
   TaxDocumentContractError,
   applyTaxPeriodResolution,
+  assertTaxPeriodAvailable,
   assertTaxPeriodCandidate,
   assertTaxPeriodReplay,
   assertTaxPeriodTransition,
@@ -132,6 +143,7 @@ module.exports = {
   createSaleTaxProjectionRuntime,
   createTaxDocumentLedgerPublicationRuntime,
   createTaxLedgerPeriodAssignmentService,
+  createTaxPeriodAvailabilityService,
   createTaxPeriodCreationService,
   createTaxPeriodLifecycleService,
   isAssignableTaxPeriodStatus,
@@ -139,12 +151,14 @@ module.exports = {
   isTaxDocumentSourceType,
   isTaxDocumentType,
   normalizeCreateMonthlyTaxPeriodCommand,
+  normalizeEnsureTaxPeriodCommand,
   normalizeTaxDocumentCommand,
   normalizeTaxPeriodLifecycleCommand,
   periodContainsDate,
   projectCompletedSaleToTaxDocument,
   projectTaxDocumentDraftToLedgerEntry,
   publishDocumentAndLedgerInTransaction,
+  requireAvailabilityDate,
   resolveLedgerType,
   resolveSaleTaxProjectionDecision,
   resolveTaxDocumentType,
