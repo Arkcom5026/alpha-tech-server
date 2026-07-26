@@ -7,7 +7,22 @@ function httpError(status, code, message) {
   return error;
 }
 
-function toTimeline(intakes, repairs, claims) {
+function toTimeline(intakes, repairs, claims, events = []) {
+  if (events.length > 0) {
+    return events.map((event) => ({
+      type: event.eventType,
+      referenceId: event.sourceId,
+      referenceNo: null,
+      title: event.title || event.eventType,
+      status: null,
+      description: event.description,
+      sourceType: event.sourceType,
+      customerVisible: event.customerVisible,
+      occurredAt: event.occurredAt,
+      metadata: event.metadata,
+    }));
+  }
+
   return [
     ...intakes.map((item) => ({
       type: 'DEVICE_INTAKE',
@@ -53,15 +68,16 @@ class DevicePassportService {
       throw httpError(404, 'DEVICE_NOT_FOUND', 'ไม่พบอุปกรณ์ในสาขานี้');
     }
 
-    const [ownershipHistory, intakes, repairs, claims] = await Promise.all([
+    const [ownershipHistory, intakes, repairs, claims, events] = await Promise.all([
       this.repository.getOwnershipHistory(id),
       this.repository.getIntakes(id),
       this.repository.getRepairs(id),
       this.repository.getClaims(id),
+      this.repository.getEvents(id),
     ]);
 
     return {
-      contractVersion: 'device-passport.v1',
+      contractVersion: 'device-passport.v2',
       device,
       currentOwnerCustomerId: device.currentOwnerCustomerId,
       ownershipHistory,
@@ -69,7 +85,8 @@ class DevicePassportService {
         intakes,
         repairs,
         claims,
-        timeline: toTimeline(intakes, repairs, claims),
+        events,
+        timeline: toTimeline(intakes, repairs, claims, events),
       },
     };
   }
