@@ -57,6 +57,7 @@ model EmployeeProfile {
   PurchaseOrderReceipt              PurchaseOrderReceipt[]
   refundTransaction                 RefundTransaction[]
   repairJobs                        RepairJob[]
+  createdServiceAssets              ServiceAsset[]              @relation("ServiceAssetCreatedBy")
   sale                              Sale[]
   saleReturns                       SaleReturn[]
   performedStockMovements           StockMovement[]
@@ -110,6 +111,7 @@ model Branch {
   purchaseOrderReceipt            PurchaseOrderReceipt[]
   refundTransaction               RefundTransaction[]
   repairJobs                      RepairJob[]
+  serviceAssets                   ServiceAsset[]
   sale                            Sale[]
   salesCompletionCommands         SalesCompletionCommand[]
   saleReturn                      SaleReturn[]
@@ -190,6 +192,7 @@ model ProductType {
   branch            Branch?            @relation(fields: [branchId], references: [id])
   globalProductType GlobalProductType  @relation(fields: [globalProductTypeId], references: [id])
   productTypeBrands ProductTypeBrand[]
+  serviceAssets     ServiceAsset[]
 
   @@unique([branchId, globalProductTypeId, normalizedName])
   @@index([branchId])
@@ -204,6 +207,7 @@ model Brand {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   products          Product[]
+  serviceAssets     ServiceAsset[]
   productTypeBrands ProductTypeBrand[]
 
   @@index([active])
@@ -239,6 +243,7 @@ model Product {
   purchaseOrderItems       PurchaseOrderItem[]
   PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
   repairPartItems          RepairPartItem[]
+  serviceAssets            ServiceAsset[]
   saleItemSimple           SaleItemSimple[]
   serviceItems             ServiceItem[]
   simpleLots               SimpleLot[]
@@ -374,6 +379,7 @@ model StockItem {
   costPrice                  Decimal?                  @db.Decimal(12, 2)
   barcodeReceiptItem         BarcodeReceiptItem[]
   repairJobs                 RepairJob[]
+  serviceAssets              ServiceAsset[]            @relation("ServiceAssetSourceStockItem")
   saleItems                  SaleItem[]
   stockMovements             StockMovement[]
   stockAuditScanLog          StockAuditScanLog[]
@@ -1328,6 +1334,7 @@ model CustomerProfile {
   orders                   Order[]
   orderOnlines             OrderOnline[]
   repairJobs               RepairJob[]
+  serviceAssets            ServiceAsset[]
   sales                    Sale[]
   services                 ServiceOrder[]
   v2CustomerDeposits       V2CustomerDeposit[]
@@ -1432,12 +1439,83 @@ model Position {
   @@index([branchId, isActive])
 }
 
+model ServiceAsset {
+  id                    Int                @id @default(autoincrement())
+  assetNo               String
+  branchId              Int
+  customerId            Int
+  sourceStockItemId     Int?               @unique
+  productId             Int?
+  productTypeId         Int?
+  brandId               Int?
+  createdByEmployeeId   Int?
+  source                ServiceAssetSource @default(EXTERNAL_CUSTOMER)
+  status                ServiceAssetStatus @default(ACTIVE)
+  deviceType            String
+  brandNameSnapshot     String?
+  modelName             String
+  serialNumber          String?
+  customerAssetTag      String?
+  color                 String?
+  description           String?
+  accessories           String[]           @default([])
+  physicalCondition     String?
+  accessInstructions    String?
+  purchaseSource        String?
+  purchaseDate          DateTime?
+  externalWarrantyUntil DateTime?
+  externalWarrantyNote  String?
+  metadata              Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  archivedAt            DateTime?
+
+  branch          Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer        CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  sourceStockItem StockItem?          @relation("ServiceAssetSourceStockItem", fields: [sourceStockItemId], references: [id], onDelete: Restrict)
+  product         Product?            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productType     ProductType?        @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  brand           Brand?              @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  createdBy       EmployeeProfile?    @relation("ServiceAssetCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  images          ServiceAssetImage[]
+  repairJobs      RepairJob[]
+  warrantyClaims  WarrantyClaim[]
+
+  @@unique([branchId, assetNo])
+  @@unique([branchId, serialNumber])
+  @@index([branchId, customerId, status])
+  @@index([customerId, updatedAt])
+  @@index([productId])
+  @@index([productTypeId])
+  @@index([brandId])
+  @@index([createdByEmployeeId])
+}
+
+model ServiceAssetImage {
+  id             Int                   @id @default(autoincrement())
+  serviceAssetId Int
+  publicId       String?               @unique
+  url            String
+  secureUrl      String?
+  caption        String?
+  kind           ServiceAssetImageKind @default(GENERAL)
+  isCover        Boolean               @default(false)
+  active         Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  serviceAsset   ServiceAsset          @relation(fields: [serviceAssetId], references: [id], onDelete: Cascade)
+
+  @@index([serviceAssetId, active])
+  @@index([serviceAssetId, kind])
+}
+
 model RepairJob {
   id               Int              @id @default(autoincrement())
   jobNo            String           @unique
   branchId         Int
   customerId       Int
   stockItemId      Int?
+  serviceAssetId   Int?
   deviceModel      String
   reportedSymptoms String
   technicianNotes  String?
@@ -1450,6 +1528,7 @@ model RepairJob {
   branch           Branch           @relation(fields: [branchId], references: [id])
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   stockItem        StockItem?       @relation(fields: [stockItemId], references: [id])
+  serviceAsset     ServiceAsset?    @relation(fields: [serviceAssetId], references: [id], onDelete: Restrict)
   technician       EmployeeProfile? @relation(fields: [technicianId], references: [id])
   partsUsed        RepairPartItem[]
 
@@ -1457,6 +1536,7 @@ model RepairJob {
 
   @@index([branchId])
   @@index([stockItemId])
+  @@index([serviceAssetId])
 }
 
 model RepairPartItem {
@@ -1473,6 +1553,7 @@ model WarrantyClaim {
   id                     Int                             @id @default(autoincrement())
   branchId               Int
   stockItemId            Int
+  serviceAssetId         Int?
   supplierId             Int?
   saleReturnItemId       Int?
   previousClaimId        Int?
@@ -1499,6 +1580,7 @@ model WarrantyClaim {
   updatedAt              DateTime                        @updatedAt
   branch                 Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
   stockItem              StockItem                       @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  serviceAsset           ServiceAsset?                   @relation(fields: [serviceAssetId], references: [id], onDelete: Restrict)
   supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
   repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
@@ -1512,6 +1594,7 @@ model WarrantyClaim {
 
   @@unique([branchId, claimNo])
   @@index([stockItemId, openedAt])
+  @@index([serviceAssetId, openedAt])
   @@index([supplierId, openedAt])
   @@index([saleReturnItemId])
   @@index([repairJobId, openedAt])
@@ -1552,6 +1635,29 @@ model WarrantyClaimCompletionCommand {
 
   @@unique([branchId, commandKey])
   @@index([branchId, createdAt])
+}
+
+enum ServiceAssetSource {
+  SOLD_BY_BRANCH
+  EXTERNAL_CUSTOMER
+  MANUAL_IMPORT
+}
+
+enum ServiceAssetStatus {
+  ACTIVE
+  IN_SERVICE
+  IN_CLAIM
+  RETURNED_TO_CUSTOMER
+  ARCHIVED
+}
+
+enum ServiceAssetImageKind {
+  GENERAL
+  INTAKE_CONDITION
+  SERIAL_LABEL
+  ACCESSORY
+  DAMAGE
+  WARRANTY_DOCUMENT
 }
 
 enum Role {

@@ -10,7 +10,7 @@ const main = async () => {
       id: 'sub-001',
       taxDocumentId: 'tax-doc-001',
       providerKey: 'MOCK',
-      status: 'PENDING',
+      status: 'DRAFT',
       version: 0,
     },
     events: [],
@@ -76,14 +76,15 @@ const main = async () => {
   assert.strictEqual(replayed.replayed, true);
   assert.strictEqual(state.events.length, 1);
 
-  await assert.rejects(
-    () =>
-      createPrismaTaxAuthoritySubmissionPersistence({
-        db: { taxAuthoritySubmission: {} },
-      }).load('sub-001'),
-    (error) =>
-      error.code === 'INVALID_TAX_AUTHORITY_SUBMISSION_PERSISTENCE_CLIENT',
-  );
+  assert.throws(
+  () =>
+    createPrismaTaxAuthoritySubmissionPersistence({
+      db: { taxAuthoritySubmission: {} },
+    }),
+  (error) =>
+    error.code === 'INVALID_TAX_AUTHORITY_SUBMISSION_PERSISTENCE_CLIENT' &&
+    error.details?.missingModels?.includes('taxAuthoritySubmissionEvent'),
+);
 
   console.log('Tax Authority Submission Persistence: PASS');
 };
