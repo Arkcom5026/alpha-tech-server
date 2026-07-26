@@ -52,6 +52,16 @@ class DevicePassportRepository {
       ORDER BY "openedAt" ASC, "id" ASC
     `;
   }
+
+  getEvents(deviceId) {
+    return this.prisma.$queryRaw`
+      SELECT "id", "eventType", "sourceType", "sourceId", "title", "description",
+             "actorType", "actorEmployeeId", "customerVisible", "metadata", "occurredAt", "createdAt"
+      FROM "DevicePassportEvent"
+      WHERE "deviceId" = ${Number(deviceId)}
+      ORDER BY "occurredAt" ASC, "id" ASC
+    `;
+  }
 }
 
 module.exports = new DevicePassportRepository();
