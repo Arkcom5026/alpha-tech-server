@@ -30,10 +30,10 @@ assert.deepStrictEqual(routeContracts, [
 
 assert.strictEqual(tax.intake.routes, routes);
 assert.strictEqual(typeof tax.intake.service.registerTaxCandidate, 'function');
-assert.strictEqual(typeof tax.intake.service.registerSaleCandidate, 'function');
+assert.strictEqual(typeof tax.intake.service.registerSaleTaxCandidate, 'function');
 assert.strictEqual(typeof tax.intake.service.listCandidates, 'function');
 assert.strictEqual(typeof tax.intake.service.listDocuments, 'function');
 assert.strictEqual(typeof tax.intake.service.getDocumentDetail, 'function');
-assert.strictEqual(typeof tax.intake.service.transitionDocument, 'function');
+assert.strictEqual(typeof tax.intake.service.transitionTaxDocument, 'function');
 
 console.log('Tax intake HTTP contract: PASS');
