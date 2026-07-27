@@ -237,11 +237,22 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
-  const status = err?.status || err?.statusCode || 500;
-  res.status(status).json({
+
+  const candidateStatusCode = Number(err?.statusCode);
+  const statusCode =
+    Number.isInteger(candidateStatusCode) &&
+    candidateStatusCode >= 400 &&
+    candidateStatusCode <= 599
+      ? candidateStatusCode
+      : 500;
+  const code = err?.code || 'INTERNAL_SERVER_ERROR';
+
+  res.status(statusCode).json({
     ok: false,
-    error: err?.code || 'INTERNAL_SERVER_ERROR',
+    error: code,
+    code,
     message: err?.message || 'Internal server error',
+    details: err?.details || null,
     requestId: req.id,
   });
 });
