@@ -6,8 +6,10 @@ const source = fs.readFileSync(path.join(__dirname, 'quickReceiptSessionControll
 
 assert.match(source, /requireActor\(req, res\)/)
 assert.match(source, /service\.createDraft\(req\.body \|\| \{\}, actor\.branchId, actor\.employeeId\)/)
-assert.match(source, /service\.complete\(req\.body \|\| \{\}, actor\.branchId, actor\.employeeId, req\.get\('X-Idempotency-Key'\)\)/)
+assert.match(source, /completeService\.complete\(/[\s\S]*req\.get\('X-Idempotency-Key'\)/)
 assert.match(source, /service\.finalize\(req\.params\.id, actor\.branchId, actor\.employeeId, req\.get\('X-Idempotency-Key'\)\)/)
+assert.match(source, /Number\(data\?\.id\) !== Number\(req\.params\.id\)/)
+assert.match(source, /IDEMPOTENCY_KEY_CONFLICT/)
 assert.match(source, /service\.cancel\(req\.params\.id, actor\.branchId, req\.body\?\.reason\)/)
 assert.match(source, /code: error\?\.code \|\| 'QUICK_RECEIPT_FAILED'/)
 assert.match(source, /details: error\?\.details/)
