@@ -1,0 +1,95 @@
+const prisma = require('../../../../database/prisma/client');
+
+const deviceSelect = {
+  id: true,
+  barcode: true,
+  serialNumber: true,
+  tag: true,
+  status: true,
+  branchId: true,
+  product: {
+    select: {
+      id: true,
+      name: true,
+      brand: { select: { id: true, name: true } },
+      productType: { select: { id: true, name: true } },
+    },
+  },
+  saleItems: {
+    take: 1,
+    orderBy: { sale: { soldAt: 'desc' } },
+    select: {
+      sale: {
+        select: {
+          customerId: true,
+          soldAt: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              companyName: true,
+              user: { select: { loginId: true, email: true } },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const customerSelect = {
+  id: true,
+  name: true,
+  companyName: true,
+  taxId: true,
+  type: true,
+  addressDetail: true,
+  user: { select: { loginId: true, email: true } },
+};
+
+class IntakeSearchRepository {
+  constructor(client = prisma) {
+    this.prisma = client;
+  }
+
+  async search(branchId, query, limit = 10) {
+    const insensitive = { contains: query, mode: 'insensitive' };
+
+    const [devices, customers] = await Promise.all([
+      this.prisma.stockItem.findMany({
+        where: {
+          branchId: Number(branchId),
+          OR: [
+            { barcode: insensitive },
+            { serialNumber: insensitive },
+            { tag: insensitive },
+            { product: { name: insensitive } },
+            { product: { brand: { name: insensitive } } },
+          ],
+        },
+        select: deviceSelect,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: limit,
+      }),
+      this.prisma.customerProfile.findMany({
+        where: {
+          OR: [
+            { name: insensitive },
+            { companyName: insensitive },
+            { taxId: insensitive },
+            { user: { loginId: insensitive } },
+            { user: { email: insensitive } },
+          ],
+        },
+        select: customerSelect,
+        orderBy: [{ companyName: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+        take: limit,
+      }),
+    ]);
+
+    return { devices, customers };
+  }
+}
+
+module.exports = new IntakeSearchRepository();
+module.exports.IntakeSearchRepository = IntakeSearchRepository;
