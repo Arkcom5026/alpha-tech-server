@@ -277,7 +277,7 @@ async function assertBaseTables(client) {
 }
 
 async function main() {
-  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
   if (!connectionString) {
     throw new Error('DIRECT_URL or DATABASE_URL is required');
   }
