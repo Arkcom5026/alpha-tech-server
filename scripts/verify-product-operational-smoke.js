@@ -3,15 +3,13 @@ require('dotenv').config()
 const baseUrl = String(process.env.OPERATIONAL_API_BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '')
 const token = String(process.env.OPERATIONAL_AUTH_TOKEN || '').trim()
 const branchId = String(process.env.OPERATIONAL_BRANCH_ID || '').trim()
-const productId = String(process.env.OPERATIONAL_PRODUCT_ID || '').trim()
-const templateProductId = String(process.env.OPERATIONAL_TEMPLATE_PRODUCT_ID || '').trim()
+const configuredProductId = String(process.env.OPERATIONAL_PRODUCT_ID || '').trim()
+const configuredTemplateProductId = String(process.env.OPERATIONAL_TEMPLATE_PRODUCT_ID || '').trim()
 const allowMutation = String(process.env.OPERATIONAL_ALLOW_MUTATION || '').toLowerCase() === 'true'
 
 const isPlaceholder = (value) => !value || /^<.*>$/.test(value)
 const hasToken = !isPlaceholder(token)
 const hasBranchId = !isPlaceholder(branchId)
-const hasProductId = !isPlaceholder(productId)
-const hasTemplateProductId = !isPlaceholder(templateProductId)
 
 const parseJsonEnv = (name) => {
   const raw = String(process.env[name] || '').trim()
@@ -61,9 +59,41 @@ const request = async ({ name, path, method = 'GET', auth = false, body, expecte
   return payload
 }
 
+const findFirstValue = (payload, keys) => {
+  const visited = new Set()
+
+  const walk = (value) => {
+    if (!value || typeof value !== 'object' || visited.has(value)) return null
+    visited.add(value)
+
+    if (!Array.isArray(value)) {
+      for (const key of keys) {
+        const candidate = value[key]
+        if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
+          return String(candidate).trim()
+        }
+      }
+    }
+
+    const children = Array.isArray(value) ? value : Object.values(value)
+    for (const child of children) {
+      const found = walk(child)
+      if (found) return found
+    }
+
+    return null
+  }
+
+  return walk(payload)
+}
+
 const main = async () => {
+  let productId = isPlaceholder(configuredProductId) ? '' : configuredProductId
+  let templateProductId = isPlaceholder(configuredTemplateProductId) ? '' : configuredTemplateProductId
+
+  let onlineSearchPayload = null
   if (hasBranchId) {
-    await request({
+    onlineSearchPayload = await request({
       name: 'Online product search',
       path: `/api/products/online/search?limit=1&branchId=${encodeURIComponent(branchId)}`,
       expected: [200],
@@ -72,24 +102,36 @@ const main = async () => {
     results.push({ name: 'Online product search', status: 'SKIP', detail: 'OPERATIONAL_BRANCH_ID is missing or still a placeholder' })
   }
 
-  if (hasProductId && hasBranchId) {
-    await request({
-      name: 'Online product detail',
-      path: `/api/products/online/detail/${encodeURIComponent(productId)}?branchId=${encodeURIComponent(branchId)}`,
-      expected: [200],
-    })
-  } else {
-    results.push({ name: 'Online product detail', status: 'SKIP', detail: 'Product ID or branch ID is missing' })
-  }
-
-  await request({
+  const posSearchPayload = await request({
     name: 'POS product search',
     path: '/api/products/pos/search?limit=1',
     auth: true,
     expected: [200],
   })
 
-  if (hasProductId) {
+  if (!productId) {
+    productId = findFirstValue(posSearchPayload, ['operationalProductId', 'productId', 'id'])
+      || findFirstValue(onlineSearchPayload, ['operationalProductId', 'productId', 'id'])
+      || ''
+  }
+
+  if (!templateProductId) {
+    templateProductId = findFirstValue(posSearchPayload, ['templateProductId', 'productTemplateId', 'templateId'])
+      || findFirstValue(onlineSearchPayload, ['templateProductId', 'productTemplateId', 'templateId'])
+      || ''
+  }
+
+  if (productId && hasBranchId) {
+    await request({
+      name: 'Online product detail',
+      path: `/api/products/online/detail/${encodeURIComponent(productId)}?branchId=${encodeURIComponent(branchId)}`,
+      expected: [200],
+    })
+  } else {
+    results.push({ name: 'Online product detail', status: 'SKIP', detail: 'No product was returned by search' })
+  }
+
+  if (productId) {
     await request({
       name: 'POS product detail',
       path: `/api/products/pos/${encodeURIComponent(productId)}`,
@@ -97,10 +139,10 @@ const main = async () => {
       expected: [200],
     })
   } else {
-    results.push({ name: 'POS product detail', status: 'SKIP', detail: 'OPERATIONAL_PRODUCT_ID is missing or still a placeholder' })
+    results.push({ name: 'POS product detail', status: 'SKIP', detail: 'No product was returned by search' })
   }
 
-  if (hasTemplateProductId) {
+  if (templateProductId) {
     await request({
       name: 'Runtime lookup by template',
       path: `/api/products/pos/runtime-by-template/${encodeURIComponent(templateProductId)}`,
@@ -108,7 +150,7 @@ const main = async () => {
       expected: [200, 404],
     })
   } else {
-    results.push({ name: 'Runtime lookup by template', status: 'SKIP', detail: 'OPERATIONAL_TEMPLATE_PRODUCT_ID is missing or still a placeholder' })
+    results.push({ name: 'Runtime lookup by template', status: 'SKIP', detail: 'No template ID was returned by search' })
   }
 
   await request({
@@ -118,7 +160,7 @@ const main = async () => {
     expected: [200],
   })
 
-  if (hasProductId) {
+  if (productId) {
     await request({
       name: 'Ready-to-sell detail',
       path: `/api/products/ready-to-sell/structured/${encodeURIComponent(productId)}`,
@@ -126,7 +168,7 @@ const main = async () => {
       expected: [200, 404],
     })
   } else {
-    results.push({ name: 'Ready-to-sell detail', status: 'SKIP', detail: 'OPERATIONAL_PRODUCT_ID is missing or still a placeholder' })
+    results.push({ name: 'Ready-to-sell detail', status: 'SKIP', detail: 'No product was returned by search' })
   }
 
   await request({
@@ -162,7 +204,7 @@ const main = async () => {
     results.push({ name: 'Create product from template', status: 'SKIP', detail: 'Mutation disabled or payload missing' })
   }
 
-  if (allowMutation && updatePayload && hasProductId) {
+  if (allowMutation && updatePayload && productId) {
     await request({
       name: 'Update product',
       path: `/api/products/${encodeURIComponent(productId)}`,
@@ -176,6 +218,9 @@ const main = async () => {
   }
 
   console.table(results)
+
+  if (productId) console.log(`[operational] resolved product ID: ${productId}`)
+  if (templateProductId) console.log(`[operational] resolved template ID: ${templateProductId}`)
 
   const failed = results.filter((result) => result.status === 'FAIL')
   const skipped = results.filter((result) => result.status === 'SKIP')
