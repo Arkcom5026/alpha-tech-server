@@ -69,3 +69,46 @@ test('unified intake search returns an empty result instead of throwing not foun
   const result = await service.execute({ branchId: 2 }, 'โรงพยาบาล');
   assert.deepEqual(result.counts, { devices: 0, customers: 0, total: 0 });
 });
+
+
+test('unified intake search finds a registered external device by store barcode', async () => {
+  const service = new IntakeSearchService({
+    async search() {
+      return {
+        devices: [],
+        registeredDevices: [{
+          id: 2,
+          barcode: 'DEV-2-A1B2C3D4',
+          serialNumber: null,
+          imei: null,
+          category: 'NOTEBOOK',
+          brand: 'Acer',
+          model: 'Aspire',
+          status: 'IN_REPAIR',
+          currentOwner: {
+            id: 224,
+            name: 'ทดลอง รับซ่อม',
+            companyName: null,
+            user: { loginId: '0811111111', email: null },
+          },
+          repairJobs: [{
+            id: 2,
+            jobNo: 'RE-2-20260727-S302CYM3241CC',
+            status: 'RECEIVED',
+            createdAt: new Date('2026-07-27T09:03:44Z'),
+          }],
+        }],
+        customers: [],
+      };
+    },
+  });
+
+  const result = await service.execute({ branchId: 2 }, 'DEV-2-A1B2C3D4');
+
+  assert.equal(result.counts.devices, 1);
+  assert.equal(result.devices[0].sourceType, 'REGISTERED_DEVICE');
+  assert.equal(result.devices[0].exactIdentifierMatch, true);
+  assert.equal(result.devices[0].barcode, 'DEV-2-A1B2C3D4');
+  assert.equal(result.devices[0].latestCustomer.id, 224);
+  assert.equal(result.devices[0].latestRepairJob.id, 2);
+});
