@@ -65,6 +65,15 @@ model EmployeeProfile {
   performedWarrantyClaimEvents      WarrantyClaimEvent[]
   deviceOwnershipHistory            DeviceOwnershipHistory[]    @relation("DeviceOwnershipCreatedBy")
   devicePassportEvents              DevicePassportEvent[]       @relation("DevicePassportActor")
+  checkedDeviceIntakeItems          DeviceIntakeChecklist[]     @relation("DeviceIntakeChecklistCheckedBy")
+  uploadedDeviceIntakeDocuments     DeviceIntakeDocument[]      @relation("DeviceIntakeDocumentUploadedBy")
+  uploadedDeviceIntakePhotos        DeviceIntakePhoto[]         @relation("DeviceIntakePhotoUploadedBy")
+  performedDeviceIntakeAudits       DeviceIntakeAudit[]         @relation("DeviceIntakeAuditPerformedBy")
+  receivedDeviceIntakes             DeviceIntake[]              @relation("DeviceIntakeReceivedBy")
+  diagnosedRepairJobs               RepairDiagnosis[]           @relation("RepairDiagnosisDiagnosedBy")
+  performedRepairLaborItems         RepairLaborItem[]           @relation("RepairLaborPerformedBy")
+  checkedRepairQualityChecks        RepairQualityCheck[]        @relation("RepairQualityCheckedBy")
+  deliveredRepairJobs               RepairDelivery[]            @relation("RepairDeliveryDeliveredBy")
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -120,6 +129,7 @@ model Branch {
   warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
   devices                         Device[]
   devicePassportEvents            DevicePassportEvent[]
+  deviceIntakes                   DeviceIntake[]
   salesTaxFilingBatches           SalesTaxFilingBatch[]
   services                        ServiceOrder[]
   simpleLots                      SimpleLot[]
@@ -1322,6 +1332,7 @@ model CustomerProfile {
   repairJobs                RepairJob[]
   ownedDevices              Device[]                  @relation("DeviceCurrentOwner")
   deviceOwnershipHistory    DeviceOwnershipHistory[]
+  deviceIntakes             DeviceIntake[]
   actedDevicePassportEvents DevicePassportEvent[]     @relation("DevicePassportCustomerActor")
   sales                     Sale[]
   services                  ServiceOrder[]
@@ -1451,6 +1462,11 @@ model RepairJob {
   partsUsed        RepairPartItem[]
 
   warrantyClaims WarrantyClaim[]
+  deviceIntake   DeviceIntake?
+  diagnosis      RepairDiagnosis?
+  laborItems     RepairLaborItem[]
+  qualityCheck   RepairQualityCheck?
+  delivery       RepairDelivery?
 
   @@index([branchId])
   @@index([stockItemId])
@@ -1524,11 +1540,280 @@ model WarrantyClaim {
   @@index([branchId, status, openedAt])
 }
 
-/// Aggregate root and durable identity of a physical device.
-/// fingerprint is an immutable runtime identity, not a business identifier.
-/// status is a read-optimized lifecycle projection; authoritative workflow state
-/// remains with its originating module. Lifecycle changes should update status and
-/// append a passport event in the same application transaction where supported.
+// ============================================================
+// REPAIR EXECUTION AGGREGATE FOUNDATION
+// Phase 3 â€” additive diagnosis, labor, quality control, delivery
+// ============================================================
+
+model RepairDiagnosis {
+  id                    Int                   @id @default(autoincrement())
+  repairJobId           Int                   @unique
+  status                RepairDiagnosisStatus @default(PENDING)
+  diagnosedByEmployeeId Int?
+  symptomSummary        String?
+  problemFound          String?
+  rootCause             String?
+  recommendedAction     String?
+  diagnosticData        Json?
+  estimatedLaborCost    Decimal               @default(0.0) @db.Decimal(12, 2)
+  estimatedPartsCost    Decimal               @default(0.0) @db.Decimal(12, 2)
+  diagnosedAt           DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  diagnosedBy EmployeeProfile? @relation("RepairDiagnosisDiagnosedBy", fields: [diagnosedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, diagnosedAt])
+  @@index([diagnosedByEmployeeId, diagnosedAt])
+}
+
+model RepairLaborItem {
+  id                    Int       @id @default(autoincrement())
+  repairJobId           Int
+  description           String
+  quantity              Decimal   @default(1.0) @db.Decimal(10, 2)
+  unitPrice             Decimal   @default(0.0) @db.Decimal(12, 2)
+  performedByEmployeeId Int?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  note                  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  performedBy EmployeeProfile? @relation("RepairLaborPerformedBy", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, createdAt])
+  @@index([performedByEmployeeId, completedAt])
+}
+
+model RepairQualityCheck {
+  id                  Int            @id @default(autoincrement())
+  repairJobId         Int            @unique
+  status              RepairQcStatus @default(PENDING)
+  checkedByEmployeeId Int?
+  checklist           Json?
+  note                String?
+  checkedAt           DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  repairJob RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  checkedBy EmployeeProfile? @relation("RepairQualityCheckedBy", fields: [checkedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, checkedAt])
+  @@index([checkedByEmployeeId, checkedAt])
+}
+
+model RepairDelivery {
+  id                    Int                  @id @default(autoincrement())
+  repairJobId           Int                  @unique
+  status                RepairDeliveryStatus @default(PENDING)
+  method                RepairDeliveryMethod @default(PICKUP_AT_BRANCH)
+  deliveredByEmployeeId Int?
+  recipientName         String?
+  recipientPhone        String?
+  proofUrl              String?
+  note                  String?
+  deliveredAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  deliveredBy EmployeeProfile? @relation("RepairDeliveryDeliveredBy", fields: [deliveredByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, deliveredAt])
+  @@index([deliveredByEmployeeId, deliveredAt])
+}
+
+/// Aggregate root representing the durable identity of a physical customer device.
+/// Sale, repair, warranty, and future operational modules reference this identity
+/// instead of creating competing device histories of their own.
+
+// ============================================================
+// DEVICE INTAKE AGGREGATE FOUNDATION
+// Phase 2 â€” additive reception, evidence, consent, and audit data
+// ============================================================
+
+model DeviceIntake {
+  id                   Int                @id @default(autoincrement())
+  deviceId             Int
+  branchId             Int
+  customerId           Int
+  repairJobId          Int?               @unique
+  receivedByEmployeeId Int
+  referenceNo          String
+  customerProblem      String
+  internalRemark       String?
+  status               DeviceIntakeStatus @default(RECEIVED)
+  priority             DevicePriority     @default(NORMAL)
+  receivedAt           DateTime           @default(now())
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  device      Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  branch      Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer    CustomerProfile         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  receivedBy  EmployeeProfile         @relation("DeviceIntakeReceivedBy", fields: [receivedByEmployeeId], references: [id], onDelete: Restrict)
+  repairJob   RepairJob?              @relation(fields: [repairJobId], references: [id], onDelete: SetNull)
+  snapshot    DeviceIntakeSnapshot?
+  condition   DeviceIntakeCondition?
+  accessories DeviceIntakeAccessory[]
+  consent     DeviceIntakeConsent?
+  audits      DeviceIntakeAudit[]
+  photos      DeviceIntakePhoto[]
+  documents   DeviceIntakeDocument[]
+  checklist   DeviceIntakeChecklist[]
+
+  @@unique([branchId, referenceNo])
+  @@index([deviceId, receivedAt])
+  @@index([branchId, status, receivedAt])
+  @@index([customerId, receivedAt])
+  @@index([receivedByEmployeeId, receivedAt])
+  @@index([priority, status])
+}
+
+model DeviceIntakeSnapshot {
+  id                 Int      @id @default(autoincrement())
+  deviceIntakeId     Int      @unique
+  brand              String?
+  model              String?
+  serialNumber       String?
+  imei               String?
+  barcode            String?
+  color              String?
+  capacity           String?
+  accessoriesSummary String?
+  createdAt          DateTime @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeCondition {
+  id                Int                   @id @default(autoincrement())
+  deviceIntakeId    Int                   @unique
+  screenCondition   DeviceConditionLevel? @default(UNKNOWN)
+  bodyCondition     DeviceConditionLevel? @default(UNKNOWN)
+  liquidDamage      Boolean?
+  powerOn           Boolean?
+  displayWorking    Boolean?
+  touchWorking      Boolean?
+  cameraWorking     Boolean?
+  speakerWorking    Boolean?
+  microphoneWorking Boolean?
+  chargingWorking   Boolean?
+  buttonsWorking    Boolean?
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAccessory {
+  id             Int           @id @default(autoincrement())
+  deviceIntakeId Int
+  accessoryType  AccessoryType
+  quantity       Int           @default(1)
+  remark         String?
+  createdAt      DateTime      @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+
+  @@index([deviceIntakeId])
+  @@index([accessoryType])
+}
+
+model DeviceIntakeConsent {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int       @unique
+  allowDataErase       Boolean   @default(false)
+  allowFactoryReset    Boolean   @default(false)
+  allowDisassembly     Boolean   @default(false)
+  allowOutsourceRepair Boolean   @default(false)
+  customerSignature    String?
+  signedAt             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAudit {
+  id                    Int                    @id @default(autoincrement())
+  deviceIntakeId        Int
+  eventType             DeviceIntakeAuditEvent
+  performedByEmployeeId Int?
+  note                  String?
+  metadata              Json?
+  occurredAt            DateTime               @default(now())
+  createdAt             DateTime               @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  performedBy  EmployeeProfile? @relation("DeviceIntakeAuditPerformedBy", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, occurredAt])
+  @@index([performedByEmployeeId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model DeviceIntakePhoto {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int
+  url                  String
+  storageKey           String?
+  category             String?
+  caption              String?
+  uploadedByEmployeeId Int?
+  takenAt              DateTime?
+  createdAt            DateTime  @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakePhotoUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, createdAt])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeDocument {
+  id                   Int      @id @default(autoincrement())
+  deviceIntakeId       Int
+  documentType         String
+  fileName             String?
+  url                  String
+  storageKey           String?
+  uploadedByEmployeeId Int?
+  createdAt            DateTime @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakeDocumentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, documentType])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeChecklist {
+  id                  Int       @id @default(autoincrement())
+  deviceIntakeId      Int
+  code                String
+  label               String
+  isChecked           Boolean   @default(false)
+  result              String?
+  note                String?
+  checkedByEmployeeId Int?
+  checkedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  checkedBy    EmployeeProfile? @relation("DeviceIntakeChecklistCheckedBy", fields: [checkedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceIntakeId, code])
+  @@index([deviceIntakeId, isChecked])
+  @@index([checkedByEmployeeId])
+}
+
 model Device {
   id                     Int                      @id @default(autoincrement())
   branchId               Int
@@ -1546,9 +1831,6 @@ model Device {
   imei                   String?
   barcode                String?
   status                 DeviceStatus             @default(ACTIVE)
-  identityVersion        Int                      @default(1)
-  registeredAt           DateTime                 @default(now())
-  retiredAt              DateTime?
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
   branch                 Branch                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1559,26 +1841,18 @@ model Device {
   ownershipHistory       DeviceOwnershipHistory[]
   passportEvents         DevicePassportEvent[]
 
-  // Future-ready placeholder. Prisma requires a DeviceIntake model and opposite
-  // relation before this can become an active field:
-  // deviceIntakes DeviceIntake[]
+  deviceIntakes DeviceIntake[]
 
   @@index([branchId])
   @@index([currentOwnerCustomerId])
   @@index([stockItemId])
   @@index([category])
   @@index([status])
-  @@index([serialNumber])
-  @@index([imei])
-  @@index([barcode])
-  @@index([branchId, status])
-  @@index([currentOwnerCustomerId, status])
 }
 
-/// Append-oriented ownership ledger and Source of Truth for ownership history.
-/// Device.currentOwnerCustomerId is a projection. Application policy must prevent
-/// overlapping active ownership periods. A future reviewed SQL migration may add
-/// a partial active-owner unique index after ownership mutation behavior is verified.
+/// Append-oriented ownership ledger and authority for device ownership history.
+/// An active ownership entry has endedAt = null. Application policy must prevent
+/// overlapping active OWNER periods for the same device.
 model DeviceOwnershipHistory {
   id                  Int                 @id @default(autoincrement())
   deviceId            Int
@@ -1589,7 +1863,6 @@ model DeviceOwnershipHistory {
   createdByEmployeeId Int?
   startedAt           DateTime
   endedAt             DateTime?
-  note                String?
   createdAt           DateTime            @default(now())
   device              Device              @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   customer            CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -1599,13 +1872,15 @@ model DeviceOwnershipHistory {
   @@index([deviceId, endedAt])
   @@index([customerId, startedAt])
   @@index([sourceType, sourceId])
-  @@index([deviceId, ownershipType, endedAt])
-  @@index([customerId, ownershipType, endedAt])
 }
 
-/// Append-oriented operational ledger of workflow facts published by domain modules.
-/// Events complement, not replace, workflow state machines; historical rows must
-/// not be rewritten to represent current state.
+// ============================================================
+// DEVICE PASSPORT TIMELINE FOUNDATION
+// Phase 4 â€” additive event vocabulary, idempotency and traceability
+// ============================================================
+
+/// Append-oriented operational ledger for the complete device passport timeline.
+/// Domain modules publish events here; they must not overwrite historical events.
 model DevicePassportEvent {
   id              Int                     @id @default(autoincrement())
   deviceId        Int
@@ -1613,6 +1888,14 @@ model DevicePassportEvent {
   eventType       DevicePassportEventType
   sourceType      DeviceSourceType?
   sourceId        String?
+  /// Optional publisher-supplied idempotency key. A publisher must reuse the
+  /// same key when retrying the same domain event for the same device.
+  eventKey        String?
+  /// Groups events produced by one operational request or workflow.
+  correlationId   String?
+  /// Identifies the preceding command/event when causal traceability is known.
+  causationId     String?
+  schemaVersion   Int                     @default(1)
   title           String
   description     String?
   actorType       DeviceActorType
@@ -1620,7 +1903,6 @@ model DevicePassportEvent {
   actorCustomerId Int?
   customerVisible Boolean                 @default(false)
   metadata        Json?
-  eventVersion    Int                     @default(1)
   occurredAt      DateTime
   createdAt       DateTime                @default(now())
   device          Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
@@ -1628,13 +1910,14 @@ model DevicePassportEvent {
   actorEmployee   EmployeeProfile?        @relation("DevicePassportActor", fields: [actorEmployeeId], references: [id], onDelete: SetNull)
   actorCustomer   CustomerProfile?        @relation("DevicePassportCustomerActor", fields: [actorCustomerId], references: [id], onDelete: SetNull)
 
+  @@unique([deviceId, eventKey])
   @@index([deviceId, occurredAt])
+  @@index([deviceId, eventType, occurredAt])
   @@index([branchId, eventType, occurredAt])
   @@index([sourceType, sourceId])
+  @@index([correlationId, occurredAt])
   @@index([actorEmployeeId])
   @@index([actorCustomerId])
-  @@index([deviceId, eventType, occurredAt])
-  @@index([deviceId, customerVisible, occurredAt])
 }
 
 model WarrantyClaimEvent {
@@ -1698,14 +1981,72 @@ enum DeviceCategory {
 enum DeviceSourceType {
   SALE
   SALE_RETURN
-  REPAIR_JOB
-  WARRANTY_CLAIM
   STOCK_ITEM
   PURCHASE_RECEIPT
+  DEVICE_OWNERSHIP
+  DEVICE_INTAKE
+  REPAIR_JOB
+  REPAIR_DIAGNOSIS
+  REPAIR_PART
+  REPAIR_LABOR
+  REPAIR_QUALITY_CHECK
+  REPAIR_DELIVERY
+  WARRANTY_CLAIM
+  WARRANTY_CLAIM_EVENT
   MANUAL
   IMPORT
   SYSTEM
   OTHER
+}
+
+enum DeviceIntakeStatus {
+  DRAFT
+  RECEIVED
+  INSPECTION_COMPLETED
+  LINKED_TO_REPAIR
+  CANCELLED
+}
+
+enum DevicePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AccessoryType {
+  CHARGER
+  POWER_ADAPTER
+  CABLE
+  BATTERY
+  BAG_CASE
+  SIM_CARD
+  MEMORY_CARD
+  OTHER
+}
+
+enum DeviceConditionLevel {
+  UNKNOWN
+  GOOD
+  FAIR
+  DAMAGED
+  SEVERELY_DAMAGED
+}
+
+enum DeviceIntakeAuditEvent {
+  CREATED
+  UPDATED
+  SNAPSHOT_RECORDED
+  CONDITION_RECORDED
+  ACCESSORY_ADDED
+  ACCESSORY_REMOVED
+  CONSENT_SIGNED
+  PHOTO_ADDED
+  DOCUMENT_ADDED
+  CHECKLIST_UPDATED
+  LINKED_TO_REPAIR
+  STATUS_CHANGED
+  CANCELLED
 }
 
 enum DeviceStatus {
@@ -1714,10 +2055,6 @@ enum DeviceStatus {
   IN_WARRANTY_CLAIM
   RETIRED
   LOST
-  REGISTERED
-  IN_STOCK
-  SOLD
-  RETURNED
 }
 
 enum DeviceOwnershipType {
@@ -1735,19 +2072,42 @@ enum DeviceActorType {
 enum DevicePassportEventType {
   REGISTERED
   OWNERSHIP_CHANGED
+  PURCHASED
+  SOLD
+  RETURNED
+  INTAKE_CREATED
+  INTAKE_RECEIVED
+  INTAKE_INSPECTION_COMPLETED
+  INTAKE_CANCELLED
+  REPAIR_CREATED
+  REPAIR_ASSIGNED
+  REPAIR_STATUS_CHANGED
+  DIAGNOSIS_STARTED
+  DIAGNOSIS_COMPLETED
+  DIAGNOSIS_REVISED
+  PART_ADDED
+  PART_REMOVED
+  LABOR_ADDED
+  LABOR_COMPLETED
+  QC_STARTED
+  QC_PASSED
+  QC_FAILED
+  DELIVERY_PREPARED
+  DELIVERED
+  WARRANTY_CLAIM_OPENED
+  WARRANTY_CLAIM_SUBMITTED
+  WARRANTY_CLAIM_PROVIDER_RECEIVED
+  WARRANTY_CLAIM_RESOLVED
+  WARRANTY_CLAIM_CANCELLED
+  WARRANTY_REPLACED
+  WARRANTY_CREDITED
+  DEVICE_STATUS_CHANGED
+  NOTE_ADDED
+  /// Compatibility event values retained during runtime migration.
   INTAKE
   REPAIR_UPDATED
   WARRANTY_CLAIM_UPDATED
   STATUS_CHANGED
-  NOTE_ADDED
-  PURCHASE_RECEIVED
-  SALE_COMPLETED
-  SALE_RETURNED
-  REPAIR_RECEIVED
-  REPAIR_COMPLETED
-  WARRANTY_CLAIM_OPENED
-  WARRANTY_CLAIM_RESOLVED
-  DEVICE_RETIRED
 }
 
 enum PurchaseOrderStatus {
@@ -2017,7 +2377,7 @@ enum SalesTaxFilingStatus {
 
 // ============================================================
 // TAX AUTHORITY FOUNDATION
-// Step 3.1 — Enum Foundation
+// Step 3.1 â€” Enum Foundation
 // ============================================================
 
 enum TaxDocumentType {
@@ -2073,4 +2433,34 @@ enum TaxPeriodStatus {
   LOCKED
   SUBMITTED
   REOPENED
+}
+
+enum RepairDiagnosisStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REVISED
+  CANCELLED
+}
+
+enum RepairQcStatus {
+  PENDING
+  IN_PROGRESS
+  PASSED
+  FAILED
+  WAIVED
+}
+
+enum RepairDeliveryStatus {
+  PENDING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum RepairDeliveryMethod {
+  PICKUP_AT_BRANCH
+  COURIER
+  DELIVERY_BY_STORE
+  OTHER
 }

@@ -33,6 +33,7 @@ class CreateRepairJobService {
           );
         }
 
+        let deviceId = null;
         if (payload.stockItemId) {
           const stockItem = await repo.findStockItemForIntake(payload.stockItemId);
           assertStockItemBranch(stockItem, actor.branchId);
@@ -43,6 +44,7 @@ class CreateRepairJobService {
             payload.customerId,
             payload.allowCustomerOverride && actor.role === 'MANAGER'
           );
+          deviceId = stockItem.devices?.[0]?.id || null;
         }
 
         if (payload.technicianId) {
@@ -65,6 +67,7 @@ class CreateRepairJobService {
           branchId: actor.branchId,
           customerId: payload.customerId,
           stockItemId: payload.stockItemId,
+          deviceId,
           deviceModel: payload.deviceModel,
           reportedSymptoms: payload.reportedSymptoms,
           technicianNotes: payload.technicianNotes,
@@ -73,6 +76,31 @@ class CreateRepairJobService {
           technicianId: payload.technicianId,
           status: 'RECEIVED',
         });
+
+        if (created.deviceId && typeof repo.publishPassportEvent === 'function') {
+          await repo.publishPassportEvent({
+            deviceId: created.deviceId,
+            branchId: created.branchId,
+            eventType: 'REPAIR_CREATED',
+            sourceType: 'REPAIR_JOB',
+            sourceId: String(created.id),
+            eventKey: `repair-job:${created.id}:created`,
+            correlationId: `repair-job:${created.id}`,
+            title: `เปิดใบงานซ่อม ${created.jobNo}`,
+            description: created.reportedSymptoms,
+            actorEmployeeId: actor.employeeId || null,
+            customerVisible: true,
+            metadata: {
+              repairJobId: created.id,
+              jobNo: created.jobNo,
+              customerId: created.customerId,
+              stockItemId: created.stockItemId,
+              status: created.status,
+              deviceModel: created.deviceModel,
+            },
+            occurredAt: created.createdAt,
+          });
+        }
 
         return mapRepairJob(created);
       });
