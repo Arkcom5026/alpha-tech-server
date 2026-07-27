@@ -21,7 +21,6 @@ jobs:
     name: Syntax, Prisma, Tests and Startup
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alpha_tech_ci
@@ -29,7 +28,6 @@ jobs:
       JWT_SECRET: github-actions-test-secret
       PORT: 3000
       CORS_ALLOW_ALL: "true"
-
     services:
       postgres:
         image: postgres:16
@@ -44,26 +42,20 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Generate Prisma Client
         run: npx prisma generate
-
       - name: Validate Prisma schema
         run: npx prisma validate
-
       - name: Check JavaScript syntax
         shell: bash
         run: |
@@ -72,16 +64,13 @@ jobs:
             -path './generated' -prune -o \
             -name '*.js' -print0 | \
           xargs -0 -n1 node --check
-
       - name: Run backend tests
         run: npm test
-
       - name: Start backend
         shell: bash
         run: |
           npm start > backend-startup.log 2>&1 &
           echo $! > backend.pid
-
       - name: Verify backend startup
         shell: bash
         run: |
@@ -91,27 +80,19 @@ jobs:
               cat backend-startup.log
               exit 1
             fi
-
-            status_code="$(curl --silent --output /dev/null \
-              --write-out '%{http_code}' \
-              http://127.0.0.1:3000/__ci-startup-check || true)"
-
+            status_code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/__ci-startup-check || true)"
             if [ "$status_code" != "000" ]; then
               echo "Backend responded with HTTP $status_code"
               exit 0
             fi
-
             sleep 1
           done
-
           echo "Backend did not respond within the startup window"
           cat backend-startup.log
           exit 1
-
       - name: Show backend log
         if: always()
         run: cat backend-startup.log || true
-
       - name: Stop backend
         if: always()
         shell: bash
@@ -124,7 +105,6 @@ jobs:
     name: Tax STEP 004 Runtime Certification
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alpha_tech_tax_ci
@@ -132,7 +112,6 @@ jobs:
       JWT_SECRET: github-actions-test-secret
       PORT: 3001
       CORS_ALLOW_ALL: "true"
-
     services:
       postgres:
         image: postgres:16
@@ -147,35 +126,32 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Generate Prisma Client
         run: npx prisma generate
-
       - name: Validate Prisma schema
         run: npx prisma validate
-
       - name: Bootstrap base schema
         run: npx prisma db push --skip-generate
-
       - name: Apply Tax STEP 004 migration
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260727233000_add_tax_intake_foundation/migration.sql
-
-      - name: Run Tax STEP 004 contracts
-        run: npm run test:tax-intake
-
+      - name: Foundation contract
+        run: node tests/tax-intake-foundation.contract.test.js
+      - name: HTTP contract
+        run: node tests/tax-intake-http.contract.test.js
+      - name: Lifecycle and sale source contract
+        run: node tests/tax-lifecycle-sale-source.contract.test.js
+      - name: Sales publication contract
+        run: node tests/tax-step-004-sales-publication.contract.test.js
       - name: Check Tax and Sales publication syntax
         run: |
           node --check src/modules/tax/index.js
