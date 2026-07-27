@@ -1,0 +1,130 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const {
+  REPAIR_WORKFLOW_ACTION,
+  REPAIR_WORKFLOW_STATUS,
+  getAvailableRepairWorkflowActions,
+  projectLegacyServiceStatus,
+  resolveRepairWorkflowTransition,
+} = require('./repairWorkflowPolicy');
+
+test('covers the canonical repair path from received to closed', () => {
+  const path = [
+    REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
+    REPAIR_WORKFLOW_ACTION.START_DIAGNOSIS,
+    REPAIR_WORKFLOW_ACTION.COMPLETE_DIAGNOSIS,
+    REPAIR_WORKFLOW_ACTION.APPROVE_QUOTATION,
+    REPAIR_WORKFLOW_ACTION.START_REPAIR,
+    REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR,
+    REPAIR_WORKFLOW_ACTION.PASS_QC,
+    REPAIR_WORKFLOW_ACTION.DELIVER,
+    REPAIR_WORKFLOW_ACTION.CLOSE,
+  ];
+
+  let status = REPAIR_WORKFLOW_STATUS.RECEIVED;
+  for (const action of path) {
+    status = resolveRepairWorkflowTransition(status, action).targetStatus;
+  }
+
+  assert.equal(status, REPAIR_WORKFLOW_STATUS.CLOSED);
+});
+
+test('supports waiting for parts and resuming repair', () => {
+  const waiting = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.REPAIRING,
+    REPAIR_WORKFLOW_ACTION.WAIT_FOR_PARTS
+  );
+  assert.equal(waiting.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_PARTS);
+  assert.equal(waiting.passportEventType, 'REPAIR_STATUS_CHANGED');
+
+  const resumed = resolveRepairWorkflowTransition(
+    waiting.targetStatus,
+    REPAIR_WORKFLOW_ACTION.RESUME_REPAIR
+  );
+  assert.equal(resumed.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
+});
+
+test('requires failed QC to return through explicit rework', () => {
+  const failed = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.WAITING_QC,
+    REPAIR_WORKFLOW_ACTION.FAIL_QC
+  );
+  assert.equal(failed.targetStatus, REPAIR_WORKFLOW_STATUS.QC_FAILED);
+  assert.equal(failed.passportEventType, 'QC_FAILED');
+
+  assert.throws(
+    () => resolveRepairWorkflowTransition(
+      failed.targetStatus,
+      REPAIR_WORKFLOW_ACTION.PASS_QC
+    ),
+    (error) => error.code === 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED'
+  );
+
+  const rework = resolveRepairWorkflowTransition(
+    failed.targetStatus,
+    REPAIR_WORKFLOW_ACTION.REWORK_AFTER_QC
+  );
+  assert.equal(rework.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
+});
+
+test('rejects illegal transitions and exposes available actions', () => {
+  assert.throws(
+    () => resolveRepairWorkflowTransition(
+      REPAIR_WORKFLOW_STATUS.RECEIVED,
+      REPAIR_WORKFLOW_ACTION.DELIVER
+    ),
+    (error) => {
+      assert.equal(error.code, 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED');
+      assert.equal(error.details.status, REPAIR_WORKFLOW_STATUS.RECEIVED);
+      assert.deepEqual(
+        error.details.availableActions.map((item) => item.action),
+        [REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS, REPAIR_WORKFLOW_ACTION.CANCEL]
+      );
+      return true;
+    }
+  );
+});
+
+test('projects authoritative actions including passport event vocabulary', () => {
+  const actions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.WAITING_QC);
+  assert.deepEqual(actions, [
+    {
+      action: REPAIR_WORKFLOW_ACTION.PASS_QC,
+      targetStatus: REPAIR_WORKFLOW_STATUS.READY_FOR_DELIVERY,
+      passportEventType: 'QC_PASSED',
+    },
+    {
+      action: REPAIR_WORKFLOW_ACTION.FAIL_QC,
+      targetStatus: REPAIR_WORKFLOW_STATUS.QC_FAILED,
+      passportEventType: 'QC_FAILED',
+    },
+  ]);
+});
+
+test('maps detailed workflow statuses to the current legacy ServiceStatus safely', () => {
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.RECEIVED), 'RECEIVED');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.WAITING_PARTS), 'WAITING_PARTS');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.DIAGNOSING), 'IN_PROGRESS');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.READY_FOR_DELIVERY), 'IN_PROGRESS');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.DELIVERED), 'COMPLETED');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.CLOSED), 'COMPLETED');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.REJECTED), 'CANCELLED');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.CANCELLED), 'CANCELLED');
+});
+
+test('marks only terminal target statuses as terminal', () => {
+  const rejected = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.WAITING_APPROVAL,
+    REPAIR_WORKFLOW_ACTION.REJECT_QUOTATION
+  );
+  assert.equal(rejected.targetStatus, REPAIR_WORKFLOW_STATUS.REJECTED);
+  assert.equal(rejected.terminal, true);
+
+  const approved = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.WAITING_APPROVAL,
+    REPAIR_WORKFLOW_ACTION.APPROVE_QUOTATION
+  );
+  assert.equal(approved.targetStatus, REPAIR_WORKFLOW_STATUS.APPROVED);
+  assert.equal(approved.terminal, false);
+});
