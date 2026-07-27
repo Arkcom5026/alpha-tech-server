@@ -12,6 +12,8 @@ const normalizeError = (error) => {
   const databaseText = `${error?.message || ''} ${error?.meta?.message || ''} ${error?.meta?.cause || ''}`
   const isUniqueViolation = databaseCode === '23505' || databaseCode === 'P2002' || /unique constraint|duplicate key/i.test(databaseText)
   const isInventoryIdentity = /StockItem_barcode_ci_unique|SimpleLot_barcode_ci_unique|StockItem_serialNumber_ci_unique|barcode|serialNumber/i.test(databaseText)
+  const isCheckViolation = databaseCode === '23514' || /check constraint/i.test(databaseText)
+  const isTaxConstraint = /QuickReceiptSession_(tax_mode|tax_pricing|subtotal|vat_amount|total_amount)_check/i.test(databaseText)
 
   if (isUniqueViolation && isInventoryIdentity) {
     const conflict = new Error('Barcode หรือ Serial Number นี้มีอยู่ในระบบแล้ว')
@@ -19,6 +21,13 @@ const normalizeError = (error) => {
     conflict.code = 'INVENTORY_IDENTITY_ALREADY_EXISTS'
     conflict.details = { databaseCode }
     return conflict
+  }
+  if (isCheckViolation && isTaxConstraint) {
+    const validation = new Error('ข้อมูลภาษีหรือยอดเอกสารไม่ถูกต้อง')
+    validation.statusCode = 400
+    validation.code = 'QUICK_RECEIPT_TAX_DATA_INVALID'
+    validation.details = { databaseCode }
+    return validation
   }
   return error
 }
