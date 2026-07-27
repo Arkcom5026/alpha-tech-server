@@ -1,12 +1,66 @@
+const crypto = require('node:crypto')
+
 const QuickReceiptSessionService = require('./QuickReceiptSessionService')
 
 const cleanText = (value) => String(value || '').trim()
+const normalizeDeliveryNote = (value) => cleanText(value).replace(/\s+/g, '').toUpperCase()
+const asNumber = (value) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+const normalizeDate = (value) => (value ? new Date(value).toISOString().slice(0, 10) : null)
 const makeError = (message, statusCode = 400, code = 'QUICK_RECEIPT_COMPLETE_FAILED') => {
   const error = new Error(message)
   error.statusCode = statusCode
   error.code = code
   return error
 }
+
+const normalizeUnits = (items) => (Array.isArray(items) ? items : [])
+  .map((item) => ({
+    barcode: cleanText(item?.barcode),
+    serialNumber: cleanText(item?.serialNumber) || null,
+  }))
+  .filter((item) => item.barcode)
+  .sort((left, right) => `${left.barcode}:${left.serialNumber || ''}`.localeCompare(`${right.barcode}:${right.serialNumber || ''}`))
+
+const normalizeLine = (line) => ({
+  productId: asNumber(line?.productId),
+  quantity: asNumber(line?.quantity),
+  costPrice: asNumber(line?.costPrice),
+  priceRetail: asNumber(line?.priceRetail),
+  priceWholesale: asNumber(line?.priceWholesale),
+  priceTechnician: asNumber(line?.priceTechnician),
+  priceOnline: asNumber(line?.priceOnline),
+  note: cleanText(line?.note) || null,
+  items: normalizeUnits(line?.items),
+})
+
+const canonicalPayload = (payload) => {
+  const lines = (Array.isArray(payload?.items) ? payload.items : [])
+    .map(normalizeLine)
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+
+  return {
+    supplierId: asNumber(payload?.supplierId),
+    deliveryNoteNumber: normalizeDeliveryNote(payload?.deliveryNoteNumber),
+    deliveryNoteDate: normalizeDate(payload?.deliveryNoteDate),
+    note: cleanText(payload?.note) || null,
+    taxDocumentMode: cleanText(payload?.taxDocumentMode || 'NOT_RECEIVED').toUpperCase(),
+    supplierTaxInvoiceNumber: cleanText(payload?.supplierTaxInvoiceNumber) || null,
+    supplierTaxInvoiceDate: normalizeDate(payload?.supplierTaxInvoiceDate),
+    taxPricingMode: cleanText(payload?.taxPricingMode).toUpperCase() || null,
+    documentSubtotal: asNumber(payload?.documentSubtotal),
+    documentVatAmount: asNumber(payload?.documentVatAmount),
+    documentTotalAmount: asNumber(payload?.documentTotalAmount),
+    items: lines,
+  }
+}
+
+const payloadHash = (payload) => crypto
+  .createHash('sha256')
+  .update(JSON.stringify(canonicalPayload(payload)))
+  .digest('hex')
 
 /**
  * One HTTP command for the small-delivery workflow.
@@ -25,6 +79,7 @@ class QuickReceiptCompleteService {
     const key = cleanText(commandKey)
     if (!key) throw makeError('ต้องมี X-Idempotency-Key', 400, 'IDEMPOTENCY_KEY_REQUIRED')
 
+    const incomingHash = payloadHash(payload)
     const priorCommands = await this.prisma.$queryRawUnsafe(
       `SELECT "receiptId" FROM "QuickReceiptFinalizeCommand"
        WHERE "branchId"=$1 AND "commandKey"=$2 LIMIT 1`,
@@ -32,7 +87,16 @@ class QuickReceiptCompleteService {
       key
     )
     if (priorCommands.length) {
-      return this.sessions.getReceipt(priorCommands[0].receiptId, branchId)
+      const priorReceipt = await this.sessions.getReceipt(priorCommands[0].receiptId, branchId)
+      const priorHash = payloadHash(priorReceipt)
+      if (priorHash !== incomingHash) {
+        throw makeError(
+          'X-Idempotency-Key นี้ถูกใช้กับข้อมูลใบรับสินค้าอื่นแล้ว',
+          409,
+          'IDEMPOTENCY_KEY_CONFLICT'
+        )
+      }
+      return priorReceipt
     }
 
     const lines = Array.isArray(payload?.items) ? payload.items : []
@@ -68,3 +132,5 @@ class QuickReceiptCompleteService {
 }
 
 module.exports = QuickReceiptCompleteService
+module.exports.canonicalPayload = canonicalPayload
+module.exports.payloadHash = payloadHash
