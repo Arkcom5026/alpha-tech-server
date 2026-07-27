@@ -21,21 +21,11 @@ const handleQuickReceiveDropdowns = quickReceiveDropdownController?.getQuickRece
 
 const verifyToken = require('../../../../../middlewares/verifyToken')
 
-if (typeof verifyToken !== 'function') {
-  throw new Error('[quickStockRoutes] verifyToken middleware is not a function')
-}
-if (typeof handleQuickEnroll !== 'function') {
-  throw new Error('[quickStockRoutes] handleQuickEnroll is not a function')
-}
-if (typeof handleQuickStockInAllInOne !== 'function') {
-  throw new Error('[quickStockRoutes] handleQuickStockInAllInOne is not a function')
-}
-if (typeof handleQuickStockExistingReceive !== 'function') {
-  throw new Error('[quickStockRoutes] handleQuickStockExistingReceive is not a function')
-}
-if (typeof handleQuickReceiveDropdowns !== 'function') {
-  throw new Error('[quickStockRoutes] handleQuickReceiveDropdowns is not a function')
-}
+if (typeof verifyToken !== 'function') throw new Error('[quickStockRoutes] verifyToken middleware is not a function')
+if (typeof handleQuickEnroll !== 'function') throw new Error('[quickStockRoutes] handleQuickEnroll is not a function')
+if (typeof handleQuickStockInAllInOne !== 'function') throw new Error('[quickStockRoutes] handleQuickStockInAllInOne is not a function')
+if (typeof handleQuickStockExistingReceive !== 'function') throw new Error('[quickStockRoutes] handleQuickStockExistingReceive is not a function')
+if (typeof handleQuickReceiveDropdowns !== 'function') throw new Error('[quickStockRoutes] handleQuickReceiveDropdowns is not a function')
 
 const cleanRole = (r) => String(r || '').trim().toUpperCase()
 const allowQuickStockForEmployeeContext = (req, res, next) => {
@@ -57,9 +47,10 @@ router.post('/quick-enroll', handleQuickEnroll)
 router.post('/all-in-one', handleQuickStockInAllInOne)
 router.post('/existing', handleQuickStockExistingReceive)
 
-// Quick Receipt Session: one delivery note, many product types, resumable draft.
+// Quick Receipt Session: one delivery note, many product types, resumable or one-shot.
 router.get('/receipts', quickReceiptSessionController.list)
 router.post('/receipts', quickReceiptSessionController.create)
+router.post('/receipts/complete', quickReceiptSessionController.complete)
 router.get('/receipts/:id', quickReceiptSessionController.detail)
 router.patch('/receipts/:id', quickReceiptSessionController.update)
 router.post('/receipts/:id/items', quickReceiptSessionController.addItem)
