@@ -89,6 +89,7 @@ function validateExternalDeviceIntake(payload = {}) {
 
   const serialNumber = optionalText(device.serialNumber, 'Serial Number', 255);
   const imei = optionalText(device.imei, 'IMEI', 255);
+  const barcode = optionalText(device.barcode, 'Barcode/QR ร้าน', 255);
 
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
@@ -98,6 +99,7 @@ function validateExternalDeviceIntake(payload = {}) {
       model: requiredText(device.model, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
       serialNumber,
       imei,
+      barcode,
     },
     customerProblem: requiredText(payload.customerProblem, 'อาการที่ลูกค้าแจ้ง', 4000),
     internalRemark: optionalText(payload.internalRemark, 'หมายเหตุภายใน', 4000),
