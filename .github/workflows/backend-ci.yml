@@ -167,6 +167,9 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Bootstrap base schema
+        run: npx prisma db push --skip-generate
+
       - name: Apply Tax STEP 004 migration
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260727233000_add_tax_intake_foundation/migration.sql
 
