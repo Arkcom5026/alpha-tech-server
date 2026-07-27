@@ -3,10 +3,12 @@ const repository = require('./repairTrackingAccessRepository');
 
 const DEFAULT_EXPIRY_DAYS = 90;
 
-function createHttpError(status, code, message) {
+function createHttpError(statusCode, code, message) {
   const error = new Error(message);
-  error.status = status;
+  error.statusCode = statusCode;
+  error.status = statusCode;
   error.code = code;
+  error.isOperational = true;
   return error;
 }
 
@@ -19,26 +21,31 @@ function mapCustomerStatus(status) {
     RECEIVED: {
       code: 'RECEIVED',
       label: 'ร้านรับอุปกรณ์แล้ว',
+      description: 'อุปกรณ์อยู่กับร้านและรอการตรวจสอบ',
       stage: 1,
     },
     IN_PROGRESS: {
       code: 'IN_PROGRESS',
       label: 'กำลังตรวจสอบหรือดำเนินการ',
+      description: 'ช่างกำลังตรวจสอบหรือซ่อมอุปกรณ์',
       stage: 2,
     },
     WAITING_PARTS: {
       code: 'WAITING_PARTS',
       label: 'กำลังรออะไหล่',
+      description: 'ร้านกำลังจัดเตรียมหรือรออะไหล่ที่จำเป็น',
       stage: 3,
     },
     COMPLETED: {
       code: 'READY',
-      label: 'ดำเนินการเสร็จแล้ว กรุณาติดต่อร้าน',
+      label: 'ดำเนินการเสร็จแล้ว',
+      description: 'กรุณาติดต่อร้านเพื่อรับอุปกรณ์',
       stage: 4,
     },
     CANCELLED: {
       code: 'CANCELLED',
       label: 'ยุติการดำเนินงาน',
+      description: 'รายการนี้ถูกยกเลิกหรือยุติแล้ว',
       stage: 0,
     },
   };
@@ -46,31 +53,102 @@ function mapCustomerStatus(status) {
   return map[status] || {
     code: 'IN_PROGRESS',
     label: 'กำลังดำเนินการ',
+    description: 'กรุณาติดต่อร้านหากต้องการข้อมูลเพิ่มเติม',
     stage: 2,
+  };
+}
+
+function mapClaimStatus(claim) {
+  if (!claim) return null;
+  const completed = ['RESOLVED', 'CANCELLED', 'REJECTED'].includes(claim.status);
+  return {
+    claimNo: claim.claimNo,
+    status: claim.status,
+    label: completed ? 'ดำเนินการเคลมเสร็จสิ้น' : 'อยู่ระหว่างดำเนินการเคลม',
+    serviceProvider: claim.serviceProvider || null,
+    openedAt: claim.openedAt,
+    lastUpdatedAt: claim.updatedAt,
   };
 }
 
 function toPublicProjection(job) {
   const product = job.stockItem?.product;
+  const intakeSnapshot = job.deviceIntake?.snapshot;
+  const registeredDevice = job.device;
+  const currentStatus = mapCustomerStatus(job.status);
+  const device = {
+    displayName:
+      product?.name ||
+      [registeredDevice?.brand, registeredDevice?.model].filter(Boolean).join(' ') ||
+      [intakeSnapshot?.brand, intakeSnapshot?.model].filter(Boolean).join(' ') ||
+      job.deviceModel,
+    model: registeredDevice?.model || intakeSnapshot?.model || job.deviceModel,
+    brand: product?.brand?.name || registeredDevice?.brand || intakeSnapshot?.brand || null,
+    type: product?.productType?.name || registeredDevice?.category || null,
+    serialNumber:
+      job.stockItem?.serialNumber ||
+      registeredDevice?.serialNumber ||
+      intakeSnapshot?.serialNumber ||
+      null,
+    imei: registeredDevice?.imei || intakeSnapshot?.imei || null,
+    barcode:
+      job.stockItem?.barcode ||
+      registeredDevice?.barcode ||
+      intakeSnapshot?.barcode ||
+      null,
+  };
+
+  const publicEvents = (registeredDevice?.passportEvents || []).map((event) => ({
+    type: event.eventType,
+    title: event.title,
+    description: event.description || null,
+    occurredAt: event.occurredAt,
+  }));
+
+  const timeline = [
+    {
+      type: 'RECEIVED',
+      title: 'ร้านรับอุปกรณ์แล้ว',
+      description: 'บันทึกรายการรับอุปกรณ์เข้าสู่ระบบเรียบร้อยแล้ว',
+      occurredAt: job.deviceIntake?.receivedAt || job.createdAt,
+    },
+    ...publicEvents,
+  ];
+
+  if (job.updatedAt && new Date(job.updatedAt).getTime() !== new Date(job.createdAt).getTime()) {
+    timeline.push({
+      type: currentStatus.code,
+      title: currentStatus.label,
+      description: currentStatus.description,
+      occurredAt: job.updatedAt,
+    });
+  }
+
   return {
     contractVersion: 'repair-customer-tracking.v1',
     repair: {
       jobNo: job.jobNo,
-      device: {
-        displayName: product?.name || job.deviceModel,
-        model: job.deviceModel,
-        brand: product?.brand?.name || null,
-        type: product?.productType?.name || null,
-        serialNumber: job.stockItem?.serialNumber || null,
-        barcode: job.stockItem?.barcode || null,
-      },
+      intakeReference: job.deviceIntake?.referenceNo || null,
+      device,
       reportedSymptoms: job.reportedSymptoms,
-      status: mapCustomerStatus(job.status),
+      status: currentStatus,
       estimate: {
         amount: Number(job.estimatedCost || 0),
+        depositPaid: Number(job.depositPaid || 0),
+        estimatedBalance: Math.max(
+          Number(job.estimatedCost || 0) - Number(job.depositPaid || 0),
+          0
+        ),
         currency: 'THB',
       },
-      receivedAt: job.createdAt,
+      accessories: (job.deviceIntake?.accessories || []).map((item) => ({
+        type: item.accessoryType,
+        quantity: item.quantity,
+        remark: item.remark || null,
+      })),
+      claim: mapClaimStatus(job.warrantyClaims?.[0]),
+      timeline,
+      receivedAt: job.deviceIntake?.receivedAt || job.createdAt,
       lastUpdatedAt: job.updatedAt,
     },
     branch: {
@@ -105,6 +183,7 @@ async function issue(actor, repairJobId, options = {}) {
   });
 
   return {
+    contractVersion: 'repair-tracking-access.v1',
     accessId: access.id,
     repairJobId: job.id,
     jobNo: job.jobNo,
@@ -148,4 +227,7 @@ module.exports = {
   rotate: issue,
   revoke,
   getPublicTracking,
+  hashToken,
+  mapCustomerStatus,
+  toPublicProjection,
 };
