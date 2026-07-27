@@ -19,6 +19,9 @@ const {
   updateRepairJobStatus,
 } = require('../status/updateRepairJobStatusController');
 const {
+  transitionRepairWorkflow,
+} = require('../workflow/http/transitionRepairWorkflowController');
+const {
   addRepairPart,
 } = require('../parts/addRepairPartController');
 const {
@@ -101,6 +104,12 @@ router.delete(
   '/jobs/:id/tracking-access',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   revokeTrackingAccess
+);
+
+router.post(
+  '/jobs/:id/workflow/commands',
+  allowRepairRoles(...OPERATION_ROLES),
+  transitionRepairWorkflow
 );
 
 router.patch(
