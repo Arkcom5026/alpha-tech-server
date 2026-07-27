@@ -71,6 +71,7 @@ const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
+const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
 
 // Optional SIMPLE routes
 let simpleStockRoutes = null;
@@ -220,6 +221,7 @@ app.use('/api/quick-receipts', quickReceiptRoutes);
 app.use('/api/stocks', stockRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/upload-product', uploadProductRoutes);
+app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
 
 if (simpleStockRoutes) {
