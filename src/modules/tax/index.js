@@ -9,6 +9,7 @@
 module.exports = Object.freeze({
   intake: Object.freeze({
     registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
+    registerSaleCandidate: require('./sources/sale/registerSaleTaxCandidateService').registerSaleTaxCandidate,
     routes: require('./http/taxIntakeRoutes'),
     service: require('./http/taxIntakeService'),
   }),
@@ -19,6 +20,7 @@ module.exports = Object.freeze({
   documents: Object.freeze({
     contracts: require('./documents/contracts/taxDocumentContract'),
     lifecycle: require('./documents/lifecycle/taxDocumentLifecycle'),
+    transition: require('./documents/lifecycle/transitionTaxDocumentService').transitionTaxDocument,
   }),
   periods: Object.freeze({
     routes: require('./periods/taxPeriodRoutes'),
