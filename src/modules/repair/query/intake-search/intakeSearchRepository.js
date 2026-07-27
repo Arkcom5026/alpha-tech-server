@@ -37,6 +37,36 @@ const deviceSelect = {
   },
 };
 
+const registeredDeviceSelect = {
+  id: true,
+  barcode: true,
+  serialNumber: true,
+  imei: true,
+  category: true,
+  brand: true,
+  model: true,
+  status: true,
+  branchId: true,
+  currentOwner: {
+    select: {
+      id: true,
+      name: true,
+      companyName: true,
+      user: { select: { loginId: true, email: true } },
+    },
+  },
+  repairJobs: {
+    take: 1,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      jobNo: true,
+      status: true,
+      createdAt: true,
+    },
+  },
+};
+
 const customerSelect = {
   id: true,
   name: true,
@@ -54,11 +84,12 @@ class IntakeSearchRepository {
 
   async search(branchId, query, limit = 10) {
     const insensitive = { contains: query, mode: 'insensitive' };
+    const normalizedBranchId = Number(branchId);
 
-    const [devices, customers] = await Promise.all([
+    const [devices, registeredDevices, customers] = await Promise.all([
       this.prisma.stockItem.findMany({
         where: {
-          branchId: Number(branchId),
+          branchId: normalizedBranchId,
           OR: [
             { barcode: insensitive },
             { serialNumber: insensitive },
@@ -68,6 +99,22 @@ class IntakeSearchRepository {
           ],
         },
         select: deviceSelect,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: limit,
+      }),
+      this.prisma.device.findMany({
+        where: {
+          branchId: normalizedBranchId,
+          stockItemId: null,
+          OR: [
+            { barcode: insensitive },
+            { serialNumber: insensitive },
+            { imei: insensitive },
+            { brand: insensitive },
+            { model: insensitive },
+          ],
+        },
+        select: registeredDeviceSelect,
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
         take: limit,
       }),
@@ -87,7 +134,7 @@ class IntakeSearchRepository {
       }),
     ]);
 
-    return { devices, customers };
+    return { devices, registeredDevices, customers };
   }
 }
 
