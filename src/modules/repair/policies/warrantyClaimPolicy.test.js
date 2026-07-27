@@ -6,7 +6,7 @@ const {
   assertResolutionRequirements,
 } = require('./warrantyClaimPolicy');
 
-test('requires an existing non-terminal repair job linked to stock identity', () => {
+test('requires an existing non-terminal repair job linked to stock or device identity', () => {
   assert.throws(() => assertRepairCanOpenClaim(null), {
     code: 'REPAIR_JOB_NOT_FOUND',
     status: 'fail',
@@ -16,11 +16,26 @@ test('requires an existing non-terminal repair job linked to stock identity', ()
     { code: 'REPAIR_JOB_TERMINAL', status: 'fail' }
   );
   assert.throws(
-    () => assertRepairCanOpenClaim({ status: 'IN_PROGRESS', stockItemId: null, stockItem: null }),
+    () => assertRepairCanOpenClaim({
+      status: 'IN_PROGRESS',
+      stockItemId: null,
+      stockItem: null,
+      deviceId: null,
+      device: null,
+    }),
     { code: 'WARRANTY_STOCK_ITEM_REQUIRED', status: 'fail' }
   );
   assert.doesNotThrow(() =>
     assertRepairCanOpenClaim({ status: 'IN_PROGRESS', stockItemId: 1, stockItem: { id: 1 } })
+  );
+  assert.doesNotThrow(() =>
+    assertRepairCanOpenClaim({
+      status: 'IN_PROGRESS',
+      stockItemId: null,
+      stockItem: null,
+      deviceId: 2,
+      device: { id: 2 },
+    })
   );
 });
 
