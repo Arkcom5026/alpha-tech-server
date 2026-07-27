@@ -48,6 +48,17 @@ test('mapRepairJob converts numeric values and preserves empty collections', () 
     customer: { companyName: 'Customer Co.' },
     stockItemId: null,
     stockItem: null,
+    deviceId: 41,
+    device: {
+      id: 41,
+      category: 'NOTEBOOK',
+      brand: 'Acer',
+      model: 'Aspire',
+      serialNumber: '11223344',
+      imei: null,
+      barcode: null,
+      status: 'IN_REPAIR',
+    },
     deviceModel: 'Model X',
     reportedSymptoms: 'No power',
     technicianNotes: null,
@@ -65,6 +76,9 @@ test('mapRepairJob converts numeric values and preserves empty collections', () 
   assert.equal(result.estimatedCost, 1500.5);
   assert.equal(result.depositPaid, null);
   assert.equal(result.stockItem, null);
+  assert.equal(result.deviceId, 41);
+  assert.equal(result.device.serialNumber, '11223344');
+  assert.equal(result.device.brand, 'Acer');
   assert.deepEqual(result.partsUsed, []);
   assert.deepEqual(result.warrantyClaims, []);
 });
