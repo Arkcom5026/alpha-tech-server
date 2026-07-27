@@ -9,7 +9,7 @@
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "test:inventory": "node scripts/run-module-tests.js --list",
     "test:modules": "node scripts/run-module-tests.js",
-    "test:tax-intake": "node tests/tax-intake-foundation.contract.test.js && node tests/tax-intake-http.contract.test.js && node tests/tax-lifecycle-sale-source.contract.test.js && node tests/tax-step-004-sales-publication.contract.test.js",
+    "test:tax-intake": "node tests/tax-intake-foundation.contract.test.js && node tests/tax-intake-http.contract.test.js && node tests/tax-lifecycle-sale-source.contract.test.js && node tests/tax-step-004-sales-publication.contract.test.js && node tests/tax-step-004-completion.contract.test.js",
     "test:certification": "npm run test:regression && npm run test:modules && npm run test:tax-intake",
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.bootstrap.js",
     "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
