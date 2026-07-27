@@ -62,6 +62,7 @@ class RepairTrackingAccessRepository {
         reportedSymptoms: true,
         status: true,
         estimatedCost: true,
+        depositPaid: true,
         createdAt: true,
         updatedAt: true,
         branch: { select: { name: true, phone: true, address: true } },
@@ -76,6 +77,61 @@ class RepairTrackingAccessRepository {
                 productType: { select: { name: true } },
               },
             },
+          },
+        },
+        device: {
+          select: {
+            id: true,
+            barcode: true,
+            serialNumber: true,
+            imei: true,
+            brand: true,
+            model: true,
+            category: true,
+            passportEvents: {
+              where: { customerVisible: true },
+              orderBy: { occurredAt: 'asc' },
+              take: 30,
+              select: {
+                eventType: true,
+                title: true,
+                description: true,
+                occurredAt: true,
+              },
+            },
+          },
+        },
+        deviceIntake: {
+          select: {
+            referenceNo: true,
+            receivedAt: true,
+            snapshot: {
+              select: {
+                brand: true,
+                model: true,
+                serialNumber: true,
+                imei: true,
+                barcode: true,
+              },
+            },
+            accessories: {
+              select: {
+                accessoryType: true,
+                quantity: true,
+                remark: true,
+              },
+            },
+          },
+        },
+        warrantyClaims: {
+          orderBy: { openedAt: 'desc' },
+          take: 1,
+          select: {
+            claimNo: true,
+            status: true,
+            serviceProvider: true,
+            openedAt: true,
+            updatedAt: true,
           },
         },
       },
