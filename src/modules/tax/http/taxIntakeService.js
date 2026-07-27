@@ -2,7 +2,9 @@
 
 const candidateRepository = require('../candidates/repository/taxCandidateRepository');
 const documentRepository = require('../documents/repository/taxDocumentRepository');
+const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
+const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 
 const requirePositiveInt = (value, code, fieldName) => {
   const parsed = Number(value);
@@ -45,5 +47,7 @@ module.exports = Object.freeze({
   getDocumentDetail,
   listCandidates,
   listDocuments,
+  registerSaleTaxCandidate,
   registerTaxCandidate,
+  transitionTaxDocument,
 });
