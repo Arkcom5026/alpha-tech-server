@@ -13,6 +13,7 @@ const repairJobDetailInclude = {
       },
     },
   },
+  device: true,
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
