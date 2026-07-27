@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { Prisma } = require('../../../lib/prisma');
 
 const {
   ListSuppliersService,
@@ -9,11 +10,6 @@ const { GetSupplierService } = require('./query/detail/getSupplierSlice');
 const { CreateSupplierService } = require('./create/createSupplierSlice');
 const { UpdateSupplierService } = require('./update/updateSupplierSlice');
 const { DeleteSupplierService } = require('./delete/deleteSupplierSlice');
-
-const decimalLike = (value) => ({
-  toNumber: () => value,
-  minus: (other) => decimalLike(value - Number(other?.toNumber ? other.toNumber() : other)),
-});
 
 test('list repository preserves branch scope, system visibility and search projection', async () => {
   let received;
@@ -35,7 +31,11 @@ test('list repository preserves branch scope, system visibility and search proje
 
 test('list service maps decimal credit values and remaining credit', async () => {
   const service = new ListSuppliersService({
-    findMany: async () => [{ id: 1, creditLimit: decimalLike(1000), creditBalance: decimalLike(250) }],
+    findMany: async () => [{
+      id: 1,
+      creditLimit: new Prisma.Decimal(1000),
+      creditBalance: new Prisma.Decimal(250),
+    }],
   });
   const [supplier] = await service.execute(1, {});
   assert.equal(supplier.creditLimit, 1000);
