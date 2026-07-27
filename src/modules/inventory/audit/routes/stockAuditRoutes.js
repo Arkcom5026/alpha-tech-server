@@ -1,14 +1,14 @@
 const express = require('express');
 const verifyToken = require('../../../../../middlewares/verifyToken');
+const { startReadyAudit } = require('../start/startAuditController');
 const { getActiveReadySession } = require('../query/active/getActiveAuditController');
 const { getOverview } = require('../query/overview/getAuditOverviewController');
+const { listAuditItems } = require('../query/items/listAuditItemsController');
 const {
-  startReadyAudit,
   scanBarcode,
   scanSn,
   confirmAudit,
   cancelAudit,
-  listAuditItems,
 } = require('../../../../../controllers/stockAuditController');
 
 const router = express.Router();
