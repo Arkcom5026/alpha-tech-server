@@ -24,6 +24,12 @@ const enumDefinitions = {
     'CHARGER', 'POWER_ADAPTER', 'CABLE', 'BATTERY', 'BAG_CASE',
     'SIM_CARD', 'MEMORY_CARD', 'OTHER',
   ],
+  DeviceIntakeAuditEvent: [
+    'CREATED', 'UPDATED', 'SNAPSHOT_RECORDED', 'CONDITION_RECORDED',
+    'ACCESSORY_ADDED', 'ACCESSORY_REMOVED', 'CONSENT_SIGNED',
+    'PHOTO_ADDED', 'DOCUMENT_ADDED', 'CHECKLIST_UPDATED',
+    'LINKED_TO_REPAIR', 'STATUS_CHANGED', 'CANCELLED',
+  ],
   DeviceStatus: [
     'ACTIVE', 'IN_REPAIR', 'IN_WARRANTY_CLAIM', 'RETIRED', 'LOST',
   ],
@@ -163,6 +169,54 @@ CREATE INDEX IF NOT EXISTS "DeviceIntakeAccessory_deviceIntakeId_idx"
 CREATE INDEX IF NOT EXISTS "DeviceIntakeAccessory_accessoryType_idx"
   ON "DeviceIntakeAccessory"("accessoryType");
 
+CREATE TABLE IF NOT EXISTS "DeviceIntakeConsent" (
+  "id" SERIAL PRIMARY KEY,
+  "deviceIntakeId" INTEGER NOT NULL,
+  "allowDataErase" BOOLEAN NOT NULL DEFAULT false,
+  "allowFactoryReset" BOOLEAN NOT NULL DEFAULT false,
+  "allowDisassembly" BOOLEAN NOT NULL DEFAULT false,
+  "allowOutsourceRepair" BOOLEAN NOT NULL DEFAULT false,
+  "customerSignature" TEXT,
+  "signedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "DeviceIntakeConsent_deviceIntakeId_key"
+  ON "DeviceIntakeConsent"("deviceIntakeId");
+
+CREATE TABLE IF NOT EXISTS "DeviceIntakePhoto" (
+  "id" SERIAL PRIMARY KEY,
+  "deviceIntakeId" INTEGER NOT NULL,
+  "url" TEXT NOT NULL,
+  "storageKey" TEXT,
+  "category" TEXT,
+  "caption" TEXT,
+  "uploadedByEmployeeId" INTEGER,
+  "takenAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "DeviceIntakePhoto_deviceIntakeId_createdAt_idx"
+  ON "DeviceIntakePhoto"("deviceIntakeId", "createdAt");
+CREATE INDEX IF NOT EXISTS "DeviceIntakePhoto_uploadedByEmployeeId_idx"
+  ON "DeviceIntakePhoto"("uploadedByEmployeeId");
+
+CREATE TABLE IF NOT EXISTS "DeviceIntakeAudit" (
+  "id" SERIAL PRIMARY KEY,
+  "deviceIntakeId" INTEGER NOT NULL,
+  "eventType" "DeviceIntakeAuditEvent" NOT NULL,
+  "performedByEmployeeId" INTEGER,
+  "note" TEXT,
+  "metadata" JSONB,
+  "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "DeviceIntakeAudit_deviceIntakeId_occurredAt_idx"
+  ON "DeviceIntakeAudit"("deviceIntakeId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "DeviceIntakeAudit_performedByEmployeeId_occurredAt_idx"
+  ON "DeviceIntakeAudit"("performedByEmployeeId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "DeviceIntakeAudit_eventType_occurredAt_idx"
+  ON "DeviceIntakeAudit"("eventType", "occurredAt");
+
 CREATE TABLE IF NOT EXISTS "DeviceOwnershipHistory" (
   "id" SERIAL PRIMARY KEY,
   "deviceId" INTEGER NOT NULL,
@@ -238,6 +292,11 @@ const foreignKeys = [
   ['DeviceIntake_repairJobId_fkey', 'DeviceIntake', 'repairJobId', 'RepairJob', 'id', 'SET NULL'],
   ['DeviceIntakeSnapshot_deviceIntakeId_fkey', 'DeviceIntakeSnapshot', 'deviceIntakeId', 'DeviceIntake', 'id', 'CASCADE'],
   ['DeviceIntakeAccessory_deviceIntakeId_fkey', 'DeviceIntakeAccessory', 'deviceIntakeId', 'DeviceIntake', 'id', 'CASCADE'],
+  ['DeviceIntakeConsent_deviceIntakeId_fkey', 'DeviceIntakeConsent', 'deviceIntakeId', 'DeviceIntake', 'id', 'CASCADE'],
+  ['DeviceIntakePhoto_deviceIntakeId_fkey', 'DeviceIntakePhoto', 'deviceIntakeId', 'DeviceIntake', 'id', 'CASCADE'],
+  ['DeviceIntakePhoto_uploadedByEmployeeId_fkey', 'DeviceIntakePhoto', 'uploadedByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
+  ['DeviceIntakeAudit_deviceIntakeId_fkey', 'DeviceIntakeAudit', 'deviceIntakeId', 'DeviceIntake', 'id', 'CASCADE'],
+  ['DeviceIntakeAudit_performedByEmployeeId_fkey', 'DeviceIntakeAudit', 'performedByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
   ['DeviceOwnershipHistory_deviceId_fkey', 'DeviceOwnershipHistory', 'deviceId', 'Device', 'id', 'RESTRICT'],
   ['DeviceOwnershipHistory_customerId_fkey', 'DeviceOwnershipHistory', 'customerId', 'CustomerProfile', 'id', 'RESTRICT'],
   ['DeviceOwnershipHistory_createdByEmployeeId_fkey', 'DeviceOwnershipHistory', 'createdByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
@@ -344,6 +403,9 @@ async function main() {
         to_regclass('public."RepairTrackingAccess"') IS NOT NULL AS repair_tracking_access,
         to_regclass('public."RepairTrackingAccess_tokenHash_key"') IS NOT NULL AS tracking_token_identity,
         to_regclass('public."DeviceIntake"') IS NOT NULL AS intake,
+        to_regclass('public."DeviceIntakeConsent"') IS NOT NULL AS intake_consent,
+        to_regclass('public."DeviceIntakePhoto"') IS NOT NULL AS intake_photo,
+        to_regclass('public."DeviceIntakeAudit"') IS NOT NULL AS intake_audit,
         to_regclass('public."Device_branchId_barcode_key"') IS NOT NULL AS device_barcode_identity,
         EXISTS (
           SELECT 1

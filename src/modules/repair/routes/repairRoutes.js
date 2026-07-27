@@ -49,6 +49,11 @@ const {
   getPublicRepairTracking,
 } = require('../customer-access/repairTrackingAccessController');
 const {
+  getIntakeEvidence,
+  saveIntakeEvidence,
+} = require('../intake-evidence/intakeEvidenceController');
+const intakeEvidenceUpload = require('../intake-evidence/intakeEvidenceUpload');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -122,6 +127,19 @@ router.delete(
   '/jobs/:id/tracking-access',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   revokeTrackingAccess
+);
+
+router.get(
+  '/jobs/:id/intake-evidence',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  getIntakeEvidence
+);
+
+router.post(
+  '/jobs/:id/intake-evidence',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  intakeEvidenceUpload,
+  saveIntakeEvidence
 );
 
 router.post(
