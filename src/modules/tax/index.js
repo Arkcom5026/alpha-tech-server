@@ -9,6 +9,8 @@
 module.exports = Object.freeze({
   intake: Object.freeze({
     registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
+    routes: require('./http/taxIntakeRoutes'),
+    service: require('./http/taxIntakeService'),
   }),
   candidates: Object.freeze({
     contracts: require('./candidates/contracts/taxCandidateContract'),
