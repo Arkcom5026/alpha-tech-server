@@ -21,6 +21,7 @@ const walkJavaScriptFiles = (root) => {
     'coverage',
     'dist',
     'build',
+    'artifacts',
     'recovery',
     'migration-evidence',
   ]);
