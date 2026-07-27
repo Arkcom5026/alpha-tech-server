@@ -32,6 +32,7 @@ const repairJobDetailInclude = {
   branch: true,
   customer: { include: { user: true } },
   stockItem: { include: stockItemIntakeInclude },
+  device: true,
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
