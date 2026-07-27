@@ -13,6 +13,7 @@ const app = express();
 // Trust proxy (Render / reverse proxy)
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+app.disable('etag');
 
 // Request ID (for logs / support)
 app.use((req, res, next) => {
@@ -159,6 +160,14 @@ app.options('*', cors(corsOptions));
 
 morgan.token('reqId', (req) => req.id);
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms - reqId=:reqId'));
+
+// Operational API responses must always reflect current POS state.
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // ⚠️ TEMPORARY: Auth trace middleware
 const { traceRequest } = require('./middlewares/authTrace');
