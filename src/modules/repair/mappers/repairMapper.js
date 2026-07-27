@@ -61,6 +61,49 @@ function mapDeviceIdentity(device) {
   };
 }
 
+function mapRepairAsset(job) {
+  if (job.stockItem) {
+    return {
+      sourceType: 'STOCK_ITEM',
+      sourceId: job.stockItem.id,
+      displayName: job.stockItem.product?.name || job.deviceModel || 'สินค้าในร้าน',
+      brand: job.stockItem.product?.brand?.name || null,
+      category: job.stockItem.product?.productType?.name || null,
+      model: job.deviceModel || null,
+      barcode: job.stockItem.barcode || job.device?.barcode || null,
+      serialNumber: job.stockItem.serialNumber || job.device?.serialNumber || null,
+      imei: job.device?.imei || null,
+    };
+  }
+
+  if (job.device) {
+    const deviceName = [job.device.brand, job.device.model].filter(Boolean).join(' ');
+    return {
+      sourceType: 'CUSTOMER_DEVICE',
+      sourceId: job.device.id,
+      displayName: deviceName || job.deviceModel || 'อุปกรณ์ของลูกค้า',
+      brand: job.device.brand || null,
+      category: job.device.category || null,
+      model: job.device.model || job.deviceModel || null,
+      barcode: job.device.barcode || null,
+      serialNumber: job.device.serialNumber || null,
+      imei: job.device.imei || null,
+    };
+  }
+
+  return {
+    sourceType: 'DESCRIBED_DEVICE',
+    sourceId: null,
+    displayName: job.deviceModel || 'อุปกรณ์ที่ลูกค้านำมาซ่อม',
+    brand: null,
+    category: null,
+    model: job.deviceModel || null,
+    barcode: null,
+    serialNumber: null,
+    imei: null,
+  };
+}
+
 function mapRepairJob(job) {
   const customer = mapCustomer(job.customer);
 
@@ -75,6 +118,7 @@ function mapRepairJob(job) {
     stockItem: mapStockIdentity(job.stockItem),
     deviceId: job.deviceId ?? job.device?.id ?? null,
     device: mapDeviceIdentity(job.device),
+    repairAsset: mapRepairAsset(job),
     deviceModel: job.deviceModel,
     reportedSymptoms: job.reportedSymptoms,
     technicianNotes: job.technicianNotes,
@@ -171,4 +215,5 @@ module.exports = {
   mapWarrantyClaim,
   mapStockIdentity,
   mapDeviceIdentity,
+  mapRepairAsset,
 };
