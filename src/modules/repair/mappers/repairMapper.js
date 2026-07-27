@@ -104,6 +104,57 @@ function mapRepairAsset(job) {
   };
 }
 
+function mapClaimAsset(claim) {
+  if (claim.stockItem) {
+    return {
+      sourceType: 'STOCK_ITEM',
+      sourceId: claim.stockItem.id,
+      displayName:
+        claim.stockItem.product?.name ||
+        claim.repairJob?.deviceModel ||
+        'สินค้าในร้าน',
+      brand: claim.stockItem.product?.brand?.name || null,
+      category: claim.stockItem.product?.productType?.name || null,
+      model: claim.repairJob?.deviceModel || null,
+      barcode: claim.stockItem.barcode || claim.device?.barcode || null,
+      serialNumber:
+        claim.stockItem.serialNumber || claim.device?.serialNumber || null,
+      imei: claim.device?.imei || null,
+    };
+  }
+
+  if (claim.device) {
+    const deviceName = [claim.device.brand, claim.device.model]
+      .filter(Boolean)
+      .join(' ');
+    return {
+      sourceType: 'CUSTOMER_DEVICE',
+      sourceId: claim.device.id,
+      displayName:
+        deviceName || claim.repairJob?.deviceModel || 'อุปกรณ์ของลูกค้า',
+      brand: claim.device.brand || null,
+      category: claim.device.category || null,
+      model: claim.device.model || claim.repairJob?.deviceModel || null,
+      barcode: claim.device.barcode || null,
+      serialNumber: claim.device.serialNumber || null,
+      imei: claim.device.imei || null,
+    };
+  }
+
+  return {
+    sourceType: 'DESCRIBED_DEVICE',
+    sourceId: null,
+    displayName:
+      claim.repairJob?.deviceModel || 'อุปกรณ์ในรายการเคลม',
+    brand: null,
+    category: null,
+    model: claim.repairJob?.deviceModel || null,
+    barcode: null,
+    serialNumber: null,
+    imei: null,
+  };
+}
+
 function mapRepairJob(job) {
   const customer = mapCustomer(job.customer);
 
@@ -155,6 +206,8 @@ function mapRepairJob(job) {
 }
 
 function mapWarrantyClaim(claim) {
+  const customer = mapCustomer(claim.repairJob?.customer);
+
   return {
     id: claim.id,
     claimNo: claim.claimNo,
@@ -163,6 +216,7 @@ function mapWarrantyClaim(claim) {
     stockItem: mapStockIdentity(claim.stockItem),
     deviceId: claim.deviceId ?? claim.device?.id ?? null,
     device: mapDeviceIdentity(claim.device),
+    claimAsset: mapClaimAsset(claim),
     repairJobId: claim.repairJobId,
     repairJob: claim.repairJob
       ? {
@@ -170,9 +224,25 @@ function mapWarrantyClaim(claim) {
           jobNo: claim.repairJob.jobNo,
           status: claim.repairJob.status,
           customerId: claim.repairJob.customerId,
-          customerName: customerName(claim.repairJob.customer),
+          customerName: customer?.name || null,
+          customer,
+          deviceModel: claim.repairJob.deviceModel,
+          reportedSymptoms: claim.repairJob.reportedSymptoms,
         }
       : null,
+    source: claim.repairJob
+      ? {
+          type: 'REPAIR_JOB',
+          id: claim.repairJob.id,
+          referenceNo: claim.repairJob.jobNo,
+          label: 'งานซ่อม',
+        }
+      : {
+          type: 'DIRECT_CLAIM',
+          id: null,
+          referenceNo: null,
+          label: 'เคลมโดยตรง',
+        },
     repairLinkState: claim.repairLinkState,
     supplier: claim.supplier
       ? {
@@ -216,4 +286,5 @@ module.exports = {
   mapStockIdentity,
   mapDeviceIdentity,
   mapRepairAsset,
+  mapClaimAsset,
 };
