@@ -2,6 +2,11 @@
 // QuickStock Runtime Repository
 // Data-access layer only. Keep business decisions in QuickStockService.
 
+const {
+  createStockMovement,
+  createStockMovements,
+} = require('../../../inventory/movement/stockMovementWriter')
+
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return null
   const n = Number.parseInt(value, 10)
@@ -255,13 +260,13 @@ class QuickStockRepository {
   async createStockMovements({ db, data = [] } = {}) {
     const client = this.client(db)
 
-    return client.stockMovement.createMany({ data })
+    return createStockMovements(client, data)
   }
 
   async createStockMovement({ db, data } = {}) {
     const client = this.client(db)
 
-    return client.stockMovement.create({ data })
+    return createStockMovement(client, data)
   }
 
   async createSimpleLot({ db, data } = {}) {
