@@ -12,11 +12,11 @@ function normalizeReceivePayload(req, _res, next) {
     const body = req.body || {}
     if (body && typeof body === 'object') {
       if (typeof body.barcode === 'string') {
-        req.body = { ...body, barcode: { barcode: body.barcode, serialNumber: body.serialNumber } }
+        req.body = { barcode: { barcode: body.barcode, serialNumber: body.serialNumber } }
       } else if (body.barcode && typeof body.barcode === 'object' && typeof body.barcode.barcode === 'string') {
         // already normalized
       } else if (typeof body.code === 'string') {
-        req.body = { ...body, barcode: { barcode: body.code, serialNumber: body.serialNumber } }
+        req.body = { barcode: { barcode: body.code, serialNumber: body.serialNumber } }
       }
     }
   } catch (_) {}
