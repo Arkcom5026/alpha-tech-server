@@ -24,10 +24,12 @@ function assertRepairCanOpenClaim(job) {
     );
   }
 
-  if (!job.stockItemId || !job.stockItem) {
+  const hasStockIdentity = Boolean(job.stockItemId && job.stockItem);
+  const hasDeviceIdentity = Boolean(job.deviceId && job.device);
+  if (!hasStockIdentity && !hasDeviceIdentity) {
     throw new RepairError(
       RepairFailureCode.WARRANTY_STOCK_ITEM_REQUIRED,
-      'งานซ่อมนี้ยังไม่ได้ผูกกับสินค้าที่มีตัวตนในสต็อก จึงยังเปิดเคลมไม่ได้',
+      'งานซ่อมนี้ยังไม่ได้ผูกกับ StockItem หรือ Device จึงยังเปิดเคลมไม่ได้',
       409
     );
   }
