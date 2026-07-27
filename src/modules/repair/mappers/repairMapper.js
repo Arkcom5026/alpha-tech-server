@@ -13,6 +13,18 @@ function customerName(customer) {
   );
 }
 
+function mapCustomer(customer) {
+  if (!customer) return null;
+
+  return {
+    id: customer.id,
+    name: customerName(customer),
+    phone: customer.phone || customer.user?.phone || null,
+    email: customer.email || customer.user?.email || null,
+    companyName: customer.companyName || null,
+  };
+}
+
 function mapStockIdentity(stockItem) {
   if (!stockItem) return null;
   return {
@@ -50,12 +62,15 @@ function mapDeviceIdentity(device) {
 }
 
 function mapRepairJob(job) {
+  const customer = mapCustomer(job.customer);
+
   return {
     id: job.id,
     jobNo: job.jobNo,
     branchId: job.branchId,
     customerId: job.customerId,
-    customerName: customerName(job.customer),
+    customerName: customer?.name || null,
+    customer,
     stockItemId: job.stockItemId,
     stockItem: mapStockIdentity(job.stockItem),
     deviceId: job.deviceId ?? job.device?.id ?? null,
