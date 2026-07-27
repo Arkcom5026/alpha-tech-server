@@ -83,7 +83,8 @@ class OpenWarrantyClaimService {
         const claim = await repo.createWarrantyClaim(
           {
             branchId: actor.branchId,
-            stockItemId: job.stockItemId,
+            stockItemId: job.stockItemId || null,
+            deviceId: job.deviceId || null,
             supplierId: selectedSupplierId,
             repairJobId: job.id,
             repairLinkState: 'LINKED_VERIFIED',
