@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS "Device" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "Device_fingerprint_key"
   ON "Device"("fingerprint");
+CREATE UNIQUE INDEX IF NOT EXISTS "Device_branchId_barcode_key"
+  ON "Device"("branchId", "barcode");
 CREATE INDEX IF NOT EXISTS "Device_branchId_idx" ON "Device"("branchId");
 CREATE INDEX IF NOT EXISTS "Device_currentOwnerCustomerId_idx"
   ON "Device"("currentOwnerCustomerId");
@@ -318,6 +320,7 @@ async function main() {
       SELECT
         to_regclass('public."Device"') IS NOT NULL AS device,
         to_regclass('public."DeviceIntake"') IS NOT NULL AS intake,
+        to_regclass('public."Device_branchId_barcode_key"') IS NOT NULL AS device_barcode_identity,
         EXISTS (
           SELECT 1
           FROM information_schema.columns
