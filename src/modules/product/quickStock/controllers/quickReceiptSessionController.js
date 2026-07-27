@@ -7,12 +7,30 @@ const getActor = (req) => ({
   branchId: req.employee?.branchId || req.user?.branchId || null,
   employeeId: req.employee?.id || req.user?.employeeId || null,
 })
-const sendError = (res, error) => res.status(error?.statusCode || error?.status || 500).json({
-  success: false,
-  code: error?.code || 'QUICK_RECEIPT_FAILED',
-  message: error?.message || 'ดำเนินการรับสินค้าด่วนไม่สำเร็จ',
-  details: error?.details,
-})
+const normalizeError = (error) => {
+  const databaseCode = error?.meta?.code || error?.code
+  const databaseText = `${error?.message || ''} ${error?.meta?.message || ''} ${error?.meta?.cause || ''}`
+  const isUniqueViolation = databaseCode === '23505' || databaseCode === 'P2002' || /unique constraint|duplicate key/i.test(databaseText)
+  const isInventoryIdentity = /StockItem_barcode_ci_unique|SimpleLot_barcode_ci_unique|StockItem_serialNumber_ci_unique|barcode|serialNumber/i.test(databaseText)
+
+  if (isUniqueViolation && isInventoryIdentity) {
+    const conflict = new Error('Barcode หรือ Serial Number นี้มีอยู่ในระบบแล้ว')
+    conflict.statusCode = 409
+    conflict.code = 'INVENTORY_IDENTITY_ALREADY_EXISTS'
+    conflict.details = { databaseCode }
+    return conflict
+  }
+  return error
+}
+const sendError = (res, rawError) => {
+  const error = normalizeError(rawError)
+  return res.status(error?.statusCode || error?.status || 500).json({
+    success: false,
+    code: error?.code || 'QUICK_RECEIPT_FAILED',
+    message: error?.message || 'ดำเนินการรับสินค้าด่วนไม่สำเร็จ',
+    details: error?.details,
+  })
+}
 const requireActor = (req, res) => {
   const actor = getActor(req)
   if (!actor.branchId || !actor.employeeId) {
