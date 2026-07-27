@@ -2,7 +2,9 @@
   "name": "your-project",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "npm run db:ensure-device-intake",
     "start": "node server.js",
+    "db:ensure-device-intake": "node scripts/ensure-device-intake-foundation.js",
     "dev": "nodemon server.js",
     "test": "npm run test:certification",
     "test:regression": "node tests/customer-receipt-auth-regression.test.js",
