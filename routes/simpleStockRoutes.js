@@ -7,8 +7,10 @@ const {
   pingSimple,
   createSimpleReceipt,
   createSimpleSale,
-  createSimpleAdjustment,
 } = require('../controllers/simpleStockController');
+const {
+  createSimpleAdjustment,
+} = require('../src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentController');
 
 // ✅ ใช้ middleware เดียวกับไฟล์เดิม
 const verifyToken = require('../middlewares/verifyToken');

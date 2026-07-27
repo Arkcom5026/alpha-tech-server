@@ -18,17 +18,33 @@ const resolveProductInventoryPolicy = (product = {}) =>
     inventoryBehavior: product.inventoryBehavior,
   })
 
-const assertProductCanReceive = (product = {}) => {
+const assertTrackedProductOperation = (product, { nonStockCode, simpleOnlyCode } = {}) => {
   const policy = resolveProductInventoryPolicy(product)
 
   if (policy.inventoryBehavior === PRODUCT_INVENTORY_BEHAVIOR.NON_STOCK) {
-    throw inventoryMutationError('NON_STOCK_PRODUCT_CANNOT_BE_RECEIVED')
+    throw inventoryMutationError(nonStockCode)
+  }
+
+  if (simpleOnlyCode && policy.mode !== 'SIMPLE') {
+    throw inventoryMutationError(simpleOnlyCode)
   }
 
   return policy
 }
 
+const assertProductCanReceive = (product = {}) =>
+  assertTrackedProductOperation(product, {
+    nonStockCode: 'NON_STOCK_PRODUCT_CANNOT_BE_RECEIVED',
+  })
+
+const assertProductCanAdjustSimpleStock = (product = {}) =>
+  assertTrackedProductOperation(product, {
+    nonStockCode: 'NON_STOCK_PRODUCT_CANNOT_BE_ADJUSTED',
+    simpleOnlyCode: 'SIMPLE_ADJUSTMENT_REQUIRES_SIMPLE_MODE',
+  })
+
 module.exports = {
+  assertProductCanAdjustSimpleStock,
   assertProductCanReceive,
   resolveProductInventoryPolicy,
 }
