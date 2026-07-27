@@ -1,0 +1,132 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  TransitionRepairWorkflowService,
+} = require('./transitionRepairWorkflowService');
+
+function repairJob(overrides = {}) {
+  return {
+    id: 41,
+    jobNo: 'RE-3-41',
+    branchId: 3,
+    deviceId: 55,
+    status: 'RECEIVED',
+    device: { id: 55, passportEvents: [] },
+    ...overrides,
+  };
+}
+
+function repositoryFor(job) {
+  const calls = {};
+  return {
+    calls,
+    transaction(work) {
+      return work({
+        findRepairJob: async () => job,
+        updateLegacyStatus: async (id, status) => {
+          calls.update = { id, status };
+          return { ...job, status };
+        },
+        publishPassportEvent: async (event) => {
+          calls.event = event;
+          return { id: 91, ...event };
+        },
+      });
+    },
+  };
+}
+
+test('applies a transition and passport event in one transaction boundary', async () => {
+  const repo = repositoryFor(repairJob());
+  const service = new TransitionRepairWorkflowService(repo);
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'QUEUE_DIAGNOSIS',
+      commandKey: 'queue-diagnosis-1',
+      expectedWorkflowStatus: 'RECEIVED',
+    }
+  );
+
+  assert.deepEqual(repo.calls.update, { id: 41, status: 'RECEIVED' });
+  assert.equal(repo.calls.event.eventType, 'REPAIR_STATUS_CHANGED');
+  assert.equal(repo.calls.event.eventKey, 'repair-workflow:41:queue-diagnosis-1');
+  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'WAITING_DIAGNOSIS');
+  assert.equal(result.status, 'WAITING_DIAGNOSIS');
+  assert.equal(result.passportEventId, 91);
+});
+
+test('uses the latest device passport workflow target as current authority', async () => {
+  const job = repairJob({
+    status: 'IN_PROGRESS',
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'DIAGNOSING' } }],
+    },
+  });
+  const repo = repositoryFor(job);
+  const service = new TransitionRepairWorkflowService(repo);
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'COMPLETE_DIAGNOSIS',
+      commandKey: 'diagnosis-complete-1',
+      expectedWorkflowStatus: 'DIAGNOSING',
+    }
+  );
+
+  assert.equal(result.previousStatus, 'DIAGNOSING');
+  assert.equal(result.status, 'WAITING_APPROVAL');
+  assert.equal(repo.calls.update.status, 'IN_PROGRESS');
+  assert.equal(repo.calls.event.eventType, 'DIAGNOSIS_COMPLETED');
+});
+
+test('rejects stale commands before any write', async () => {
+  const job = repairJob({
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'WAITING_APPROVAL' } }],
+    },
+  });
+  const repo = repositoryFor(job);
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 3, employeeId: 7 },
+      {
+        repairJobId: 41,
+        action: 'APPROVE_QUOTATION',
+        commandKey: 'approve-1',
+        expectedWorkflowStatus: 'DIAGNOSING',
+      }
+    ),
+    (error) => error.code === 'REPAIR_WORKFLOW_VERSION_CONFLICT'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
+});
+
+test('requires branch ownership and a linked device passport', async () => {
+  const wrongBranch = new TransitionRepairWorkflowService(repositoryFor(repairJob()));
+  await assert.rejects(
+    wrongBranch.execute(
+      { branchId: 4, employeeId: 7 },
+      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'x' }
+    ),
+    (error) => error.code === 'REPAIR_JOB_NOT_FOUND'
+  );
+
+  const noDevice = new TransitionRepairWorkflowService(
+    repositoryFor(repairJob({ deviceId: null, device: null }))
+  );
+  await assert.rejects(
+    noDevice.execute(
+      { branchId: 3, employeeId: 7 },
+      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'x' }
+    ),
+    (error) => error.code === 'REPAIR_DEVICE_REQUIRED'
+  );
+});
