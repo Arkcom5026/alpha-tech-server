@@ -16,6 +16,9 @@ const {
   createRepairJob,
 } = require('../create/createRepairJobController');
 const {
+  createExternalDeviceIntake,
+} = require('../external-intake/createExternalDeviceIntakeController');
+const {
   updateRepairJobStatus,
 } = require('../status/updateRepairJobStatusController');
 const {
@@ -68,6 +71,12 @@ router.get(
   '/customers/:customerId/warranty-assets',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   listCustomerWarrantyAssets
+);
+
+router.post(
+  '/intakes/external-device',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  createExternalDeviceIntake
 );
 
 router.get(
