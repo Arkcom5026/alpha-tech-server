@@ -65,8 +65,9 @@ test('status service validates job id before transaction access', async () => {
   assert.equal(called, false);
 });
 
-test('status service applies transition and maps updated job', async () => {
+test('status service applies transition and records timeline event atomically', async () => {
   let updateData;
+  let timelineEvent;
   const txRepo = {
     findJob(branchId, id) {
       assert.equal(branchId, 4);
@@ -86,13 +87,17 @@ test('status service applies transition and maps updated job', async () => {
         technician: { id: 9, name: 'Tech', phone: null },
       });
     },
+    createTimelineEvent(event) {
+      timelineEvent = event;
+      return Promise.resolve({ id: 1, repairJobId: event.repairJobId });
+    },
   };
   const service = new UpdateRepairJobStatusService({
     transaction(work) { return work(txRepo); },
   });
 
   const result = await service.execute(
-    { branchId: 4 },
+    { branchId: 4, employeeId: 12 },
     31,
     { status: 'in_progress', technicianId: 9, technicianNotes: ' ตรวจสอบแล้ว ' }
   );
@@ -101,6 +106,21 @@ test('status service applies transition and maps updated job', async () => {
     status: 'IN_PROGRESS',
     technicianNotes: 'ตรวจสอบแล้ว',
     technicianId: 9,
+  });
+  assert.deepEqual(timelineEvent, {
+    repairJobId: 31,
+    eventType: 'STATUS_CHANGED',
+    fromStatus: 'RECEIVED',
+    toStatus: 'IN_PROGRESS',
+    customerVisible: true,
+    customerTitle: 'กำลังตรวจสอบหรือดำเนินการ',
+    customerMessage: 'ช่างกำลังตรวจสอบหรือซ่อมอุปกรณ์',
+    internalNote: 'ตรวจสอบแล้ว',
+    performedByEmployeeId: 12,
+    metadata: {
+      customerCode: 'IN_PROGRESS',
+      customerStage: 2,
+    },
   });
   assert.equal(result.status, 'IN_PROGRESS');
   assert.equal(result.technician.id, 9);

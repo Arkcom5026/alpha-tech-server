@@ -146,6 +146,24 @@ class RepairTrackingAccessRepository {
     });
   }
 
+  async listCustomerVisibleTimelineEvents(repairJobId) {
+    return this.prisma.$queryRaw`
+      SELECT
+        "id",
+        "eventType",
+        "fromStatus",
+        "toStatus",
+        "customerTitle",
+        "customerMessage",
+        "occurredAt",
+        "metadata"
+      FROM "RepairJobEvent"
+      WHERE "repairJobId" = ${Number(repairJobId)}
+        AND "customerVisible" = true
+      ORDER BY "occurredAt" ASC, "id" ASC
+    `;
+  }
+
   async getLatestEstimateApproval(repairJobId) {
     const rows = await this.prisma.$queryRaw`
       SELECT
