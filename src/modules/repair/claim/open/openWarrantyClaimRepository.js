@@ -47,7 +47,7 @@ class OpenWarrantyClaimRepository {
 
   getClient() {
     if (!this.prisma) {
-      this.prisma = require('../../../../../database/prisma/client');
+      this.prisma = require('../../../../database/prisma/client');
     }
     return this.prisma;
   }
