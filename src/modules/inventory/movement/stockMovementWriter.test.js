@@ -137,6 +137,10 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
   const runtimePaths = [
     '../../../../controllers/receiptSimpleController.js',
     '../../../../controllers/purchaseOrderReceiptSimpleController.js',
+    '../simple-stock/adjust/simpleStockAdjustmentRepository.js',
+    '../simple-stock/transfer/simpleStockTransferRepository.js',
+    '../stock-item/receive/stockItemReceiveSlices.js',
+    '../../procurement/receipt/commit/commitReceiptRepository.js',
     '../../sales/completion/services/saleCompletionService.js',
     '../../sales/create/controllers/saleLegacyCreateController.js',
   ];
@@ -146,7 +150,7 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
     const source = fs.readFileSync(absolutePath, 'utf8');
 
     assert.match(source, /stockMovement\.(create|createMany)\s*\(/);
-    assert.match(source, /lib\/prisma/);
+    assert.match(source, /(lib\/prisma|database\/prisma\/client)/);
     assert.doesNotMatch(source, /new\s+PrismaClient\s*\(/);
   }
 });
@@ -157,6 +161,10 @@ test('repository production runtime cannot add an unregistered direct stock move
   const allowedRuntimeWriters = new Set([
     path.resolve(REPOSITORY_ROOT, 'controllers/receiptSimpleController.js'),
     path.resolve(REPOSITORY_ROOT, 'controllers/purchaseOrderReceiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentRepository.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/stock-item/receive/stockItemReceiveSlices.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/commit/commitReceiptRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/completion/services/saleCompletionService.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/create/controllers/saleLegacyCreateController.js'),
   ]);
