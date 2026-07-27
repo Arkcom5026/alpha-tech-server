@@ -53,11 +53,15 @@ const canonicalResult = (sale, payments, replayed, commandKey) => ({
 });
 
 const productInventoryBehavior = (product) => {
+  const authority = String(product?.inventoryBehavior || '').trim().toUpperCase();
+  if (authority === 'TRACKED' || authority === 'NON_STOCK') return authority;
+
+  // Transitional fallback for records read through an older schema projection.
   const config = product?.productConfig && typeof product.productConfig === 'object'
     ? product.productConfig
     : {};
-  const explicit = String(config.inventoryBehavior || config.stockBehavior || '').toUpperCase();
-  if (explicit === 'NON_STOCK' || explicit === 'NONE' || explicit === 'SERVICE') return 'NON_STOCK';
+  const legacy = String(config.inventoryBehavior || config.stockBehavior || '').toUpperCase();
+  if (legacy === 'NON_STOCK' || legacy === 'NONE' || legacy === 'SERVICE') return 'NON_STOCK';
   if (config.inventoryTracked === false || config.trackInventory === false || config.stockTracking === false) {
     return 'NON_STOCK';
   }
@@ -85,8 +89,19 @@ const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
   const simpleProductIds = [...new Set(simpleLines.map((item) => item.productId))];
   const products = simpleProductIds.length
     ? await tx.product.findMany({
-        where: { id: { in: simpleProductIds }, active: true, mode: 'SIMPLE' },
-        select: { id: true, mode: true, productConfig: true },
+        where: {
+          id: { in: simpleProductIds },
+          active: true,
+          mode: 'SIMPLE',
+          productType: { branchId },
+          branchPrice: { some: { branchId, isActive: true } },
+        },
+        select: {
+          id: true,
+          mode: true,
+          inventoryBehavior: true,
+          productConfig: true,
+        },
       })
     : [];
   if (products.length !== simpleProductIds.length) {
