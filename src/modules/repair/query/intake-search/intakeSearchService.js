@@ -1,5 +1,5 @@
 const intakeSearchRepository = require('./intakeSearchRepository');
-const { validateLookup } = require('../../validators/repairValidator');
+const { validateSearchQuery } = require('../../validators/repairValidator');
 
 const normalize = (value) => String(value || '').trim().toLocaleLowerCase('th-TH');
 
@@ -47,7 +47,7 @@ class IntakeSearchService {
   }
 
   async execute(actor, rawQuery) {
-    const query = validateLookup(rawQuery);
+    const query = validateSearchQuery(rawQuery);
     const result = await this.repository.search(actor.branchId, query, 10);
     const devices = (result.devices || [])
       .map((device) => projectDevice(device, query))
