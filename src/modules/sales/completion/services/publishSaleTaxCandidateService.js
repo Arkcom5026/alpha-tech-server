@@ -27,8 +27,9 @@ const publishSaleTaxCandidate = async ({ sale, branchId, employeeId }) => {
     return Object.freeze({
       status: result?.replayed ? 'REPLAYED' : 'REGISTERED',
       saleId,
+      replayed: Boolean(result?.replayed),
       candidateId: result?.candidate?.id || null,
-      taxDocumentId: result?.taxDocument?.id || null,
+      taxDocumentId: result?.document?.id || null,
     });
   } catch (error) {
     console.error('[sales.tax-intake] publication failed', {
