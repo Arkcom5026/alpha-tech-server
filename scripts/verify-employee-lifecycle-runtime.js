@@ -15,6 +15,7 @@ const syntaxFiles = [
   'routes/authRoutes.js',
   'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
+  'src/modules/employee/routes/employeeRoutes.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -58,19 +59,30 @@ assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId pro
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
 assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
-const employeeRoutes = read('routes/employeeRoutes.js');
+const employeeRootRoute = read('routes/employeeRoutes.js');
+const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
 assertContains(
-  employeeRoutes,
+  employeeRootRoute,
+  "src/modules/employee/routes/employeeRoutes",
+  'employee root route delegates to module authority'
+);
+assertNotContains(
+  employeeRootRoute,
+  "../controllers/employeeController",
+  'employee root route legacy controller ownership'
+);
+assertContains(
+  employeeModuleRoute,
   'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
   'employee approval compatibility endpoint'
 );
 assertContains(
-  employeeRoutes,
+  employeeModuleRoute,
   "canonicalEndpoint: '/api/auth/add-sub-employee'",
   'canonical employee creation endpoint declaration'
 );
 assertNotContains(
-  employeeRoutes,
+  employeeModuleRoute,
   "router.post('/approve-employee', approveEmployee)",
   'live employee approval handler'
 );
