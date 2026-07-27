@@ -1,6 +1,10 @@
 const { prisma } = require('../../../../lib/prisma')
 const { decideOperationalProductMode } = require('../policies/operationalProductModePolicy')
 const {
+  calcAvailable,
+  isReadyProduct,
+} = require('../calculations/operationalStockAvailability')
+const {
   createLocalOperationalProductRecord,
   createOperationalProductRecordFromTemplate,
   fetchOperationalRuntimeProduct,
@@ -71,19 +75,6 @@ const pickBranchPricePayload = (data = {}) => {
   ].some((key) => flat[key] !== undefined)
 
   return hasFlat ? flat : null
-}
-
-const calcAvailable = (stockBalance) => {
-  const quantity = Number(stockBalance?.quantity ?? 0)
-  const reserved = Number(stockBalance?.reserved ?? 0)
-  return { quantity, reserved, available: Math.max(0, quantity - reserved) }
-}
-
-const isSimpleProduct = (product) => product?.mode === 'SIMPLE' || product?.noSN === true
-
-const isReadyProduct = (product, available) => {
-  if (isSimpleProduct(product)) return available > 0
-  return (product?.stockItems?.length ?? 0) > 0
 }
 
 const toOperationalRuntimeProduct = (p, branchId = null) => {
