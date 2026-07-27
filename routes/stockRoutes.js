@@ -1,40 +1,17 @@
-
-
-
-
-
-
-
-// ✅ stockRoutes.js — Routing สำหรับโมดูล Stock (Dashboard subset)
-// แนวคิด: Dashboard เป็น “ส่วนหนึ่งของ Stock” ไม่แยกโมดูลใหม่
+// ✅ stockRoutes.js — Inventory dashboard compatibility routes
 
 const express = require('express');
 const router = express.Router();
 
+const overviewController = require('../src/modules/inventory/dashboard/query/overview/getStockDashboardOverviewSlice');
+const auditInProgressController = require('../src/modules/inventory/dashboard/query/audit-in-progress/getStockDashboardAuditInProgressSlice');
+const riskController = require('../src/modules/inventory/dashboard/query/risk/getStockDashboardRiskSlice');
+
 const verifyToken = require('../middlewares/verifyToken');
 router.use(verifyToken);
 
-// -----------------------------
-// Dashboard (manual-load per block)
-// Base path (mounted in server.js):
-//   app.use('/api/stock/dashboard', stockRoutes);
-// แล้ว endpoint จะเป็น:
-//   GET /api/stock/dashboard/overview
-//   GET /api/stock/dashboard/audit-in-progress
-//   GET /api/stock/dashboard/risk
-// -----------------------------
-const {
-  getStockDashboardOverview,
-  getStockDashboardAuditInProgress,
-  getStockDashboardRisk,
-} = require('../controllers/stockController');
-
-router.get('/overview', getStockDashboardOverview);
-router.get('/audit-in-progress', getStockDashboardAuditInProgress);
-router.get('/risk', getStockDashboardRisk);
+router.get('/overview', overviewController.handle);
+router.get('/audit-in-progress', auditInProgressController.handle);
+router.get('/risk', riskController.handle);
 
 module.exports = router;
-
-
-
-
