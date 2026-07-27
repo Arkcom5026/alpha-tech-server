@@ -276,33 +276,49 @@ class QuickStockRepository {
     return client.simpleLot.create({ data })
   }
 
-  async upsertStockBalance({ db, productId, branchId, quantity, lastReceivedCost, avgCost } = {}) {
+  async upsertStockBalance({ db, productId, branchId, quantity, lastReceivedCost } = {}) {
     const client = this.client(db)
     const pId = toInt(productId)
     const brId = toInt(branchId)
-    const qty = toInt(quantity) || 0
+    const qty = toNumber(quantity, 0)
     const lastCost = toNumber(lastReceivedCost, 0)
-    const averageCost = toNumber(avgCost, lastCost)
 
-    return client.stockBalance.upsert({
-      where: {
-        productId_branchId: {
-          productId: pId,
-          branchId: brId,
+    const rows = await client.$queryRawUnsafe(
+      `SELECT "id", "quantity", "avgCost"
+       FROM "StockBalance"
+       WHERE "productId"=$1 AND "branchId"=$2
+       FOR UPDATE`,
+      pId,
+      brId
+    )
+
+    if (rows.length) {
+      const current = rows[0]
+      const currentQty = toNumber(current.quantity, 0)
+      const currentAvg = toNumber(current.avgCost, lastCost)
+      const nextQty = currentQty + qty
+      const weightedAvg = nextQty > 0
+        ? ((currentQty * currentAvg) + (qty * lastCost)) / nextQty
+        : lastCost
+
+      return client.stockBalance.update({
+        where: { id: current.id },
+        data: {
+          quantity: nextQty,
+          lastReceivedCost: lastCost,
+          avgCost: weightedAvg,
         },
-      },
-      update: {
-        quantity: { increment: qty },
-        lastReceivedCost: lastCost,
-        avgCost: averageCost,
-      },
-      create: {
+      })
+    }
+
+    return client.stockBalance.create({
+      data: {
         productId: pId,
         branchId: brId,
         quantity: qty,
         reserved: 0,
         lastReceivedCost: lastCost,
-        avgCost: averageCost,
+        avgCost: lastCost,
       },
     })
   }
