@@ -85,6 +85,18 @@ function validateLookup(rawLookup) {
   return lookup;
 }
 
+function validateSearchQuery(rawQuery) {
+  const query = typeof rawQuery === 'string' ? rawQuery.trim() : '';
+  if (!query || query.length > 160) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_LOOKUP,
+      'กรุณาระบุชื่อ เบอร์โทร รุ่น ยี่ห้อ หรือรหัสอุปกรณ์ที่ถูกต้อง',
+      400
+    );
+  }
+  return query;
+}
+
 function validateCreateRepairJob(payload = {}) {
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
@@ -177,6 +189,7 @@ function validateListQuery(query = {}) {
 
 module.exports = {
   validateLookup,
+  validateSearchQuery,
   validateCreateRepairJob,
   validateRepairStatusUpdate,
   validateAddPart,
