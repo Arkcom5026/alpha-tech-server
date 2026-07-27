@@ -75,6 +75,10 @@ CREATE INDEX IF NOT EXISTS "Device_status_idx" ON "Device"("status");
 ALTER TABLE "RepairJob" ADD COLUMN IF NOT EXISTS "deviceId" INTEGER;
 CREATE INDEX IF NOT EXISTS "RepairJob_deviceId_idx" ON "RepairJob"("deviceId");
 
+ALTER TABLE "WarrantyClaim" ADD COLUMN IF NOT EXISTS "deviceId" INTEGER;
+CREATE INDEX IF NOT EXISTS "WarrantyClaim_deviceId_idx"
+  ON "WarrantyClaim"("deviceId");
+
 CREATE TABLE IF NOT EXISTS "DeviceIntake" (
   "id" SERIAL PRIMARY KEY,
   "deviceId" INTEGER NOT NULL,
@@ -201,6 +205,7 @@ const foreignKeys = [
   ['Device_currentOwnerCustomerId_fkey', 'Device', 'currentOwnerCustomerId', 'CustomerProfile', 'id', 'SET NULL'],
   ['Device_stockItemId_fkey', 'Device', 'stockItemId', 'StockItem', 'id', 'SET NULL'],
   ['RepairJob_deviceId_fkey', 'RepairJob', 'deviceId', 'Device', 'id', 'SET NULL'],
+  ['WarrantyClaim_deviceId_fkey', 'WarrantyClaim', 'deviceId', 'Device', 'id', 'SET NULL'],
   ['DeviceIntake_deviceId_fkey', 'DeviceIntake', 'deviceId', 'Device', 'id', 'RESTRICT'],
   ['DeviceIntake_branchId_fkey', 'DeviceIntake', 'branchId', 'Branch', 'id', 'RESTRICT'],
   ['DeviceIntake_customerId_fkey', 'DeviceIntake', 'customerId', 'CustomerProfile', 'id', 'RESTRICT'],
@@ -262,7 +267,10 @@ async function ensureForeignKeys(client) {
 }
 
 async function assertBaseTables(client) {
-  const required = ['Branch', 'CustomerProfile', 'EmployeeProfile', 'StockItem', 'RepairJob'];
+  const required = [
+    'Branch', 'CustomerProfile', 'EmployeeProfile', 'StockItem',
+    'RepairJob', 'WarrantyClaim',
+  ];
   const result = await client.query(
     `SELECT name
        FROM unnest($1::text[]) AS name
@@ -315,7 +323,14 @@ async function main() {
           WHERE table_schema = 'public'
             AND table_name = 'RepairJob'
             AND column_name = 'deviceId'
-        ) AS repair_job_device
+        ) AS repair_job_device,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'WarrantyClaim'
+            AND column_name = 'deviceId'
+        ) AS warranty_claim_device
     `);
     if (!Object.values(verification.rows[0]).every(Boolean)) {
       throw new Error('Device foundation verification failed');
