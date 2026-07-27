@@ -7,6 +7,8 @@ const {
   StockMovementWriter,
   createStockMovement,
   createStockMovements,
+  isStockMovementAuthorizedClient,
+  authorizeStockMovementClient,
 } = require('./stockMovementWriter');
 
 test('stock movement writer delegates one movement without remapping runtime data', async () => {
@@ -119,7 +121,6 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
 });
 
 test('transaction clients are wrapped before application work executes', async () => {
-  const { authorizeStockMovementClient } = require('./stockMovementWriter');
   let rawMovementQuery;
   const rawTransactionClient = {
     stockMovement: {
@@ -140,4 +141,20 @@ test('transaction clients are wrapped before application work executes', async (
   }));
 
   assert.equal(rawMovementQuery.data.type, 'RECEIVE');
+});
+
+test('movement authority wrapping is idempotent across repeated calls', () => {
+  const rawClient = {
+    stockMovement: {
+      create: async () => ({ id: 1 }),
+      createMany: async () => ({ count: 0 }),
+    },
+  };
+
+  const first = authorizeStockMovementClient(rawClient);
+  const second = authorizeStockMovementClient(first);
+
+  assert.equal(first, second);
+  assert.equal(isStockMovementAuthorizedClient(first), true);
+  assert.equal(isStockMovementAuthorizedClient(rawClient), false);
 });
