@@ -150,7 +150,15 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
     const source = fs.readFileSync(absolutePath, 'utf8');
 
     assert.match(source, /stockMovement\.(create|createMany)\s*\(/);
-    assert.match(source, /(lib\/prisma|database\/prisma\/client)/);
+
+    const usesDirectAuthority = /(lib\/prisma|database\/prisma\/client)/.test(source);
+    const sharedImport = source.match(/require\(['"](\.\.\/shared\/stockItemShared)['"]\)/);
+    if (sharedImport) {
+      const sharedPath = path.resolve(path.dirname(absolutePath), `${sharedImport[1]}.js`);
+      const sharedSource = fs.readFileSync(sharedPath, 'utf8');
+      assert.match(sharedSource, /lib\/prisma/);
+    }
+    assert.equal(usesDirectAuthority || Boolean(sharedImport), true);
     assert.doesNotMatch(source, /new\s+PrismaClient\s*\(/);
   }
 });
