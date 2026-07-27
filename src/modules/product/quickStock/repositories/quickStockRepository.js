@@ -177,6 +177,7 @@ class QuickStockRepository {
         mode: true,
         noSN: true,
         trackSerialNumber: true,
+        inventoryBehavior: true,
         productTypeId: true,
         templateProductId: true,
       },

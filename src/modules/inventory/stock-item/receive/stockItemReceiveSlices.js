@@ -1,4 +1,5 @@
 const { prisma, D, toInt, branchIdFrom } = require('../shared/stockItemShared')
+const { assertProductCanReceive } = require('../../policies/productInventoryMutationPolicy')
 
 async function receiveStockItem(req, res) {
   try {
@@ -38,6 +39,11 @@ async function receiveStockItem(req, res) {
     const product = barcodeItem.receiptItem?.purchaseOrderItem?.product
     const purchaseOrder = barcodeItem.receiptItem?.purchaseOrderItem?.purchaseOrder
     if (!product || !purchaseOrder) return res.status(400).json({ error: 'Product or PO data missing.' })
+    try {
+      assertProductCanReceive(product)
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ code: error.code, message: error.message })
+    }
     const branchId = toInt(barcodeItem.receiptItem?.receipt?.branchId)
     if (!branchId || branchId !== branchIdFromUser) return res.status(403).json({ error: 'คุณไม่มีสิทธิ์รับสินค้าของสาขาอื่น' })
 
@@ -49,7 +55,34 @@ async function receiveStockItem(req, res) {
       const quantity = toInt(barcodeItem.receiptItem?.quantity) || 0
       const totalCost = D(barcodeItem.receiptItem?.costPrice || 0).times(quantity || 1)
       const result = await prisma.$transaction(async (tx) => {
-        const updatedBRI = await tx.barcodeReceiptItem.update({ where: { id: barcodeItem.id }, data: { status: 'SN_RECEIVED' } })
+        const lot = await tx.simpleLot.create({
+          data: {
+            productId: product.id,
+            branchId,
+            receiptItemId: barcodeItem.receiptItem.id,
+            barcode: barcodeItem.barcode,
+            qtyInitial: quantity,
+            qtyRemaining: quantity,
+            unitCost: barcodeItem.receiptItem?.costPrice || 0,
+            status: 'ACTIVE',
+          },
+        })
+        const updatedBRI = await tx.barcodeReceiptItem.update({
+          where: { id: barcodeItem.id },
+          data: { status: 'SN_RECEIVED', simpleLotId: lot.id },
+        })
+        await tx.stockMovement.create({
+          data: {
+            productId: product.id,
+            branchId,
+            qty: quantity,
+            type: 'RECEIVE',
+            simpleLotId: lot.id,
+            refType: 'PURCHASE_RECEIPT',
+            refId: barcodeItem.receiptItem?.receiptId || null,
+            note: `รับสินค้า SIMPLE จาก LOT ${barcodeItem.barcode}`,
+          },
+        })
         await tx.stockBalance.upsert({
           where: { productId_branchId: { productId: product.id, branchId } },
           update: { quantity: { increment: quantity } },
@@ -137,10 +170,24 @@ async function receiveAllPendingNoSN(req, res) {
           id: barcodeItem.id, barcode: barcodeItem.barcode, receiptItemId: barcodeItem.receiptItemId,
           quantity: D(item.quantity || 0), costPrice: D(item.costPrice || 0), productId: product?.id,
           productMode: String(product?.mode || '').toUpperCase(),
+          inventoryBehavior: product?.inventoryBehavior,
+          productNoSN: product?.noSN,
+          trackSerialNumber: product?.trackSerialNumber,
         })
       }
     }
     if (!pendingEntries.length) return res.status(200).json({ message: 'ไม่มีรายการค้างรับ', receivedCount: 0, receiptId })
+
+    try {
+      pendingEntries.forEach((entry) => assertProductCanReceive({
+        mode: entry.productMode,
+        inventoryBehavior: entry.inventoryBehavior,
+        noSN: entry.productNoSN,
+        trackSerialNumber: entry.trackSerialNumber,
+      }))
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ code: error.code, message: error.message })
+    }
 
     const supplier = receipt.purchaseOrder?.supplier
     const supplierId = receipt.purchaseOrder?.supplierId
@@ -165,7 +212,34 @@ async function receiveAllPendingNoSN(req, res) {
           totalCreditIncrement = totalCreditIncrement.plus(unitCost)
         } else {
           const quantity = D(entry.quantity || 0)
-          await tx.barcodeReceiptItem.update({ where: { id: entry.id }, data: { status: 'SN_RECEIVED' } })
+          const lot = await tx.simpleLot.create({
+            data: {
+              productId: entry.productId,
+              branchId,
+              receiptItemId: entry.receiptItemId,
+              barcode: String(entry.barcode),
+              qtyInitial: quantity,
+              qtyRemaining: quantity,
+              unitCost,
+              status: 'ACTIVE',
+            },
+          })
+          await tx.barcodeReceiptItem.update({
+            where: { id: entry.id },
+            data: { status: 'SN_RECEIVED', simpleLotId: lot.id },
+          })
+          await tx.stockMovement.create({
+            data: {
+              productId: entry.productId,
+              branchId,
+              qty: quantity,
+              type: 'RECEIVE',
+              simpleLotId: lot.id,
+              refType: 'PURCHASE_RECEIPT',
+              refId: receiptId,
+              note: `รับสินค้า SIMPLE จาก LOT ${entry.barcode}`,
+            },
+          })
           await tx.stockBalance.upsert({
             where: { productId_branchId: { productId: entry.productId, branchId } },
             update: { quantity: { increment: quantity } }, create: { productId: entry.productId, branchId, quantity, reserved: 0 },

@@ -11,7 +11,7 @@
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "test:inventory": "node scripts/run-module-tests.js --list",
     "test:modules": "node scripts/run-module-tests.js",
-    "test:certification": "npm run test:regression && npm run test:modules && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input && npm run verify:product-inventory-authority && npm run verify:product-inventory-runtime && npm run verify:sale-simple-inventory-authority",
+    "test:certification": "npm run test:regression && npm run test:modules && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input && npm run verify:product-inventory-authority && npm run verify:product-inventory-runtime && npm run verify:sale-simple-inventory-authority && npm run verify:simple-receive-authority",
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.bootstrap.js",
     "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
     "verify:product-backend-migration": "npm run verify:product-runtime-controller && npm run verify:product-create-compatibility",
@@ -24,7 +24,8 @@
     "verify:product-runtime-input": "node tests/product-runtime-input.test.js",
     "verify:product-inventory-authority": "node tests/product-inventory-authority.contract.test.js",
     "verify:product-inventory-runtime": "node tests/product-inventory-runtime-contract.test.js",
-    "verify:sale-simple-inventory-authority": "node tests/sale-simple-inventory-authority.test.js"
+    "verify:sale-simple-inventory-authority": "node tests/sale-simple-inventory-authority.test.js",
+    "verify:simple-receive-authority": "node tests/simple-receive-authority.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",

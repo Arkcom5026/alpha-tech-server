@@ -1,4 +1,5 @@
 const { prisma } = require('../../../../../lib/prisma');
+const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy');
 
 const toNumber = (value) => Number(value?.toString?.() ?? value ?? 0);
 
@@ -26,7 +27,7 @@ const commit = ({ id, branchId }) =>
     for (const item of receipt.items) {
       const product = item.product || item.purchaseOrderItem?.product;
       if (!product) throw new Error('ไม่พบข้อมูลสินค้าในรายการรับ');
-      const mode = product.mode || 'STRUCTURED';
+      const { mode } = assertProductCanReceive(product);
 
       if (mode === 'SIMPLE') {
         const lotCodes = await tx.barcodeReceiptItem.findMany({
@@ -58,6 +59,19 @@ const commit = ({ id, branchId }) =>
         await tx.barcodeReceiptItem.updateMany({
           where: { receiptItemId: item.id, kind: 'LOT', branchId },
           data: { simpleLotId: lot.id },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            productId: product.id,
+            branchId,
+            type: 'RECEIVE',
+            qty: item.quantity,
+            simpleLotId: lot.id,
+            refType: 'PURCHASE_RECEIPT',
+            refId: receipt.id,
+            note: `รับสินค้า SIMPLE จากใบรับ #${receipt.id}`,
+          },
         });
       } else {
         const quantity = toNumber(item.quantity);

@@ -6,6 +6,8 @@
 
 const { PrismaClient } = require('@prisma/client')
 const productTemplateEngine = require('../../services/productTemplateEngine')
+const { decideOperationalProductMode } = require('../../runtime/policies/operationalProductModePolicy')
+const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy')
 const {
   QuickStockRepository,
   toInt,
@@ -132,7 +134,14 @@ class QuickStockService {
           }
         }
 
-        const isSN = data.trackSerialNumber === true || data.trackSerialNumber === 'true'
+        const runtimePolicy = decideOperationalProductMode({
+          mode: data.mode,
+          trackSerialNumber: data.trackSerialNumber,
+          noSN: data.noSN,
+          inventoryBehavior: data.inventoryBehavior,
+        })
+        assertProductCanReceive(runtimePolicy)
+        const isSN = runtimePolicy.mode === 'STRUCTURED'
 
         const product = await this.timed(
           traceScope,
@@ -143,9 +152,13 @@ class QuickStockService {
               name: data.productName.trim(),
               productTypeId: toInt(data.productTypeId),
               brandId,
-              mode: isSN ? 'STRUCTURED' : 'SIMPLE',
-              trackSerialNumber: isSN,
-              noSN: !isSN,
+              mode: runtimePolicy.mode,
+              trackSerialNumber: runtimePolicy.trackSerialNumber,
+              noSN: runtimePolicy.noSN,
+              inventoryBehavior: runtimePolicy.inventoryBehavior,
+              saleBarcode: runtimePolicy.mode === 'SIMPLE'
+                ? String(data.saleBarcode || data.productBarcode || '').trim() || null
+                : null,
               active: true,
             },
           }),
@@ -255,26 +268,6 @@ class QuickStockService {
               },
             }),
             { traceId, productId: product.id, branchId, qty, costPerUnit }
-          )
-
-          const now = new Date()
-          const stockItemsData = Array.from({ length: qty }).map((_, idx) => ({
-            barcode: `${isolatedBarcode}-${idx + 1}`,
-            serialNumber: null,
-            costPrice: costPerUnit,
-            productId: product.id,
-            branchId,
-            status: 'IN_STOCK',
-            scannedByEmployeeId: empId,
-            receivedAt: now,
-            scannedAt: now,
-          }))
-
-          await this.timed(
-            traceScope,
-            'AIO_06_CREATE_STOCK_ITEMS_FOR_SIMPLE',
-            () => this.repository.createStockItems({ db: tx, data: stockItemsData }),
-            { traceId, productId: product.id, branchId, count: stockItemsData.length }
           )
 
           await this.timed(
@@ -572,6 +565,8 @@ class QuickStockService {
           throw err
         }
 
+        const runtimePolicy = assertProductCanReceive(product)
+
         const branchPriceUpdateData = {
           costPrice: runtimePricePayload.costPrice,
           isActive: true,
@@ -607,10 +602,7 @@ class QuickStockService {
           }
         )
 
-        const isStructured =
-          product.trackSerialNumber === true ||
-          product.mode === 'STRUCTURED' ||
-          product.noSN === false
+        const isStructured = runtimePolicy.mode === 'STRUCTURED'
 
         let createdStockItems = 0
         let createdSimpleLotId = null
