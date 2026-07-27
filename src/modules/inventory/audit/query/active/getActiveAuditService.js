@@ -1,4 +1,4 @@
-﻿const { findActiveReadyAudit } = require('./getActiveAuditRepository');
+const { findActiveReadyAudit } = require('./getActiveAuditRepository');
 
 const getActiveAudit = async ({ branchId, repository = findActiveReadyAudit }) => {
   if (!Number.isFinite(branchId)) {

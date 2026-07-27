@@ -45,10 +45,8 @@ foreach ($path in $paths) {
   git cat-file -e "$SourceBranch`:$path" 2>$null
   if ($LASTEXITCODE -ne 0) { throw "Missing source path: $path" }
 
-  $directory = Split-Path -Parent $path
-  if ($directory) { New-Item -ItemType Directory -Force -Path $directory | Out-Null }
-
-  git show "$SourceBranch`:$path" | Set-Content -Path $path -Encoding utf8
+  git restore --source=$SourceBranch --worktree -- $path
+  if ($LASTEXITCODE -ne 0) { throw "Failed restoring source path: $path" }
 }
 
 @'

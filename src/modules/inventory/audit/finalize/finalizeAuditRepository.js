@@ -1,4 +1,4 @@
-﻿const { prisma } = require('../../../../../lib/prisma');
+const { prisma } = require('../../../../../lib/prisma');
 
 const findAuditSession = async ({ sessionId, client = prisma }) => client.stockAuditSession.findUnique({
   where: { id: sessionId },

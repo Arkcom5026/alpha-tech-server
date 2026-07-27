@@ -1,4 +1,4 @@
-﻿const { scanBarcode, scanSerial } = require('./scanAuditService');
+const { scanBarcode, scanSerial } = require('./scanAuditService');
 
 const scanBarcodeController = async (req, res) => {
   try {
@@ -11,8 +11,8 @@ const scanBarcodeController = async (req, res) => {
     });
     return res.status(result.status).json(result.body);
   } catch (error) {
-    console.error('Γ¥î [scanBarcode] error:', error);
-    return res.status(500).json({ message: 'α╕¬α╣üα╕üα╕Öα╕Üα╕▓α╕úα╣îα╣éα╕äα╣ëα╕öα╣äα╕íα╣êα╕¬α╕│α╣Çα╕úα╣çα╕ê' });
+    console.error('❌ [scanBarcode] error:', error);
+    return res.status(500).json({ message: 'สแกนบาร์โค้ดไม่สำเร็จ' });
   }
 };
 
@@ -27,8 +27,8 @@ const scanSerialController = async (req, res) => {
     });
     return res.status(result.status).json(result.body);
   } catch (error) {
-    console.error('Γ¥î [scanSn] error:', error);
-    return res.status(500).json({ message: 'α╕¬α╣üα╕üα╕Ö SN α╣äα╕íα╣êα╕¬α╕│α╣Çα╕úα╣çα╕ê' });
+    console.error('❌ [scanSn] error:', error);
+    return res.status(500).json({ message: 'สแกน SN ไม่สำเร็จ' });
   }
 };
 

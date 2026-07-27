@@ -1,4 +1,4 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -26,7 +26,7 @@ test('start audit preserves existing draft conflict payload', async () => {
   assert.deepEqual(result, {
     status: 409,
     body: {
-      message: 'α╕íα╕╡α╕úα╕¡α╕Üα╕òα╕úα╕ºα╕êα╣üα╕Üα╕Ü DRAFT α╕¡α╕óα╕╣α╣êα╣üα╕Ñα╣ëα╕º',
+      message: 'มีรอบตรวจแบบ DRAFT อยู่แล้ว',
       sessionId: 22,
       expectedCount: 9,
     },

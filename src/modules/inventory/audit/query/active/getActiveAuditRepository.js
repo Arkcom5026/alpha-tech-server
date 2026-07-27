@@ -1,4 +1,4 @@
-﻿const { prisma } = require('../../../../../../lib/prisma');
+const { prisma } = require('../../../../../../lib/prisma');
 
 const findActiveReadyAudit = ({ branchId, client = prisma }) =>
   client.stockAuditSession.findFirst({

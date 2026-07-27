@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const { startReadyAudit } = require('../start/startAuditController');
 const { getActiveReadySession } = require('../query/active/getActiveAuditController');

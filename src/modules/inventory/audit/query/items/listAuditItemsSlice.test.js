@@ -1,4 +1,4 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { listAuditItems, normalizePositiveInt } = require('./listAuditItemsService');
@@ -50,7 +50,7 @@ test('list items normalizes paging and maps legacy response projection', async (
           barcode: 'ABC',
           isScanned: true,
           scannedAt: null,
-          product: { id: 6, name: 'α╕¬α╕┤α╕Öα╕äα╣ëα╕▓' },
+          product: { id: 6, name: 'สินค้า' },
           stockItem: { serialNumber: 'SN-1' },
         }],
       };
@@ -71,7 +71,7 @@ test('list items normalizes paging and maps legacy response projection', async (
       serialNumber: 'SN-1',
       isScanned: true,
       scannedAt: null,
-      product: { id: 6, name: 'α╕¬α╕┤α╕Öα╕äα╣ëα╕▓' },
+      product: { id: 6, name: 'สินค้า' },
     }],
     total: 1,
     page: 1,

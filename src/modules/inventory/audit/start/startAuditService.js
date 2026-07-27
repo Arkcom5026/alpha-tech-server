@@ -1,4 +1,4 @@
-﻿const {
+const {
   findOpenReadyAudit,
   listExpectedStockItems,
   createReadyAudit,
@@ -20,7 +20,7 @@ const startReadyStockAudit = async ({
     return {
       status: 409,
       body: {
-        message: 'α╕íα╕╡α╕úα╕¡α╕Üα╕òα╕úα╕ºα╕êα╣üα╕Üα╕Ü DRAFT α╕¡α╕óα╕╣α╣êα╣üα╕Ñα╣ëα╕º',
+        message: 'มีรอบตรวจแบบ DRAFT อยู่แล้ว',
         sessionId: existing.id,
         expectedCount: existing.expectedCount,
       },

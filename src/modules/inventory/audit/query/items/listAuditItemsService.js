@@ -1,4 +1,4 @@
-﻿const {
+const {
   findAuditSessionForItems,
   listAuditSnapshotItems,
 } = require('./listAuditItemsRepository');
@@ -20,16 +20,16 @@ const listAuditItems = async ({
   listItems = listAuditSnapshotItems,
 }) => {
   if (!Number.isFinite(sessionId)) {
-    return { status: 400, body: { message: 'sessionId α╣äα╕íα╣êα╕ûα╕╣α╕üα╕òα╣ëα╕¡α╕ç' } };
+    return { status: 400, body: { message: 'sessionId ไม่ถูกต้อง' } };
   }
 
   const session = await findSession({ sessionId });
-  if (!session) return { status: 404, body: { message: 'α╣äα╕íα╣êα╕₧α╕Üα╕úα╕¡α╕Üα╣Çα╕èα╣çα╕äα╕¬α╕òα╣èα╕¡α╕ü' } };
+  if (!session) return { status: 404, body: { message: 'ไม่พบรอบเช็คสต๊อก' } };
   if (!Number.isFinite(branchId) || session.branchId !== branchId) {
-    return { status: 403, body: { message: 'α╣äα╕íα╣êα╕íα╕╡α╕¬α╕┤α╕ùα╕ÿα╕┤α╣îα╣Çα╕éα╣ëα╕▓α╕ûα╕╢α╕çα╕úα╕¡α╕Üα╕Öα╕╡α╣ë' } };
+    return { status: 403, body: { message: 'ไม่มีสิทธิ์เข้าถึงรอบนี้' } };
   }
   if (session.mode !== 'READY') {
-    return { status: 400, body: { message: 'α╣éα╕½α╕íα╕öα╕úα╕¡α╕Üα╕òα╕úα╕ºα╕êα╣äα╕íα╣êα╕ûα╕╣α╕üα╕òα╣ëα╕¡α╕ç' } };
+    return { status: 400, body: { message: 'โหมดรอบตรวจไม่ถูกต้อง' } };
   }
 
   const normalizedPage = normalizePositiveInt(page, 1);

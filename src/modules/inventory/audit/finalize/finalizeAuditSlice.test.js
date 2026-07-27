@@ -1,4 +1,4 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -18,7 +18,7 @@ test('cancel preserves branch, READY, and closed-session policies', async () => 
     repositories: { findAuditSession: async () => ({ id: 1, branchId: 1, mode: 'READY', status: 'DRAFT', confirmedAt: new Date() }) },
   });
   assert.equal(closed.status, 409);
-  assert.match(closed.body.message, /α╕¢α╕┤α╕öα╣äα╕¢α╣üα╕Ñα╣ëα╕º/);
+  assert.match(closed.body.message, /ปิดไปแล้ว/);
 });
 
 test('cancel delegates closure and preserves legacy response', async () => {
