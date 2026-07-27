@@ -11,6 +11,36 @@ const {
   authorizeStockMovementClient,
 } = require('./stockMovementWriter');
 
+const REPOSITORY_ROOT = path.resolve(__dirname, '../../../..');
+
+const walkJavaScriptFiles = (root) => {
+  const files = [];
+  const ignoredDirectories = new Set([
+    '.git',
+    'node_modules',
+    'coverage',
+    'dist',
+    'build',
+    'recovery',
+    'migration-evidence',
+  ]);
+
+  const visit = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!ignoredDirectories.has(entry.name)) visit(path.join(current, entry.name));
+        continue;
+      }
+      if (entry.isFile() && /\.(cjs|mjs|js)$/.test(entry.name)) {
+        files.push(path.join(current, entry.name));
+      }
+    }
+  };
+
+  visit(root);
+  return files;
+};
+
 test('stock movement writer delegates one movement without remapping runtime data', async () => {
   let received;
   const client = {
@@ -118,6 +148,28 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
     assert.match(source, /lib\/prisma/);
     assert.doesNotMatch(source, /new\s+PrismaClient\s*\(/);
   }
+});
+
+test('repository production runtime cannot add an unregistered direct stock movement writer', () => {
+  const authorityTestPath = path.resolve(__filename);
+  const writerPath = path.resolve(__dirname, 'stockMovementWriter.js');
+  const allowedRuntimeWriters = new Set([
+    path.resolve(REPOSITORY_ROOT, 'controllers/receiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'controllers/purchaseOrderReceiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/sales/completion/services/saleCompletionService.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/sales/create/controllers/saleLegacyCreateController.js'),
+  ]);
+
+  const discovered = walkJavaScriptFiles(REPOSITORY_ROOT)
+    .filter((file) => file !== authorityTestPath && file !== writerPath)
+    .filter((file) => /stockMovement\.(create|createMany)\s*\(/.test(fs.readFileSync(file, 'utf8')));
+
+  assert.deepEqual(
+    discovered.map((file) => path.relative(REPOSITORY_ROOT, file).replaceAll('\\', '/')).sort(),
+    [...allowedRuntimeWriters]
+      .map((file) => path.relative(REPOSITORY_ROOT, file).replaceAll('\\', '/'))
+      .sort()
+  );
 });
 
 test('transaction clients are wrapped before application work executes', async () => {
