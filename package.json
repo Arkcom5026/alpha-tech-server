@@ -11,7 +11,7 @@
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "test:inventory": "node scripts/run-module-tests.js --list",
     "test:modules": "node scripts/run-module-tests.js",
-    "test:certification": "npm run test:regression && npm run test:modules && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers",
+    "test:certification": "npm run test:regression && npm run test:modules && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input",
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.bootstrap.js",
     "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
     "verify:product-backend-migration": "npm run verify:product-runtime-controller && npm run verify:product-create-compatibility",
@@ -20,7 +20,8 @@
     "backup": "node recovery/jobRunner.js --mode backup-workflow",
     "verify:product-mode-policy": "node tests/product-mode-policy.test.js",
     "verify:product-stock-availability": "node tests/product-stock-availability.test.js",
-    "verify:product-runtime-mappers": "node tests/product-runtime-mappers.test.js"
+    "verify:product-runtime-mappers": "node tests/product-runtime-mappers.test.js",
+    "verify:product-runtime-input": "node tests/product-runtime-input.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
