@@ -1,5 +1,5 @@
 const { prisma } = require('../../../../../../lib/prisma');
-const { listInclude, parseStatusCsv } = require('../../../shared/purchaseOrderShared');
+const { listInclude, parseStatusCsv } = require('../../shared/purchaseOrderShared');
 
 class ListPurchaseOrdersRepository {
   constructor(client = prisma) {
