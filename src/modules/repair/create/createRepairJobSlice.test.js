@@ -18,6 +18,8 @@ function createdJob(data = {}) {
     customer: { name: 'ลูกค้าทดสอบ' },
     stockItemId: data.stockItemId || null,
     stockItem: null,
+    deviceId: data.deviceId || null,
+    device: data.deviceId ? { id: data.deviceId } : null,
     deviceModel: data.deviceModel || 'Notebook',
     reportedSymptoms: data.reportedSymptoms || 'เปิดไม่ติด',
     technicianNotes: data.technicianNotes || null,
@@ -49,7 +51,7 @@ test('create repository binds transaction work to transaction client', async () 
   assert.equal(receivedRepo.prisma, tx);
 });
 
-test('create repository owns customer, stock, technician and repair writes', async () => {
+test('create repository owns customer, stock, technician, repair and passport writes', async () => {
   const calls = {};
   const repository = new CreateRepairJobRepository({
     customerProfile: {
@@ -64,21 +66,36 @@ test('create repository owns customer, stock, technician and repair writes', asy
     repairJob: {
       create(args) { calls.create = args; return Promise.resolve(createdJob(args.data)); },
     },
+    devicePassportEvent: {
+      create(args) { calls.passport = args; return Promise.resolve({ id: 91, ...args.data }); },
+    },
   });
 
   await repository.findCustomer('8');
   await repository.findStockItemForIntake('12');
   await repository.findTechnician('5');
   await repository.create({ branchId: 3, customerId: 8 });
+  await repository.publishPassportEvent({
+    deviceId: 12,
+    branchId: 3,
+    eventType: 'REPAIR_CREATED',
+    sourceType: 'REPAIR_JOB',
+    sourceId: '41',
+    eventKey: 'repair-job:41:created',
+    title: 'เปิดใบงานซ่อม',
+  });
 
   assert.deepEqual(calls.customer.where, { id: 8 });
   assert.deepEqual(calls.stock.where, { id: 12 });
+  assert.ok(calls.stock.include.devices);
   assert.ok(calls.stock.include.repairJobs);
   assert.ok(calls.stock.include.warrantyClaims);
   assert.deepEqual(calls.technician.where, { id: 5 });
   assert.equal(calls.create.data.branchId, 3);
   assert.ok(calls.create.include.customer);
+  assert.ok(calls.create.include.device);
   assert.ok(calls.create.include.partsUsed);
+  assert.equal(calls.passport.data.eventType, 'REPAIR_CREATED');
 });
 
 test('create service validates customer and creates a RECEIVED branch-owned job', async () => {
@@ -113,9 +130,55 @@ test('create service validates customer and creates a RECEIVED branch-owned job'
   assert.equal(written.customerId, 8);
   assert.equal(written.status, 'RECEIVED');
   assert.equal(written.deviceModel, 'Notebook');
+  assert.equal(written.deviceId, null);
   assert.match(written.jobNo, /^RE-3-/);
   assert.equal(result.id, 41);
   assert.equal(result.estimatedCost, 500);
+});
+
+test('create service links stock device and publishes REPAIR_CREATED atomically', async () => {
+  let written;
+  let published;
+  const service = new CreateRepairJobService({
+    transaction(work) {
+      return work({
+        findCustomer: () => Promise.resolve({ id: 8 }),
+        findStockItemForIntake: () => Promise.resolve({
+          id: 12,
+          branchId: 3,
+          devices: [{ id: 55 }],
+          repairJobs: [],
+          warrantyClaims: [],
+          saleItems: [],
+        }),
+        create(data) {
+          written = data;
+          return Promise.resolve(createdJob(data));
+        },
+        publishPassportEvent(event) {
+          published = event;
+          return Promise.resolve({ id: 91, ...event });
+        },
+      });
+    },
+  });
+
+  await service.execute(
+    { branchId: 3, employeeId: 7, role: 'CASHIER' },
+    {
+      customerId: 8,
+      stockItemId: 12,
+      deviceModel: 'Notebook',
+      reportedSymptoms: 'เปิดไม่ติด',
+    }
+  );
+
+  assert.equal(written.deviceId, 55);
+  assert.equal(published.deviceId, 55);
+  assert.equal(published.eventType, 'REPAIR_CREATED');
+  assert.equal(published.eventKey, 'repair-job:41:created');
+  assert.equal(published.actorEmployeeId, 7);
+  assert.equal(published.metadata.repairJobId, 41);
 });
 
 test('create service preserves customer-not-found and unique-conflict contracts', async () => {

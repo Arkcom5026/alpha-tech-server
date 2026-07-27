@@ -1,8 +1,16 @@
 const prisma = require('../../../database/prisma/client');
+const {
+  publishDevicePassportEvent,
+} = require('../../device/passport/publish/devicePassportEventPublisher');
 
 const stockItemIntakeInclude = {
   product: { include: { brand: true, productType: true } },
   branch: true,
+  devices: {
+    where: { status: { not: 'RETIRED' } },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+  },
   purchaseOrderReceiptItem: {
     include: { receipt: { include: { supplier: true } } },
   },
@@ -31,6 +39,7 @@ const stockItemIntakeInclude = {
 const repairJobDetailInclude = {
   branch: true,
   customer: { include: { user: true } },
+  device: true,
   stockItem: {
     include: {
       product: { include: { brand: true, productType: true } },
@@ -91,6 +100,10 @@ class CreateRepairJobRepository {
       data,
       include: repairJobDetailInclude,
     });
+  }
+
+  publishPassportEvent(event) {
+    return publishDevicePassportEvent(this.prisma, event);
   }
 }
 
