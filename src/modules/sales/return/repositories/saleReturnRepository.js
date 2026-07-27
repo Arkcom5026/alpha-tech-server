@@ -1,5 +1,6 @@
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 const { decimal } = require('../utils/saleReturnMoney');
+const { createStockMovement } = require('../../../inventory/movement/stockMovementWriter');
 
 const saleReturnResultInclude = {
   sale: { select: { id: true, code: true } },
@@ -118,7 +119,7 @@ const restoreSerializedItem = async ({
       lastReturnedAt: occurredAt,
     },
   });
-  await client.stockMovement.create({ data: movement });
+  await createStockMovement(client, movement);
   return true;
 };
 
@@ -167,7 +168,7 @@ const restoreSimpleItem = async ({
       quantity: { increment: decimal(item.quantity) },
     },
   });
-  await client.stockMovement.create({ data: movement });
+  await createStockMovement(client, movement);
 };
 
 const createRefundEvidence = ({ client, command, saleReturnId, branchId, employeeId, occurredAt }) => {
