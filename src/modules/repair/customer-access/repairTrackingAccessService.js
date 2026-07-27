@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
 const { mapApproval } = require('../estimate-approval/repairEstimateApprovalPolicy');
 const { mapHandover } = require('../handover/repairHandoverPolicy');
+const {
+  mapCustomerStatus,
+  mapPersistedTimelineEvent,
+} = require('../customer-timeline/repairCustomerTimelinePolicy');
 
 const DEFAULT_EXPIRY_DAYS = 90;
 
@@ -18,48 +22,6 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function mapCustomerStatus(status) {
-  const map = {
-    RECEIVED: {
-      code: 'RECEIVED',
-      label: 'ร้านรับอุปกรณ์แล้ว',
-      description: 'อุปกรณ์อยู่กับร้านและรอการตรวจสอบ',
-      stage: 1,
-    },
-    IN_PROGRESS: {
-      code: 'IN_PROGRESS',
-      label: 'กำลังตรวจสอบหรือดำเนินการ',
-      description: 'ช่างกำลังตรวจสอบหรือซ่อมอุปกรณ์',
-      stage: 2,
-    },
-    WAITING_PARTS: {
-      code: 'WAITING_PARTS',
-      label: 'กำลังรออะไหล่',
-      description: 'ร้านกำลังจัดเตรียมหรือรออะไหล่ที่จำเป็น',
-      stage: 3,
-    },
-    COMPLETED: {
-      code: 'READY',
-      label: 'ดำเนินการเสร็จแล้ว',
-      description: 'กรุณาติดต่อร้านเพื่อรับอุปกรณ์',
-      stage: 4,
-    },
-    CANCELLED: {
-      code: 'CANCELLED',
-      label: 'ยุติการดำเนินงาน',
-      description: 'รายการนี้ถูกยกเลิกหรือยุติแล้ว',
-      stage: 0,
-    },
-  };
-
-  return map[status] || {
-    code: 'IN_PROGRESS',
-    label: 'กำลังดำเนินการ',
-    description: 'กรุณาติดต่อร้านหากต้องการข้อมูลเพิ่มเติม',
-    stage: 2,
-  };
-}
-
 function mapClaimStatus(claim) {
   if (!claim) return null;
   const completed = ['RESOLVED', 'CANCELLED', 'REJECTED'].includes(claim.status);
@@ -73,7 +35,7 @@ function mapClaimStatus(claim) {
   };
 }
 
-function toPublicProjection(job) {
+function toPublicProjection(job, persistedTimelineEvents = []) {
   const product = job.stockItem?.product;
   const intakeSnapshot = job.deviceIntake?.snapshot;
   const registeredDevice = job.device;
@@ -107,6 +69,7 @@ function toPublicProjection(job) {
     occurredAt: event.occurredAt,
   }));
 
+  const statusEvents = persistedTimelineEvents.map(mapPersistedTimelineEvent);
   const timeline = [
     {
       type: 'RECEIVED',
@@ -115,9 +78,14 @@ function toPublicProjection(job) {
       occurredAt: job.deviceIntake?.receivedAt || job.createdAt,
     },
     ...publicEvents,
-  ];
+    ...statusEvents,
+  ].sort((left, right) => new Date(left.occurredAt) - new Date(right.occurredAt));
 
-  if (job.updatedAt && new Date(job.updatedAt).getTime() !== new Date(job.createdAt).getTime()) {
+  if (
+    statusEvents.length === 0 &&
+    job.updatedAt &&
+    new Date(job.updatedAt).getTime() !== new Date(job.createdAt).getTime()
+  ) {
     timeline.push({
       type: currentStatus.code,
       title: currentStatus.label,
@@ -216,15 +184,18 @@ async function getPublicTracking(token) {
     throw createHttpError(404, 'TRACKING_ACCESS_NOT_FOUND', 'ลิงก์ติดตามงานไม่ถูกต้องหรือหมดอายุ');
   }
 
-  const job = await repository.getPublicRepairProjection(access.repairJobId);
+  const [job, timelineEvents, estimateApproval] = await Promise.all([
+    repository.getPublicRepairProjection(access.repairJobId),
+    repository.listCustomerVisibleTimelineEvents(access.repairJobId),
+    repository.getLatestEstimateApproval(access.repairJobId),
+  ]);
+
   if (!job) {
     throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบข้อมูลงานซ่อม');
   }
 
-  const projection = toPublicProjection(job);
-  projection.repair.estimateApproval = mapApproval(
-    await repository.getLatestEstimateApproval(access.repairJobId)
-  );
+  const projection = toPublicProjection(job, timelineEvents);
+  projection.repair.estimateApproval = mapApproval(estimateApproval);
   await repository.touch(access.id);
   return projection;
 }

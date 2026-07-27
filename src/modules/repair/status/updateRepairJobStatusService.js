@@ -10,6 +10,9 @@ const {
   assertRepairTransition,
 } = require('../policies/repairTransitionPolicy');
 const { mapRepairJob } = require('../mappers/repairMapper');
+const {
+  buildStatusChangedEvent,
+} = require('../customer-timeline/repairCustomerTimelinePolicy');
 
 class UpdateRepairJobStatusService {
   constructor(statusRepository = repository) {
@@ -65,6 +68,16 @@ class UpdateRepairJobStatusService {
           ? { technicianId: payload.technicianId }
           : {}),
       });
+
+      await repo.createTimelineEvent(
+        buildStatusChangedEvent({
+          repairJobId: job.id,
+          fromStatus: job.status,
+          toStatus: payload.status,
+          actor,
+          internalNote: payload.technicianNotes,
+        })
+      );
 
       return mapRepairJob(updated);
     });
