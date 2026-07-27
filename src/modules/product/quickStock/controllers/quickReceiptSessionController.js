@@ -21,6 +21,12 @@ const requireActor = (req, res) => {
   }
   return actor
 }
+const makeConflict = (message, code) => {
+  const error = new Error(message)
+  error.statusCode = 409
+  error.code = code
+  return error
+}
 
 exports.list = async (req, res) => {
   try {
@@ -80,6 +86,12 @@ exports.finalize = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
     const data = await service.finalize(req.params.id, actor.branchId, actor.employeeId, req.get('X-Idempotency-Key'))
+    if (Number(data?.id) !== Number(req.params.id)) {
+      throw makeConflict(
+        'X-Idempotency-Key นี้ถูกใช้ยืนยันใบรับสินค้าอื่นแล้ว',
+        'IDEMPOTENCY_KEY_CONFLICT'
+      )
+    }
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
