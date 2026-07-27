@@ -74,6 +74,7 @@ model EmployeeProfile {
   performedRepairLaborItems         RepairLaborItem[]           @relation("RepairLaborPerformedBy")
   checkedRepairQualityChecks        RepairQualityCheck[]        @relation("RepairQualityCheckedBy")
   deliveredRepairJobs               RepairDelivery[]            @relation("RepairDeliveryDeliveredBy")
+  createdRepairTrackingAccesses     RepairTrackingAccess[]      @relation("RepairTrackingAccessCreatedBy")
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -1471,10 +1472,29 @@ model RepairJob {
   laborItems     RepairLaborItem[]
   qualityCheck   RepairQualityCheck?
   delivery       RepairDelivery?
+  trackingAccesses RepairTrackingAccess[]
 
   @@index([branchId])
   @@index([stockItemId])
   @@index([deviceId])
+}
+
+model RepairTrackingAccess {
+  id                    Int              @id @default(autoincrement())
+  repairJobId           Int
+  tokenHash             String           @unique @db.VarChar(64)
+  expiresAt             DateTime?
+  revokedAt             DateTime?
+  lastAccessedAt        DateTime?
+  createdByEmployeeId   Int?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  repairJob             RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  createdBy             EmployeeProfile? @relation("RepairTrackingAccessCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, createdAt])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
 
 model RepairPartItem {
