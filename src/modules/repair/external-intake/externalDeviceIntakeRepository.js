@@ -31,10 +31,11 @@ class ExternalDeviceIntakeRepository {
     });
   }
 
-  findDeviceByIdentity(branchId, { serialNumber, imei }) {
+  findDeviceByIdentity(branchId, { serialNumber, imei, barcode }) {
     const identity = [];
     if (serialNumber) identity.push({ serialNumber });
     if (imei) identity.push({ imei });
+    if (barcode) identity.push({ barcode });
     if (!identity.length) return null;
 
     return this.prisma.device.findFirst({
