@@ -25,12 +25,13 @@ const resolveEmployee = async ({ userId, employeeId, repository = findEmployeeId
 
 const scanBarcode = async ({ sessionId, branchId, barcode, userId, employeeId, repositories = {} }) => {
   if (!Number.isFinite(sessionId)) return { status: 400, body: { message: 'sessionId ไม่ถูกต้อง' } };
-  const normalized = barcode ? String(barcode).trim() : '';
-  if (!normalized) return { status: 400, body: { message: 'กรุณาระบุบาร์โค้ด' } };
 
   const session = await (repositories.findAuditSession || findAuditSession)({ sessionId });
   const invalid = validateSession({ session, branchId });
   if (invalid) return invalid;
+
+  const normalized = barcode ? String(barcode).trim() : '';
+  if (!normalized) return { status: 400, body: { message: 'กรุณาระบุบาร์โค้ด' } };
 
   const actor = await resolveEmployee({ userId, employeeId, repository: repositories.findEmployeeId || findEmployeeId });
   if (actor.error) return actor.error;
@@ -52,12 +53,13 @@ const scanBarcode = async ({ sessionId, branchId, barcode, userId, employeeId, r
 
 const scanSerial = async ({ sessionId, branchId, serialNumber, userId, employeeId, repositories = {} }) => {
   if (!Number.isFinite(sessionId)) return { status: 400, body: { message: 'sessionId ไม่ถูกต้อง' } };
-  const normalized = serialNumber ? String(serialNumber).trim() : '';
-  if (!normalized) return { status: 400, body: { message: 'กรุณาระบุ Serial Number (SN)' } };
 
   const session = await (repositories.findAuditSession || findAuditSession)({ sessionId });
   const invalid = validateSession({ session, branchId });
   if (invalid) return invalid;
+
+  const normalized = serialNumber ? String(serialNumber).trim() : '';
+  if (!normalized) return { status: 400, body: { message: 'กรุณาระบุ Serial Number (SN)' } };
 
   const actor = await resolveEmployee({ userId, employeeId, repository: repositories.findEmployeeId || findEmployeeId });
   if (actor.error) return actor.error;
