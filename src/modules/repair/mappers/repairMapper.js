@@ -102,6 +102,8 @@ function mapWarrantyClaim(claim) {
     branchId: claim.branchId,
     stockItemId: claim.stockItemId,
     stockItem: mapStockIdentity(claim.stockItem),
+    deviceId: claim.deviceId ?? claim.device?.id ?? null,
+    device: mapDeviceIdentity(claim.device),
     repairJobId: claim.repairJobId,
     repairJob: claim.repairJob
       ? {
