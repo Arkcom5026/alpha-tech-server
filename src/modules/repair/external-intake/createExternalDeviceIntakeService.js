@@ -9,6 +9,10 @@ function createExternalIntakeReference(branchId) {
   return `EXT-${branchId}-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
+function createInternalDeviceBarcode(branchId) {
+  return `DEV-${branchId}-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
+}
+
 class CreateExternalDeviceIntakeService {
   constructor(repo = repository) {
     this.repository = repo;
@@ -16,6 +20,10 @@ class CreateExternalDeviceIntakeService {
 
   execute(actor, rawPayload) {
     const payload = validateExternalDeviceIntake(rawPayload);
+    const deviceIdentity = {
+      ...payload.device,
+      barcode: payload.device.barcode || createInternalDeviceBarcode(actor.branchId),
+    };
 
     return this.repository.transaction(async (repo) => {
       const customer = await repo.findCustomer(payload.customerId);
@@ -27,11 +35,11 @@ class CreateExternalDeviceIntakeService {
         );
       }
 
-      const duplicate = await repo.findDeviceByIdentity(actor.branchId, payload.device);
+      const duplicate = await repo.findDeviceByIdentity(actor.branchId, deviceIdentity);
       if (duplicate) {
         throw new RepairError(
           RepairFailureCode.CONFLICT,
-          'พบอุปกรณ์ที่ใช้ Serial Number หรือ IMEI นี้อยู่แล้ว กรุณาค้นหาอุปกรณ์เดิม',
+          'พบอุปกรณ์ที่ใช้ Barcode, Serial Number หรือ IMEI นี้อยู่แล้ว กรุณาค้นหาอุปกรณ์เดิม',
           409,
           { deviceId: duplicate.id }
         );
@@ -47,8 +55,9 @@ class CreateExternalDeviceIntakeService {
         category: payload.device.category,
         brand: payload.device.brand,
         model: payload.device.model,
-        serialNumber: payload.device.serialNumber,
-        imei: payload.device.imei,
+        serialNumber: deviceIdentity.serialNumber,
+        imei: deviceIdentity.imei,
+        barcode: deviceIdentity.barcode,
         status: 'IN_REPAIR',
       });
 
@@ -81,8 +90,9 @@ class CreateExternalDeviceIntakeService {
           create: {
             brand: payload.device.brand,
             model: payload.device.model,
-            serialNumber: payload.device.serialNumber,
-            imei: payload.device.imei,
+            serialNumber: deviceIdentity.serialNumber,
+            imei: deviceIdentity.imei,
+            barcode: deviceIdentity.barcode,
             accessoriesSummary: payload.accessories
               .map((item) => `${item.accessoryType} x${item.quantity}`)
               .join(', ') || null,
@@ -166,3 +176,4 @@ class CreateExternalDeviceIntakeService {
 module.exports = new CreateExternalDeviceIntakeService();
 module.exports.CreateExternalDeviceIntakeService = CreateExternalDeviceIntakeService;
 module.exports.createExternalIntakeReference = createExternalIntakeReference;
+module.exports.createInternalDeviceBarcode = createInternalDeviceBarcode;
