@@ -229,6 +229,8 @@ model Product {
   active                   Boolean                    @default(true)
   name                     String
   mode                     ProductMode                @default(STRUCTURED)
+  inventoryBehavior        ProductInventoryBehavior   @default(TRACKED)
+  saleBarcode              String?
   trackSerialNumber        Boolean                    @default(false)
   productTypeId            Int?
   brandId                  Int?
@@ -260,6 +262,8 @@ model Product {
   v2StockAuditItems        V2StockAuditItem[]
 
   @@index([mode, active])
+  @@index([mode, inventoryBehavior, active])
+  @@index([saleBarcode])
   @@index([productTypeId])
   @@index([brandId])
   @@index([templateProductId])
@@ -2249,6 +2253,11 @@ enum BusinessType {
 enum ProductMode {
   SIMPLE
   STRUCTURED
+}
+
+enum ProductInventoryBehavior {
+  TRACKED
+  NON_STOCK
 }
 
 enum StockMovementType {
