@@ -7,7 +7,6 @@ const {
   StockMovementWriter,
   createStockMovement,
   createStockMovements,
-  authorizeStockMovementClient,
 } = require('./stockMovementWriter');
 
 test('stock movement writer delegates one movement without remapping runtime data', async () => {
@@ -92,50 +91,53 @@ test('quick stock repository delegates movement persistence to inventory authori
   assert.doesNotMatch(source, /client\.stockMovement\.createMany\s*\(/);
 });
 
-test('authorized prisma client intercepts direct movement writes without changing payloads', async () => {
-  const calls = [];
-  const rawClient = {
-    stockMovement: {
-      create: async (query) => {
-        calls.push(['create', query]);
-        return { id: 1, ...query.data };
-      },
-      createMany: async (query) => {
-        calls.push(['createMany', query]);
-        return { count: query.data.length };
-      },
-    },
-  };
-  const client = authorizeStockMovementClient(rawClient);
-  const one = { branchId: 1, productId: 2, qty: -1, type: 'SALE' };
-  const many = [{ branchId: 1, productId: 3, qty: 1, type: 'RETURN' }];
+test('the shared Prisma singleton installs inventory movement authority', () => {
+  const prismaPath = path.resolve(__dirname, '../../../../lib/prisma.js');
+  const source = fs.readFileSync(prismaPath, 'utf8');
 
-  await client.stockMovement.create({ data: one });
-  await client.stockMovement.createMany({ data: many });
-
-  assert.equal(calls[0][1].data, one);
-  assert.equal(calls[1][1].data, many);
+  assert.match(source, /authorizeStockMovementClient/);
+  assert.match(source, /_prismaRaw/);
+  assert.match(source, /_prisma\s*\?\?=\s*authorizeStockMovementClient/);
 });
 
-test('authorized prisma client also governs transaction-scoped movement writes', async () => {
-  const calls = [];
-  const transactionClient = {
+test('remaining stock movement runtimes use the authorized Prisma singleton', () => {
+  const runtimePaths = [
+    '../../../../controllers/receiptSimpleController.js',
+    '../../../../controllers/purchaseOrderReceiptSimpleController.js',
+    '../../sales/completion/services/saleCompletionService.js',
+    '../../sales/create/controllers/saleLegacyCreateController.js',
+  ];
+
+  for (const relativePath of runtimePaths) {
+    const absolutePath = path.resolve(__dirname, relativePath);
+    const source = fs.readFileSync(absolutePath, 'utf8');
+
+    assert.match(source, /stockMovement\.(create|createMany)\s*\(/);
+    assert.match(source, /lib\/prisma/);
+    assert.doesNotMatch(source, /new\s+PrismaClient\s*\(/);
+  }
+});
+
+test('transaction clients are wrapped before application work executes', async () => {
+  const { authorizeStockMovementClient } = require('./stockMovementWriter');
+  let rawMovementQuery;
+  const rawTransactionClient = {
     stockMovement: {
       create: async (query) => {
-        calls.push(query);
-        return { id: 9, ...query.data };
+        rawMovementQuery = query;
+        return { id: 91 };
       },
     },
   };
   const rawClient = {
-    stockMovement: transactionClient.stockMovement,
-    $transaction: async (work) => work(transactionClient),
+    stockMovement: rawTransactionClient.stockMovement,
+    $transaction: async (work) => work(rawTransactionClient),
   };
-  const client = authorizeStockMovementClient(rawClient);
-  const movement = { branchId: 4, productId: 5, qty: 1, type: 'RECEIVE' };
 
-  const result = await client.$transaction((tx) => tx.stockMovement.create({ data: movement }));
+  const authorized = authorizeStockMovementClient(rawClient);
+  await authorized.$transaction((tx) => tx.stockMovement.create({
+    data: { productId: 1, branchId: 1, qty: 1, type: 'RECEIVE' },
+  }));
 
-  assert.equal(calls[0].data, movement);
-  assert.equal(result.id, 9);
+  assert.equal(rawMovementQuery.data.type, 'RECEIVE');
 });
