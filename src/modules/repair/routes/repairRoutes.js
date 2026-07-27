@@ -59,6 +59,11 @@ const {
 } = require('../intake-evidence/intakeEvidenceController');
 const intakeEvidenceUpload = require('../intake-evidence/intakeEvidenceUpload');
 const {
+  confirmPublicPickup,
+  getRepairHandover,
+  finalizeRepairHandover,
+} = require('../handover/repairHandoverController');
+const {
   loadRepairEmployeeContext,
   allowRepairRoles,
 } = require('../middlewares/repairAuthorization');
@@ -74,6 +79,7 @@ router.post(
   '/public/tracking/:token/estimate-decision',
   decidePublicEstimateApproval
 );
+router.post('/public/tracking/:token/pickup-confirmation', confirmPublicPickup);
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
@@ -148,6 +154,16 @@ router.post(
   '/jobs/:id/estimate-approval',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   publishEstimateApproval
+);
+router.get(
+  '/jobs/:id/handover',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  getRepairHandover
+);
+router.post(
+  '/jobs/:id/handover/finalize',
+  allowRepairRoles(...OPERATION_ROLES),
+  finalizeRepairHandover
 );
 
 router.get(

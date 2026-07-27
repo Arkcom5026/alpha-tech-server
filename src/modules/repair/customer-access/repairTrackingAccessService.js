@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
 const { mapApproval } = require('../estimate-approval/repairEstimateApprovalPolicy');
+const { mapHandover } = require('../handover/repairHandoverPolicy');
 
 const DEFAULT_EXPIRY_DAYS = 90;
 
@@ -148,6 +149,7 @@ function toPublicProjection(job) {
         remark: item.remark || null,
       })),
       claim: mapClaimStatus(job.warrantyClaims?.[0]),
+      handover: mapHandover(job.delivery),
       timeline,
       receivedAt: job.deviceIntake?.receivedAt || job.createdAt,
       lastUpdatedAt: job.updatedAt,

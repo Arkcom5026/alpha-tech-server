@@ -1665,6 +1665,13 @@ model RepairDelivery {
   deliveredByEmployeeId Int?
   recipientName         String?
   recipientPhone        String?
+  customerConfirmedBy   String?
+  customerConfirmedAt   DateTime?
+  customerNote          String?
+  paymentConfirmed      Boolean               @default(false)
+  deviceReturned        Boolean               @default(false)
+  accessoriesReturned   Boolean               @default(false)
+  handoverSnapshot      Json?
   proofUrl              String?
   note                  String?
   deliveredAt           DateTime?

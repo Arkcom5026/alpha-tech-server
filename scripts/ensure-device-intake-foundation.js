@@ -33,6 +33,8 @@ const enumDefinitions = {
   RepairEstimateApprovalStatus: [
     'PENDING', 'APPROVED', 'REJECTED', 'SUPERSEDED', 'EXPIRED',
   ],
+  RepairDeliveryStatus: ['PENDING', 'READY', 'DELIVERED', 'CANCELLED'],
+  RepairDeliveryMethod: ['PICKUP_AT_BRANCH', 'COURIER', 'DELIVERY_BY_STORE', 'OTHER'],
   DeviceStatus: [
     'ACTIVE', 'IN_REPAIR', 'IN_WARRANTY_CLAIM', 'RETIRED', 'LOST',
   ],
@@ -98,6 +100,41 @@ CREATE INDEX IF NOT EXISTS "RepairEstimateApproval_repairJobId_status_idx"
   ON "RepairEstimateApproval"("repairJobId", "status");
 CREATE INDEX IF NOT EXISTS "RepairEstimateApproval_status_expiresAt_idx"
   ON "RepairEstimateApproval"("status", "expiresAt");
+
+CREATE TABLE IF NOT EXISTS "RepairDelivery" (
+  "id" SERIAL PRIMARY KEY,
+  "repairJobId" INTEGER NOT NULL,
+  "status" "RepairDeliveryStatus" NOT NULL DEFAULT 'PENDING',
+  "method" "RepairDeliveryMethod" NOT NULL DEFAULT 'PICKUP_AT_BRANCH',
+  "deliveredByEmployeeId" INTEGER,
+  "recipientName" TEXT,
+  "recipientPhone" TEXT,
+  "proofUrl" TEXT,
+  "note" TEXT,
+  "customerConfirmedBy" TEXT,
+  "customerConfirmedAt" TIMESTAMP(3),
+  "customerNote" TEXT,
+  "paymentConfirmed" BOOLEAN NOT NULL DEFAULT false,
+  "deviceReturned" BOOLEAN NOT NULL DEFAULT false,
+  "accessoriesReturned" BOOLEAN NOT NULL DEFAULT false,
+  "handoverSnapshot" JSONB,
+  "deliveredAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "customerConfirmedBy" TEXT;
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "customerConfirmedAt" TIMESTAMP(3);
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "customerNote" TEXT;
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "paymentConfirmed" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "deviceReturned" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "accessoriesReturned" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "RepairDelivery" ADD COLUMN IF NOT EXISTS "handoverSnapshot" JSONB;
+CREATE UNIQUE INDEX IF NOT EXISTS "RepairDelivery_repairJobId_key"
+  ON "RepairDelivery"("repairJobId");
+CREATE INDEX IF NOT EXISTS "RepairDelivery_status_deliveredAt_idx"
+  ON "RepairDelivery"("status", "deliveredAt");
+CREATE INDEX IF NOT EXISTS "RepairDelivery_deliveredByEmployeeId_deliveredAt_idx"
+  ON "RepairDelivery"("deliveredByEmployeeId", "deliveredAt");
 
 CREATE TABLE IF NOT EXISTS "Device" (
   "id" SERIAL PRIMARY KEY,
@@ -309,6 +346,8 @@ const foreignKeys = [
   ['RepairTrackingAccess_createdByEmployeeId_fkey', 'RepairTrackingAccess', 'createdByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
   ['RepairEstimateApproval_repairJobId_fkey', 'RepairEstimateApproval', 'repairJobId', 'RepairJob', 'id', 'CASCADE'],
   ['RepairEstimateApproval_requestedByEmployeeId_fkey', 'RepairEstimateApproval', 'requestedByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
+  ['RepairDelivery_repairJobId_fkey', 'RepairDelivery', 'repairJobId', 'RepairJob', 'id', 'CASCADE'],
+  ['RepairDelivery_deliveredByEmployeeId_fkey', 'RepairDelivery', 'deliveredByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
   ['Device_branchId_fkey', 'Device', 'branchId', 'Branch', 'id', 'RESTRICT'],
   ['Device_currentOwnerCustomerId_fkey', 'Device', 'currentOwnerCustomerId', 'CustomerProfile', 'id', 'SET NULL'],
   ['Device_stockItemId_fkey', 'Device', 'stockItemId', 'StockItem', 'id', 'SET NULL'],
@@ -432,6 +471,8 @@ async function main() {
         to_regclass('public."RepairTrackingAccess"') IS NOT NULL AS repair_tracking_access,
         to_regclass('public."RepairTrackingAccess_tokenHash_key"') IS NOT NULL AS tracking_token_identity,
         to_regclass('public."RepairEstimateApproval"') IS NOT NULL AS repair_estimate_approval,
+        to_regclass('public."RepairDelivery"') IS NOT NULL AS repair_delivery,
+        to_regclass('public."RepairDelivery_repairJobId_key"') IS NOT NULL AS repair_delivery_identity,
         to_regclass('public."DeviceIntake"') IS NOT NULL AS intake,
         to_regclass('public."DeviceIntakeConsent"') IS NOT NULL AS intake_consent,
         to_regclass('public."DeviceIntakePhoto"') IS NOT NULL AS intake_photo,

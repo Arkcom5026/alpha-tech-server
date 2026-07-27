@@ -134,6 +134,14 @@ class RepairTrackingAccessRepository {
             updatedAt: true,
           },
         },
+        delivery: {
+          select: {
+            status: true,
+            customerConfirmedBy: true,
+            customerConfirmedAt: true,
+            deliveredAt: true,
+          },
+        },
       },
     });
   }
