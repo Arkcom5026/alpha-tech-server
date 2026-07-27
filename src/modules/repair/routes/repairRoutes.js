@@ -4,6 +4,9 @@ const {
   getIntakeContext,
 } = require('../query/intake-context/intakeContextController');
 const {
+  searchIntake,
+} = require('../query/intake-search/intakeSearchController');
+const {
   listCustomerWarrantyAssets,
 } = require('../query/customer-warranty-assets/customerWarrantyAssetsController');
 const {
@@ -60,6 +63,12 @@ router.get('/public/tracking/:token', getPublicRepairTracking);
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
+
+router.get(
+  '/intake-search',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  searchIntake
+);
 
 router.get(
   '/intake-context/:lookup',
