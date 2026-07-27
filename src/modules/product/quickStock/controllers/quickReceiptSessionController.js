@@ -1,6 +1,8 @@
 const QuickReceiptSessionService = require('../services/QuickReceiptSessionServiceSingleton')
+const QuickReceiptCompleteService = require('../services/QuickReceiptCompleteServiceSingleton')
 
 const service = new QuickReceiptSessionService()
+const completeService = new QuickReceiptCompleteService()
 const getActor = (req) => ({
   branchId: req.employee?.branchId || req.user?.branchId || null,
   employeeId: req.employee?.id || req.user?.employeeId || null,
@@ -38,6 +40,18 @@ exports.create = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
     const data = await service.createDraft(req.body || {}, actor.branchId, actor.employeeId)
+    return res.status(201).json({ success: true, data })
+  } catch (error) { return sendError(res, error) }
+}
+exports.complete = async (req, res) => {
+  try {
+    const actor = requireActor(req, res); if (!actor) return
+    const data = await completeService.complete(
+      req.body || {},
+      actor.branchId,
+      actor.employeeId,
+      req.get('X-Idempotency-Key')
+    )
     return res.status(201).json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
