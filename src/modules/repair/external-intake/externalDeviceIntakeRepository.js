@@ -1,7 +1,7 @@
-const prisma = require('../../../../database/prisma/client');
+const prisma = require('../../../database/prisma/client');
 const {
   publishDevicePassportEvent,
-} = require('../../../device/passport/publish/devicePassportEventPublisher');
+} = require('../../device/passport/publish/devicePassportEventPublisher');
 
 const repairJobInclude = {
   branch: true,
