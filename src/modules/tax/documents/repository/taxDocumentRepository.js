@@ -27,6 +27,15 @@ const findByCandidateId = async (candidateId, tx = prisma) => {
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const findByIdForUpdate = async ({ branchId, taxDocumentId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT * FROM "TaxDocument"
+    WHERE "id" = ${Number(taxDocumentId)} AND "branchId" = ${Number(branchId)}
+    LIMIT 1 FOR UPDATE
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const findDetailById = async ({ branchId, taxDocumentId }, tx = prisma) => {
   const documents = await tx.$queryRaw(Prisma.sql`
     SELECT d.*, row_to_json(c.*) AS candidate
@@ -74,6 +83,18 @@ const create = async (document, tx = prisma) => {
   return mapRow(rows[0]);
 };
 
+const updateStatus = async ({ branchId, taxDocumentId, expectedStatus, targetStatus }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    UPDATE "TaxDocument"
+    SET "status" = ${targetStatus}, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${Number(taxDocumentId)}
+      AND "branchId" = ${Number(branchId)}
+      AND "status" = ${expectedStatus}
+    RETURNING *
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const appendLifecycleEvent = async ({ taxDocumentId, fromStatus, toStatus, reason, actorEmployeeId, metadata }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxDocumentLifecycleEvent" (
@@ -104,8 +125,10 @@ const list = async ({ branchId, status, documentType, limit = 50, offset = 0 }, 
 module.exports = Object.freeze({
   findByIdentityKey,
   findByCandidateId,
+  findByIdForUpdate,
   findDetailById,
   create,
+  updateStatus,
   appendLifecycleEvent,
   list,
 });
