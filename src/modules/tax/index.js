@@ -7,6 +7,9 @@
  * depend on them. Internal repositories remain private to their slices.
  */
 module.exports = Object.freeze({
+  intake: Object.freeze({
+    registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
+  }),
   candidates: Object.freeze({
     contracts: require('./candidates/contracts/taxCandidateContract'),
     mapping: require('./candidates/mapping/mapCandidateToTaxDocument'),
