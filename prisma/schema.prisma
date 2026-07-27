@@ -1843,6 +1843,7 @@ model Device {
 
   deviceIntakes DeviceIntake[]
 
+  @@unique([branchId, barcode])
   @@index([branchId])
   @@index([currentOwnerCustomerId])
   @@index([stockItemId])
