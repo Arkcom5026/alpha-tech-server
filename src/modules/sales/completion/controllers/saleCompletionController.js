@@ -1,5 +1,6 @@
 const { validateSaleCompletionRequest } = require('../validators/saleCompletionValidator');
 const { completeSale } = require('../services/saleCompletionService');
+const { publishSaleTaxCandidate } = require('../services/publishSaleTaxCandidateService');
 
 const completeSaleController = async (req, res) => {
   try {
@@ -10,7 +11,15 @@ const completeSaleController = async (req, res) => {
     }
     const command = validateSaleCompletionRequest(req.body);
     const result = await completeSale({ command, branchId, employeeId });
-    return res.status(result.idempotency.replayed ? 200 : 201).json(result);
+    const taxIntake = await publishSaleTaxCandidate({
+      sale: result.sale,
+      branchId,
+      employeeId,
+    });
+    return res.status(result.idempotency.replayed ? 200 : 201).json({
+      ...result,
+      taxIntake,
+    });
   } catch (error) {
     const status = Number(error?.status) || 500;
     if (status >= 500) console.error('[sales.complete] failed', { code: error?.code, message: error?.message });
