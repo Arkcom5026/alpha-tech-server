@@ -64,6 +64,9 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Prepare CI database
+        run: npx prisma db push --skip-generate
+
       - name: Check JavaScript syntax
         shell: bash
         run: |
