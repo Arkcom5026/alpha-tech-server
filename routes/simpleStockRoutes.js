@@ -11,6 +11,9 @@ const {
 const {
   createSimpleAdjustment,
 } = require('../src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentController');
+const {
+  createSimpleTransfer,
+} = require('../src/modules/inventory/simple-stock/transfer/simpleStockTransferController');
 
 // ✅ ใช้ middleware เดียวกับไฟล์เดิม
 const verifyToken = require('../middlewares/verifyToken');
@@ -30,6 +33,9 @@ router.post('/sales', createSimpleSale);
 
 // ปรับยอดสต๊อก (บวก/ลบ พร้อมเหตุผล)
 router.post('/adjustments', createSimpleAdjustment);
+
+// โอนสินค้า SIMPLE ระหว่างสาขา
+router.post('/transfers', createSimpleTransfer);
 
 module.exports = router;
 

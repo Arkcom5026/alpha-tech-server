@@ -43,8 +43,15 @@ const assertProductCanAdjustSimpleStock = (product = {}) =>
     simpleOnlyCode: 'SIMPLE_ADJUSTMENT_REQUIRES_SIMPLE_MODE',
   })
 
+const assertProductCanTransferSimpleStock = (product = {}) =>
+  assertTrackedProductOperation(product, {
+    nonStockCode: 'NON_STOCK_PRODUCT_CANNOT_BE_TRANSFERRED',
+    simpleOnlyCode: 'SIMPLE_TRANSFER_REQUIRES_SIMPLE_MODE',
+  })
+
 module.exports = {
   assertProductCanAdjustSimpleStock,
   assertProductCanReceive,
+  assertProductCanTransferSimpleStock,
   resolveProductInventoryPolicy,
 }
