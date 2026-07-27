@@ -33,6 +33,8 @@ const resolveBranchId = (req, source) => {
   return requestedBranchId;
 };
 
+const actorEmployeeId = (req) => req.user?.employeeProfileId || req.user?.employeeId || null;
+
 const handle = (operation, successStatus = 200) => async (req, res, next) => {
   try {
     const result = await operation(req);
@@ -46,7 +48,16 @@ const registerCandidate = handle(
   (req) => service.registerTaxCandidate({
     ...req.body,
     branchId: resolveBranchId(req, req.body),
-    actorEmployeeId: req.user?.employeeProfileId || req.user?.employeeId || null,
+    actorEmployeeId: actorEmployeeId(req),
+  }),
+  201,
+);
+
+const registerSaleCandidate = handle(
+  (req) => service.registerSaleTaxCandidate({
+    branchId: resolveBranchId(req, req.body),
+    saleId: req.params.saleId,
+    actorEmployeeId: actorEmployeeId(req),
   }),
   201,
 );
@@ -66,9 +77,19 @@ const getDocumentDetail = handle((req) => service.getDocumentDetail({
   taxDocumentId: req.params.taxDocumentId,
 }));
 
+const transitionDocument = handle((req) => service.transitionTaxDocument({
+  branchId: resolveBranchId(req, req.body),
+  taxDocumentId: req.params.taxDocumentId,
+  targetStatus: req.body?.targetStatus,
+  reason: req.body?.reason,
+  actorEmployeeId: actorEmployeeId(req),
+}));
+
 module.exports = Object.freeze({
   getDocumentDetail,
   listCandidates,
   listDocuments,
   registerCandidate,
+  registerSaleCandidate,
+  transitionDocument,
 });
