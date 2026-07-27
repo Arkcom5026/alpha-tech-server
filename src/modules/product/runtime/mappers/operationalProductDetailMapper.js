@@ -35,6 +35,8 @@ const toOperationalProductDetail = (p) => {
     name: p.name,
     spec: null,
     mode,
+    inventoryBehavior: p.inventoryBehavior ?? 'TRACKED',
+    saleBarcode: p.saleBarcode ?? null,
     noSN: p.noSN,
     trackSerialNumber: p.trackSerialNumber,
     unitId: p.unitId ?? p.unit?.id ?? null,

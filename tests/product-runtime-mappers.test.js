@@ -68,6 +68,8 @@ const run = () => {
 
   const online = toOperationalProductOnlineSearchItem(baseProduct)
   assert.equal(online.readyPickupAtBranch, true)
+  assert.equal(online.inventoryBehavior, 'NON_STOCK')
+  assert.equal(online.saleBarcode, 'SVC-001')
   assert.equal(online.priceOnlineEffective, 110)
 
   const detail = toOperationalProductDetail(baseProduct)
@@ -78,6 +80,8 @@ const run = () => {
 
   const onlineDetail = toOperationalOnlineProductDetail(baseProduct)
   assert.equal(onlineDetail.readyPickupAtBranch, true)
+  assert.equal(onlineDetail.inventoryBehavior, 'NON_STOCK')
+  assert.equal(onlineDetail.saleBarcode, 'SVC-001')
   assert.equal(onlineDetail.unitName, 'ชิ้น')
 
   console.log('Operational Product Runtime Mappers: PASS')
