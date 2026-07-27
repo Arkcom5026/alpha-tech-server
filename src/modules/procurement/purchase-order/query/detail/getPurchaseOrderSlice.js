@@ -1,5 +1,5 @@
 const { prisma } = require('../../../../../../lib/prisma');
-const { detailInclude, normalizeDetail } = require('../../../shared/purchaseOrderShared');
+const { detailInclude, normalizeDetail } = require('../../shared/purchaseOrderShared');
 
 class GetPurchaseOrderRepository {
   constructor(client = prisma) { this.prisma = client; }
