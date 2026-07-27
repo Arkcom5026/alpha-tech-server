@@ -49,6 +49,7 @@ const repairJobDetailInclude = {
 
 const warrantyClaimDetailInclude = {
   branch: true,
+  device: true,
   supplier: true,
   repairJob: {
     include: {
