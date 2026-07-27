@@ -1,0 +1,36 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.join(__dirname, '..')
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
+
+const routes = read('src/modules/product/quickStock/routes/quickStockRoutes.js')
+const controller = read('src/modules/product/quickStock/controllers/quickReceiptSessionController.js')
+const sessions = read('src/modules/product/quickStock/services/QuickReceiptSessionService.js')
+const complete = read('src/modules/product/quickStock/services/QuickReceiptCompleteService.js')
+const migration = read('prisma/migrations/20260727190000_quick_receipt_session_foundation/migration.sql')
+
+assert(routes.includes("router.post('/receipts/complete', quickReceiptSessionController.complete)"))
+assert(routes.includes("router.post('/receipts/:id/finalize', quickReceiptSessionController.finalize)"))
+assert(controller.includes("req.get('X-Idempotency-Key')"))
+assert(complete.includes('this.sessions.createDraft'))
+assert(complete.includes('this.sessions.addItem'))
+assert(complete.includes('this.sessions.finalize'))
+assert(complete.includes('ONE_SHOT_PREPARATION_FAILED'))
+
+assert(sessions.includes("FOR UPDATE"))
+assert(sessions.includes('QuickReceiptFinalizeCommand'))
+assert(sessions.includes('findExistingBarcodes'))
+assert(sessions.includes('findExistingSerialNumbers'))
+assert(sessions.includes('createStockMovement'))
+assert(sessions.includes("refType: 'QUICK_RECEIPT'"))
+assert(sessions.includes('upsertStockBalance'))
+assert(sessions.includes("\"status\"='COMPLETED'"))
+
+assert(migration.includes('CREATE TABLE "QuickReceiptSession"'))
+assert(migration.includes('CREATE TABLE "QuickReceiptSessionItem"'))
+assert(migration.includes('CREATE TABLE "QuickReceiptFinalizeCommand"'))
+assert(migration.includes('normalizedDeliveryNoteNumber'))
+
+console.log('✅ Quick Receipt dual-mode repository contract passed')
