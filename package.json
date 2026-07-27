@@ -11,7 +11,7 @@
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "test:inventory": "node scripts/run-module-tests.js --list",
     "test:modules": "node scripts/run-module-tests.js",
-    "test:quick-receipt": "node src/modules/product/quickStock/services/QuickReceiptSessionService.test.js && node src/modules/product/quickStock/services/QuickReceiptCompleteService.test.js && node src/modules/product/quickStock/controllers/quickReceiptSessionController.test.js && node src/modules/product/quickStock/routes/quickStockRoutes.test.js",
+    "test:quick-receipt": "node prisma/migrations/20260727190000_quick_receipt_session_foundation/migration.test.js && node src/modules/product/quickStock/services/QuickReceiptSessionService.test.js && node src/modules/product/quickStock/services/QuickReceiptSessionService.inventory.test.js && node src/modules/product/quickStock/services/QuickReceiptCompleteService.test.js && node src/modules/product/quickStock/controllers/quickReceiptSessionController.test.js && node src/modules/product/quickStock/routes/quickStockRoutes.test.js",
     "test:tax-intake": "node tests/tax-intake-foundation.contract.test.js && node tests/tax-intake-http.contract.test.js && node tests/tax-lifecycle-sale-source.contract.test.js && node tests/tax-step-004-sales-publication.contract.test.js && node tests/tax-step-004-completion.contract.test.js",
     "test:certification": "npm run test:regression && npm run test:modules && npm run test:quick-receipt && npm run test:tax-intake && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input && npm run verify:product-inventory-authority && npm run verify:product-inventory-runtime && npm run verify:sale-simple-inventory-authority && npm run verify:simple-receive-authority && npm run verify:simple-adjustment-authority && npm run verify:simple-transfer-authority",
     "verify:product-runtime-controller": "node tests/operational-product-runtime-controller.contract.bootstrap.js",
@@ -50,7 +50,7 @@
     "nodemailer": "^6.10.1",
     "pg": "^8.22.0",
     "socket.io": "^4.8.3",
-    "streamifier": "^0.1.1",
+    "streamifier": "^1.0.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
