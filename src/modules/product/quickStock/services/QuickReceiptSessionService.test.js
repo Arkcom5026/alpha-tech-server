@@ -23,8 +23,8 @@ assert.deepEqual(structuredLine, {
   costPrice: 450.5,
   priceRetail: 590,
   priceWholesale: 550,
-  priceTechnician: 0,
-  priceOnline: 0,
+  priceTechnician: null,
+  priceOnline: null,
   note: 'รับตามใบส่งของ DN-001',
   items: [
     { barcode: 'BC-001', serialNumber: 'SN-001' },
