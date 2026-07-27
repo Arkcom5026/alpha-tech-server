@@ -21,10 +21,12 @@ const projectDevice = (device, query) => {
     .some((value) => normalize(value) === normalize(query));
 
   return {
+    sourceType: 'STOCK_ITEM',
     id: device.id,
     barcode: device.barcode,
     serialNumber: device.serialNumber,
     serviceTag: device.tag,
+    imei: null,
     status: device.status,
     exactIdentifierMatch,
     product: device.product,
@@ -37,7 +39,47 @@ const projectDevice = (device, query) => {
           email: sale.customer.user?.email || '',
         }
       : null,
+    latestRepairJob: null,
     soldAt: sale?.soldAt || null,
+  };
+};
+
+const projectRegisteredDevice = (device, query) => {
+  const exactIdentifierMatch = [device.barcode, device.serialNumber, device.imei]
+    .filter(Boolean)
+    .some((value) => normalize(value) === normalize(query));
+  const owner = device.currentOwner;
+  const latestRepairJob = device.repairJobs?.[0] || null;
+
+  return {
+    sourceType: 'REGISTERED_DEVICE',
+    id: device.id,
+    barcode: device.barcode,
+    serialNumber: device.serialNumber,
+    serviceTag: null,
+    imei: device.imei,
+    status: device.status,
+    category: device.category,
+    brand: device.brand,
+    model: device.model,
+    exactIdentifierMatch,
+    product: {
+      id: null,
+      name: device.model || device.category || 'อุปกรณ์ลงทะเบียน',
+      brand: device.brand ? { id: null, name: device.brand } : null,
+      productType: null,
+    },
+    latestCustomer: owner
+      ? {
+          id: owner.id,
+          name: owner.name || '',
+          companyName: owner.companyName || '',
+          phone: owner.user?.loginId || '',
+          email: owner.user?.email || '',
+        }
+      : null,
+    latestRepairJob,
+    soldAt: null,
   };
 };
 
@@ -49,9 +91,12 @@ class IntakeSearchService {
   async execute(actor, rawQuery) {
     const query = validateSearchQuery(rawQuery);
     const result = await this.repository.search(actor.branchId, query, 10);
-    const devices = (result.devices || [])
-      .map((device) => projectDevice(device, query))
-      .sort((a, b) => Number(b.exactIdentifierMatch) - Number(a.exactIdentifierMatch));
+    const devices = [
+      ...(result.devices || []).map((device) => projectDevice(device, query)),
+      ...(result.registeredDevices || []).map((device) =>
+        projectRegisteredDevice(device, query)
+      ),
+    ].sort((a, b) => Number(b.exactIdentifierMatch) - Number(a.exactIdentifierMatch));
     const customers = (result.customers || []).map(projectCustomer);
 
     return {
@@ -70,4 +115,5 @@ class IntakeSearchService {
 module.exports = new IntakeSearchService();
 module.exports.IntakeSearchService = IntakeSearchService;
 module.exports.projectDevice = projectDevice;
+module.exports.projectRegisteredDevice = projectRegisteredDevice;
 module.exports.projectCustomer = projectCustomer;
