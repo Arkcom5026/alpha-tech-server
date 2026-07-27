@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   StockMovementWriter,
@@ -75,4 +77,16 @@ test('writer refuses clients without stock movement persistence capability', () 
     () => new StockMovementWriter({}),
     /Prisma stockMovement client is required/
   );
+});
+
+test('quick stock repository delegates movement persistence to inventory authority', () => {
+  const repositoryPath = path.resolve(
+    __dirname,
+    '../../product/quickStock/repositories/quickStockRepository.js'
+  );
+  const source = fs.readFileSync(repositoryPath, 'utf8');
+
+  assert.match(source, /inventory\/movement\/stockMovementWriter/);
+  assert.doesNotMatch(source, /client\.stockMovement\.create\s*\(/);
+  assert.doesNotMatch(source, /client\.stockMovement\.createMany\s*\(/);
 });
