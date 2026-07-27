@@ -1,4 +1,5 @@
 const { prisma } = require('../../../../lib/prisma')
+const { decideOperationalProductMode } = require('../policies/operationalProductModePolicy')
 const {
   createLocalOperationalProductRecord,
   createOperationalProductRecordFromTemplate,
@@ -71,38 +72,6 @@ const pickBranchPricePayload = (data = {}) => {
 
   return hasFlat ? flat : null
 }
-
-const decideLocalMode = ({ explicitMode, noSN, trackSerialNumber }) => {
-  const rawMode = explicitMode === undefined || explicitMode === null ? '' : String(explicitMode).trim()
-  const exp = rawMode ? rawMode.toUpperCase() : undefined
-  const hasNoSN = noSN !== undefined
-  const hasTrack = trackSerialNumber !== undefined
-  const n = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
-  const t = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1'
-
-  if (exp === 'SIMPLE' || exp === 'NOSN' || exp === 'NO_SN' || exp === 'NO-SN') {
-    return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  }
-
-  if (exp === 'STRUCTURED' || exp === 'SN') {
-    return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-  }
-
-  if (hasNoSN || hasTrack) {
-    if (t) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && n === false) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && n === true) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-    if (hasTrack && t === false) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  }
-
-  return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-}
-
-
-
-
-
-
 
 const calcAvailable = (stockBalance) => {
   const quantity = Number(stockBalance?.quantity ?? 0)
@@ -446,10 +415,11 @@ const createLocalOperationalProduct = async ({ branchId, data = {}, db = prisma 
       throw error
     }
 
-    const { mode, noSN, trackSerialNumber } = decideLocalMode({
+    const { mode, noSN, trackSerialNumber } = decideOperationalProductMode({
       explicitMode: data.mode ?? data.stockMode ?? data.stockBehavior,
       noSN: data.noSN,
       trackSerialNumber: data.trackSerialNumber,
+      inventoryBehavior: data.inventoryBehavior,
     })
 
     const product = await createLocalOperationalProductRecord({
