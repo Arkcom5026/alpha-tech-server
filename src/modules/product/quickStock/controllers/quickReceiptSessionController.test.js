@@ -11,7 +11,10 @@ assert.match(source, /service\.finalize\(req\.params\.id, actor\.branchId, actor
 assert.match(source, /Number\(data\?\.id\) !== Number\(req\.params\.id\)/)
 assert.match(source, /IDEMPOTENCY_KEY_CONFLICT/)
 assert.match(source, /service\.cancel\(req\.params\.id, actor\.branchId, req\.body\?\.reason\)/)
-assert.match(source, /code: error\?\.code \|\| 'QUICK_RECEIPT_FAILED'/)
+assert.match(source, /normalizeError\(rawError\)/)
+assert.match(source, /databaseCode === '23505'/)
+assert.match(source, /INVENTORY_IDENTITY_ALREADY_EXISTS/)
+assert.match(source, /Barcode หรือ Serial Number นี้มีอยู่ในระบบแล้ว/)
 assert.match(source, /details: error\?\.details/)
 
 console.log('✅ quickReceiptSessionController HTTP contract passed')
