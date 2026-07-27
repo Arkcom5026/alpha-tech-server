@@ -12,6 +12,7 @@ const warrantyClaimDetailInclude = {
       },
     },
   },
+  device: true,
   supplier: true,
   repairJob: {
     include: {
