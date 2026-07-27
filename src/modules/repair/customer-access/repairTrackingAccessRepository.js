@@ -137,6 +137,20 @@ class RepairTrackingAccessRepository {
       },
     });
   }
+
+  async getLatestEstimateApproval(repairJobId) {
+    const rows = await this.prisma.$queryRaw`
+      SELECT
+        "id", "repairJobId", "estimateAmount", "depositAmount", "balanceAmount",
+        "status", "requestNote", "customerNote", "confirmedByName",
+        "requestedAt", "expiresAt", "decidedAt"
+      FROM "RepairEstimateApproval"
+      WHERE "repairJobId" = ${Number(repairJobId)}
+      ORDER BY "requestedAt" DESC, "id" DESC
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  }
 }
 
 module.exports = new RepairTrackingAccessRepository();

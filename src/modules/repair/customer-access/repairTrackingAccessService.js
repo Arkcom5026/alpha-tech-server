@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
+const { mapApproval } = require('../estimate-approval/repairEstimateApprovalPolicy');
 
 const DEFAULT_EXPIRY_DAYS = 90;
 
@@ -218,8 +219,12 @@ async function getPublicTracking(token) {
     throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบข้อมูลงานซ่อม');
   }
 
+  const projection = toPublicProjection(job);
+  projection.repair.estimateApproval = mapApproval(
+    await repository.getLatestEstimateApproval(access.repairJobId)
+  );
   await repository.touch(access.id);
-  return toPublicProjection(job);
+  return projection;
 }
 
 module.exports = {

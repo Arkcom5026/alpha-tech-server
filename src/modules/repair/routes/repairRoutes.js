@@ -49,6 +49,11 @@ const {
   getPublicRepairTracking,
 } = require('../customer-access/repairTrackingAccessController');
 const {
+  publishEstimateApproval,
+  getLatestEstimateApproval,
+  decidePublicEstimateApproval,
+} = require('../estimate-approval/repairEstimateApprovalController');
+const {
   getIntakeEvidence,
   saveIntakeEvidence,
 } = require('../intake-evidence/intakeEvidenceController');
@@ -65,6 +70,10 @@ const OPERATION_ROLES = ['OWNER', 'MANAGER'];
 
 // Customer-safe endpoint. It must remain before the staff authentication middleware.
 router.get('/public/tracking/:token', getPublicRepairTracking);
+router.post(
+  '/public/tracking/:token/estimate-decision',
+  decidePublicEstimateApproval
+);
 
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
@@ -127,6 +136,18 @@ router.delete(
   '/jobs/:id/tracking-access',
   allowRepairRoles(...READ_AND_INTAKE_ROLES),
   revokeTrackingAccess
+);
+
+router.get(
+  '/jobs/:id/estimate-approval',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  getLatestEstimateApproval
+);
+
+router.post(
+  '/jobs/:id/estimate-approval',
+  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  publishEstimateApproval
 );
 
 router.get(

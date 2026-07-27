@@ -75,6 +75,7 @@ model EmployeeProfile {
   checkedRepairQualityChecks        RepairQualityCheck[]        @relation("RepairQualityCheckedBy")
   deliveredRepairJobs               RepairDelivery[]            @relation("RepairDeliveryDeliveredBy")
   createdRepairTrackingAccesses     RepairTrackingAccess[]      @relation("RepairTrackingAccessCreatedBy")
+  requestedRepairEstimateApprovals  RepairEstimateApproval[]    @relation("RepairEstimateApprovalRequestedBy")
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -1473,6 +1474,7 @@ model RepairJob {
   qualityCheck   RepairQualityCheck?
   delivery       RepairDelivery?
   trackingAccesses RepairTrackingAccess[]
+  estimateApprovals RepairEstimateApproval[]
 
   @@index([branchId])
   @@index([stockItemId])
@@ -1495,6 +1497,31 @@ model RepairTrackingAccess {
   @@index([repairJobId, createdAt])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model RepairEstimateApproval {
+  id                    Int                          @id @default(autoincrement())
+  repairJobId           Int
+  estimateAmount        Decimal                      @db.Decimal(12, 2)
+  depositAmount         Decimal                      @default(0.0) @db.Decimal(12, 2)
+  balanceAmount         Decimal                      @db.Decimal(12, 2)
+  status                RepairEstimateApprovalStatus @default(PENDING)
+  requestNote           String?
+  customerNote          String?
+  confirmedByName       String?
+  requestedByEmployeeId Int?
+  requestedAt           DateTime                     @default(now())
+  expiresAt             DateTime?
+  decidedAt             DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  requestedBy EmployeeProfile? @relation("RepairEstimateApprovalRequestedBy", fields: [requestedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, requestedAt])
+  @@index([repairJobId, status])
+  @@index([status, expiresAt])
 }
 
 model RepairPartItem {
@@ -2072,6 +2099,14 @@ enum DeviceIntakeAuditEvent {
   LINKED_TO_REPAIR
   STATUS_CHANGED
   CANCELLED
+}
+
+enum RepairEstimateApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
 }
 
 enum DeviceStatus {

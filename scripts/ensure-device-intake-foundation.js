@@ -30,6 +30,9 @@ const enumDefinitions = {
     'PHOTO_ADDED', 'DOCUMENT_ADDED', 'CHECKLIST_UPDATED',
     'LINKED_TO_REPAIR', 'STATUS_CHANGED', 'CANCELLED',
   ],
+  RepairEstimateApprovalStatus: [
+    'PENDING', 'APPROVED', 'REJECTED', 'SUPERSEDED', 'EXPIRED',
+  ],
   DeviceStatus: [
     'ACTIVE', 'IN_REPAIR', 'IN_WARRANTY_CLAIM', 'RETIRED', 'LOST',
   ],
@@ -71,6 +74,30 @@ CREATE INDEX IF NOT EXISTS "RepairTrackingAccess_expiresAt_idx"
   ON "RepairTrackingAccess"("expiresAt");
 CREATE INDEX IF NOT EXISTS "RepairTrackingAccess_revokedAt_idx"
   ON "RepairTrackingAccess"("revokedAt");
+
+CREATE TABLE IF NOT EXISTS "RepairEstimateApproval" (
+  "id" SERIAL PRIMARY KEY,
+  "repairJobId" INTEGER NOT NULL,
+  "estimateAmount" DECIMAL(12,2) NOT NULL,
+  "depositAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+  "balanceAmount" DECIMAL(12,2) NOT NULL,
+  "status" "RepairEstimateApprovalStatus" NOT NULL DEFAULT 'PENDING',
+  "requestNote" TEXT,
+  "customerNote" TEXT,
+  "confirmedByName" TEXT,
+  "requestedByEmployeeId" INTEGER,
+  "requestedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expiresAt" TIMESTAMP(3),
+  "decidedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "RepairEstimateApproval_repairJobId_requestedAt_idx"
+  ON "RepairEstimateApproval"("repairJobId", "requestedAt");
+CREATE INDEX IF NOT EXISTS "RepairEstimateApproval_repairJobId_status_idx"
+  ON "RepairEstimateApproval"("repairJobId", "status");
+CREATE INDEX IF NOT EXISTS "RepairEstimateApproval_status_expiresAt_idx"
+  ON "RepairEstimateApproval"("status", "expiresAt");
 
 CREATE TABLE IF NOT EXISTS "Device" (
   "id" SERIAL PRIMARY KEY,
@@ -280,6 +307,8 @@ CREATE INDEX IF NOT EXISTS "DevicePassportEvent_actorCustomerId_idx"
 const foreignKeys = [
   ['RepairTrackingAccess_repairJobId_fkey', 'RepairTrackingAccess', 'repairJobId', 'RepairJob', 'id', 'CASCADE'],
   ['RepairTrackingAccess_createdByEmployeeId_fkey', 'RepairTrackingAccess', 'createdByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
+  ['RepairEstimateApproval_repairJobId_fkey', 'RepairEstimateApproval', 'repairJobId', 'RepairJob', 'id', 'CASCADE'],
+  ['RepairEstimateApproval_requestedByEmployeeId_fkey', 'RepairEstimateApproval', 'requestedByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
   ['Device_branchId_fkey', 'Device', 'branchId', 'Branch', 'id', 'RESTRICT'],
   ['Device_currentOwnerCustomerId_fkey', 'Device', 'currentOwnerCustomerId', 'CustomerProfile', 'id', 'SET NULL'],
   ['Device_stockItemId_fkey', 'Device', 'stockItemId', 'StockItem', 'id', 'SET NULL'],
@@ -402,6 +431,7 @@ async function main() {
         to_regclass('public."Device"') IS NOT NULL AS device,
         to_regclass('public."RepairTrackingAccess"') IS NOT NULL AS repair_tracking_access,
         to_regclass('public."RepairTrackingAccess_tokenHash_key"') IS NOT NULL AS tracking_token_identity,
+        to_regclass('public."RepairEstimateApproval"') IS NOT NULL AS repair_estimate_approval,
         to_regclass('public."DeviceIntake"') IS NOT NULL AS intake,
         to_regclass('public."DeviceIntakeConsent"') IS NOT NULL AS intake_consent,
         to_regclass('public."DeviceIntakePhoto"') IS NOT NULL AS intake_photo,
