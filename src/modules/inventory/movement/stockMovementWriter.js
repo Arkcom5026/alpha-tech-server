@@ -1,4 +1,5 @@
 const RAW_STOCK_MOVEMENT_DELEGATE = Symbol.for('alpha-tech.inventory.raw-stock-movement-delegate');
+const AUTHORIZED_STOCK_MOVEMENT_CLIENT = Symbol.for('alpha-tech.inventory.authorized-stock-movement-client');
 
 class StockMovementWriter {
   constructor(client) {
@@ -26,8 +27,12 @@ const createStockMovements = (client, data) => new StockMovementWriter(client).c
 
 const authorizedClientCache = new WeakMap();
 
+const isStockMovementAuthorizedClient = (client) =>
+  Boolean(client?.[AUTHORIZED_STOCK_MOVEMENT_CLIENT]);
+
 const authorizeStockMovementClient = (client) => {
   if (!client || (typeof client !== 'object' && typeof client !== 'function')) return client;
+  if (isStockMovementAuthorizedClient(client)) return client;
   if (authorizedClientCache.has(client)) return authorizedClientCache.get(client);
 
   let authorizedClient;
@@ -49,6 +54,7 @@ const authorizeStockMovementClient = (client) => {
 
   authorizedClient = new Proxy(client, {
     get(target, property, receiver) {
+      if (property === AUTHORIZED_STOCK_MOVEMENT_CLIENT) return true;
       if (property === RAW_STOCK_MOVEMENT_DELEGATE) return stockMovementDelegate;
       if (property === 'stockMovement' && authorizedStockMovement) return authorizedStockMovement;
       if (property === '$transaction' && typeof target.$transaction === 'function') {
@@ -71,8 +77,10 @@ const authorizeStockMovementClient = (client) => {
 
 module.exports = {
   RAW_STOCK_MOVEMENT_DELEGATE,
+  AUTHORIZED_STOCK_MOVEMENT_CLIENT,
   StockMovementWriter,
   createStockMovement,
   createStockMovements,
+  isStockMovementAuthorizedClient,
   authorizeStockMovementClient,
 };
