@@ -4,11 +4,14 @@ const {
 } = require('../../../device/passport/publish/devicePassportEventPublisher');
 
 const repairWorkflowInclude = {
-  device: true,
-  passportEvents: {
-    where: { sourceType: 'REPAIR_JOB' },
-    orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-    take: 1,
+  device: {
+    include: {
+      passportEvents: {
+        where: { sourceType: 'REPAIR_JOB' },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+      },
+    },
   },
 };
 
