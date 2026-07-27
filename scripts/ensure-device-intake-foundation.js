@@ -46,6 +46,26 @@ const enumDefinitions = {
 };
 
 const foundationSql = `
+CREATE TABLE IF NOT EXISTS "RepairTrackingAccess" (
+  "id" SERIAL PRIMARY KEY,
+  "repairJobId" INTEGER NOT NULL,
+  "tokenHash" VARCHAR(64) NOT NULL,
+  "expiresAt" TIMESTAMP(3),
+  "revokedAt" TIMESTAMP(3),
+  "lastAccessedAt" TIMESTAMP(3),
+  "createdByEmployeeId" INTEGER,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "RepairTrackingAccess_tokenHash_key"
+  ON "RepairTrackingAccess"("tokenHash");
+CREATE INDEX IF NOT EXISTS "RepairTrackingAccess_repairJobId_createdAt_idx"
+  ON "RepairTrackingAccess"("repairJobId", "createdAt");
+CREATE INDEX IF NOT EXISTS "RepairTrackingAccess_expiresAt_idx"
+  ON "RepairTrackingAccess"("expiresAt");
+CREATE INDEX IF NOT EXISTS "RepairTrackingAccess_revokedAt_idx"
+  ON "RepairTrackingAccess"("revokedAt");
+
 CREATE TABLE IF NOT EXISTS "Device" (
   "id" SERIAL PRIMARY KEY,
   "branchId" INTEGER NOT NULL,
@@ -204,6 +224,8 @@ CREATE INDEX IF NOT EXISTS "DevicePassportEvent_actorCustomerId_idx"
 `;
 
 const foreignKeys = [
+  ['RepairTrackingAccess_repairJobId_fkey', 'RepairTrackingAccess', 'repairJobId', 'RepairJob', 'id', 'CASCADE'],
+  ['RepairTrackingAccess_createdByEmployeeId_fkey', 'RepairTrackingAccess', 'createdByEmployeeId', 'EmployeeProfile', 'id', 'SET NULL'],
   ['Device_branchId_fkey', 'Device', 'branchId', 'Branch', 'id', 'RESTRICT'],
   ['Device_currentOwnerCustomerId_fkey', 'Device', 'currentOwnerCustomerId', 'CustomerProfile', 'id', 'SET NULL'],
   ['Device_stockItemId_fkey', 'Device', 'stockItemId', 'StockItem', 'id', 'SET NULL'],
@@ -319,6 +341,8 @@ async function main() {
     const verification = await client.query(`
       SELECT
         to_regclass('public."Device"') IS NOT NULL AS device,
+        to_regclass('public."RepairTrackingAccess"') IS NOT NULL AS repair_tracking_access,
+        to_regclass('public."RepairTrackingAccess_tokenHash_key"') IS NOT NULL AS tracking_token_identity,
         to_regclass('public."DeviceIntake"') IS NOT NULL AS intake,
         to_regclass('public."Device_branchId_barcode_key"') IS NOT NULL AS device_barcode_identity,
         EXISTS (
@@ -347,7 +371,7 @@ async function main() {
     if (!Object.values(verification.rows[0]).every(Boolean)) {
       throw new Error('Device foundation verification failed');
     }
-    console.log('[db] Device intake foundation is ready');
+    console.log('[db] Device intake and customer tracking foundation is ready');
   } finally {
     try {
       await client.query('SELECT pg_advisory_unlock($1)', [lockKey]);
