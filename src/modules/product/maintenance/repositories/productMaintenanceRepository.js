@@ -8,7 +8,7 @@ const findOperationalProductForUpdate = ({ db, productId, branchId } = {}) => (
       id: Number(productId),
       productType: { branchId: Number(branchId) },
     },
-    select: { id: true, productTypeId: true },
+    select: { id: true, productTypeId: true, mode: true, noSN: true, trackSerialNumber: true, inventoryBehavior: true, saleBarcode: true },
   })
 )
 
@@ -102,9 +102,17 @@ const rebuildSimpleStockBalance = async ({ db, productId, branchId } = {}) => {
 
 const transaction = (callback, options = { timeout: 15000 }) => prisma.$transaction(callback, options)
 
+const findSaleBarcodeConflict = ({ db, branchId, saleBarcode, excludeProductId } = {}) => (
+  getDb(db).product.findFirst({
+    where: { saleBarcode, productType: { branchId: Number(branchId) }, id: { not: Number(excludeProductId) } },
+    select: { id: true },
+  })
+)
+
 module.exports = {
   transaction,
   findOperationalProductForUpdate,
+  findSaleBarcodeConflict,
   findOperationalProductType,
   updateProduct,
   upsertBranchPrice,

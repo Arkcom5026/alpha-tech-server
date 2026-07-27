@@ -18,6 +18,8 @@ const baseProduct = {
   active: true,
   name: 'Simple Product',
   mode: 'SIMPLE',
+  inventoryBehavior: 'NON_STOCK',
+  saleBarcode: 'SVC-001',
   noSN: true,
   trackSerialNumber: false,
   productTypeId: 8,
@@ -53,11 +55,14 @@ const baseProduct = {
 const run = () => {
   const runtime = toOperationalRuntimeProduct(baseProduct, 7)
   assert.equal(runtime.available, 8)
+  assert.equal(runtime.inventoryBehavior, 'NON_STOCK')
+  assert.equal(runtime.saleBarcode, 'SVC-001')
   assert.equal(runtime.branchId, 7)
   assert.equal(runtime.categoryName, 'Supplies')
 
   const pos = toOperationalProductPosSearchItem(baseProduct)
   assert.equal(pos.available, 8)
+  assert.equal(pos.inventoryBehavior, 'NON_STOCK')
   assert.equal(pos.isReady, true)
   assert.equal(pos.lastCost, 65)
 
@@ -67,6 +72,7 @@ const run = () => {
 
   const detail = toOperationalProductDetail(baseProduct)
   assert.equal(detail.available, 8)
+  assert.equal(detail.saleBarcode, 'SVC-001')
   assert.equal(detail.isReady, true)
   assert.equal(detail.productTypeName, 'Consumable')
 

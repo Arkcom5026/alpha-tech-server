@@ -17,6 +17,8 @@ const toOperationalRuntimeProduct = (p, branchId = null) => {
     active: typeof p.active === 'boolean' ? p.active : true,
     name: p.name,
     mode: p.mode,
+    inventoryBehavior: p.inventoryBehavior ?? 'TRACKED',
+    saleBarcode: p.saleBarcode ?? null,
     noSN: p.noSN,
     trackSerialNumber: p.trackSerialNumber,
 

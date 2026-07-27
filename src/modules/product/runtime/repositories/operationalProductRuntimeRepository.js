@@ -5,6 +5,8 @@ const selectOperationalRuntimeProduct = (branchId) => ({
   active: true,
   name: true,
   mode: true,
+  inventoryBehavior: true,
+  saleBarcode: true,
   noSN: true,
   trackSerialNumber: true,
   templateProductId: true,
@@ -60,6 +62,8 @@ const selectOperationalProductDetail = (branchId) => ({
   id: true,
   name: true,
   mode: true,
+  inventoryBehavior: true,
+  saleBarcode: true,
   noSN: true,
   trackSerialNumber: true,
   productTypeId: true,
@@ -112,6 +116,8 @@ const selectOperationalOnlineProduct = (branchId) => ({
   id: true,
   name: true,
   mode: true,
+  inventoryBehavior: true,
+  saleBarcode: true,
   noSN: true,
   productTypeId: true,
   productType: {
@@ -370,6 +376,8 @@ const findTemplateProductForClone = ({
       id: true,
       name: true,
       mode: true,
+      inventoryBehavior: true,
+      saleBarcode: true,
       noSN: true,
       trackSerialNumber: true,
       brandId: true,
@@ -410,6 +418,13 @@ const createOperationalProductRecordFromTemplate = ({
   })
 )
 
+const findOperationalProductSaleBarcodeConflict = ({ branchId, saleBarcode, excludeProductId, db = prisma }) => (
+  db.product.findFirst({
+    where: { saleBarcode, productType: { branchId: Number(branchId) }, ...(excludeProductId ? { id: { not: Number(excludeProductId) } } : {}) },
+    select: { id: true },
+  })
+)
+
 
 module.exports = {
   withDb,
@@ -428,6 +443,7 @@ module.exports = {
   findOperationalProductList,
   findOperationalOnlineProductList,
   findOperationalOnlineProductDetailById,
+  findOperationalProductSaleBarcodeConflict,
   findStockItemByBarcode,
   findStockItemBySerialNumber,
   selectOperationalRuntimeProduct,

@@ -14,6 +14,7 @@ const {
   findOperationalProductList,
   findOperationalOnlineProductList,
   findOperationalOnlineProductDetailById,
+  findOperationalProductSaleBarcodeConflict,
   findStockItemByBarcode,
   findStockItemBySerialNumber,
   findTemplateBranchByCode,
@@ -147,18 +148,27 @@ const createLocalOperationalProduct = async ({ branchId, data = {}, db = prisma 
       throw error
     }
 
-    const { mode, noSN, trackSerialNumber } = decideOperationalProductMode({
+    const { mode, noSN, trackSerialNumber, inventoryBehavior } = decideOperationalProductMode({
       explicitMode: data.mode ?? data.stockMode ?? data.stockBehavior,
       noSN: data.noSN,
       trackSerialNumber: data.trackSerialNumber,
       inventoryBehavior: data.inventoryBehavior,
     })
+    const saleBarcode = normStr(data.saleBarcode) || null
+    if (saleBarcode && mode !== 'SIMPLE') {
+      const error = new Error('SALE_BARCODE_REQUIRES_SIMPLE_MODE'); error.statusCode = 400; error.code = error.message; throw error
+    }
+    if (saleBarcode && await findOperationalProductSaleBarcodeConflict({ branchId: brId, saleBarcode, db: tx })) {
+      const error = new Error('SALE_BARCODE_ALREADY_EXISTS_IN_BRANCH'); error.statusCode = 409; error.code = error.message; throw error
+    }
 
     const product = await createLocalOperationalProductRecord({
       db: tx,
       data: {
         name,
         mode,
+        inventoryBehavior,
+        saleBarcode,
         noSN,
         trackSerialNumber,
         active: typeof data.active === 'boolean' ? data.active : true,
@@ -279,6 +289,8 @@ const createOperationalProductFromTemplate = async ({ branchId, templateProductI
     data: {
       name: template.name,
       mode: structured ? 'STRUCTURED' : 'SIMPLE',
+      inventoryBehavior: template.inventoryBehavior ?? 'TRACKED',
+      saleBarcode: null,
       noSN: !structured,
       trackSerialNumber: structured,
       active: true,

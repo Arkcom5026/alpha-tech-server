@@ -1,4 +1,5 @@
 const repo = require('../repositories/productMaintenanceRepository')
+const { decideOperationalProductMode } = require('../../runtime/policies/operationalProductModePolicy')
 
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return undefined
@@ -20,31 +21,6 @@ const makeError = (code, status = 400) => {
   error.status = status
   error.statusCode = status
   return error
-}
-
-const decideMode = ({ explicitMode, noSN, trackSerialNumber } = {}) => {
-  const raw = explicitMode == null ? '' : String(explicitMode).trim().toUpperCase()
-  const hasNoSN = noSN !== undefined
-  const hasTrack = trackSerialNumber !== undefined
-  const normalizedNoSN = noSN === true || noSN === 'true' || noSN === 1 || noSN === '1'
-  const normalizedTrack = trackSerialNumber === true || trackSerialNumber === 'true' || trackSerialNumber === 1 || trackSerialNumber === '1'
-
-  if (['SIMPLE', 'NOSN', 'NO_SN', 'NO-SN'].includes(raw)) {
-    return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  }
-
-  if (['STRUCTURED', 'SN'].includes(raw)) {
-    return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-  }
-
-  if (hasNoSN || hasTrack) {
-    if (normalizedTrack) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && normalizedNoSN === false) return { mode: 'STRUCTURED', noSN: false, trackSerialNumber: true }
-    if (hasNoSN && normalizedNoSN === true) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-    if (hasTrack && normalizedTrack === false) return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
-  }
-
-  return { mode: 'SIMPLE', noSN: true, trackSerialNumber: false }
 }
 
 const pickBranchPricePayload = (data = {}) => {
@@ -84,22 +60,27 @@ const updateOperationalProduct = async ({ productId, branchId, data = {} } = {})
   if (!id) throw makeError('INVALID_ID', 400)
   if (!brId) throw makeError('unauthorized', 401)
 
-  const shouldOverrideMode = ['mode', 'stockMode', 'stockBehavior', 'noSN', 'trackSerialNumber']
+  const shouldOverrideMode = ['mode', 'stockMode', 'stockBehavior', 'noSN', 'trackSerialNumber', 'inventoryBehavior']
     .some((key) => data[key] !== undefined)
-
-  const partialMode = shouldOverrideMode
-    ? decideMode({
-        explicitMode: data.mode ?? data.stockMode ?? data.stockBehavior,
-        noSN: data.noSN,
-        trackSerialNumber: data.trackSerialNumber,
-      })
-    : null
 
   let learnLater = null
 
   const result = await repo.transaction(async (tx) => {
     const current = await repo.findOperationalProductForUpdate({ db: tx, productId: id, branchId: brId })
     if (!current) throw makeError('NOT_FOUND', 404)
+
+    const partialMode = shouldOverrideMode ? decideOperationalProductMode({
+      explicitMode: data.mode ?? data.stockMode ?? data.stockBehavior ?? current.mode,
+      noSN: data.noSN ?? current.noSN,
+      trackSerialNumber: data.trackSerialNumber ?? current.trackSerialNumber,
+      inventoryBehavior: data.inventoryBehavior ?? current.inventoryBehavior,
+    }) : null
+    const effectiveMode = partialMode?.mode ?? current.mode
+    const saleBarcode = data.saleBarcode !== undefined ? (normalizeText(data.saleBarcode) || null) : current.saleBarcode
+    if (saleBarcode && effectiveMode !== 'SIMPLE') throw makeError('SALE_BARCODE_REQUIRES_SIMPLE_MODE', 400)
+    if (saleBarcode && await repo.findSaleBarcodeConflict({ db: tx, branchId: brId, saleBarcode, excludeProductId: id })) {
+      throw makeError('SALE_BARCODE_ALREADY_EXISTS_IN_BRANCH', 409)
+    }
 
     const incomingTypeId = toInt(data.productTypeId)
     const incomingCategoryId = toInt(data.categoryId)
@@ -118,6 +99,7 @@ const updateOperationalProduct = async ({ productId, branchId, data = {} } = {})
       data: {
         name: data.name != null ? normalizeText(data.name) : undefined,
         ...(partialMode ? partialMode : {}),
+        saleBarcode: data.saleBarcode !== undefined ? saleBarcode : undefined,
         active: typeof data.active === 'boolean' ? data.active : undefined,
         productTypeId: incomingTypeId !== undefined ? typeCheck.productTypeId : undefined,
         brandId: toInt(data.brandId),
@@ -154,7 +136,7 @@ const updateOperationalProduct = async ({ productId, branchId, data = {} } = {})
       })
     }
 
-    if (partialMode?.mode === 'SIMPLE') {
+    if (partialMode?.mode === 'SIMPLE' && partialMode.inventoryBehavior === 'TRACKED') {
       try {
         await repo.rebuildSimpleStockBalance({ db: tx, productId: id, branchId: brId })
       } catch (error) {

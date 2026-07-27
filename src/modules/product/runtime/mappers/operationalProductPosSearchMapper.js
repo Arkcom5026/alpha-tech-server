@@ -24,6 +24,8 @@ const toOperationalProductPosSearchItem = (p) => {
     active: typeof p.active === 'boolean' ? p.active : true,
     name: p.name,
     mode: p.mode,
+    inventoryBehavior: p.inventoryBehavior ?? 'TRACKED',
+    saleBarcode: p.saleBarcode ?? null,
     categoryId: p.productType?.globalProductType?.category?.id ?? null,
     productTypeId: p.productTypeId ?? null,
     category: catName,
