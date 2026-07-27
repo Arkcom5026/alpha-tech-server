@@ -63,6 +63,8 @@ model EmployeeProfile {
   createdWarrantyClaims             WarrantyClaim[]             @relation("WarrantyClaimCreatedBy")
   resolvedWarrantyClaims            WarrantyClaim[]             @relation("WarrantyClaimResolvedBy")
   performedWarrantyClaimEvents      WarrantyClaimEvent[]
+  deviceOwnershipHistory            DeviceOwnershipHistory[]    @relation("DeviceOwnershipCreatedBy")
+  devicePassportEvents              DevicePassportEvent[]       @relation("DevicePassportActor")
   refundedReturns                   SaleReturn[]                @relation("RefundedBy")
   salesTaxFilingBatches             SalesTaxFilingBatch[]
   assignedServices                  ServiceOrder[]
@@ -116,6 +118,8 @@ model Branch {
   saleReturnCompletionCommands    SaleReturnCompletionCommand[]
   warrantyClaims                  WarrantyClaim[]
   warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
+  devices                         Device[]
+  devicePassportEvents            DevicePassportEvent[]
   salesTaxFilingBatches           SalesTaxFilingBatch[]
   services                        ServiceOrder[]
   simpleLots                      SimpleLot[]
@@ -381,6 +385,7 @@ model StockItem {
   scannedBy                  EmployeeProfile?          @relation(fields: [scannedByEmployeeId], references: [id])
   warrantyClaims             WarrantyClaim[]
   replacementWarrantyClaims  WarrantyClaim[]           @relation("WarrantyClaimReplacementStockItem")
+  devices                    Device[]
 
   @@unique([serialNumber, productId])
   @@index([branchId, status, productId])
@@ -1290,34 +1295,37 @@ model RefreshToken {
 }
 
 model CustomerProfile {
-  id                       Int                       @id @default(autoincrement())
-  name                     String?
-  picture                  String?
-  userId                   Int                       @unique
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  creditBalance            Decimal?                  @default(0) @db.Decimal(12, 2)
-  creditLimit              Decimal?                  @default(0) @db.Decimal(12, 2)
-  paymentTerms             Int?
-  type                     CustomerType              @default(INDIVIDUAL)
-  companyName              String?
-  subdistrictCode          String?
-  taxId                    String?
-  addressDetail            String?
-  depositBalance_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
-  outstandingDebt_v2       Decimal                   @default(0.0) @db.Decimal(12, 2)
-  cart                     Cart[]
-  combinedBillingDocuments CombinedBillingDocument[]
-  customerDeposits         CustomerDeposit[]
-  subdistrict              Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
-  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customerReceipts         CustomerReceipt[]
-  orders                   Order[]
-  orderOnlines             OrderOnline[]
-  repairJobs               RepairJob[]
-  sales                    Sale[]
-  services                 ServiceOrder[]
-  v2CustomerDeposits       V2CustomerDeposit[]
+  id                        Int                       @id @default(autoincrement())
+  name                      String?
+  picture                   String?
+  userId                    Int                       @unique
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
+  creditLimit               Decimal?                  @default(0) @db.Decimal(12, 2)
+  paymentTerms              Int?
+  type                      CustomerType              @default(INDIVIDUAL)
+  companyName               String?
+  subdistrictCode           String?
+  taxId                     String?
+  addressDetail             String?
+  depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
+  outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
+  cart                      Cart[]
+  combinedBillingDocuments  CombinedBillingDocument[]
+  customerDeposits          CustomerDeposit[]
+  subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
+  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerReceipts          CustomerReceipt[]
+  orders                    Order[]
+  orderOnlines              OrderOnline[]
+  repairJobs                RepairJob[]
+  ownedDevices              Device[]                  @relation("DeviceCurrentOwner")
+  deviceOwnershipHistory    DeviceOwnershipHistory[]
+  actedDevicePassportEvents DevicePassportEvent[]     @relation("DevicePassportCustomerActor")
+  sales                     Sale[]
+  services                  ServiceOrder[]
+  v2CustomerDeposits        V2CustomerDeposit[]
 
   @@index([subdistrictCode])
 }
@@ -1425,6 +1433,7 @@ model RepairJob {
   branchId         Int
   customerId       Int
   stockItemId      Int?
+  deviceId         Int?
   deviceModel      String
   reportedSymptoms String
   technicianNotes  String?
@@ -1437,6 +1446,7 @@ model RepairJob {
   branch           Branch           @relation(fields: [branchId], references: [id])
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   stockItem        StockItem?       @relation(fields: [stockItemId], references: [id])
+  device           Device?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   technician       EmployeeProfile? @relation(fields: [technicianId], references: [id])
   partsUsed        RepairPartItem[]
 
@@ -1444,6 +1454,7 @@ model RepairJob {
 
   @@index([branchId])
   @@index([stockItemId])
+  @@index([deviceId])
 }
 
 model RepairPartItem {
@@ -1464,6 +1475,7 @@ model WarrantyClaim {
   saleReturnItemId       Int?
   previousClaimId        Int?
   repairJobId            Int?
+  deviceId               Int?
   repairLinkState        WarrantyClaimRepairLinkState    @default(UNLINKED_LEGACY)
   claimNo                String
   status                 WarrantyClaimStatus             @default(DRAFT)
@@ -1489,6 +1501,7 @@ model WarrantyClaim {
   supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
   repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
+  device                 Device?                         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   previousClaim          WarrantyClaim?                  @relation("WarrantyClaimHistory", fields: [previousClaimId], references: [id], onDelete: Restrict)
   subsequentClaims       WarrantyClaim[]                 @relation("WarrantyClaimHistory")
   replacementStockItem   StockItem?                      @relation("WarrantyClaimReplacementStockItem", fields: [replacementStockItemId], references: [id], onDelete: Restrict)
@@ -1502,12 +1515,126 @@ model WarrantyClaim {
   @@index([supplierId, openedAt])
   @@index([saleReturnItemId])
   @@index([repairJobId, openedAt])
+  @@index([deviceId])
   @@index([repairLinkState, openedAt])
   @@index([previousClaimId])
   @@index([replacementStockItemId])
   @@index([createdByEmployeeId])
   @@index([resolvedByEmployeeId])
   @@index([branchId, status, openedAt])
+}
+
+/// Aggregate root and durable identity of a physical device.
+/// fingerprint is an immutable runtime identity, not a business identifier.
+/// status is a read-optimized lifecycle projection; authoritative workflow state
+/// remains with its originating module. Lifecycle changes should update status and
+/// append a passport event in the same application transaction where supported.
+model Device {
+  id                     Int                      @id @default(autoincrement())
+  branchId               Int
+  /// Read-optimized projection of the currently active OWNER history entry.
+  /// Ownership mutations must update this field and DeviceOwnershipHistory atomically.
+  currentOwnerCustomerId Int?
+  stockItemId            Int?
+  /// Runtime-generated immutable identity key. It is not a customer-facing serial,
+  /// barcode, IMEI, or a concatenated business key.
+  fingerprint            String                   @unique
+  category               DeviceCategory?
+  brand                  String?
+  model                  String?
+  serialNumber           String?
+  imei                   String?
+  barcode                String?
+  status                 DeviceStatus             @default(ACTIVE)
+  identityVersion        Int                      @default(1)
+  registeredAt           DateTime                 @default(now())
+  retiredAt              DateTime?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  branch                 Branch                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  currentOwner           CustomerProfile?         @relation("DeviceCurrentOwner", fields: [currentOwnerCustomerId], references: [id], onDelete: SetNull)
+  stockItem              StockItem?               @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  repairJobs             RepairJob[]
+  warrantyClaims         WarrantyClaim[]
+  ownershipHistory       DeviceOwnershipHistory[]
+  passportEvents         DevicePassportEvent[]
+
+  // Future-ready placeholder. Prisma requires a DeviceIntake model and opposite
+  // relation before this can become an active field:
+  // deviceIntakes DeviceIntake[]
+
+  @@index([branchId])
+  @@index([currentOwnerCustomerId])
+  @@index([stockItemId])
+  @@index([category])
+  @@index([status])
+  @@index([serialNumber])
+  @@index([imei])
+  @@index([barcode])
+  @@index([branchId, status])
+  @@index([currentOwnerCustomerId, status])
+}
+
+/// Append-oriented ownership ledger and Source of Truth for ownership history.
+/// Device.currentOwnerCustomerId is a projection. Application policy must prevent
+/// overlapping active ownership periods. A future reviewed SQL migration may add
+/// a partial active-owner unique index after ownership mutation behavior is verified.
+model DeviceOwnershipHistory {
+  id                  Int                 @id @default(autoincrement())
+  deviceId            Int
+  customerId          Int
+  ownershipType       DeviceOwnershipType
+  sourceType          DeviceSourceType?
+  sourceId            String?
+  createdByEmployeeId Int?
+  startedAt           DateTime
+  endedAt             DateTime?
+  note                String?
+  createdAt           DateTime            @default(now())
+  device              Device              @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy           EmployeeProfile?    @relation("DeviceOwnershipCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId, startedAt])
+  @@index([deviceId, endedAt])
+  @@index([customerId, startedAt])
+  @@index([sourceType, sourceId])
+  @@index([deviceId, ownershipType, endedAt])
+  @@index([customerId, ownershipType, endedAt])
+}
+
+/// Append-oriented operational ledger of workflow facts published by domain modules.
+/// Events complement, not replace, workflow state machines; historical rows must
+/// not be rewritten to represent current state.
+model DevicePassportEvent {
+  id              Int                     @id @default(autoincrement())
+  deviceId        Int
+  branchId        Int
+  eventType       DevicePassportEventType
+  sourceType      DeviceSourceType?
+  sourceId        String?
+  title           String
+  description     String?
+  actorType       DeviceActorType
+  actorEmployeeId Int?
+  actorCustomerId Int?
+  customerVisible Boolean                 @default(false)
+  metadata        Json?
+  eventVersion    Int                     @default(1)
+  occurredAt      DateTime
+  createdAt       DateTime                @default(now())
+  device          Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  branch          Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actorEmployee   EmployeeProfile?        @relation("DevicePassportActor", fields: [actorEmployeeId], references: [id], onDelete: SetNull)
+  actorCustomer   CustomerProfile?        @relation("DevicePassportCustomerActor", fields: [actorCustomerId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId, occurredAt])
+  @@index([branchId, eventType, occurredAt])
+  @@index([sourceType, sourceId])
+  @@index([actorEmployeeId])
+  @@index([actorCustomerId])
+  @@index([deviceId, eventType, occurredAt])
+  @@index([deviceId, customerVisible, occurredAt])
 }
 
 model WarrantyClaimEvent {
@@ -1552,6 +1679,75 @@ enum EmployeeRole {
   OWNER
   MANAGER
   CASHIER
+}
+
+enum DeviceCategory {
+  DESKTOP_COMPUTER
+  NOTEBOOK
+  PRINTER
+  MONITOR
+  UPS
+  NETWORK_DEVICE
+  MOBILE_DEVICE
+  TABLET
+  STORAGE_DEVICE
+  ACCESSORY
+  OTHER
+}
+
+enum DeviceSourceType {
+  SALE
+  SALE_RETURN
+  REPAIR_JOB
+  WARRANTY_CLAIM
+  STOCK_ITEM
+  PURCHASE_RECEIPT
+  MANUAL
+  IMPORT
+  SYSTEM
+  OTHER
+}
+
+enum DeviceStatus {
+  ACTIVE
+  IN_REPAIR
+  IN_WARRANTY_CLAIM
+  RETIRED
+  LOST
+  REGISTERED
+  IN_STOCK
+  SOLD
+  RETURNED
+}
+
+enum DeviceOwnershipType {
+  OWNER
+  CUSTODIAN
+  BORROWER
+}
+
+enum DeviceActorType {
+  EMPLOYEE
+  CUSTOMER
+  SYSTEM
+}
+
+enum DevicePassportEventType {
+  REGISTERED
+  OWNERSHIP_CHANGED
+  INTAKE
+  REPAIR_UPDATED
+  WARRANTY_CLAIM_UPDATED
+  STATUS_CHANGED
+  NOTE_ADDED
+  PURCHASE_RECEIVED
+  SALE_COMPLETED
+  SALE_RETURNED
+  REPAIR_RECEIVED
+  REPAIR_COMPLETED
+  WARRANTY_CLAIM_OPENED
+  WARRANTY_CLAIM_RESOLVED
+  DEVICE_RETIRED
 }
 
 enum PurchaseOrderStatus {
