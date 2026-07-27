@@ -44,30 +44,42 @@ for (const relativePath of syntaxFiles) {
   }
 }
 
+// Tax intake and Quick Receipt currently use SQL-migration-owned tables with
+// repository $queryRaw access. Their authority is the migration contract, not
+// Prisma Client model declarations.
+const taxMigration = read('prisma/migrations/20260727233000_add_tax_intake_foundation/migration.sql');
+assertContains(taxMigration, 'CREATE TABLE "TaxCandidate"', 'Tax candidate table authority');
+assertContains(taxMigration, 'CREATE TABLE "TaxDocument"', 'Tax document table authority');
+assertContains(taxMigration, 'CREATE TABLE "TaxDocumentLifecycleEvent"', 'Tax document lifecycle event authority');
+assertContains(taxMigration, 'TaxCandidate_branchId_sourceType_sourceId_key', 'Tax candidate source uniqueness');
+assertContains(taxMigration, 'TaxDocument_identityKey_key', 'Tax document identity uniqueness');
+
+const quickReceiptMigration = read('prisma/migrations/20260727190000_quick_receipt_session_foundation/migration.sql');
+assertContains(quickReceiptMigration, 'CREATE TABLE "QuickReceiptSession"', 'Quick receipt session table authority');
+assertContains(quickReceiptMigration, 'CREATE TABLE "QuickReceiptSessionItem"', 'Quick receipt session item table authority');
+assertContains(quickReceiptMigration, 'CREATE TABLE "QuickReceiptFinalizeCommand"', 'Quick receipt finalization authority');
+assertContains(quickReceiptMigration, 'QuickReceiptSession_active_delivery_unique', 'Quick receipt active delivery uniqueness');
+
 const schema = read('prisma/schema.prisma');
-assertContains(schema, 'model TaxCandidate {', 'Tax candidate model');
-assertContains(schema, 'model TaxDocument {', 'Tax document model');
-assertContains(schema, 'model TaxDocumentLine {', 'Tax document line model');
-assertContains(schema, 'model QuickReceiptSession {', 'Quick receipt session model');
-assertContains(schema, 'model QuickReceiptSessionItem {', 'Quick receipt session item model');
 assertContains(schema, 'model PurchaseOrderReceipt {', 'purchase receipt tax source model');
 
 const server = read('server.js');
 assertContains(server, "require('./src/modules/tax/http/taxIntakeRoutes')", 'tax intake route import');
-assertContains(server, "app.use('/api/tax/intake', taxIntakeRoutes)", 'tax intake route mount');
+assertContains(server, "app.use('/api/tax', taxIntakeRoutes)", 'tax intake route mount');
+assertContains(server, "app.use('/api/tax', taxPeriodRoutes)", 'tax period route mount');
 
 const taxIndex = read('src/modules/tax/index.js');
-assertContains(taxIndex, "registerTaxCandidateService", 'tax candidate registration authority');
-assertContains(taxIndex, "registerSaleTaxCandidateService", 'sale tax publication authority');
-assertContains(taxIndex, "transitionTaxDocumentService", 'tax document transition authority');
-assertContains(taxIndex, "taxPeriodRoutes", 'tax period authority');
+assertContains(taxIndex, 'registerTaxCandidateService', 'tax candidate registration authority');
+assertContains(taxIndex, 'registerSaleTaxCandidateService', 'sale tax publication authority');
+assertContains(taxIndex, 'transitionTaxDocumentService', 'tax document transition authority');
+assertContains(taxIndex, 'taxPeriodRoutes', 'tax period authority');
 
 const routes = read('src/modules/tax/http/taxIntakeRoutes.js');
 assertContains(routes, 'router.use(verifyToken)', 'tax intake authentication guard');
 assertContains(routes, "'/candidates/register'", 'generic candidate registration endpoint');
 assertContains(routes, "'/candidates/register-sale/:saleId'", 'sale candidate registration endpoint');
 assertContains(routes, "'/documents/:taxDocumentId/transition'", 'tax document lifecycle endpoint');
-assertNotContains(routes, "controllers/inputTaxReportController", 'legacy input tax controller ownership');
+assertNotContains(routes, 'controllers/inputTaxReportController', 'legacy input tax controller ownership');
 
 const lifecycle = read('src/modules/tax/documents/lifecycle/taxDocumentLifecycle.js');
 assertContains(lifecycle, "DRAFT: Object.freeze(['REGISTERED', 'CANCELLED'])", 'draft lifecycle transitions');
@@ -79,6 +91,10 @@ const candidateContract = read('src/modules/tax/candidates/contracts/taxCandidat
 assertContains(candidateContract, 'sourceType', 'tax candidate source identity');
 assertContains(candidateContract, 'sourceId', 'tax candidate source reference');
 assertContains(candidateContract, 'branchId', 'tax candidate branch authority');
+
+const candidateRepository = read('src/modules/tax/candidates/repository/taxCandidateRepository.js');
+assertContains(candidateRepository, 'FROM "TaxCandidate"', 'candidate SQL read authority');
+assertContains(candidateRepository, 'INSERT INTO "TaxCandidate"', 'candidate SQL write authority');
 
 const registerCandidate = read('src/modules/tax/intake/registerTaxCandidateService.js');
 assertContains(registerCandidate, 'taxCandidateRepository', 'candidate persistence authority');
