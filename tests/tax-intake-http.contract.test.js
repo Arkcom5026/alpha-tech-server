@@ -6,9 +6,11 @@ const routes = require('../src/modules/tax/http/taxIntakeRoutes');
 const tax = require('../src/modules/tax');
 
 assert.strictEqual(typeof controller.registerCandidate, 'function');
+assert.strictEqual(typeof controller.registerSaleCandidate, 'function');
 assert.strictEqual(typeof controller.listCandidates, 'function');
 assert.strictEqual(typeof controller.listDocuments, 'function');
 assert.strictEqual(typeof controller.getDocumentDetail, 'function');
+assert.strictEqual(typeof controller.transitionDocument, 'function');
 
 const routeContracts = routes.stack
   .filter((layer) => layer.route)
@@ -19,15 +21,19 @@ const routeContracts = routes.stack
 
 assert.deepStrictEqual(routeContracts, [
   { path: '/candidates/register', methods: ['post'] },
+  { path: '/candidates/register-sale/:saleId', methods: ['post'] },
   { path: '/candidates', methods: ['get'] },
   { path: '/documents', methods: ['get'] },
   { path: '/documents/:taxDocumentId', methods: ['get'] },
+  { path: '/documents/:taxDocumentId/transition', methods: ['post'] },
 ]);
 
 assert.strictEqual(tax.intake.routes, routes);
 assert.strictEqual(typeof tax.intake.service.registerTaxCandidate, 'function');
+assert.strictEqual(typeof tax.intake.service.registerSaleCandidate, 'function');
 assert.strictEqual(typeof tax.intake.service.listCandidates, 'function');
 assert.strictEqual(typeof tax.intake.service.listDocuments, 'function');
 assert.strictEqual(typeof tax.intake.service.getDocumentDetail, 'function');
+assert.strictEqual(typeof tax.intake.service.transitionDocument, 'function');
 
 console.log('Tax intake HTTP contract: PASS');
