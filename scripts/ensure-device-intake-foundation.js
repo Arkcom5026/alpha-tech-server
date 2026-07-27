@@ -76,6 +76,7 @@ ALTER TABLE "RepairJob" ADD COLUMN IF NOT EXISTS "deviceId" INTEGER;
 CREATE INDEX IF NOT EXISTS "RepairJob_deviceId_idx" ON "RepairJob"("deviceId");
 
 ALTER TABLE "WarrantyClaim" ADD COLUMN IF NOT EXISTS "deviceId" INTEGER;
+ALTER TABLE "WarrantyClaim" ALTER COLUMN "stockItemId" DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS "WarrantyClaim_deviceId_idx"
   ON "WarrantyClaim"("deviceId");
 
@@ -330,7 +331,15 @@ async function main() {
           WHERE table_schema = 'public'
             AND table_name = 'WarrantyClaim'
             AND column_name = 'deviceId'
-        ) AS warranty_claim_device
+        ) AS warranty_claim_device,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'WarrantyClaim'
+            AND column_name = 'stockItemId'
+            AND is_nullable = 'YES'
+        ) AS warranty_claim_stock_optional
     `);
     if (!Object.values(verification.rows[0]).every(Boolean)) {
       throw new Error('Device foundation verification failed');
