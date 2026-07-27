@@ -1486,7 +1486,7 @@ model RepairPartItem {
 model WarrantyClaim {
   id                     Int                             @id @default(autoincrement())
   branchId               Int
-  stockItemId            Int
+  stockItemId            Int?
   supplierId             Int?
   saleReturnItemId       Int?
   previousClaimId        Int?
@@ -1513,7 +1513,7 @@ model WarrantyClaim {
   createdAt              DateTime                        @default(now())
   updatedAt              DateTime                        @updatedAt
   branch                 Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  stockItem              StockItem                       @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  stockItem              StockItem?                      @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
   supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
   repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
