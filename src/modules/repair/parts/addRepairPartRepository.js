@@ -1,4 +1,5 @@
 const prisma = require('../../../database/prisma/client');
+const { createStockMovement } = require('../../inventory/movement/stockMovementWriter');
 
 const repairJobDetailInclude = {
   branch: true,
@@ -91,7 +92,7 @@ class AddRepairPartRepository {
   }
 
   createStockMovement(data) {
-    return this.prisma.stockMovement.create({ data });
+    return createStockMovement(this.prisma, data);
   }
 }
 
