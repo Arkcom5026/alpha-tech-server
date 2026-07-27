@@ -35,6 +35,20 @@ function mapStockIdentity(stockItem) {
   };
 }
 
+function mapDeviceIdentity(device) {
+  if (!device) return null;
+  return {
+    id: device.id,
+    category: device.category,
+    brand: device.brand,
+    model: device.model,
+    serialNumber: device.serialNumber,
+    imei: device.imei,
+    barcode: device.barcode,
+    status: device.status,
+  };
+}
+
 function mapRepairJob(job) {
   return {
     id: job.id,
@@ -44,6 +58,8 @@ function mapRepairJob(job) {
     customerName: customerName(job.customer),
     stockItemId: job.stockItemId,
     stockItem: mapStockIdentity(job.stockItem),
+    deviceId: job.deviceId ?? job.device?.id ?? null,
+    device: mapDeviceIdentity(job.device),
     deviceModel: job.deviceModel,
     reportedSymptoms: job.reportedSymptoms,
     technicianNotes: job.technicianNotes,
@@ -137,4 +153,5 @@ module.exports = {
   mapRepairJob,
   mapWarrantyClaim,
   mapStockIdentity,
+  mapDeviceIdentity,
 };
