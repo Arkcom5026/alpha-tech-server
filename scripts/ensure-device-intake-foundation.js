@@ -1,3 +1,5 @@
+﻿require('dotenv').config();
+
 const { Client } = require('pg');
 
 const lockKey = 24072701;
@@ -437,16 +439,28 @@ async function assertBaseTables(client) {
 }
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
-  if (!connectionString) {
+  const rawConnectionString =
+    process.env.DIRECT_URL || process.env.DATABASE_URL;
+
+  if (!rawConnectionString) {
     throw new Error('DIRECT_URL or DATABASE_URL is required');
   }
 
+  const databaseUrl = new URL(rawConnectionString);
+  const isLocalDatabase = ['localhost', '127.0.0.1', '::1'].includes(
+    databaseUrl.hostname
+  );
+
+  databaseUrl.searchParams.delete('sslmode');
+  databaseUrl.searchParams.delete('sslcert');
+  databaseUrl.searchParams.delete('sslkey');
+  databaseUrl.searchParams.delete('sslrootcert');
+
   const client = new Client({
-    connectionString,
-    ssl: process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : undefined,
+    connectionString: databaseUrl.toString(),
+    ssl: isLocalDatabase
+      ? false
+      : { rejectUnauthorized: false },
   });
 
   await client.connect();
