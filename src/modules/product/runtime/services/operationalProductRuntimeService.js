@@ -15,6 +15,7 @@ const {
   findOperationalOnlineProductList,
   findOperationalOnlineProductDetailById,
   findOperationalProductSaleBarcodeConflict,
+  findSimpleProductBySaleBarcode,
   findStockItemByBarcode,
   findStockItemBySerialNumber,
   findTemplateBranchByCode,
@@ -540,11 +541,37 @@ const findOperationalProductByBarcode = async ({ branchId, barcode, db = prisma 
     throw error
   }
 
-  return findStockItemByBarcode({
+  const stockItem = await findStockItemByBarcode({
     branchId: brId,
     barcode: code,
     db,
   })
+  if (stockItem) return stockItem
+
+  const product = await findSimpleProductBySaleBarcode({
+    branchId: brId,
+    saleBarcode: code,
+    db,
+  })
+  if (!product) return null
+
+  const nonStock = product.inventoryBehavior === 'NON_STOCK'
+  const balance = product.stockBalances?.[0]
+  const available = Math.max(0, Number(balance?.quantity || 0) - Number(balance?.reserved || 0))
+  const lot = product.simpleLots?.[0] || null
+  if (!nonStock && (!lot || available <= 0)) return null
+
+  return {
+    kind: nonStock ? 'NON_STOCK' : 'SIMPLE',
+    lineType: 'SIMPLE',
+    stockItemId: null,
+    productId: product.id,
+    simpleLotId: nonStock ? null : lot.id,
+    barcode: product.saleBarcode,
+    inventoryBehavior: product.inventoryBehavior,
+    qtyRemaining: nonStock ? null : available,
+    product,
+  }
 }
 
 const findOperationalProductBySerial = async ({ branchId, serialNumber, db = prisma }) => {
@@ -676,61 +703,57 @@ const getReadyToSell = async ({
   let simpleItems = []
 
   if (wantSimple) {
-    try {
-      const raw = await db.stockBalance.findMany({
-        where: {
-          branchId: brId,
-          product: {
-            is: {
-              OR: [{ mode: 'SIMPLE' }, { noSN: true }],
-              ...(keyword ? { name: { contains: keyword, mode: 'insensitive' } } : {}),
-            },
-          },
-        },
-        select: {
-          id: true,
-          productId: true,
-          quantity: true,
-          reserved: true,
-          updatedAt: true,
-          product: {
-            select: {
-              id: true,
-              name: true,
-              brandId: true,
-              brand: { select: { id: true, name: true } },
-              unitId: true,
-              unit: { select: { id: true, name: true } },
-            },
-          },
-        },
-      })
+    const raw = await db.product.findMany({
+      where: {
+        active: true,
+        mode: 'SIMPLE',
+        productType: { branchId: brId },
+        branchPrice: { some: { branchId: brId, isActive: true } },
+        ...(keyword ? {
+          OR: [
+            { name: { contains: keyword, mode: 'insensitive' } },
+            { saleBarcode: { contains: keyword, mode: 'insensitive' } },
+          ],
+        } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        inventoryBehavior: true,
+        saleBarcode: true,
+        brandId: true,
+        brand: { select: { id: true, name: true } },
+        unitId: true,
+        unit: { select: { id: true, name: true } },
+        branchPrice: { where: { branchId: brId, isActive: true }, take: 1, select: { id: true } },
+        stockBalances: { where: { branchId: brId }, take: 1, select: { quantity: true, reserved: true, updatedAt: true } },
+      },
+    })
 
-      simpleItems = raw
-        .map((r) => {
-          const quantity = Number(r.quantity ?? 0)
-          const reserved = Number(r.reserved ?? 0)
-          const available = Math.max(0, quantity - reserved)
+    simpleItems = raw.flatMap((product) => {
+      const balance = product.stockBalances?.[0]
+      const available = Math.max(0, Number(balance?.quantity || 0) - Number(balance?.reserved || 0))
+      const nonStock = product.inventoryBehavior === 'NON_STOCK'
+      if (!nonStock && available <= 0) return []
 
-          return {
-            kind: 'SIMPLE',
-            productId: r.productId,
-            productName: r.product?.name ?? null,
-            brandId: r.product?.brandId ?? r.product?.brand?.id ?? null,
-            brandName: r.product?.brand?.name ?? null,
-            unitId: r.product?.unitId ?? r.product?.unit?.id ?? null,
-            unitName: r.product?.unit?.name ?? null,
-            unit: r.product?.unit ? { id: r.product.unit.id, name: r.product.unit.name } : null,
-            qty: available,
-            receivedAt: r.updatedAt ?? null,
-            status: 'IN_STOCK',
-            hasDetails: false,
-          }
-        })
-        .filter((x) => x.qty > 0)
-    } catch (_error) {
-      simpleItems = []
-    }
+      return [{
+        kind: nonStock ? 'NON_STOCK' : 'SIMPLE',
+        productId: product.id,
+        productName: product.name,
+        inventoryBehavior: product.inventoryBehavior,
+        saleBarcode: product.saleBarcode,
+        displayCode: product.saleBarcode || '-',
+        brandId: product.brandId ?? product.brand?.id ?? null,
+        brandName: product.brand?.name ?? null,
+        unitId: product.unitId ?? product.unit?.id ?? null,
+        unitName: product.unit?.name ?? null,
+        unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
+        qty: nonStock ? null : available,
+        receivedAt: balance?.updatedAt ?? null,
+        status: 'IN_STOCK',
+        hasDetails: false,
+      }]
+    })
   }
 
   const merged = [...structuredItems, ...simpleItems].sort((a, b) => {

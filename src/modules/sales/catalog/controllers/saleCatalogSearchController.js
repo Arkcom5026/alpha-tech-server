@@ -15,7 +15,7 @@ const toNumber = (value) => {
 }
 
 const normalizeInventoryBehavior = (product) => {
-  const configured = String(product?.productConfig?.inventoryBehavior || '').trim().toUpperCase()
+  const configured = String(product?.inventoryBehavior || product?.productConfig?.inventoryBehavior || '').trim().toUpperCase()
   return configured === 'NON_STOCK' ? 'NON_STOCK' : 'TRACKED'
 }
 
@@ -134,6 +134,7 @@ const findSimpleProducts = async ({ branchId, query, take = 20 }) => {
       branchPrice: { some: { branchId, isActive: true } },
       OR: [
         { name: { contains: query, mode: 'insensitive' } },
+        { saleBarcode: { equals: query } },
         { productConfig: { path: ['saleBarcode'], equals: query } },
         { productConfig: { path: ['barcode'], equals: query } },
         { productConfig: { path: ['serviceCode'], equals: query } },
@@ -142,6 +143,11 @@ const findSimpleProducts = async ({ branchId, query, take = 20 }) => {
     include: {
       branchPrice: { where: { branchId, isActive: true }, take: 1 },
       stockBalances: { where: { branchId }, take: 1 },
+      simpleLots: {
+        where: { branchId, status: 'ACTIVE', qtyRemaining: { gt: 0 } },
+        orderBy: { receivedAt: 'asc' },
+        take: 1,
+      },
     },
     orderBy: { id: 'asc' },
     take,
@@ -154,7 +160,8 @@ const findSimpleProducts = async ({ branchId, query, take = 20 }) => {
 
     if (inventoryBehavior === 'TRACKED' && qtyRemaining <= 0) return []
 
-    const configuredBarcode = product.productConfig?.saleBarcode
+    const configuredBarcode = product.saleBarcode
+      || product.productConfig?.saleBarcode
       || product.productConfig?.barcode
       || product.productConfig?.serviceCode
       || ''
@@ -165,7 +172,7 @@ const findSimpleProducts = async ({ branchId, query, take = 20 }) => {
       lineType: 'SIMPLE',
       status: 'IN_STOCK',
       stockItemId: null,
-      simpleLotId: null,
+      simpleLotId: inventoryBehavior === 'TRACKED' ? (product.simpleLots?.[0]?.id ?? null) : null,
       productId: product.id,
       product,
       productName: product.name,

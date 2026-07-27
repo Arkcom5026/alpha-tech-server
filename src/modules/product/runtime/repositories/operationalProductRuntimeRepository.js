@@ -418,6 +418,27 @@ const createOperationalProductRecordFromTemplate = ({
   })
 )
 
+const findSimpleProductBySaleBarcode = ({ branchId, saleBarcode, db = prisma }) => (
+  db.product.findFirst({
+    where: {
+      active: true,
+      mode: 'SIMPLE',
+      saleBarcode,
+      productType: { branchId: Number(branchId) },
+      branchPrice: { some: { branchId: Number(branchId), isActive: true } },
+    },
+    select: {
+      ...selectOperationalRuntimeProduct(Number(branchId)),
+      simpleLots: {
+        where: { branchId: Number(branchId), status: 'ACTIVE', qtyRemaining: { gt: 0 } },
+        orderBy: { receivedAt: 'asc' },
+        take: 1,
+        select: { id: true, qtyRemaining: true },
+      },
+    },
+  })
+)
+
 const findOperationalProductSaleBarcodeConflict = ({ branchId, saleBarcode, excludeProductId, db = prisma }) => (
   db.product.findFirst({
     where: { saleBarcode, productType: { branchId: Number(branchId) }, ...(excludeProductId ? { id: { not: Number(excludeProductId) } } : {}) },
@@ -444,6 +465,7 @@ module.exports = {
   findOperationalOnlineProductList,
   findOperationalOnlineProductDetailById,
   findOperationalProductSaleBarcodeConflict,
+  findSimpleProductBySaleBarcode,
   findStockItemByBarcode,
   findStockItemBySerialNumber,
   selectOperationalRuntimeProduct,

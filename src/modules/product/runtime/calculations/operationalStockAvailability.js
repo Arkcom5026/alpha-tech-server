@@ -13,6 +13,9 @@ const isSimpleProduct = (product) =>
   product?.mode === 'SIMPLE' || product?.noSN === true
 
 const isReadyProduct = (product, available) => {
+  if (isSimpleProduct(product) && product?.inventoryBehavior === 'NON_STOCK') {
+    return product?.active !== false && (product?.branchPrice?.length ?? 0) > 0
+  }
   if (isSimpleProduct(product)) return Number(available) > 0
   return (product?.stockItems?.length ?? 0) > 0
 }

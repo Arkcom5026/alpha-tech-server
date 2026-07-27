@@ -29,6 +29,24 @@ const run = () => {
   assert.equal(isReadyProduct({ mode: 'SIMPLE' }, 1), true)
   assert.equal(isReadyProduct({ mode: 'SIMPLE' }, 0), false)
   assert.equal(
+    isReadyProduct({
+      mode: 'SIMPLE',
+      inventoryBehavior: 'NON_STOCK',
+      active: true,
+      branchPrice: [{ id: 1 }],
+    }, 0),
+    true
+  )
+  assert.equal(
+    isReadyProduct({
+      mode: 'SIMPLE',
+      inventoryBehavior: 'NON_STOCK',
+      active: true,
+      branchPrice: [],
+    }, 0),
+    false
+  )
+  assert.equal(
     isReadyProduct({ mode: 'STRUCTURED', stockItems: [{ id: 1 }] }, 0),
     true
   )
