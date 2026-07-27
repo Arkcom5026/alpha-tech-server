@@ -116,8 +116,19 @@ test('mapWarrantyClaim projects repair link, supplier, events and credit amount'
     id: 21,
     claimNo: 'CL-21',
     branchId: 7,
-    stockItemId: 1,
+    stockItemId: null,
     stockItem: null,
+    deviceId: 2,
+    device: {
+      id: 2,
+      category: 'NOTEBOOK',
+      brand: 'Acer',
+      model: 'Aspire',
+      serialNumber: '11223344',
+      imei: null,
+      barcode: null,
+      status: 'IN_WARRANTY_CLAIM',
+    },
     repairJobId: 11,
     repairJob: { id: 11, jobNo: 'RP-11', status: 'IN_PROGRESS', customerId: 3, customer: { name: 'Buyer' } },
     repairLinkState: 'LINKED_VERIFIED',
@@ -142,6 +153,8 @@ test('mapWarrantyClaim projects repair link, supplier, events and credit amount'
   });
 
   assert.equal(result.repairJob.customerName, 'Buyer');
+  assert.equal(result.deviceId, 2);
+  assert.equal(result.device.serialNumber, '11223344');
   assert.equal(result.supplier.name, 'Supplier');
   assert.equal(result.creditAmount, 900.25);
   assert.equal(result.events[0].performedByName, 'Tech');
