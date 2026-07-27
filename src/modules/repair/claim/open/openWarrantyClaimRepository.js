@@ -10,6 +10,7 @@ const warrantyClaimDetailInclude = {
       },
     },
   },
+  device: true,
   supplier: true,
   repairJob: {
     include: {
@@ -77,6 +78,7 @@ class OpenWarrantyClaimRepository {
             },
           },
         },
+        device: true,
         warrantyClaims: true,
       },
     });
