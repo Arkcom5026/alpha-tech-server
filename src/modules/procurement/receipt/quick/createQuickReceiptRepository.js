@@ -1,6 +1,21 @@
 const { Prisma } = require('@prisma/client');
+const dayjs = require('dayjs');
 const { prisma } = require('../../../../../lib/prisma');
-const { generateReceiptCode } = require('../../../../../utils/generateReceiptCode');
+
+const generateReceiptCode = async (branchId, client) => {
+  const paddedBranch = String(branchId).padStart(2, '0');
+  const prefix = `RC-${paddedBranch}${dayjs().format('YYMM')}`;
+  const latest = await client.purchaseOrderReceipt.findFirst({
+    where: { code: { startsWith: prefix } },
+    orderBy: { code: 'desc' },
+    select: { code: true },
+  });
+  const lastSequence = latest?.code
+    ? Number.parseInt(latest.code.split('-').pop(), 10)
+    : 0;
+  const nextSequence = (Number.isNaN(lastSequence) ? 0 : lastSequence) + 1;
+  return `${prefix}-${String(nextSequence).padStart(4, '0')}`;
+};
 
 const create = async ({ branchId, receivedById, note, supplierId, items }) => {
   return prisma.$transaction(async (tx) => {
@@ -29,4 +44,4 @@ const create = async ({ branchId, receivedById, note, supplierId, items }) => {
   }, { timeout: 20000, maxWait: 8000 });
 };
 
-module.exports = { create };
+module.exports = { create, generateReceiptCode };
