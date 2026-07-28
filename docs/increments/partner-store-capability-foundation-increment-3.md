@@ -94,6 +94,7 @@ npm run test:product-reservation
 ## Verification State
 - Repository implementation for current online-commerce scope: complete.
 - Safe Prisma projection aligner: implemented.
+- Prisma schema itself: not yet modified by the aligner.
 - Local aligner execution: not executed.
 - Contract execution: not executed.
 - Prisma validation: not executed.
