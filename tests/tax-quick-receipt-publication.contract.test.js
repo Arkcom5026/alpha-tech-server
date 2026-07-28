@@ -15,7 +15,7 @@ const taxEntry = read('src/modules/tax/index.js');
 assert.match(controller, /publishQuickReceiptTaxCandidate/, 'Quick Receipt finalize must publish after inventory completion');
 assert.match(controller, /taxIntake/, 'Finalize response must expose tax publication evidence');
 assert.match(publisher, /status !== 'COMPLETED'/, 'Only committed receipts may publish');
-assert.match(publisher, /taxMode !== 'RECEIVED_WITH_GOODS'/, 'Pending or non-claim receipts must not create fake tax documents');
+assert.match(publisher, /taxMode !== 'RECEIVED'/, 'Pending or non-claim receipts must not create fake tax documents');
 assert.match(publisher, /PENDING_RETRY/, 'Tax failure must not roll back committed inventory');
 assert.match(adapter, /sourceType: 'PURCHASE_RECEIPT'/, 'Tax source identity must be PURCHASE_RECEIPT');
 assert.match(adapter, /sourceId: `QUICK_RECEIPT:\$\{receiptId\}`/, 'Quick Receipt source identity must be stable');

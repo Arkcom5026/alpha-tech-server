@@ -2,6 +2,7 @@ const crypto = require('node:crypto')
 
 const { QuickStockRepository, toInt } = require('../repositories/quickStockRepository')
 const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy')
+const { normalizeInputTaxDocumentMode } = require('../../../tax/inputDocuments/contracts/inputTaxDocumentModeContract')
 
 const normalizeDeliveryNote = (value) => String(value || '').trim().replace(/\s+/g, '').toUpperCase()
 const cleanText = (value) => String(value || '').trim()
@@ -101,7 +102,7 @@ class QuickReceiptSessionService {
       throw error
     }
 
-    const taxMode = cleanText(payload?.taxDocumentMode || 'NOT_RECEIVED').toUpperCase()
+    const taxMode = normalizeInputTaxDocumentMode(payload?.taxDocumentMode || 'NOT_RECEIVED')
     const created = await this.prisma.$queryRawUnsafe(
       `INSERT INTO "QuickReceiptSession" (
          "code", "branchId", "supplierId", "deliveryNoteNumber", "normalizedDeliveryNoteNumber",
@@ -136,7 +137,7 @@ class QuickReceiptSessionService {
        WHERE "id"=$13 AND "branchId"=$14`,
       supplierId, deliveryNoteNumber, normalized, asDate(payload?.deliveryNoteDate ?? receipt.deliveryNoteDate),
       cleanText(payload?.note ?? receipt.note) || null,
-      cleanText(payload?.taxDocumentMode ?? receipt.taxDocumentMode).toUpperCase(),
+      normalizeInputTaxDocumentMode(payload?.taxDocumentMode ?? receipt.taxDocumentMode),
       cleanText(payload?.supplierTaxInvoiceNumber ?? receipt.supplierTaxInvoiceNumber) || null,
       asDate(payload?.supplierTaxInvoiceDate ?? receipt.supplierTaxInvoiceDate),
       cleanText(payload?.taxPricingMode ?? receipt.taxPricingMode).toUpperCase() || null,

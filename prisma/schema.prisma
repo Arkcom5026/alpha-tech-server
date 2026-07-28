@@ -531,6 +531,9 @@ model PurchaseOrderReceipt {
   statusReceipt            ReceiptStatus              @default(PENDING)
   supplierTaxInvoiceDate   DateTime?
   supplierTaxInvoiceNumber String?
+  taxDocumentMode          InputTaxDocumentMode       @default(UNCLASSIFIED)
+  taxDocumentReceivedAt    DateTime?
+  taxDocumentReceiptSource TaxDocumentReceiptSource?
   vatRate                  Decimal?                   @default(7) @db.Decimal(5, 2)
   source                   ReceiptSource              @default(PO)
   supplierId               Int?
@@ -544,6 +547,7 @@ model PurchaseOrderReceipt {
   supplierPaymentReceipts  SupplierPaymentReceipt[]
 
   @@index([branchId, receivedAt])
+  @@index([branchId, taxDocumentMode, receivedAt])
   @@index([purchaseOrderId])
   @@index([source, receivedAt])
 }
@@ -2439,6 +2443,19 @@ enum InputTaxFilingStatus {
   DRAFT
   SUBMITTED
   VOIDED
+}
+
+enum InputTaxDocumentMode {
+  UNCLASSIFIED
+  NOT_RECEIVED
+  RECEIVED
+  NON_VAT_DOCUMENT
+  NO_INPUT_TAX_CLAIM
+}
+
+enum TaxDocumentReceiptSource {
+  WITH_GOODS
+  LATER
 }
 
 enum SalesTaxFilingStatus {

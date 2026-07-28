@@ -1,6 +1,9 @@
 'use strict';
 
 module.exports = Object.freeze({
+  inputDocuments: Object.freeze({
+    modes: require('./inputDocuments/contracts/inputTaxDocumentModeContract'),
+  }),
   intake: Object.freeze({
     registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
     registerSaleCandidate:

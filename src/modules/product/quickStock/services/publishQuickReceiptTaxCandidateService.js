@@ -13,7 +13,7 @@ const publishQuickReceiptTaxCandidate = async ({ receipt, branchId, employeeId }
   if (status !== 'COMPLETED') {
     return Object.freeze({ status: 'SKIPPED', reason: 'QUICK_RECEIPT_NOT_COMPLETED', receiptId });
   }
-  if (taxMode !== 'RECEIVED_WITH_GOODS') {
+  if (taxMode !== 'RECEIVED') {
     return Object.freeze({
       status: 'SKIPPED',
       reason: 'TAX_DOCUMENT_NOT_RECEIVED',
