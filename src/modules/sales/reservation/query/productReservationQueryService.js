@@ -1,6 +1,7 @@
 'use strict';
 
 const repository = require('./productReservationQueryRepository');
+const { ORDER_SOURCES, FULFILLMENT_METHODS } = require('../create/productReservationCreateService');
 
 const STATUSES = Object.freeze(['ACTIVE', 'PARTIALLY_PAID', 'READY_FOR_PICKUP', 'COMPLETED', 'CANCELLED', 'EXPIRED']);
 
@@ -17,24 +18,34 @@ const positiveInt = (value, fieldName, required = true) => {
   return parsed;
 };
 
-const listProductReservations = (input = {}) => {
-  const status = String(input.status || '').trim().toUpperCase();
-  if (status && !STATUSES.includes(status)) {
-    throw Object.assign(new Error('Invalid reservation status'), {
+const optionalEnum = (value, allowed, fieldName, code) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if (!allowed.includes(normalized)) {
+    throw Object.assign(new Error(`Invalid ${fieldName}`), {
       statusCode: 400,
-      code: 'RESERVATION_STATUS_INVALID',
-      details: { status },
+      code,
+      details: { [fieldName]: normalized, allowed },
     });
   }
-  return repository.list({
-    branchId: positiveInt(input.branchId, 'branchId'),
-    customerId: positiveInt(input.customerId, 'customerId', false),
-    status: status || null,
-    keyword: String(input.keyword || '').trim(),
-    limit: Math.min(Math.max(Number(input.limit) || 50, 1), 200),
-    offset: Math.max(Number(input.offset) || 0, 0),
-  });
+  return normalized;
 };
+
+const listProductReservations = (input = {}) => repository.list({
+  branchId: positiveInt(input.branchId, 'branchId'),
+  customerId: positiveInt(input.customerId, 'customerId', false),
+  status: optionalEnum(input.status, STATUSES, 'status', 'RESERVATION_STATUS_INVALID'),
+  orderSource: optionalEnum(input.orderSource, ORDER_SOURCES, 'orderSource', 'RESERVATION_ORDER_SOURCE_INVALID'),
+  fulfillmentMethod: optionalEnum(
+    input.fulfillmentMethod,
+    FULFILLMENT_METHODS,
+    'fulfillmentMethod',
+    'RESERVATION_FULFILLMENT_METHOD_INVALID'
+  ),
+  keyword: String(input.keyword || '').trim(),
+  limit: Math.min(Math.max(Number(input.limit) || 50, 1), 200),
+  offset: Math.max(Number(input.offset) || 0, 0),
+});
 
 const getProductReservationById = async (input = {}) => {
   const reservation = await repository.findById({
@@ -50,4 +61,10 @@ const getProductReservationById = async (input = {}) => {
   return reservation;
 };
 
-module.exports = Object.freeze({ STATUSES, listProductReservations, getProductReservationById });
+module.exports = Object.freeze({
+  STATUSES,
+  ORDER_SOURCES,
+  FULFILLMENT_METHODS,
+  listProductReservations,
+  getProductReservationById,
+});
