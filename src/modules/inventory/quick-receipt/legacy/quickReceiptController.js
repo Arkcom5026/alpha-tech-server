@@ -3,18 +3,22 @@
 const { LegacyQuickReceiptRepository } = require('./quickReceiptRepository')
 const { LegacyQuickReceiptService } = require('./quickReceiptService')
 
-const asNumber = (value, fallback = 0) => {
-  if (value === '' || value === null || value === undefined) return fallback
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
 const asPositiveInteger = (value) => {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-const requestContextError = (code, statusCode = 401) => {
+const asPositiveNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+const asNonNegativeNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+const requestError = (code, statusCode = 400) => {
   const error = new Error(code)
   error.code = code
   error.statusCode = statusCode
@@ -25,8 +29,8 @@ const requireRequestContext = (req) => {
   const branchId = asPositiveInteger(req.user?.branchId)
   const userId = asPositiveInteger(req.user?.id)
 
-  if (!branchId) throw requestContextError('BRANCH_ID_MISSING')
-  if (!userId) throw requestContextError('USER_ID_MISSING')
+  if (!branchId) throw requestError('BRANCH_ID_MISSING', 401)
+  if (!userId) throw requestError('USER_ID_MISSING', 401)
 
   return { branchId, userId }
 }
@@ -46,9 +50,15 @@ const ensureDraft = async (req, res, next) => {
   try {
     const { branchId, userId } = requireRequestContext(req)
     const { source = 'QUICK_HYBRID', supplierId = 0, note = '' } = req.body || {}
+    const normalizedSupplierId = supplierId === 0 || supplierId === '0'
+      ? 0
+      : asPositiveInteger(supplierId)
+
+    if (normalizedSupplierId == null) throw requestError('INVALID_SUPPLIER_ID')
+
     const result = await buildService(req).ensureDraft({
-      source,
-      supplierId: asNumber(supplierId, 0),
+      source: String(source || 'QUICK_HYBRID').trim() || 'QUICK_HYBRID',
+      supplierId: normalizedSupplierId,
       note: String(note || ''),
       userId,
       branchId,
@@ -63,17 +73,29 @@ const ensureDraft = async (req, res, next) => {
 const saveItemDraft = async (req, res, next) => {
   try {
     const { branchId } = requireRequestContext(req)
-    const { id } = req.params
-    if (!id) return res.status(400).json({ code: 'INVALID', message: 'missing receipt id' })
+    const receiptId = asPositiveInteger(req.params?.id)
+    if (!receiptId) throw requestError('INVALID_RECEIPT_ID')
 
     const { itemId, productId, qty, unitCost = 0, vatRate = 0 } = req.body || {}
+    const normalizedItemId = itemId == null || itemId === '' ? null : asPositiveInteger(itemId)
+    const normalizedProductId = asPositiveInteger(productId)
+    const normalizedQty = asPositiveNumber(qty)
+    const normalizedUnitCost = asNonNegativeNumber(unitCost)
+    const normalizedVatRate = asNonNegativeNumber(vatRate)
+
+    if (itemId != null && itemId !== '' && !normalizedItemId) throw requestError('INVALID_RECEIPT_ITEM_ID')
+    if (!normalizedProductId) throw requestError('INVALID_PRODUCT_ID')
+    if (!normalizedQty) throw requestError('INVALID_QUANTITY')
+    if (normalizedUnitCost == null) throw requestError('INVALID_UNIT_COST')
+    if (normalizedVatRate == null || normalizedVatRate > 100) throw requestError('INVALID_VAT_RATE')
+
     const result = await buildService(req).saveDraftItem({
-      receiptId: id,
-      itemId: itemId || undefined,
-      productId: asNumber(productId),
-      qty: asNumber(qty),
-      unitCost: asNumber(unitCost),
-      vatRate: asNumber(vatRate),
+      receiptId,
+      itemId: normalizedItemId || undefined,
+      productId: normalizedProductId,
+      qty: normalizedQty,
+      unitCost: normalizedUnitCost,
+      vatRate: normalizedVatRate,
       idempotencyKey: req.get('X-Idempotency-Key') || undefined,
       branchId,
     })
@@ -87,12 +109,13 @@ const saveItemDraft = async (req, res, next) => {
 const deleteItemDraft = async (req, res, next) => {
   try {
     const { branchId } = requireRequestContext(req)
-    const { id, itemId } = req.params
-    if (!id || !itemId) {
-      return res.status(400).json({ code: 'INVALID', message: 'missing id or itemId' })
-    }
+    const receiptId = asPositiveInteger(req.params?.id)
+    const itemId = asPositiveInteger(req.params?.itemId)
 
-    const result = await buildService(req).deleteDraftItem({ receiptId: id, itemId, branchId })
+    if (!receiptId) throw requestError('INVALID_RECEIPT_ID')
+    if (!itemId) throw requestError('INVALID_RECEIPT_ITEM_ID')
+
+    const result = await buildService(req).deleteDraftItem({ receiptId, itemId, branchId })
     return res.status(200).json(result)
   } catch (error) {
     return next(error)
@@ -102,11 +125,11 @@ const deleteItemDraft = async (req, res, next) => {
 const finalize = async (req, res, next) => {
   try {
     const { branchId } = requireRequestContext(req)
-    const { id } = req.params
-    if (!id) return res.status(400).json({ code: 'INVALID', message: 'missing receipt id' })
+    const receiptId = asPositiveInteger(req.params?.id)
+    if (!receiptId) throw requestError('INVALID_RECEIPT_ID')
 
     const result = await buildService(req).finalize({
-      receiptId: id,
+      receiptId,
       finalizeToken: req.get('X-Finalize-Token') || undefined,
       branchId,
     })
