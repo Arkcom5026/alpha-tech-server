@@ -5,6 +5,8 @@ module.exports = Object.freeze({
     registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
     registerSaleCandidate:
       require('./sources/sale/registerSaleTaxCandidateService').registerSaleTaxCandidate,
+    registerPurchaseReceiptCandidate:
+      require('./sources/purchaseReceipt/registerPurchaseReceiptTaxCandidateService').registerPurchaseReceiptTaxCandidate,
     routes: require('./http/taxIntakeRoutes'),
     service: require('./http/taxIntakeService'),
   }),

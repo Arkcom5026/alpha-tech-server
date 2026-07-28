@@ -1,5 +1,6 @@
 const QuickReceiptSessionService = require('../services/QuickReceiptSessionServiceSingleton')
 const QuickReceiptCompleteService = require('../services/QuickReceiptCompleteServiceSingleton')
+const { publishQuickReceiptTaxCandidate } = require('../services/publishQuickReceiptTaxCandidateService')
 
 const service = new QuickReceiptSessionService()
 const completeService = new QuickReceiptCompleteService()
@@ -119,7 +120,12 @@ exports.finalize = async (req, res) => {
         'IDEMPOTENCY_KEY_CONFLICT'
       )
     }
-    return res.json({ success: true, data })
+    const taxIntake = await publishQuickReceiptTaxCandidate({
+      receipt: data,
+      branchId: actor.branchId,
+      employeeId: actor.employeeId,
+    })
+    return res.json({ success: true, data: { ...data, taxIntake } })
   } catch (error) { return sendError(res, error) }
 }
 exports.cancel = async (req, res) => {
