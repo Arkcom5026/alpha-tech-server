@@ -37,7 +37,7 @@ const createSimpleSale = async (req, res) => {
 
     return sendSimpleStockError(res, 501, 'createSimpleSale is not implemented yet', {
       context: buildSimpleStockContext(req),
-      hint: 'Endpoint is mounted successfully. Implement the sale application slice when ready.',
+      hint: 'Endpoint is mounted successfully. Implement simpleStockService.sale when ready.',
     })
   } catch (error) {
     console.error('❌ createSimpleSale error:', error)
