@@ -44,7 +44,7 @@ const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptIte
 const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
-const saleRoutes = require('./routes/saleRoutes');
+const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./routes/saleReturnRoutes');
 const refundRoutes = require('./routes/refundRoutes');
@@ -220,3 +220,42 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/upload-product', uploadProductRoutes);
 app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
+app.use('/api/simple-stock', simpleStockRoutes);
+
+// ===================== Errors =====================
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: 'NOT_FOUND',
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+app.use((err, req, res, _next) => {
+  console.error('❌ Unhandled error:', err);
+
+  const candidateStatusCode = Number(err?.statusCode ?? err?.status);
+  const statusCode =
+    Number.isInteger(candidateStatusCode) &&
+    candidateStatusCode >= 400 &&
+    candidateStatusCode <= 599
+      ? candidateStatusCode
+      : 500;
+  const code = err?.code || 'INTERNAL_SERVER_ERROR';
+
+  res.status(statusCode).json({
+    ok: false,
+    error: code,
+    code,
+    message: err?.message || 'Internal server error',
+    details: err?.details || null,
+    requestId: req.id,
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
+
+module.exports = app;
