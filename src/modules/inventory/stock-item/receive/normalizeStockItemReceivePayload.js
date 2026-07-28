@@ -7,7 +7,11 @@ function normalizeStockItemReceivePayload(req, _res, next) {
     return next()
   }
 
-  if (body.barcode && typeof body.barcode === 'object') {
+  if (
+    body.barcode &&
+    typeof body.barcode === 'object' &&
+    typeof body.barcode.barcode === 'string'
+  ) {
     return next()
   }
 
