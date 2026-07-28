@@ -20,6 +20,12 @@ class LegacyQuickReceiptService {
     this.barcodeFactory = barcodeFactory
   }
 
+  assertBranchOwnership(receipt, branchId) {
+    if (!branchId || Number(receipt.branchId) !== Number(branchId)) {
+      throw legacyError('receipt not found', 404, 'NOT_FOUND')
+    }
+  }
+
   async ensureDraft({ source, supplierId, note, userId, branchId }) {
     const id = await this.repository.createDraft({
       source,
@@ -32,12 +38,13 @@ class LegacyQuickReceiptService {
     return { id, status: 'DRAFT', source, supplierId, note }
   }
 
-  async saveDraftItem({ receiptId, itemId, productId, qty, unitCost, vatRate, idempotencyKey }) {
+  async saveDraftItem({ receiptId, itemId, productId, qty, unitCost, vatRate, idempotencyKey, branchId }) {
     if (!receiptId) throw new Error('missing receipt id')
     if (!productId || !qty) throw new Error('missing product or qty')
 
     const receipt = await this.repository.findReceipt(receiptId)
     if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
+    this.assertBranchOwnership(receipt, branchId)
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
 
     const item = {
@@ -53,17 +60,20 @@ class LegacyQuickReceiptService {
       ? await this.repository.updateDraftItem(receiptId, itemId, item)
       : await this.repository.createDraftItem(item)
 
-    return { itemId: savedId ?? itemId }
+    if (!savedId) throw legacyError('receipt item not found', 404, 'NOT_FOUND')
+    return { itemId: savedId }
   }
 
-  async deleteDraftItem({ receiptId, itemId }) {
+  async deleteDraftItem({ receiptId, itemId, branchId }) {
     if (!receiptId || !itemId) throw new Error('missing id')
 
     const receipt = await this.repository.findReceipt(receiptId)
     if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
+    this.assertBranchOwnership(receipt, branchId)
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
 
-    await this.repository.deleteDraftItem(receiptId, itemId)
+    const deleted = await this.repository.deleteDraftItem(receiptId, itemId)
+    if (Number(deleted) === 0) throw legacyError('receipt item not found', 404, 'NOT_FOUND')
     return { ok: true }
   }
 
@@ -73,6 +83,7 @@ class LegacyQuickReceiptService {
     return this.repository.transaction(async (repo) => {
       const receipt = await repo.findReceiptForUpdate(receiptId)
       if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
+      this.assertBranchOwnership(receipt, branchId)
 
       if (receipt.status === 'FINALIZED') {
         return {
