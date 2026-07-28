@@ -99,20 +99,17 @@ const create = async (command, db = prisma) => db.$transaction(async (tx) => {
       )
     `);
 
-    await tx.stockMovement.create({
-      data: {
-        productId: line.productId,
-        branchId: command.branchId,
-        type: 'RESERVE',
-        qty: new Prisma.Decimal(line.lineType === 'STOCK_ITEM' ? -1 : -line.quantity),
-        stockItemId: line.stockItemId,
-        simpleLotId: line.simpleLotId,
-        refType: 'PRODUCT_RESERVATION',
-        refId: Number(reservation.id),
-        performedByEmployeeId: command.employeeId,
-        note: `Reservation ${command.code}`,
-      },
-    });
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "StockMovement" (
+        "productId", "branchId", "qty", "type", "refType", "refId", "note",
+        "simpleLotId", "stockItemId", "performedByEmployeeId", "createdAt", "occurredAt"
+      ) VALUES (
+        ${line.productId}, ${command.branchId}, ${line.lineType === 'STOCK_ITEM' ? -1 : -line.quantity},
+        'RESERVE'::"StockMovementType", 'PRODUCT_RESERVATION', ${Number(reservation.id)},
+        ${`Reservation ${command.code}`}, ${line.simpleLotId}, ${line.stockItemId}, ${command.employeeId},
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+    `);
   }
 
   const items = await tx.$queryRaw(Prisma.sql`
