@@ -17,6 +17,16 @@ const findByRegistrationKey = async (registrationKey, tx = prisma) => {
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const findByIdForUpdate = async ({ branchId, candidateId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT * FROM "TaxCandidate"
+    WHERE "id" = ${Number(candidateId)}
+      AND "branchId" = ${Number(branchId)}
+    LIMIT 1 FOR UPDATE
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const create = async (candidate, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxCandidate" (
@@ -71,6 +81,7 @@ const list = async ({ branchId, status, sourceType, limit = 50, offset = 0 }, tx
 
 module.exports = Object.freeze({
   findByRegistrationKey,
+  findByIdForUpdate,
   create,
   updateMapped,
   updateConverted,
