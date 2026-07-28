@@ -15,6 +15,7 @@ const {
   buildTaxDocumentOperationalReadinessProjection,
 } = require('../documents/readiness/buildTaxDocumentOperationalReadinessProjection');
 const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
+const { buildTaxDocumentWorkspaceProjection } = require('../documents/workspace/buildTaxDocumentWorkspaceProjection');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 const {
@@ -27,6 +28,17 @@ const requirePositiveInt = (value, code, fieldName) => {
     throw Object.assign(new Error(`${fieldName} must be a positive integer`), { code, statusCode: 400 });
   }
   return parsed;
+};
+
+const findDocumentOrThrow = async ({ branchId, taxDocumentId }) => {
+  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
+  if (!document) {
+    throw Object.assign(new Error('Tax document not found'), {
+      code: 'TAX_DOCUMENT_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+  return document;
 };
 
 const listCandidates = (input) => candidateRepository.list({
@@ -48,13 +60,7 @@ const listDocuments = (input) => documentRepository.list({
 const getDocumentDetail = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
-  if (!document) {
-    throw Object.assign(new Error('Tax document not found'), {
-      code: 'TAX_DOCUMENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  }
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
   return {
     ...document,
     inputTaxReconciliation: await projectInputTaxReconciliation({ document }),
@@ -64,53 +70,36 @@ const getDocumentDetail = async (input) => {
 const getDocumentPrintProjection = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
-  if (!document) {
-    throw Object.assign(new Error('Tax document not found'), {
-      code: 'TAX_DOCUMENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  }
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
   return buildTaxDocumentPrintProjection({ document });
 };
 
 const getDocumentTimelineProjection = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
-  if (!document) {
-    throw Object.assign(new Error('Tax document not found'), {
-      code: 'TAX_DOCUMENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  }
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
   return buildTaxDocumentTimelineProjection({ document });
 };
 
 const getDocumentReplacementChainProjection = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
-  if (!document) {
-    throw Object.assign(new Error('Tax document not found'), {
-      code: 'TAX_DOCUMENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  }
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
   return buildTaxDocumentReplacementChainProjection({ document });
 };
 
 const getDocumentOperationalReadinessProjection = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
-  if (!document) {
-    throw Object.assign(new Error('Tax document not found'), {
-      code: 'TAX_DOCUMENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  }
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
   return buildTaxDocumentOperationalReadinessProjection({ document });
+};
+
+const getDocumentWorkspaceProjection = async (input) => {
+  const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
+  const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
+  const document = await findDocumentOrThrow({ branchId, taxDocumentId });
+  return buildTaxDocumentWorkspaceProjection({ document });
 };
 
 module.exports = Object.freeze({
@@ -121,6 +110,7 @@ module.exports = Object.freeze({
   getDocumentPrintProjection,
   getDocumentReplacementChainProjection,
   getDocumentTimelineProjection,
+  getDocumentWorkspaceProjection,
   issueTaxDocument,
   listCandidates,
   listDocuments,
