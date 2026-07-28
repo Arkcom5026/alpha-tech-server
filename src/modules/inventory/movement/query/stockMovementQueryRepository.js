@@ -17,33 +17,49 @@ class StockMovementQueryRepository {
     serialNumber,
     from,
     to,
-    cursorId,
+    cursor,
     limit,
   }) {
+    const where = {
+      branchId: Number(branchId),
+      ...(productId ? { productId: Number(productId) } : {}),
+      ...(type ? { type } : {}),
+      ...(refType ? { refType } : {}),
+      ...(refId ? { refId: Number(refId) } : {}),
+      ...(barcode || serialNumber
+        ? {
+            stockItem: {
+              ...(barcode ? { barcode } : {}),
+              ...(serialNumber ? { serialNumber } : {}),
+            },
+          }
+        : {}),
+      ...(from || to
+        ? {
+            occurredAt: {
+              ...(from ? { gte: from } : {}),
+              ...(to ? { lte: to } : {}),
+            },
+          }
+        : {}),
+    }
+
+    if (cursor) {
+      where.AND = [
+        {
+          OR: [
+            { occurredAt: { lt: cursor.occurredAt } },
+            {
+              occurredAt: cursor.occurredAt,
+              id: { lt: Number(cursor.id) },
+            },
+          ],
+        },
+      ]
+    }
+
     return this.prisma.stockMovement.findMany({
-      where: {
-        branchId: Number(branchId),
-        ...(productId ? { productId: Number(productId) } : {}),
-        ...(type ? { type } : {}),
-        ...(refType ? { refType } : {}),
-        ...(refId ? { refId: Number(refId) } : {}),
-        ...(barcode || serialNumber
-          ? {
-              stockItem: {
-                ...(barcode ? { barcode } : {}),
-                ...(serialNumber ? { serialNumber } : {}),
-              },
-            }
-          : {}),
-        ...(from || to
-          ? {
-              occurredAt: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lte: to } : {}),
-              },
-            }
-          : {}),
-      },
+      where,
       select: {
         id: true,
         productId: true,
@@ -90,12 +106,6 @@ class StockMovementQueryRepository {
         },
       },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      ...(cursorId
-        ? {
-            cursor: { id: Number(cursorId) },
-            skip: 1,
-          }
-        : {}),
       take: limit + 1,
     })
   }
