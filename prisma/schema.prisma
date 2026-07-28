@@ -531,6 +531,8 @@ model PurchaseOrderReceipt {
   statusReceipt            ReceiptStatus              @default(PENDING)
   supplierTaxInvoiceDate   DateTime?
   supplierTaxInvoiceNumber String?
+  deliveryNoteNumber       String?
+  deliveryNoteDate         DateTime?
   taxDocumentMode          InputTaxDocumentMode       @default(UNCLASSIFIED)
   taxDocumentReceivedAt    DateTime?
   taxDocumentReceiptSource TaxDocumentReceiptSource?
