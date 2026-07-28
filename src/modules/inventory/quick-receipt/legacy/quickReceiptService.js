@@ -1,5 +1,7 @@
 'use strict'
 
+const { assertQuickReceiptRepository } = require('../quickReceiptRepositoryContract')
+
 const nowIso = () => new Date().toISOString()
 
 const genBarcode = (productId) => {
@@ -15,7 +17,7 @@ const legacyError = (message, status, code) => Object.assign(new Error(message),
 
 class LegacyQuickReceiptService {
   constructor(repository, { clock = nowIso, barcodeFactory = genBarcode } = {}) {
-    this.repository = repository
+    this.repository = assertQuickReceiptRepository(repository)
     this.clock = clock
     this.barcodeFactory = barcodeFactory
   }
@@ -50,7 +52,7 @@ class LegacyQuickReceiptService {
     this.assertBranchOwnership(receipt, branchId)
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
 
-    if (!itemId && idempotencyKey && this.repository.findDraftItemByIdempotencyKey) {
+    if (!itemId && idempotencyKey) {
       const existing = await this.repository.findDraftItemByIdempotencyKey(receiptId, idempotencyKey)
       if (existing) return { itemId: existing.id }
     }
@@ -92,7 +94,8 @@ class LegacyQuickReceiptService {
     }
 
     return this.repository.transaction(async (repo) => {
-      const receipt = await repo.findReceiptForUpdate(receiptId)
+      const transactionRepository = assertQuickReceiptRepository(repo)
+      const receipt = await transactionRepository.findReceiptForUpdate(receiptId)
       if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
       this.assertBranchOwnership(receipt, branchId)
 
@@ -104,8 +107,8 @@ class LegacyQuickReceiptService {
         return {
           receiptId,
           committedAt: receipt.finalizedAt || this.clock(),
-          lotBarcodes: await repo.listLotBarcodes(receiptId),
-          stockMovements: await repo.listReceiptMovements(receiptId),
+          lotBarcodes: await transactionRepository.listLotBarcodes(receiptId),
+          stockMovements: await transactionRepository.listReceiptMovements(receiptId),
         }
       }
 
@@ -113,14 +116,14 @@ class LegacyQuickReceiptService {
         throw legacyError('finalize token mismatch', 409, 'CONFLICT')
       }
 
-      const items = await repo.listReceiptItems(receiptId)
+      const items = await transactionRepository.listReceiptItems(receiptId)
       if (items.length === 0) throw legacyError('no items to finalize', 409, 'EMPTY')
 
       const lotBarcodes = []
       const stockMovements = []
 
       for (const item of items) {
-        await repo.increaseStockBalance({
+        await transactionRepository.increaseStockBalance({
           branchId,
           productId: item.productId,
           quantity: item.qty,
@@ -129,12 +132,12 @@ class LegacyQuickReceiptService {
         stockMovements.push({ productId: item.productId, qty: item.qty })
 
         const code = this.barcodeFactory(item.productId)
-        await repo.createLotBarcode({ code, productId: item.productId, receiptId })
+        await transactionRepository.createLotBarcode({ code, productId: item.productId, receiptId })
         lotBarcodes.push({ productId: item.productId, code })
       }
 
       const committedAt = this.clock()
-      await repo.finalizeReceipt(receiptId, committedAt, finalizeToken)
+      await transactionRepository.finalizeReceipt(receiptId, committedAt, finalizeToken)
 
       return { receiptId, committedAt, lotBarcodes, stockMovements }
     })
