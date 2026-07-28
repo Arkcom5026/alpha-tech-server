@@ -20,6 +20,8 @@ module.exports = Object.freeze({
   candidates: Object.freeze({
     contracts: require('./candidates/contracts/taxCandidateContract'),
     mapping: require('./candidates/mapping/mapCandidateToTaxDocument'),
+    convert:
+      require('./candidates/conversion/convertTaxCandidateService').convertTaxCandidate,
   }),
   documents: Object.freeze({
     contracts: require('./documents/contracts/taxDocumentContract'),
