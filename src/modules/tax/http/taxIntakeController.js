@@ -78,6 +78,12 @@ const getOutputTaxOverview = handle((req) => service.getOutputTaxOverview({
   month: req.query?.month,
 }));
 
+const getOutputTaxPeriodReadiness = handle((req) => service.getOutputTaxPeriodReadiness({
+  branchId: resolveBranchId(req, req.query),
+  year: req.query?.year,
+  month: req.query?.month,
+}));
+
 const getOutputTaxPeriodReport = handle((req) => service.getOutputTaxPeriodReport({
   branchId: resolveBranchId(req, req.query),
   year: req.query?.year,
@@ -160,6 +166,7 @@ module.exports = Object.freeze({
   getDocumentTimelineProjection,
   getDocumentWorkspaceProjection,
   getOutputTaxOverview,
+  getOutputTaxPeriodReadiness,
   getOutputTaxPeriodReport,
   issueDocument,
   listCandidates,
