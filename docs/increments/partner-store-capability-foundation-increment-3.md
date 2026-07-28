@@ -69,3 +69,6 @@ Branch authority is resolved only from authenticated user context. A request-bod
 - Geocoding and distance calculation.
 - Opening hours and holidays.
 - Product-level online visibility.
+
+## Next Highest-Value Target
+Expose a read-only public storefront projection by enabled slug, returning only customer-safe current capability fields and never exposing internal branch policy mutation endpoints.
