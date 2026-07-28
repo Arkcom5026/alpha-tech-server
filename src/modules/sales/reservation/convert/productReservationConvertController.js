@@ -32,6 +32,10 @@ const convertProductReservationToSaleController = async (req, res, next) => {
     });
     return res.status(result.idempotency?.replayed ? 200 : 201).json({ ok: true, data: result });
   } catch (error) {
+    // Canonical Sales Completion uses `status`; reservation middleware uses `statusCode`.
+    if (!error.statusCode && Number.isInteger(Number(error.status))) {
+      error.statusCode = Number(error.status);
+    }
     return next(error);
   }
 };
