@@ -21,6 +21,7 @@ router.get('/documents/:taxDocumentId/timeline', controller.getDocumentTimelineP
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
 router.post('/documents/:taxDocumentId/issue', controller.issueDocument);
 router.post('/documents/:taxDocumentId/cancel', controller.cancelDocument);
+router.post('/documents/:taxDocumentId/replace', controller.replaceDocument);
 router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
 
 module.exports = router;
