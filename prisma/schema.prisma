@@ -51,6 +51,7 @@ model EmployeeProfile {
   position                          Position?                   @relation(fields: [positionId], references: [id])
   user                              User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
   inputTaxFilingBatches             InputTaxFilingBatch[]
+  taxDocumentLifecycleEvents        TaxDocumentLifecycleEvent[] @relation("TaxDocumentLifecycleEventActor")
   confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
   payment                           Payment[]
   purchaseOrderCreated              PurchaseOrder[]
@@ -145,6 +146,8 @@ model Branch {
   suppliers                       Supplier[]
   supplierPayment                 SupplierPayment[]
   supplierPayables                SupplierPayable[]
+  taxCandidates                   TaxCandidate[]
+  taxDocuments                    TaxDocument[]
   v2StockAudits                   V2StockAudit[]
 
   @@index([subdistrictCode])
@@ -618,6 +621,72 @@ model InputTaxFilingItem {
 
   @@unique([batchId, purchaseOrderReceiptId])
   @@index([purchaseOrderReceiptId])
+}
+
+model TaxCandidate {
+  id                 Int                @id @default(autoincrement())
+  branchId           Int
+  sourceType         String
+  sourceId           String
+  sourceDocumentNo   String?
+  registrationKey    String             @unique
+  status             TaxCandidateStatus @default(REGISTERED)
+  occurredAt         DateTime
+  snapshot           Json               @default("{}")
+  mappedDocumentType String?
+  rejectionCode      String?
+  rejectionReason    String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  branch             Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  document           TaxDocument?
+
+  @@unique([branchId, sourceType, sourceId])
+  @@index([branchId, status, occurredAt])
+  @@index([sourceType, sourceId])
+}
+
+model TaxDocument {
+  id                Int                         @id @default(autoincrement())
+  branchId          Int
+  candidateId       Int?                        @unique
+  documentType      String
+  documentNumber    String
+  counterpartyTaxId String?
+  identityKey       String                      @unique
+  status            String                      @default("DRAFT")
+  issuedAt          DateTime?
+  occurredAt        DateTime
+  currency          String                      @default("THB")
+  subtotalAmount    Decimal                     @default(0) @db.Decimal(14, 2)
+  taxAmount         Decimal                     @default(0) @db.Decimal(14, 2)
+  totalAmount       Decimal                     @default(0) @db.Decimal(14, 2)
+  snapshot          Json                        @default("{}")
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  branch            Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  candidate         TaxCandidate?               @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  lifecycleEvents   TaxDocumentLifecycleEvent[]
+
+  @@index([branchId, status, occurredAt])
+  @@index([branchId, documentType, documentNumber])
+}
+
+model TaxDocumentLifecycleEvent {
+  id              Int              @id @default(autoincrement())
+  taxDocumentId   Int
+  fromStatus      String?
+  toStatus        String
+  reason          String?
+  actorEmployeeId Int?
+  occurredAt      DateTime         @default(now())
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  taxDocument     TaxDocument      @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+  actorEmployee   EmployeeProfile? @relation("TaxDocumentLifecycleEventActor", fields: [actorEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([taxDocumentId, occurredAt])
+  @@index([actorEmployeeId, occurredAt])
 }
 
 model PurchaseOrderReceiptItem {
@@ -2554,6 +2623,13 @@ enum InputTaxDocumentMode {
 enum TaxDocumentReceiptSource {
   WITH_GOODS
   LATER
+}
+
+enum TaxCandidateStatus {
+  REGISTERED
+  MAPPED
+  REJECTED
+  CONVERTED
 }
 
 enum SalesTaxFilingStatus {
