@@ -87,6 +87,11 @@ const getDocumentTimelineProjection = handle((req) => service.getDocumentTimelin
   taxDocumentId: req.params.taxDocumentId,
 }));
 
+const getDocumentReplacementChainProjection = handle((req) => service.getDocumentReplacementChainProjection({
+  branchId: resolveBranchId(req, req.query),
+  taxDocumentId: req.params.taxDocumentId,
+}));
+
 const issueDocument = handle((req) => service.issueTaxDocument({
   branchId: resolveBranchId(req, req.body),
   taxDocumentId: req.params.taxDocumentId,
@@ -128,6 +133,7 @@ module.exports = Object.freeze({
   cancelDocument,
   getDocumentDetail,
   getDocumentPrintProjection,
+  getDocumentReplacementChainProjection,
   getDocumentTimelineProjection,
   issueDocument,
   listCandidates,
