@@ -152,6 +152,7 @@ const sumActiveDocumentAllocations = async ({
 }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     SELECT
+      COUNT(*)::int AS "receiptCount",
       COALESCE(SUM("allocatedSubtotal"), 0)::numeric AS "subtotalAmount",
       COALESCE(SUM("allocatedVatAmount"), 0)::numeric AS "vatAmount",
       COALESCE(SUM("allocatedTotalAmount"), 0)::numeric AS "totalAmount"
@@ -162,6 +163,7 @@ const sumActiveDocumentAllocations = async ({
         OR "id" <> ${excludingLinkId == null ? null : Number(excludingLinkId)})
   `);
   return {
+    receiptCount: Number(rows[0]?.receiptCount || 0),
     subtotalAmount: Number(rows[0]?.subtotalAmount || 0),
     vatAmount: Number(rows[0]?.vatAmount || 0),
     totalAmount: Number(rows[0]?.totalAmount || 0),

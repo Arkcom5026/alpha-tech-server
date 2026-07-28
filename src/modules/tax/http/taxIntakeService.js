@@ -5,6 +5,9 @@ const documentRepository = require('../documents/repository/taxDocumentRepositor
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
+const {
+  projectInputTaxReconciliation,
+} = require('../inputDocuments/reconciliation/inputTaxDocumentReconciliationService');
 
 const requirePositiveInt = (value, code, fieldName) => {
   const parsed = Number(value);
@@ -40,7 +43,10 @@ const getDocumentDetail = async (input) => {
       statusCode: 404,
     });
   }
-  return document;
+  return {
+    ...document,
+    inputTaxReconciliation: await projectInputTaxReconciliation({ document }),
+  };
 };
 
 module.exports = Object.freeze({

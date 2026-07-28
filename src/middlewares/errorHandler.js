@@ -11,6 +11,8 @@ const errorHandler = (err, req, res, next) => {
       status: status,
       error: {
         message: err.message || 'เกิดความล้มเหลวในการเชื่อมโยงบริการของระบบความปลอดภัย',
+        ...(err.code && { code: err.code }),
+        ...(err.details && { details: err.details }),
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
       }
     });
