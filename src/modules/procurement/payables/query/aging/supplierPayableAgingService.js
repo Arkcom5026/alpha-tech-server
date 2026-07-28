@@ -79,7 +79,7 @@ const list = async (input) => {
     statement.payableCount += 1;
     statement.grossOutstanding = money(statement.grossOutstanding + payable.outstandingAmount);
     if (payable.status === 'DISPUTED') {
-      statement.disputedOutstanding = money(statement.disputedOutstanding + payable.outstandingAmount);
+      statement.disputedOutstanding = money(statement.disputedOutstanding + payable.disputedAmount);
     }
     const field = bucketField[payable.bucket];
     statement.buckets[field] = money(statement.buckets[field] + payable.outstandingAmount);
