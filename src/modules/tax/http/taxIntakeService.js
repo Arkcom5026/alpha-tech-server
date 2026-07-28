@@ -6,6 +6,7 @@ const { convertTaxCandidate } = require('../candidates/conversion/convertTaxCand
 const { issueTaxDocument } = require('../documents/issue/issueTaxDocumentService');
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { buildTaxDocumentPrintProjection } = require('../documents/print/buildTaxDocumentPrintProjection');
+const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 const {
@@ -65,10 +66,24 @@ const getDocumentPrintProjection = async (input) => {
   return buildTaxDocumentPrintProjection({ document });
 };
 
+const getDocumentTimelineProjection = async (input) => {
+  const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
+  const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
+  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
+  if (!document) {
+    throw Object.assign(new Error('Tax document not found'), {
+      code: 'TAX_DOCUMENT_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+  return buildTaxDocumentTimelineProjection({ document });
+};
+
 module.exports = Object.freeze({
   convertTaxCandidate,
   getDocumentDetail,
   getDocumentPrintProjection,
+  getDocumentTimelineProjection,
   issueTaxDocument,
   listCandidates,
   listDocuments,
