@@ -2,6 +2,7 @@
 
 const repository = require('./pendingInputTaxDocumentRepository');
 const SOURCE_TYPES = Object.freeze(['PO_RECEIPT', 'QUICK_RECEIPT']);
+const LINK_STATES = Object.freeze(['ACTION_REQUIRED', 'UNLINKED', 'PARTIALLY_LINKED', 'LINKED']);
 
 const positiveInt = (value, code, fieldName, required = true) => {
   if ((value === null || value === undefined || value === '') && !required) return null;
@@ -29,14 +30,21 @@ const listPendingInputTaxDocuments = (input = {}) => {
       code: 'PENDING_INPUT_TAX_SOURCE_INVALID', statusCode: 400,
     });
   }
+  const requestedLinkState = String(input.linkState || 'ACTION_REQUIRED').trim().toUpperCase();
+  if (requestedLinkState && !LINK_STATES.includes(requestedLinkState)) {
+    throw Object.assign(new Error('linkState must be ACTION_REQUIRED, UNLINKED, PARTIALLY_LINKED, or LINKED'), {
+      code: 'PENDING_INPUT_TAX_LINK_STATE_INVALID', statusCode: 400,
+    });
+  }
   return repository.listPending({
     branchId: positiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId'),
     sourceType: requestedSource || null,
     supplierId: positiveInt(input.supplierId, 'PENDING_INPUT_TAX_SUPPLIER_INVALID', 'supplierId', false),
+    linkState: requestedLinkState || null,
     keyword: String(input.keyword || '').trim(),
     fromDate: parseDate(input.fromDate, 'fromDate'),
     toDateExclusive: parseDate(input.toDate, 'toDate', true),
     limit: input.limit, offset: input.offset,
   });
 };
-module.exports = Object.freeze({ SOURCE_TYPES, listPendingInputTaxDocuments });
+module.exports = Object.freeze({ LINK_STATES, SOURCE_TYPES, listPendingInputTaxDocuments });

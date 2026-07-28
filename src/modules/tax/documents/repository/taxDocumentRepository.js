@@ -7,6 +7,7 @@ const mapRow = (row) => ({
   id: Number(row.id),
   branchId: Number(row.branchId),
   candidateId: row.candidateId == null ? null : Number(row.candidateId),
+  supplierId: row.supplierId == null ? null : Number(row.supplierId),
 });
 
 const findByIdentityKey = async (identityKey, tx = prisma) => {
@@ -112,11 +113,40 @@ const list = async ({ branchId, status, documentType, limit = 50, offset = 0 }, 
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
   const safeOffset = Math.max(Number(offset) || 0, 0);
   const rows = await tx.$queryRaw(Prisma.sql`
-    SELECT * FROM "TaxDocument"
-    WHERE "branchId" = ${Number(branchId)}
-      AND (${status || null}::text IS NULL OR "status" = ${status || null})
-      AND (${documentType || null}::text IS NULL OR "documentType" = ${documentType || null})
-    ORDER BY "occurredAt" DESC, "id" DESC
+    SELECT
+      document.*,
+      COALESCE(
+        NULLIF(document."snapshot"->>'supplierId', '')::int,
+        NULLIF(candidate."snapshot"->>'supplierId', '')::int,
+        supplier_identity."supplierId"
+      ) AS "supplierId"
+    FROM "TaxDocument" document
+    LEFT JOIN "TaxCandidate" candidate ON candidate."id" = document."candidateId"
+    LEFT JOIN LATERAL (
+      SELECT supplier."id" AS "supplierId"
+      FROM "Supplier" supplier
+      WHERE supplier."branchId" = document."branchId"
+        AND REGEXP_REPLACE(COALESCE(supplier."taxId", ''), '\\D', '', 'g') <> ''
+        AND REGEXP_REPLACE(COALESCE(supplier."taxId", ''), '\\D', '', 'g') = REGEXP_REPLACE(
+          COALESCE(
+            document."counterpartyTaxId",
+            document."snapshot"->>'issuerTaxId',
+            document."snapshot"->>'counterpartyTaxId',
+            candidate."snapshot"->>'issuerTaxId',
+            candidate."snapshot"->>'counterpartyTaxId',
+            ''
+          ),
+          '\\D',
+          '',
+          'g'
+        )
+      ORDER BY supplier."id" ASC
+      LIMIT 1
+    ) supplier_identity ON true
+    WHERE document."branchId" = ${Number(branchId)}
+      AND (${status || null}::text IS NULL OR document."status" = ${status || null})
+      AND (${documentType || null}::text IS NULL OR document."documentType" = ${documentType || null})
+    ORDER BY document."occurredAt" DESC, document."id" DESC
     LIMIT ${safeLimit} OFFSET ${safeOffset}
   `);
   return rows.map(mapRow);
