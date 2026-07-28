@@ -3,6 +3,7 @@
 const candidateRepository = require('../candidates/repository/taxCandidateRepository');
 const documentRepository = require('../documents/repository/taxDocumentRepository');
 const { convertTaxCandidate } = require('../candidates/conversion/convertTaxCandidateService');
+const { cancelTaxDocument } = require('../documents/cancellation/cancelTaxDocumentService');
 const { issueTaxDocument } = require('../documents/issue/issueTaxDocumentService');
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { buildTaxDocumentPrintProjection } = require('../documents/print/buildTaxDocumentPrintProjection');
@@ -80,6 +81,7 @@ const getDocumentTimelineProjection = async (input) => {
 };
 
 module.exports = Object.freeze({
+  cancelTaxDocument,
   convertTaxCandidate,
   getDocumentDetail,
   getDocumentPrintProjection,
