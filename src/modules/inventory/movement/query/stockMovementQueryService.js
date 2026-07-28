@@ -14,6 +14,13 @@ const asPositiveInteger = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+const asOptionalDate = (value, code) => {
+  if (value == null || value === '') return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) throw movementQueryError(code)
+  return parsed
+}
+
 class StockMovementQueryService {
   constructor(repo = repository) {
     this.repository = repo
@@ -30,6 +37,17 @@ class StockMovementQueryService {
       throw movementQueryError('INVALID_PRODUCT_ID')
     }
 
+    const refId = query.refId == null || query.refId === ''
+      ? null
+      : asPositiveInteger(query.refId)
+    if (query.refId != null && query.refId !== '' && !refId) {
+      throw movementQueryError('INVALID_REF_ID')
+    }
+
+    const from = asOptionalDate(query.from, 'INVALID_FROM_DATE')
+    const to = asOptionalDate(query.to, 'INVALID_TO_DATE')
+    if (from && to && from > to) throw movementQueryError('INVALID_DATE_RANGE')
+
     const requestedLimit = Number(query.limit)
     const limit = Number.isInteger(requestedLimit)
       ? Math.min(Math.max(requestedLimit, 1), 200)
@@ -40,7 +58,9 @@ class StockMovementQueryService {
       productId,
       type: query.type ? String(query.type).trim().toUpperCase() : null,
       refType: query.refType ? String(query.refType).trim() : null,
-      refId: query.refId ? String(query.refId).trim() : null,
+      refId,
+      from,
+      to,
       limit,
     })
 
