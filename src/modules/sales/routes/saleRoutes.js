@@ -8,8 +8,10 @@ const { searchSaleItemsController } = require('../item-search/controllers/saleIt
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 const productReservationRoutes = require('../reservation/routes/productReservationRoutes');
+const publicStorefrontRoutes = require('../storefront/public/publicStorefrontRoutes');
 
 const router = express.Router();
+router.use('/storefronts', publicStorefrontRoutes);
 router.use(verifyToken);
 router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
