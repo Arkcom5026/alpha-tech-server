@@ -16,6 +16,11 @@ class LegacyQuickReceiptRepository {
     if (!this.db) throw new Error('DB connection not available')
   }
 
+  now() {
+    this.assertAvailable()
+    return this.db.fn.now()
+  }
+
   createDraft(payload) {
     this.assertAvailable()
     return this.db(TABLES.receipt).insert(payload).returning('id')
@@ -57,65 +62,75 @@ class LegacyQuickReceiptRepository {
   }
 
   findReceiptForUpdate(receiptId) {
+    this.assertAvailable()
     return this.db(TABLES.receipt).where({ id: receiptId }).forUpdate().first()
   }
 
   listReceiptItems(receiptId) {
+    this.assertAvailable()
     return this.db(TABLES.item).where({ receipt_id: receiptId })
   }
 
   listLotBarcodes(receiptId) {
+    this.assertAvailable()
     return this.db(TABLES.barcode)
       .select('code', 'product_id')
       .where({ receipt_id: receiptId, kind: 'LOT' })
   }
 
   listReceiptMovements(receiptId) {
+    this.assertAvailable()
     return this.db(TABLES.item)
       .select('product_id as productId', 'qty')
       .where({ receipt_id: receiptId })
   }
 
   findStockBalance(branchId, productId) {
+    this.assertAvailable()
     return this.db(TABLES.stock)
       .where({ branch_id: branchId, product_id: productId })
       .first()
   }
 
   updateStockBalance(id, quantity) {
+    this.assertAvailable()
     return this.db(TABLES.stock).where({ id }).update({
       quantity,
-      updated_at: this.db.fn.now(),
+      updated_at: this.now(),
     })
   }
 
   createStockBalance({ branchId, productId, quantity }) {
+    this.assertAvailable()
+    const timestamp = this.now()
     return this.db(TABLES.stock).insert({
       branch_id: branchId,
       product_id: productId,
       quantity,
-      created_at: this.db.fn.now(),
-      updated_at: this.db.fn.now(),
+      created_at: timestamp,
+      updated_at: timestamp,
     })
   }
 
   createLotBarcode({ code, productId, receiptId }) {
+    this.assertAvailable()
     return this.db(TABLES.barcode).insert({
       code,
       kind: 'LOT',
       product_id: productId,
       receipt_id: receiptId,
       status: 'SN_RECEIVED',
-      created_at: this.db.fn.now(),
+      created_at: this.now(),
     })
   }
 
   finalizeReceipt(receiptId, committedAt, finalizeToken) {
+    this.assertAvailable()
     return this.db(TABLES.receipt).where({ id: receiptId }).update({
       status: 'FINALIZED',
       finalized_at: committedAt,
       finalize_token: finalizeToken || this.db.raw('COALESCE(finalize_token, ?) ', [finalizeToken || null]),
-      updated_at: this.db.fn.now(),
+      updated_at: this.now(),
     })
   }
 }
