@@ -16,6 +16,7 @@ router.post('/candidates/register', controller.registerCandidate);
 router.post('/candidates/register-sale/:saleId', controller.registerSaleCandidate);
 router.get('/candidates', controller.listCandidates);
 router.get('/documents', controller.listDocuments);
+router.get('/documents/:taxDocumentId/workspace', controller.getDocumentWorkspaceProjection);
 router.get('/documents/:taxDocumentId/operational-readiness', controller.getDocumentOperationalReadinessProjection);
 router.get('/documents/:taxDocumentId/print-projection', controller.getDocumentPrintProjection);
 router.get('/documents/:taxDocumentId/timeline', controller.getDocumentTimelineProjection);
