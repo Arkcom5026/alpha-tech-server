@@ -8,9 +8,15 @@ const { searchSaleItemsController } = require('../item-search/controllers/saleIt
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 const posHeldCartRoutes = require('../held-cart/routes/posHeldCartRoutes');
+const {
+  getPartnerStoreCapabilityController,
+  savePartnerStoreCapabilityController,
+} = require('../reservation/store-capability/partnerStoreCapabilityController');
 
 const router = express.Router();
 router.use(verifyToken);
+router.get('/store-capability', getPartnerStoreCapabilityController);
+router.put('/store-capability', savePartnerStoreCapabilityController);
 router.use('/held-carts', posHeldCartRoutes);
 router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
