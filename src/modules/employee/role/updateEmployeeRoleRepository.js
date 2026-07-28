@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../lib/prisma');
+const { prisma } = require('../../../lib/prisma');
 
 const findEmployeeProfileByUserId = (userId) => prisma.employeeProfile.findUnique({ where: { userId } });
 

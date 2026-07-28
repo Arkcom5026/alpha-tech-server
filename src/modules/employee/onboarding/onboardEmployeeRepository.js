@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { prisma } = require('../../../../lib/prisma');
+const { prisma } = require('../../../lib/prisma');
 
 const findExistingUserAndPosition = async ({ email, positionId }) => Promise.all([
   prisma.user.findUnique({ where: { email }, select: { id: true } }),

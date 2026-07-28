@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../../lib/prisma');
+const { prisma } = require('../../../../lib/prisma');
 
 const listBranches = () => prisma.branch.findMany({
   select: { id: true, name: true },

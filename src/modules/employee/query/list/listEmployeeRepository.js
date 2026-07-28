@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../lib/prisma');
+const { prisma } = require('../../../../lib/prisma');
 
 const listEmployees = ({ where, skip, take }) => Promise.all([
   prisma.employeeProfile.findMany({
