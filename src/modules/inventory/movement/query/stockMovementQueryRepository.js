@@ -7,14 +7,22 @@ class StockMovementQueryRepository {
     this.prisma = client
   }
 
-  list({ branchId, productId, type, refType, refId, limit }) {
+  list({ branchId, productId, type, refType, refId, from, to, limit }) {
     return this.prisma.stockMovement.findMany({
       where: {
         branchId: Number(branchId),
         ...(productId ? { productId: Number(productId) } : {}),
         ...(type ? { type } : {}),
         ...(refType ? { refType } : {}),
-        ...(refId ? { refId: String(refId) } : {}),
+        ...(refId ? { refId: Number(refId) } : {}),
+        ...(from || to
+          ? {
+              occurredAt: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lte: to } : {}),
+              },
+            }
+          : {}),
       },
       select: {
         id: true,
@@ -27,9 +35,26 @@ class StockMovementQueryRepository {
         note: true,
         performedByEmployeeId: true,
         simpleLotId: true,
+        stockItemId: true,
+        previousStockStatus: true,
+        resultingStockStatus: true,
+        occurredAt: true,
         createdAt: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            saleBarcode: true,
+          },
+        },
+        performedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: limit,
     })
   }
