@@ -1,4 +1,4 @@
-const { toPrismaRole } = require('../../../shared/employeeUtils');
+const { toPrismaRole } = require('../../shared/employeeUtils');
 const { findUsersByRole } = require('./usersByRoleRepository');
 
 const listUsersByRole = async (requestedRole) => {
