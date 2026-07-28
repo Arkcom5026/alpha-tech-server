@@ -7,6 +7,7 @@ const { cancelTaxDocument } = require('../documents/cancellation/cancelTaxDocume
 const { issueTaxDocument } = require('../documents/issue/issueTaxDocumentService');
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { buildTaxDocumentPrintProjection } = require('../documents/print/buildTaxDocumentPrintProjection');
+const { replaceCancelledTaxDocument } = require('../documents/replacement/replaceCancelledTaxDocumentService');
 const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
@@ -91,5 +92,6 @@ module.exports = Object.freeze({
   listDocuments,
   registerSaleTaxCandidate,
   registerTaxCandidate,
+  replaceCancelledTaxDocument,
   transitionTaxDocument,
 });
