@@ -72,6 +72,12 @@ const listDocuments = handle((req) => service.listDocuments({
   branchId: resolveBranchId(req, req.query),
 }));
 
+const getOutputTaxPeriodReport = handle((req) => service.getOutputTaxPeriodReport({
+  branchId: resolveBranchId(req, req.query),
+  year: req.query?.year,
+  month: req.query?.month,
+}));
+
 const getDocumentDetail = handle((req) => service.getDocumentDetail({
   branchId: resolveBranchId(req, req.query),
   taxDocumentId: req.params.taxDocumentId,
@@ -147,6 +153,7 @@ module.exports = Object.freeze({
   getDocumentReplacementChainProjection,
   getDocumentTimelineProjection,
   getDocumentWorkspaceProjection,
+  getOutputTaxPeriodReport,
   issueDocument,
   listCandidates,
   listDocuments,
