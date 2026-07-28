@@ -44,6 +44,13 @@ class StockMovementQueryService {
       throw movementQueryError('INVALID_REF_ID')
     }
 
+    const cursorId = query.cursor == null || query.cursor === ''
+      ? null
+      : asPositiveInteger(query.cursor)
+    if (query.cursor != null && query.cursor !== '' && !cursorId) {
+      throw movementQueryError('INVALID_CURSOR')
+    }
+
     const from = asOptionalDate(query.from, 'INVALID_FROM_DATE')
     const to = asOptionalDate(query.to, 'INVALID_TO_DATE')
     if (from && to && from > to) throw movementQueryError('INVALID_DATE_RANGE')
@@ -61,17 +68,24 @@ class StockMovementQueryService {
       refId,
       from,
       to,
+      cursorId,
       limit,
     })
 
+    const hasMore = rows.length > limit
+    const pageRows = hasMore ? rows.slice(0, limit) : rows
+    const movements = pageRows.map((row) => ({
+      ...row,
+      qty: row.qty?.toString?.() ?? String(row.qty ?? 0),
+    }))
+
     return {
       branchId: normalizedBranchId,
-      count: rows.length,
+      count: movements.length,
       limit,
-      movements: rows.map((row) => ({
-        ...row,
-        qty: row.qty?.toString?.() ?? String(row.qty ?? 0),
-      })),
+      hasMore,
+      nextCursor: hasMore ? movements[movements.length - 1]?.id ?? null : null,
+      movements,
     }
   }
 }
