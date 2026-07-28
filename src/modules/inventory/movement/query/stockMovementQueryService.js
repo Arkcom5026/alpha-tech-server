@@ -35,6 +35,16 @@ const asOptionalEnum = (value, allowed, code) => {
   return normalized
 }
 
+const STOCK_MOVEMENT_TYPES = [
+  'RECEIVE',
+  'SALE',
+  'ADJUST',
+  'TRANSFER',
+  'RETURN',
+  'RESERVE',
+  'RELEASE',
+]
+
 const encodeCursor = (row) => {
   if (!row?.id || !row?.occurredAt) return null
   return Buffer.from(JSON.stringify({
@@ -99,6 +109,8 @@ class StockMovementQueryService {
     const barcode = asOptionalText(query.barcode, 'INVALID_BARCODE')
     const serialNumber = asOptionalText(query.serialNumber, 'INVALID_SERIAL_NUMBER')
     const direction = asOptionalEnum(query.direction, ['IN', 'OUT'], 'INVALID_DIRECTION')
+    const type = asOptionalEnum(query.type, STOCK_MOVEMENT_TYPES, 'INVALID_MOVEMENT_TYPE')
+    const refType = asOptionalText(query.refType, 'INVALID_REF_TYPE', 80)
 
     const from = asOptionalDate(query.from, 'INVALID_FROM_DATE')
     const to = asOptionalDate(query.to, 'INVALID_TO_DATE')
@@ -114,9 +126,9 @@ class StockMovementQueryService {
       productId,
       stockItemId,
       simpleLotId,
-      type: query.type ? String(query.type).trim().toUpperCase() : null,
+      type,
       direction,
-      refType: query.refType ? String(query.refType).trim() : null,
+      refType,
       refId,
       barcode,
       serialNumber,
