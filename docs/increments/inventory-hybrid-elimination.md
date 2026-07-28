@@ -6,10 +6,32 @@
 2. Move SIMPLE stock HTTP ownership into `src/modules/inventory/simple-stock`.
 3. Move Stock Item HTTP ownership and receive payload normalization into `src/modules/inventory/stock-item`.
 4. Move Inventory Dashboard route composition into `src/modules/inventory/dashboard`.
+5. Audit SIMPLE adjustment and transfer as canonical movement writers.
 
 ## Compatibility policy
 
 Root-level files mounted by `server.js` remain thin adapters until server composition is migrated in a separately controlled increment. Public endpoint paths and current handler behavior are preserved.
+
+## Movement authority audit
+
+Repository inspection confirms that SIMPLE adjustment and SIMPLE transfer already write stock movements inside module-owned Prisma transactions.
+
+### Adjustment
+
+- Validates branch authority and SIMPLE-product policy.
+- Updates `StockBalance` and SIMPLE lots in one transaction.
+- Writes `ADJUST` movements for every positive or negative lot change.
+- Rejects quantity changes that would violate reserved stock or lot consistency.
+
+### Transfer
+
+- Uses a transfer key for replay/idempotency detection.
+- Consumes source lots and creates destination lots in one transaction.
+- Writes paired negative/positive `TRANSFER` movements.
+- Updates both source and destination balances atomically.
+- Rejects branch, product-identity, availability, and lot-consistency violations.
+
+Disposition: no separate generic movement controller should be introduced. Movement is a persisted domain record owned by the operation that causes it. A future movement history/query capability may read these records, but must not become an alternate write authority.
 
 ## Audit hold: legacy Quick Receipt
 
