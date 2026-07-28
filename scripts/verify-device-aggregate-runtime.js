@@ -61,7 +61,8 @@ assertContains(packageJson, '"db:ensure-device-intake": "node scripts/ensure-dev
 
 const foundation = read('scripts/ensure-device-intake-foundation.js');
 assertContains(foundation, "require('dotenv').config();", 'device foundation environment loading');
-assertContains(foundation, "process.env.DIRECT_URL || process.env.DATABASE_URL", 'device foundation direct database preference');
+assertContains(foundation, "process.env.DATABASE_URL || process.env.DIRECT_URL", 'device foundation runtime database preference');
+assertContains(foundation, 'Device foundation connection authority', 'device foundation connection authority evidence');
 assertContains(foundation, "['localhost', '127.0.0.1', '::1']", 'device foundation local SSL policy');
 
 const repairRoutes = read('src/modules/repair/routes/repairRoutes.js');

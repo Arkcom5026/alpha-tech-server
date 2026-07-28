@@ -440,11 +440,16 @@ async function assertBaseTables(client) {
 
 async function main() {
   const rawConnectionString =
-    process.env.DIRECT_URL || process.env.DATABASE_URL;
+    process.env.DATABASE_URL || process.env.DIRECT_URL;
+  const connectionAuthority = process.env.DATABASE_URL
+    ? 'DATABASE_URL'
+    : 'DIRECT_URL';
 
   if (!rawConnectionString) {
-    throw new Error('DIRECT_URL or DATABASE_URL is required');
+    throw new Error('DATABASE_URL or DIRECT_URL is required');
   }
+
+  console.log(`[db] Device foundation connection authority: ${connectionAuthority}`);
 
   const databaseUrl = new URL(rawConnectionString);
   const isLocalDatabase = ['localhost', '127.0.0.1', '::1'].includes(
