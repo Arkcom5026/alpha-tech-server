@@ -20,7 +20,7 @@ class LegacyQuickReceiptService {
 
   async ensureDraft({ source, supplierId, note, userId, branchId }) {
     const timestamp = this.repository.now()
-    const payload = {
+    const id = await this.repository.createDraft({
       source,
       supplier_id: supplierId || 0,
       note: note || '',
@@ -29,16 +29,7 @@ class LegacyQuickReceiptService {
       user_id: userId || null,
       created_at: timestamp,
       updated_at: timestamp,
-    }
-
-    let id
-    try {
-      const rows = await this.repository.createDraft(payload)
-      id = Array.isArray(rows) ? (rows[0]?.id ?? rows[0]) : rows
-    } catch {
-      const result = await this.repository.createDraftWithoutReturning(payload)
-      id = Array.isArray(result) ? result[0] : result
-    }
+    })
 
     return { id, status: 'DRAFT', source, supplierId, note }
   }
@@ -66,13 +57,7 @@ class LegacyQuickReceiptService {
       await this.repository.updateDraftItem(receiptId, itemId, body)
     } else {
       body.created_at = this.repository.now()
-      try {
-        const rows = await this.repository.createDraftItem(body)
-        savedId = Array.isArray(rows) ? (rows[0]?.id ?? rows[0]) : rows
-      } catch {
-        const result = await this.repository.createDraftItemWithoutReturning(body)
-        savedId = Array.isArray(result) ? result[0] : result
-      }
+      savedId = await this.repository.createDraftItem(body)
     }
 
     return { itemId: savedId }
@@ -89,7 +74,7 @@ class LegacyQuickReceiptService {
     return { ok: true }
   }
 
-  async finalize({ receiptId, finalizeToken, userId, branchId }) {
+  async finalize({ receiptId, finalizeToken, branchId }) {
     if (!receiptId) throw new Error('missing receipt id')
 
     return this.repository.transaction(async (repo) => {
