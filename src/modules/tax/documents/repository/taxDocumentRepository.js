@@ -28,6 +28,17 @@ const findByCandidateId = async (candidateId, tx = prisma) => {
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const findByDocumentNumber = async ({ branchId, documentType, documentNumber }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT * FROM "TaxDocument"
+    WHERE "branchId" = ${Number(branchId)}
+      AND "documentType" = ${String(documentType || '')}
+      AND "documentNumber" = ${String(documentNumber || '')}
+    LIMIT 1
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const findByIdForUpdate = async ({ branchId, taxDocumentId }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     SELECT * FROM "TaxDocument"
@@ -96,6 +107,21 @@ const updateStatus = async ({ branchId, taxDocumentId, expectedStatus, targetSta
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const issue = async ({ branchId, taxDocumentId, expectedStatus, documentNumber, issuedAt }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    UPDATE "TaxDocument"
+    SET "documentNumber" = ${String(documentNumber)},
+        "issuedAt" = ${new Date(issuedAt)},
+        "status" = 'ISSUED',
+        "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${Number(taxDocumentId)}
+      AND "branchId" = ${Number(branchId)}
+      AND "status" = ${String(expectedStatus)}
+    RETURNING *
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const appendLifecycleEvent = async ({ taxDocumentId, fromStatus, toStatus, reason, actorEmployeeId, metadata }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxDocumentLifecycleEvent" (
@@ -155,10 +181,12 @@ const list = async ({ branchId, status, documentType, limit = 50, offset = 0 }, 
 module.exports = Object.freeze({
   findByIdentityKey,
   findByCandidateId,
+  findByDocumentNumber,
   findByIdForUpdate,
   findDetailById,
   create,
   updateStatus,
+  issue,
   appendLifecycleEvent,
   list,
 });
