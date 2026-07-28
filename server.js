@@ -41,7 +41,7 @@ const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
-const stockItemRoutes = require('./routes/stockItemRoutes');
+const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./routes/saleRoutes');
@@ -63,27 +63,20 @@ const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
 const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
 const salesReportRoutes = require('./routes/salesReportRoutes');
 const uploadSlipRoutes = require('./routes/uploadSlipRoutes');
-const stockAuditRoutes = require('./routes/stockAuditRoutes');
+const stockAuditRoutes = require('./src/modules/inventory/audit/routes/stockAuditRoutes');
 const positionRoutes = require('./routes/positionRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 const locationsRoutes = require('./routes/locationsRoutes');
 const receiptSimpleRoutes = require('./routes/receiptSimpleRoutes');
 const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
-const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
-const stockRoutes = require('./routes/stockRoutes');
+const quickReceiptRoutes = require('./src/modules/inventory/quick-receipt/routes/quickReceiptRoutes');
+const stockRoutes = require('./src/modules/inventory/dashboard/routes/stockDashboardRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
-
-// Optional SIMPLE routes
-let simpleStockRoutes = null;
-try {
-  simpleStockRoutes = require('./routes/simpleStockRoutes');
-} catch (e) {
-  console.warn('⚠️ SIMPLE routes not loaded:', e.message);
-}
+const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
@@ -118,28 +111,23 @@ const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
   const o = normalizeOrigin(origin);
-  if (!o) return true; 
+  if (!o) return true;
 
-  // 1. ตรวจสอบจาก Array รายชื่อโดเมนหลัก (เปรียบเทียบหลังผ่านการ Normalize แล้ว)
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
 
-  // 2. ตรวจสอบผ่านระบบ Regex (สำหรับ Vercel Preview/Branch URL)
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
 
 const corsOptions = {
   origin(origin, callback) {
-    // โหมดข้ามการตรวจสิทธิ์หากตั้งค่าไว้ใน Environment
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
 
-    // 🟢 FIXED: คืนค่าสิทธิ์ผ่านฉลุยทันทีเมื่อตรวจสอบแล้วว่า Origin ปลอดภัยและมาจากระบบหลักจริง
     if (!origin || isAllowedOrigin(origin)) {
       return callback(null, true);
     }
 
-    // บันทึกข้อผิดพลาดกรณีพบ Origin แปลกปลอมที่ไม่ได้รับอนุญาต
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -165,7 +153,6 @@ app.options('*', cors(corsOptions));
 morgan.token('reqId', (req) => req.id);
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms - reqId=:reqId'));
 
-// Operational API responses must always reflect current POS state.
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -173,7 +160,6 @@ app.use('/api', (_req, res, next) => {
   next();
 });
 
-// ⚠️ TEMPORARY: Auth trace middleware
 const { traceRequest } = require('./middlewares/authTrace');
 app.use('/api', traceRequest);
 
@@ -194,9 +180,7 @@ app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 mountProductModule(app);
 
-// Repair + Warranty Claim (canonical path)
 app.use('/api/repairs', repairRoutes);
-// Backward compatibility for clients using the singular path
 app.use('/api/repair', repairRoutes);
 
 app.use('/api/purchase-orders', purchaseOrderRoutes);
@@ -205,9 +189,7 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
-// Sales (new canonical path)
 app.use('/api/sales', saleRoutes);
-// Backward-compat (old path)
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
 app.use('/api/refunds', refundRoutes);
@@ -238,10 +220,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/upload-product', uploadProductRoutes);
 app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
-
-if (simpleStockRoutes) {
-  app.use('/api/simple-stock', simpleStockRoutes);
-}
+app.use('/api/simple-stock', simpleStockRoutes);
 
 // ===================== Errors =====================
 app.use((req, res) => {
@@ -255,7 +234,7 @@ app.use((req, res) => {
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
 
-  const candidateStatusCode = Number(err?.statusCode);
+  const candidateStatusCode = Number(err?.statusCode ?? err?.status);
   const statusCode =
     Number.isInteger(candidateStatusCode) &&
     candidateStatusCode >= 400 &&
