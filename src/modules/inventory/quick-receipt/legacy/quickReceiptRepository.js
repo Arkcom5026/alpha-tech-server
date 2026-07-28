@@ -16,6 +16,8 @@ const normalizeReceipt = (row) => row
   ? {
       id: row.id,
       status: row.status,
+      branchId: row.branch_id,
+      userId: row.user_id,
       finalizedAt: row.finalized_at,
       finalizeToken: row.finalize_token,
     }
@@ -76,7 +78,7 @@ class LegacyQuickReceiptRepository {
 
   async updateDraftItem(receiptId, itemId, item) {
     this.assertAvailable()
-    await this.db(TABLES.item).where({ id: itemId, receipt_id: receiptId }).update({
+    const updated = await this.db(TABLES.item).where({ id: itemId, receipt_id: receiptId }).update({
       product_id: item.productId,
       qty: item.qty,
       unit_cost: item.unitCost ?? 0,
@@ -84,7 +86,7 @@ class LegacyQuickReceiptRepository {
       idempotency_key: item.idempotencyKey || null,
       updated_at: this.now(),
     })
-    return itemId
+    return Number(updated) > 0 ? itemId : null
   }
 
   createDraftItem(item) {
