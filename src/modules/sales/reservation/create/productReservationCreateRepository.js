@@ -13,6 +13,12 @@ const create = async (command, db = prisma) => db.$transaction(async (tx) => {
   });
   if (!customer) conflict('RESERVATION_CUSTOMER_NOT_FOUND', 'Customer was not found');
 
+  const branch = await tx.branch.findFirst({
+    where: { id: command.branchId },
+    select: { id: true },
+  });
+  if (!branch) conflict('RESERVATION_BRANCH_NOT_FOUND', 'Selected branch was not found');
+
   const stockLines = command.items.filter((line) => line.lineType === 'STOCK_ITEM');
   const simpleLines = command.items.filter((line) => line.lineType === 'SIMPLE');
 
@@ -76,10 +82,16 @@ const create = async (command, db = prisma) => db.$transaction(async (tx) => {
   const reservationRows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "ProductReservation" (
       "code", "branchId", "customerId", "createdByEmployeeId", "status",
+      "orderSource", "sourceReference", "fulfillmentMethod", "deliveryFeeMode", "deliveryFee",
+      "recipientName", "recipientPhone", "deliveryAddress", "deliveryNote",
       "totalBeforeDiscount", "totalDiscount", "totalAmount", "depositAmount",
       "note", "pickupAt", "expiresAt", "createdAt", "updatedAt"
     ) VALUES (
       ${command.code}, ${command.branchId}, ${command.customerId}, ${command.employeeId}, 'ACTIVE',
+      ${command.orderSource}::"OnlineOrderSource", ${command.sourceReference},
+      ${command.fulfillmentMethod}::"OnlineFulfillmentMethod",
+      ${command.deliveryFeeMode}::"OnlineDeliveryFeeMode", ${command.deliveryFee},
+      ${command.recipientName}, ${command.recipientPhone}, ${command.deliveryAddress}, ${command.deliveryNote},
       ${command.totalBeforeDiscount}, ${command.totalDiscount}, ${command.totalAmount}, 0,
       ${command.note}, ${command.pickupAt}, ${command.expiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     ) RETURNING *
@@ -129,6 +141,8 @@ const create = async (command, db = prisma) => db.$transaction(async (tx) => {
       totalDiscount: Number(reservation.totalDiscount),
       totalAmount: Number(reservation.totalAmount),
       depositAmount: Number(reservation.depositAmount),
+      deliveryFee: Number(reservation.deliveryFee || 0),
+      orderGrandTotal: Number(reservation.totalAmount) + Number(reservation.deliveryFee || 0),
       items: items.map((item) => ({
         ...item,
         id: Number(item.id),
