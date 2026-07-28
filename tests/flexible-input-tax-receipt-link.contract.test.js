@@ -25,6 +25,8 @@ assert.match(service, /'DRAFT',[\s\S]*'REGISTERED',[\s\S]*'UNDER_REVIEW',[\s\S]*
 assert.doesNotMatch(service, /VALIDATED|ISSUED/);
 assert.match(service, /commandKey is required/);
 assert.match(repository, /FOR UPDATE OF document/);
+assert.match(repository, /supplier_identity/);
+assert.match(repository, /REGEXP_REPLACE/);
 assert.match(repository, /FOR UPDATE OF receipt/);
 assert.match(repository, /InputTaxDocumentReceiptLinkEvent/);
 assert.match(repository, /state" = 'CANCELLED'/);

@@ -21,11 +21,33 @@ const findDocumentForUpdate = async ({ branchId, taxDocumentId }, tx = prisma) =
       document.*,
       COALESCE(
         NULLIF(document."snapshot"->>'supplierId', '')::int,
-        NULLIF(candidate."snapshot"->>'supplierId', '')::int
+        NULLIF(candidate."snapshot"->>'supplierId', '')::int,
+        supplier_identity."supplierId"
       ) AS "supplierId",
       period."status"::text AS "taxPeriodStatus"
     FROM "TaxDocument" document
     LEFT JOIN "TaxCandidate" candidate ON candidate."id" = document."candidateId"
+    LEFT JOIN LATERAL (
+      SELECT supplier."id" AS "supplierId"
+      FROM "Supplier" supplier
+      WHERE supplier."branchId" = document."branchId"
+        AND REGEXP_REPLACE(COALESCE(supplier."taxId", ''), '\\D', '', 'g') <> ''
+        AND REGEXP_REPLACE(COALESCE(supplier."taxId", ''), '\\D', '', 'g') = REGEXP_REPLACE(
+          COALESCE(
+            document."counterpartyTaxId",
+            document."snapshot"->>'issuerTaxId',
+            document."snapshot"->>'counterpartyTaxId',
+            candidate."snapshot"->>'issuerTaxId',
+            candidate."snapshot"->>'counterpartyTaxId',
+            ''
+          ),
+          '\\D',
+          '',
+          'g'
+        )
+      ORDER BY supplier."id" ASC
+      LIMIT 1
+    ) supplier_identity ON true
     LEFT JOIN LATERAL (
       SELECT "status"
       FROM "TaxPeriod"

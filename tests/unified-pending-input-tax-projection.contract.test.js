@@ -21,6 +21,7 @@ assert.match(repository, /InputTaxDocumentReceiptLink/);
 assert.match(repository, /PARTIALLY_LINKED/);
 assert.match(repository, /allocatedTotalAmount/);
 assert.match(repository, /supplierTaxId/);
+assert.match(repository, /quick\."documentTotalAmount"/);
 assert.equal((repository.match(/supplier\."isSystem" = false/g) || []).length, 2);
 assert.match(repository, /r\."branchId" = \$\{Number\(branchId\)\}/);
 assert.match(repository, /quick\."branchId" = \$\{Number\(branchId\)\}/);

@@ -60,7 +60,11 @@ const listPending = async ({
         quick."deliveryNoteNumber" AS "deliveryNoteNumber", quick."completedAt" AS "receivedAt",
         COUNT(DISTINCT item."id")::int AS "itemTypeCount",
         COALESCE(SUM(item."quantity"), 0)::numeric AS "totalQuantity",
-        COALESCE(SUM(item."quantity" * item."costPrice"), 0)::numeric AS "receiptAmount",
+        COALESCE(
+          quick."documentTotalAmount",
+          SUM(item."quantity" * item."costPrice"),
+          0
+        )::numeric AS "receiptAmount",
         quick."taxDocumentMode"::text AS "taxDocumentMode",
         GREATEST(0, EXTRACT(DAY FROM CURRENT_TIMESTAMP - quick."completedAt"))::int AS "pendingDays"
       FROM "QuickReceiptSession" quick
