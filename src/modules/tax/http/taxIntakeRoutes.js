@@ -5,10 +5,12 @@ const verifyToken = require('../../../../middlewares/verifyToken');
 const controller = require('./taxIntakeController');
 const pendingInputTaxDocumentRoutes = require('../inputDocuments/pending/pendingInputTaxDocumentRoutes');
 const inputTaxReceiptLinkRoutes = require('../inputDocuments/links/inputTaxReceiptLinkRoutes');
+const inputTaxOverviewRoutes = require('../inputDocuments/overview/inputTaxOverviewRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
 
+router.use('/input-documents/overview', inputTaxOverviewRoutes);
 router.use('/input-documents/pending', pendingInputTaxDocumentRoutes);
 router.use('/documents/:taxDocumentId/receipt-links', inputTaxReceiptLinkRoutes);
 

@@ -3,6 +3,10 @@
 module.exports = Object.freeze({
   inputDocuments: Object.freeze({
     modes: require('./inputDocuments/contracts/inputTaxDocumentModeContract'),
+    overview: Object.freeze({
+      contract: require('./inputDocuments/overview/inputTaxOverviewContract'),
+      query: require('./inputDocuments/overview/inputTaxOverviewService').getInputTaxOverview,
+    }),
     pending: Object.freeze({
       query: require('./inputDocuments/pending/pendingInputTaxDocumentService').listPendingInputTaxDocuments,
     }),
