@@ -41,7 +41,7 @@ const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
 const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
-const stockItemRoutes = require('./routes/stockItemRoutes');
+const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./routes/saleRoutes');
@@ -60,27 +60,20 @@ const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
 const combinedBillingRoutes = require('./routes/combinedBillingRoutes');
 const salesReportRoutes = require('./routes/salesReportRoutes');
 const uploadSlipRoutes = require('./routes/uploadSlipRoutes');
-const stockAuditRoutes = require('./routes/stockAuditRoutes');
+const stockAuditRoutes = require('./src/modules/inventory/audit/routes/stockAuditRoutes');
 const positionRoutes = require('./routes/positionRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 const locationsRoutes = require('./routes/locationsRoutes');
 const receiptSimpleRoutes = require('./routes/receiptSimpleRoutes');
 const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
 const quickReceiptRoutes = require('./routes/quickReceiptRoutes');
-const stockRoutes = require('./routes/stockRoutes');
+const stockRoutes = require('./src/modules/inventory/dashboard/routes/stockDashboardRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
-
-// Optional SIMPLE routes
-let simpleStockRoutes = null;
-try {
-  simpleStockRoutes = require('./routes/simpleStockRoutes');
-} catch (e) {
-  console.warn('⚠️ SIMPLE routes not loaded:', e.message);
-}
+const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
@@ -232,10 +225,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/upload-product', uploadProductRoutes);
 app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
-
-if (simpleStockRoutes) {
-  app.use('/api/simple-stock', simpleStockRoutes);
-}
+app.use('/api/simple-stock', simpleStockRoutes);
 
 // ===================== Errors =====================
 app.use((req, res) => {
