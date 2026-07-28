@@ -2,9 +2,10 @@
   "name": "your-project",
   "version": "1.0.0",
   "scripts": {
-    "prestart": "npm run db:ensure-device-intake",
+    "prestart": "npm run db:ensure-device-intake && npm run db:ensure-input-tax-links",
     "start": "node server.js",
     "db:ensure-device-intake": "node scripts/ensure-device-intake-foundation.js",
+    "db:ensure-input-tax-links": "node scripts/ensure-flexible-input-tax-receipt-links.js",
     "dev": "nodemon server.js",
     "test": "npm run test:certification",
     "test:regression": "node tests/customer-receipt-auth-regression.test.js",
