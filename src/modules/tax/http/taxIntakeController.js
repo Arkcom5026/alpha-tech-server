@@ -97,6 +97,11 @@ const getDocumentOperationalReadinessProjection = handle((req) => service.getDoc
   taxDocumentId: req.params.taxDocumentId,
 }));
 
+const getDocumentWorkspaceProjection = handle((req) => service.getDocumentWorkspaceProjection({
+  branchId: resolveBranchId(req, req.query),
+  taxDocumentId: req.params.taxDocumentId,
+}));
+
 const issueDocument = handle((req) => service.issueTaxDocument({
   branchId: resolveBranchId(req, req.body),
   taxDocumentId: req.params.taxDocumentId,
@@ -141,6 +146,7 @@ module.exports = Object.freeze({
   getDocumentPrintProjection,
   getDocumentReplacementChainProjection,
   getDocumentTimelineProjection,
+  getDocumentWorkspaceProjection,
   issueDocument,
   listCandidates,
   listDocuments,
