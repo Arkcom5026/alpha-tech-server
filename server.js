@@ -45,6 +45,7 @@ const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stock
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
+const publicStorefrontRoutes = require('./src/modules/sales/storefront/public/publicStorefrontRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -83,15 +84,10 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
-  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
-
-  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-
-  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -189,6 +185,7 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
+app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
