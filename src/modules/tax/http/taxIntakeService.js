@@ -11,6 +11,9 @@ const { replaceCancelledTaxDocument } = require('../documents/replacement/replac
 const {
   buildTaxDocumentReplacementChainProjection,
 } = require('../documents/replacement/buildTaxDocumentReplacementChainProjection');
+const {
+  buildTaxDocumentOperationalReadinessProjection,
+} = require('../documents/readiness/buildTaxDocumentOperationalReadinessProjection');
 const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
@@ -97,10 +100,24 @@ const getDocumentReplacementChainProjection = async (input) => {
   return buildTaxDocumentReplacementChainProjection({ document });
 };
 
+const getDocumentOperationalReadinessProjection = async (input) => {
+  const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
+  const taxDocumentId = requirePositiveInt(input.taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
+  const document = await documentRepository.findDetailById({ branchId, taxDocumentId });
+  if (!document) {
+    throw Object.assign(new Error('Tax document not found'), {
+      code: 'TAX_DOCUMENT_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+  return buildTaxDocumentOperationalReadinessProjection({ document });
+};
+
 module.exports = Object.freeze({
   cancelTaxDocument,
   convertTaxCandidate,
   getDocumentDetail,
+  getDocumentOperationalReadinessProjection,
   getDocumentPrintProjection,
   getDocumentReplacementChainProjection,
   getDocumentTimelineProjection,
