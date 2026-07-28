@@ -3,6 +3,9 @@
 const { prisma } = require('../../../../../lib/prisma');
 const { assertTaxDocumentTransition } = require('./taxDocumentLifecycle');
 const documentRepository = require('../repository/taxDocumentRepository');
+const {
+  assertInputTaxDocumentReconciled,
+} = require('../../inputDocuments/reconciliation/inputTaxDocumentReconciliationService');
 
 const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, reason, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -29,6 +32,11 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
     const decision = assertTaxDocumentTransition({ currentStatus: current.status, targetStatus: normalizedTarget });
     if (decision.replayed) return Object.freeze({ replayed: true, document: current });
 
+    let reconciliation = null;
+    if (decision.targetStatus === 'APPROVED') {
+      reconciliation = await assertInputTaxDocumentReconciled({ document: current }, tx);
+    }
+
     const updated = await documentRepository.updateStatus({
       branchId: normalizedBranchId,
       taxDocumentId: normalizedDocumentId,
@@ -52,7 +60,7 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
       metadata: { branchId: normalizedBranchId },
     }, tx);
 
-    return Object.freeze({ replayed: false, document: updated });
+    return Object.freeze({ replayed: false, document: updated, reconciliation });
   });
 };
 
