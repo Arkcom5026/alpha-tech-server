@@ -3,7 +3,17 @@
 const repository = require('./productReservationQueryRepository');
 const { ORDER_SOURCES, FULFILLMENT_METHODS } = require('../create/productReservationCreateService');
 
-const STATUSES = Object.freeze(['ACTIVE', 'PARTIALLY_PAID', 'READY_FOR_PICKUP', 'COMPLETED', 'CANCELLED', 'EXPIRED']);
+const STATUSES = Object.freeze([
+  'ACTIVE',
+  'PARTIALLY_PAID',
+  'READY_FOR_PICKUP',
+  'READY_TO_SHIP',
+  'SHIPPING',
+  'DELIVERED',
+  'COMPLETED',
+  'CANCELLED',
+  'EXPIRED',
+]);
 
 const positiveInt = (value, fieldName, required = true) => {
   if ((value === undefined || value === null || value === '') && !required) return null;
