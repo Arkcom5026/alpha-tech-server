@@ -8,6 +8,7 @@ const mapRow = (row) => ({
   receiptCode: row.receiptCode,
   supplierId: Number(row.supplierId),
   supplierName: row.supplierName,
+  supplierTaxId: row.supplierTaxId || null,
   purchaseOrderCode: row.purchaseOrderCode || null,
   deliveryNoteNumber: row.deliveryNoteNumber || null,
   receivedAt: row.receivedAt,
@@ -34,7 +35,8 @@ const listPending = async ({
       SELECT
         'PO_RECEIPT'::text AS "sourceType", r."id"::text AS "sourceId",
         r."code" AS "receiptCode", COALESCE(r."supplierId", po."supplierId") AS "supplierId",
-        supplier."name" AS "supplierName", po."code" AS "purchaseOrderCode",
+        supplier."name" AS "supplierName", supplier."taxId" AS "supplierTaxId",
+        po."code" AS "purchaseOrderCode",
         r."deliveryNoteNumber" AS "deliveryNoteNumber", r."receivedAt" AS "receivedAt",
         COUNT(DISTINCT item."id")::int AS "itemTypeCount",
         COALESCE(SUM(item."quantity"), 0)::numeric AS "totalQuantity",
@@ -53,7 +55,8 @@ const listPending = async ({
       SELECT
         'QUICK_RECEIPT'::text AS "sourceType", quick."id"::text AS "sourceId",
         quick."code" AS "receiptCode", quick."supplierId" AS "supplierId",
-        supplier."name" AS "supplierName", NULL::text AS "purchaseOrderCode",
+        supplier."name" AS "supplierName", supplier."taxId" AS "supplierTaxId",
+        NULL::text AS "purchaseOrderCode",
         quick."deliveryNoteNumber" AS "deliveryNoteNumber", quick."completedAt" AS "receivedAt",
         COUNT(DISTINCT item."id")::int AS "itemTypeCount",
         COALESCE(SUM(item."quantity"), 0)::numeric AS "totalQuantity",
