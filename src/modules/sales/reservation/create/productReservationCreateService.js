@@ -1,6 +1,7 @@
 'use strict';
 
 const repository = require('./productReservationCreateRepository');
+const { evaluateStorefrontCheckout } = require('../../storefront/checkout/storefrontCheckoutEligibilityService');
 
 const ORDER_SOURCES = Object.freeze(['MARKETPLACE', 'STOREFRONT', 'FACEBOOK', 'LINE', 'QR', 'PHONE', 'OTHER']);
 const FULFILLMENT_METHODS = Object.freeze(['PICKUP', 'DELIVERY']);
@@ -121,7 +122,21 @@ const createProductReservation = async (input = {}, authority = {}) => {
   if (pickupAt && expiresAt && expiresAt < pickupAt) fail(400, 'RESERVATION_EXPIRY_INVALID', 'expiresAt cannot be earlier than pickupAt');
 
   const orderSource = enumValue(input.orderSource, ORDER_SOURCES, 'orderSource', 'STOREFRONT');
-  const fulfillment = normalizeFulfillment(input);
+  const fulfillmentMethod = enumValue(input.fulfillmentMethod, FULFILLMENT_METHODS, 'fulfillmentMethod', 'PICKUP');
+  const checkoutAgreement = await evaluateStorefrontCheckout({
+    branchId,
+    orderSource,
+    fulfillmentMethod,
+    storefrontSlug: input.storefrontSlug,
+    destinationAreas: input.destinationAreas,
+    deliveryDistanceKm: input.deliveryDistanceKm,
+  });
+  const fulfillment = normalizeFulfillment(checkoutAgreement ? {
+    ...input,
+    fulfillmentMethod,
+    deliveryFeeMode: checkoutAgreement.deliveryFeeMode,
+    deliveryFee: checkoutAgreement.deliveryFee,
+  } : input);
   if (fulfillment.fulfillmentMethod === 'DELIVERY' && pickupAt) {
     fail(400, 'RESERVATION_PICKUP_DATE_INVALID', 'pickupAt is not allowed for DELIVERY fulfillment');
   }
