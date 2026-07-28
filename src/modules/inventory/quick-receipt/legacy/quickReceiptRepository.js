@@ -35,6 +35,11 @@ const normalizeItem = (row) => row
     }
   : null
 
+const isUniqueConstraintError = (error) => {
+  const code = String(error?.code || '')
+  return code === '23505' || code === 'ER_DUP_ENTRY' || code === 'SQLITE_CONSTRAINT_UNIQUE'
+}
+
 class LegacyQuickReceiptRepository {
   constructor(db) {
     this.db = db
@@ -102,18 +107,31 @@ class LegacyQuickReceiptRepository {
     return Number(updated) > 0 ? itemId : null
   }
 
-  createDraftItem(item) {
+  async createDraftItem(item) {
     const timestamp = this.now()
-    return this.insertWithId(TABLES.item, {
-      receipt_id: item.receiptId,
-      product_id: item.productId,
-      qty: item.qty,
-      unit_cost: item.unitCost ?? 0,
-      vat_rate: item.vatRate ?? 0,
-      idempotency_key: item.idempotencyKey || null,
-      created_at: timestamp,
-      updated_at: timestamp,
-    })
+
+    try {
+      return await this.insertWithId(TABLES.item, {
+        receipt_id: item.receiptId,
+        product_id: item.productId,
+        qty: item.qty,
+        unit_cost: item.unitCost ?? 0,
+        vat_rate: item.vatRate ?? 0,
+        idempotency_key: item.idempotencyKey || null,
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+    } catch (error) {
+      if (!item.idempotencyKey || !isUniqueConstraintError(error)) throw error
+
+      const existing = await this.findDraftItemByIdempotencyKey(
+        item.receiptId,
+        item.idempotencyKey
+      )
+
+      if (existing) return existing.id
+      throw error
+    }
   }
 
   deleteDraftItem(receiptId, itemId) {
@@ -175,6 +193,8 @@ class LegacyQuickReceiptRepository {
         updated_at: timestamp,
       })
     } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error
+
       const retried = await this.db(TABLES.stock)
         .where({ branch_id: branchId, product_id: productId })
         .increment('quantity', quantity)
