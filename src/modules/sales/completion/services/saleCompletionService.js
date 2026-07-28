@@ -199,6 +199,40 @@ const completeSale = async ({ command, branchId, employeeId }) => {
   for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt += 1) {
     try {
       await runCompletionTransaction(async (tx) => {
+        let sourceHeldCart = null;
+        if (command.sale.sourceHeldCartId) {
+          const heldRows = await tx.$queryRaw(Prisma.sql`
+            SELECT * FROM "PosHeldCart"
+            WHERE "id" = ${command.sale.sourceHeldCartId} AND "branchId" = ${branchId}
+            LIMIT 1 FOR UPDATE
+          `);
+          sourceHeldCart = heldRows[0];
+          if (!sourceHeldCart) {
+            throw new SalesError(404, 'HELD_CART_NOT_FOUND', 'Source held cart was not found in this branch');
+          }
+          if (sourceHeldCart.status !== 'OPEN') {
+            throw new SalesError(409, 'HELD_CART_NOT_OPEN', 'Source held cart is no longer open', {
+              heldCartId: command.sale.sourceHeldCartId,
+              status: sourceHeldCart.status,
+            });
+          }
+          const heldLines = await tx.$queryRaw(Prisma.sql`
+            SELECT * FROM "PosHeldCartLine"
+            WHERE "heldCartId" = ${command.sale.sourceHeldCartId}
+            ORDER BY "sortOrder", "id"
+          `);
+          const commandByKey = new Map(command.sale.items.map((item) => [item.lineId, item]));
+          const mismatch = heldLines.length !== command.sale.items.length || heldLines.some((line) => {
+            const item = commandByKey.get(line.lineKey);
+            if (!item || item.lineType !== line.lineType || Number(item.productId) !== Number(line.productId)) return true;
+            if (line.lineType === 'STOCK_ITEM') return Number(item.stockItemId) !== Number(line.stockItemId);
+            return Number(item.simpleLotId || 0) !== Number(line.simpleLotId || 0)
+              || Math.abs(Number(item.quantity) - Number(line.quantity)) > 0.0001;
+          });
+          if (mismatch) {
+            throw new SalesError(409, 'HELD_CART_SNAPSHOT_CONFLICT', 'Sale items do not match the latest held cart snapshot');
+          }
+        }
         const customer = command.sale.customerId
           ? await tx.customerProfile.findFirst({
               where: { id: command.sale.customerId },
@@ -243,6 +277,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             paidAmount: D(0),
             statusPayment: 'UNPAID',
             officialDocumentNumber: command.sale.isCredit && command.sale.deliveryNoteMode === 'PRINT' ? `DN-${code}` : null,
+            sourceHeldCartId: sourceHeldCart ? Number(sourceHeldCart.id) : null,
             items: evidence.stockLines.length ? {
               create: evidence.stockLines.map((item) => ({
                 stockItemId: item.stockItemId,
@@ -342,6 +377,18 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             saleId: sale.id,
           },
         });
+        if (sourceHeldCart) {
+          const converted = await tx.$executeRaw(Prisma.sql`
+            UPDATE "PosHeldCart"
+            SET "status" = 'CONVERTED', "convertedAt" = CURRENT_TIMESTAMP,
+              "updatedById" = ${employeeId}, "lastActivityAt" = CURRENT_TIMESTAMP,
+              "version" = "version" + 1, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${Number(sourceHeldCart.id)} AND "status" = 'OPEN'
+          `);
+          if (Number(converted) !== 1) {
+            throw new SalesError(409, 'HELD_CART_CONVERSION_CONFLICT', 'Held cart changed during sale completion');
+          }
+        }
       });
 
       const final = await loadVerifiedReplay({

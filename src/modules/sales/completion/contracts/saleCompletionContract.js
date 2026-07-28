@@ -129,6 +129,9 @@ const parseCompleteSaleCommand = (body = {}) => {
   }
 
   const customerId = sale.customerId == null ? null : Number(sale.customerId);
+  const sourceHeldCartId = sale.sourceHeldCartId == null
+    ? null
+    : positiveInteger(sale.sourceHeldCartId, 'sourceHeldCartId');
   if (mode === 'CREDIT' && !customerId) {
     throw new SalesError(400, 'CREDIT_CUSTOMER_REQUIRED', 'Credit sale requires a customer');
   }
@@ -165,7 +168,7 @@ const parseCompleteSaleCommand = (body = {}) => {
   const command = {
     commandKey,
     sale: {
-      customerId, totalBeforeDiscount, totalDiscount, totalAmount, vat, vatRate,
+      customerId, sourceHeldCartId, totalBeforeDiscount, totalDiscount, totalAmount, vat, vatRate,
       note: sale.note || null, items: normalizedItems, mode,
       isCredit: mode === 'CREDIT', isTaxInvoice: mode === 'CREDIT' ? false : !!sale.isTaxInvoice,
       saleType: sale.saleType || undefined,
