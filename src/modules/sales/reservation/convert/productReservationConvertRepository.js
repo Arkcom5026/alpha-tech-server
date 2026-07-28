@@ -11,9 +11,12 @@ const loadForConversion = async ({ id, branchId }, db = prisma) => {
   const reservation = reservations[0];
   if (!reservation) return null;
 
+  // Completed reservations keep their immutable line evidence for idempotent replay.
+  // Non-completed lifecycle states are still validated by the conversion service.
   const items = await db.$queryRaw(Prisma.sql`
     SELECT * FROM "ProductReservationItem"
-    WHERE "reservationId" = ${id} AND "isActive" = TRUE
+    WHERE "reservationId" = ${id}
+      AND ("isActive" = TRUE OR ${reservation.convertedSaleId != null})
     ORDER BY "id" ASC
   `);
 
