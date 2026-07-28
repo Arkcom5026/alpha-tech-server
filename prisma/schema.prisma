@@ -82,8 +82,10 @@ model EmployeeProfile {
   stockAuditScanLog                 StockAuditScanLog[]
   stockAuditSession                 StockAuditSession[]
   stockItem                         StockItem[]
-  supplierPayment                   SupplierPayment[]
+  supplierPayment                   SupplierPayment[]             @relation("SupplierPaymentCreatedBy")
   createdSupplierPayables           SupplierPayable[]            @relation("SupplierPayableCreatedBy")
+  voidedSupplierPayments            SupplierPayment[]             @relation("SupplierPaymentVoidedBy")
+  reversedSupplierPaymentAllocations SupplierPaymentAllocation[] @relation("SupplierPaymentAllocationReversedBy")
   v2StockAudits                     V2StockAudit[]
 }
 
@@ -1044,10 +1046,18 @@ model SupplierPayment {
   code                    String?                  @unique
   amount                  Decimal?                 @db.Decimal(12, 2)
   statusPayment           PaymentStatus            @default(UNPAID)
+  lifecycleStatus         SupplierPaymentLifecycleStatus @default(DRAFT)
+  confirmedAt             DateTime?
+  voidedAt                DateTime?
+  voidedById              Int?
+  voidReason              String?
+  version                 Int                      @default(1)
   branch                  Branch                   @relation(fields: [branchId], references: [id])
-  employee                EmployeeProfile          @relation(fields: [employeeId], references: [id])
+  employee                EmployeeProfile          @relation("SupplierPaymentCreatedBy", fields: [employeeId], references: [id])
+  voidedBy                EmployeeProfile?         @relation("SupplierPaymentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
   supplier                Supplier                 @relation(fields: [supplierId], references: [id])
   supplierPaymentReceipts SupplierPaymentReceipt[]
+  payableAllocations      SupplierPaymentAllocation[]
 
   @@index([branchId, paidAt])
   @@index([supplierId])
@@ -1090,6 +1100,7 @@ model SupplierPayable {
   supplier      Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   createdBy     EmployeeProfile       @relation("SupplierPayableCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   receiptLinks  SupplierPayableReceiptLink[]
+  paymentAllocations SupplierPaymentAllocation[]
 
   @@index([branchId, status, dueDate])
   @@index([branchId, supplierId, status])
@@ -1106,6 +1117,25 @@ model SupplierPayableReceiptLink {
 
   @@unique([payableId, receiptId])
   @@index([receiptId])
+}
+
+model SupplierPaymentAllocation {
+  id            Int                            @id @default(autoincrement())
+  paymentId     Int
+  payableId     Int
+  amount        Decimal                        @db.Decimal(12, 2)
+  state         SupplierPaymentAllocationState @default(ACTIVE)
+  allocatedAt   DateTime                       @default(now())
+  reversedAt    DateTime?
+  reversedById  Int?
+  reversalReason String?
+  createdAt     DateTime                       @default(now())
+  payment       SupplierPayment                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  payable       SupplierPayable                @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  reversedBy    EmployeeProfile?               @relation("SupplierPaymentAllocationReversedBy", fields: [reversedById], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, state])
+  @@index([payableId, state])
 }
 
 model OrderOnline {
@@ -2286,6 +2316,17 @@ enum SupplierPayableStatus {
   PAID
   DISPUTED
   CANCELLED
+}
+
+enum SupplierPaymentLifecycleStatus {
+  DRAFT
+  CONFIRMED
+  VOIDED
+}
+
+enum SupplierPaymentAllocationState {
+  ACTIVE
+  REVERSED
 }
 
 enum PaymentSlipStatus {
