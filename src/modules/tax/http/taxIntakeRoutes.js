@@ -20,6 +20,7 @@ router.get('/documents/:taxDocumentId/print-projection', controller.getDocumentP
 router.get('/documents/:taxDocumentId/timeline', controller.getDocumentTimelineProjection);
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
 router.post('/documents/:taxDocumentId/issue', controller.issueDocument);
+router.post('/documents/:taxDocumentId/cancel', controller.cancelDocument);
 router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
 
 module.exports = router;
