@@ -28,6 +28,29 @@ const asOptionalText = (value, code, maxLength = 120) => {
   return normalized
 }
 
+const encodeCursor = (row) => {
+  if (!row?.id || !row?.occurredAt) return null
+  return Buffer.from(JSON.stringify({
+    id: Number(row.id),
+    occurredAt: new Date(row.occurredAt).toISOString(),
+  }), 'utf8').toString('base64url')
+}
+
+const decodeCursor = (value) => {
+  if (value == null || value === '') return null
+
+  try {
+    const decoded = JSON.parse(Buffer.from(String(value), 'base64url').toString('utf8'))
+    const id = asPositiveInteger(decoded?.id)
+    const occurredAt = asOptionalDate(decoded?.occurredAt, 'INVALID_CURSOR')
+    if (!id || !occurredAt) throw movementQueryError('INVALID_CURSOR')
+    return { id, occurredAt }
+  } catch (error) {
+    if (error?.code === 'INVALID_CURSOR') throw error
+    throw movementQueryError('INVALID_CURSOR')
+  }
+}
+
 class StockMovementQueryService {
   constructor(repo = repository) {
     this.repository = repo
@@ -51,13 +74,7 @@ class StockMovementQueryService {
       throw movementQueryError('INVALID_REF_ID')
     }
 
-    const cursorId = query.cursor == null || query.cursor === ''
-      ? null
-      : asPositiveInteger(query.cursor)
-    if (query.cursor != null && query.cursor !== '' && !cursorId) {
-      throw movementQueryError('INVALID_CURSOR')
-    }
-
+    const cursor = decodeCursor(query.cursor)
     const barcode = asOptionalText(query.barcode, 'INVALID_BARCODE')
     const serialNumber = asOptionalText(query.serialNumber, 'INVALID_SERIAL_NUMBER')
 
@@ -80,7 +97,7 @@ class StockMovementQueryService {
       serialNumber,
       from,
       to,
-      cursorId,
+      cursor,
       limit,
     })
 
@@ -89,6 +106,12 @@ class StockMovementQueryService {
     const movements = pageRows.map((row) => ({
       ...row,
       qty: row.qty?.toString?.() ?? String(row.qty ?? 0),
+      stockItem: row.stockItem
+        ? {
+            ...row.stockItem,
+            costPrice: row.stockItem.costPrice?.toString?.() ?? null,
+          }
+        : null,
     }))
 
     return {
@@ -96,7 +119,7 @@ class StockMovementQueryService {
       count: movements.length,
       limit,
       hasMore,
-      nextCursor: hasMore ? movements[movements.length - 1]?.id ?? null : null,
+      nextCursor: hasMore ? encodeCursor(pageRows[pageRows.length - 1]) : null,
       movements,
     }
   }
