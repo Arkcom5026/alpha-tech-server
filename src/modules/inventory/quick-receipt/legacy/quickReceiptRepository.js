@@ -156,25 +156,33 @@ class LegacyQuickReceiptRepository {
 
   async increaseStockBalance({ branchId, productId, quantity }) {
     this.assertAvailable()
-    const existing = await this.db(TABLES.stock)
-      .where({ branch_id: branchId, product_id: productId })
-      .first()
 
-    if (existing) {
-      return this.db(TABLES.stock).where({ id: existing.id }).update({
-        quantity: (existing.quantity || 0) + quantity,
-        updated_at: this.now(),
-      })
-    }
+    const updated = await this.db(TABLES.stock)
+      .where({ branch_id: branchId, product_id: productId })
+      .increment('quantity', quantity)
+      .update({ updated_at: this.now() })
+
+    if (Number(updated) > 0) return updated
 
     const timestamp = this.now()
-    return this.db(TABLES.stock).insert({
-      branch_id: branchId,
-      product_id: productId,
-      quantity,
-      created_at: timestamp,
-      updated_at: timestamp,
-    })
+
+    try {
+      return await this.db(TABLES.stock).insert({
+        branch_id: branchId,
+        product_id: productId,
+        quantity,
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+    } catch (error) {
+      const retried = await this.db(TABLES.stock)
+        .where({ branch_id: branchId, product_id: productId })
+        .increment('quantity', quantity)
+        .update({ updated_at: this.now() })
+
+      if (Number(retried) > 0) return retried
+      throw error
+    }
   }
 
   createLotBarcode({ code, productId, receiptId }) {
