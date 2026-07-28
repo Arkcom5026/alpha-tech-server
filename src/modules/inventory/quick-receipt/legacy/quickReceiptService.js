@@ -19,6 +19,7 @@ class LegacyQuickReceiptService {
   }
 
   async ensureDraft({ source, supplierId, note, userId, branchId }) {
+    const timestamp = this.repository.now()
     const payload = {
       source,
       supplier_id: supplierId || 0,
@@ -26,8 +27,8 @@ class LegacyQuickReceiptService {
       status: 'DRAFT',
       branch_id: branchId || null,
       user_id: userId || null,
-      created_at: this.repository.db.fn.now(),
-      updated_at: this.repository.db.fn.now(),
+      created_at: timestamp,
+      updated_at: timestamp,
     }
 
     let id
@@ -57,14 +58,14 @@ class LegacyQuickReceiptService {
       unit_cost: unitCost ?? 0,
       vat_rate: vatRate ?? 0,
       idempotency_key: idempotencyKey || null,
-      updated_at: this.repository.db.fn.now(),
+      updated_at: this.repository.now(),
     }
 
     let savedId = itemId
     if (itemId) {
       await this.repository.updateDraftItem(receiptId, itemId, body)
     } else {
-      body.created_at = this.repository.db.fn.now()
+      body.created_at = this.repository.now()
       try {
         const rows = await this.repository.createDraftItem(body)
         savedId = Array.isArray(rows) ? (rows[0]?.id ?? rows[0]) : rows
