@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
+const { releaseReservationAllocation } = require('../shared/productReservationAllocationRelease');
 
 const conflict = (code, message, details) => {
   throw Object.assign(new Error(message), { statusCode: 409, code, details });
@@ -36,35 +37,15 @@ const cancel = async ({ id, branchId, employeeId, reason }, db = prisma) => db.$
     FOR UPDATE
   `);
 
-  const simpleByProduct = new Map();
-  for (const item of items) {
-    if (item.lineType === 'SIMPLE') {
-      const productId = Number(item.productId);
-      simpleByProduct.set(productId, (simpleByProduct.get(productId) || 0) + Number(item.quantity));
-    }
-  }
-
-  for (const [productId, quantity] of simpleByProduct.entries()) {
-    const changed = await tx.$executeRaw(Prisma.sql`
-      UPDATE "StockBalance"
-      SET "reserved" = "reserved" - ${quantity}, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "productId" = ${productId}
-        AND "branchId" = ${branchId}
-        AND "reserved" >= ${quantity}
-    `);
-    if (changed !== 1) {
-      conflict('RESERVATION_RELEASE_CONFLICT', 'Reserved stock could not be released safely', {
-        productId,
-        quantity,
-      });
-    }
-  }
-
-  await tx.$executeRaw(Prisma.sql`
-    UPDATE "ProductReservationItem"
-    SET "isActive" = FALSE, "updatedAt" = CURRENT_TIMESTAMP
-    WHERE "reservationId" = ${id} AND "isActive" = TRUE
-  `);
+  const release = await releaseReservationAllocation({
+    tx,
+    reservation,
+    items,
+    branchId,
+    employeeId,
+    movementRefType: 'PRODUCT_RESERVATION_CANCEL',
+    movementNote: `Release reservation ${reservation.code}`,
+  });
 
   const updated = await tx.$queryRaw(Prisma.sql`
     UPDATE "ProductReservation"
@@ -79,27 +60,12 @@ const cancel = async ({ id, branchId, employeeId, reason }, db = prisma) => db.$
     RETURNING *
   `);
 
-  for (const item of items) {
-    await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "StockMovement" (
-        "productId", "branchId", "qty", "type", "refType", "refId", "note",
-        "simpleLotId", "stockItemId", "performedByEmployeeId", "occurredAt", "createdAt"
-      ) VALUES (
-        ${Number(item.productId)}, ${branchId}, ${Number(item.quantity)}, 'RESERVE',
-        'PRODUCT_RESERVATION_CANCEL', ${id}, ${`Release reservation ${reservation.code}`},
-        ${item.simpleLotId == null ? null : Number(item.simpleLotId)},
-        ${item.stockItemId == null ? null : Number(item.stockItemId)},
-        ${employeeId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-    `);
-  }
-
   return {
     id: Number(updated[0].id),
     code: updated[0].code,
     status: updated[0].status,
     cancelledAt: updated[0].cancelledAt,
-    releasedItemCount: items.length,
+    releasedItemCount: release.releasedItemCount,
     replayed: false,
   };
 });
