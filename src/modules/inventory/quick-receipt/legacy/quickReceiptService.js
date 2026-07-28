@@ -41,11 +41,19 @@ class LegacyQuickReceiptService {
   async saveDraftItem({ receiptId, itemId, productId, qty, unitCost, vatRate, idempotencyKey, branchId }) {
     if (!receiptId) throw new Error('missing receipt id')
     if (!productId || !qty) throw new Error('missing product or qty')
+    if (!itemId && !idempotencyKey) {
+      throw legacyError('idempotency key is required', 400, 'IDEMPOTENCY_KEY_REQUIRED')
+    }
 
     const receipt = await this.repository.findReceipt(receiptId)
     if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
     this.assertBranchOwnership(receipt, branchId)
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
+
+    if (!itemId && idempotencyKey && this.repository.findDraftItemByIdempotencyKey) {
+      const existing = await this.repository.findDraftItemByIdempotencyKey(receiptId, idempotencyKey)
+      if (existing) return { itemId: existing.id }
+    }
 
     const item = {
       receiptId,
@@ -79,6 +87,9 @@ class LegacyQuickReceiptService {
 
   async finalize({ receiptId, finalizeToken, branchId }) {
     if (!receiptId) throw new Error('missing receipt id')
+    if (!finalizeToken) {
+      throw legacyError('finalize token is required', 400, 'FINALIZE_TOKEN_REQUIRED')
+    }
 
     return this.repository.transaction(async (repo) => {
       const receipt = await repo.findReceiptForUpdate(receiptId)
@@ -86,6 +97,10 @@ class LegacyQuickReceiptService {
       this.assertBranchOwnership(receipt, branchId)
 
       if (receipt.status === 'FINALIZED') {
+        if (receipt.finalizeToken && receipt.finalizeToken !== finalizeToken) {
+          throw legacyError('finalize token mismatch', 409, 'CONFLICT')
+        }
+
         return {
           receiptId,
           committedAt: receipt.finalizedAt || this.clock(),
@@ -94,7 +109,7 @@ class LegacyQuickReceiptService {
         }
       }
 
-      if (receipt.finalizeToken && finalizeToken && receipt.finalizeToken !== finalizeToken) {
+      if (receipt.finalizeToken && receipt.finalizeToken !== finalizeToken) {
         throw legacyError('finalize token mismatch', 409, 'CONFLICT')
       }
 
