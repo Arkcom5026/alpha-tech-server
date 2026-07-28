@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const { registerTaxCandidate } = require('../../intake/registerTaxCandidateService');
+const { convertTaxCandidate } = require('../../candidates/conversion/convertTaxCandidateService');
 
 const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -51,7 +52,7 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
   const taxAmount = Number(sale.vat || 0);
   const subtotalAmount = Math.max(0, gross - taxAmount);
 
-  return registerTaxCandidate({
+  const registration = await registerTaxCandidate({
     branchId: normalizedBranchId,
     sourceType: 'SALE',
     sourceId: String(sale.id),
@@ -76,6 +77,12 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       currency: 'THB',
       issuedAt: sale.updatedAt || sale.createdAt,
     },
+  });
+
+  return convertTaxCandidate({
+    branchId: normalizedBranchId,
+    candidateId: registration.candidate.id,
+    actorEmployeeId,
   });
 };
 
