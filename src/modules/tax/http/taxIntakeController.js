@@ -96,6 +96,14 @@ const issueDocument = handle((req) => service.issueTaxDocument({
   actorEmployeeId: actorEmployeeId(req),
 }));
 
+const cancelDocument = handle((req) => service.cancelTaxDocument({
+  branchId: resolveBranchId(req, req.body),
+  taxDocumentId: req.params.taxDocumentId,
+  reason: req.body?.reason,
+  cancelledAt: req.body?.cancelledAt,
+  actorEmployeeId: actorEmployeeId(req),
+}));
+
 const transitionDocument = handle((req) => service.transitionTaxDocument({
   branchId: resolveBranchId(req, req.body),
   taxDocumentId: req.params.taxDocumentId,
@@ -105,6 +113,7 @@ const transitionDocument = handle((req) => service.transitionTaxDocument({
 }));
 
 module.exports = Object.freeze({
+  cancelDocument,
   getDocumentDetail,
   getDocumentPrintProjection,
   getDocumentTimelineProjection,
