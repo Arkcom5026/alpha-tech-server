@@ -12,7 +12,7 @@ const createSimpleReceipt = async (req, res) => {
     const branchId = requireSimpleStockBranch(req, res)
     if (!branchId) return undefined
 
-    const { productId, qty, unitCost, refType, refId, note } = req.body || {}
+    const { productId, qty, unitCost } = req.body || {}
     const normalizedQty = toNumber(qty)
     const normalizedUnitCost = toNumber(unitCost)
 
@@ -34,18 +34,7 @@ const createSimpleReceipt = async (req, res) => {
 
     return sendSimpleStockError(res, 501, 'createSimpleReceipt is not implemented yet', {
       context: buildSimpleStockContext(req),
-      hint: 'Endpoint is mounted successfully. Implement the receipt application slice when ready.',
-      compatibility: {
-        branchId,
-        payload: {
-          productId,
-          qty: normalizedQty,
-          unitCost: normalizedUnitCost,
-          refType,
-          refId,
-          note,
-        },
-      },
+      hint: 'Endpoint is mounted successfully. Implement simpleStockService.receipt when ready.',
     })
   } catch (error) {
     console.error('❌ createSimpleReceipt error:', error)
