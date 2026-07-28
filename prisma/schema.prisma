@@ -90,6 +90,10 @@ model EmployeeProfile {
   activatedSupplierAdvances          SupplierAdvance[]            @relation("SupplierAdvanceActivatedBy")
   voidedSupplierAdvances             SupplierAdvance[]            @relation("SupplierAdvanceVoidedBy")
   reversedSupplierAdvanceAllocations SupplierAdvanceAllocation[]  @relation("SupplierAdvanceAllocationReversedBy")
+  openedSupplierPayableDisputes      SupplierPayableDispute[]      @relation("SupplierPayableDisputeOpenedBy")
+  resolvedSupplierPayableDisputes    SupplierPayableDispute[]      @relation("SupplierPayableDisputeResolvedBy")
+  createdSupplierPayableAdjustments  SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentCreatedBy")
+  voidedSupplierPayableAdjustments   SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentVoidedBy")
   v2StockAudits                     V2StockAudit[]
 }
 
@@ -149,6 +153,8 @@ model Branch {
   suppliers                       Supplier[]
   supplierPayment                 SupplierPayment[]
   supplierPayables                SupplierPayable[]
+  supplierPayableDisputes         SupplierPayableDispute[]
+  supplierPayableAdjustments      SupplierPayableAdjustment[]
   supplierAdvances                SupplierAdvance[]
   v2StockAudits                   V2StockAudit[]
 
@@ -472,6 +478,8 @@ model Supplier {
   branch               Branch                 @relation(fields: [branchId], references: [id])
   supplierPayment      SupplierPayment[]
   supplierPayables     SupplierPayable[]
+  supplierPayableDisputes SupplierPayableDispute[]
+  supplierPayableAdjustments SupplierPayableAdjustment[]
   supplierAdvances     SupplierAdvance[]
   warrantyClaims       WarrantyClaim[]
 
@@ -1109,9 +1117,72 @@ model SupplierPayable {
   receiptLinks  SupplierPayableReceiptLink[]
   paymentAllocations SupplierPaymentAllocation[]
   advanceAllocations SupplierAdvanceAllocation[]
+  disputes           SupplierPayableDispute[]
+  adjustments        SupplierPayableAdjustment[]
 
   @@index([branchId, status, dueDate])
   @@index([branchId, supplierId, status])
+}
+
+model SupplierPayableDispute {
+  id             Int                           @id @default(autoincrement())
+  branchId       Int
+  supplierId     Int
+  payableId      Int
+  status         SupplierPayableDisputeStatus  @default(OPEN)
+  disputedAmount Decimal                       @db.Decimal(12, 2)
+  reason         String
+  openedById     Int
+  openedAt       DateTime                      @default(now())
+  resolvedById   Int?
+  resolvedAt     DateTime?
+  resolutionNote String?
+  version        Int                           @default(1)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  branch         Branch                        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier       Supplier                      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable               @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  openedBy       EmployeeProfile               @relation("SupplierPayableDisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  resolvedBy     EmployeeProfile?              @relation("SupplierPayableDisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  adjustments    SupplierPayableAdjustment[]
+
+  @@index([branchId, status, openedAt])
+  @@index([payableId, status])
+}
+
+model SupplierPayableAdjustment {
+  id             Int                              @id @default(autoincrement())
+  branchId       Int
+  supplierId     Int
+  payableId      Int
+  disputeId      Int?
+  code           String                           @unique
+  type           SupplierPayableAdjustmentType
+  direction      SupplierPayableAdjustmentDirection
+  status         SupplierPayableAdjustmentStatus  @default(CONFIRMED)
+  amount         Decimal                          @db.Decimal(12, 2)
+  documentNumber String?
+  documentDate   DateTime?
+  note           String?
+  createdById    Int
+  confirmedAt    DateTime                         @default(now())
+  voidedById     Int?
+  voidedAt       DateTime?
+  voidReason     String?
+  version        Int                              @default(1)
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  branch         Branch                           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier       Supplier                         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable                  @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  dispute        SupplierPayableDispute?           @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  createdBy      EmployeeProfile                  @relation("SupplierPayableAdjustmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy       EmployeeProfile?                 @relation("SupplierPayableAdjustmentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+
+  @@index([branchId, supplierId, status])
+  @@index([payableId, status])
+  @@index([disputeId])
 }
 
 model SupplierPayableReceiptLink {
@@ -2392,6 +2463,32 @@ enum SupplierAdvanceStatus {
   ACTIVE
   EXHAUSTED
   VOIDED
+}
+
+enum SupplierPayableDisputeStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
+}
+
+enum SupplierPayableAdjustmentDirection {
+  CREDIT
+  DEBIT
+}
+
+enum SupplierPayableAdjustmentStatus {
+  CONFIRMED
+  VOIDED
+}
+
+enum SupplierPayableAdjustmentType {
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PRICE_CORRECTION
+  SHORTAGE
+  DAMAGE
+  DISCOUNT
+  OTHER
 }
 
 enum PaymentSlipStatus {

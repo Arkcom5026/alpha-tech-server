@@ -10,6 +10,7 @@ const list = async ({ branchId, supplierId = null, asOf }, tx = prisma) => {
       payable."id",
       payable."supplierId",
       payable."code",
+      payable."status",
       payable."documentNumber",
       payable."documentDate",
       payable."dueDate",
@@ -32,7 +33,7 @@ const list = async ({ branchId, supplierId = null, asOf }, tx = prisma) => {
     FROM "SupplierPayable" payable
     JOIN "Supplier" supplier ON supplier."id" = payable."supplierId"
     WHERE payable."branchId" = ${Number(branchId)}
-      AND payable."status" IN ('OPEN', 'PARTIALLY_PAID')
+      AND payable."status" IN ('OPEN', 'PARTIALLY_PAID', 'DISPUTED')
       AND payable."totalAmount" > payable."paidAmount"
       AND (${supplierId == null ? null : Number(supplierId)}::int IS NULL
         OR payable."supplierId" = ${supplierId == null ? null : Number(supplierId)})

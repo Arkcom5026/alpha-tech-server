@@ -65,6 +65,7 @@ const list = async (input) => {
         supplierName: name,
         payableCount: 0,
         grossOutstanding: 0,
+        disputedOutstanding: 0,
         availableAdvance: 0,
         netExposure: 0,
         buckets: emptyBuckets(),
@@ -77,6 +78,9 @@ const list = async (input) => {
     const statement = ensure(payable.supplierId, payable.supplierName);
     statement.payableCount += 1;
     statement.grossOutstanding = money(statement.grossOutstanding + payable.outstandingAmount);
+    if (payable.status === 'DISPUTED') {
+      statement.disputedOutstanding = money(statement.disputedOutstanding + payable.outstandingAmount);
+    }
     const field = bucketField[payable.bucket];
     statement.buckets[field] = money(statement.buckets[field] + payable.outstandingAmount);
   }
@@ -92,6 +96,7 @@ const list = async (input) => {
     .sort((a, b) => b.netExposure - a.netExposure || a.supplierName.localeCompare(b.supplierName, 'th'));
   const totals = statementRows.reduce((result, statement) => ({
     grossOutstanding: money(result.grossOutstanding + statement.grossOutstanding),
+    disputedOutstanding: money(result.disputedOutstanding + statement.disputedOutstanding),
     availableAdvance: money(result.availableAdvance + statement.availableAdvance),
     netExposure: money(result.netExposure + statement.netExposure),
     payableCount: result.payableCount + statement.payableCount,
@@ -101,6 +106,7 @@ const list = async (input) => {
     ])),
   }), {
     grossOutstanding: 0,
+    disputedOutstanding: 0,
     availableAdvance: 0,
     netExposure: 0,
     payableCount: 0,
