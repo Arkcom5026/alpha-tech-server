@@ -2,7 +2,7 @@
 
 const express = require('express')
 
-const verifyToken = require('../../../../../middlewares/verifyToken')
+const verifyToken = require('../../../../middlewares/verifyToken')
 const receiptSlices = require('../receipt/stockItemReceiptSlices')
 const lifecycleSlices = require('../lifecycle/stockItemLifecycleSlices')
 const receiveSlices = require('../receive/stockItemReceiveSlices')
