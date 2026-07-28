@@ -22,13 +22,12 @@ class LegacyQuickReceiptService {
     const timestamp = this.repository.now()
     const id = await this.repository.createDraft({
       source,
-      supplier_id: supplierId || 0,
-      note: note || '',
-      status: 'DRAFT',
-      branch_id: branchId || null,
-      user_id: userId || null,
-      created_at: timestamp,
-      updated_at: timestamp,
+      supplierId,
+      note,
+      userId,
+      branchId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     })
 
     return { id, status: 'DRAFT', source, supplierId, note }
@@ -42,22 +41,25 @@ class LegacyQuickReceiptService {
     if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
 
-    const body = {
-      receipt_id: receiptId,
-      product_id: productId,
+    const timestamp = this.repository.now()
+    const item = {
+      receiptId,
+      productId,
       qty,
-      unit_cost: unitCost ?? 0,
-      vat_rate: vatRate ?? 0,
-      idempotency_key: idempotencyKey || null,
-      updated_at: this.repository.now(),
+      unitCost,
+      vatRate,
+      idempotencyKey,
+      updatedAt: timestamp,
     }
 
     let savedId = itemId
     if (itemId) {
-      await this.repository.updateDraftItem(receiptId, itemId, body)
+      await this.repository.updateDraftItem(receiptId, itemId, item)
     } else {
-      body.created_at = this.repository.now()
-      savedId = await this.repository.createDraftItem(body)
+      savedId = await this.repository.createDraftItem({
+        ...item,
+        createdAt: timestamp,
+      })
     }
 
     return { itemId: savedId }
@@ -84,13 +86,13 @@ class LegacyQuickReceiptService {
       if (receipt.status === 'FINALIZED') {
         return {
           receiptId,
-          committedAt: receipt.finalized_at || nowIso(),
+          committedAt: receipt.finalizedAt || nowIso(),
           lotBarcodes: await repo.listLotBarcodes(receiptId),
           stockMovements: await repo.listReceiptMovements(receiptId),
         }
       }
 
-      if (receipt.finalize_token && finalizeToken && receipt.finalize_token !== finalizeToken) {
+      if (receipt.finalizeToken && finalizeToken && receipt.finalizeToken !== finalizeToken) {
         throw legacyError('finalize token mismatch', 409, 'CONFLICT')
       }
 
@@ -101,22 +103,22 @@ class LegacyQuickReceiptService {
       const stockMovements = []
 
       for (const item of items) {
-        const existing = await repo.findStockBalance(branchId, item.product_id)
+        const existing = await repo.findStockBalance(branchId, item.productId)
         if (existing) {
           await repo.updateStockBalance(existing.id, (existing.quantity || 0) + item.qty)
         } else {
           await repo.createStockBalance({
             branchId,
-            productId: item.product_id,
+            productId: item.productId,
             quantity: item.qty,
           })
         }
 
-        stockMovements.push({ productId: item.product_id, qty: item.qty })
+        stockMovements.push({ productId: item.productId, qty: item.qty })
 
-        const code = genBarcode(item.product_id)
-        await repo.createLotBarcode({ code, productId: item.product_id, receiptId })
-        lotBarcodes.push({ productId: item.product_id, code })
+        const code = genBarcode(item.productId)
+        await repo.createLotBarcode({ code, productId: item.productId, receiptId })
+        lotBarcodes.push({ productId: item.productId, code })
       }
 
       const committedAt = nowIso()
