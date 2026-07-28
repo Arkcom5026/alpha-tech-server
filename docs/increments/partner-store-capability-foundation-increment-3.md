@@ -82,7 +82,6 @@ It refuses to write when an expected anchor is missing or duplicated.
 - Existing order snapshots are never rewritten from mutable store policy.
 
 ## Required Local Verification
-Run in this order:
 
 ```bash
 npm run prisma:align-online-commerce
