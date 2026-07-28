@@ -7,9 +7,11 @@ const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = re
 const { searchSaleItemsController } = require('../item-search/controllers/saleItemSearchController');
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
+const posHeldCartRoutes = require('../held-cart/routes/posHeldCartRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
+router.use('/held-carts', posHeldCartRoutes);
 router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
 router.use('/returns', saleReturnRoutes);
