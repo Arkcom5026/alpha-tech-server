@@ -4,7 +4,6 @@ const {
   createSupplierPayment,
   getAllSupplierPayments,
   getSupplierPaymentsByPO,
-  deleteSupplierPayment,
   getAdvancePaymentsBySupplier,
   getSupplierPaymentsBySupplier,
 } = require('../controllers/supplierPaymentController');
@@ -33,13 +32,25 @@ const requireSupplierPaymentActor = (req, res, next) => {
   return next();
 };
 
-// สร้างรายการชำระเงินใหม่ ต้องมี EmployeeProfile และสาขาจาก DB authority
-router.post('/', requireSupplierPaymentActor, createSupplierPayment);
+// Receipt-based settlement moved to Supplier Payable Allocation Authority.
+// Advance remains on the legacy endpoint until the dedicated advance increment.
+router.post('/', requireSupplierPaymentActor, (req, res, next) => {
+  if (String(req.body?.paymentType || '').trim().toUpperCase() !== 'ADVANCE') {
+    return res.status(409).json({
+      code: 'SUPPLIER_PAYABLE_FLOW_REQUIRED',
+      message: 'การตัดยอด Supplier ต้องดำเนินการผ่าน Supplier Payable',
+    });
+  }
+  return createSupplierPayment(req, res, next);
+});
 
 router.get('/advance', getAdvancePaymentsBySupplier);
 router.get('/by-supplier/:supplierId', getSupplierPaymentsBySupplier);
 router.get('/', getAllSupplierPayments);
 router.get('/by-po/:poId', getSupplierPaymentsByPO);
-router.delete('/:id', deleteSupplierPayment);
+router.delete('/:id', (req, res) => res.status(409).json({
+  code: 'SUPPLIER_PAYMENT_REVERSAL_REQUIRED',
+  message: 'รายการชำระเงินห้ามลบ กรุณาใช้กระบวนการยกเลิกเพื่อรักษาประวัติ',
+}));
 
 module.exports = router;

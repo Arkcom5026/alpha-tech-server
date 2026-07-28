@@ -217,6 +217,22 @@ const createFromReceipts = async ({
       VALUES (${Number(payable.id)}, ${Number(receipt.id)}, ${money(receipt.totalAmount)})
     `);
   }
+
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "SupplierPaymentAllocation" ("paymentId", "payableId", "amount", "allocatedAt")
+    SELECT
+      legacy_link."paymentId",
+      ${Number(payable.id)},
+      SUM(legacy_link."amountPaid")::numeric,
+      MIN(payment."paidAt")
+    FROM "SupplierPaymentReceipt" legacy_link
+    JOIN "SupplierPayment" payment ON payment."id" = legacy_link."paymentId"
+    WHERE legacy_link."receiptId" IN (${Prisma.join(receiptIds.map(Number))})
+      AND payment."branchId" = ${Number(branchId)}
+      AND payment."lifecycleStatus" = 'CONFIRMED'
+    GROUP BY legacy_link."paymentId"
+    ON CONFLICT DO NOTHING
+  `);
   return mapPayable({ ...payable, receipts: [] });
 };
 
