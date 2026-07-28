@@ -32,9 +32,9 @@ assert.match(deliveryService, /READY_TO_SHIP/);
 assert.match(deliveryService, /SHIPPING/);
 assert.match(deliveryService, /DELIVERED/);
 
-assert.match(routes, /:\/id\/ready-to-ship/);
-assert.match(routes, /:\/id\/shipping/);
-assert.match(routes, /:\/id\/delivered/);
+assert.match(routes, /\/:id\/ready-to-ship/);
+assert.match(routes, /\/:id\/shipping/);
+assert.match(routes, /\/:id\/delivered/);
 
 assert.match(queryService, /'READY_TO_SHIP'/);
 assert.match(queryService, /'SHIPPING'/);
