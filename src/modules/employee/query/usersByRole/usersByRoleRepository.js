@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../lib/prisma');
+const { prisma } = require('../../../../lib/prisma');
 
 const findUsersByRole = async (role) => prisma.user.findMany({
   where: { role },

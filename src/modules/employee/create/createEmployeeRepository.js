@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../lib/prisma');
+const { prisma } = require('../../../lib/prisma');
 
 const createEmployee = async ({ userId, name, phone, branchId, positionId }) => prisma.$transaction(async (tx) => {
   await tx.user.update({
