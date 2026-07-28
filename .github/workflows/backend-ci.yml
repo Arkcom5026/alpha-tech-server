@@ -82,7 +82,7 @@ jobs:
       - name: Start backend
         shell: bash
         run: |
-          npm start > backend-startup.log 2>&1 &
+          node server.js > backend-startup.log 2>&1 &
           echo $! > backend.pid
 
       - name: Verify backend startup
@@ -108,12 +108,23 @@ jobs:
           done
 
           echo "Backend did not respond within the startup window"
+          ps -ef | grep -E 'node|npm' | grep -v grep || true
+          ss -ltnp || true
           cat backend-startup.log
           exit 1
 
       - name: Show backend log
         if: always()
         run: cat backend-startup.log || true
+
+      - name: Upload backend startup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-startup-log
+          path: backend-startup.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Stop backend
         if: always()
