@@ -7,7 +7,19 @@ class StockMovementQueryRepository {
     this.prisma = client
   }
 
-  list({ branchId, productId, type, refType, refId, from, to, cursorId, limit }) {
+  list({
+    branchId,
+    productId,
+    type,
+    refType,
+    refId,
+    barcode,
+    serialNumber,
+    from,
+    to,
+    cursorId,
+    limit,
+  }) {
     return this.prisma.stockMovement.findMany({
       where: {
         branchId: Number(branchId),
@@ -15,6 +27,14 @@ class StockMovementQueryRepository {
         ...(type ? { type } : {}),
         ...(refType ? { refType } : {}),
         ...(refId ? { refId: Number(refId) } : {}),
+        ...(barcode || serialNumber
+          ? {
+              stockItem: {
+                ...(barcode ? { barcode } : {}),
+                ...(serialNumber ? { serialNumber } : {}),
+              },
+            }
+          : {}),
         ...(from || to
           ? {
               occurredAt: {
@@ -45,6 +65,21 @@ class StockMovementQueryRepository {
             id: true,
             name: true,
             saleBarcode: true,
+          },
+        },
+        stockItem: {
+          select: {
+            id: true,
+            barcode: true,
+            serialNumber: true,
+            status: true,
+            receivedAt: true,
+            soldAt: true,
+            warrantyDays: true,
+            expiredAt: true,
+            batchNumber: true,
+            locationCode: true,
+            costPrice: true,
           },
         },
         performedBy: {
