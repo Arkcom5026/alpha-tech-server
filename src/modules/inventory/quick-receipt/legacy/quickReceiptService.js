@@ -14,20 +14,19 @@ const genBarcode = (productId) => {
 const legacyError = (message, status, code) => Object.assign(new Error(message), { status, code })
 
 class LegacyQuickReceiptService {
-  constructor(repository) {
+  constructor(repository, { clock = nowIso, barcodeFactory = genBarcode } = {}) {
     this.repository = repository
+    this.clock = clock
+    this.barcodeFactory = barcodeFactory
   }
 
   async ensureDraft({ source, supplierId, note, userId, branchId }) {
-    const timestamp = this.repository.now()
     const id = await this.repository.createDraft({
       source,
       supplierId,
       note,
       userId,
       branchId,
-      createdAt: timestamp,
-      updatedAt: timestamp,
     })
 
     return { id, status: 'DRAFT', source, supplierId, note }
@@ -41,7 +40,6 @@ class LegacyQuickReceiptService {
     if (!receipt) throw legacyError('receipt not found', 404, 'NOT_FOUND')
     if (receipt.status !== 'DRAFT') throw legacyError('receipt not in DRAFT', 409, 'CONFLICT')
 
-    const timestamp = this.repository.now()
     const item = {
       receiptId,
       productId,
@@ -49,20 +47,13 @@ class LegacyQuickReceiptService {
       unitCost,
       vatRate,
       idempotencyKey,
-      updatedAt: timestamp,
     }
 
-    let savedId = itemId
-    if (itemId) {
-      await this.repository.updateDraftItem(receiptId, itemId, item)
-    } else {
-      savedId = await this.repository.createDraftItem({
-        ...item,
-        createdAt: timestamp,
-      })
-    }
+    const savedId = itemId
+      ? await this.repository.updateDraftItem(receiptId, itemId, item)
+      : await this.repository.createDraftItem(item)
 
-    return { itemId: savedId }
+    return { itemId: savedId ?? itemId }
   }
 
   async deleteDraftItem({ receiptId, itemId }) {
@@ -86,7 +77,7 @@ class LegacyQuickReceiptService {
       if (receipt.status === 'FINALIZED') {
         return {
           receiptId,
-          committedAt: receipt.finalizedAt || nowIso(),
+          committedAt: receipt.finalizedAt || this.clock(),
           lotBarcodes: await repo.listLotBarcodes(receiptId),
           stockMovements: await repo.listReceiptMovements(receiptId),
         }
@@ -103,25 +94,20 @@ class LegacyQuickReceiptService {
       const stockMovements = []
 
       for (const item of items) {
-        const existing = await repo.findStockBalance(branchId, item.productId)
-        if (existing) {
-          await repo.updateStockBalance(existing.id, (existing.quantity || 0) + item.qty)
-        } else {
-          await repo.createStockBalance({
-            branchId,
-            productId: item.productId,
-            quantity: item.qty,
-          })
-        }
+        await repo.increaseStockBalance({
+          branchId,
+          productId: item.productId,
+          quantity: item.qty,
+        })
 
         stockMovements.push({ productId: item.productId, qty: item.qty })
 
-        const code = genBarcode(item.productId)
+        const code = this.barcodeFactory(item.productId)
         await repo.createLotBarcode({ code, productId: item.productId, receiptId })
         lotBarcodes.push({ productId: item.productId, code })
       }
 
-      const committedAt = nowIso()
+      const committedAt = this.clock()
       await repo.finalizeReceipt(receiptId, committedAt, finalizeToken)
 
       return { receiptId, committedAt, lotBarcodes, stockMovements }
