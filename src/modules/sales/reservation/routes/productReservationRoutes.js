@@ -15,12 +15,18 @@ const {
   markProductReservationShippingController,
   markProductReservationDeliveredController,
 } = require('../status/productReservationDeliveryStatusController');
+const {
+  getPartnerStoreCapabilityController,
+  savePartnerStoreCapabilityController,
+} = require('../store-capability/partnerStoreCapabilityController');
 
 const router = express.Router();
 router.get('/', listProductReservationsController);
-router.get('/:id', getProductReservationByIdController);
 router.post('/', createProductReservationController);
 router.post('/expire-due', expireDueProductReservationsController);
+router.get('/store-capability', getPartnerStoreCapabilityController);
+router.put('/store-capability', savePartnerStoreCapabilityController);
+router.get('/:id', getProductReservationByIdController);
 router.post('/:id/ready-for-pickup', markProductReservationReadyController);
 router.post('/:id/ready-to-ship', markProductReservationReadyToShipController);
 router.post('/:id/shipping', markProductReservationShippingController);
