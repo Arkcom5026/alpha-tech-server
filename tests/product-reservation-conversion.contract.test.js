@@ -7,11 +7,13 @@ const path = require('node:path');
 const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 
 const routes = read('src/modules/sales/reservation/routes/productReservationRoutes.js');
+const convertController = read('src/modules/sales/reservation/convert/productReservationConvertController.js');
 const convertService = read('src/modules/sales/reservation/convert/productReservationConvertService.js');
 const convertRepository = read('src/modules/sales/reservation/convert/productReservationConvertRepository.js');
 const completionService = read('src/modules/sales/completion/services/saleCompletionService.js');
 
 assert.match(routes, /router\.post\('\/:id\/convert-to-sale', convertProductReservationToSaleController\)/);
+assert.match(convertController, /error\.statusCode = Number\(error\.status\)/);
 assert.match(convertService, /parseCompleteSaleCommand/);
 assert.match(convertService, /completeSale\(\{/);
 assert.match(convertService, /sourceType: 'PRODUCT_RESERVATION'/);
