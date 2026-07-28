@@ -7,11 +7,13 @@ const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = re
 const { searchSaleItemsController } = require('../item-search/controllers/saleItemSearchController');
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
+const productReservationRoutes = require('../reservation/routes/productReservationRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
 router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
+router.use('/reservations', productReservationRoutes);
 router.use('/returns', saleReturnRoutes);
 router.post('/', createSale);
 router.get('/', getAllSales);
