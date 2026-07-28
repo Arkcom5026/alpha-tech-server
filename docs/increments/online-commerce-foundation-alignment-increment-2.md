@@ -3,6 +3,9 @@
 ## Mission
 Elevate the existing Product Reservation foundation into the single online order authority for Alpha-Tech local commerce without creating a competing order aggregate.
 
+## Single Order Authority
+`ProductReservation` is the Single Order Authority for Alpha-Tech local online commerce. Marketplace, partner storefront, Facebook, LINE, QR, phone, and other acquisition channels must create and operate through this authority rather than introducing a competing `OnlineOrder` aggregate.
+
 ## Product Direction
 Customers may enter through the platform marketplace, a partner storefront, Facebook, LINE, QR, phone, or another channel. Every channel targets one explicitly selected branch whose POS inventory is the realtime stock authority.
 
@@ -48,11 +51,12 @@ Each transition:
 
 ## Verification State
 - Repository implementation: COMPLETE for source, fulfillment, create/query, and lifecycle contracts
-- Prisma projection alignment: PENDING safe full-file patch capability
-- Contract test execution: NOT EXECUTED
-- Prisma validation: NOT EXECUTED
+- Prisma projection alignment: completed locally; pending commit and push
+- Prisma validate: PASS from local Task Work evidence
+- Prisma generate: PASS from local Task Work evidence
+- Contract test execution: rerun required after documentation contract repair
 - Migration execution: NOT EXECUTED
-- Build: NOT EXECUTED
+- Build script: NOT AVAILABLE in package.json
 - Runtime Gate: PENDING PRODUCTION DEPLOYMENT
 - Operational Gate: PENDING PRODUCTION TEST
 
