@@ -35,7 +35,7 @@ const requireSupplierPaymentActor = (req, res, next) => {
 // Receipt-based settlement moved to Supplier Payable Allocation Authority.
 // Advance remains on the legacy endpoint until the dedicated advance increment.
 router.post('/', requireSupplierPaymentActor, (req, res, next) => {
-  if (String(req.body?.paymentType || '').trim().toUpperCase() === 'RECEIPT_BASED') {
+  if (String(req.body?.paymentType || '').trim().toUpperCase() !== 'ADVANCE') {
     return res.status(409).json({
       code: 'SUPPLIER_PAYABLE_FLOW_REQUIRED',
       message: 'การตัดยอด Supplier ต้องดำเนินการผ่าน Supplier Payable',
