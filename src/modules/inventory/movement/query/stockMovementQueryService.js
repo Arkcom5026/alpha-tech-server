@@ -21,6 +21,13 @@ const asOptionalDate = (value, code) => {
   return parsed
 }
 
+const asOptionalText = (value, code, maxLength = 120) => {
+  if (value == null || value === '') return null
+  const normalized = String(value).trim()
+  if (!normalized || normalized.length > maxLength) throw movementQueryError(code)
+  return normalized
+}
+
 class StockMovementQueryService {
   constructor(repo = repository) {
     this.repository = repo
@@ -51,6 +58,9 @@ class StockMovementQueryService {
       throw movementQueryError('INVALID_CURSOR')
     }
 
+    const barcode = asOptionalText(query.barcode, 'INVALID_BARCODE')
+    const serialNumber = asOptionalText(query.serialNumber, 'INVALID_SERIAL_NUMBER')
+
     const from = asOptionalDate(query.from, 'INVALID_FROM_DATE')
     const to = asOptionalDate(query.to, 'INVALID_TO_DATE')
     if (from && to && from > to) throw movementQueryError('INVALID_DATE_RANGE')
@@ -66,6 +76,8 @@ class StockMovementQueryService {
       type: query.type ? String(query.type).trim().toUpperCase() : null,
       refType: query.refType ? String(query.refType).trim() : null,
       refId,
+      barcode,
+      serialNumber,
       from,
       to,
       cursorId,
