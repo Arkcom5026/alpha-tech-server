@@ -7,6 +7,11 @@ const TABLES = {
   barcode: 'barcodes',
 }
 
+const extractInsertedId = (result) => {
+  if (Array.isArray(result)) return result[0]?.id ?? result[0] ?? null
+  return result?.id ?? result ?? null
+}
+
 class LegacyQuickReceiptRepository {
   constructor(db) {
     this.db = db
@@ -21,14 +26,18 @@ class LegacyQuickReceiptRepository {
     return this.db.fn.now()
   }
 
-  createDraft(payload) {
+  async insertWithId(table, payload) {
     this.assertAvailable()
-    return this.db(TABLES.receipt).insert(payload).returning('id')
+
+    try {
+      return extractInsertedId(await this.db(table).insert(payload).returning('id'))
+    } catch {
+      return extractInsertedId(await this.db(table).insert(payload))
+    }
   }
 
-  createDraftWithoutReturning(payload) {
-    this.assertAvailable()
-    return this.db(TABLES.receipt).insert(payload)
+  createDraft(payload) {
+    return this.insertWithId(TABLES.receipt, payload)
   }
 
   findReceipt(receiptId) {
@@ -42,13 +51,7 @@ class LegacyQuickReceiptRepository {
   }
 
   createDraftItem(body) {
-    this.assertAvailable()
-    return this.db(TABLES.item).insert(body).returning('id')
-  }
-
-  createDraftItemWithoutReturning(body) {
-    this.assertAvailable()
-    return this.db(TABLES.item).insert(body)
+    return this.insertWithId(TABLES.item, body)
   }
 
   deleteDraftItem(receiptId, itemId) {
