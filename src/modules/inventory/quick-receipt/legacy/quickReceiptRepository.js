@@ -12,6 +12,40 @@ const extractInsertedId = (result) => {
   return result?.id ?? result ?? null
 }
 
+const toReceipt = (row) => row
+  ? {
+      id: row.id,
+      status: row.status,
+      finalizedAt: row.finalized_at ?? null,
+      finalizeToken: row.finalize_token ?? null,
+    }
+  : null
+
+const toReceiptItem = (row) => ({
+  id: row.id,
+  productId: row.product_id,
+  qty: row.qty,
+  unitCost: row.unit_cost,
+  vatRate: row.vat_rate,
+})
+
+const toLotBarcode = (row) => ({
+  code: row.code,
+  productId: row.product_id,
+})
+
+const toStockMovement = (row) => ({
+  productId: row.product_id ?? row.productId,
+  qty: row.qty,
+})
+
+const toStockBalance = (row) => row
+  ? {
+      id: row.id,
+      quantity: row.quantity,
+    }
+  : null
+
 class LegacyQuickReceiptRepository {
   constructor(db) {
     this.db = db
@@ -36,22 +70,47 @@ class LegacyQuickReceiptRepository {
     }
   }
 
-  createDraft(payload) {
-    return this.insertWithId(TABLES.receipt, payload)
+  createDraft({ source, supplierId, note, userId, branchId, createdAt, updatedAt }) {
+    return this.insertWithId(TABLES.receipt, {
+      source,
+      supplier_id: supplierId || 0,
+      note: note || '',
+      status: 'DRAFT',
+      branch_id: branchId || null,
+      user_id: userId || null,
+      created_at: createdAt,
+      updated_at: updatedAt,
+    })
   }
 
-  findReceipt(receiptId) {
+  async findReceipt(receiptId) {
     this.assertAvailable()
-    return this.db(TABLES.receipt).where({ id: receiptId }).first()
+    return toReceipt(await this.db(TABLES.receipt).where({ id: receiptId }).first())
   }
 
   updateDraftItem(receiptId, itemId, body) {
     this.assertAvailable()
-    return this.db(TABLES.item).where({ id: itemId, receipt_id: receiptId }).update(body)
+    return this.db(TABLES.item).where({ id: itemId, receipt_id: receiptId }).update({
+      product_id: body.productId,
+      qty: body.qty,
+      unit_cost: body.unitCost ?? 0,
+      vat_rate: body.vatRate ?? 0,
+      idempotency_key: body.idempotencyKey || null,
+      updated_at: body.updatedAt,
+    })
   }
 
-  createDraftItem(body) {
-    return this.insertWithId(TABLES.item, body)
+  createDraftItem({ receiptId, productId, qty, unitCost, vatRate, idempotencyKey, createdAt, updatedAt }) {
+    return this.insertWithId(TABLES.item, {
+      receipt_id: receiptId,
+      product_id: productId,
+      qty,
+      unit_cost: unitCost ?? 0,
+      vat_rate: vatRate ?? 0,
+      idempotency_key: idempotencyKey || null,
+      created_at: createdAt,
+      updated_at: updatedAt,
+    })
   }
 
   deleteDraftItem(receiptId, itemId) {
@@ -64,35 +123,37 @@ class LegacyQuickReceiptRepository {
     return this.db.transaction((trx) => work(new LegacyQuickReceiptRepository(trx)))
   }
 
-  findReceiptForUpdate(receiptId) {
+  async findReceiptForUpdate(receiptId) {
     this.assertAvailable()
-    return this.db(TABLES.receipt).where({ id: receiptId }).forUpdate().first()
+    return toReceipt(await this.db(TABLES.receipt).where({ id: receiptId }).forUpdate().first())
   }
 
-  listReceiptItems(receiptId) {
+  async listReceiptItems(receiptId) {
     this.assertAvailable()
-    return this.db(TABLES.item).where({ receipt_id: receiptId })
+    return (await this.db(TABLES.item).where({ receipt_id: receiptId })).map(toReceiptItem)
   }
 
-  listLotBarcodes(receiptId) {
+  async listLotBarcodes(receiptId) {
     this.assertAvailable()
-    return this.db(TABLES.barcode)
+    return (await this.db(TABLES.barcode)
       .select('code', 'product_id')
-      .where({ receipt_id: receiptId, kind: 'LOT' })
+      .where({ receipt_id: receiptId, kind: 'LOT' }))
+      .map(toLotBarcode)
   }
 
-  listReceiptMovements(receiptId) {
+  async listReceiptMovements(receiptId) {
     this.assertAvailable()
-    return this.db(TABLES.item)
-      .select('product_id as productId', 'qty')
-      .where({ receipt_id: receiptId })
+    return (await this.db(TABLES.item)
+      .select('product_id', 'qty')
+      .where({ receipt_id: receiptId }))
+      .map(toStockMovement)
   }
 
-  findStockBalance(branchId, productId) {
+  async findStockBalance(branchId, productId) {
     this.assertAvailable()
-    return this.db(TABLES.stock)
+    return toStockBalance(await this.db(TABLES.stock)
       .where({ branch_id: branchId, product_id: productId })
-      .first()
+      .first())
   }
 
   updateStockBalance(id, quantity) {
