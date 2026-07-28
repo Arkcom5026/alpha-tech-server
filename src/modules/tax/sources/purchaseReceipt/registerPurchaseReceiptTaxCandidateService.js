@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const { registerTaxCandidate } = require('../../intake/registerTaxCandidateService');
+const { convertTaxCandidate } = require('../../candidates/conversion/convertTaxCandidateService');
 
 const positiveInteger = (value, code, fieldName) => {
   const number = Number(value);
@@ -61,7 +62,7 @@ const registerPurchaseReceiptTaxCandidate = async ({
     });
   }
 
-  return registerTaxCandidate({
+  const registration = await registerTaxCandidate({
     branchId: normalizedBranchId,
     sourceType: 'PURCHASE_RECEIPT',
     sourceId: `QUICK_RECEIPT:${receiptId}`,
@@ -87,6 +88,13 @@ const registerPurchaseReceiptTaxCandidate = async ({
       currency: 'THB',
       issuedAt: receipt.supplierTaxInvoiceDate,
     },
+  });
+
+  return convertTaxCandidate({
+    branchId: normalizedBranchId,
+    candidateId: registration.candidate.id,
+    documentType: 'INPUT_TAX_INVOICE',
+    actorEmployeeId,
   });
 };
 
