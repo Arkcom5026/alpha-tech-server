@@ -1,7 +1,6 @@
 'use strict'
 
-const { LegacyQuickReceiptRepository } = require('./quickReceiptRepository')
-const { LegacyQuickReceiptService } = require('./quickReceiptService')
+const { createLegacyQuickReceiptService } = require('./createLegacyQuickReceiptService')
 
 const asPositiveInteger = (value) => {
   const parsed = Number(value)
@@ -35,17 +34,6 @@ const requireRequestContext = (req) => {
   return { branchId, userId }
 }
 
-const getDb = (req) => {
-  if (req?.app?.locals?.knex) return req.app.locals.knex
-  try { return require('../../../../../db') } catch {}
-  try { return require('../../../../../../db') } catch {}
-  return null
-}
-
-const buildService = (req) => new LegacyQuickReceiptService(
-  new LegacyQuickReceiptRepository(getDb(req))
-)
-
 const ensureDraft = async (req, res, next) => {
   try {
     const { branchId, userId } = requireRequestContext(req)
@@ -56,7 +44,7 @@ const ensureDraft = async (req, res, next) => {
 
     if (normalizedSupplierId == null) throw requestError('INVALID_SUPPLIER_ID')
 
-    const result = await buildService(req).ensureDraft({
+    const result = await createLegacyQuickReceiptService(req).ensureDraft({
       source: String(source || 'QUICK_HYBRID').trim() || 'QUICK_HYBRID',
       supplierId: normalizedSupplierId,
       note: String(note || ''),
@@ -89,7 +77,7 @@ const saveItemDraft = async (req, res, next) => {
     if (normalizedUnitCost == null) throw requestError('INVALID_UNIT_COST')
     if (normalizedVatRate == null || normalizedVatRate > 100) throw requestError('INVALID_VAT_RATE')
 
-    const result = await buildService(req).saveDraftItem({
+    const result = await createLegacyQuickReceiptService(req).saveDraftItem({
       receiptId,
       itemId: normalizedItemId || undefined,
       productId: normalizedProductId,
@@ -115,7 +103,11 @@ const deleteItemDraft = async (req, res, next) => {
     if (!receiptId) throw requestError('INVALID_RECEIPT_ID')
     if (!itemId) throw requestError('INVALID_RECEIPT_ITEM_ID')
 
-    const result = await buildService(req).deleteDraftItem({ receiptId, itemId, branchId })
+    const result = await createLegacyQuickReceiptService(req).deleteDraftItem({
+      receiptId,
+      itemId,
+      branchId,
+    })
     return res.status(200).json(result)
   } catch (error) {
     return next(error)
@@ -128,7 +120,7 @@ const finalize = async (req, res, next) => {
     const receiptId = asPositiveInteger(req.params?.id)
     if (!receiptId) throw requestError('INVALID_RECEIPT_ID')
 
-    const result = await buildService(req).finalize({
+    const result = await createLegacyQuickReceiptService(req).finalize({
       receiptId,
       finalizeToken: req.get('X-Finalize-Token') || undefined,
       branchId,
