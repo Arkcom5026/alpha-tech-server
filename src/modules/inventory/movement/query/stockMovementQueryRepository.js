@@ -10,7 +10,10 @@ class StockMovementQueryRepository {
   list({
     branchId,
     productId,
+    stockItemId,
+    simpleLotId,
     type,
+    direction,
     refType,
     refId,
     barcode,
@@ -23,7 +26,11 @@ class StockMovementQueryRepository {
     const where = {
       branchId: Number(branchId),
       ...(productId ? { productId: Number(productId) } : {}),
+      ...(stockItemId ? { stockItemId: Number(stockItemId) } : {}),
+      ...(simpleLotId ? { simpleLotId: Number(simpleLotId) } : {}),
       ...(type ? { type } : {}),
+      ...(direction === 'IN' ? { qty: { gt: 0 } } : {}),
+      ...(direction === 'OUT' ? { qty: { lt: 0 } } : {}),
       ...(refType ? { refType } : {}),
       ...(refId ? { refId: Number(refId) } : {}),
       ...(barcode || serialNumber
