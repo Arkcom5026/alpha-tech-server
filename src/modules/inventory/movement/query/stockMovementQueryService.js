@@ -28,6 +28,13 @@ const asOptionalText = (value, code, maxLength = 120) => {
   return normalized
 }
 
+const asOptionalEnum = (value, allowed, code) => {
+  if (value == null || value === '') return null
+  const normalized = String(value).trim().toUpperCase()
+  if (!allowed.includes(normalized)) throw movementQueryError(code)
+  return normalized
+}
+
 const encodeCursor = (row) => {
   if (!row?.id || !row?.occurredAt) return null
   return Buffer.from(JSON.stringify({
@@ -67,6 +74,20 @@ class StockMovementQueryService {
       throw movementQueryError('INVALID_PRODUCT_ID')
     }
 
+    const stockItemId = query.stockItemId == null || query.stockItemId === ''
+      ? null
+      : asPositiveInteger(query.stockItemId)
+    if (query.stockItemId != null && query.stockItemId !== '' && !stockItemId) {
+      throw movementQueryError('INVALID_STOCK_ITEM_ID')
+    }
+
+    const simpleLotId = query.simpleLotId == null || query.simpleLotId === ''
+      ? null
+      : asPositiveInteger(query.simpleLotId)
+    if (query.simpleLotId != null && query.simpleLotId !== '' && !simpleLotId) {
+      throw movementQueryError('INVALID_SIMPLE_LOT_ID')
+    }
+
     const refId = query.refId == null || query.refId === ''
       ? null
       : asPositiveInteger(query.refId)
@@ -77,6 +98,7 @@ class StockMovementQueryService {
     const cursor = decodeCursor(query.cursor)
     const barcode = asOptionalText(query.barcode, 'INVALID_BARCODE')
     const serialNumber = asOptionalText(query.serialNumber, 'INVALID_SERIAL_NUMBER')
+    const direction = asOptionalEnum(query.direction, ['IN', 'OUT'], 'INVALID_DIRECTION')
 
     const from = asOptionalDate(query.from, 'INVALID_FROM_DATE')
     const to = asOptionalDate(query.to, 'INVALID_TO_DATE')
@@ -90,7 +112,10 @@ class StockMovementQueryService {
     const rows = await this.repository.list({
       branchId: normalizedBranchId,
       productId,
+      stockItemId,
+      simpleLotId,
       type: query.type ? String(query.type).trim().toUpperCase() : null,
+      direction,
       refType: query.refType ? String(query.refType).trim() : null,
       refId,
       barcode,
@@ -106,6 +131,11 @@ class StockMovementQueryService {
     const movements = pageRows.map((row) => ({
       ...row,
       qty: row.qty?.toString?.() ?? String(row.qty ?? 0),
+      direction: row.qty?.isPositive?.()
+        ? 'IN'
+        : row.qty?.isNegative?.()
+          ? 'OUT'
+          : 'NEUTRAL',
       stockItem: row.stockItem
         ? {
             ...row.stockItem,
