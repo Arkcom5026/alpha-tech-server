@@ -1,0 +1,30 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const repository = read('src/modules/tax/inputDocuments/pending/pendingInputTaxDocumentRepository.js');
+const service = read('src/modules/tax/inputDocuments/pending/pendingInputTaxDocumentService.js');
+const controller = read('src/modules/tax/inputDocuments/pending/pendingInputTaxDocumentController.js');
+const routes = read('src/modules/tax/inputDocuments/pending/pendingInputTaxDocumentRoutes.js');
+const taxRoutes = read('src/modules/tax/http/taxIntakeRoutes.js');
+const taxEntry = read('src/modules/tax/index.js');
+
+assert.match(repository, /'PO_RECEIPT'::text AS "sourceType"/);
+assert.match(repository, /'QUICK_RECEIPT'::text AS "sourceType"/);
+assert.match(repository, /r\."statusReceipt"::text = 'COMPLETED'/);
+assert.match(repository, /quick\."status" = 'COMPLETED'/);
+assert.equal((repository.match(/"taxDocumentMode"::text = 'NOT_RECEIVED'/g) || []).length, 2);
+assert.equal((repository.match(/supplier\."isSystem" = false/g) || []).length, 2);
+assert.match(repository, /r\."branchId" = \$\{Number\(branchId\)\}/);
+assert.match(repository, /quick\."branchId" = \$\{Number\(branchId\)\}/);
+assert.doesNotMatch(repository, /UPDATE|INSERT|DELETE FROM/);
+assert.match(service, /PO_RECEIPT/);
+assert.match(service, /QUICK_RECEIPT/);
+assert.match(controller, /PENDING_INPUT_TAX_BRANCH_FORBIDDEN/);
+assert.match(routes, /router\.get\('\/'/);
+assert.match(taxRoutes, /\/input-documents\/pending/);
+assert.match(taxEntry, /listPendingInputTaxDocuments/);
+console.log('Unified pending input-tax receipt projection contract: PASS');
