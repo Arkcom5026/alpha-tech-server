@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createSupplierPayment,
   getAllSupplierPayments,
   getSupplierPaymentsByPO,
   getAdvancePaymentsBySupplier,
@@ -32,17 +31,10 @@ const requireSupplierPaymentActor = (req, res, next) => {
   return next();
 };
 
-// Receipt-based settlement moved to Supplier Payable Allocation Authority.
-// Advance remains on the legacy endpoint until the dedicated advance increment.
-router.post('/', requireSupplierPaymentActor, (req, res, next) => {
-  if (String(req.body?.paymentType || '').trim().toUpperCase() !== 'ADVANCE') {
-    return res.status(409).json({
-      code: 'SUPPLIER_PAYABLE_FLOW_REQUIRED',
-      message: 'การตัดยอด Supplier ต้องดำเนินการผ่าน Supplier Payable',
-    });
-  }
-  return createSupplierPayment(req, res, next);
-});
+router.post('/', requireSupplierPaymentActor, (req, res) => res.status(409).json({
+  code: 'SUPPLIER_PAYMENT_AUTHORITY_REQUIRED',
+  message: 'การชำระและเงินจ่ายล่วงหน้า Supplier ต้องดำเนินการผ่าน authority ใหม่',
+}));
 
 router.get('/advance', getAdvancePaymentsBySupplier);
 router.get('/by-supplier/:supplierId', getSupplierPaymentsBySupplier);

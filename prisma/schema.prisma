@@ -86,6 +86,10 @@ model EmployeeProfile {
   createdSupplierPayables           SupplierPayable[]            @relation("SupplierPayableCreatedBy")
   voidedSupplierPayments            SupplierPayment[]             @relation("SupplierPaymentVoidedBy")
   reversedSupplierPaymentAllocations SupplierPaymentAllocation[] @relation("SupplierPaymentAllocationReversedBy")
+  createdSupplierAdvances            SupplierAdvance[]            @relation("SupplierAdvanceCreatedBy")
+  activatedSupplierAdvances          SupplierAdvance[]            @relation("SupplierAdvanceActivatedBy")
+  voidedSupplierAdvances             SupplierAdvance[]            @relation("SupplierAdvanceVoidedBy")
+  reversedSupplierAdvanceAllocations SupplierAdvanceAllocation[]  @relation("SupplierAdvanceAllocationReversedBy")
   v2StockAudits                     V2StockAudit[]
 }
 
@@ -145,6 +149,7 @@ model Branch {
   suppliers                       Supplier[]
   supplierPayment                 SupplierPayment[]
   supplierPayables                SupplierPayable[]
+  supplierAdvances                SupplierAdvance[]
   v2StockAudits                   V2StockAudit[]
 
   @@index([subdistrictCode])
@@ -467,6 +472,7 @@ model Supplier {
   branch               Branch                 @relation(fields: [branchId], references: [id])
   supplierPayment      SupplierPayment[]
   supplierPayables     SupplierPayable[]
+  supplierAdvances     SupplierAdvance[]
   warrantyClaims       WarrantyClaim[]
 
   @@unique([branchId, name])
@@ -1058,6 +1064,7 @@ model SupplierPayment {
   supplier                Supplier                 @relation(fields: [supplierId], references: [id])
   supplierPaymentReceipts SupplierPaymentReceipt[]
   payableAllocations      SupplierPaymentAllocation[]
+  supplierAdvance         SupplierAdvance?
 
   @@index([branchId, paidAt])
   @@index([supplierId])
@@ -1101,6 +1108,7 @@ model SupplierPayable {
   createdBy     EmployeeProfile       @relation("SupplierPayableCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   receiptLinks  SupplierPayableReceiptLink[]
   paymentAllocations SupplierPaymentAllocation[]
+  advanceAllocations SupplierAdvanceAllocation[]
 
   @@index([branchId, status, dueDate])
   @@index([branchId, supplierId, status])
@@ -1135,6 +1143,56 @@ model SupplierPaymentAllocation {
   reversedBy    EmployeeProfile?               @relation("SupplierPaymentAllocationReversedBy", fields: [reversedById], references: [id], onDelete: Restrict)
 
   @@index([paymentId, state])
+  @@index([payableId, state])
+}
+
+model SupplierAdvance {
+  id               Int                   @id @default(autoincrement())
+  branchId         Int
+  supplierId       Int
+  paymentId        Int                   @unique
+  code             String                @unique
+  status           SupplierAdvanceStatus @default(ACTIVE)
+  originalAmount   Decimal               @db.Decimal(12, 2)
+  availableAmount  Decimal               @db.Decimal(12, 2)
+  legacyImported   Boolean               @default(false)
+  createdById      Int
+  activatedAt      DateTime?
+  activatedById    Int?
+  voidedAt         DateTime?
+  voidedById       Int?
+  voidReason       String?
+  version          Int                   @default(1)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  branch           Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier         Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payment          SupplierPayment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  createdBy        EmployeeProfile       @relation("SupplierAdvanceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  activatedBy      EmployeeProfile?      @relation("SupplierAdvanceActivatedBy", fields: [activatedById], references: [id], onDelete: Restrict)
+  voidedBy         EmployeeProfile?      @relation("SupplierAdvanceVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+  allocations      SupplierAdvanceAllocation[]
+
+  @@index([branchId, supplierId, status])
+  @@index([branchId, status, createdAt])
+}
+
+model SupplierAdvanceAllocation {
+  id             Int                            @id @default(autoincrement())
+  advanceId      Int
+  payableId      Int
+  amount         Decimal                        @db.Decimal(12, 2)
+  state          SupplierPaymentAllocationState @default(ACTIVE)
+  appliedAt      DateTime                       @default(now())
+  reversedAt     DateTime?
+  reversedById   Int?
+  reversalReason String?
+  createdAt      DateTime                       @default(now())
+  advance        SupplierAdvance                @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable                @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  reversedBy     EmployeeProfile?               @relation("SupplierAdvanceAllocationReversedBy", fields: [reversedById], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, state])
   @@index([payableId, state])
 }
 
@@ -2327,6 +2385,13 @@ enum SupplierPaymentLifecycleStatus {
 enum SupplierPaymentAllocationState {
   ACTIVE
   REVERSED
+}
+
+enum SupplierAdvanceStatus {
+  REVIEW_REQUIRED
+  ACTIVE
+  EXHAUSTED
+  VOIDED
 }
 
 enum PaymentSlipStatus {
