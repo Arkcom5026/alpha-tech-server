@@ -23,15 +23,17 @@ const normalizeReceipt = (row) => row
     }
   : null
 
-const normalizeItem = (row) => ({
-  id: row.id,
-  receiptId: row.receipt_id,
-  productId: row.product_id,
-  qty: row.qty,
-  unitCost: row.unit_cost,
-  vatRate: row.vat_rate,
-  idempotencyKey: row.idempotency_key,
-})
+const normalizeItem = (row) => row
+  ? {
+      id: row.id,
+      receiptId: row.receipt_id,
+      productId: row.product_id,
+      qty: row.qty,
+      unitCost: row.unit_cost,
+      vatRate: row.vat_rate,
+      idempotencyKey: row.idempotency_key,
+    }
+  : null
 
 class LegacyQuickReceiptRepository {
   constructor(db) {
@@ -74,6 +76,17 @@ class LegacyQuickReceiptRepository {
   async findReceipt(receiptId) {
     this.assertAvailable()
     return normalizeReceipt(await this.db(TABLES.receipt).where({ id: receiptId }).first())
+  }
+
+  async findDraftItemByIdempotencyKey(receiptId, idempotencyKey) {
+    this.assertAvailable()
+    if (!idempotencyKey) return null
+
+    return normalizeItem(
+      await this.db(TABLES.item)
+        .where({ receipt_id: receiptId, idempotency_key: idempotencyKey })
+        .first()
+    )
   }
 
   async updateDraftItem(receiptId, itemId, item) {
@@ -181,7 +194,7 @@ class LegacyQuickReceiptRepository {
     return this.db(TABLES.receipt).where({ id: receiptId }).update({
       status: 'FINALIZED',
       finalized_at: committedAt,
-      finalize_token: finalizeToken || this.db.raw('COALESCE(finalize_token, ?) ', [finalizeToken || null]),
+      finalize_token: finalizeToken,
       updated_at: this.now(),
     })
   }
