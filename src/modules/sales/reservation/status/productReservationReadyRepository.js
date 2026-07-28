@@ -19,11 +19,17 @@ const markReady = async ({ id, branchId }, db = prisma) => db.$transaction(async
       code: 'RESERVATION_NOT_FOUND',
     });
   }
+  if (reservation.fulfillmentMethod !== 'PICKUP') {
+    conflict('RESERVATION_PICKUP_METHOD_REQUIRED', 'Only pickup reservations can be marked ready for pickup', {
+      fulfillmentMethod: reservation.fulfillmentMethod,
+    });
+  }
   if (reservation.status === 'READY_FOR_PICKUP') {
     return {
       id: Number(reservation.id),
       code: reservation.code,
       status: reservation.status,
+      fulfillmentMethod: reservation.fulfillmentMethod,
       pickupAt: reservation.pickupAt,
       replayed: true,
     };
@@ -56,6 +62,7 @@ const markReady = async ({ id, branchId }, db = prisma) => db.$transaction(async
     id: Number(updated[0].id),
     code: updated[0].code,
     status: updated[0].status,
+    fulfillmentMethod: updated[0].fulfillmentMethod,
     pickupAt: updated[0].pickupAt,
     replayed: false,
   };
