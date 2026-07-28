@@ -56,7 +56,6 @@ const productInventoryBehavior = (product) => {
   const authority = String(product?.inventoryBehavior || '').trim().toUpperCase();
   if (authority === 'TRACKED' || authority === 'NON_STOCK') return authority;
 
-  // Transitional fallback for records read through an older schema projection.
   const config = product?.productConfig && typeof product.productConfig === 'object'
     ? product.productConfig
     : {};
@@ -68,7 +67,7 @@ const productInventoryBehavior = (product) => {
   return 'TRACKED';
 };
 
-const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
+const prepareMixedSaleEvidence = async ({ tx, items, branchId, reservationAllocation = null }) => {
   const stockLines = items.filter((item) => item.lineType === 'STOCK_ITEM');
   const simpleLines = items.filter((item) => item.lineType === 'SIMPLE');
   const stockIds = stockLines.map((item) => item.stockItemId);
@@ -84,6 +83,16 @@ const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
     throw stockConflict('One or more stock items are no longer available', {
       unavailableStockItemIds: stockIds.filter((id) => !available.has(id)),
     });
+  }
+
+  if (reservationAllocation) {
+    const ownedStockIds = new Set(reservationAllocation.stockItemIds || []);
+    const foreignStockIds = stockIds.filter((id) => !ownedStockIds.has(id));
+    if (foreignStockIds.length) {
+      throw new SalesError(409, 'RESERVATION_STOCK_CONFLICT', 'Sale contains stock items outside the reservation allocation', {
+        stockItemIds: foreignStockIds,
+      });
+    }
   }
 
   const simpleProductIds = [...new Set(simpleLines.map((item) => item.productId))];
@@ -167,9 +176,15 @@ const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
   }
   for (const [productId, required] of requiredByProduct.entries()) {
     const balance = balanceByProduct.get(productId);
-    const available = Number(balance?.quantity || 0) - Number(balance?.reserved || 0);
-    if (!balance || available + 0.0001 < required) {
-      throw stockConflict('Simple product quantity is no longer available', { productId, required, available });
+    const ownedReserved = Number(reservationAllocation?.simpleByProduct?.get(productId) || 0);
+    const available = Number(balance?.quantity || 0) - Number(balance?.reserved || 0) + ownedReserved;
+    if (!balance || available + 0.0001 < required || ownedReserved + 0.0001 < (reservationAllocation ? required : 0)) {
+      throw new SalesError(409, reservationAllocation ? 'RESERVATION_STOCK_CONFLICT' : 'SALE_STOCK_CONFLICT', 'Simple product quantity is no longer available', {
+        productId,
+        required,
+        available,
+        ownedReserved,
+      });
     }
   }
 
@@ -187,7 +202,44 @@ const prepareMixedSaleEvidence = async ({ tx, items, branchId }) => {
   };
 };
 
-const completeSale = async ({ command, branchId, employeeId }) => {
+const loadReservationAllocation = async ({ tx, reservationId, branchId }) => {
+  const reservations = await tx.$queryRaw(Prisma.sql`
+    SELECT * FROM "ProductReservation"
+    WHERE "id" = ${reservationId} AND "branchId" = ${branchId}
+    FOR UPDATE
+  `);
+  const reservation = reservations[0];
+  if (!reservation) throw new SalesError(404, 'RESERVATION_NOT_FOUND', 'Product reservation was not found');
+  if (reservation.convertedSaleId != null) {
+    return { reservation, alreadyConverted: true, stockItemIds: [], simpleByProduct: new Map(), items: [] };
+  }
+  if (!['ACTIVE', 'PARTIALLY_PAID', 'READY_FOR_PICKUP'].includes(reservation.status)) {
+    throw new SalesError(409, 'RESERVATION_NOT_CONVERTIBLE', 'Reservation cannot be converted from its current status', {
+      status: reservation.status,
+    });
+  }
+  if (Number(reservation.depositAmount || 0) > 0) {
+    throw new SalesError(409, 'RESERVATION_DEPOSIT_NOT_POSTED', 'Reservation deposit requires posted payment evidence before conversion');
+  }
+  const items = await tx.$queryRaw(Prisma.sql`
+    SELECT * FROM "ProductReservationItem"
+    WHERE "reservationId" = ${reservationId} AND "isActive" = TRUE
+    ORDER BY "id" ASC
+    FOR UPDATE
+  `);
+  if (!items.length) throw new SalesError(409, 'RESERVATION_ITEMS_MISSING', 'Reservation has no active items');
+  const stockItemIds = items.filter((item) => item.lineType === 'STOCK_ITEM').map((item) => Number(item.stockItemId));
+  const simpleByProduct = new Map();
+  for (const item of items) {
+    if (item.lineType === 'SIMPLE') {
+      const productId = Number(item.productId);
+      simpleByProduct.set(productId, (simpleByProduct.get(productId) || 0) + Number(item.quantity));
+    }
+  }
+  return { reservation, alreadyConverted: false, stockItemIds, simpleByProduct, items };
+};
+
+const completeSale = async ({ command, branchId, employeeId, completionContext = null }) => {
   const replay = await loadVerifiedReplay({
     branchId,
     commandKey: command.commandKey,
@@ -199,6 +251,15 @@ const completeSale = async ({ command, branchId, employeeId }) => {
   for (let attempt = 0; attempt <= SALE_CODE_MAX_RETRY; attempt += 1) {
     try {
       await runCompletionTransaction(async (tx) => {
+        const reservationAllocation = completionContext?.sourceType === 'PRODUCT_RESERVATION'
+          ? await loadReservationAllocation({ tx, reservationId: completionContext.reservationId, branchId })
+          : null;
+        if (reservationAllocation?.alreadyConverted) {
+          throw new SalesError(409, 'RESERVATION_ALREADY_CONVERTED', 'Reservation has already been converted', {
+            saleId: Number(reservationAllocation.reservation.convertedSaleId),
+          });
+        }
+
         const customer = command.sale.customerId
           ? await tx.customerProfile.findFirst({
               where: { id: command.sale.customerId },
@@ -213,6 +274,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
           tx,
           items: command.sale.items,
           branchId,
+          reservationAllocation,
         });
         const productByStock = new Map(evidence.stockItems.map((item) => [item.id, item.productId]));
         const code = await generateSaleCode(tx, branchId, attempt);
@@ -279,9 +341,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             where: { id: { in: evidence.stockIds }, branchId, status: 'IN_STOCK' },
             data: { status: 'SOLD', soldAt: new Date() },
           });
-          if (changed.count !== evidence.stockIds.length) {
-            throw stockConflict('Stock changed during completion');
-          }
+          if (changed.count !== evidence.stockIds.length) throw stockConflict('Stock changed during completion');
         }
 
         for (const [lotId, required] of evidence.requiredByLot.entries()) {
@@ -293,10 +353,15 @@ const completeSale = async ({ command, branchId, employeeId }) => {
         }
 
         for (const [productId, required] of evidence.requiredByProduct.entries()) {
-          const changed = await tx.stockBalance.updateMany({
-            where: { productId, branchId, quantity: { gte: D(required) } },
-            data: { quantity: { decrement: D(required) } },
-          });
+          const changed = reservationAllocation
+            ? await tx.stockBalance.updateMany({
+                where: { productId, branchId, quantity: { gte: D(required) }, reserved: { gte: D(required) } },
+                data: { quantity: { decrement: D(required) }, reserved: { decrement: D(required) } },
+              })
+            : await tx.stockBalance.updateMany({
+                where: { productId, branchId, quantity: { gte: D(required) } },
+                data: { quantity: { decrement: D(required) } },
+              });
           if (changed.count !== 1) throw stockConflict('Simple stock balance changed during completion', { productId });
         }
 
@@ -342,6 +407,17 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             saleId: sale.id,
           },
         });
+
+        if (reservationAllocation) {
+          await tx.productReservationItem.updateMany({
+            where: { reservationId: completionContext.reservationId, isActive: true },
+            data: { isActive: false },
+          });
+          await tx.productReservation.update({
+            where: { id: completionContext.reservationId },
+            data: { status: 'COMPLETED', convertedSaleId: sale.id, completedAt: new Date() },
+          });
+        }
       });
 
       const final = await loadVerifiedReplay({
