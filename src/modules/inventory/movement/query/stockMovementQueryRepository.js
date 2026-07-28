@@ -7,7 +7,7 @@ class StockMovementQueryRepository {
     this.prisma = client
   }
 
-  list({ branchId, productId, type, refType, refId, from, to, limit }) {
+  list({ branchId, productId, type, refType, refId, from, to, cursorId, limit }) {
     return this.prisma.stockMovement.findMany({
       where: {
         branchId: Number(branchId),
@@ -55,7 +55,13 @@ class StockMovementQueryRepository {
         },
       },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      take: limit,
+      ...(cursorId
+        ? {
+            cursor: { id: Number(cursorId) },
+            skip: 1,
+          }
+        : {}),
+      take: limit + 1,
     })
   }
 }
