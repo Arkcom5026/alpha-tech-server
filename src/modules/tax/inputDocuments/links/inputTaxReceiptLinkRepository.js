@@ -146,6 +146,28 @@ const sumActiveAllocations = async ({ branchId, sourceType, sourceId, excludingL
   };
 };
 
+const sumActiveDocumentAllocations = async ({
+  taxDocumentId,
+  excludingLinkId = null,
+}, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT
+      COALESCE(SUM("allocatedSubtotal"), 0)::numeric AS "subtotalAmount",
+      COALESCE(SUM("allocatedVatAmount"), 0)::numeric AS "vatAmount",
+      COALESCE(SUM("allocatedTotalAmount"), 0)::numeric AS "totalAmount"
+    FROM "InputTaxDocumentReceiptLink"
+    WHERE "taxDocumentId" = ${Number(taxDocumentId)}
+      AND "state" = 'ACTIVE'
+      AND (${excludingLinkId == null ? null : Number(excludingLinkId)}::int IS NULL
+        OR "id" <> ${excludingLinkId == null ? null : Number(excludingLinkId)})
+  `);
+  return {
+    subtotalAmount: Number(rows[0]?.subtotalAmount || 0),
+    vatAmount: Number(rows[0]?.vatAmount || 0),
+    totalAmount: Number(rows[0]?.totalAmount || 0),
+  };
+};
+
 const findByLinkKey = async (linkKey, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     SELECT * FROM "InputTaxDocumentReceiptLink" WHERE "linkKey" = ${linkKey} LIMIT 1
@@ -253,5 +275,6 @@ module.exports = Object.freeze({
   findReceiptForUpdate,
   listByDocument,
   sumActiveAllocations,
+  sumActiveDocumentAllocations,
   updateAllocation,
 });

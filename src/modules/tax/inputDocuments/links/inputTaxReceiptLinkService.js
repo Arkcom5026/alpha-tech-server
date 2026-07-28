@@ -70,6 +70,31 @@ const assertCapacity = ({ receipt, existing, allocation }) => {
     });
   }
 };
+const assertDocumentCapacity = ({ document, existing, allocation }) => {
+  const next = {
+    subtotalAmount: existing.subtotalAmount + allocation.allocatedSubtotal,
+    vatAmount: existing.vatAmount + allocation.allocatedVatAmount,
+    totalAmount: existing.totalAmount + allocation.allocatedTotalAmount,
+  };
+  const maximum = {
+    subtotalAmount: Number(document.subtotalAmount || 0),
+    vatAmount: Number(document.taxAmount || 0),
+    totalAmount: Number(document.totalAmount || 0),
+  };
+  const exceedsKnownAmount = (actual, limit) => limit > 0 && actual > limit + 0.001;
+  if (
+    exceedsKnownAmount(next.subtotalAmount, maximum.subtotalAmount)
+    || exceedsKnownAmount(next.vatAmount, maximum.vatAmount)
+    || exceedsKnownAmount(next.totalAmount, maximum.totalAmount)
+  ) {
+    fail(
+      'Active receipt allocations exceed tax document amount',
+      'INPUT_TAX_LINK_DOCUMENT_ALLOCATION_EXCEEDED',
+      409,
+      { documentAmount: maximum, requestedActiveTotal: next },
+    );
+  }
+};
 const resolveDocumentAndReceipt = async ({ branchId, taxDocumentId, reference }, tx) => {
   const document = await repository.findDocumentForUpdate({ branchId, taxDocumentId }, tx);
   if (!document) fail('Tax document not found', 'TAX_DOCUMENT_NOT_FOUND', 404);
@@ -132,6 +157,14 @@ const attachReceiptLinks = async ({ branchId, taxDocumentId, commandKey, receipt
         branchId: normalizedBranchId, sourceType: reference.sourceType, sourceId: reference.sourceId,
       }, tx);
       assertCapacity({ receipt, existing, allocation: reference });
+      const existingDocumentAllocations = await repository.sumActiveDocumentAllocations({
+        taxDocumentId: normalizedDocumentId,
+      }, tx);
+      assertDocumentCapacity({
+        document,
+        existing: existingDocumentAllocations,
+        allocation: reference,
+      });
       const link = await repository.create({
         taxDocumentId: normalizedDocumentId,
         branchId: normalizedBranchId,
@@ -175,6 +208,15 @@ const reallocateReceiptLink = async ({ branchId, taxDocumentId, linkId, allocati
       sourceId: current.sourceId, excludingLinkId: current.id,
     }, tx);
     assertCapacity({ receipt, existing, allocation: nextAllocation });
+    const existingDocumentAllocations = await repository.sumActiveDocumentAllocations({
+      taxDocumentId: normalized.taxDocumentId,
+      excludingLinkId: current.id,
+    }, tx);
+    assertDocumentCapacity({
+      document,
+      existing: existingDocumentAllocations,
+      allocation: nextAllocation,
+    });
     const updated = await repository.updateAllocation({ linkId: current.id, ...nextAllocation }, tx);
     await repository.appendEvent({
       linkId: current.id, eventType: 'ALLOCATION_CHANGED', actorEmployeeId: actorEmployeeId || null,
