@@ -3,6 +3,7 @@
 const express = require('express');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const controller = require('./supplierPayableController');
+const agingController = require('../query/aging/supplierPayableAgingController');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -22,6 +23,7 @@ router.use((req, res, next) => {
 });
 
 router.get('/candidates', controller.listCandidates);
+router.get('/aging', agingController.list);
 router.get('/', controller.list);
 router.post('/from-receipts', controller.createFromReceipts);
 
