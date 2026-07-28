@@ -39,6 +39,7 @@ CREATE TABLE "ProductReservationItem" (
   "price" DECIMAL(12,2) NOT NULL,
   "vatAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
   "remark" TEXT,
+  "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "ProductReservationItem_reservationId_fkey" FOREIGN KEY ("reservationId") REFERENCES "ProductReservation"("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -59,8 +60,4 @@ CREATE INDEX "ProductReservationItem_product_idx" ON "ProductReservationItem"("p
 CREATE INDEX "ProductReservationItem_simple_lot_idx" ON "ProductReservationItem"("simpleLotId");
 CREATE UNIQUE INDEX "ProductReservationItem_active_stock_unique"
   ON "ProductReservationItem"("stockItemId")
-  WHERE "stockItemId" IS NOT NULL AND EXISTS (
-    SELECT 1 FROM "ProductReservation" reservation
-    WHERE reservation."id" = "ProductReservationItem"."reservationId"
-      AND reservation."status" IN ('ACTIVE','PARTIALLY_PAID','READY_FOR_PICKUP')
-  );
+  WHERE "stockItemId" IS NOT NULL AND "isActive" = TRUE;
