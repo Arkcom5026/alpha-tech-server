@@ -5,7 +5,12 @@ const { prisma } = require('../../../../../lib/prisma');
 const repository = require('./inputTaxReceiptLinkRepository');
 
 const SOURCE_TYPES = Object.freeze(['PO_RECEIPT', 'QUICK_RECEIPT']);
-const MUTABLE_DOCUMENT_STATUSES = Object.freeze(['DRAFT', 'VALIDATED', 'ISSUED']);
+const MUTABLE_DOCUMENT_STATUSES = Object.freeze([
+  'DRAFT',
+  'REGISTERED',
+  'UNDER_REVIEW',
+  'REJECTED',
+]);
 const LOCKED_PERIOD_STATUSES = Object.freeze(['LOCKED', 'SUBMITTED']);
 
 const fail = (message, code, statusCode = 400, details) => {

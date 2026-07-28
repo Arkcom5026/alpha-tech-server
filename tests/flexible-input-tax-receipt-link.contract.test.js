@@ -21,6 +21,8 @@ assert.match(service, /INPUT_TAX_LINK_ALLOCATION_EXCEEDED/);
 assert.match(service, /INPUT_TAX_LINK_ALREADY_ACTIVE/);
 assert.match(service, /INPUT_TAX_LINK_PERIOD_LOCKED/);
 assert.match(service, /INPUT_TAX_LINK_DOCUMENT_LOCKED/);
+assert.match(service, /'DRAFT',[\s\S]*'REGISTERED',[\s\S]*'UNDER_REVIEW',[\s\S]*'REJECTED'/);
+assert.doesNotMatch(service, /VALIDATED|ISSUED/);
 assert.match(service, /commandKey is required/);
 assert.match(repository, /FOR UPDATE OF document/);
 assert.match(repository, /FOR UPDATE OF receipt/);
