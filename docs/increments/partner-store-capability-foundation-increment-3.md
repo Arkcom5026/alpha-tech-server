@@ -1,62 +1,71 @@
 # Partner Store Capability Foundation — Increment 3
 
 ## Mission
-Establish branch-owned online commerce policy without coupling mutable store configuration to immutable order snapshots.
+Establish branch-owned online-commerce policy independently from immutable order snapshots, then expose an authenticated branch-scoped management slice.
 
 ## Authority Boundary
-- `PartnerStoreCapability` owns current storefront and fulfillment policy for one branch.
-- `PartnerStoreServiceArea` owns the configured administrative delivery areas.
-- `ProductReservation` continues to own the source, fulfillment method, recipient, address, and delivery-fee agreement captured when the order is created.
-- Changing store policy must never rewrite existing orders.
+- `PartnerStoreCapability` owns current mutable storefront and fulfillment policy for one branch.
+- `PartnerStoreServiceArea` owns configured administrative delivery areas.
+- `ProductReservation` owns the immutable agreement captured at order creation.
+- Store policy changes must never rewrite existing orders.
 
-## Capability Projection
-Each branch may configure:
-- storefront visibility and unique storefront slug
-- customer-facing display name and contact phone
-- pickup availability
-- delivery availability
-- delivery fee mode: FREE, FIXED, or NEGOTIATED
-- fixed delivery fee when applicable
-- service-area mode: PICKUP_ONLY, ADMIN_AREAS, DISTANCE, or NATIONWIDE
-- maximum delivery distance for distance-based service
-- preparation SLA in minutes
-- pickup and delivery instructions
+## Durable Capability
+Each branch may configure storefront visibility, unique slug, display name, contact phone, pickup, delivery, delivery fee policy, service-area mode, preparation SLA, and fulfillment instructions.
 
-## Service Areas
-Administrative service areas are represented as separate durable rows supporting:
+Service-area modes:
+- PICKUP_ONLY
+- ADMIN_AREAS
+- DISTANCE
+- NATIONWIDE
+
+Administrative area types:
 - PROVINCE
 - DISTRICT
 - SUBDISTRICT
 - POSTAL_CODE
 
-The unique capability/type/code contract prevents duplicate active policy entries and supports future marketplace coverage queries.
+## Authenticated Vertical Slice
+HTTP → Controller → Service → Repository → PostgreSQL is implemented under the existing authenticated Sales router.
 
-## Database Guards
-- One capability row per branch.
-- Delivery-disabled stores cannot retain delivery fee or delivery-zone configuration.
-- Delivery-enabled stores require a fee mode and a non-pickup service-area mode.
+Endpoints:
+- `GET /sales/reservations/store-capability`
+- `PUT /sales/reservations/store-capability`
+
+Branch authority is resolved only from authenticated user context. A request-body branch ID is never accepted as authority.
+
+## Policy Validation
+- At least one fulfillment method must remain enabled.
+- Enabled storefront requires a valid lowercase slug.
+- Delivery-disabled stores must use PICKUP_ONLY.
+- Delivery-enabled stores require a delivery service-area mode.
 - FIXED delivery requires a positive fee.
-- Non-FIXED delivery cannot retain a fixed fee.
-- DISTANCE mode requires a positive maximum distance.
-- Non-DISTANCE modes cannot retain a maximum distance.
-- Preparation SLA must be positive when supplied.
+- ADMIN_AREAS requires at least one unique area.
+- DISTANCE requires a positive maximum distance.
+- Preparation SLA must be positive.
+
+## Persistence Behavior
+- Upsert is transactional.
+- Branch existence is locked and verified.
+- Service-area replacement occurs in the same transaction.
+- Existing ProductReservation snapshots are untouched.
 
 ## Compatibility
 - No existing branch is automatically published online.
-- Default behavior is storefront disabled, pickup enabled, and delivery disabled.
-- Existing order rows and reservation lifecycle behavior are unchanged.
-
-## Deferred Runtime Scope
-This increment establishes durable policy authority only. The following remain separate increments:
-- authenticated capability create/update/query endpoints
-- public storefront query projection
-- checkout eligibility evaluation against current store policy
-- geographic distance calculation and address geocoding
-- opening hours and holiday exceptions
-- product-level online visibility
+- Default durable behavior remains storefront disabled, pickup enabled, and delivery disabled.
+- Existing reservation lifecycle and Sale conversion behavior are unchanged.
 
 ## Verification State
-- Migration and repository contract: implemented.
+- Durable migration and repository contract: implemented.
+- Authenticated branch-scoped read/write slice: implemented.
+- Foundation and runtime contract tests are wired into `test:product-reservation`.
 - Contract execution: not executed.
 - Prisma projection alignment: pending safe full-file patch capability.
-- Migration execution, build, runtime, and operational verification: pending.
+- Prisma validation, migration execution, build, runtime, and operational verification: pending.
+
+## Deferred
+- Role-specific authorization beyond authenticated branch scope.
+- Public storefront projection.
+- Checkout eligibility evaluation.
+- Geocoding and distance calculation.
+- Opening hours and holidays.
+- Product-level online visibility.
