@@ -10,6 +10,11 @@ const { cancelProductReservationController } = require('../cancel/productReserva
 const { expireDueProductReservationsController } = require('../expiry/productReservationExpiryController');
 const { convertProductReservationToSaleController } = require('../convert/productReservationConvertController');
 const { markProductReservationReadyController } = require('../status/productReservationReadyController');
+const {
+  markProductReservationReadyToShipController,
+  markProductReservationShippingController,
+  markProductReservationDeliveredController,
+} = require('../status/productReservationDeliveryStatusController');
 
 const router = express.Router();
 router.get('/', listProductReservationsController);
@@ -17,6 +22,9 @@ router.get('/:id', getProductReservationByIdController);
 router.post('/', createProductReservationController);
 router.post('/expire-due', expireDueProductReservationsController);
 router.post('/:id/ready-for-pickup', markProductReservationReadyController);
+router.post('/:id/ready-to-ship', markProductReservationReadyToShipController);
+router.post('/:id/shipping', markProductReservationShippingController);
+router.post('/:id/delivered', markProductReservationDeliveredController);
 router.post('/:id/cancel', cancelProductReservationController);
 router.post('/:id/convert-to-sale', convertProductReservationToSaleController);
 
