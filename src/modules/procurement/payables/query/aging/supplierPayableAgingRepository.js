@@ -10,12 +10,14 @@ const list = async ({ branchId, supplierId = null, asOf }, tx = prisma) => {
       payable."id",
       payable."supplierId",
       payable."code",
+      payable."status",
       payable."documentNumber",
       payable."documentDate",
       payable."dueDate",
       payable."totalAmount",
       payable."paidAmount",
       (payable."totalAmount" - payable."paidAmount")::numeric AS "outstandingAmount",
+      COALESCE(open_dispute."disputedAmount", 0)::numeric AS "disputedAmount",
       supplier."name" AS "supplierName",
       CASE
         WHEN payable."dueDate" IS NULL THEN 'NO_DUE_DATE'
@@ -31,8 +33,15 @@ const list = async ({ branchId, supplierId = null, asOf }, tx = prisma) => {
       END::int AS "daysOverdue"
     FROM "SupplierPayable" payable
     JOIN "Supplier" supplier ON supplier."id" = payable."supplierId"
+    LEFT JOIN LATERAL (
+      SELECT dispute."disputedAmount"
+      FROM "SupplierPayableDispute" dispute
+      WHERE dispute."payableId" = payable."id" AND dispute."status" = 'OPEN'
+      ORDER BY dispute."openedAt" DESC, dispute."id" DESC
+      LIMIT 1
+    ) open_dispute ON true
     WHERE payable."branchId" = ${Number(branchId)}
-      AND payable."status" IN ('OPEN', 'PARTIALLY_PAID')
+      AND payable."status" IN ('OPEN', 'PARTIALLY_PAID', 'DISPUTED')
       AND payable."totalAmount" > payable."paidAmount"
       AND (${supplierId == null ? null : Number(supplierId)}::int IS NULL
         OR payable."supplierId" = ${supplierId == null ? null : Number(supplierId)})
@@ -62,6 +71,7 @@ const list = async ({ branchId, supplierId = null, asOf }, tx = prisma) => {
       totalAmount: money(row.totalAmount),
       paidAmount: money(row.paidAmount),
       outstandingAmount: money(row.outstandingAmount),
+      disputedAmount: money(row.disputedAmount),
       daysOverdue: Number(row.daysOverdue || 0),
     })),
     advances: advances.map((row) => ({
