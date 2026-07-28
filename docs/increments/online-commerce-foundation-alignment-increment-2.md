@@ -34,7 +34,7 @@ Each transition:
 ## Architecture Rules
 - `ProductReservation` remains the current aggregate authority.
 - Marketplace and storefront remain acquisition surfaces, not separate order domains.
-- Sales Completion remains the sole Sale creation/payment/stock-consumption authority.
+- Sales Completion remains the sole Sale creation, payment, and stock-consumption authority.
 - Realtime branch inventory remains authoritative.
 - POS Hold Cart is outside this agenda.
 
