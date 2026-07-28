@@ -177,6 +177,13 @@ const createFromReceipts = async ({
   }
 
   const totalAmount = money(receipts.reduce((sum, receipt) => sum + Number(receipt.totalAmount), 0));
+  if (totalAmount <= 0) {
+    throw Object.assign(new Error('Payable total must be greater than zero'), {
+      code: 'SUPPLIER_PAYABLE_TOTAL_REQUIRED',
+      statusCode: 409,
+      isOperational: true,
+    });
+  }
   const paidAmount = money(receipts.reduce(
     (sum, receipt) => sum + Math.min(Number(receipt.paidAmount), Number(receipt.totalAmount)),
     0,

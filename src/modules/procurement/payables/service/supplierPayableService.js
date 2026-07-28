@@ -15,6 +15,20 @@ const positiveInt = (value, field, code) => {
   return parsed;
 };
 
+const optionalDate = (value, field) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw Object.assign(new Error(`${field} must be a valid date`), {
+      code: 'SUPPLIER_PAYABLE_DATE_INVALID',
+      statusCode: 400,
+      isOperational: true,
+      details: { field },
+    });
+  }
+  return parsed;
+};
+
 const listCandidates = (input) => repository.listCandidates({
   branchId: positiveInt(input.branchId, 'branchId', 'SUPPLIER_PAYABLE_BRANCH_REQUIRED'),
   supplierId: input.supplierId ? positiveInt(input.supplierId, 'supplierId', 'SUPPLIER_PAYABLE_SUPPLIER_REQUIRED') : null,
@@ -37,13 +51,22 @@ const createFromReceipts = async (input) => {
       isOperational: true,
     });
   }
+  const documentDate = optionalDate(input.documentDate, 'documentDate');
+  const dueDate = optionalDate(input.dueDate, 'dueDate');
+  if (documentDate && dueDate && dueDate < documentDate) {
+    throw Object.assign(new Error('dueDate cannot be earlier than documentDate'), {
+      code: 'SUPPLIER_PAYABLE_DUE_DATE_INVALID',
+      statusCode: 400,
+      isOperational: true,
+    });
+  }
   return prisma.$transaction((tx) => repository.createFromReceipts({
     branchId: positiveInt(input.branchId, 'branchId', 'SUPPLIER_PAYABLE_BRANCH_REQUIRED'),
     supplierId: positiveInt(input.supplierId, 'supplierId', 'SUPPLIER_PAYABLE_SUPPLIER_REQUIRED'),
     receiptIds,
     documentNumber: String(input.documentNumber || '').trim() || null,
-    documentDate: input.documentDate || null,
-    dueDate: input.dueDate || null,
+    documentDate,
+    dueDate,
     note: String(input.note || '').trim() || null,
     createdById: positiveInt(input.createdById, 'createdById', 'SUPPLIER_PAYABLE_ACTOR_REQUIRED'),
   }, tx));

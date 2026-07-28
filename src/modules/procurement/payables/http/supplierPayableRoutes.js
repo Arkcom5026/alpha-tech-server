@@ -9,7 +9,9 @@ router.use(verifyToken);
 
 router.use((req, res, next) => {
   const accountRole = String(req.user?.role || '').trim().toUpperCase();
-  const employeeRole = String(req.user?.employeeRole || req.user?.position || '').trim().toUpperCase();
+  const employeeRole = String(
+    req.user?.employeeRole || req.user?.v2Role || req.user?.position || '',
+  ).trim().toUpperCase();
   if (['SUPERADMIN', 'ADMIN'].includes(accountRole) || ['OWNER', 'MANAGER'].includes(employeeRole)) {
     return next();
   }
