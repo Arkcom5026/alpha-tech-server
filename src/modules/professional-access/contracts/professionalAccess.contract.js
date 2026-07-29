@@ -1,0 +1,80 @@
+'use strict';
+
+const buildAuthorityErrorCodes = (prefix) =>
+  Object.freeze({
+    USER_REQUIRED: `${prefix}_USER_REQUIRED`,
+    ORGANIZATION_REQUIRED: `${prefix}_ORGANIZATION_REQUIRED`,
+    BUSINESS_REQUIRED: `${prefix}_BUSINESS_REQUIRED`,
+    MEMBERSHIP_REQUIRED: `${prefix}_MEMBERSHIP_REQUIRED`,
+    MEMBERSHIP_INACTIVE: `${prefix}_MEMBERSHIP_INACTIVE`,
+    ASSIGNMENT_REQUIRED: `${prefix}_ASSIGNMENT_REQUIRED`,
+    ASSIGNMENT_INACTIVE: `${prefix}_ASSIGNMENT_INACTIVE`,
+    ASSIGNMENT_NOT_STARTED: `${prefix}_ASSIGNMENT_NOT_STARTED`,
+    ASSIGNMENT_EXPIRED: `${prefix}_ASSIGNMENT_EXPIRED`,
+    PERMISSION_DENIED: `${prefix}_PERMISSION_DENIED`,
+    BRANCH_INVALID: `${prefix}_BRANCH_INVALID`,
+  });
+
+const PROFESSIONAL_ACCESS_BASE_PATH = '/api/professional-access';
+
+const PROFESSIONAL_ACCESS_RESOURCES = Object.freeze({
+  TAX_REVIEW: 'TAX_REVIEW',
+});
+
+const PROFESSIONAL_ACCESS_ACTIONS = Object.freeze({
+  READ: 'READ',
+  COMMENT: 'COMMENT',
+  RESOLVE: 'RESOLVE',
+});
+
+const PROFESSIONAL_ACCESS_BRANCH_MODES = Object.freeze({
+  ALL_BUSINESS_BRANCHES: 'ALL_BUSINESS_BRANCHES',
+  SELECTED_BRANCHES: 'SELECTED_BRANCHES',
+  NO_BRANCH_CONTEXT: 'NO_BRANCH_CONTEXT',
+});
+
+const TAX_REVIEW_SESSION_STATUSES = Object.freeze({
+  OPEN: 'OPEN',
+  IN_REVIEW: 'IN_REVIEW',
+  RESOLVED: 'RESOLVED',
+});
+
+const PROFESSIONAL_ACCESS_ERROR_CODES = Object.freeze({
+  ...buildAuthorityErrorCodes('PROFESSIONAL_ACCESS'),
+  TAX_REVIEW_NOT_FOUND: 'TAX_REVIEW_NOT_FOUND',
+  TAX_REVIEW_ALREADY_RESOLVED: 'TAX_REVIEW_ALREADY_RESOLVED',
+});
+
+const ACCOUNTANT_WORKSPACE_ERROR_CODES = buildAuthorityErrorCodes('ACCOUNTANT_WORKSPACE');
+
+const TAX_REVIEW_ERROR_CODES = Object.freeze({
+  ...buildAuthorityErrorCodes('TAX_REVIEW'),
+  BRANCH_REQUIRED: 'TAX_REVIEW_BRANCH_REQUIRED',
+  PERIOD_INVALID: 'TAX_REVIEW_PERIOD_INVALID',
+  TITLE_REQUIRED: 'TAX_REVIEW_TITLE_REQUIRED',
+  ID_REQUIRED: 'TAX_REVIEW_ID_REQUIRED',
+  NOT_FOUND: 'TAX_REVIEW_NOT_FOUND',
+  NOTE_REQUIRED: 'TAX_REVIEW_NOTE_REQUIRED',
+  ALREADY_RESOLVED: 'TAX_REVIEW_ALREADY_RESOLVED',
+});
+
+const PROFESSIONAL_ACCESS_ENDPOINTS = Object.freeze({
+  LIST_BUSINESSES: 'GET /organizations/:externalOrganizationId/businesses',
+  GET_BUSINESS_WORKSPACE: 'GET /organizations/:externalOrganizationId/businesses/:businessId',
+  LIST_TAX_REVIEWS: 'GET /organizations/:externalOrganizationId/businesses/:businessId/tax-reviews',
+  CREATE_TAX_REVIEW: 'POST /organizations/:externalOrganizationId/businesses/:businessId/tax-reviews',
+  ADD_TAX_REVIEW_NOTE: 'POST /organizations/:externalOrganizationId/businesses/:businessId/tax-reviews/:reviewId/notes',
+  RESOLVE_TAX_REVIEW: 'POST /organizations/:externalOrganizationId/businesses/:businessId/tax-reviews/:reviewId/resolve',
+});
+
+module.exports = {
+  ACCOUNTANT_WORKSPACE_ERROR_CODES,
+  PROFESSIONAL_ACCESS_ACTIONS,
+  PROFESSIONAL_ACCESS_BASE_PATH,
+  PROFESSIONAL_ACCESS_BRANCH_MODES,
+  PROFESSIONAL_ACCESS_ENDPOINTS,
+  PROFESSIONAL_ACCESS_ERROR_CODES,
+  PROFESSIONAL_ACCESS_RESOURCES,
+  TAX_REVIEW_ERROR_CODES,
+  TAX_REVIEW_SESSION_STATUSES,
+};

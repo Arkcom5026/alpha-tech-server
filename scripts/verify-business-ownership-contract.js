@@ -65,7 +65,11 @@ for (const invariant of [
 
 for (const phrase of [
   'Business is the first-class tenant and data owner',
-  'A Branch is a location or operational subdivision of one Business',
+  'A Business owns its operational and tax data',
+  'A Branch is a location or operating unit owned by exactly one Business',
+  'A location or operational subdivision of one Business',
+  'every migrated Branch must belong to exactly one Business',
+  'The current `Branch` model remains a compatibility structure during migration',
   'client-provided `businessId` or `branchId` is a selector',
   'External organizations receive delegated access',
   'No step may silently broaden access',

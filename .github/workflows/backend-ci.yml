@@ -64,6 +64,9 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Verify P1 Professional Access repository gate
+        run: npm run verify:p1-professional-access
+
       - name: Prepare CI database
         run: npx prisma db push --skip-generate
 
