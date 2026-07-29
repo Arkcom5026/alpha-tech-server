@@ -104,11 +104,11 @@ const commit = async ({ branchId, sessionTokenHash, proofTokenHash, idempotencyK
      AND bp."branchId" = ${branchId}
     WHERE p."id" IN (${Prisma.join(productIds)})
       AND p."active" = TRUE
-      AND bp."active" = TRUE
+      AND bp."isActive" = TRUE
       AND bp."priceOnline" IS NOT NULL
       AND bp."priceOnline" > 0
-      AND (bp."effectiveAt" IS NULL OR bp."effectiveAt" <= CURRENT_TIMESTAMP)
-      AND (bp."expiresAt" IS NULL OR bp."expiresAt" > CURRENT_TIMESTAMP)
+      AND (bp."effectiveDate" IS NULL OR bp."effectiveDate" <= CURRENT_TIMESTAMP)
+      AND (bp."expiredDate" IS NULL OR bp."expiredDate" > CURRENT_TIMESTAMP)
     FOR UPDATE OF bp
   `);
   if (prices.length !== productIds.length) {
