@@ -7,6 +7,7 @@ const legacyAuthController = require('../../../../controllers/authController');
 const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
 const loginController = require('../login/loginController');
 const sessionController = require('../session/sessionController');
+const passwordController = require('../password/passwordController');
 const tenantAuthController = require('../controllers/authController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
@@ -73,8 +74,6 @@ const register = ensureLegacyFn('register');
 const addSubEmployee = employeeOnboardingController.addSubEmployee;
 const findUserByEmail = resolveLegacyHandler('findUserByEmail');
 const getMe = ensureLegacyFn('getMe');
-const forgotPassword = ensureLegacyFn('forgotPassword');
-const resetPassword = ensureLegacyFn('resetPassword');
 
 if (typeof loginController.login !== 'function') {
   throw new Error('[authRoutes] loginController.login must be a function');
@@ -83,6 +82,12 @@ if (typeof loginController.login !== 'function') {
 for (const handlerName of ['refreshSession', 'logoutSession', 'revokeSession']) {
   if (typeof sessionController[handlerName] !== 'function') {
     throw new Error(`[authRoutes] sessionController.${handlerName} must be a function`);
+  }
+}
+
+for (const handlerName of ['forgotPassword', 'resetPassword']) {
+  if (typeof passwordController[handlerName] !== 'function') {
+    throw new Error(`[authRoutes] passwordController.${handlerName} must be a function`);
   }
 }
 
@@ -105,8 +110,8 @@ router.post('/add-sub-employee', verifyToken, addSubEmployee);
 router.post('/logout-all', verifyToken, sessionController.revokeSession);
 router.get('/users/find', verifyToken, findUserByEmail);
 router.get('/me', verifyToken, getMe);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password', passwordController.forgotPassword);
+router.post('/reset-password', passwordController.resetPassword);
 
 // Existing tenant-login responsibility retained under the same canonical route owner.
 router.post('/:tenant_slug/auth/login', tenantContext, tenantAuthController.login);
