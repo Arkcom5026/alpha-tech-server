@@ -54,6 +54,43 @@ const requireReason = (value, code) => {
   return reason;
 };
 
+const normalizeCurrency = (value) => {
+  const currency = String(value || 'THB').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    fail('currency must be a 3-letter ISO currency code', 'OUTPUT_TAX_PERIOD_CURRENCY_INVALID', 400);
+  }
+  return currency;
+};
+
+const normalizeNonNegativeInt = (value, fieldName) => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    fail(`${fieldName} must be a non-negative integer`, 'OUTPUT_TAX_PERIOD_SUMMARY_INVALID', 400, {
+      field: fieldName,
+    });
+  }
+  return parsed;
+};
+
+const normalizeNonNegativeAmount = (value, fieldName) => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    fail(`${fieldName} must be a non-negative number`, 'OUTPUT_TAX_PERIOD_SUMMARY_INVALID', 400, {
+      field: fieldName,
+    });
+  }
+  return parsed;
+};
+
+const normalizeSummary = (summary = {}) => Object.freeze({
+  documentCount: normalizeNonNegativeInt(summary.documentCount, 'summary.documentCount'),
+  activeDocumentCount: normalizeNonNegativeInt(summary.activeDocumentCount, 'summary.activeDocumentCount'),
+  cancelledDocumentCount: normalizeNonNegativeInt(summary.cancelledDocumentCount, 'summary.cancelledDocumentCount'),
+  subtotalAmount: normalizeNonNegativeAmount(summary.subtotalAmount, 'summary.subtotalAmount'),
+  taxAmount: normalizeNonNegativeAmount(summary.taxAmount, 'summary.taxAmount'),
+  totalAmount: normalizeNonNegativeAmount(summary.totalAmount, 'summary.totalAmount'),
+});
+
 const normalizeActorEmployeeId = (value) =>
   requirePositiveInt(value, 'actorEmployeeId', 'OUTPUT_TAX_PERIOD_ACTOR_REQUIRED');
 
@@ -132,26 +169,30 @@ const createPeriod = async ({ branchId, year, month, currency = 'THB', summary =
   const normalizedBranchId = requirePositiveInt(branchId, 'branchId', 'TAX_BRANCH_REQUIRED');
   const normalizedYear = requireYear(year);
   const normalizedMonth = requireMonth(month);
+  const normalizedCurrency = normalizeCurrency(currency);
+  const normalizedSummary = normalizeSummary(summary);
 
   return prisma.$transaction(async (tx) => {
     const existing = await outputTaxPeriodRepository.findByBranchYearMonth(
       { branchId: normalizedBranchId, year: normalizedYear, month: normalizedMonth },
       tx,
     );
-    if (existing) return existing;
+    if (existing) {
+      fail(
+        'Output tax period already exists',
+        'OUTPUT_TAX_PERIOD_ALREADY_EXISTS',
+        409,
+        { outputTaxPeriodId: existing.id, version: existing.version, status: existing.status },
+      );
+    }
 
     const created = await outputTaxPeriodRepository.create(
       {
         branchId: normalizedBranchId,
         year: normalizedYear,
         month: normalizedMonth,
-        currency,
-        documentCount: summary.documentCount || 0,
-        activeDocumentCount: summary.activeDocumentCount || 0,
-        cancelledDocumentCount: summary.cancelledDocumentCount || 0,
-        subtotalAmount: summary.subtotalAmount || 0,
-        taxAmount: summary.taxAmount || 0,
-        totalAmount: summary.totalAmount || 0,
+        currency: normalizedCurrency,
+        ...normalizedSummary,
         snapshot,
       },
       tx,
