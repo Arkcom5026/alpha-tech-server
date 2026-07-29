@@ -16,7 +16,7 @@ const {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   updateSerialNumber,
-} = require('../../../../../controllers/barcodeController');
+} = require('../barcodeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
