@@ -4,6 +4,9 @@ const { prisma } = require('../../../../../lib/prisma');
 const { mapCandidateToTaxDocumentDraft } = require('../mapping/mapCandidateToTaxDocument');
 const candidateRepository = require('../repository/taxCandidateRepository');
 const documentRepository = require('../../documents/repository/taxDocumentRepository');
+const {
+  assertPeriodAllowsCreate,
+} = require('../../outputTax/period/guard/outputTaxPeriodGuard');
 
 const numberOrZero = (value) => {
   const number = Number(value);
@@ -42,6 +45,11 @@ const convertTaxCandidate = async ({ branchId, candidateId, documentType, actorE
     if (existingDocument) {
       return Object.freeze({ replayed: true, candidate, document: existingDocument });
     }
+
+    await assertPeriodAllowsCreate({
+      branchId: normalizedBranchId,
+      occurredAt: candidate.occurredAt,
+    }, tx);
 
     const snapshot = candidate.snapshot || {};
     const mapped = mapCandidateToTaxDocumentDraft({
