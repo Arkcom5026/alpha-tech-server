@@ -95,6 +95,7 @@ const findAssignment = ({ externalOrganizationId, businessId, now }) =>
         orderBy: [{ resource: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
+          status: true,
           resource: true,
           actions: true,
           branchMode: true,
@@ -107,7 +108,10 @@ const findAssignment = ({ externalOrganizationId, businessId, now }) =>
     },
   });
 
+const findActiveAssignment = findAssignment;
+
 module.exports = {
+  findActiveAssignment,
   findActiveMembership,
   findAssignment,
   listActiveAssignments,
