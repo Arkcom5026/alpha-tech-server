@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
+const outputTaxPeriodRepository = require('../period/repository/outputTaxPeriodRepository');
 
 const normalizePositiveInt = (value, code, fieldName) => {
   const parsed = Number(value);
@@ -47,31 +48,38 @@ const buildOutputTaxPeriodReport = async ({ branchId, year, month }) => {
   const periodStart = startOfMonthUtc(normalizedYear, normalizedMonth);
   const periodEndExclusive = startOfNextMonthUtc(normalizedYear, normalizedMonth);
 
-  const rows = await prisma.$queryRaw(Prisma.sql`
-    SELECT
-      document."id",
-      document."documentType",
-      document."documentNumber",
-      document."status",
-      document."issuedAt",
-      document."occurredAt",
-      document."counterpartyTaxId",
-      document."currency",
-      document."subtotalAmount",
-      document."taxAmount",
-      document."totalAmount",
-      document."snapshot",
-      candidate."sourceType",
-      candidate."sourceId",
-      candidate."sourceDocumentNo"
-    FROM "TaxDocument" document
-    LEFT JOIN "TaxCandidate" candidate ON candidate."id" = document."candidateId"
-    WHERE document."branchId" = ${normalizedBranchId}
-      AND document."documentType" LIKE 'OUTPUT_%'
-      AND document."issuedAt" >= ${periodStart}
-      AND document."issuedAt" < ${periodEndExclusive}
-    ORDER BY document."issuedAt" ASC, document."id" ASC
-  `);
+  const [rows, period] = await Promise.all([
+    prisma.$queryRaw(Prisma.sql`
+      SELECT
+        document."id",
+        document."documentType",
+        document."documentNumber",
+        document."status",
+        document."issuedAt",
+        document."occurredAt",
+        document."counterpartyTaxId",
+        document."currency",
+        document."subtotalAmount",
+        document."taxAmount",
+        document."totalAmount",
+        document."snapshot",
+        candidate."sourceType",
+        candidate."sourceId",
+        candidate."sourceDocumentNo"
+      FROM "TaxDocument" document
+      LEFT JOIN "TaxCandidate" candidate ON candidate."id" = document."candidateId"
+      WHERE document."branchId" = ${normalizedBranchId}
+        AND document."documentType" LIKE 'OUTPUT_%'
+        AND document."issuedAt" >= ${periodStart}
+        AND document."issuedAt" < ${periodEndExclusive}
+      ORDER BY document."issuedAt" ASC, document."id" ASC
+    `),
+    outputTaxPeriodRepository.findByBranchYearMonth({
+      branchId: normalizedBranchId,
+      year: normalizedYear,
+      month: normalizedMonth,
+    }),
+  ]);
 
   const documents = rows.map((row) => {
     const snapshot = row.snapshot || {};
@@ -124,19 +132,31 @@ const buildOutputTaxPeriodReport = async ({ branchId, year, month }) => {
     }, {}),
   );
 
+  const authority = Object.freeze({
+    periodExists: Boolean(period),
+    periodId: period?.id || null,
+    status: period?.status || null,
+    version: period?.version || null,
+    lockedForTaxWrites: Boolean(period && ['CLOSING', 'CLOSED'].includes(period.status)),
+    closeRequestedAt: period?.closeRequestedAt || null,
+    closedAt: period?.closedAt || null,
+    reopenedAt: period?.reopenedAt || null,
+  });
+
   return Object.freeze({
-    schemaVersion: 'OUTPUT_TAX_PERIOD_REPORT_V1',
+    schemaVersion: 'OUTPUT_TAX_PERIOD_REPORT_V2',
     branchId: normalizedBranchId,
     year: normalizedYear,
     month: normalizedMonth,
     periodStart: periodStart.toISOString(),
     periodEndExclusive: periodEndExclusive.toISOString(),
-    currency: activeDocuments[0]?.currency || documents[0]?.currency || 'THB',
+    currency: activeDocuments[0]?.currency || documents[0]?.currency || period?.currency || 'THB',
     documentCount: documents.length,
     activeDocumentCount: activeDocuments.length,
     cancelledDocumentCount: cancelledDocuments.length,
     totals: Object.freeze(totals),
     byDocumentType,
+    authority,
     documents: Object.freeze(documents),
   });
 };
