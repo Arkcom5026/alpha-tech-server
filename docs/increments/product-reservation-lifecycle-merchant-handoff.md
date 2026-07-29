@@ -87,6 +87,16 @@ Current-main review is complete.
 - Operational Gate
 - merge readiness
 
+## Slice 1 Repository Implementation
+
+The first implementation increment is now present on the feature branch:
+
+- `prisma/product-reservation.prisma` records the recovered aggregate, item, lifecycle fields, indexes, and replay-key authority as a reconciliation draft
+- `src/modules/sales/reservations/lifecycle/productReservationLifecycleContract.js` defines explicit lifecycle states and allowed transitions
+- `tests/product-reservation-lifecycle-contract.test.js` records focused transition and stock-release expectations
+
+The Prisma reconciliation remains a draft file intentionally. It must be consolidated into `prisma/schema.prisma` only after the exact existing database column types and legacy status vocabulary are verified through runtime/database evidence. No existing migration was edited and no base table was recreated.
+
 ## Architecture Constraints
 
 1. Every transition is branch-safe and transaction-scoped.
@@ -111,8 +121,10 @@ Base main SHA: 8ad9652a8e6c6cccea662c3734abec9a8b80511d
 Authority Review: COMPLETE
 Gap Analysis: COMPLETE
 Targeted Implementation Plan: RECORDED
-Prisma reconciliation: NEXT
-Lifecycle implementation: PENDING
+Prisma reconciliation draft: PRESENT — NOT YET CONSOLIDATED
+Lifecycle contract: PRESENT
+Focused repository contract test: PRESENT — NOT RUNTIME VERIFIED
+Lifecycle runtime implementation: NEXT
 Merchant handoff implementation: PENDING
 Runtime verification: DEFERRED — NOT PASS
 Operational verification: DEFERRED — NOT PASS
