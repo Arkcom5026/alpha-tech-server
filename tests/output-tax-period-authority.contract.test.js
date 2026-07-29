@@ -27,6 +27,8 @@ const periodReadiness = read(
 const outputTaxOverview = read(
   'src/modules/tax/outputTax/dashboard/buildOutputTaxOverviewService.js',
 );
+const intakeService = read('src/modules/tax/http/taxIntakeService.js');
+const intakeController = read('src/modules/tax/http/taxIntakeController.js');
 const intakeRoutes = read('src/modules/tax/http/taxIntakeRoutes.js');
 const registerCandidate = read('src/modules/tax/intake/registerTaxCandidateService.js');
 const convertCandidate = read(
@@ -163,14 +165,40 @@ expectIncludes(
 );
 
 expectIncludes(
+  intakeService,
+  [
+    'buildOutputTaxPeriodClosingPlan',
+    'getOutputTaxPeriodClosingPlan',
+    'branchId: requirePositiveInt',
+    'year: input.year',
+    'month: input.month',
+  ],
+  'Tax intake HTTP service closing plan adapter',
+);
+
+expectIncludes(
+  intakeController,
+  [
+    'getOutputTaxPeriodClosingPlan',
+    'service.getOutputTaxPeriodClosingPlan',
+    'branchId: resolveBranchId(req, req.query)',
+    'year: req.query?.year',
+    'month: req.query?.month',
+  ],
+  'Tax intake HTTP controller closing plan adapter',
+);
+
+expectIncludes(
   intakeRoutes,
   [
+    "'/output-tax/period-closing-plan'",
+    'controller.getOutputTaxPeriodClosingPlan',
     "'/output-tax/periods'",
-    "'/output-tax/periods/:id'",
-    "'/output-tax/periods/:id/timeline'",
-    "'/output-tax/periods/:id/request-close'",
-    "'/output-tax/periods/:id/close'",
-    "'/output-tax/periods/:id/reopen'",
+    "'/output-tax/periods/:outputTaxPeriodId'",
+    "'/output-tax/periods/:outputTaxPeriodId/timeline'",
+    "'/output-tax/periods/:outputTaxPeriodId/request-close'",
+    "'/output-tax/periods/:outputTaxPeriodId/close'",
+    "'/output-tax/periods/:outputTaxPeriodId/reopen'",
   ],
   'Tax intake HTTP routes',
 );
