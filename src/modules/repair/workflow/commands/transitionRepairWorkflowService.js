@@ -60,11 +60,11 @@ class TransitionRepairWorkflowService {
       : null;
 
     return this.repository.transaction(async (repo) => {
-      const repairJob = await repo.findRepairJob(repairJobId);
-      if (!repairJob || repairJob.branchId !== branchId) {
+      const repairJob = await repo.findRepairJob(branchId, repairJobId);
+      if (!repairJob) {
         throw new RepairWorkflowCommandError(
           'REPAIR_JOB_NOT_FOUND',
-          'Repair job was not found in the actor branch',
+          'Repair job was not found in the actor business',
           { repairJobId, branchId }
         );
       }
@@ -100,7 +100,11 @@ class TransitionRepairWorkflowService {
         );
       }
 
-      const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus);
+      const updated = await repo.updateLegacyStatus(
+        branchId,
+        repairJobId,
+        legacyStatus
+      );
       const event = await repo.publishPassportEvent({
         deviceId: repairJob.deviceId,
         branchId,
