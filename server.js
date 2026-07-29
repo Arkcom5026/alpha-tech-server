@@ -45,6 +45,7 @@ const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stock
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
+const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -137,11 +138,12 @@ const corsOptions = {
     'Authorization',
     'X-Idempotency-Key',
     'X-Finalize-Token',
+    'X-Anonymous-Session-Token',
     'X-Requested-With',
     'Accept',
     'Origin',
   ],
-  exposedHeaders: ['X-Request-Id'],
+  exposedHeaders: ['X-Request-Id', 'X-Anonymous-Session-Token'],
   credentials: true,
   maxAge: 86400,
   optionsSuccessStatus: 204,
@@ -189,6 +191,7 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
+app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
