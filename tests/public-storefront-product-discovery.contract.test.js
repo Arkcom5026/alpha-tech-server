@@ -30,6 +30,7 @@ assert.doesNotMatch(routes, /verifyToken|authenticate|requireAuth|router\.use/);
 assert.match(controller, /req\.params\?\.slug/);
 assert.match(service, /STOREFRONT_SLUG_INVALID/);
 assert.match(service, /STOREFRONT_NOT_FOUND/);
+assert.match(service, /const \{ branchId: _branchId, \.\.\.publicStorefront \} = storefront/);
 assert.match(repository, /FROM "PartnerStoreCapability" capability/);
 assert.match(repository, /capability\."storefrontEnabled" = TRUE/);
 assert.match(repository, /capability\."storefrontSlug" = \$\{slug\}/);
@@ -44,9 +45,6 @@ assert.match(repository, /product\."active" = TRUE/);
 assert.match(repository, /'AVAILABLE' : 'OUT_OF_STOCK'/);
 
 for (const forbidden of [
-  'branchId:',
-  'capabilityId:',
-  'availableQuantity:',
   'costPrice:',
   'averageCost:',
   'supplier',

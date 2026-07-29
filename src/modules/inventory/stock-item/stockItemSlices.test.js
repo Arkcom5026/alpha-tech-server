@@ -67,10 +67,13 @@ test('search requires both query and branch authority', async () => {
   assert.equal(res.state.body.error, 'Missing query or branchId')
 })
 
-test('stock item routes are owned by inventory slices and no longer import legacy controller', () => {
-  const routePath = path.join(__dirname, '../../../../routes/stockItemRoutes.js')
+test('stock item routes are owned and mounted by inventory slices', () => {
+  const server = fs.readFileSync(path.resolve(__dirname, '../../../../server.js'), 'utf8')
+  const routePath = path.join(__dirname, 'routes/stockItemRoutes.js')
   const source = fs.readFileSync(routePath, 'utf8')
-  assert.match(source, /src\/modules\/inventory\/stock-item/)
+
+  assert.match(server, /require\('\.\/src\/modules\/inventory\/stock-item\/routes\/stockItemRoutes'\)/)
+  assert.match(server, /app\.use\('\/api\/stock-items', stockItemRoutes\)/)
   assert.doesNotMatch(source, /controllers\/stockItemController/)
   assert.match(source, /receive-all-no-sn/)
   assert.match(source, /update-sn\/:barcode/)
