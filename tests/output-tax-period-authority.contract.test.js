@@ -18,6 +18,15 @@ const periodRepository = read(
 const closingPlan = read(
   'src/modules/tax/outputTax/closing/buildOutputTaxPeriodClosingPlanService.js',
 );
+const periodReport = read(
+  'src/modules/tax/outputTax/reporting/buildOutputTaxPeriodReportService.js',
+);
+const periodReadiness = read(
+  'src/modules/tax/outputTax/readiness/buildOutputTaxPeriodReadinessService.js',
+);
+const outputTaxOverview = read(
+  'src/modules/tax/outputTax/dashboard/buildOutputTaxOverviewService.js',
+);
 const intakeRoutes = read('src/modules/tax/http/taxIntakeRoutes.js');
 const registerCandidate = read('src/modules/tax/intake/registerTaxCandidateService.js');
 const convertCandidate = read(
@@ -50,9 +59,9 @@ expectIncludes(
     "CLOSING: 'CLOSING'",
     "CLOSED: 'CLOSED'",
     "REOPENED: 'REOPENED'",
-    "targetStatus: PERIOD_STATUS.CLOSING",
-    "targetStatus: PERIOD_STATUS.CLOSED",
-    "targetStatus: PERIOD_STATUS.REOPENED",
+    'targetStatus: PERIOD_STATUS.CLOSING',
+    'targetStatus: PERIOD_STATUS.CLOSED',
+    'targetStatus: PERIOD_STATUS.REOPENED',
     'OUTPUT_TAX_PERIOD_READINESS_BLOCKED',
     'OUTPUT_TAX_PERIOD_CLOSE_SNAPSHOT_V1',
     'findByIdForUpdate',
@@ -109,6 +118,48 @@ expectIncludes(
     "? 'OUTPUT_TAX_PERIOD_CLOSED'",
   ],
   'OutputTaxPeriod closing plan projection',
+);
+
+expectIncludes(
+  periodReport,
+  [
+    'OUTPUT_TAX_PERIOD_REPORT_V2',
+    'findByBranchYearMonth',
+    'periodExists',
+    'lockedForTaxWrites',
+    'closeRequestedAt',
+    'closedAt',
+    'reopenedAt',
+  ],
+  'OutputTaxPeriod monthly report projection',
+);
+
+expectIncludes(
+  periodReadiness,
+  [
+    'OUTPUT_TAX_PERIOD_READINESS_V2',
+    'compatibilitySchemaVersion',
+    'readyForCloseAuthorization',
+    'closeRequestAllowed',
+    'closeAllowed',
+    'reopenAllowed',
+    'nextRequiredAction',
+  ],
+  'OutputTaxPeriod readiness projection',
+);
+
+expectIncludes(
+  outputTaxOverview,
+  [
+    'OUTPUT_TAX_OVERVIEW_V2',
+    'compatibilitySchemaVersion',
+    'periodExists',
+    'lockedForTaxWrites',
+    'closeRequestedAt',
+    'closedAt',
+    'reopenedAt',
+  ],
+  'Output tax overview projection',
 );
 
 expectIncludes(
