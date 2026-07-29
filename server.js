@@ -49,6 +49,8 @@ const publicStorefrontRoutes = require('./src/modules/sales/storefront/public/pu
 const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
 const commerceIdentityRoutes = require('./src/modules/sales/storefront/identity/commerceIdentityRoutes');
 const productReservationCommitmentRoutes = require('./src/modules/sales/storefront/commitment/productReservationCommitmentRoutes');
+const productReservationMerchantRoutes = require('./src/modules/sales/reservations/merchant/productReservationMerchantRoutes');
+const productReservationExpiryRoutes = require('./src/modules/sales/reservations/expiry/productReservationExpiryRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -200,6 +202,8 @@ app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
 app.use('/api/sales/storefronts/:slug/commitment', productReservationCommitmentRoutes);
+app.use('/api/sales/reservations/expiry', productReservationExpiryRoutes);
+app.use('/api/sales/reservations', productReservationMerchantRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);

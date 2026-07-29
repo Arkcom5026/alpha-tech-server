@@ -45,6 +45,7 @@ model CommerceCommitmentIdentity {
   createdAt          DateTime                  @default(now())
   anonymousSession   AnonymousShoppingSession  @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
   challenge          CommerceIdentityChallenge @relation(fields: [challengeId], references: [id], onDelete: Restrict)
+  productReservations ProductReservation[]
 
   @@index([anonymousSessionId, expiresAt], map: "CommerceCommitmentIdentity_session_expiry_idx")
 }

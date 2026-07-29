@@ -52,6 +52,9 @@ model EmployeeProfile {
   user                              User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
   inputTaxFilingBatches             InputTaxFilingBatch[]
   taxDocumentLifecycleEvents        TaxDocumentLifecycleEvent[]
+  createdProductReservations        ProductReservation[]         @relation("ProductReservationCreatedBy")
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[] @relation("ProductReservationLifecycleCommandActor")
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[] @relation("ProductReservationLifecycleEventActor")
   confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
   payment                           Payment[]
   purchaseOrderCreated              PurchaseOrder[]
@@ -154,6 +157,9 @@ model Branch {
   stockBalances                   StockBalance[]
   stock                           StockItem[]
   stockMovement                   StockMovement[]
+  productReservations             ProductReservation[]
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[]
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[]
   suppliers                       Supplier[]
   supplierPayment                 SupplierPayment[]
   supplierPayables                SupplierPayable[]
@@ -284,6 +290,7 @@ model Product {
   stockBalances            StockBalance[]
   stockItems               StockItem[]
   stockMovement            StockMovement[]
+  productReservationItems  ProductReservationItem[]
   v2StockAuditItems        V2StockAuditItem[]
 
   @@index([mode, active])
@@ -416,6 +423,7 @@ model StockItem {
   repairJobs                 RepairJob[]
   saleItems                  SaleItem[]
   stockMovements             StockMovement[]
+  productReservationItems    ProductReservationItem[]
   stockAuditScanLog          StockAuditScanLog[]
   stockAuditSnapshotItem     StockAuditSnapshotItem[]
   branch                     Branch                    @relation(fields: [branchId], references: [id])
@@ -1506,6 +1514,7 @@ model SimpleLot {
   product            Product                   @relation(fields: [productId], references: [id])
   receiptItem        PurchaseOrderReceiptItem? @relation(fields: [receiptItemId], references: [id])
   stockMovements     StockMovement[]
+  productReservationItems ProductReservationItem[]
   posHeldCartLines   PosHeldCartLine[]
 
   @@index([branchId, productId, receivedAt])
@@ -1649,6 +1658,7 @@ model CustomerProfile {
   services                  ServiceOrder[]
   v2CustomerDeposits        V2CustomerDeposit[]
   posHeldCarts              PosHeldCart[]
+  productReservations       ProductReservation[]
 
   @@index([subdistrictCode])
 }
@@ -2999,4 +3009,149 @@ enum RepairDeliveryMethod {
   COURIER
   DELIVERY_BY_STORE
   OTHER
+}
+
+enum ProductReservationActorType {
+  EMPLOYEE
+  COMMERCE_IDENTITY
+}
+
+enum ProductReservationStatus {
+  ACTIVE
+  ACCEPTED
+  FULFILLMENT_READY
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ProductReservationLineType {
+  STOCK_ITEM
+  SIMPLE
+}
+
+enum ProductReservationLifecycleCommandType {
+  ACCEPT
+  MARK_FULFILLMENT_READY
+  CANCEL
+  EXPIRE
+}
+
+enum OnlineOrderSource {
+  ONLINE
+  STOREFRONT
+}
+
+enum OnlineFulfillmentMethod {
+  PICKUP
+}
+
+model ProductReservation {
+  id                  Int                         @id @default(autoincrement())
+  code                String                      @unique
+  branchId            Int
+  customerId          Int?
+  createdByEmployeeId Int?
+  actorType           ProductReservationActorType @default(EMPLOYEE)
+  commerceIdentityId  Int?                        @unique
+  anonymousSessionId  Int?                        @unique
+  idempotencyKey      String?
+  status              ProductReservationStatus    @default(ACTIVE)
+  orderSource         OnlineOrderSource           @default(ONLINE)
+  sourceReference     String?
+  fulfillmentMethod   OnlineFulfillmentMethod     @default(PICKUP)
+  totalBeforeDiscount Decimal                      @default(0) @db.Decimal(12, 2)
+  totalDiscount       Decimal                      @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal                      @db.Decimal(12, 2)
+  depositAmount       Decimal                      @default(0) @db.Decimal(12, 2)
+  note                String?
+  expiresAt           DateTime?
+  stockReleasedAt     DateTime?
+  version             Int                         @default(1)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  branch              Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdByEmployee   EmployeeProfile?             @relation("ProductReservationCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  commerceIdentity    CommerceCommitmentIdentity?  @relation(fields: [commerceIdentityId], references: [id], onDelete: Restrict)
+  anonymousSession    AnonymousShoppingSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: Restrict)
+  items               ProductReservationItem[]
+  lifecycleCommands   ProductReservationLifecycleCommand[]
+  lifecycleEvents     ProductReservationLifecycleEvent[]
+
+  @@index([branchId, status, createdAt])
+  @@index([status, expiresAt])
+}
+
+model ProductReservationLifecycleCommand {
+  id            Int                                   @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandKey    String
+  commandType   ProductReservationLifecycleCommandType
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  stockReleased Boolean                               @default(false)
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime                              @default(now())
+  reservation   ProductReservation                    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch                                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?                      @relation("ProductReservationLifecycleCommandActor", fields: [actorId], references: [id], onDelete: SetNull)
+  event         ProductReservationLifecycleEvent?
+
+  @@unique([reservationId, commandKey])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationLifecycleEvent {
+  id            Int                @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandId     Int                @unique
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime           @default(now())
+  reservation   ProductReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  command       ProductReservationLifecycleCommand @relation(fields: [commandId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?   @relation("ProductReservationLifecycleEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationItem {
+  id            Int                        @id @default(autoincrement())
+  reservationId Int
+  lineId        String
+  lineType      ProductReservationLineType
+  productId     Int
+  stockItemId   Int?
+  simpleLotId   Int?
+  quantity      Decimal                    @db.Decimal(12, 2)
+  basePrice     Decimal                    @db.Decimal(12, 2)
+  discount      Decimal                    @default(0) @db.Decimal(12, 2)
+  price         Decimal                    @db.Decimal(12, 2)
+  vatAmount     Decimal                    @default(0) @db.Decimal(12, 2)
+  remark        String?
+  isActive      Boolean                    @default(true)
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  reservation   ProductReservation         @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product       Product                    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockItem     StockItem?                 @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  simpleLot     SimpleLot?                 @relation(fields: [simpleLotId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, lineId])
+  @@index([reservationId, isActive])
+  @@index([productId])
+  @@index([simpleLotId])
 }

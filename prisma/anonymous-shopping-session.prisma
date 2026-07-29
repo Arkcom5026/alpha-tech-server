@@ -2,19 +2,20 @@
 // Persistence authority is introduced by migration 20260729013000_anonymous_shopping_session_foundation.
 
 model AnonymousShoppingSession {
-  id                   Int                            @id @default(autoincrement())
-  branchId             Int
-  publicTokenHash      String                         @unique
-  status               AnonymousShoppingSessionStatus @default(ACTIVE)
-  expiresAt            DateTime
-  committedAt          DateTime?
-  abandonedAt          DateTime?
-  lastActivityAt       DateTime                       @default(now())
-  createdAt            DateTime                       @default(now())
-  updatedAt            DateTime                       @updatedAt
-  items                AnonymousShoppingSessionItem[]
-  identityChallenges   CommerceIdentityChallenge[]
-  commitmentIdentities CommerceCommitmentIdentity[]
+  id             Int                            @id @default(autoincrement())
+  branchId       Int
+  publicTokenHash String                         @unique
+  status         AnonymousShoppingSessionStatus @default(ACTIVE)
+  expiresAt      DateTime
+  committedAt    DateTime?
+  abandonedAt    DateTime?
+  lastActivityAt DateTime                       @default(now())
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  items          AnonymousShoppingSessionItem[]
+  productReservations          ProductReservation[]
+  commerceIdentityChallenges   CommerceIdentityChallenge[]
+  commerceCommitmentIdentities CommerceCommitmentIdentity[]
 
   @@index([branchId, status])
   @@index([status, expiresAt])
