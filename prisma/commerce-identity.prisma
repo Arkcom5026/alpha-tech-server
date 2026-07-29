@@ -1,0 +1,50 @@
+enum CommerceIdentityChallengePurpose {
+  RESERVATION_COMMITMENT
+}
+
+enum CommerceIdentityChallengeStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  LOCKED
+  CANCELLED
+  CONSUMED
+}
+
+model CommerceIdentityChallenge {
+  id                 Int                              @id @default(autoincrement())
+  anonymousSessionId Int
+  purpose            CommerceIdentityChallengePurpose @default(RESERVATION_COMMITMENT)
+  phoneNormalized    String
+  status             CommerceIdentityChallengeStatus  @default(PENDING)
+  otpHash             String
+  expiresAt          DateTime
+  verifiedAt         DateTime?
+  consumedAt         DateTime?
+  cancelledAt        DateTime?
+  attemptCount       Int                              @default(0)
+  resendCount        Int                              @default(0)
+  lastSentAt         DateTime                         @default(now())
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+  anonymousSession   AnonymousShoppingSession         @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  commitmentIdentity CommerceCommitmentIdentity?
+
+  @@index([status, expiresAt], map: "CommerceIdentityChallenge_expiry_idx")
+}
+
+model CommerceCommitmentIdentity {
+  id                 Int                       @id @default(autoincrement())
+  anonymousSessionId Int
+  challengeId        Int                       @unique
+  phoneNormalized    String
+  proofTokenHash     String                    @unique
+  verifiedAt         DateTime
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  createdAt          DateTime                  @default(now())
+  anonymousSession   AnonymousShoppingSession  @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  challenge          CommerceIdentityChallenge @relation(fields: [challengeId], references: [id], onDelete: Restrict)
+
+  @@index([anonymousSessionId, expiresAt], map: "CommerceCommitmentIdentity_session_expiry_idx")
+}

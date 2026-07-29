@@ -45,6 +45,10 @@ const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stock
 const barcodeRoutes = require('./src/modules/inventory/barcode/routes/barcodeRoutes');
 const customerRoutes = require('./src/modules/customer/routes/customerRoutes');
 const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
+const publicStorefrontRoutes = require('./src/modules/sales/storefront/public/publicStorefrontRoutes');
+const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
+const commerceIdentityRoutes = require('./src/modules/sales/storefront/identity/commerceIdentityRoutes');
+const productReservationCommitmentRoutes = require('./src/modules/sales/storefront/commitment/productReservationCommitmentRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -57,6 +61,7 @@ const orderOnlineRoutes = require('./src/modules/commerce/order-online/routes/or
 const cartRoutes = require('./src/modules/commerce/cart/routes/cartRoutes');
 const branchPriceRoutes = require('./src/modules/product/pricing/routes/branchPriceRoutes');
 const branchRoutes = require('./src/modules/branch/routes/branchRoutes');
+const partnerStoreCapabilityRoutes = require('./src/modules/partnerStore/routes/partnerStoreCapabilityRoutes');
 const customerDepositRoutes = require('./src/modules/finance/customer-deposit/routes/customerDepositRoutes');
 const purchaseReportRoutes = require('./src/modules/reporting/purchase/routes/purchaseReportRoutes');
 const inputTaxReportRoutes = require('./src/modules/reporting/tax/input/routes/inputTaxReportRoutes');
@@ -71,9 +76,9 @@ const receiptSimpleRoutes = require('./src/modules/procurement/receipt/simple/ro
 const purchaseOrderReceiptSimpleRoutes = require('./routes/purchaseOrderReceiptSimpleRoutes');
 const quickReceiptRoutes = require('./src/modules/inventory/quick-receipt/routes/quickReceiptRoutes');
 const stockRoutes = require('./src/modules/inventory/dashboard/routes/stockDashboardRoutes');
-const financeRoutes = require('./src/modules/finance/legacy-runtime/routes/financeRuntimeRoutes');
+const financeRoutes = require('./routes/financeRoutes');
 const customerReceiptRoutes = require('./src/modules/finance/customer-receipt/routes/customerReceiptRoutes');
-const productTypeBrandRoutes = require('./src/modules/brand/routes/productTypeBrandRoutes');
+const productTypeBrandRoutes = require('./routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
 const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
@@ -83,10 +88,15 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
+  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
+
+  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
+
+  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -104,10 +114,13 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
+
   const o = normalizeOrigin(origin);
   if (!o) return true;
+
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
+
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
@@ -115,7 +128,11 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
+
+    if (!origin || isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -125,11 +142,13 @@ const corsOptions = {
     'Authorization',
     'X-Idempotency-Key',
     'X-Finalize-Token',
+    'X-Anonymous-Session-Token',
+    'X-Commerce-Identity-Proof',
     'X-Requested-With',
     'Accept',
     'Origin',
   ],
-  exposedHeaders: ['X-Request-Id'],
+  exposedHeaders: ['X-Request-Id', 'X-Anonymous-Session-Token', 'X-Commerce-Identity-Proof'],
   credentials: true,
   maxAge: 86400,
   optionsSuccessStatus: 204,
@@ -177,6 +196,10 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
+app.use('/api/sales/storefronts', publicStorefrontRoutes);
+app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
+app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
+app.use('/api/sales/storefronts/:slug/commitment', productReservationCommitmentRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
@@ -191,6 +214,7 @@ app.use('/api/order-online', orderOnlineRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/branch-prices', branchPriceRoutes);
 app.use('/api/branches', branchRoutes);
+app.use('/api/partner-store', partnerStoreCapabilityRoutes);
 app.use('/api/purchase-reports', purchaseReportRoutes);
 app.use('/api/input-tax-reports', inputTaxReportRoutes);
 app.use('/api/combined-billing', combinedBillingRoutes);
@@ -221,6 +245,7 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
+
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
   const statusCode =
     Number.isInteger(candidateStatusCode) &&
@@ -244,3 +269,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+module.exports = app;

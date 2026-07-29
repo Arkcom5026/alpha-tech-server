@@ -1,0 +1,39 @@
+// Anonymous Shopping Session Prisma projection
+// Persistence authority is introduced by migration 20260729013000_anonymous_shopping_session_foundation.
+
+model AnonymousShoppingSession {
+  id             Int                            @id @default(autoincrement())
+  branchId       Int
+  publicTokenHash String                         @unique
+  status         AnonymousShoppingSessionStatus @default(ACTIVE)
+  expiresAt      DateTime
+  committedAt    DateTime?
+  abandonedAt    DateTime?
+  lastActivityAt DateTime                       @default(now())
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  items          AnonymousShoppingSessionItem[]
+
+  @@index([branchId, status])
+  @@index([status, expiresAt])
+}
+
+model AnonymousShoppingSessionItem {
+  id        Int                      @id @default(autoincrement())
+  sessionId Int
+  productId Int
+  quantity  Int
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  session   AnonymousShoppingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, productId])
+  @@index([productId])
+}
+
+enum AnonymousShoppingSessionStatus {
+  ACTIVE
+  COMMITTED
+  EXPIRED
+  ABANDONED
+}
