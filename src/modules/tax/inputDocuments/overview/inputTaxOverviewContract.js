@@ -76,6 +76,16 @@ const createEmptyOverview = ({ branchId, periodView, periodFrom, periodTo, curre
     deferredVatAmount: '0.00',
     blockerSummary: [],
   },
+  periodAuthority: {
+    supportedStatuses: ['OPEN', 'CLOSED', 'LOCKED', 'SUBMITTED', 'REOPENED'],
+    mutationBlockedStatuses: ['CLOSED', 'LOCKED', 'SUBMITTED'],
+    periodEndpoints: {
+      list: '/api/tax/periods',
+      summary: '/api/tax/periods/summary',
+      close: '/api/tax/periods/:taxPeriodId/close',
+      reopen: '/api/tax/periods/:taxPeriodId/reopen',
+    },
+  },
   byDocumentType: [],
   bySourceType: [],
   bySupplier: [],
