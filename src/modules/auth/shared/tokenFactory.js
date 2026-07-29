@@ -13,7 +13,7 @@ const buildAccessToken = (user, options = {}) => {
     branchId: profile?.branchId || null,
     employeeId: profile?.id || null,
     ...options,
-  }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIS });
+  }, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
 };
 
 module.exports = {
