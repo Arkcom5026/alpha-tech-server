@@ -6,6 +6,7 @@ const express = require('express');
 const legacyAuthController = require('../../../../controllers/authController');
 const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
 const loginController = require('../login/loginController');
+const sessionController = require('../session/sessionController');
 const tenantAuthController = require('../controllers/authController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
@@ -69,12 +70,7 @@ const resolveLegacyHandler = (key) => {
 };
 
 const register = ensureLegacyFn('register');
-const refreshSession = ensureLegacyFn('refreshSession');
-const logoutSession = ensureLegacyFn('logoutSession');
 const addSubEmployee = employeeOnboardingController.addSubEmployee;
-const revokeSession = resolveLegacyHandler('revokeSession')
-  || resolveLegacyHandler('logoutAllSessions')
-  || resolveLegacyHandler('logoutAll');
 const findUserByEmail = resolveLegacyHandler('findUserByEmail');
 const getMe = ensureLegacyFn('getMe');
 const forgotPassword = ensureLegacyFn('forgotPassword');
@@ -82,6 +78,12 @@ const resetPassword = ensureLegacyFn('resetPassword');
 
 if (typeof loginController.login !== 'function') {
   throw new Error('[authRoutes] loginController.login must be a function');
+}
+
+for (const handlerName of ['refreshSession', 'logoutSession', 'revokeSession']) {
+  if (typeof sessionController[handlerName] !== 'function') {
+    throw new Error(`[authRoutes] sessionController.${handlerName} must be a function`);
+  }
 }
 
 if (typeof addSubEmployee !== 'function') {
@@ -97,14 +99,10 @@ if (typeof findUserByEmail !== 'function') {
 // Current canonical /api/auth contract.
 router.post('/login', loginController.login);
 router.post('/register', register);
-router.post('/refresh', traceRefreshRequest, refreshSession);
-router.post('/logout', logoutSession);
+router.post('/refresh', traceRefreshRequest, sessionController.refreshSession);
+router.post('/logout', sessionController.logoutSession);
 router.post('/add-sub-employee', verifyToken, addSubEmployee);
-
-if (typeof revokeSession === 'function') {
-  router.post('/logout-all', verifyToken, revokeSession);
-}
-
+router.post('/logout-all', verifyToken, sessionController.revokeSession);
 router.get('/users/find', verifyToken, findUserByEmail);
 router.get('/me', verifyToken, getMe);
 router.post('/forgot-password', forgotPassword);
