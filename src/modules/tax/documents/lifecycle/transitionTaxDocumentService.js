@@ -6,6 +6,9 @@ const documentRepository = require('../repository/taxDocumentRepository');
 const {
   assertInputTaxDocumentReconciled,
 } = require('../../inputDocuments/reconciliation/inputTaxDocumentReconciliationService');
+const {
+  assertPeriodAllowsTransition,
+} = require('../../outputTax/period/guard/outputTaxPeriodGuard');
 
 const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, reason, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -31,6 +34,11 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
 
     const decision = assertTaxDocumentTransition({ currentStatus: current.status, targetStatus: normalizedTarget });
     if (decision.replayed) return Object.freeze({ replayed: true, document: current });
+
+    await assertPeriodAllowsTransition({
+      branchId: normalizedBranchId,
+      occurredAt: current.occurredAt,
+    }, tx);
 
     let reconciliation = null;
     if (decision.targetStatus === 'APPROVED') {
