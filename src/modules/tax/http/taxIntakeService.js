@@ -17,6 +17,15 @@ const {
 const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
 const { buildTaxDocumentWorkspaceProjection } = require('../documents/workspace/buildTaxDocumentWorkspaceProjection');
 const { buildOutputTaxOverview } = require('../outputTax/dashboard/buildOutputTaxOverviewService');
+const {
+  closePeriod,
+  createPeriod,
+  getPeriod,
+  getPeriodTimeline,
+  listPeriods,
+  reopenPeriod,
+  requestClosePeriod,
+} = require('../outputTax/period/application/outputTaxPeriodService');
 const { buildOutputTaxPeriodReadiness } = require('../outputTax/readiness/buildOutputTaxPeriodReadinessService');
 const { buildOutputTaxPeriodReport } = require('../outputTax/reporting/buildOutputTaxPeriodReportService');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
@@ -125,7 +134,9 @@ const getOutputTaxPeriodReport = (input) => buildOutputTaxPeriodReport({
 
 module.exports = Object.freeze({
   cancelTaxDocument,
+  closeOutputTaxPeriod: closePeriod,
   convertTaxCandidate,
+  createOutputTaxPeriod: createPeriod,
   getDocumentDetail,
   getDocumentOperationalReadinessProjection,
   getDocumentPrintProjection,
@@ -133,13 +144,18 @@ module.exports = Object.freeze({
   getDocumentTimelineProjection,
   getDocumentWorkspaceProjection,
   getOutputTaxOverview,
+  getOutputTaxPeriod: getPeriod,
   getOutputTaxPeriodReadiness,
   getOutputTaxPeriodReport,
+  getOutputTaxPeriodTimeline: getPeriodTimeline,
   issueTaxDocument,
   listCandidates,
   listDocuments,
+  listOutputTaxPeriods: listPeriods,
   registerSaleTaxCandidate,
   registerTaxCandidate,
+  reopenOutputTaxPeriod: reopenPeriod,
   replaceCancelledTaxDocument,
+  requestCloseOutputTaxPeriod: requestClosePeriod,
   transitionTaxDocument,
 });
