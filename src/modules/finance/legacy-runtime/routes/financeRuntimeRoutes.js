@@ -3,7 +3,7 @@ const router = express.Router();
 
 const financeController = require('../../controllers/financeRuntimeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
-const dailyClosingRoutes = require('../../../../../src/features/finance/dailyClosing.routes');
+const dailyClosingRoutes = require('../../daily-closing/routes/dailyClosingRoutes');
 
 router.use(verifyToken);
 router.use('/', dailyClosingRoutes);
