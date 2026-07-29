@@ -7,7 +7,7 @@ const getSupplierController = require('../query/detail/getSupplierSlice');
 const updateSupplierController = require('../update/updateSupplierSlice');
 const deleteSupplierController = require('../delete/deleteSupplierSlice');
 
-const verifyToken = require('../../../middlewares/verifyToken');
+const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.post('/', createSupplierController.handle);
