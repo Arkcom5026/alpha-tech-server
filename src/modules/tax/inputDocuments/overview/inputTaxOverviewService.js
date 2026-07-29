@@ -6,6 +6,7 @@ const {
   MONEY_TOLERANCE,
   createReconciliationProjection,
 } = require('../reconciliation/inputTaxReconciliationContract');
+const { projectInputTaxEligibility } = require('../eligibility/inputTaxEligibilityService');
 
 const ACTIVE_STATUSES = new Set(['DRAFT', 'ISSUED', 'APPROVED']);
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'VOIDED', 'REPLACED']);
@@ -112,23 +113,28 @@ const percentChange = (current, previous) => {
 
 const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, documents, previousDocuments }) => {
   const result = createEmptyOverview({ branchId, periodView, periodFrom, periodTo });
-  const activeDocuments = documents.filter(isActive).map((row) => ({
-    ...row,
-    reconciliation: projectDocumentReconciliation(row),
-  }));
+  const activeDocuments = documents.filter(isActive).map((row) => {
+    const reconciliation = projectDocumentReconciliation(row);
+    return { ...row, reconciliation, eligibility: projectInputTaxEligibility({ document: row, reconciliation }) };
+  });
   const cancelledDocuments = documents.filter(isCancelled);
-  const previousActive = previousDocuments.filter(isActive).map((row) => ({
-    ...row,
-    reconciliation: projectDocumentReconciliation(row),
-  }));
+  const previousActive = previousDocuments.filter(isActive).map((row) => {
+    const reconciliation = projectDocumentReconciliation(row);
+    return { ...row, reconciliation, eligibility: projectInputTaxEligibility({ document: row, reconciliation }) };
+  });
   const sum = (rows, field) => rows.reduce((total, row) => total + amount(row[field]), 0);
+  const sumEligibility = (rows, field) => rows.reduce((total, row) => total + amount(row.eligibility[field]), 0);
   const reconciled = activeDocuments.filter((row) => row.reconciliation.status === 'RECONCILED');
   const unlinked = activeDocuments.filter((row) => row.reconciliation.status === 'UNLINKED');
   const partiallyReconciled = activeDocuments.filter((row) => row.reconciliation.status === 'PARTIALLY_RECONCILED');
   const overAllocated = activeDocuments.filter((row) => row.reconciliation.status === 'OVER_ALLOCATED');
   const mismatched = [...partiallyReconciled, ...overAllocated];
-  const blocked = activeDocuments.filter((row) => !row.reconciliation.canApprove);
-  const ready = reconciled;
+  const eligible = activeDocuments.filter((row) => ['ELIGIBLE', 'PARTIALLY_ELIGIBLE'].includes(row.eligibility.status));
+  const deferred = activeDocuments.filter((row) => row.eligibility.status === 'DEFERRED');
+  const selected = activeDocuments.filter((row) => row.eligibility.status === 'SELECTED_FOR_FILING');
+  const filed = activeDocuments.filter((row) => row.eligibility.status === 'FILED');
+  const blocked = activeDocuments.filter((row) => !row.eligibility.canSelectForFiling
+    && !['SELECTED_FOR_FILING', 'FILED', 'DEFERRED'].includes(row.eligibility.status));
 
   result.headline.documentCount = documents.length;
   result.headline.activeDocumentCount = activeDocuments.length;
@@ -137,13 +143,16 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.headline.vatAmount = money(sum(activeDocuments, 'vatAmount'));
   result.headline.totalAmount = money(sum(activeDocuments, 'totalAmount'));
   result.headline.reconciledVatAmount = money(sum(reconciled, 'vatAmount'));
-  result.headline.claimableVatAmount = money(sum(ready, 'vatAmount'));
-  result.headline.blockedVatAmount = money(sum(blocked, 'vatAmount'));
+  result.headline.claimableVatAmount = money(sumEligibility(eligible, 'eligibleVatAmount'));
+  result.headline.selectedVatAmount = money(sumEligibility(selected, 'eligibleVatAmount'));
+  result.headline.filedVatAmount = money(sumEligibility(filed, 'eligibleVatAmount'));
+  result.headline.deferredVatAmount = money(sumEligibility(deferred, 'eligibleVatAmount'));
+  result.headline.blockedVatAmount = money(sumEligibility(blocked, 'grossVatAmount'));
 
   const previousVat = sum(previousActive, 'vatAmount');
-  const previousClaimableVat = sum(
-    previousActive.filter((row) => row.reconciliation.status === 'RECONCILED'),
-    'vatAmount',
+  const previousClaimableVat = sumEligibility(
+    previousActive.filter((row) => ['ELIGIBLE', 'PARTIALLY_ELIGIBLE'].includes(row.eligibility.status)),
+    'eligibleVatAmount',
   );
   const vatComparison = percentChange(result.headline.vatAmount, previousVat);
   const claimComparison = percentChange(result.headline.claimableVatAmount, previousClaimableVat);
@@ -163,25 +172,40 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.reconciliation.allocationDifferenceAmount = money(mismatched.reduce(
     (total, row) => total + Math.abs(amount(row.reconciliation.variance.totalAmount)), 0,
   ));
-  result.reconciliation.unreconciledVatAmount = money(sum(blocked, 'vatAmount'));
+  result.reconciliation.unreconciledVatAmount = money(sum([...unlinked, ...mismatched], 'vatAmount'));
 
   const missingTaxId = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_SUPPLIER_TAX_ID'));
   const missingNumber = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_INVOICE_NUMBER'));
-  const attentionDocuments = activeDocuments.filter((row) => row.reconciliation.qualityCodes.length > 0);
+  const attentionDocuments = activeDocuments.filter((row) => row.reconciliation.qualityCodes.length > 0
+    || row.eligibility.reasonCodes.length > 0);
   result.quality.missingSupplierTaxIdCount = missingTaxId.length;
   result.quality.missingInvoiceNumberCount = missingNumber.length;
   result.quality.attentionItemCount = attentionDocuments.length;
   result.quality.hasAttentionItems = attentionDocuments.length > 0;
 
-  result.filingReadiness.readyDocumentCount = ready.length;
+  result.filingReadiness.readyDocumentCount = eligible.length;
   result.filingReadiness.blockedDocumentCount = blocked.length;
-  result.filingReadiness.readyVatAmount = money(sum(ready, 'vatAmount'));
-  result.filingReadiness.blockedVatAmount = money(sum(blocked, 'vatAmount'));
+  result.filingReadiness.selectedDocumentCount = selected.length;
+  result.filingReadiness.filedDocumentCount = filed.length;
+  result.filingReadiness.deferredDocumentCount = deferred.length;
+  result.filingReadiness.readyVatAmount = money(sumEligibility(eligible, 'eligibleVatAmount'));
+  result.filingReadiness.blockedVatAmount = money(sumEligibility(blocked, 'grossVatAmount'));
+  result.filingReadiness.selectedVatAmount = money(sumEligibility(selected, 'eligibleVatAmount'));
+  result.filingReadiness.filedVatAmount = money(sumEligibility(filed, 'eligibleVatAmount'));
+  result.filingReadiness.deferredVatAmount = money(sumEligibility(deferred, 'eligibleVatAmount'));
   const blockerCodes = ['UNLINKED_DOCUMENT', 'ALLOCATION_MISMATCH', 'OVER_ALLOCATED'];
-  result.filingReadiness.blockerSummary = blockerCodes.map((code) => {
+  const reconciliationBlockers = blockerCodes.map((code) => {
     const rows = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes(code));
     return { code, documentCount: rows.length, vatAmount: money(sum(rows, 'vatAmount')) };
-  }).filter((item) => item.documentCount > 0);
+  });
+  const eligibilityCodes = [...new Set(blocked.flatMap((row) => row.eligibility.reasonCodes))];
+  const eligibilityBlockers = eligibilityCodes.map((code) => {
+    const rows = blocked.filter((row) => row.eligibility.reasonCodes.includes(code));
+    return { code, documentCount: rows.length, vatAmount: money(sumEligibility(rows, 'grossVatAmount')) };
+  });
+  result.filingReadiness.blockerSummary = [...reconciliationBlockers, ...eligibilityBlockers]
+    .filter((item) => item.documentCount > 0)
+    .filter((item, index, rows) => rows.findIndex((candidate) => candidate.code === item.code) === index);
 
   const group = (keyFn) => {
     const map = new Map();
@@ -208,9 +232,10 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   const activeById = new Map(activeDocuments.map((row) => [row.id, row]));
   result.recentDocuments = documents.slice(0, 10).map((row) => {
     const activeRow = activeById.get(row.id);
-    const reconciliation = activeRow
-      ? activeRow.reconciliation
-      : projectDocumentReconciliation(row);
+    const reconciliation = activeRow ? activeRow.reconciliation : projectDocumentReconciliation(row);
+    const eligibility = activeRow
+      ? activeRow.eligibility
+      : projectInputTaxEligibility({ document: row, reconciliation });
     return {
       taxDocumentId: row.id,
       documentType: row.documentType,
@@ -227,8 +252,12 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
       linkedReceiptCount: row.linkedReceiptCount,
       reconciliationStatus: reconciliation.status,
       reconciliation,
-      filingStatus: 'NOT_SELECTED',
-      attentionReasons: reconciliation.qualityCodes,
+      eligibilityStatus: eligibility.status,
+      eligibility,
+      filingStatus: ['SELECTED_FOR_FILING', 'FILED'].includes(eligibility.status)
+        ? eligibility.status
+        : 'NOT_SELECTED',
+      attentionReasons: [...new Set([...reconciliation.qualityCodes, ...eligibility.reasonCodes])],
       updatedAt: row.updatedAt,
     };
   });
