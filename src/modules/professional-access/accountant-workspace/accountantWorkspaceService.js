@@ -1,63 +1,24 @@
-const fail = (code, message, statusCode = 400) => {
-  const error = new Error(message);
-  error.code = code;
-  error.statusCode = statusCode;
-  throw error;
-};
-
-const normalizePositiveInt = (value, code, message) => {
-  const normalized = Number(value);
-  if (!Number.isInteger(normalized) || normalized <= 0) fail(code, message);
-  return normalized;
-};
-
-const normalizeStatus = (value) => String(value || '').trim().toUpperCase();
-
-const assertActiveMembership = (membership) => {
-  if (!membership) fail('ACCOUNTANT_WORKSPACE_MEMBERSHIP_REQUIRED', 'External organization membership is required', 403);
-  if (normalizeStatus(membership.status) !== 'ACTIVE') {
-    fail('ACCOUNTANT_WORKSPACE_MEMBERSHIP_INACTIVE', 'External organization membership is not active', 403);
-  }
-};
-
-const assertAssignmentAvailable = (assignment, now = new Date()) => {
-  if (!assignment) fail('ACCOUNTANT_WORKSPACE_ASSIGNMENT_NOT_FOUND', 'Business assignment not found', 404);
-  if (normalizeStatus(assignment.status) !== 'ACTIVE') {
-    fail('ACCOUNTANT_WORKSPACE_ASSIGNMENT_INACTIVE', 'Business assignment is not active', 403);
-  }
-  if (assignment.effectiveFrom && new Date(assignment.effectiveFrom) > now) {
-    fail('ACCOUNTANT_WORKSPACE_ASSIGNMENT_NOT_STARTED', 'Business assignment is not effective yet', 403);
-  }
-  if (assignment.effectiveUntil && new Date(assignment.effectiveUntil) < now) {
-    fail('ACCOUNTANT_WORKSPACE_ASSIGNMENT_EXPIRED', 'Business assignment has expired', 403);
-  }
-};
+const {
+  authorizeProfessionalAccess,
+  normalizePositiveInt,
+} = require('../shared/professionalAccessAuthority');
 
 const listBusinesses = async ({ repository, userId, externalOrganizationId, now = new Date() }) => {
-  const normalizedUserId = normalizePositiveInt(
+  const { ids, membership } = await authorizeProfessionalAccess({
+    repository,
     userId,
-    'ACCOUNTANT_WORKSPACE_USER_REQUIRED',
-    'userId must be a positive integer',
-  );
-  const normalizedOrganizationId = normalizePositiveInt(
     externalOrganizationId,
-    'ACCOUNTANT_WORKSPACE_ORGANIZATION_REQUIRED',
-    'externalOrganizationId must be a positive integer',
-  );
-
-  const membership = await repository.findActiveMembership({
-    userId: normalizedUserId,
-    externalOrganizationId: normalizedOrganizationId,
+    now,
+    codePrefix: 'ACCOUNTANT_WORKSPACE',
   });
-  assertActiveMembership(membership);
 
   const assignments = await repository.listActiveAssignments({
-    externalOrganizationId: normalizedOrganizationId,
+    externalOrganizationId: ids.externalOrganizationId,
     now,
   });
 
   return {
-    externalOrganizationId: normalizedOrganizationId,
+    externalOrganizationId: ids.externalOrganizationId,
     membership: {
       id: membership.id,
       role: membership.role,
@@ -83,37 +44,23 @@ const getBusinessWorkspace = async ({
   businessId,
   now = new Date(),
 }) => {
-  const normalizedUserId = normalizePositiveInt(
-    userId,
-    'ACCOUNTANT_WORKSPACE_USER_REQUIRED',
-    'userId must be a positive integer',
-  );
-  const normalizedOrganizationId = normalizePositiveInt(
-    externalOrganizationId,
-    'ACCOUNTANT_WORKSPACE_ORGANIZATION_REQUIRED',
-    'externalOrganizationId must be a positive integer',
-  );
   const normalizedBusinessId = normalizePositiveInt(
     businessId,
     'ACCOUNTANT_WORKSPACE_BUSINESS_REQUIRED',
     'businessId must be a positive integer',
   );
 
-  const membership = await repository.findActiveMembership({
-    userId: normalizedUserId,
-    externalOrganizationId: normalizedOrganizationId,
-  });
-  assertActiveMembership(membership);
-
-  const assignment = await repository.findAssignment({
-    externalOrganizationId: normalizedOrganizationId,
+  const { ids, membership, assignment } = await authorizeProfessionalAccess({
+    repository,
+    userId,
+    externalOrganizationId,
     businessId: normalizedBusinessId,
     now,
+    codePrefix: 'ACCOUNTANT_WORKSPACE',
   });
-  assertAssignmentAvailable(assignment, now);
 
   return {
-    externalOrganizationId: normalizedOrganizationId,
+    externalOrganizationId: ids.externalOrganizationId,
     membership: {
       id: membership.id,
       role: membership.role,
