@@ -47,6 +47,7 @@ const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
 const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
 const commerceIdentityRoutes = require('./src/modules/sales/storefront/identity/commerceIdentityRoutes');
+const productReservationCommitmentRoutes = require('./src/modules/sales/storefront/commitment/productReservationCommitmentRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -195,6 +196,7 @@ app.use('/api/barcodes', barcodeRoutes);
 
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
+app.use('/api/sales/storefronts/:slug/commitment', productReservationCommitmentRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
