@@ -10,7 +10,7 @@ const passwordController = require('../password/passwordController');
 const currentUserController = require('../current-user/currentUserController');
 const userLookupController = require('../user-lookup/userLookupController');
 const employeeOnboardingController = require('../employee-onboarding/employeeOnboardingController');
-const tenantAuthController = require('../controllers/authController');
+const tenantLoginController = require('../tenant-login/tenantLoginController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
 const tenantContext = require('../../../middlewares/tenantContext');
@@ -89,6 +89,10 @@ if (typeof employeeOnboardingController.addSubEmployee !== 'function') {
   throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
 }
 
+if (typeof tenantLoginController.login !== 'function') {
+  throw new Error('[authRoutes] tenantLoginController.login must be a function');
+}
+
 // Current canonical /api/auth contract.
 router.post('/login', loginController.login);
 router.post('/register', registrationController.register);
@@ -101,7 +105,7 @@ router.get('/me', verifyToken, currentUserController.getMe);
 router.post('/forgot-password', passwordController.forgotPassword);
 router.post('/reset-password', passwordController.resetPassword);
 
-// Existing tenant-login responsibility retained under the same canonical route owner.
-router.post('/:tenant_slug/auth/login', tenantContext, tenantAuthController.login);
+// Tenant-scoped compatibility contract backed by the canonical User + EmployeeProfile identity.
+router.post('/:tenant_slug/auth/login', tenantContext, tenantLoginController.login);
 
 module.exports = router;
