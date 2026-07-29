@@ -3,13 +3,13 @@
 
 const express = require('express');
 
-const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
 const loginController = require('../login/loginController');
 const registrationController = require('../registration/registrationController');
 const sessionController = require('../session/sessionController');
 const passwordController = require('../password/passwordController');
 const currentUserController = require('../current-user/currentUserController');
 const userLookupController = require('../user-lookup/userLookupController');
+const employeeOnboardingController = require('../employee-onboarding/employeeOnboardingController');
 const tenantAuthController = require('../controllers/authController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
@@ -57,8 +57,6 @@ router.use((req, res, next) => {
   next();
 });
 
-const addSubEmployee = employeeOnboardingController.addSubEmployee;
-
 if (typeof loginController.login !== 'function') {
   throw new Error('[authRoutes] loginController.login must be a function');
 }
@@ -87,7 +85,7 @@ if (typeof userLookupController.findUserByEmail !== 'function') {
   throw new Error('[authRoutes] userLookupController.findUserByEmail must be a function');
 }
 
-if (typeof addSubEmployee !== 'function') {
+if (typeof employeeOnboardingController.addSubEmployee !== 'function') {
   throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
 }
 
@@ -96,7 +94,7 @@ router.post('/login', loginController.login);
 router.post('/register', registrationController.register);
 router.post('/refresh', traceRefreshRequest, sessionController.refreshSession);
 router.post('/logout', sessionController.logoutSession);
-router.post('/add-sub-employee', verifyToken, addSubEmployee);
+router.post('/add-sub-employee', verifyToken, employeeOnboardingController.addSubEmployee);
 router.post('/logout-all', verifyToken, sessionController.revokeSession);
 router.get('/users/find', verifyToken, userLookupController.findUserByEmail);
 router.get('/me', verifyToken, currentUserController.getMe);
