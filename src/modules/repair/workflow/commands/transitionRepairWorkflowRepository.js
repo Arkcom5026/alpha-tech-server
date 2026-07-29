@@ -26,16 +26,22 @@ class TransitionRepairWorkflowRepository {
     );
   }
 
-  findRepairJob(repairJobId) {
-    return this.prisma.repairJob.findUnique({
-      where: { id: Number(repairJobId) },
+  findRepairJob(branchId, repairJobId) {
+    return this.prisma.repairJob.findFirst({
+      where: {
+        id: Number(repairJobId),
+        branchId: Number(branchId),
+      },
       include: repairWorkflowInclude,
     });
   }
 
-  updateLegacyStatus(repairJobId, status) {
+  updateLegacyStatus(branchId, repairJobId, status) {
     return this.prisma.repairJob.update({
-      where: { id: Number(repairJobId) },
+      where: {
+        id: Number(repairJobId),
+        branchId: Number(branchId),
+      },
       data: { status },
       include: repairWorkflowInclude,
     });
