@@ -3,6 +3,9 @@
 const { prisma } = require('../../../../lib/prisma');
 const { buildTaxCandidateRegistration } = require('../candidates/contracts/taxCandidateContract');
 const candidateRepository = require('../candidates/repository/taxCandidateRepository');
+const {
+  assertPeriodAllowsCreate,
+} = require('../outputTax/period/guard/outputTaxPeriodGuard');
 
 const registerTaxCandidate = async (input) => {
   const registration = buildTaxCandidateRegistration(input);
@@ -16,6 +19,14 @@ const registerTaxCandidate = async (input) => {
     if (existingCandidate) {
       return Object.freeze({ replayed: true, candidate: existingCandidate, document: null });
     }
+
+    await assertPeriodAllowsCreate(
+      {
+        branchId: registration.branchId,
+        occurredAt: registration.occurredAt,
+      },
+      tx,
+    );
 
     const candidate = await candidateRepository.create(registration, tx);
     return Object.freeze({ replayed: false, candidate, document: null });
