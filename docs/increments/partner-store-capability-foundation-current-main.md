@@ -30,10 +30,10 @@ Base SHA at bootstrap:
 c38aef64e208fa9e627649ab084c3e348762465a
 ```
 
-Current implementation SHA:
+Repository implementation SHA:
 
 ```text
-4583fb22fba9412601c53f1b33457563ca946ad0
+8284cacdd96cd62decb3afd4fbff0a42f766090e
 ```
 
 ## Implemented Scope
@@ -46,6 +46,34 @@ Current implementation SHA:
 - Explicit service-area rows
 - Foreign-key, uniqueness, consistency-check, and lookup-index authority
 - Existing branches remain unpublished by default
+
+### Prisma projection
+
+Prisma 6 multi-file schema support is enabled through:
+
+```json
+{
+  "prisma": {
+    "schema": "prisma"
+  }
+}
+```
+
+Domain projection:
+
+```text
+prisma/partner-store-capability.prisma
+```
+
+The projection defines:
+
+- `PartnerStoreCapability`
+- `PartnerStoreServiceArea`
+- `OnlineDeliveryFeeMode`
+- `StoreServiceAreaMode`
+- `StoreServiceAreaType`
+- one-to-many capability/service-area relation
+- uniqueness and lookup indexes aligned with the migration
 
 ### Internal runtime authority
 
@@ -102,16 +130,33 @@ The runtime does not accept `branchId` from URL parameters or request payloads.
 - Duplicate service-area identity is rejected by `areaType + areaCode`.
 - Capability upsert and service-area replacement execute in one transaction.
 
-### Repository verification wiring
+### Repository contract authority
 
-- `tests/partner-store-capability-foundation.contract.test.js`
-- `npm run test:partner-store-capability`
+`tests/partner-store-capability-foundation.contract.test.js` now verifies:
+
+- migration enums, tables, constraints, indexes, and additive scope
+- Prisma multi-file schema configuration
+- Prisma models, enums, relation, uniqueness, and indexes
+- server route mount
+- GET/PUT endpoint wiring
+- authentication and employee-context middleware
+- branch isolation at the controller boundary
+- service policy ownership and transaction use
+- repository Prisma delegate usage
+- reservation and legacy online-order non-interference
+
+Command:
+
+```text
+npm run test:partner-store-capability
+```
 
 ## Current Changed Files
 
 ```text
 docs/increments/partner-store-capability-foundation-current-main.md
 package.json
+prisma/partner-store-capability.prisma
 prisma/migrations/20260729143000_partner_store_capability_foundation/migration.sql
 server.js
 src/modules/partnerStore/controllers/partnerStoreCapabilityController.js
@@ -120,24 +165,6 @@ src/modules/partnerStore/routes/partnerStoreCapabilityRoutes.js
 src/modules/partnerStore/services/partnerStoreCapabilityService.js
 tests/partner-store-capability-foundation.contract.test.js
 ```
-
-## Local Prisma Projection Evidence
-
-Task Work previously completed targeted `prisma/schema.prisma` alignment locally at commit:
-
-```text
-948e74afadd34c9cfa2a8145e6bdcbfb39dfcfe2
-```
-
-Reported evidence:
-
-```text
-prisma validate: PASS
-prisma generate: PASS
-git diff --check: PASS
-```
-
-This local commit is not visible on the remote PR branch. Remote Prisma schema/migration alignment therefore remains pending repository evidence.
 
 ## Testing Authority
 
@@ -186,17 +213,18 @@ Targeted file scope: PASS
 Authority semantics documented: PASS
 Unrelated PR #48 history excluded: PASS
 Additive/non-destructive migration review: PASS
+Prisma schema/migration alignment: IMPLEMENTED
 Internal Route → Controller → Service → Repository flow: IMPLEMENTED
 Branch isolation design: IMPLEMENTED
-Focused contract wiring: PASS
-Remote Prisma schema/migration alignment: PENDING
+Focused repository contract: COMPLETE
+Repository Implementation: COMPLETE
 Owner-supplied test evidence: PENDING
-Repository Gate: PARTIAL
 ```
 
 ### Runtime Gate — Owner Authority
 
 ```text
+Prisma validate and generate: PENDING ON CURRENT REMOTE SHA
 Migration apply against representative database: PENDING
 Focused foundation tests: PENDING
 Create/read/update policy behavior: PENDING
@@ -220,20 +248,19 @@ GET /api/sales/storefronts/:slug
 ## Current State
 
 ```text
-Repository working area: OPEN
-Implementation: PERSISTENCE + INTERNAL RUNTIME AUTHORITY IMPLEMENTED
-Remote head SHA: 4583fb22fba9412601c53f1b33457563ca946ad0
-Remote Prisma projection: PENDING
-Repository Gate: PARTIAL
+Repository working area: IMPLEMENTATION COMPLETE
+Repository implementation SHA: 8284cacdd96cd62decb3afd4fbff0a42f766090e
+Remote Prisma projection: IMPLEMENTED
+Repository Implementation: COMPLETE
 Runtime Gate: PENDING — OWNER AUTHORITY
 Operational impact: NONE
 Production impact: NONE
 ```
 
-## Remaining Agenda
+## Remaining Agenda Before Merge
 
-1. Make the Prisma schema projection visible on the remote PR branch.
-2. Receive owner test and runtime evidence against an exact SHA.
-3. Refresh PR #72 against the completed Partner Store Capability authority.
-4. Keep PR #79 as Draft until evidence gates are satisfied.
-5. Do not merge or deploy without explicit authorization.
+1. Project owner runs Prisma validate/generate and focused/runtime verification against the final remote SHA.
+2. Record exact tested SHA and evidence in PR #79.
+3. Review merge readiness and merge only under explicit owner authorization.
+4. Open the next agenda for refreshing PR #72 after PR #79 is merged.
+5. Do not deploy or apply production migrations without separate authorization.
