@@ -1,5 +1,7 @@
-const fs = require('fs');
-const path = require('path');
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 describe('barcode audit vertical slice ownership', () => {
   const root = path.resolve(__dirname, '..');
@@ -7,18 +9,19 @@ describe('barcode audit vertical slice ownership', () => {
 
   test('audit route uses only the audit controller', () => {
     const route = read('src/modules/inventory/barcode/routes/barcodeRoutes.js');
-    expect(route).toContain("require('../audit/barcodeAuditController')");
-    expect(route).toContain("router.get('/receipt/:receiptId/audit', auditReceiptBarcodes)");
-    expect(route).toContain('markReceiptAsCompleted');
+    assert.match(route, /require\('\.\.\/audit\/barcodeAuditController'\)/);
+    assert.match(route, /router\.get\('\/receipt\/:receiptId\/audit', auditReceiptBarcodes\)/);
+    assert.match(route, /markReceiptAsCompleted/);
+    assert.doesNotMatch(route, /controllers\/barcodeController/);
   });
 
   test('audit owns controller service and repository layers', () => {
     const controller = read('src/modules/inventory/barcode/audit/barcodeAuditController.js');
     const service = read('src/modules/inventory/barcode/audit/barcodeAuditService.js');
     const repository = read('src/modules/inventory/barcode/audit/barcodeAuditRepository.js');
-    expect(controller).toContain("require('./barcodeAuditService')");
-    expect(service).toContain("require('./barcodeAuditRepository')");
-    expect(repository).toContain("require('../../../../../lib/prisma')");
+    assert.match(controller, /require\('\.\/barcodeAuditService'\)/);
+    assert.match(service, /require\('\.\/barcodeAuditRepository'\)/);
+    assert.match(repository, /require\('\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma'\)/);
   });
 
   test('audit preserves classifications and anomaly contracts', () => {
@@ -32,18 +35,18 @@ describe('barcode audit vertical slice ownership', () => {
       'mixedItems',
       'unknownItems',
       'includeDetails',
-    ]) expect(service).toContain(token);
+    ]) assert.match(service, new RegExp(token));
   });
 
   test('repository remains branch-scoped and read-only', () => {
     const repository = read('src/modules/inventory/barcode/audit/barcodeAuditRepository.js');
-    expect(repository).toContain('where: { id: receiptId, branchId }');
-    expect(repository).toContain('purchaseOrderReceiptItem.findMany');
-    expect(repository).toContain('barcodeReceiptItem.findMany');
-    expect(repository).toContain('stockItem.findMany');
-    expect(repository).toContain('simpleLot.findMany');
-    expect(repository).not.toContain('.create(');
-    expect(repository).not.toContain('.update(');
-    expect(repository).not.toContain('.delete(');
+    assert.match(repository, /where: \{ id: receiptId, branchId \}/);
+    assert.match(repository, /purchaseOrderReceiptItem\.findMany/);
+    assert.match(repository, /barcodeReceiptItem\.findMany/);
+    assert.match(repository, /stockItem\.findMany/);
+    assert.match(repository, /simpleLot\.findMany/);
+    assert.doesNotMatch(repository, /\.create\(/);
+    assert.doesNotMatch(repository, /\.update\(/);
+    assert.doesNotMatch(repository, /\.delete\(/);
   });
 });
