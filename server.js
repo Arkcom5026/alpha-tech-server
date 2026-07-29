@@ -36,6 +36,7 @@ const productProfileRoutes = require('./routes/productProfileRoutes');
 const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const { mountProductModule } = require('./src/modules/product');
+const { mountProfessionalAccessModule } = require('./src/modules/professional-access');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
@@ -186,6 +187,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 mountProductModule(app);
+mountProfessionalAccessModule(app);
 
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
@@ -258,16 +260,9 @@ app.use((err, req, res, _next) => {
   res.status(statusCode).json({
     ok: false,
     error: code,
-    code,
     message: err?.message || 'Internal server error',
-    details: err?.details || null,
     requestId: req.id,
   });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
 });
 
 module.exports = app;
