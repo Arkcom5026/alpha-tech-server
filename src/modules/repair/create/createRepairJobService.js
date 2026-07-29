@@ -2,7 +2,6 @@ const repository = require('./createRepairJobRepository');
 const { validateCreateRepairJob } = require('../validators/repairValidator');
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
 const {
-  assertStockItemBranch,
   assertNoActiveRepair,
   assertNoActiveClaim,
   assertCustomerMatchesLatestSale,
@@ -24,19 +23,28 @@ class CreateRepairJobService {
 
     const createAttempt = () =>
       this.repository.transaction(async (repo) => {
-        const customer = await repo.findCustomer(payload.customerId);
+        const customer = await repo.findCustomer(actor.branchId, payload.customerId);
         if (!customer) {
           throw new RepairError(
             RepairFailureCode.CUSTOMER_NOT_FOUND,
-            'ไม่พบข้อมูลลูกค้าในระบบ',
+            'ไม่พบข้อมูลลูกค้าในร้านนี้',
             404
           );
         }
 
         let deviceId = null;
         if (payload.stockItemId) {
-          const stockItem = await repo.findStockItemForIntake(payload.stockItemId);
-          assertStockItemBranch(stockItem, actor.branchId);
+          const stockItem = await repo.findStockItemForIntake(
+            actor.branchId,
+            payload.stockItemId
+          );
+          if (!stockItem) {
+            throw new RepairError(
+              RepairFailureCode.STOCK_ITEM_NOT_FOUND,
+              'ไม่พบสินค้าในร้านนี้',
+              404
+            );
+          }
           assertNoActiveRepair(stockItem);
           assertNoActiveClaim(stockItem);
           assertCustomerMatchesLatestSale(
@@ -48,15 +56,14 @@ class CreateRepairJobService {
         }
 
         if (payload.technicianId) {
-          const technician = await repo.findTechnician(payload.technicianId);
-          if (
-            !technician ||
-            Number(technician.branchId) !== Number(actor.branchId) ||
-            !technician.active
-          ) {
+          const technician = await repo.findTechnician(
+            actor.branchId,
+            payload.technicianId
+          );
+          if (!technician) {
             throw new RepairError(
               RepairFailureCode.TECHNICIAN_NOT_FOUND,
-              'ไม่พบช่างที่ใช้งานได้ในสาขานี้',
+              'ไม่พบช่างที่ใช้งานได้ในร้านนี้',
               404
             );
           }
@@ -86,7 +93,7 @@ class CreateRepairJobService {
             sourceId: String(created.id),
             eventKey: `repair-job:${created.id}:created`,
             correlationId: `repair-job:${created.id}`,
-            title: `เปิดใบงานซ่อม ${created.jobNo}`,
+            title: `เปิดใบรับซ่อม ${created.jobNo}`,
             description: created.reportedSymptoms,
             actorEmployeeId: actor.employeeId || null,
             customerVisible: true,
@@ -116,7 +123,7 @@ class CreateRepairJobService {
         if (isPrismaUniqueConflict(retryError)) {
           throw new RepairError(
             RepairFailureCode.CONFLICT,
-            'ไม่สามารถสร้างเลขใบงานซ่อมที่ไม่ซ้ำได้ กรุณาลองใหม่',
+            'ไม่สามารถสร้างเลขใบรับซ่อมที่ไม่ซ้ำได้ กรุณาลองใหม่',
             409
           );
         }
