@@ -34,6 +34,9 @@ const findActiveAssignment = ({ externalOrganizationId, businessId, now }) =>
       id: true,
       businessId: true,
       externalOrganizationId: true,
+      status: true,
+      effectiveFrom: true,
+      effectiveUntil: true,
       permissionScopes: {
         where: {
           status: 'ACTIVE',
@@ -43,10 +46,14 @@ const findActiveAssignment = ({ externalOrganizationId, businessId, now }) =>
         },
         select: {
           id: true,
+          status: true,
+          resource: true,
           actions: true,
           branchMode: true,
           branchIds: true,
           constraints: true,
+          effectiveFrom: true,
+          effectiveUntil: true,
         },
       },
     },
