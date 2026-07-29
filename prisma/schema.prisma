@@ -26,6 +26,7 @@ model User {
   orderOnline         OrderOnline[]
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  storeCustomerIdentityLinks StoreCustomerIdentityLink[]
 }
 
 model EmployeeProfile {
@@ -161,6 +162,7 @@ model Branch {
   posHeldCarts                    PosHeldCart[]
   supplierAdvances                SupplierAdvance[]
   v2StockAudits                   V2StockAudit[]
+  storeCustomers                  StoreCustomer[]
 
   @@index([subdistrictCode])
 }
@@ -1633,6 +1635,55 @@ model CustomerProfile {
   @@index([subdistrictCode])
 }
 
+model StoreCustomer {
+  id              Int                         @id @default(autoincrement())
+  branchId        Int
+  displayName     String?
+  phone           String?
+  email           String?
+  type            CustomerType                @default(INDIVIDUAL)
+  companyName     String?
+  taxId           String?
+  addressDetail   String?
+  subdistrictCode String?
+  creditLimit     Decimal?                    @default(0) @db.Decimal(12, 2)
+  paymentTerms    Int?
+  internalNote    String?
+  active          Boolean                     @default(true)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  branch          Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  subdistrict     Subdistrict?                @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
+  identityLinks   StoreCustomerIdentityLink[]
+
+  @@index([branchId, active])
+  @@index([branchId, displayName])
+  @@index([branchId, phone])
+  @@index([branchId, email])
+  @@index([branchId, taxId])
+  @@index([subdistrictCode])
+}
+
+model StoreCustomerIdentityLink {
+  id                 Int                                    @id @default(autoincrement())
+  storeCustomerId    Int
+  userId             Int
+  status             StoreCustomerIdentityLinkStatus        @default(PENDING)
+  verificationMethod StoreCustomerIdentityVerificationMethod?
+  requestedAt        DateTime                               @default(now())
+  verifiedAt         DateTime?
+  rejectedAt         DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime                               @default(now())
+  updatedAt          DateTime                               @updatedAt
+  storeCustomer      StoreCustomer                          @relation(fields: [storeCustomerId], references: [id], onDelete: Cascade)
+  user               User                                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([storeCustomerId, userId])
+  @@index([userId, status])
+  @@index([storeCustomerId, status])
+}
+
 model CustomerDeposit {
   id             Int              @id @default(autoincrement())
   cashAmount     Decimal          @default(0) @db.Decimal(12, 2)
@@ -1708,6 +1759,7 @@ model Subdistrict {
   postcode        String?
   branches        Branch[]
   CustomerProfile CustomerProfile[]
+  storeCustomers  StoreCustomer[]
   district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
 
   @@index([districtCode])
@@ -2645,6 +2697,20 @@ enum CustomerType {
   INDIVIDUAL
   ORGANIZATION
   GOVERNMENT
+}
+
+enum StoreCustomerIdentityLinkStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
+enum StoreCustomerIdentityVerificationMethod {
+  OTP
+  AUTHENTICATED_SESSION
+  STAFF_ASSISTED
+  MIGRATION_REVIEW
 }
 
 enum BarcodeStatus {
