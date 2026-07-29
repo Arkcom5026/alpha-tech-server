@@ -42,6 +42,18 @@ const buildRefreshTokenRecord = ({ userId, rememberMe, req }) => {
   };
 };
 
+const setRefreshTokenCookie = (res, refreshToken, rememberMe = false) => {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    path: '/api/auth',
+    maxAge: rememberMe
+      ? 7 * 24 * 60 * 60 * 1000
+      : 24 * 60 * 60 * 1000,
+  });
+};
+
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     httpOnly: true,
@@ -56,5 +68,6 @@ module.exports = {
   sha256,
   getRefreshTokenExpiresIn,
   buildRefreshTokenRecord,
+  setRefreshTokenCookie,
   clearRefreshTokenCookie,
 };
