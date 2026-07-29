@@ -31,8 +31,12 @@ assertIncludes(repository, 'FOR UPDATE', 'Session, proof, items, and prices requ
 assertIncludes(repository, 'proofTokenHash', 'Identity proof must be resolved by hash');
 assertIncludes(repository, 'publicTokenHash', 'Idempotency replay must bind to the original session token hash');
 assertIncludes(repository, 'COMMITMENT_IDEMPOTENCY_CONFLICT', 'Reused idempotency keys must reject different commands');
-assertIncludes(repository, 'effectiveAt', 'Current publication start must be revalidated');
-assertIncludes(repository, 'expiresAt', 'Current publication expiry must be revalidated');
+assertIncludes(repository, 'isActive', 'Current publication activation must be revalidated');
+assertIncludes(repository, 'effectiveDate', 'Current publication start must be revalidated');
+assertIncludes(repository, 'expiredDate', 'Current publication expiry must be revalidated');
+assertExcludes(repository, 'bp."active"', 'Stale BranchPrice active field must not be used');
+assertExcludes(repository, 'bp."effectiveAt"', 'Stale BranchPrice effectiveAt field must not be used');
+assertExcludes(repository, 'bp."expiresAt"', 'Stale BranchPrice expiresAt field must not be used');
 assertIncludes(repository, 'priceOnline', 'Server must read current online price');
 assertIncludes(repository, 'unitPriceCents', 'Money must be normalized before aggregation');
 assertIncludes(repository, 'totalAmountCents', 'Reservation totals must avoid floating-point accumulation');
