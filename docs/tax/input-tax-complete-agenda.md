@@ -14,20 +14,25 @@ CI, automated tests, and build results are not merge gates for this agenda. Runt
 
 `INPUT_TAX_OVERVIEW_V1` foundation was merged through PR #73 and is the starting authority for this branch.
 
-## Remaining Definition of Done
+## Completion State
 
-1. Reconciliation and quality semantics
-2. Eligibility authority
-3. Partial eligibility
-4. Duplicate detection authority
-5. Replacement-document chain
-6. Document, received, claim, and filed period views
-7. Filing readiness
-8. TaxDocument-centric filing persistence
-9. Input-tax period closing and reopening
-10. Frontend Input Tax Control Center contract readiness
-11. Repository-level integration and final scope review
-12. Production verification checklist for owner execution after merge
+All repository-scoped agenda items are implemented on this branch. The remaining gate is owner production verification after merge.
+
+1. Reconciliation, eligibility, duplicate, replacement, and period-view projections: complete.
+2. TaxDocument-centric filing persistence with legacy receipt compatibility: complete.
+3. Period close/reopen authority: uses branch-scoped `TaxPeriod` persistence and lifecycle endpoints.
+4. Filing selection/removal is blocked for `CLOSED`, `LOCKED`, and `SUBMITTED` periods.
+5. `INPUT_TAX_OVERVIEW_V1` remains additive and compatible; Control Center receives period authority metadata and stable period endpoints.
+6. Repository integration evidence: focused contract test covers period authority, blocked mutations, contract compatibility, and production checklist.
+
+## Owner Production-Verification Checklist
+
+- Verify one OPEN monthly period per branch can be created and listed by an OWNER or MANAGER.
+- Close the period and confirm filing selection and removal return `INPUT_TAX_PERIOD_MUTATION_BLOCKED`.
+- Reopen the period and confirm selection/removal resumes without changing legacy `purchaseOrderReceiptId` records.
+- Verify `INPUT_TAX_OVERVIEW_V1` retains its existing fields and the Control Center can read `periodAuthority` metadata.
+- Verify branch isolation: an operator cannot administer or mutate another branch's period.
+- Verify a rollback by reverting this single increment restores the prior repository behavior without database migration.
 
 ## Merge Authority
 

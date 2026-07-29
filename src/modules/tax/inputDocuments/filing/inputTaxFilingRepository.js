@@ -99,7 +99,27 @@ const findActiveByDocument = async ({ taxDocumentId }, tx = prisma) => {
   return rows;
 };
 
+const findBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT
+      batch."id" AS "batchId",
+      batch."branchId",
+      batch."year",
+      batch."month",
+      period."id" AS "taxPeriodId",
+      period."status" AS "taxPeriodStatus"
+    FROM "InputTaxFilingBatch" batch
+    LEFT JOIN "TaxPeriod" period
+      ON period."branchId" = batch."branchId"
+      AND period."periodCode" = CONCAT(batch."year", '-', LPAD(batch."month"::text, 2, '0'))
+    WHERE batch."id" = ${Number(batchId)}
+    LIMIT 1
+  `);
+  return rows[0] || null;
+};
+
 module.exports = Object.freeze({
+  findBatchPeriodAuthority,
   findActiveByDocument,
   markBatchFiled,
   removeDocumentFromFiling,

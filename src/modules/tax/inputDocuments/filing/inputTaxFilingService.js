@@ -27,6 +27,30 @@ const decimal = (value, fieldName) => {
   return parsed.toFixed(2);
 };
 
+const PERIOD_MUTATION_BLOCKED_STATUSES = new Set(['CLOSED', 'LOCKED', 'SUBMITTED']);
+
+const assertBatchPeriodMutable = async ({ batchId }, tx) => {
+  const authority = await repository.findBatchPeriodAuthority({ batchId }, tx);
+  if (!authority) {
+    throw Object.assign(new Error('Input tax filing batch was not found'), {
+      code: 'INPUT_TAX_FILING_BATCH_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+  if (PERIOD_MUTATION_BLOCKED_STATUSES.has(authority.taxPeriodStatus)) {
+    throw Object.assign(new Error('Input tax filing mutation is blocked while its period is closed'), {
+      code: 'INPUT_TAX_PERIOD_MUTATION_BLOCKED',
+      statusCode: 409,
+      details: {
+        batchId: Number(authority.batchId),
+        taxPeriodId: authority.taxPeriodId,
+        taxPeriodStatus: authority.taxPeriodStatus,
+      },
+    });
+  }
+  return authority;
+};
+
 const mapRow = (row) => createFilingItemProjection({
   id: Number(row.id),
   batchId: Number(row.batchId),
@@ -55,6 +79,8 @@ const selectTaxDocumentForFiling = async ({
 }, tx) => {
   const normalizedBatchId = positiveInt(batchId, 'batchId');
   const normalizedTaxDocumentId = positiveInt(taxDocumentId, 'taxDocumentId');
+
+  await assertBatchPeriodMutable({ batchId: normalizedBatchId }, tx);
 
   if (!reconciliation?.canApprove) {
     throw Object.assign(new Error('Input tax document must be reconciled before filing selection'), {
@@ -119,6 +145,25 @@ const selectTaxDocumentForFiling = async ({
   return mapRow(row);
 };
 
+const removeTaxDocumentFromFiling = async ({ batchId, taxDocumentId, removedReason = null, removedAt = new Date() }, tx) => {
+  const normalizedBatchId = positiveInt(batchId, 'batchId');
+  const normalizedTaxDocumentId = positiveInt(taxDocumentId, 'taxDocumentId');
+  await assertBatchPeriodMutable({ batchId: normalizedBatchId }, tx);
+  const row = await repository.removeDocumentFromFiling({
+    batchId: normalizedBatchId,
+    taxDocumentId: normalizedTaxDocumentId,
+    removedAt,
+    removedReason,
+  }, tx);
+  if (!row) {
+    throw Object.assign(new Error('Selected input tax filing item was not found'), {
+      code: 'INPUT_TAX_FILING_ITEM_NOT_MUTABLE',
+      statusCode: 409,
+    });
+  }
+  return mapRow(row);
+};
+
 const markInputTaxBatchFiled = async ({ batchId, filedAt = new Date() }, tx) => {
   const normalizedBatchId = positiveInt(batchId, 'batchId');
   const affectedDocumentCount = await repository.markBatchFiled({
@@ -134,6 +179,9 @@ const markInputTaxBatchFiled = async ({ batchId, filedAt = new Date() }, tx) => 
 };
 
 module.exports = Object.freeze({
+  PERIOD_MUTATION_BLOCKED_STATUSES,
+  assertBatchPeriodMutable,
   markInputTaxBatchFiled,
+  removeTaxDocumentFromFiling,
   selectTaxDocumentForFiling,
 });
