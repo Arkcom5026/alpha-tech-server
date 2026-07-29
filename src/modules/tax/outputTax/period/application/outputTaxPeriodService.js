@@ -147,6 +147,15 @@ const assertTransitionResult = (period) => {
   return period;
 };
 
+const buildAuthority = ({ period, readiness }) => Object.freeze({
+  periodExists: true,
+  lockedForTaxWrites: [PERIOD_STATUS.CLOSING, PERIOD_STATUS.CLOSED].includes(period.status),
+  closeRequestAllowed: [PERIOD_STATUS.OPEN, PERIOD_STATUS.REOPENED].includes(period.status),
+  closeAllowed: period.status === PERIOD_STATUS.CLOSING && readiness.readyForFiling,
+  reopenAllowed: period.status === PERIOD_STATUS.CLOSED,
+  expectedVersion: period.version,
+});
+
 const buildEventSnapshot = (period) => ({
   branchId: period.branchId,
   year: period.year,
@@ -494,7 +503,7 @@ const getPeriod = async ({ branchId, outputTaxPeriodId }) => {
     }),
   );
 
-  const [report, readiness, closingPlan] = await Promise.all([
+  const [report, readiness] = await Promise.all([
     buildOutputTaxPeriodReport({
       branchId: normalizedBranchId,
       year: period.year,
@@ -505,23 +514,33 @@ const getPeriod = async ({ branchId, outputTaxPeriodId }) => {
       year: period.year,
       month: period.month,
     }),
-    buildOutputTaxPeriodClosingPlan({
-      branchId: normalizedBranchId,
-      year: period.year,
-      month: period.month,
-    }),
   ]);
 
+  const authority = buildAuthority({ period, readiness });
+  const closingPlan = await buildOutputTaxPeriodClosingPlan({
+    branchId: normalizedBranchId,
+    year: period.year,
+    month: period.month,
+  });
+
+  if (closingPlan.period.id !== period.id || closingPlan.period.version !== period.version) {
+    fail(
+      'Output tax period projection changed while building detail',
+      'OUTPUT_TAX_PERIOD_PROJECTION_CONFLICT',
+      409,
+      {
+        outputTaxPeriodId: period.id,
+        expectedVersion: period.version,
+        currentVersion: closingPlan.period.version,
+      },
+    );
+  }
+
   return Object.freeze({
-    schemaVersion: 'OUTPUT_TAX_PERIOD_DETAIL_V1',
+    schemaVersion: 'OUTPUT_TAX_PERIOD_DETAIL_V2',
+    compatibilitySchemaVersion: 'OUTPUT_TAX_PERIOD_DETAIL_V1',
     period: Object.freeze(period),
-    authority: Object.freeze({
-      periodExists: true,
-      lockedForTaxWrites: ['CLOSING', 'CLOSED'].includes(period.status),
-      closeRequestAllowed: ['OPEN', 'REOPENED'].includes(period.status),
-      closeAllowed: period.status === 'CLOSING' && readiness.readyForFiling,
-      reopenAllowed: period.status === 'CLOSED',
-    }),
+    authority,
     report,
     readiness,
     closingPlan,
@@ -532,9 +551,11 @@ const getPeriodTimeline = async ({ branchId, outputTaxPeriodId }) => {
   const detail = await getPeriod({ branchId, outputTaxPeriodId });
   const events = await outputTaxPeriodRepository.listEvents({ outputTaxPeriodId: detail.period.id });
   return Object.freeze({
-    schemaVersion: 'OUTPUT_TAX_PERIOD_TIMELINE_V1',
+    schemaVersion: 'OUTPUT_TAX_PERIOD_TIMELINE_V2',
+    compatibilitySchemaVersion: 'OUTPUT_TAX_PERIOD_TIMELINE_V1',
     period: detail.period,
     authority: detail.authority,
+    currentVersion: detail.period.version,
     events: Object.freeze(events),
   });
 };
