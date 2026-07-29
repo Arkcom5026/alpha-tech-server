@@ -17,6 +17,7 @@ router.post('/candidates/register-sale/:saleId', controller.registerSaleCandidat
 router.get('/candidates', controller.listCandidates);
 router.get('/documents', controller.listDocuments);
 router.get('/output-tax/overview', controller.getOutputTaxOverview);
+router.get('/output-tax/period-closing-plan', controller.getOutputTaxPeriodClosingPlan);
 router.get('/output-tax/period-readiness', controller.getOutputTaxPeriodReadiness);
 router.get('/output-tax/period-report', controller.getOutputTaxPeriodReport);
 router.post('/output-tax/periods', controller.createOutputTaxPeriod);
