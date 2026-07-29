@@ -6,8 +6,6 @@ const { prisma, Prisma } = require('../../../../../lib/prisma');
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const mapSession = (row, items = []) => ({
-  id: Number(row.id),
-  branchId: Number(row.branchId),
   status: row.status,
   expiresAt: row.expiresAt,
   lastActivityAt: row.lastActivityAt,
@@ -30,7 +28,7 @@ const findStorefrontBySlug = async (slug, db = prisma) => {
   return rows[0] || null;
 };
 
-const findActiveByToken = async ({ branchId, token }, db = prisma) => {
+const findActiveRecordByToken = async ({ branchId, token }, db = prisma) => {
   const tokenHash = hashToken(token);
   const rows = await db.$queryRaw(Prisma.sql`
     SELECT *
@@ -41,14 +39,20 @@ const findActiveByToken = async ({ branchId, token }, db = prisma) => {
       AND "expiresAt" > CURRENT_TIMESTAMP
     LIMIT 1
   `);
-  if (!rows[0]) return null;
-  const items = await db.$queryRaw(Prisma.sql`
-    SELECT "productId", "quantity"
-    FROM "AnonymousShoppingSessionItem"
-    WHERE "sessionId" = ${rows[0].id}
-    ORDER BY "id"
-  `);
-  return mapSession(rows[0], items);
+  return rows[0] || null;
+};
+
+const loadItems = async (sessionId, db = prisma) => db.$queryRaw(Prisma.sql`
+  SELECT "productId", "quantity"
+  FROM "AnonymousShoppingSessionItem"
+  WHERE "sessionId" = ${sessionId}
+  ORDER BY "id"
+`);
+
+const findActiveByToken = async ({ branchId, token }, db = prisma) => {
+  const row = await findActiveRecordByToken({ branchId, token }, db);
+  if (!row) return null;
+  return mapSession(row, await loadItems(row.id, db));
 };
 
 const create = async ({ branchId, token, expiresAt }, db = prisma) => {
@@ -67,7 +71,7 @@ const create = async ({ branchId, token, expiresAt }, db = prisma) => {
 };
 
 const upsertItem = async ({ branchId, token, productId, quantity }, db = prisma) => db.$transaction(async (tx) => {
-  const session = await findActiveByToken({ branchId, token }, tx);
+  const session = await findActiveRecordByToken({ branchId, token }, tx);
   if (!session) return null;
 
   const products = await tx.$queryRaw(Prisma.sql`
@@ -79,6 +83,8 @@ const upsertItem = async ({ branchId, token, productId, quantity }, db = prisma)
       AND bp."active" = TRUE
       AND bp."priceOnline" IS NOT NULL
       AND bp."priceOnline" > 0
+      AND (bp."effectiveAt" IS NULL OR bp."effectiveAt" <= CURRENT_TIMESTAMP)
+      AND (bp."expiresAt" IS NULL OR bp."expiresAt" > CURRENT_TIMESTAMP)
     LIMIT 1
   `);
   if (!products[0]) {
@@ -106,11 +112,12 @@ const upsertItem = async ({ branchId, token, productId, quantity }, db = prisma)
     WHERE "id" = ${session.id}
   `);
 
-  return findActiveByToken({ branchId, token }, tx);
+  const refreshed = await findActiveRecordByToken({ branchId, token }, tx);
+  return refreshed ? mapSession(refreshed, await loadItems(refreshed.id, tx)) : null;
 });
 
 const removeItem = async ({ branchId, token, productId }, db = prisma) => db.$transaction(async (tx) => {
-  const session = await findActiveByToken({ branchId, token }, tx);
+  const session = await findActiveRecordByToken({ branchId, token }, tx);
   if (!session) return null;
   await tx.$executeRaw(Prisma.sql`
     DELETE FROM "AnonymousShoppingSessionItem"
@@ -122,7 +129,8 @@ const removeItem = async ({ branchId, token, productId }, db = prisma) => db.$tr
         "updatedAt" = CURRENT_TIMESTAMP
     WHERE "id" = ${session.id}
   `);
-  return findActiveByToken({ branchId, token }, tx);
+  const refreshed = await findActiveRecordByToken({ branchId, token }, tx);
+  return refreshed ? mapSession(refreshed, await loadItems(refreshed.id, tx)) : null;
 });
 
 const abandon = async ({ branchId, token }, db = prisma) => {
