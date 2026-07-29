@@ -2,6 +2,9 @@ const prisma = require('../../../database/prisma/client');
 const {
   publishDevicePassportEvent,
 } = require('../../device/passport/publish/devicePassportEventPublisher');
+const {
+  customerBusinessScope,
+} = require('../query/intake-search/intakeSearchRepository');
 
 const stockItemIntakeInclude = {
   product: { include: { brand: true, productType: true } },
@@ -75,23 +78,34 @@ class CreateRepairJobRepository {
     return this.prisma.$transaction((tx) => work(new CreateRepairJobRepository(tx)));
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    const normalizedBranchId = Number(branchId);
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...customerBusinessScope(normalizedBranchId),
+      },
       include: { user: true },
     });
   }
 
-  findStockItemForIntake(stockItemId) {
-    return this.prisma.stockItem.findUnique({
-      where: { id: Number(stockItemId) },
+  findStockItemForIntake(branchId, stockItemId) {
+    return this.prisma.stockItem.findFirst({
+      where: {
+        id: Number(stockItemId),
+        branchId: Number(branchId),
+      },
       include: stockItemIntakeInclude,
     });
   }
 
-  findTechnician(technicianId) {
-    return this.prisma.employeeProfile.findUnique({
-      where: { id: Number(technicianId) },
+  findTechnician(branchId, technicianId) {
+    return this.prisma.employeeProfile.findFirst({
+      where: {
+        id: Number(technicianId),
+        branchId: Number(branchId),
+        active: true,
+      },
     });
   }
 
