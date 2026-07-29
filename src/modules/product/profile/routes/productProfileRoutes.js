@@ -10,7 +10,7 @@ const {
   archiveProductProfile,
   restoreProductProfile,
   getProductProfileDropdowns,
-} = require('../../../../../controllers/productProfileController');
+} = require('../controllers/productProfileController');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../../middlewares/requireAdmin');
