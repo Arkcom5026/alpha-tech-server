@@ -37,7 +37,7 @@ assert.match(service, /missingSupplierTaxIdCount/);
 assert.match(service, /NO_COMPARABLE_BASE/);
 assert.match(service, /UNLINKED_DOCUMENT/);
 assert.match(service, /ALLOCATION_MISMATCH/);
-assert.match(service, /Only DOCUMENT period view is implemented in Increment 1/);
+assert.match(service, /PERIOD_VIEWS\.includes\(periodView\)/);
 assert.match(service, /toFixed\(2\)/);
 
 assert.match(controller, /OWNER/);
