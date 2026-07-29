@@ -1,4 +1,5 @@
 const {
+  assertPermission,
   authorizeProfessionalAccess,
   fail,
   normalizePositiveInt,
@@ -20,7 +21,7 @@ const authorizeTaxReview = ({
     externalOrganizationId,
     businessId,
     branchId,
-    resource: 'TAX_REVIEW',
+    resource: action ? 'TAX_REVIEW' : undefined,
     action,
     now,
     codePrefix: 'TAX_REVIEW',
@@ -97,6 +98,45 @@ const createReview = async ({
   });
 };
 
+const loadReviewWithAuthority = async ({
+  repository,
+  userId,
+  externalOrganizationId,
+  businessId,
+  reviewId,
+  action,
+  now,
+}) => {
+  const normalizedReviewId = normalizePositiveInt(
+    reviewId,
+    'TAX_REVIEW_ID_REQUIRED',
+    'reviewId is required',
+  );
+  const authority = await authorizeTaxReview({
+    repository,
+    userId,
+    externalOrganizationId,
+    businessId,
+    now,
+  });
+  const review = await repository.findReview({
+    id: normalizedReviewId,
+    assignmentId: authority.assignment.id,
+  });
+  if (!review) fail('TAX_REVIEW_NOT_FOUND', 'Tax review session not found', 404);
+
+  assertPermission({
+    assignment: authority.assignment,
+    resource: 'TAX_REVIEW',
+    action,
+    branchId: review.branchId,
+    now,
+    codePrefix: 'TAX_REVIEW',
+  });
+
+  return { ...authority, review, reviewId: normalizedReviewId };
+};
+
 const addNote = async ({
   repository,
   userId,
@@ -106,31 +146,25 @@ const addNote = async ({
   message,
   now = new Date(),
 }) => {
-  const normalizedReviewId = normalizePositiveInt(
-    reviewId,
-    'TAX_REVIEW_ID_REQUIRED',
-    'reviewId is required',
-  );
   const normalizedMessage = String(message || '').trim();
   if (!normalizedMessage) fail('TAX_REVIEW_NOTE_REQUIRED', 'message is required');
 
-  const { ids, assignment } = await authorizeTaxReview({
+  const authority = await loadReviewWithAuthority({
     repository,
     userId,
     externalOrganizationId,
     businessId,
+    reviewId,
     action: 'COMMENT',
     now,
   });
-  const review = await repository.findReview({ id: normalizedReviewId, assignmentId: assignment.id });
-  if (!review) fail('TAX_REVIEW_NOT_FOUND', 'Tax review session not found', 404);
-  if (review.status === 'RESOLVED') {
+  if (authority.review.status === 'RESOLVED') {
     fail('TAX_REVIEW_ALREADY_RESOLVED', 'Resolved review cannot receive notes', 409);
   }
 
   return repository.addNote({
-    reviewSessionId: normalizedReviewId,
-    authorUserId: ids.userId,
+    reviewSessionId: authority.reviewId,
+    authorUserId: authority.ids.userId,
     message: normalizedMessage,
   });
 };
@@ -143,33 +177,32 @@ const resolveReview = async ({
   reviewId,
   now = new Date(),
 }) => {
-  const normalizedReviewId = normalizePositiveInt(
-    reviewId,
-    'TAX_REVIEW_ID_REQUIRED',
-    'reviewId is required',
-  );
-  const { ids, assignment } = await authorizeTaxReview({
+  const authority = await loadReviewWithAuthority({
     repository,
     userId,
     externalOrganizationId,
     businessId,
+    reviewId,
     action: 'RESOLVE',
     now,
   });
-  const review = await repository.findReview({ id: normalizedReviewId, assignmentId: assignment.id });
-  if (!review) fail('TAX_REVIEW_NOT_FOUND', 'Tax review session not found', 404);
-  if (review.status === 'RESOLVED') return { replayed: true, review };
+  if (authority.review.status === 'RESOLVED') {
+    return { replayed: true, review: authority.review };
+  }
 
   await repository.updateStatus({
-    id: normalizedReviewId,
-    assignmentId: assignment.id,
+    id: authority.reviewId,
+    assignmentId: authority.assignment.id,
     status: 'RESOLVED',
     resolvedAt: now,
-    resolvedByUserId: ids.userId,
+    resolvedByUserId: authority.ids.userId,
   });
   return {
     replayed: false,
-    review: await repository.findReview({ id: normalizedReviewId, assignmentId: assignment.id }),
+    review: await repository.findReview({
+      id: authority.reviewId,
+      assignmentId: authority.assignment.id,
+    }),
   };
 };
 
