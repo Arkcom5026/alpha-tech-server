@@ -6,12 +6,44 @@ const {
   buildCustomerAddress,
 } = require('../shared/customerControllerSupport');
 
-const includeAddress = {
+const includeStoreCustomerAddress = {
+  subdistrict: { include: { district: { include: { province: true } } } },
+};
+
+const includeLegacyCustomerAddress = {
   user: true,
   subdistrict: { include: { district: { include: { province: true } } } },
 };
 
-const presentCustomer = (customer, { includeCredit = true, includeType = true } = {}) => {
+const presentStoreCustomer = (customer) => {
+  const subdistrictCode = customer.subdistrict?.code || null;
+  const districtCode =
+    customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+  const provinceCode =
+    customer.subdistrict?.district?.provinceCode ||
+    customer.subdistrict?.district?.province?.code ||
+    null;
+
+  return {
+    id: customer.id,
+    name: customer.displayName,
+    phone: customer.phone || null,
+    provinceCode,
+    districtCode,
+    subdistrictCode,
+    addressDetail: customer.addressDetail || null,
+    email: customer.email || '',
+    type: customer.type,
+    companyName: customer.companyName,
+    taxId: customer.taxId,
+    postcode: customer.subdistrict?.postcode || null,
+    creditLimit: customer.creditLimit,
+    creditBalance: 0,
+    customerAddress: buildCustomerAddress(customer),
+  };
+};
+
+const presentLegacyCustomer = (customer, { includeCredit = true, includeType = true } = {}) => {
   const subdistrictCode = customer.subdistrict?.code || null;
   const districtCode =
     customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
@@ -60,16 +92,17 @@ const getCustomerByPhone = async (req, res) => {
       return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
     }
 
-    const customer = await prisma.customerProfile.findFirst({
+    const customer = await prisma.storeCustomer.findFirst({
       where: {
-        user: { loginId: phone },
-        sale: { some: { branchId } },
+        branchId,
+        active: true,
+        phone,
       },
-      include: includeAddress,
+      include: includeStoreCustomerAddress,
     });
 
     if (!customer) return res.status(404).json({ message: 'ไม่พบลูกค้า' });
-    return res.json(presentCustomer(customer));
+    return res.json(presentStoreCustomer(customer));
   } catch (err) {
     console.error('❌ getCustomerByPhone error:', err);
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
@@ -84,16 +117,17 @@ const getCustomerByName = async (req, res) => {
     const q = String(req.query?.q || '').trim();
     if (!q) return res.json([]);
 
-    const customers = await prisma.customerProfile.findMany({
+    const customers = await prisma.storeCustomer.findMany({
       where: {
-        name: { contains: q, mode: 'insensitive' },
-        sale: { some: { branchId } },
+        branchId,
+        active: true,
+        displayName: { contains: q, mode: 'insensitive' },
       },
       take: 10,
-      include: includeAddress,
+      include: includeStoreCustomerAddress,
     });
 
-    return res.json(customers.map((customer) => presentCustomer(customer)));
+    return res.json(customers.map((customer) => presentStoreCustomer(customer)));
   } catch (err) {
     console.error('❌ getCustomerByName error:', err);
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
@@ -108,11 +142,11 @@ async function getCustomerByUserId(req, res) {
 
     const customer = await prisma.customerProfile.findUnique({
       where: { userId },
-      include: includeAddress,
+      include: includeLegacyCustomerAddress,
     });
 
     if (!customer) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
-    return res.json(presentCustomer(customer, { includeCredit: false, includeType: false }));
+    return res.json(presentLegacyCustomer(customer, { includeCredit: false, includeType: false }));
   } catch (err) {
     console.error('❌ getCustomerByUserId error:', err);
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการโหลดข้อมูลลูกค้า' });
