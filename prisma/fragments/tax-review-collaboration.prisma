@@ -1,0 +1,51 @@
+// P1 Tax Review Collaboration — additive Prisma fragment
+
+enum TaxReviewSessionStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+}
+
+model TaxReviewSession {
+  id               Int                    @id @default(autoincrement())
+  assignmentId     Int
+  businessId       Int
+  branchId         Int
+  taxPeriodCode    String                 @db.VarChar(7)
+  title            String
+  status           TaxReviewSessionStatus @default(OPEN)
+  openedByUserId   Int
+  resolvedByUserId Int?
+  resolvedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  assignment       BusinessAccountingFirmAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  business         Business               @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  branch           Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  openedByUser     User                   @relation("TaxReviewOpenedBy", fields: [openedByUserId], references: [id], onDelete: Restrict)
+  resolvedByUser   User?                  @relation("TaxReviewResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  notes            TaxReviewNote[]
+
+  @@index([assignmentId, status])
+  @@index([businessId, branchId, taxPeriodCode])
+}
+
+model TaxReviewNote {
+  id              Int              @id @default(autoincrement())
+  reviewSessionId Int
+  authorUserId    Int
+  message         String
+  createdAt       DateTime         @default(now())
+  reviewSession   TaxReviewSession @relation(fields: [reviewSessionId], references: [id], onDelete: Cascade)
+  authorUser      User             @relation("TaxReviewNoteAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([reviewSessionId, createdAt])
+}
+
+// Required additive relation fields for existing models:
+// BusinessAccountingFirmAssignment.taxReviewSessions TaxReviewSession[]
+// Business.taxReviewSessions TaxReviewSession[]
+// Branch.taxReviewSessions TaxReviewSession[]
+// User.openedTaxReviews TaxReviewSession[] @relation("TaxReviewOpenedBy")
+// User.resolvedTaxReviews TaxReviewSession[] @relation("TaxReviewResolvedBy")
+// User.authoredTaxReviewNotes TaxReviewNote[] @relation("TaxReviewNoteAuthor")
