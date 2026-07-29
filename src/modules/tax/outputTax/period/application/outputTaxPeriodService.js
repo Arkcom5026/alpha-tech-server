@@ -2,6 +2,8 @@
 
 const { prisma } = require('../../../../../../lib/prisma');
 const { buildOutputTaxPeriodReadiness } = require('../../readiness/buildOutputTaxPeriodReadinessService');
+const { buildOutputTaxPeriodReport } = require('../../reporting/buildOutputTaxPeriodReportService');
+const { buildOutputTaxPeriodClosingPlan } = require('../../closing/buildOutputTaxPeriodClosingPlanService');
 const outputTaxPeriodRepository = require('../repository/outputTaxPeriodRepository');
 
 const PERIOD_STATUS = Object.freeze({
@@ -485,18 +487,56 @@ const getPeriod = async ({ branchId, outputTaxPeriodId }) => {
     'outputTaxPeriodId',
     'OUTPUT_TAX_PERIOD_ID_REQUIRED',
   );
-  return assertPeriodExists(
+  const period = assertPeriodExists(
     await outputTaxPeriodRepository.findById({
       branchId: normalizedBranchId,
       outputTaxPeriodId: normalizedPeriodId,
     }),
   );
+
+  const [report, readiness, closingPlan] = await Promise.all([
+    buildOutputTaxPeriodReport({
+      branchId: normalizedBranchId,
+      year: period.year,
+      month: period.month,
+    }),
+    buildOutputTaxPeriodReadiness({
+      branchId: normalizedBranchId,
+      year: period.year,
+      month: period.month,
+    }),
+    buildOutputTaxPeriodClosingPlan({
+      branchId: normalizedBranchId,
+      year: period.year,
+      month: period.month,
+    }),
+  ]);
+
+  return Object.freeze({
+    schemaVersion: 'OUTPUT_TAX_PERIOD_DETAIL_V1',
+    period: Object.freeze(period),
+    authority: Object.freeze({
+      periodExists: true,
+      lockedForTaxWrites: ['CLOSING', 'CLOSED'].includes(period.status),
+      closeRequestAllowed: ['OPEN', 'REOPENED'].includes(period.status),
+      closeAllowed: period.status === 'CLOSING' && readiness.readyForFiling,
+      reopenAllowed: period.status === 'CLOSED',
+    }),
+    report,
+    readiness,
+    closingPlan,
+  });
 };
 
 const getPeriodTimeline = async ({ branchId, outputTaxPeriodId }) => {
-  const period = await getPeriod({ branchId, outputTaxPeriodId });
-  const events = await outputTaxPeriodRepository.listEvents({ outputTaxPeriodId: period.id });
-  return Object.freeze({ period, events: Object.freeze(events) });
+  const detail = await getPeriod({ branchId, outputTaxPeriodId });
+  const events = await outputTaxPeriodRepository.listEvents({ outputTaxPeriodId: detail.period.id });
+  return Object.freeze({
+    schemaVersion: 'OUTPUT_TAX_PERIOD_TIMELINE_V1',
+    period: detail.period,
+    authority: detail.authority,
+    events: Object.freeze(events),
+  });
 };
 
 const listPeriods = async ({ branchId, status = null, year = null, limit = 50, offset = 0 }) => {
