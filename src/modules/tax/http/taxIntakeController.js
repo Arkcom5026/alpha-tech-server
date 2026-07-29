@@ -90,6 +90,54 @@ const getOutputTaxPeriodReport = handle((req) => service.getOutputTaxPeriodRepor
   month: req.query?.month,
 }));
 
+const createOutputTaxPeriod = handle(
+  (req) => service.createOutputTaxPeriod({
+    ...req.body,
+    branchId: resolveBranchId(req, req.body),
+    actorEmployeeId: actorEmployeeId(req),
+  }),
+  201,
+);
+
+const listOutputTaxPeriods = handle((req) => service.listOutputTaxPeriods({
+  ...req.query,
+  branchId: resolveBranchId(req, req.query),
+}));
+
+const getOutputTaxPeriod = handle((req) => service.getOutputTaxPeriod({
+  branchId: resolveBranchId(req, req.query),
+  outputTaxPeriodId: req.params.outputTaxPeriodId,
+}));
+
+const getOutputTaxPeriodTimeline = handle((req) => service.getOutputTaxPeriodTimeline({
+  branchId: resolveBranchId(req, req.query),
+  outputTaxPeriodId: req.params.outputTaxPeriodId,
+}));
+
+const requestCloseOutputTaxPeriod = handle((req) => service.requestCloseOutputTaxPeriod({
+  branchId: resolveBranchId(req, req.body),
+  outputTaxPeriodId: req.params.outputTaxPeriodId,
+  expectedVersion: req.body?.expectedVersion,
+  reason: req.body?.reason,
+  actorEmployeeId: actorEmployeeId(req),
+}));
+
+const closeOutputTaxPeriod = handle((req) => service.closeOutputTaxPeriod({
+  branchId: resolveBranchId(req, req.body),
+  outputTaxPeriodId: req.params.outputTaxPeriodId,
+  expectedVersion: req.body?.expectedVersion,
+  reason: req.body?.reason,
+  actorEmployeeId: actorEmployeeId(req),
+}));
+
+const reopenOutputTaxPeriod = handle((req) => service.reopenOutputTaxPeriod({
+  branchId: resolveBranchId(req, req.body),
+  outputTaxPeriodId: req.params.outputTaxPeriodId,
+  expectedVersion: req.body?.expectedVersion,
+  reason: req.body?.reason,
+  actorEmployeeId: actorEmployeeId(req),
+}));
+
 const getDocumentDetail = handle((req) => service.getDocumentDetail({
   branchId: resolveBranchId(req, req.query),
   taxDocumentId: req.params.taxDocumentId,
@@ -159,6 +207,8 @@ const transitionDocument = handle((req) => service.transitionTaxDocument({
 
 module.exports = Object.freeze({
   cancelDocument,
+  closeOutputTaxPeriod,
+  createOutputTaxPeriod,
   getDocumentDetail,
   getDocumentOperationalReadinessProjection,
   getDocumentPrintProjection,
@@ -166,13 +216,18 @@ module.exports = Object.freeze({
   getDocumentTimelineProjection,
   getDocumentWorkspaceProjection,
   getOutputTaxOverview,
+  getOutputTaxPeriod,
   getOutputTaxPeriodReadiness,
   getOutputTaxPeriodReport,
+  getOutputTaxPeriodTimeline,
   issueDocument,
   listCandidates,
   listDocuments,
+  listOutputTaxPeriods,
   registerCandidate,
   registerSaleCandidate,
+  reopenOutputTaxPeriod,
   replaceDocument,
+  requestCloseOutputTaxPeriod,
   transitionDocument,
 });
