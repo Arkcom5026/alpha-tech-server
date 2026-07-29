@@ -10,7 +10,7 @@ const {
   updatePosition,
   toggleActive,
   hardDelete,
-} = require('../../../../controllers/positionController');
+} = require('../controllers/positionController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../middlewares/requireAdmin');
