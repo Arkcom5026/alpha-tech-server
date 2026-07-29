@@ -26,14 +26,14 @@ model PartnerStoreCapability {
 }
 
 model PartnerStoreServiceArea {
-  id           Int                  @id @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
   capabilityId Int
   areaType     StoreServiceAreaType
   areaCode     String
   areaName     String?
-  active       Boolean              @default(true)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  active       Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   capability   PartnerStoreCapability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
 
   @@unique([capabilityId, areaType, areaCode])

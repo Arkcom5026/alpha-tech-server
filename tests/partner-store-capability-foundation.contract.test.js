@@ -18,7 +18,6 @@ const controller = read('src/modules/partnerStore/controllers/partnerStoreCapabi
 const service = read('src/modules/partnerStore/services/partnerStoreCapabilityService.js');
 const repository = read('src/modules/partnerStore/repositories/partnerStoreCapabilityRepository.js');
 
-// Migration authority.
 assert.match(migration, /CREATE TYPE "OnlineDeliveryFeeMode" AS ENUM/);
 assert.match(migration, /'FREE'/);
 assert.match(migration, /'FIXED'/);
@@ -54,7 +53,6 @@ assert.match(migration, /ON DELETE CASCADE/);
 assert.match(migration, /UNIQUE \("capabilityId", "areaType", "areaCode"\)/);
 assert.match(migration, /PartnerStoreServiceArea_lookup_idx/);
 
-// Prisma projection authority.
 assert.equal(packageJson.prisma?.schema, 'prisma');
 assert.match(schema, /model PartnerStoreCapability/);
 assert.match(schema, /branchId\s+Int\s+@unique/);
@@ -67,12 +65,11 @@ assert.match(schema, /enum OnlineDeliveryFeeMode/);
 assert.match(schema, /enum StoreServiceAreaMode/);
 assert.match(schema, /enum StoreServiceAreaType/);
 
-// Internal runtime authority and branch isolation.
 assert.match(server, /require\('\.\/src\/modules\/partnerStore\/routes\/partnerStoreCapabilityRoutes'\)/);
 assert.match(server, /app\.use\('\/api\/partner-store', partnerStoreCapabilityRoutes\)/);
 assert.match(routes, /router\.get\('\/capability'/);
 assert.match(routes, /router\.put\('\/capability'/);
-assert.match(routes, /router\.use\(verifyToken, requireEmployeeContext\)/);
+assert.match(routes, /router\.use\(verifyToken, allowEmployeeContext\)/);
 assert.match(controller, /req\.employee\?\.branchId \|\| req\.user\?\.branchId/);
 assert.doesNotMatch(controller, /req\.body\?\.branchId/);
 assert.doesNotMatch(controller, /req\.params\?\.branchId/);
@@ -85,12 +82,9 @@ assert.match(repository, /client\.partnerStoreCapability\.upsert/);
 assert.match(repository, /client\.partnerStoreServiceArea\.deleteMany/);
 assert.match(repository, /client\.partnerStoreServiceArea\.createMany/);
 
-// Mutable current store policy must remain independent from immutable reservation snapshots.
 assert.doesNotMatch(migration, /ALTER TABLE "ProductReservation"/);
 assert.doesNotMatch(migration, /CREATE TABLE "OrderOnline"/);
 assert.doesNotMatch(migration, /ALTER TABLE "OrderOnline"/);
-
-// Existing branches remain unpublished until explicitly configured.
 assert.match(migration, /"storefrontEnabled" BOOLEAN NOT NULL DEFAULT FALSE/);
 
 console.log('partner store capability repository contract: PASS');

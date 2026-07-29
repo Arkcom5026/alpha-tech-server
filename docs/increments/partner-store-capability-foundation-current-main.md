@@ -132,7 +132,7 @@ The runtime does not accept `branchId` from URL parameters or request payloads.
 
 ### Repository contract authority
 
-`tests/partner-store-capability-foundation.contract.test.js` now verifies:
+`tests/partner-store-capability-foundation.contract.test.js` verifies:
 
 - migration enums, tables, constraints, indexes, and additive scope
 - Prisma multi-file schema configuration
@@ -224,7 +224,7 @@ Owner-supplied test evidence: PENDING
 ### Runtime Gate — Owner Authority
 
 ```text
-Prisma validate and generate: PENDING ON CURRENT REMOTE SHA
+Prisma validate and generate: PENDING ON FINAL MERGE SHA
 Migration apply against representative database: PENDING
 Focused foundation tests: PENDING
 Create/read/update policy behavior: PENDING
@@ -249,9 +249,9 @@ GET /api/sales/storefronts/:slug
 
 ```text
 Repository working area: IMPLEMENTATION COMPLETE
-Repository implementation SHA: 8284cacdd96cd62decb3afd4fbff0a42f766090e
 Remote Prisma projection: IMPLEMENTED
 Repository Implementation: COMPLETE
+Base integration: CURRENT MAIN MERGED INTO FEATURE BRANCH
 Runtime Gate: PENDING — OWNER AUTHORITY
 Operational impact: NONE
 Production impact: NONE
@@ -259,7 +259,7 @@ Production impact: NONE
 
 ## Remaining Agenda Before Merge
 
-1. Project owner runs Prisma validate/generate and focused/runtime verification against the final remote SHA.
+1. Project owner runs Prisma validate/generate and focused/runtime verification against the final merge-integrated SHA.
 2. Record exact tested SHA and evidence in PR #79.
 3. Review merge readiness and merge only under explicit owner authorization.
 4. Open the next agenda for refreshing PR #72 after PR #79 is merged.
