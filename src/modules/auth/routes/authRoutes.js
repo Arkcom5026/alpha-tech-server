@@ -3,8 +3,9 @@
 
 const express = require('express');
 
-const authController = require('../../../../controllers/authController');
+const legacyAuthController = require('../../../../controllers/authController');
 const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
+const loginController = require('../login/loginController');
 const tenantAuthController = require('../controllers/authController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
@@ -52,14 +53,14 @@ router.use((req, res, next) => {
   next();
 });
 
-const ensureFn = (key) => {
-  const fn = authController?.[key];
+const ensureLegacyFn = (key) => {
+  const fn = legacyAuthController?.[key];
   if (typeof fn === 'function') return fn;
-  throw new Error(`[authRoutes] authController.${key} must be a function (got ${typeof fn})`);
+  throw new Error(`[authRoutes] legacyAuthController.${key} must be a function (got ${typeof fn})`);
 };
 
-const resolveHandler = (key) => {
-  const value = authController?.[key];
+const resolveLegacyHandler = (key) => {
+  const value = legacyAuthController?.[key];
   if (typeof value === 'function') return value;
   if (value && typeof value.handler === 'function') return value.handler;
   if (value && typeof value.handle === 'function') return value.handle;
@@ -67,27 +68,34 @@ const resolveHandler = (key) => {
   return null;
 };
 
-const login = ensureFn('login');
-const register = ensureFn('register');
-const refreshSession = ensureFn('refreshSession');
-const logoutSession = ensureFn('logoutSession');
+const register = ensureLegacyFn('register');
+const refreshSession = ensureLegacyFn('refreshSession');
+const logoutSession = ensureLegacyFn('logoutSession');
 const addSubEmployee = employeeOnboardingController.addSubEmployee;
-const revokeSession = resolveHandler('revokeSession') || resolveHandler('logoutAllSessions') || resolveHandler('logoutAll');
-const findUserByEmail = resolveHandler('findUserByEmail');
-const getMe = ensureFn('getMe');
-const forgotPassword = ensureFn('forgotPassword');
-const resetPassword = ensureFn('resetPassword');
+const revokeSession = resolveLegacyHandler('revokeSession')
+  || resolveLegacyHandler('logoutAllSessions')
+  || resolveLegacyHandler('logoutAll');
+const findUserByEmail = resolveLegacyHandler('findUserByEmail');
+const getMe = ensureLegacyFn('getMe');
+const forgotPassword = ensureLegacyFn('forgotPassword');
+const resetPassword = ensureLegacyFn('resetPassword');
+
+if (typeof loginController.login !== 'function') {
+  throw new Error('[authRoutes] loginController.login must be a function');
+}
 
 if (typeof addSubEmployee !== 'function') {
   throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
 }
 
 if (typeof findUserByEmail !== 'function') {
-  throw new Error(`[authRoutes] authController.findUserByEmail must be a function (got ${typeof findUserByEmail})`);
+  throw new Error(
+    `[authRoutes] legacyAuthController.findUserByEmail must be a function (got ${typeof findUserByEmail})`,
+  );
 }
 
 // Current canonical /api/auth contract.
-router.post('/login', login);
+router.post('/login', loginController.login);
 router.post('/register', register);
 router.post('/refresh', traceRefreshRequest, refreshSession);
 router.post('/logout', logoutSession);
