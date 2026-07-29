@@ -1,16 +1,18 @@
-const fs = require('fs');
-const path = require('path');
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 describe('receipt barcode query vertical slice ownership', () => {
   const root = path.resolve(__dirname, '..');
   const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-  test('only by-receipt endpoint leaves the root controller in this increment', () => {
+  test('by-receipt endpoint is owned by the query slice', () => {
     const route = read('src/modules/inventory/barcode/routes/barcodeRoutes.js');
-    expect(route).toContain("require('../query/receiptBarcodeQueryController')");
-    expect(route).toContain("require('../../../../../controllers/barcodeController')");
-    expect(route).toContain("router.get('/by-receipt/:receiptId', getBarcodesByReceiptId)");
-    expect(route).toContain("router.get('/print-batch', getBarcodesForPrintBatch)");
+    assert.match(route, /require\('\.\.\/query\/receiptBarcodeQueryController'\)/);
+    assert.match(route, /router\.get\('\/by-receipt\/:receiptId', getBarcodesByReceiptId\)/);
+    assert.match(route, /router\.get\('\/print-batch', getBarcodesForPrintBatch\)/);
+    assert.doesNotMatch(route, /controllers\/barcodeController/);
   });
 
   test('query slice owns controller service and repository layers', () => {
@@ -18,17 +20,17 @@ describe('receipt barcode query vertical slice ownership', () => {
     const service = read('src/modules/inventory/barcode/query/receiptBarcodeQueryService.js');
     const repository = read('src/modules/inventory/barcode/query/receiptBarcodeQueryRepository.js');
 
-    expect(controller).toContain("require('./receiptBarcodeQueryService')");
-    expect(service).toContain("require('./receiptBarcodeQueryRepository')");
-    expect(repository).toContain("require('../../../../../lib/prisma')");
+    assert.match(controller, /require\('\.\/receiptBarcodeQueryService'\)/);
+    assert.match(service, /require\('\.\/receiptBarcodeQueryRepository'\)/);
+    assert.match(repository, /require\('\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma'\)/);
   });
 
   test('query service reuses generation service instead of duplicating generation persistence', () => {
     const service = read('src/modules/inventory/barcode/query/receiptBarcodeQueryService.js');
-    expect(service).toContain("require('../generate/generateBarcodeService')");
-    expect(service).toContain('generateMissingBarcodes');
-    expect(service).not.toContain('barcodeCounter');
-    expect(service).not.toContain('barcodeReceiptItem.createMany');
+    assert.match(service, /require\('\.\.\/generate\/generateBarcodeService'\)/);
+    assert.match(service, /generateMissingBarcodes/);
+    assert.doesNotMatch(service, /barcodeCounter/);
+    assert.doesNotMatch(service, /barcodeReceiptItem\.createMany/);
   });
 
   test('query behavior preserves filters fallback and projection semantics', () => {
@@ -36,21 +38,21 @@ describe('receipt barcode query vertical slice ownership', () => {
     const service = read('src/modules/inventory/barcode/query/receiptBarcodeQueryService.js');
     const repository = read('src/modules/inventory/barcode/query/receiptBarcodeQueryRepository.js');
 
-    expect(controller).toContain('onlyUnscanned');
-    expect(controller).toContain('onlyUnactivated');
-    expect(controller).toContain('includeFallback');
-    expect(controller).toContain("Cache-Control");
-    expect(repository).toContain('stockItemId: null');
-    expect(repository).toContain("status: { not: 'SN_RECEIVED' }");
-    expect(repository).toContain('purchaseOrderReceiptItemId');
-    expect(service).toContain('productName');
-    expect(service).toContain('stockItemStatus');
-    expect(service).toContain('qtyLabelsSuggested');
+    assert.match(controller, /onlyUnscanned/);
+    assert.match(controller, /onlyUnactivated/);
+    assert.match(controller, /includeFallback/);
+    assert.match(controller, /Cache-Control/);
+    assert.match(repository, /stockItemId: null/);
+    assert.match(repository, /status: \{ not: 'SN_RECEIVED' \}/);
+    assert.match(repository, /purchaseOrderReceiptItemId/);
+    assert.match(service, /productName/);
+    assert.match(service, /stockItemStatus/);
+    assert.match(service, /qtyLabelsSuggested/);
   });
 
-  test('unrelated barcode slices remain deferred', () => {
-    for (const directory of ['print', 'scan', 'audit', 'complete']) {
-      expect(fs.existsSync(path.join(root, `src/modules/inventory/barcode/${directory}`))).toBe(false);
+  test('all later barcode slices coexist under final ownership', () => {
+    for (const directory of ['print', 'scan', 'audit', 'completion']) {
+      assert.equal(fs.existsSync(path.join(root, `src/modules/inventory/barcode/${directory}`)), true);
     }
   });
 });
