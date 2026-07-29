@@ -1,9 +1,8 @@
-const legacyReceiptSimpleRuntime = require('../../../../../controllers/receiptSimpleController');
+'use strict';
 
-// Transitional module-owned HTTP boundary.
-// The canonical route imports this controller while the high-risk transaction
-// implementation is migrated in a later, separately verified increment.
-const create = (req, res) => legacyReceiptSimpleRuntime.create(req, res);
-const preview = (req, res) => legacyReceiptSimpleRuntime.preview(req, res);
+const runtime = require('./runtime/receiptSimpleRuntime');
+
+const create = (req, res) => runtime.create(req, res);
+const preview = (req, res) => runtime.preview(req, res);
 
 module.exports = { create, preview };

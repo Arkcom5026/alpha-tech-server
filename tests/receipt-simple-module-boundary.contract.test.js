@@ -20,9 +20,10 @@ describe('receipt simple module boundary', () => {
     expect(controller).toContain('module.exports = { create, preview }');
   });
 
-  test('legacy transaction runtime is explicitly isolated behind the boundary', () => {
+  test('transaction runtime is owned inside the receipt simple module', () => {
     const controller = read('src/modules/procurement/receipt/simple/receiptSimpleController.js');
 
-    expect(controller).toContain("require('../../../../../controllers/receiptSimpleController')");
+    expect(controller).toContain("require('./runtime/receiptSimpleRuntime')");
+    expect(controller).not.toContain('controllers/receiptSimpleController');
   });
 });
