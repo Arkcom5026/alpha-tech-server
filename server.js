@@ -38,9 +38,9 @@ const unitRoutes = require('./routes/unitRoutes');
 const { mountProductModule } = require('./src/modules/product');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
 const uploadProductRoutes = require('./routes/uploadProductRoutes');
-const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
-const purchaseOrderReceiptRoutes = require('./routes/purchaseOrderReceiptRoutes');
-const purchaseOrderReceiptItemRoutes = require('./routes/purchaseOrderReceiptItemRoutes');
+const purchaseOrderRoutes = require('./src/modules/procurement/purchase-order/routes/purchaseOrderRoutes');
+const purchaseOrderReceiptRoutes = require('./src/modules/procurement/receipt/routes/purchaseOrderReceiptRoutes');
+const purchaseOrderReceiptItemRoutes = require('./src/modules/procurement/receipt/routes/purchaseOrderReceiptItemRoutes');
 const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stockItemRoutes');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
@@ -257,5 +257,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-module.exports = app;
