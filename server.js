@@ -45,6 +45,7 @@ const stockItemRoutes = require('./src/modules/inventory/stock-item/routes/stock
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./src/modules/sales/routes/saleRoutes');
+const publicStorefrontRoutes = require('./src/modules/sales/storefront/public/publicStorefrontRoutes');
 const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
 const commerceIdentityRoutes = require('./src/modules/sales/storefront/identity/commerceIdentityRoutes');
 const productReservationCommitmentRoutes = require('./src/modules/sales/storefront/commitment/productReservationCommitmentRoutes');
@@ -195,6 +196,7 @@ app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
 
+app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
 app.use('/api/sales/storefronts/:slug/commitment', productReservationCommitmentRoutes);
