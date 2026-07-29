@@ -4,12 +4,7 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  getBarcodesForPrintBatch,
-  getReceiptsWithBarcodes,
-  searchReprintReceipts,
-  reprintBarcodes,
   markReceiptAsCompleted,
-  markBarcodesAsPrinted,
   auditReceiptBarcodes,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
@@ -21,6 +16,13 @@ const {
 const {
   getBarcodesByReceiptId,
 } = require('../query/receiptBarcodeQueryController');
+const {
+  getBarcodesForPrintBatch,
+  getReceiptsWithBarcodes,
+  searchReprintReceipts,
+  reprintBarcodes,
+  markBarcodesAsPrinted,
+} = require('../print/barcodePrintController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
