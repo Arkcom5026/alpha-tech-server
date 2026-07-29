@@ -6,7 +6,7 @@ const {
   getPurchaseReport,
   getPurchaseReceiptReport,
   getPurchaseReceiptReportDetail,
-} = require('../../../../../controllers/purchaseReportController');
+} = require('../purchaseReportController');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 router.use(verifyToken);
