@@ -20,6 +20,10 @@ const routes = read('src/modules/sales/storefront/commitment/productReservationC
 const server = read('server.js');
 
 assertIncludes(migration, 'ProductReservationActorType', 'Reservation actor authority is required');
+assertIncludes(migration, 'CREATE TABLE "ProductReservation"', 'Reservation table must be created by canonical migration');
+assertIncludes(migration, 'CREATE TABLE "ProductReservationItem"', 'Reservation item table must be created by canonical migration');
+assertIncludes(migration, 'ProductReservationStatus', 'Reservation status must have one canonical enum authority');
+assertIncludes(migration, "'ONLINE'", 'Online commitment source must be accepted by the canonical enum');
 assertIncludes(migration, 'COMMERCE_IDENTITY', 'Public commitment actor type is required');
 assertIncludes(migration, 'commerceIdentityId', 'Reservation must link to verified commerce identity');
 assertIncludes(migration, 'anonymousSessionId', 'Reservation must link to anonymous session');
