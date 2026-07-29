@@ -26,6 +26,7 @@
     "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",
     "test:public-storefront": "node tests/public-storefront-product-discovery.contract.test.js",
     "test:anonymous-shopping-session": "node tests/anonymous-shopping-session-authority.contract.test.js",
+    "test:store-customer-foundation": "node tests/store-customer-prisma-foundation.contract.test.js",
     "test:certification": "npm run test:regression && npm run test:modules && npm run test:quick-receipt && npm run test:tax-intake && npm run test:public-storefront && npm run test:anonymous-shopping-session && npm run verify:device-aggregate && npm run verify:tax-authority && npm run verify:repair-capability && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input && npm run verify:product-inventory-authority && npm run verify:product-inventory-runtime && npm run verify:sale-simple-inventory-authority && npm run verify:simple-receive-authority && npm run verify:simple-adjustment-authority && npm run verify:simple-transfer-authority",
     "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
     "verify:product-vertical-slices": "node tests/product-vertical-slice-integration.contract.test.js",
