@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../../../../../../lib/prisma');
+const { buildOutputTaxPeriodReadiness } = require('../../readiness/buildOutputTaxPeriodReadinessService');
 const outputTaxPeriodRepository = require('../repository/outputTaxPeriodRepository');
 
 const PERIOD_STATUS = Object.freeze({
@@ -86,6 +87,33 @@ const buildEventSnapshot = (period) => ({
   totalAmount: period.totalAmount,
   version: period.version,
   periodSnapshot: period.snapshot || {},
+});
+
+const buildClosingSnapshot = ({ current, readiness }) => ({
+  schemaVersion: 'OUTPUT_TAX_PERIOD_CLOSE_SNAPSHOT_V1',
+  capturedAt: new Date().toISOString(),
+  period: {
+    branchId: current.branchId,
+    year: current.year,
+    month: current.month,
+    currency: readiness.currency,
+  },
+  summary: {
+    documentCount: readiness.documentCount,
+    activeDocumentCount: readiness.activeDocumentCount,
+    cancelledDocumentCount: readiness.cancelledDocumentCount,
+    subtotalAmount: readiness.totals.subtotalAmount,
+    taxAmount: readiness.totals.taxAmount,
+    totalAmount: readiness.totals.totalAmount,
+  },
+  readiness: {
+    schemaVersion: readiness.schemaVersion,
+    readyForFiling: readiness.readyForFiling,
+    blockingFailureCount: readiness.blockingFailureCount,
+    warningCount: readiness.warningCount,
+    checks: readiness.checks,
+    attentionDocuments: readiness.attentionDocuments,
+  },
 });
 
 const createPeriod = async ({ branchId, year, month, currency = 'THB', summary = {}, snapshot = {} }) => {
@@ -208,6 +236,40 @@ const closePeriod = async ({ branchId, outputTaxPeriodId, expectedVersion, actor
   const normalizedActorId = normalizeActorEmployeeId(actorEmployeeId);
   const normalizedReason = requireReason(reason, 'OUTPUT_TAX_PERIOD_CLOSE_REASON_REQUIRED');
 
+  const period = assertPeriodExists(
+    await outputTaxPeriodRepository.findById({
+      branchId: normalizedBranchId,
+      outputTaxPeriodId: normalizedPeriodId,
+    }),
+  );
+
+  if (period.status !== PERIOD_STATUS.CLOSING) {
+    fail('Only CLOSING periods can be closed', 'OUTPUT_TAX_PERIOD_CLOSE_NOT_ALLOWED', 409);
+  }
+
+  const readiness = await buildOutputTaxPeriodReadiness({
+    branchId: normalizedBranchId,
+    year: period.year,
+    month: period.month,
+  });
+
+  if (!readiness.readyForFiling) {
+    fail(
+      'Output tax period is not ready to close',
+      'OUTPUT_TAX_PERIOD_READINESS_BLOCKED',
+      409,
+      {
+        period: { year: period.year, month: period.month },
+        blockingFailureCount: readiness.blockingFailureCount,
+        warningCount: readiness.warningCount,
+        checks: readiness.checks,
+        attentionDocuments: readiness.attentionDocuments,
+      },
+    );
+  }
+
+  const closingSnapshot = buildClosingSnapshot({ current: period, readiness });
+
   return prisma.$transaction(async (tx) => {
     const current = assertPeriodExists(
       await outputTaxPeriodRepository.findByIdForUpdate(
@@ -220,6 +282,33 @@ const closePeriod = async ({ branchId, outputTaxPeriodId, expectedVersion, actor
       fail('Only CLOSING periods can be closed', 'OUTPUT_TAX_PERIOD_CLOSE_NOT_ALLOWED', 409);
     }
 
+    if (current.version !== normalizedVersion) {
+      fail(
+        'Output tax period changed concurrently',
+        'OUTPUT_TAX_PERIOD_CONFLICT',
+        409,
+        { expectedVersion: normalizedVersion, currentVersion: current.version },
+      );
+    }
+
+    const snapshotted = assertTransitionResult(
+      await outputTaxPeriodRepository.updateSnapshot(
+        {
+          branchId: normalizedBranchId,
+          outputTaxPeriodId: normalizedPeriodId,
+          expectedVersion: normalizedVersion,
+          documentCount: readiness.documentCount,
+          activeDocumentCount: readiness.activeDocumentCount,
+          cancelledDocumentCount: readiness.cancelledDocumentCount,
+          subtotalAmount: readiness.totals.subtotalAmount,
+          taxAmount: readiness.totals.taxAmount,
+          totalAmount: readiness.totals.totalAmount,
+          snapshot: closingSnapshot,
+        },
+        tx,
+      ),
+    );
+
     const transitioned = assertTransitionResult(
       await outputTaxPeriodRepository.transitionStatus(
         {
@@ -227,7 +316,7 @@ const closePeriod = async ({ branchId, outputTaxPeriodId, expectedVersion, actor
           outputTaxPeriodId: normalizedPeriodId,
           expectedStatus: PERIOD_STATUS.CLOSING,
           targetStatus: PERIOD_STATUS.CLOSED,
-          expectedVersion: normalizedVersion,
+          expectedVersion: snapshotted.version,
           actorEmployeeId: normalizedActorId,
           reason: normalizedReason,
         },
