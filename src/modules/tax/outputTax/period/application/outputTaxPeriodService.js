@@ -91,6 +91,29 @@ const normalizeSummary = (summary = {}) => Object.freeze({
   totalAmount: normalizeNonNegativeAmount(summary.totalAmount, 'summary.totalAmount'),
 });
 
+const normalizeOptionalStatus = (value) => {
+  if (value == null || String(value).trim() === '') return null;
+  const status = String(value).trim().toUpperCase();
+  if (!Object.values(PERIOD_STATUS).includes(status)) {
+    fail('status is invalid', 'OUTPUT_TAX_PERIOD_STATUS_INVALID', 400, {
+      allowedStatuses: Object.freeze(Object.values(PERIOD_STATUS)),
+    });
+  }
+  return status;
+};
+
+const normalizePagination = ({ limit = 50, offset = 0 }) => {
+  const parsedLimit = Number(limit);
+  const parsedOffset = Number(offset);
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 200) {
+    fail('limit must be an integer between 1 and 200', 'OUTPUT_TAX_PERIOD_LIMIT_INVALID', 400);
+  }
+  if (!Number.isInteger(parsedOffset) || parsedOffset < 0) {
+    fail('offset must be a non-negative integer', 'OUTPUT_TAX_PERIOD_OFFSET_INVALID', 400);
+  }
+  return Object.freeze({ limit: parsedLimit, offset: parsedOffset });
+};
+
 const normalizeActorEmployeeId = (value) =>
   requirePositiveInt(value, 'actorEmployeeId', 'OUTPUT_TAX_PERIOD_ACTOR_REQUIRED');
 
@@ -478,13 +501,14 @@ const getPeriodTimeline = async ({ branchId, outputTaxPeriodId }) => {
 
 const listPeriods = async ({ branchId, status = null, year = null, limit = 50, offset = 0 }) => {
   const normalizedBranchId = requirePositiveInt(branchId, 'branchId', 'TAX_BRANCH_REQUIRED');
-  const normalizedYear = year == null ? null : requireYear(year);
+  const normalizedStatus = normalizeOptionalStatus(status);
+  const normalizedYear = year == null || String(year).trim() === '' ? null : requireYear(year);
+  const pagination = normalizePagination({ limit, offset });
   return outputTaxPeriodRepository.list({
     branchId: normalizedBranchId,
-    status,
+    status: normalizedStatus,
     year: normalizedYear,
-    limit,
-    offset,
+    ...pagination,
   });
 };
 
