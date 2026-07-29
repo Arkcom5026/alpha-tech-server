@@ -77,6 +77,19 @@ const customerSelect = {
   user: { select: { loginId: true, email: true } },
 };
 
+const customerBusinessScope = (branchId) => ({
+  OR: [
+    { sales: { some: { branchId } } },
+    { repairJobs: { some: { branchId } } },
+    { ownedDevices: { some: { branchId } } },
+    { deviceIntakes: { some: { branchId } } },
+    { customerReceipts: { some: { branchId } } },
+    { customerDeposits: { some: { branchId } } },
+    { posHeldCarts: { some: { branchId } } },
+    { services: { some: { branchId } } },
+  ],
+});
+
 class IntakeSearchRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -120,12 +133,17 @@ class IntakeSearchRepository {
       }),
       this.prisma.customerProfile.findMany({
         where: {
-          OR: [
-            { name: insensitive },
-            { companyName: insensitive },
-            { taxId: insensitive },
-            { user: { loginId: insensitive } },
-            { user: { email: insensitive } },
+          AND: [
+            customerBusinessScope(normalizedBranchId),
+            {
+              OR: [
+                { name: insensitive },
+                { companyName: insensitive },
+                { taxId: insensitive },
+                { user: { loginId: insensitive } },
+                { user: { email: insensitive } },
+              ],
+            },
           ],
         },
         select: customerSelect,
@@ -140,3 +158,4 @@ class IntakeSearchRepository {
 
 module.exports = new IntakeSearchRepository();
 module.exports.IntakeSearchRepository = IntakeSearchRepository;
+module.exports.customerBusinessScope = customerBusinessScope;
