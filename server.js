@@ -25,7 +25,7 @@ app.use((req, res, next) => {
 });
 
 // ===================== Routes =====================
-const authRoutes = require('./src/modules/auth/routes/authRuntimeRoutes');
+const authRoutes = require('./src/modules/auth/routes/authRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
 const superAdminCategoryRoutes = require('./src/modules/category/routes/superAdminCategoryRoutes');
