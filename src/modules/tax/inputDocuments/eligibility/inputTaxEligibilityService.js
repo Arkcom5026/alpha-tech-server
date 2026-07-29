@@ -6,7 +6,7 @@ const amount = (value) => Number(value || 0);
 const normalizeStatus = (value) => String(value || '').trim().toUpperCase();
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'VOIDED']);
 
-const projectInputTaxEligibility = ({ document, reconciliation }) => {
+const projectInputTaxEligibility = ({ document, reconciliation, duplicate, replacement }) => {
   const grossVatAmount = amount(document?.vatAmount ?? document?.taxAmount);
   const snapshot = document?.snapshot || {};
   const configuredRate = Number(snapshot.inputTaxEligibilityRate);
@@ -24,11 +24,25 @@ const projectInputTaxEligibility = ({ document, reconciliation }) => {
       reasonCodes: ['CANCELLED_DOCUMENT'],
     });
   }
-  if (normalizeStatus(document?.status) === 'REPLACED') {
+  if (normalizeStatus(document?.status) === 'REPLACED' || replacement?.status === 'REPLACED_SOURCE') {
     return createEligibilityProjection({
       status: 'INELIGIBLE', grossVatAmount, eligibleVatAmount: 0,
       ineligibleVatAmount: grossVatAmount, eligibilityRate: 0,
       reasonCodes: ['REPLACED_DOCUMENT'],
+    });
+  }
+  if (replacement?.status === 'CHAIN_CONFLICT') {
+    return createEligibilityProjection({
+      status: 'PENDING_REVIEW', grossVatAmount, eligibleVatAmount: 0,
+      ineligibleVatAmount: grossVatAmount, eligibilityRate: 0,
+      reasonCodes: ['MANUAL_REVIEW_REQUIRED'],
+    });
+  }
+  if (duplicate?.blocksEligibility) {
+    return createEligibilityProjection({
+      status: 'PENDING_REVIEW', grossVatAmount, eligibleVatAmount: 0,
+      ineligibleVatAmount: grossVatAmount, eligibilityRate: 0,
+      reasonCodes: ['DUPLICATE_DOCUMENT_RISK'],
     });
   }
   if (!reconciliation?.canApprove) {
