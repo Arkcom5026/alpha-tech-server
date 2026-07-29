@@ -107,17 +107,40 @@ const buildOutputTaxPeriodReadiness = async ({ branchId, year, month }) => {
 
   const blockingFailures = checks.filter((check) => check.blocking && !check.passed);
   const warnings = checks.filter((check) => !check.blocking && !check.passed);
+  const authority = report.authority || {};
+  const periodStatus = authority.status || null;
+  const closeRequestAllowed = Boolean(authority.periodExists) && ['OPEN', 'REOPENED'].includes(periodStatus);
+  const closeAllowed = Boolean(authority.periodExists) && periodStatus === 'CLOSING' && blockingFailures.length === 0;
+  const reopenAllowed = Boolean(authority.periodExists) && periodStatus === 'CLOSED';
 
   return Object.freeze({
-    schemaVersion: 'OUTPUT_TAX_PERIOD_READINESS_V1',
+    schemaVersion: 'OUTPUT_TAX_PERIOD_READINESS_V2',
+    compatibilitySchemaVersion: 'OUTPUT_TAX_PERIOD_READINESS_V1',
     branchId: normalizedBranchId,
-    period: Object.freeze({ year: normalizedYear, month: normalizedMonth }),
+    period: Object.freeze({
+      id: authority.periodId || null,
+      year: normalizedYear,
+      month: normalizedMonth,
+      status: periodStatus,
+      version: authority.version || null,
+    }),
+    authority: Object.freeze({
+      periodExists: Boolean(authority.periodExists),
+      lockedForTaxWrites: Boolean(authority.lockedForTaxWrites),
+      closeRequestAllowed,
+      closeAllowed,
+      reopenAllowed,
+      closeRequestedAt: authority.closeRequestedAt || null,
+      closedAt: authority.closedAt || null,
+      reopenedAt: authority.reopenedAt || null,
+    }),
     currency: report.currency,
     documentCount: report.documentCount,
     activeDocumentCount: report.activeDocumentCount,
     cancelledDocumentCount: report.cancelledDocumentCount,
     totals: report.totals,
     readyForFiling: blockingFailures.length === 0,
+    readyForCloseAuthorization: closeAllowed,
     blockingFailureCount: blockingFailures.length,
     warningCount: warnings.length,
     checks: Object.freeze(checks.map((check) => Object.freeze(check))),
@@ -130,6 +153,17 @@ const buildOutputTaxPeriodReadiness = async ({ branchId, year, month }) => {
       nonThbCurrency: Object.freeze(nonThbDocuments.map((document) => document.taxDocumentId)),
       cancelled: Object.freeze(cancelledDocuments.map((document) => document.taxDocumentId)),
     }),
+    nextRequiredAction: !authority.periodExists
+      ? 'CREATE_OUTPUT_TAX_PERIOD'
+      : closeRequestAllowed
+        ? 'REQUEST_OUTPUT_TAX_PERIOD_CLOSE'
+        : closeAllowed
+          ? 'CLOSE_OUTPUT_TAX_PERIOD'
+          : reopenAllowed
+            ? 'OUTPUT_TAX_PERIOD_CLOSED'
+            : blockingFailures.length > 0
+              ? 'RESOLVE_OUTPUT_TAX_PERIOD_READINESS_FAILURES'
+              : 'REVIEW_OUTPUT_TAX_PERIOD_AUTHORITY_STATE',
   });
 };
 
