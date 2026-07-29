@@ -4,9 +4,9 @@ const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const mapChallenge = (row) => ({
   id: Number(row.id),
-  sessionId: Number(row.sessionId),
+  sessionId: Number(row.anonymousSessionId),
   purpose: row.purpose,
-  phoneE164: row.phoneE164,
+  phoneE164: row.phoneNormalized,
   otpHash: row.otpHash,
   status: row.status,
   attemptCount: Number(row.attemptCount),
@@ -43,8 +43,10 @@ const findStorefrontBySlug = async (slug, db = prisma) => {
 
 const cancelPendingChallenges = async ({ sessionId, purpose }, db = prisma) => db.$executeRaw(Prisma.sql`
   UPDATE "CommerceIdentityChallenge"
-  SET "status" = 'CANCELLED', "updatedAt" = CURRENT_TIMESTAMP
-  WHERE "sessionId" = ${sessionId}
+  SET "status" = 'CANCELLED',
+      "cancelledAt" = CURRENT_TIMESTAMP,
+      "updatedAt" = CURRENT_TIMESTAMP
+  WHERE "anonymousSessionId" = ${sessionId}
     AND "purpose" = ${purpose}::"CommerceIdentityChallengePurpose"
     AND "status" = 'PENDING'
 `);
@@ -53,11 +55,11 @@ const createChallengeInDb = async ({ sessionId, purpose, phoneE164, otpHash, exp
   await cancelPendingChallenges({ sessionId, purpose }, db);
   const rows = await db.$queryRaw(Prisma.sql`
     INSERT INTO "CommerceIdentityChallenge" (
-      "sessionId", "purpose", "phoneE164", "otpHash", "status",
-      "attemptCount", "resendCount", "expiresAt", "createdAt", "updatedAt"
+      "anonymousSessionId", "purpose", "phoneNormalized", "otpHash", "status",
+      "attemptCount", "resendCount", "expiresAt", "lastSentAt", "createdAt", "updatedAt"
     ) VALUES (
       ${sessionId}, ${purpose}::"CommerceIdentityChallengePurpose", ${phoneE164}, ${otpHash}, 'PENDING',
-      0, 0, ${expiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      0, 0, ${expiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
     RETURNING *
   `);
@@ -74,7 +76,7 @@ const findPendingChallengeForUpdate = async ({ challengeId, sessionId }, db = pr
     SELECT *
     FROM "CommerceIdentityChallenge"
     WHERE "id" = ${challengeId}
-      AND "sessionId" = ${sessionId}
+      AND "anonymousSessionId" = ${sessionId}
     FOR UPDATE
   `);
   return rows[0] ? mapChallenge(rows[0]) : null;
@@ -93,14 +95,14 @@ const registerFailedAttempt = async ({ challengeId, maxAttempts }, db = prisma) 
   return rows[0] ? mapChallenge(rows[0]) : null;
 };
 
-const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phoneE164, proofTokenHash, proofExpiresAt }, db) => {
+const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phoneE164, proofExpiresAt }, db) => {
   const updated = await db.$queryRaw(Prisma.sql`
     UPDATE "CommerceIdentityChallenge"
     SET "status" = 'VERIFIED',
         "verifiedAt" = CURRENT_TIMESTAMP,
         "updatedAt" = CURRENT_TIMESTAMP
     WHERE "id" = ${challengeId}
-      AND "sessionId" = ${sessionId}
+      AND "anonymousSessionId" = ${sessionId}
       AND "status" = 'PENDING'
       AND "expiresAt" > CURRENT_TIMESTAMP
     RETURNING *
@@ -109,11 +111,11 @@ const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phone
 
   const proofs = await db.$queryRaw(Prisma.sql`
     INSERT INTO "CommerceCommitmentIdentity" (
-      "challengeId", "sessionId", "phoneE164", "proofTokenHash",
-      "expiresAt", "createdAt", "updatedAt"
+      "challengeId", "anonymousSessionId", "phoneNormalized", "verifiedAt",
+      "expiresAt", "createdAt"
     ) VALUES (
-      ${challengeId}, ${sessionId}, ${phoneE164}, ${proofTokenHash},
-      ${proofExpiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ${challengeId}, ${sessionId}, ${phoneE164}, CURRENT_TIMESTAMP,
+      ${proofExpiresAt}, CURRENT_TIMESTAMP
     )
     RETURNING "id", "expiresAt", "createdAt"
   `);
