@@ -10,12 +10,10 @@ const crypto = require('crypto');
 dotenv.config();
 const app = express();
 
-// Trust proxy (Render / reverse proxy)
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.disable('etag');
 
-// Request ID (for logs / support)
 app.use((req, res, next) => {
   req.id = crypto.randomUUID
     ? crypto.randomUUID()
@@ -24,7 +22,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===================== Routes =====================
 const authRoutes = require('./routes/authRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
@@ -49,6 +46,8 @@ const publicStorefrontRoutes = require('./src/modules/sales/storefront/public/pu
 const anonymousShoppingSessionRoutes = require('./src/modules/sales/storefront/session/anonymousShoppingSessionRoutes');
 const commerceIdentityRoutes = require('./src/modules/sales/storefront/identity/commerceIdentityRoutes');
 const productReservationCommitmentRoutes = require('./src/modules/sales/storefront/commitment/productReservationCommitmentRoutes');
+const productReservationMerchantRoutes = require('./src/modules/sales/reservations/merchant/productReservationMerchantRoutes');
+const productReservationExpiryRoutes = require('./src/modules/sales/reservations/expiry/productReservationExpiryRoutes');
 const paymentRoutes = require('./src/modules/sales/payment/routes/paymentRoutes');
 const saleReturnRoutes = require('./src/modules/sales/return/routes/saleReturnRoutes');
 const refundRoutes = require('./src/modules/sales/refund/routes/refundRoutes');
@@ -83,20 +82,14 @@ const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
 const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 
-// ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
-  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
-
-  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-
-  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -114,13 +107,10 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
-
   const o = normalizeOrigin(origin);
   if (!o) return true;
-
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
-
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
@@ -128,11 +118,7 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-
-    if (!origin || isAllowedOrigin(origin)) {
-      return callback(null, true);
-    }
-
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -170,7 +156,6 @@ app.use('/api', (_req, res, next) => {
 const { traceRequest } = require('./middlewares/authTrace');
 app.use('/api', traceRequest);
 
-// ===================== API =====================
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -189,17 +174,17 @@ mountProductModule(app);
 
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
-
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
-
 app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
 app.use('/api/sales/storefronts/:slug/commitment', productReservationCommitmentRoutes);
+app.use('/api/sales/reservations/expiry', productReservationExpiryRoutes);
+app.use('/api/sales/reservations', productReservationMerchantRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sale-orders', saleRoutes);
 app.use('/api/sale-returns', saleReturnRoutes);
@@ -234,7 +219,6 @@ app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
 
-// ===================== Errors =====================
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
@@ -245,16 +229,11 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
-
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
-  const statusCode =
-    Number.isInteger(candidateStatusCode) &&
-    candidateStatusCode >= 400 &&
-    candidateStatusCode <= 599
-      ? candidateStatusCode
-      : 500;
+  const statusCode = Number.isInteger(candidateStatusCode) && candidateStatusCode >= 400 && candidateStatusCode <= 599
+    ? candidateStatusCode
+    : 500;
   const code = err?.code || 'INTERNAL_SERVER_ERROR';
-
   res.status(statusCode).json({
     ok: false,
     error: code,
