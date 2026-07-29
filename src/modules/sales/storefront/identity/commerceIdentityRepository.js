@@ -7,6 +7,7 @@ const mapChallenge = (row) => ({
   sessionId: Number(row.sessionId),
   purpose: row.purpose,
   phoneE164: row.phoneE164,
+  otpHash: row.otpHash,
   status: row.status,
   attemptCount: Number(row.attemptCount),
   resendCount: Number(row.resendCount),
@@ -48,9 +49,9 @@ const cancelPendingChallenges = async ({ sessionId, purpose }, db = prisma) => d
     AND "status" = 'PENDING'
 `);
 
-const createChallenge = async ({ sessionId, purpose, phoneE164, otpHash, expiresAt }, db = prisma) => db.$transaction(async (tx) => {
-  await cancelPendingChallenges({ sessionId, purpose }, tx);
-  const rows = await tx.$queryRaw(Prisma.sql`
+const createChallengeInDb = async ({ sessionId, purpose, phoneE164, otpHash, expiresAt }, db) => {
+  await cancelPendingChallenges({ sessionId, purpose }, db);
+  const rows = await db.$queryRaw(Prisma.sql`
     INSERT INTO "CommerceIdentityChallenge" (
       "sessionId", "purpose", "phoneE164", "otpHash", "status",
       "attemptCount", "resendCount", "expiresAt", "createdAt", "updatedAt"
@@ -61,7 +62,12 @@ const createChallenge = async ({ sessionId, purpose, phoneE164, otpHash, expires
     RETURNING *
   `);
   return mapChallenge(rows[0]);
-});
+};
+
+const createChallenge = async (command, db = prisma) => {
+  if (db !== prisma) return createChallengeInDb(command, db);
+  return prisma.$transaction((tx) => createChallengeInDb(command, tx));
+};
 
 const findPendingChallengeForUpdate = async ({ challengeId, sessionId }, db = prisma) => {
   const rows = await db.$queryRaw(Prisma.sql`
@@ -87,8 +93,8 @@ const registerFailedAttempt = async ({ challengeId, maxAttempts }, db = prisma) 
   return rows[0] ? mapChallenge(rows[0]) : null;
 };
 
-const verifyChallengeAndCreateProof = async ({ challengeId, sessionId, phoneE164, proofTokenHash, proofExpiresAt }, db = prisma) => db.$transaction(async (tx) => {
-  const updated = await tx.$queryRaw(Prisma.sql`
+const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phoneE164, proofTokenHash, proofExpiresAt }, db) => {
+  const updated = await db.$queryRaw(Prisma.sql`
     UPDATE "CommerceIdentityChallenge"
     SET "status" = 'VERIFIED',
         "verifiedAt" = CURRENT_TIMESTAMP,
@@ -101,7 +107,7 @@ const verifyChallengeAndCreateProof = async ({ challengeId, sessionId, phoneE164
   `);
   if (!updated[0]) return null;
 
-  const proofs = await tx.$queryRaw(Prisma.sql`
+  const proofs = await db.$queryRaw(Prisma.sql`
     INSERT INTO "CommerceCommitmentIdentity" (
       "challengeId", "sessionId", "phoneE164", "proofTokenHash",
       "expiresAt", "createdAt", "updatedAt"
@@ -120,7 +126,12 @@ const verifyChallengeAndCreateProof = async ({ challengeId, sessionId, phoneE164
       createdAt: proofs[0].createdAt,
     },
   };
-});
+};
+
+const verifyChallengeAndCreateProof = async (command, db = prisma) => {
+  if (db !== prisma) return verifyChallengeAndCreateProofInDb(command, db);
+  return prisma.$transaction((tx) => verifyChallengeAndCreateProofInDb(command, tx));
+};
 
 module.exports = Object.freeze({
   findActiveSessionByTokenHash,
