@@ -2,7 +2,10 @@ const express = require('express');
 const { catalogNormalizeMiddleware } = require('../middleware/catalogNormalize');
 
 const { createProductType, updateProductType } = require('../controllers/productTypeController');
-const { createProductProfile, updateProductProfile } = require('../controllers/productProfileController');
+const {
+  createProductProfile,
+  updateProductProfile,
+} = require('../src/modules/product/profile/controllers/productProfileController');
 const { createProductTemplate, updateProductTemplate } = require('../controllers/productTemplateController');
 
 const router = express.Router();
@@ -12,7 +15,7 @@ const router = express.Router();
 router.post('/product-types', createProductType);
 router.patch('/product-types/:id', updateProductType);
 
-// ProductProfile still owns legacy slug.
+// ProductProfile remains an explicit compatibility boundary and returns FEATURE_RETIRED.
 router.post('/product-profiles', catalogNormalizeMiddleware, createProductProfile);
 router.patch('/product-profiles/:id', catalogNormalizeMiddleware, updateProductProfile);
 
