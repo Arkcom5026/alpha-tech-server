@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const documentRepository = require('../repository/taxDocumentRepository');
+const { assertPeriodAllowsIssue } = require('../../outputTax/period/guard/outputTaxPeriodGuard');
 
 const normalizeText = (value) => String(value || '').trim();
 
@@ -80,6 +81,11 @@ const issueTaxDocument = async ({
         statusCode: 409,
       });
     }
+
+    await assertPeriodAllowsIssue({
+      branchId: normalizedBranchId,
+      occurredAt: current.occurredAt || normalizedIssuedAt,
+    }, tx);
 
     const duplicate = await documentRepository.findByDocumentNumber({
       branchId: normalizedBranchId,
