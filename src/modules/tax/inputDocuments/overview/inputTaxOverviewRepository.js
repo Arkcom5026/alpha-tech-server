@@ -15,11 +15,13 @@ const periodExpression = (periodView) => {
       )`;
     case 'CLAIM':
       return Prisma.sql`COALESCE(
+        filing_summary."selectedAt",
         NULLIF(document."snapshot"->>'inputTaxClaimedAt', '')::timestamptz,
         NULLIF(document."snapshot"->>'inputTaxSelectedAt', '')::timestamptz
       )`;
     case 'FILED':
       return Prisma.sql`COALESCE(
+        filing_summary."filedAt",
         NULLIF(document."snapshot"->>'inputTaxFiledAt', '')::timestamptz,
         NULLIF(document."snapshot"->>'inputTaxSubmittedAt', '')::timestamptz
       )`;
@@ -51,7 +53,15 @@ const listDocumentProjection = async ({ branchId, periodView = 'DOCUMENT', perio
       COALESCE(link_summary."allocatedSubtotal", 0)::numeric AS "allocatedSubtotal",
       COALESCE(link_summary."allocatedVatAmount", 0)::numeric AS "allocatedVatAmount",
       COALESCE(link_summary."allocatedTotalAmount", 0)::numeric AS "allocatedTotalAmount",
-      COALESCE(link_summary."sourceTypes", ARRAY[]::text[]) AS "sourceTypes"
+      COALESCE(link_summary."sourceTypes", ARRAY[]::text[]) AS "sourceTypes",
+      filing_summary."filingItemId",
+      filing_summary."filingBatchId",
+      filing_summary."filingItemStatus",
+      filing_summary."claimedSubtotalAmount",
+      filing_summary."claimedVatAmount",
+      filing_summary."claimedTotalAmount",
+      filing_summary."selectedAt",
+      filing_summary."filedAt"
     FROM "TaxDocument" document
     LEFT JOIN LATERAL (
       SELECT
@@ -64,6 +74,27 @@ const listDocumentProjection = async ({ branchId, periodView = 'DOCUMENT', perio
       WHERE link."taxDocumentId" = document."id"
         AND link."state" = 'ACTIVE'
     ) link_summary ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        item."id" AS "filingItemId",
+        item."batchId" AS "filingBatchId",
+        item."status"::text AS "filingItemStatus",
+        item."claimedSubtotalAmount",
+        item."claimedVatAmount",
+        item."claimedTotalAmount",
+        item."selectedAt",
+        item."filedAt"
+      FROM "InputTaxFilingItem" item
+      JOIN "InputTaxFilingBatch" batch ON batch."id" = item."batchId"
+      WHERE item."taxDocumentId" = document."id"
+        AND item."status" IN (
+          'SELECTED'::"InputTaxFilingItemStatus",
+          'FILED'::"InputTaxFilingItemStatus"
+        )
+        AND batch."status" <> 'VOIDED'::"InputTaxFilingStatus"
+      ORDER BY item."filedAt" DESC NULLS LAST, item."selectedAt" DESC NULLS LAST, item."id" DESC
+      LIMIT 1
+    ) filing_summary ON true
     WHERE document."branchId" = ${Number(branchId)}
       AND ${selectedPeriodExpression} IS NOT NULL
       AND ${selectedPeriodExpression} >= ${periodFrom}
@@ -91,6 +122,16 @@ const listDocumentProjection = async ({ branchId, periodView = 'DOCUMENT', perio
     updatedAt: row.updatedAt,
     linkedReceiptCount: toNumber(row.linkedReceiptCount),
     sourceTypes: Array.isArray(row.sourceTypes) ? row.sourceTypes : [],
+    filing: row.filingItemId == null ? null : {
+      filingItemId: Number(row.filingItemId),
+      filingBatchId: Number(row.filingBatchId),
+      status: row.filingItemStatus,
+      claimedSubtotalAmount: toStringAmount(row.claimedSubtotalAmount),
+      claimedVatAmount: toStringAmount(row.claimedVatAmount),
+      claimedTotalAmount: toStringAmount(row.claimedTotalAmount),
+      selectedAt: row.selectedAt,
+      filedAt: row.filedAt,
+    },
   }));
 };
 
