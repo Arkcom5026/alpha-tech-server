@@ -70,10 +70,9 @@ const assertPermission = ({
     if (!(scope.actions || []).map(normalizeToken).includes(normalizedAction)) return false;
 
     const branchMode = normalizeToken(scope.branchMode);
-    if (!branchId || branchMode === 'ALL_BUSINESS_BRANCHES' || branchMode === 'NO_BRANCH_CONTEXT') {
-      return true;
-    }
-    if (branchMode !== 'SELECTED_BRANCHES') return false;
+    if (branchMode === 'ALL_BUSINESS_BRANCHES') return true;
+    if (branchMode === 'NO_BRANCH_CONTEXT') return !branchId;
+    if (branchMode !== 'SELECTED_BRANCHES' || !branchId) return false;
     return (scope.branchIds || []).map(Number).includes(Number(branchId));
   });
 
