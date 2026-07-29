@@ -135,7 +135,7 @@ test('the shared Prisma singleton installs inventory movement authority', () => 
 
 test('remaining stock movement runtimes use the authorized Prisma singleton', () => {
   const runtimePaths = [
-    '../../../../controllers/receiptSimpleController.js',
+    '../../procurement/receipt/simple/runtime/receiptSimpleRuntime.js',
     '../../../../controllers/purchaseOrderReceiptSimpleController.js',
     '../simple-stock/adjust/simpleStockAdjustmentRepository.js',
     '../simple-stock/transfer/simpleStockTransferRepository.js',
@@ -167,7 +167,7 @@ test('repository production runtime cannot add an unregistered direct stock move
   const authorityTestPath = path.resolve(__filename);
   const writerPath = path.resolve(__dirname, 'stockMovementWriter.js');
   const allowedRuntimeWriters = new Set([
-    path.resolve(REPOSITORY_ROOT, 'controllers/receiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/simple/runtime/receiptSimpleRuntime.js'),
     path.resolve(REPOSITORY_ROOT, 'controllers/purchaseOrderReceiptSimpleController.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js'),

@@ -1,65 +1,72 @@
-const fs = require('fs');
-const path = require('path');
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 describe('barcode print and reprint vertical slice ownership', () => {
   const root = path.resolve(__dirname, '..');
   const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-  test('print endpoints leave the root controller together', () => {
+  test('print endpoints are owned by the print controller', () => {
     const route = read('src/modules/inventory/barcode/routes/barcodeRoutes.js');
-    expect(route).toContain("require('../print/barcodePrintController')");
-    expect(route).toContain("router.get('/print-batch', getBarcodesForPrintBatch)");
-    expect(route).toContain("router.get('/with-barcodes', getReceiptsWithBarcodes)");
-    expect(route).toContain("router.get('/receipts-with-barcodes', getReceiptsWithBarcodes)");
-    expect(route).toContain("router.get('/reprint-search', searchReprintReceipts)");
-    expect(route).toContain("router.patch('/mark-printed', markBarcodesAsPrinted)");
-    expect(route).toContain("router.patch('/reprint/:receiptId', reprintBarcodes)");
+    assert.match(route, /require\('\.\.\/print\/barcodePrintController'\)/);
+    assert.match(route, /router\.get\('\/print-batch', getBarcodesForPrintBatch\)/);
+    assert.match(route, /router\.get\('\/with-barcodes', getReceiptsWithBarcodes\)/);
+    assert.match(route, /router\.get\('\/receipts-with-barcodes', getReceiptsWithBarcodes\)/);
+    assert.match(route, /router\.get\('\/reprint-search', searchReprintReceipts\)/);
+    assert.match(route, /router\.patch\('\/mark-printed', markBarcodesAsPrinted\)/);
+    assert.match(route, /router\.patch\('\/reprint\/:receiptId', reprintBarcodes\)/);
+    assert.doesNotMatch(route, /controllers\/barcodeController/);
   });
 
   test('print slice owns controller service and repository', () => {
     const controller = read('src/modules/inventory/barcode/print/barcodePrintController.js');
     const service = read('src/modules/inventory/barcode/print/barcodePrintService.js');
     const repository = read('src/modules/inventory/barcode/print/barcodePrintRepository.js');
-    expect(controller).toContain("require('./barcodePrintService')");
-    expect(service).toContain("require('./barcodePrintRepository')");
-    expect(repository).toContain("require('../../../../../lib/prisma')");
+    assert.match(controller, /require\('\.\/barcodePrintService'\)/);
+    assert.match(service, /require\('\.\/barcodePrintRepository'\)/);
+    assert.match(repository, /require\('\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma'\)/);
   });
 
   test('print slice reuses generation authority', () => {
     const service = read('src/modules/inventory/barcode/print/barcodePrintService.js');
-    expect(service).toContain("require('../generate/generateBarcodeService')");
-    expect(service).toContain('generateMissingBarcodes');
-    expect(service).not.toContain('barcodeCounter');
-    expect(service).not.toContain('createMany');
+    assert.match(service, /require\('\.\.\/generate\/generateBarcodeService'\)/);
+    assert.match(service, /generateMissingBarcodes/);
+    assert.doesNotMatch(service, /barcodeCounter/);
+    assert.doesNotMatch(service, /createMany/);
   });
 
   test('printed state remains atomic and branch scoped', () => {
     const repository = read('src/modules/inventory/barcode/print/barcodePrintRepository.js');
-    expect(repository).toContain('prisma.$transaction');
-    expect(repository).toContain('printed: false');
-    expect(repository).toContain('data: { printed: true }');
-    expect(repository).toContain('where: { id: receiptId, branchId }');
+    assert.match(repository, /prisma\.\$transaction/);
+    assert.match(repository, /printed: false/);
+    assert.match(repository, /data: \{ printed: true \}/);
+    assert.match(repository, /where: \{ id: receiptId, branchId \}/);
   });
 
   test('search and projection contracts remain present', () => {
     const service = read('src/modules/inventory/barcode/print/barcodePrintService.js');
-    expect(service).toContain("mode === 'RC'");
-    expect(service).toContain("mode === 'PO'");
-    expect(service).toContain("mode === 'SUP'");
-    expect(service).toContain("mode === 'ALL'");
-    expect(service).toContain('qtyLabelsSuggested');
-    expect(service).toContain('creditRemaining');
-    expect(service).toContain('stockItemSaleItemId');
-    expect(service).toContain('extractReceiptId');
+    for (const token of [
+      "mode === 'RC'",
+      "mode === 'PO'",
+      "mode === 'SUP'",
+      "mode === 'ALL'",
+      'qtyLabelsSuggested',
+      'creditRemaining',
+      'stockItemSaleItemId',
+      'extractReceiptId',
+    ]) assert.match(service, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
-  test('scan audit and completion remain deferred', () => {
+  test('scan audit and completion are owned by their vertical slices', () => {
     const route = read('src/modules/inventory/barcode/routes/barcodeRoutes.js');
-    expect(route).toContain("require('../../../../../controllers/barcodeController')");
-    expect(route).toContain('getReceiptsReadyToScanSN');
-    expect(route).toContain('getReceiptsReadyToScan');
-    expect(route).toContain('updateSerialNumber');
-    expect(route).toContain('auditReceiptBarcodes');
-    expect(route).toContain('markReceiptAsCompleted');
+    assert.match(route, /require\('\.\.\/scan\/barcodeScanController'\)/);
+    assert.match(route, /require\('\.\.\/audit\/barcodeAuditController'\)/);
+    assert.match(route, /require\('\.\.\/completion\/receiptCompletionController'\)/);
+    assert.match(route, /getReceiptsReadyToScanSN/);
+    assert.match(route, /getReceiptsReadyToScan/);
+    assert.match(route, /updateSerialNumber/);
+    assert.match(route, /auditReceiptBarcodes/);
+    assert.match(route, /markReceiptAsCompleted/);
   });
 });
