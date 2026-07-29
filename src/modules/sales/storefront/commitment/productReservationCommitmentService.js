@@ -47,13 +47,13 @@ const commitProductReservation = async ({ slug, sessionToken, identityProofToken
 
   const key = normalizeIdempotencyKey(idempotencyKey);
   const branchId = Number(storefront.branchId);
-  const existing = await repository.findExistingByIdempotency({ branchId, idempotencyKey: key });
-  if (existing) return { replayed: true, reservation: existing };
+  const sessionTokenHash = hashToken(normalizeToken(sessionToken, 'COMMITMENT_SESSION_TOKEN_INVALID'));
+  const proofTokenHash = hashToken(normalizeToken(identityProofToken, 'COMMITMENT_IDENTITY_PROOF_INVALID'));
 
   return repository.commit({
     branchId,
-    sessionTokenHash: hashToken(normalizeToken(sessionToken, 'COMMITMENT_SESSION_TOKEN_INVALID')),
-    proofTokenHash: hashToken(normalizeToken(identityProofToken, 'COMMITMENT_IDENTITY_PROOF_INVALID')),
+    sessionTokenHash,
+    proofTokenHash,
     idempotencyKey: key,
     code: createReservationCode(),
     reservationExpiresAt: new Date(Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000),
