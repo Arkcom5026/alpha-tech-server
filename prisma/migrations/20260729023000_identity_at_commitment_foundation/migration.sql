@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS "CommerceCommitmentIdentity" (
   "anonymousSessionId" INTEGER NOT NULL,
   "challengeId" INTEGER NOT NULL UNIQUE,
   "phoneNormalized" TEXT NOT NULL,
+  "proofTokenHash" TEXT NOT NULL UNIQUE,
   "verifiedAt" TIMESTAMP(3) NOT NULL,
   "expiresAt" TIMESTAMP(3) NOT NULL,
   "consumedAt" TIMESTAMP(3),
