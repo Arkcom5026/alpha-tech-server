@@ -53,6 +53,8 @@ model EmployeeProfile {
   inputTaxFilingBatches             InputTaxFilingBatch[]
   taxDocumentLifecycleEvents        TaxDocumentLifecycleEvent[]
   createdProductReservations        ProductReservation[]         @relation("ProductReservationCreatedBy")
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[] @relation("ProductReservationLifecycleCommandActor")
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[] @relation("ProductReservationLifecycleEventActor")
   confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
   payment                           Payment[]
   purchaseOrderCreated              PurchaseOrder[]
@@ -156,6 +158,8 @@ model Branch {
   stock                           StockItem[]
   stockMovement                   StockMovement[]
   productReservations             ProductReservation[]
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[]
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[]
   suppliers                       Supplier[]
   supplierPayment                 SupplierPayment[]
   supplierPayables                SupplierPayable[]
@@ -3027,6 +3031,13 @@ enum ProductReservationLineType {
   SIMPLE
 }
 
+enum ProductReservationLifecycleCommandType {
+  ACCEPT
+  MARK_FULFILLMENT_READY
+  CANCEL
+  EXPIRE
+}
+
 enum OnlineOrderSource {
   ONLINE
   STOREFRONT
@@ -3056,6 +3067,8 @@ model ProductReservation {
   depositAmount       Decimal                      @default(0) @db.Decimal(12, 2)
   note                String?
   expiresAt           DateTime?
+  stockReleasedAt     DateTime?
+  version             Int                         @default(1)
   createdAt           DateTime                     @default(now())
   updatedAt           DateTime                     @updatedAt
   branch              Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -3064,9 +3077,55 @@ model ProductReservation {
   commerceIdentity    CommerceCommitmentIdentity?  @relation(fields: [commerceIdentityId], references: [id], onDelete: Restrict)
   anonymousSession    AnonymousShoppingSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: Restrict)
   items               ProductReservationItem[]
+  lifecycleCommands   ProductReservationLifecycleCommand[]
+  lifecycleEvents     ProductReservationLifecycleEvent[]
 
   @@index([branchId, status, createdAt])
   @@index([status, expiresAt])
+}
+
+model ProductReservationLifecycleCommand {
+  id            Int                                   @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandKey    String
+  commandType   ProductReservationLifecycleCommandType
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  stockReleased Boolean                               @default(false)
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime                              @default(now())
+  reservation   ProductReservation                    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch                                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?                      @relation("ProductReservationLifecycleCommandActor", fields: [actorId], references: [id], onDelete: SetNull)
+  event         ProductReservationLifecycleEvent?
+
+  @@unique([reservationId, commandKey])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationLifecycleEvent {
+  id            Int                @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandId     Int                @unique
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime           @default(now())
+  reservation   ProductReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  command       ProductReservationLifecycleCommand @relation(fields: [commandId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?   @relation("ProductReservationLifecycleEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
 }
 
 model ProductReservationItem {
