@@ -32,6 +32,10 @@ assertIncludes(repository, "createHash('sha256')", 'Public token must be hashed 
 assertIncludes(repository, 'PartnerStoreCapability', 'Session must resolve an enabled storefront');
 assertIncludes(repository, 'BranchPrice', 'Item mutation must check public price eligibility');
 assertIncludes(repository, 'priceOnline', 'Item mutation must use the online publication boundary');
+assertIncludes(repository, 'effectiveAt', 'Item mutation must respect publication effective time');
+assertIncludes(repository, 'expiresAt', 'Item mutation must respect publication expiry time');
+assertExcludes(repository, 'branchId: Number(row.branchId)', 'Public session projection must not expose branchId');
+assertExcludes(repository, 'id: Number(row.id)', 'Public session projection must not expose internal session id');
 assertExcludes(repository, 'ProductReservation', 'Session mutation must not create a ProductReservation');
 assertExcludes(repository, 'StockMovement', 'Session mutation must not create stock movement');
 assertExcludes(repository, 'reserved', 'Session mutation must not reserve stock');
