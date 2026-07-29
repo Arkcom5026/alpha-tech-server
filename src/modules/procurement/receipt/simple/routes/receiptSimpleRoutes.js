@@ -1,7 +1,7 @@
 const express = require('express');
 
 const router = express.Router();
-const { create, preview } = require('../../../../../../controllers/receiptSimpleController');
+const { create, preview } = require('../receiptSimpleController');
 const verifyToken = require('../../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
