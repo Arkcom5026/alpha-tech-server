@@ -29,21 +29,29 @@ assertIncludes(migration, 'ProductReservation_public_idempotency_unique', 'Publi
 
 assertIncludes(repository, 'FOR UPDATE', 'Session, proof, items, and prices require locking');
 assertIncludes(repository, 'proofTokenHash', 'Identity proof must be resolved by hash');
+assertIncludes(repository, 'publicTokenHash', 'Idempotency replay must bind to the original session token hash');
+assertIncludes(repository, 'COMMITMENT_IDEMPOTENCY_CONFLICT', 'Reused idempotency keys must reject different commands');
 assertIncludes(repository, 'effectiveAt', 'Current publication start must be revalidated');
 assertIncludes(repository, 'expiresAt', 'Current publication expiry must be revalidated');
 assertIncludes(repository, 'priceOnline', 'Server must read current online price');
+assertIncludes(repository, 'unitPriceCents', 'Money must be normalized before aggregation');
+assertIncludes(repository, 'totalAmountCents', 'Reservation totals must avoid floating-point accumulation');
+assertIncludes(repository, '.toFixed(2)', 'Durable monetary writes must use two-decimal strings');
+assertIncludes(repository, 'Number.isSafeInteger', 'Money arithmetic must enforce safe numeric bounds');
 assertIncludes(repository, '"quantity" - "reserved"', 'Server must revalidate simple stock availability');
 assertIncludes(repository, '"reserved" = "reserved" +', 'Commitment must allocate stock durably');
 assertIncludes(repository, "'RESERVE'", 'Commitment must record reservation movement');
-assertIncludes(repository, "'COMMITTED'", 'Anonymous session must transition atomically');
-assertIncludes(repository, "'CONSUMED'", 'Identity challenge must be consumed atomically');
-assertIncludes(repository, 'consumedAt', 'Identity proof must become single-use');
-assertIncludes(repository, 'idempotencyKey', 'Repository must support replay-safe commitment');
+assertIncludes(repository, 'proofConsumed', 'Proof consumption must verify exactly one durable transition');
+assertIncludes(repository, 'challengeConsumed', 'Challenge consumption must verify exactly one durable transition');
+assertIncludes(repository, 'sessionCommitted', 'Session commitment must verify exactly one durable transition');
+assertIncludes(repository, 'Number(proofConsumed) !== 1', 'Proof transition failure must roll back commitment');
+assertIncludes(repository, 'Number(challengeConsumed) !== 1', 'Challenge transition failure must roll back commitment');
+assertIncludes(repository, 'Number(sessionCommitted) !== 1', 'Session transition failure must roll back commitment');
 assertExcludes(repository, 'req.body', 'Repository must not accept client transport authority');
 
 assertIncludes(service, "createHash('sha256')", 'Session and proof tokens must be hashed');
-assertIncludes(service, 'X-Idempotency-Key', 'Idempotency transport must remain explicit');
 assertIncludes(service, 'RESERVATION_TTL_MINUTES = 30', 'Reservation expiry policy must be explicit');
+assertExcludes(service, 'findExistingByIdempotency', 'Replay validation must remain inside the commitment transaction');
 assertExcludes(service, 'price', 'Client price must not be accepted by service');
 assertExcludes(service, 'branchId:', 'Client branch ID must not be accepted by service input');
 assertExcludes(service, 'quantity:', 'Client quantity must not be accepted at commitment');
