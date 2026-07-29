@@ -26,19 +26,66 @@ ProductReservation ACTIVE
 
 This increment owns only reservation lifecycle, release, and merchant handoff boundaries.
 
-## Review Scope
+## Authority Review Result
 
-- status model and transition policy
-- expiry detection and durable transition
-- cancellation authority
-- exact-once stock release
-- RELEASE stock movements
-- replay/idempotency of terminal transitions
-- store/branch isolation for merchant access
-- merchant acknowledgment/acceptance boundary
-- separation from Payment, Sale, Delivery, and customer-account authority
-- scheduled/manual expiry execution surface
-- migration, Prisma, and focused contracts
+Current-main review is complete.
+
+### Present Authority
+
+- public ProductReservation commitment runtime
+- transaction-scoped creation
+- branch-scoped price and stock checks
+- `StockBalance.reserved` increment
+- `StockMovement` with `RESERVE`
+- commitment idempotency
+- separation from Sale, Payment, Delivery, PosHeldCart, and OrderOnline
+
+### Proven Gaps
+
+- `ProductReservation` and `ProductReservationItem` are not represented in the current Prisma schema
+- ProductReservation status and transition policy are not represented in Prisma authority
+- expiry and cancellation runtime are not present
+- exact-once release of `StockBalance.reserved` is not present
+- `RELEASE` stock movement authority is not present
+- replay-safe terminal transition command authority is not present
+- merchant branch-scoped queue and action surface are not present
+- merchant acceptance/rejection and fulfillment handoff state are not present
+- scheduled/manual expiry execution surface is not present
+
+## Targeted Implementation Plan
+
+### Slice 1 — Prisma Reconciliation and Lifecycle Contract
+
+- restore existing ProductReservation aggregate and item definitions into Prisma authority without recreating existing tables
+- preserve all existing database column and relation names
+- add only lifecycle fields and constraints required by this increment
+- define explicit lifecycle states and transition policy
+- define replay-safe command ownership for terminal transitions
+- preserve existing public commitment and legacy runtime compatibility
+
+### Slice 2 — Lifecycle and Exact-once Release
+
+- branch-safe expire and cancel commands
+- transaction-scoped terminal transition
+- exact-once decrement of `StockBalance.reserved`
+- append `RELEASE` stock movements
+- reject underflow and duplicate release
+- support manual expiry execution and a scheduler-safe batch surface
+
+### Slice 3 — Merchant Fulfillment Handoff
+
+- branch-scoped reservation queue
+- merchant acknowledgment and acceptance/rejection boundary
+- fulfillment-ready handoff state
+- no implicit Sale, Payment, or Delivery creation
+
+### Slice 4 — Review and Verification
+
+- focused contract tests
+- repository ownership and boundary review
+- Runtime Gate
+- Operational Gate
+- merge readiness
 
 ## Architecture Constraints
 
@@ -47,22 +94,27 @@ This increment owns only reservation lifecycle, release, and merchant handoff bo
 3. Expiry and cancellation are replay-safe.
 4. Merchant access is limited to assigned store/branch authority.
 5. Handoff does not silently create Payment, Sale, or Delivery authority.
-6. Legacy internal reservation flows remain compatible.
+6. Legacy internal flows remain compatible.
+7. Existing migrations are immutable; new alignment is additive.
+8. Existing ProductReservation tables must not be recreated or renamed.
 
 ## Verification Policy
 
-Runtime and Operational verification remain deferred under owner authority.
+Runtime and Operational verification remain deferred under owner authority until implementation is complete.
 
 Deferred verification must remain explicit and must not be represented as PASS.
 
-## Bootstrap State
+## Current State
 
 ```text
-Base main SHA: f8d7fd3062e9e1e5fc20155ab6c5c2d0381c83a8
-Repository working area: CREATED
-Existing lifecycle implementation: UNVERIFIED
-Merchant handoff implementation: UNVERIFIED
-Runtime verification: DEFERRED — OWNER AUTHORITY
-Operational verification: DEFERRED — OWNER AUTHORITY
+Base main SHA: 8ad9652a8e6c6cccea662c3734abec9a8b80511d
+Authority Review: COMPLETE
+Gap Analysis: COMPLETE
+Targeted Implementation Plan: RECORDED
+Prisma reconciliation: NEXT
+Lifecycle implementation: PENDING
+Merchant handoff implementation: PENDING
+Runtime verification: DEFERRED — NOT PASS
+Operational verification: DEFERRED — NOT PASS
 Production impact: NONE
 ```
