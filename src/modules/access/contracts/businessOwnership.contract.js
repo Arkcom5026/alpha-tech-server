@@ -1,0 +1,109 @@
+'use strict';
+
+const BUSINESS_OWNERSHIP_CONTRACT_VERSION = 'BUSINESS_OWNERSHIP_V1';
+
+const BUSINESS_LIFECYCLE = Object.freeze([
+  'ACTIVE',
+  'SUSPENDED',
+  'ARCHIVED',
+]);
+
+const BUSINESS_MEMBERSHIP_LIFECYCLE = Object.freeze([
+  'INVITED',
+  'ACTIVE',
+  'SUSPENDED',
+  'REVOKED',
+]);
+
+const BUSINESS_ROLES = Object.freeze([
+  'OWNER',
+  'ADMIN',
+  'MANAGER',
+  'STAFF',
+  'VIEWER',
+]);
+
+const REQUEST_AUTHORITY_FIELDS = Object.freeze([
+  'userId',
+  'platformRole',
+  'businessId',
+  'businessMembershipId',
+  'businessRole',
+  'branchIds',
+  'activeBranchId',
+  'authoritySource',
+]);
+
+const OWNERSHIP_INVARIANTS = Object.freeze([
+  'BUSINESS_IS_FIRST_CLASS_TENANT_AND_DATA_OWNER',
+  'BRANCH_BELONGS_TO_EXACTLY_ONE_BUSINESS',
+  'ACTIVE_MEMBERSHIP_OR_PLATFORM_OVERRIDE_REQUIRED',
+  'CLIENT_IDENTIFIERS_ARE_SELECTORS_NOT_AUTHORITY',
+  'DATABASE_REVALIDATION_REQUIRED',
+  'CROSS_BUSINESS_ACCESS_DENIED_BY_DEFAULT',
+  'CROSS_BRANCH_ACCESS_REQUIRES_EXPLICIT_SCOPE',
+  'LEGACY_BRANCH_ID_DOES_NOT_PROVE_BUSINESS_OWNERSHIP',
+  'EXTERNAL_ORGANIZATIONS_RECEIVE_DELEGATED_ACCESS_ONLY',
+  'REVOCATION_PRESERVES_AUDIT_HISTORY',
+]);
+
+const DATA_OWNERSHIP_CLASSES = Object.freeze({
+  BUSINESS_LEVEL: Object.freeze({
+    businessId: 'REQUIRED',
+    branchId: 'OPTIONAL',
+  }),
+  BRANCH_OPERATIONAL: Object.freeze({
+    businessId: 'REQUIRED',
+    branchId: 'REQUIRED',
+  }),
+  PLATFORM_REFERENCE: Object.freeze({
+    businessId: 'ABSENT_BY_DEFAULT',
+    branchId: 'ABSENT_BY_DEFAULT',
+  }),
+  EXTERNAL_COLLABORATION: Object.freeze({
+    businessId: 'REQUIRED_AS_OWNER',
+    externalOrganizationAssignmentId: 'REQUIRED_AS_DELEGATION',
+  }),
+});
+
+const COMPATIBILITY_SEQUENCE = Object.freeze([
+  'ADD_BUSINESS_AND_MEMBERSHIP_FOUNDATION',
+  'BACKFILL_BUSINESS_OWNERSHIP',
+  'ATTACH_BRANCH_TO_BUSINESS',
+  'PROJECT_EMPLOYEE_ACCESS',
+  'ADD_DATABASE_REVALIDATED_REQUEST_AUTHORITY',
+  'MIGRATE_MODULES_INCREMENTALLY',
+  'REMOVE_LEGACY_ONLY_AFTER_ZERO_RUNTIME_REFERENCES_AND_FINAL_TEST',
+]);
+
+const businessOwnershipContract = Object.freeze({
+  version: BUSINESS_OWNERSHIP_CONTRACT_VERSION,
+  tenantAggregate: 'BUSINESS',
+  locationAggregate: 'BRANCH',
+  membershipAggregate: 'BUSINESS_MEMBERSHIP',
+  businessLifecycle: BUSINESS_LIFECYCLE,
+  membershipLifecycle: BUSINESS_MEMBERSHIP_LIFECYCLE,
+  businessRoles: BUSINESS_ROLES,
+  requestAuthorityFields: REQUEST_AUTHORITY_FIELDS,
+  ownershipInvariants: OWNERSHIP_INVARIANTS,
+  dataOwnershipClasses: DATA_OWNERSHIP_CLASSES,
+  compatibilitySequence: COMPATIBILITY_SEQUENCE,
+  legacyCompatibility: Object.freeze({
+    employeeProfileBranchId: 'TEMPORARY_SINGLE_BRANCH_PROJECTION',
+    requestUserBranchId: 'COMPATIBILITY_ONLY',
+    branchAsTenant: false,
+  }),
+  nextStep: 'P1_STEP_3_EXTERNAL_ORGANIZATION_FOUNDATION',
+});
+
+module.exports = {
+  BUSINESS_OWNERSHIP_CONTRACT_VERSION,
+  BUSINESS_LIFECYCLE,
+  BUSINESS_MEMBERSHIP_LIFECYCLE,
+  BUSINESS_ROLES,
+  REQUEST_AUTHORITY_FIELDS,
+  OWNERSHIP_INVARIANTS,
+  DATA_OWNERSHIP_CLASSES,
+  COMPATIBILITY_SEQUENCE,
+  businessOwnershipContract,
+};
