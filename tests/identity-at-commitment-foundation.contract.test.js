@@ -22,6 +22,8 @@ const server = read('server.js');
 
 assertIncludes(migration, 'CommerceIdentityChallenge', 'Identity challenge table is required');
 assertIncludes(migration, 'CommerceCommitmentIdentity', 'Commitment identity proof table is required');
+assertIncludes(migration, 'anonymousSessionId', 'Durable session linkage must use anonymousSessionId');
+assertIncludes(migration, 'phoneNormalized', 'Durable phone field must use phoneNormalized');
 assertIncludes(migration, 'otpHash', 'OTP must be persisted only as a verifier hash');
 assertIncludes(migration, 'proofTokenHash', 'Commitment proof must be persisted only as a token hash');
 assertExcludes(migration, 'customerId', 'Identity at commitment must not create customer account authority');
@@ -36,7 +38,12 @@ assertIncludes(provider, 'COMMERCE_OTP_PROVIDER_NOT_CONFIGURED', 'Production mus
 assertIncludes(repository, 'FOR UPDATE', 'Challenge verification must lock the challenge row');
 assertIncludes(repository, 'attemptCount', 'Failed attempts must be durable');
 assertIncludes(repository, "'LOCKED'", 'Challenge must lock after too many attempts');
-assertIncludes(repository, 'proofTokenHash', 'Repository must persist only proof hash');
+assertIncludes(repository, '"anonymousSessionId"', 'Repository must use the durable anonymousSessionId column');
+assertIncludes(repository, '"phoneNormalized"', 'Repository must use the durable phoneNormalized column');
+assertIncludes(repository, '"proofTokenHash"', 'Repository must persist only proof hash');
+assertIncludes(repository, '"cancelledAt"', 'Cancelled challenges must satisfy lifecycle constraints');
+assertExcludes(repository, '"sessionId"', 'Repository SQL must not reference a nonexistent sessionId column');
+assertExcludes(repository, '"phoneE164"', 'Repository SQL must not reference a nonexistent phoneE164 column');
 assertExcludes(repository, 'Customer', 'Repository must not mutate customer authority');
 assertExcludes(repository, 'ProductReservation', 'Repository must not create ProductReservation');
 assertExcludes(repository, 'StockMovement', 'Repository must not create stock movement');
