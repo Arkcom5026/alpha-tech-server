@@ -3,12 +3,13 @@
 
 const express = require('express');
 
-const legacyAuthController = require('../../../../controllers/authController');
 const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
 const loginController = require('../login/loginController');
 const registrationController = require('../registration/registrationController');
 const sessionController = require('../session/sessionController');
 const passwordController = require('../password/passwordController');
+const currentUserController = require('../current-user/currentUserController');
+const userLookupController = require('../user-lookup/userLookupController');
 const tenantAuthController = require('../controllers/authController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
@@ -56,24 +57,7 @@ router.use((req, res, next) => {
   next();
 });
 
-const ensureLegacyFn = (key) => {
-  const fn = legacyAuthController?.[key];
-  if (typeof fn === 'function') return fn;
-  throw new Error(`[authRoutes] legacyAuthController.${key} must be a function (got ${typeof fn})`);
-};
-
-const resolveLegacyHandler = (key) => {
-  const value = legacyAuthController?.[key];
-  if (typeof value === 'function') return value;
-  if (value && typeof value.handler === 'function') return value.handler;
-  if (value && typeof value.handle === 'function') return value.handle;
-  if (value && typeof value.fn === 'function') return value.fn;
-  return null;
-};
-
 const addSubEmployee = employeeOnboardingController.addSubEmployee;
-const findUserByEmail = resolveLegacyHandler('findUserByEmail');
-const getMe = ensureLegacyFn('getMe');
 
 if (typeof loginController.login !== 'function') {
   throw new Error('[authRoutes] loginController.login must be a function');
@@ -95,14 +79,16 @@ for (const handlerName of ['forgotPassword', 'resetPassword']) {
   }
 }
 
-if (typeof addSubEmployee !== 'function') {
-  throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
+if (typeof currentUserController.getMe !== 'function') {
+  throw new Error('[authRoutes] currentUserController.getMe must be a function');
 }
 
-if (typeof findUserByEmail !== 'function') {
-  throw new Error(
-    `[authRoutes] legacyAuthController.findUserByEmail must be a function (got ${typeof findUserByEmail})`,
-  );
+if (typeof userLookupController.findUserByEmail !== 'function') {
+  throw new Error('[authRoutes] userLookupController.findUserByEmail must be a function');
+}
+
+if (typeof addSubEmployee !== 'function') {
+  throw new Error('[authRoutes] employeeOnboardingController.addSubEmployee must be a function');
 }
 
 // Current canonical /api/auth contract.
@@ -112,8 +98,8 @@ router.post('/refresh', traceRefreshRequest, sessionController.refreshSession);
 router.post('/logout', sessionController.logoutSession);
 router.post('/add-sub-employee', verifyToken, addSubEmployee);
 router.post('/logout-all', verifyToken, sessionController.revokeSession);
-router.get('/users/find', verifyToken, findUserByEmail);
-router.get('/me', verifyToken, getMe);
+router.get('/users/find', verifyToken, userLookupController.findUserByEmail);
+router.get('/me', verifyToken, currentUserController.getMe);
 router.post('/forgot-password', passwordController.forgotPassword);
 router.post('/reset-password', passwordController.resetPassword);
 
