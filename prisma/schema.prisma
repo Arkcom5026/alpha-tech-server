@@ -27,6 +27,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
   storeCustomerIdentityLinks StoreCustomerIdentityLink[]
+  storeCustomerBackfillDecisions StoreCustomerBackfillDecision[]
 }
 
 model EmployeeProfile {
@@ -166,6 +167,7 @@ model Branch {
   taxDocuments                    TaxDocument[]
   v2StockAudits                   V2StockAudit[]
   storeCustomers                  StoreCustomer[]
+  storeCustomerBackfillCandidates StoreCustomerBackfillCandidate[]
 
   @@index([subdistrictCode])
 }
@@ -1651,6 +1653,7 @@ model CustomerProfile {
   services                  ServiceOrder[]
   v2CustomerDeposits        V2CustomerDeposit[]
   posHeldCarts              PosHeldCart[]
+  storeCustomerBackfillCandidates StoreCustomerBackfillCandidate[]
 
   @@index([subdistrictCode])
 }
@@ -1675,6 +1678,7 @@ model StoreCustomer {
   branch          Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   subdistrict     Subdistrict?                @relation(fields: [subdistrictCode], references: [code], onDelete: SetNull)
   identityLinks   StoreCustomerIdentityLink[]
+  backfillCandidates StoreCustomerBackfillCandidate[]
 
   @@index([branchId, active])
   @@index([branchId, displayName])
@@ -1702,6 +1706,71 @@ model StoreCustomerIdentityLink {
   @@unique([storeCustomerId, userId])
   @@index([userId, status])
   @@index([storeCustomerId, status])
+}
+
+model StoreCustomerBackfillRun {
+  id                   Int                            @id @default(autoincrement())
+  code                 String                         @unique
+  status               StoreCustomerBackfillRunStatus @default(DRAFT)
+  sourceSnapshotMarker String
+  dryRun               Boolean                        @default(true)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  failedAt             DateTime?
+  scannedCount         Int                            @default(0)
+  eligibleCount        Int                            @default(0)
+  ambiguousCount       Int                            @default(0)
+  skippedCount         Int                            @default(0)
+  failedCount          Int                            @default(0)
+  summaryMetadata      Json?
+  errorMetadata        Json?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  candidates           StoreCustomerBackfillCandidate[]
+
+  @@index([status, createdAt])
+}
+
+model StoreCustomerBackfillCandidate {
+  id                      Int                                  @id @default(autoincrement())
+  backfillRunId           Int
+  legacyCustomerProfileId Int
+  branchId                Int
+  proposedStoreCustomerId Int?
+  status                  StoreCustomerBackfillCandidateStatus @default(PENDING)
+  evidenceMetadata        Json?
+  reasonCode              String?
+  note                    String?
+  createdAt               DateTime                             @default(now())
+  updatedAt               DateTime                             @updatedAt
+  backfillRun             StoreCustomerBackfillRun             @relation(fields: [backfillRunId], references: [id], onDelete: Cascade)
+  legacyCustomerProfile   CustomerProfile                      @relation(fields: [legacyCustomerProfileId], references: [id], onDelete: Restrict)
+  branch                  Branch                               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  proposedStoreCustomer   StoreCustomer?                       @relation(fields: [proposedStoreCustomerId], references: [id], onDelete: SetNull)
+  decisions               StoreCustomerBackfillDecision[]
+
+  @@unique([backfillRunId, legacyCustomerProfileId, branchId])
+  @@index([legacyCustomerProfileId, branchId])
+  @@index([branchId, status])
+  @@index([proposedStoreCustomerId])
+}
+
+model StoreCustomerBackfillDecision {
+  id              Int                                 @id @default(autoincrement())
+  candidateId     Int
+  action          StoreCustomerBackfillDecisionAction
+  previousStatus  StoreCustomerBackfillCandidateStatus?
+  resultingStatus StoreCustomerBackfillCandidateStatus
+  reasonCode      String?
+  note            String?
+  actorUserId     Int?
+  decidedAt       DateTime                            @default(now())
+  createdAt       DateTime                            @default(now())
+  candidate       StoreCustomerBackfillCandidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  actorUser       User?                               @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, decidedAt])
+  @@index([actorUserId, decidedAt])
 }
 
 model CustomerDeposit {
@@ -2798,6 +2867,32 @@ enum StoreCustomerIdentityVerificationMethod {
   AUTHENTICATED_SESSION
   STAFF_ASSISTED
   MIGRATION_REVIEW
+}
+
+enum StoreCustomerBackfillRunStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StoreCustomerBackfillCandidateStatus {
+  PENDING
+  ELIGIBLE
+  AMBIGUOUS
+  SKIPPED
+  REJECTED
+  APPROVED
+}
+
+enum StoreCustomerBackfillDecisionAction {
+  REVIEW_QUEUED
+  APPROVE
+  REJECT
+  SKIP
+  MARK_AMBIGUOUS
+  RETRY
 }
 
 enum BarcodeStatus {
