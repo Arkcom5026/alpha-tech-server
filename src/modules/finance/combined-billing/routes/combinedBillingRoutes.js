@@ -6,7 +6,7 @@ const {
   createCombinedBillingDocument,
   getCombinedBillingById,
   getCustomersWithPendingSales,
-} = require('../../../../../controllers/combinedBillingController');
+} = require('../combinedBillingController');
 
 const router = express.Router();
 router.use(verifyToken);
