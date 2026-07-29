@@ -34,7 +34,35 @@ const validateSubdistrictPostcode = async ({ subdistrictCode, clientPostcode }) 
   return null;
 };
 
-const presentUpdatedCustomer = (customer, { includePostcode = true } = {}) => {
+const presentStoreCustomer = (customer) => {
+  const subdistrictCode = customer.subdistrict?.code || null;
+  const districtCode =
+    customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+  const provinceCode =
+    customer.subdistrict?.district?.provinceCode ||
+    customer.subdistrict?.district?.province?.code ||
+    null;
+
+  return {
+    id: customer.id,
+    name: customer.displayName,
+    type: customer.type,
+    companyName: customer.companyName,
+    taxId: customer.taxId,
+    provinceCode,
+    districtCode,
+    subdistrictCode,
+    addressDetail: customer.addressDetail,
+    postcode: customer.subdistrict?.postcode || null,
+    customerAddress: buildCustomerAddress(customer),
+    phone: customer.phone || null,
+    email: customer.email || '',
+    creditLimit: customer.creditLimit,
+    creditBalance: 0,
+  };
+};
+
+const presentLegacyCustomer = (customer, { includePostcode = true } = {}) => {
   const subdistrictCode = customer.subdistrict?.code || null;
   const districtCode =
     customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
@@ -70,36 +98,47 @@ const updateCustomerProfile = async (req, res) => {
     if (!['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(role)) {
       return res.status(403).json({ message: 'Forbidden' });
     }
+    if (!branchId) return res.status(401).json({ message: 'Unauthorized (missing branchId)' });
 
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ message: 'รหัสลูกค้าไม่ถูกต้อง' });
 
-    const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } =
-      req.body ?? {};
+    const {
+      name,
+      phone,
+      email,
+      type,
+      companyName,
+      taxId,
+      subdistrictCode,
+      addressDetail,
+    } = req.body ?? {};
 
     if (!validateCustomerType(type)) {
       return res.status(400).json({ message: 'ประเภทลูกค้าไม่ถูกต้อง' });
     }
 
-    const existing = await prisma.customerProfile.findUnique({
-      where: { id },
-      include: { user: true },
+    const existing = await prisma.storeCustomer.findFirst({
+      where: {
+        id,
+        branchId,
+        active: true,
+      },
     });
     if (!existing) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
 
-    if (
-      existing.branchId &&
-      branchId &&
-      existing.branchId !== branchId &&
-      role !== 'SUPERADMIN'
-    ) {
-      return res.status(403).json({ message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าสาขาอื่น' });
+    const sanitizedPhone =
+      typeof phone === 'undefined' ? undefined : normalizePhone(phone);
+    if (typeof sanitizedPhone !== 'undefined' && !isValidPhone(sanitizedPhone)) {
+      return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
     }
 
     const sanitize = (value) => (typeof value === 'string' ? value.trim() : value);
-    const profileData = Object.fromEntries(
+    const updateData = Object.fromEntries(
       Object.entries({
-        name: sanitize(name),
+        displayName: sanitize(name),
+        phone: sanitizedPhone,
+        email: sanitize(email),
         type,
         companyName: sanitize(companyName),
         taxId: sanitize(taxId),
@@ -117,39 +156,31 @@ const updateCustomerProfile = async (req, res) => {
     });
     if (postcodeError) return res.status(postcodeError.status).json(postcodeError.body);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.customerProfile.update({
-        where: { id },
-        data: {
-          ...profileData,
-          ...(subdistrictCode !== undefined
-            ? { subdistrictCode: subdistrictCode || null }
-            : {}),
-        },
-      });
-
-      if (phone) {
-        const newPhone = normalizePhone(phone);
-        if (!isValidPhone(newPhone)) throw new Error('INVALID_PHONE');
-        await tx.user.update({ where: { id: existing.userId }, data: { loginId: newPhone } });
-      }
+    await prisma.storeCustomer.update({
+      where: { id },
+      data: {
+        ...updateData,
+        ...(subdistrictCode !== undefined
+          ? { subdistrictCode: subdistrictCode || null }
+          : {}),
+      },
     });
 
-    const full = await prisma.customerProfile.findUnique({
-      where: { id },
+    const full = await prisma.storeCustomer.findFirst({
+      where: {
+        id,
+        branchId,
+        active: true,
+      },
       include: {
-        user: true,
         subdistrict: { include: { district: { include: { province: true } } } },
       },
     });
 
-    return res.json(presentUpdatedCustomer(full));
+    return res.json(presentStoreCustomer(full));
   } catch (error) {
     if (error && error.code === 'P2002') {
       return res.status(409).json({ message: 'ข้อมูลซ้ำกัน' });
-    }
-    if (error && error.message === 'INVALID_PHONE') {
-      return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
     }
     console.error('❌ updateCustomerProfile error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตลูกค้า' });
@@ -229,7 +260,7 @@ const updateCustomerProfileOnline = async (req, res) => {
       },
     });
 
-    return res.json(presentUpdatedCustomer(full, { includePostcode: false }));
+    return res.json(presentLegacyCustomer(full, { includePostcode: false }));
   } catch (error) {
     if (error && error.message === 'INVALID_PHONE') {
       return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
