@@ -95,7 +95,7 @@ const registerFailedAttempt = async ({ challengeId, maxAttempts }, db = prisma) 
   return rows[0] ? mapChallenge(rows[0]) : null;
 };
 
-const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phoneE164, proofExpiresAt }, db) => {
+const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phoneE164, proofTokenHash, proofExpiresAt }, db) => {
   const updated = await db.$queryRaw(Prisma.sql`
     UPDATE "CommerceIdentityChallenge"
     SET "status" = 'VERIFIED',
@@ -111,10 +111,10 @@ const verifyChallengeAndCreateProofInDb = async ({ challengeId, sessionId, phone
 
   const proofs = await db.$queryRaw(Prisma.sql`
     INSERT INTO "CommerceCommitmentIdentity" (
-      "challengeId", "anonymousSessionId", "phoneNormalized", "verifiedAt",
+      "challengeId", "anonymousSessionId", "phoneNormalized", "proofTokenHash", "verifiedAt",
       "expiresAt", "createdAt"
     ) VALUES (
-      ${challengeId}, ${sessionId}, ${phoneE164}, CURRENT_TIMESTAMP,
+      ${challengeId}, ${sessionId}, ${phoneE164}, ${proofTokenHash}, CURRENT_TIMESTAMP,
       ${proofExpiresAt}, CURRENT_TIMESTAMP
     )
     RETURNING "id", "expiresAt", "createdAt"
