@@ -73,6 +73,12 @@ expectIncludes(
     'OUTPUT_TAX_PERIOD_CONFLICT',
     'expectedVersion: normalizedVersion',
     'currentVersion: current.version',
+    'OUTPUT_TAX_PERIOD_CURRENCY_INVALID',
+    'OUTPUT_TAX_PERIOD_SUMMARY_INVALID',
+    'OUTPUT_TAX_PERIOD_ALREADY_EXISTS',
+    'outputTaxPeriodId: existing.id',
+    'status: existing.status',
+    'version: existing.version',
   ],
   'OutputTaxPeriod application service',
 );
