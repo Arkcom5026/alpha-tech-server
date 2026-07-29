@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const documentRepository = require('../repository/taxDocumentRepository');
+const { assertPeriodAllowsReplace } = require('../../outputTax/period/guard/outputTaxPeriodGuard');
 
 const normalizeText = (value) => String(value || '').trim();
 
@@ -83,6 +84,11 @@ const replaceCancelledTaxDocument = async ({
     if (existingReplacement) {
       return Object.freeze({ replayed: true, replacedDocument: cancelled, replacementDocument: existingReplacement });
     }
+
+    await assertPeriodAllowsReplace({
+      branchId: normalizedBranchId,
+      occurredAt: normalizedOccurredAt,
+    }, tx);
 
     const duplicateNumber = await documentRepository.findByDocumentNumber({
       branchId: normalizedBranchId,
