@@ -269,6 +269,8 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
       documentNumber: row.documentNumber,
       documentDate: row.issuedAt,
       receivedAt: row.occurredAt,
+      periodView,
+      periodDate: row.periodDate,
       supplier: { name: supplierName(row), taxId: supplierTaxId(row) || null },
       amounts: {
         subtotalAmount: row.subtotalAmount,
@@ -308,11 +310,6 @@ const getInputTaxOverview = async (input = {}) => {
       code: 'INPUT_TAX_OVERVIEW_PERIOD_VIEW_INVALID', statusCode: 400,
     });
   }
-  if (periodView !== 'DOCUMENT') {
-    throw Object.assign(new Error('Only DOCUMENT period view is implemented in Increment 1'), {
-      code: 'INPUT_TAX_OVERVIEW_PERIOD_VIEW_NOT_IMPLEMENTED', statusCode: 400,
-    });
-  }
   const periodFromDate = parseDateOnly(input.periodFrom, 'periodFrom');
   const periodToDate = parseDateOnly(input.periodTo, 'periodTo');
   if (periodToDate < periodFromDate) {
@@ -324,8 +321,8 @@ const getInputTaxOverview = async (input = {}) => {
   const durationMs = periodToExclusive.getTime() - periodFromDate.getTime();
   const previousFrom = new Date(periodFromDate.getTime() - durationMs);
   const [documents, previousDocuments] = await Promise.all([
-    repository.listDocumentProjection({ branchId, periodFrom: periodFromDate, periodToExclusive }),
-    repository.listDocumentProjection({ branchId, periodFrom: previousFrom, periodToExclusive: periodFromDate }),
+    repository.listDocumentProjection({ branchId, periodView, periodFrom: periodFromDate, periodToExclusive }),
+    repository.listDocumentProjection({ branchId, periodView, periodFrom: previousFrom, periodToExclusive: periodFromDate }),
   ]);
   return aggregateDocuments({
     branchId,
