@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 // ===================== Routes =====================
 const authRoutes = require('./routes/authRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
+const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
 const superAdminCategoryRoutes = require('./routes/superAdminCategoryRoutes');
 const employeeRoutes = require('./src/modules/employee/routes/employeeRoutes');
 const supplierRoutes = require('./src/modules/supplier/routes/supplierRoutes');
