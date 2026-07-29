@@ -15,6 +15,9 @@ const periodGuard = read('src/modules/tax/outputTax/period/guard/outputTaxPeriod
 const periodRepository = read(
   'src/modules/tax/outputTax/period/repository/outputTaxPeriodRepository.js',
 );
+const closingPlan = read(
+  'src/modules/tax/outputTax/closing/buildOutputTaxPeriodClosingPlanService.js',
+);
 const intakeRoutes = read('src/modules/tax/http/taxIntakeRoutes.js');
 const registerCandidate = read('src/modules/tax/intake/registerTaxCandidateService.js');
 const convertCandidate = read(
@@ -86,6 +89,26 @@ expectIncludes(
     'assertPeriodAllowsTransition',
   ],
   'OutputTaxPeriod runtime guard',
+);
+
+expectIncludes(
+  closingPlan,
+  [
+    'OUTPUT_TAX_PERIOD_CLOSING_PLAN_V2',
+    'findByBranchYearMonth',
+    'persistentCloseSupported: true',
+    'closeAuthorityImplemented: true',
+    "? 'CREATE_PERIOD'",
+    "? 'REQUEST_CLOSE'",
+    "? 'CLOSE_PERIOD'",
+    "? 'REOPEN_PERIOD'",
+    "['CLOSING', 'CLOSED'].includes(period.status)",
+    "? 'CREATE_OUTPUT_TAX_PERIOD'",
+    "? 'REQUEST_OUTPUT_TAX_PERIOD_CLOSE'",
+    "? 'CLOSE_OUTPUT_TAX_PERIOD'",
+    "? 'OUTPUT_TAX_PERIOD_CLOSED'",
+  ],
+  'OutputTaxPeriod closing plan projection',
 );
 
 expectIncludes(
