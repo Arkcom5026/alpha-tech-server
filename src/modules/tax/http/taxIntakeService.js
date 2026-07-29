@@ -16,6 +16,7 @@ const {
 } = require('../documents/readiness/buildTaxDocumentOperationalReadinessProjection');
 const { buildTaxDocumentTimelineProjection } = require('../documents/timeline/buildTaxDocumentTimelineProjection');
 const { buildTaxDocumentWorkspaceProjection } = require('../documents/workspace/buildTaxDocumentWorkspaceProjection');
+const { buildOutputTaxPeriodClosingPlan } = require('../outputTax/closing/buildOutputTaxPeriodClosingPlanService');
 const { buildOutputTaxOverview } = require('../outputTax/dashboard/buildOutputTaxOverviewService');
 const {
   closePeriod,
@@ -120,6 +121,12 @@ const getOutputTaxOverview = (input) => buildOutputTaxOverview({
   month: input.month,
 });
 
+const getOutputTaxPeriodClosingPlan = (input) => buildOutputTaxPeriodClosingPlan({
+  branchId: requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId'),
+  year: input.year,
+  month: input.month,
+});
+
 const getOutputTaxPeriodReadiness = (input) => buildOutputTaxPeriodReadiness({
   branchId: requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId'),
   year: input.year,
@@ -145,6 +152,7 @@ module.exports = Object.freeze({
   getDocumentWorkspaceProjection,
   getOutputTaxOverview,
   getOutputTaxPeriod: getPeriod,
+  getOutputTaxPeriodClosingPlan,
   getOutputTaxPeriodReadiness,
   getOutputTaxPeriodReport,
   getOutputTaxPeriodTimeline: getPeriodTimeline,
