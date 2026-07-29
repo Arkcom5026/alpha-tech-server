@@ -62,6 +62,18 @@ const assertPeriodExists = (period) => {
   return period;
 };
 
+const assertExpectedVersion = (current, expectedVersion) => {
+  if (current.version !== expectedVersion) {
+    fail(
+      'Output tax period changed concurrently',
+      'OUTPUT_TAX_PERIOD_CONFLICT',
+      409,
+      { expectedVersion, currentVersion: current.version },
+    );
+  }
+  return current;
+};
+
 const assertTransitionResult = (period) => {
   if (!period) {
     fail(
@@ -177,11 +189,14 @@ const requestClosePeriod = async ({ branchId, outputTaxPeriodId, expectedVersion
   const normalizedReason = requireReason(reason, 'OUTPUT_TAX_PERIOD_CLOSE_REASON_REQUIRED');
 
   return prisma.$transaction(async (tx) => {
-    const current = assertPeriodExists(
-      await outputTaxPeriodRepository.findByIdForUpdate(
-        { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
-        tx,
+    const current = assertExpectedVersion(
+      assertPeriodExists(
+        await outputTaxPeriodRepository.findByIdForUpdate(
+          { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
+          tx,
+        ),
       ),
+      normalizedVersion,
     );
 
     if (![PERIOD_STATUS.OPEN, PERIOD_STATUS.REOPENED].includes(current.status)) {
@@ -271,24 +286,18 @@ const closePeriod = async ({ branchId, outputTaxPeriodId, expectedVersion, actor
   const closingSnapshot = buildClosingSnapshot({ current: period, readiness });
 
   return prisma.$transaction(async (tx) => {
-    const current = assertPeriodExists(
-      await outputTaxPeriodRepository.findByIdForUpdate(
-        { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
-        tx,
+    const current = assertExpectedVersion(
+      assertPeriodExists(
+        await outputTaxPeriodRepository.findByIdForUpdate(
+          { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
+          tx,
+        ),
       ),
+      normalizedVersion,
     );
 
     if (current.status !== PERIOD_STATUS.CLOSING) {
       fail('Only CLOSING periods can be closed', 'OUTPUT_TAX_PERIOD_CLOSE_NOT_ALLOWED', 409);
-    }
-
-    if (current.version !== normalizedVersion) {
-      fail(
-        'Output tax period changed concurrently',
-        'OUTPUT_TAX_PERIOD_CONFLICT',
-        409,
-        { expectedVersion: normalizedVersion, currentVersion: current.version },
-      );
     }
 
     const snapshotted = assertTransitionResult(
@@ -358,11 +367,14 @@ const reopenPeriod = async ({ branchId, outputTaxPeriodId, expectedVersion, acto
   const normalizedReason = requireReason(reason, 'OUTPUT_TAX_PERIOD_REOPEN_REASON_REQUIRED');
 
   return prisma.$transaction(async (tx) => {
-    const current = assertPeriodExists(
-      await outputTaxPeriodRepository.findByIdForUpdate(
-        { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
-        tx,
+    const current = assertExpectedVersion(
+      assertPeriodExists(
+        await outputTaxPeriodRepository.findByIdForUpdate(
+          { branchId: normalizedBranchId, outputTaxPeriodId: normalizedPeriodId },
+          tx,
+        ),
       ),
+      normalizedVersion,
     );
 
     if (current.status !== PERIOD_STATUS.CLOSED) {
