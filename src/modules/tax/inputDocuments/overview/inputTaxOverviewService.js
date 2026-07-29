@@ -7,6 +7,8 @@ const {
   createReconciliationProjection,
 } = require('../reconciliation/inputTaxReconciliationContract');
 const { projectInputTaxEligibility } = require('../eligibility/inputTaxEligibilityService');
+const { projectInputTaxDuplicates } = require('../duplicates/inputTaxDuplicateService');
+const { projectInputTaxReplacementChains } = require('../replacements/inputTaxReplacementService');
 
 const ACTIVE_STATUSES = new Set(['DRAFT', 'ISSUED', 'APPROVED']);
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'VOIDED', 'REPLACED']);
@@ -111,17 +113,28 @@ const percentChange = (current, previous) => {
   return { value: (((amount(current) - amount(previous)) / amount(previous)) * 100).toFixed(4), reason: null };
 };
 
+const decorateDocuments = (documents) => {
+  const duplicateById = projectInputTaxDuplicates(documents);
+  const replacementById = projectInputTaxReplacementChains(documents);
+  return documents.map((row) => {
+    const reconciliation = projectDocumentReconciliation(row);
+    const duplicate = duplicateById.get(row.id);
+    const replacement = replacementById.get(row.id);
+    const eligibility = projectInputTaxEligibility({
+      document: row,
+      reconciliation,
+      duplicate,
+      replacement,
+    });
+    return { ...row, reconciliation, duplicate, replacement, eligibility };
+  });
+};
+
 const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, documents, previousDocuments }) => {
   const result = createEmptyOverview({ branchId, periodView, periodFrom, periodTo });
-  const activeDocuments = documents.filter(isActive).map((row) => {
-    const reconciliation = projectDocumentReconciliation(row);
-    return { ...row, reconciliation, eligibility: projectInputTaxEligibility({ document: row, reconciliation }) };
-  });
+  const activeDocuments = decorateDocuments(documents.filter(isActive));
   const cancelledDocuments = documents.filter(isCancelled);
-  const previousActive = previousDocuments.filter(isActive).map((row) => {
-    const reconciliation = projectDocumentReconciliation(row);
-    return { ...row, reconciliation, eligibility: projectInputTaxEligibility({ document: row, reconciliation }) };
-  });
+  const previousActive = decorateDocuments(previousDocuments.filter(isActive));
   const sum = (rows, field) => rows.reduce((total, row) => total + amount(row[field]), 0);
   const sumEligibility = (rows, field) => rows.reduce((total, row) => total + amount(row.eligibility[field]), 0);
   const reconciled = activeDocuments.filter((row) => row.reconciliation.status === 'RECONCILED');
@@ -176,10 +189,16 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
 
   const missingTaxId = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_SUPPLIER_TAX_ID'));
   const missingNumber = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_INVOICE_NUMBER'));
+  const duplicateRisk = activeDocuments.filter((row) => ['POSSIBLE_DUPLICATE', 'HIGH_CONFIDENCE_DUPLICATE', 'CONFIRMED_DUPLICATE'].includes(row.duplicate.status));
+  const replacementDocuments = activeDocuments.filter((row) => row.replacement.status !== 'NONE');
   const attentionDocuments = activeDocuments.filter((row) => row.reconciliation.qualityCodes.length > 0
-    || row.eligibility.reasonCodes.length > 0);
+    || row.eligibility.reasonCodes.length > 0
+    || row.duplicate.status !== 'NONE'
+    || row.replacement.status !== 'NONE');
   result.quality.missingSupplierTaxIdCount = missingTaxId.length;
   result.quality.missingInvoiceNumberCount = missingNumber.length;
+  result.quality.duplicateInvoiceRiskCount = duplicateRisk.length;
+  result.quality.replacementDocumentCount = replacementDocuments.length;
   result.quality.attentionItemCount = attentionDocuments.length;
   result.quality.hasAttentionItems = attentionDocuments.length > 0;
 
@@ -230,12 +249,20 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.bySourceType = group((row) => row.sourceTypes.length ? row.sourceTypes.join('+') : 'UNLINKED');
   result.bySupplier = group((row) => supplierName(row)).sort((a, b) => amount(b.vatAmount) - amount(a.vatAmount)).slice(0, 20);
   const activeById = new Map(activeDocuments.map((row) => [row.id, row]));
+  const allDuplicateById = projectInputTaxDuplicates(documents);
+  const allReplacementById = projectInputTaxReplacementChains(documents);
   result.recentDocuments = documents.slice(0, 10).map((row) => {
     const activeRow = activeById.get(row.id);
     const reconciliation = activeRow ? activeRow.reconciliation : projectDocumentReconciliation(row);
+    const duplicate = activeRow ? activeRow.duplicate : allDuplicateById.get(row.id);
+    const replacement = activeRow ? activeRow.replacement : allReplacementById.get(row.id);
     const eligibility = activeRow
       ? activeRow.eligibility
-      : projectInputTaxEligibility({ document: row, reconciliation });
+      : projectInputTaxEligibility({ document: row, reconciliation, duplicate, replacement });
+    const duplicateReason = duplicate && duplicate.status !== 'NONE' ? 'DUPLICATE_DOCUMENT_RISK' : null;
+    const replacementReason = replacement && replacement.status !== 'NONE'
+      ? (replacement.status === 'CHAIN_CONFLICT' ? 'MANUAL_REVIEW_REQUIRED' : 'REPLACED_DOCUMENT')
+      : null;
     return {
       taxDocumentId: row.id,
       documentType: row.documentType,
@@ -254,10 +281,19 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
       reconciliation,
       eligibilityStatus: eligibility.status,
       eligibility,
+      duplicateStatus: duplicate?.status || 'NONE',
+      duplicate,
+      replacementStatus: replacement?.status || 'NONE',
+      replacement,
       filingStatus: ['SELECTED_FOR_FILING', 'FILED'].includes(eligibility.status)
         ? eligibility.status
         : 'NOT_SELECTED',
-      attentionReasons: [...new Set([...reconciliation.qualityCodes, ...eligibility.reasonCodes])],
+      attentionReasons: [...new Set([
+        ...reconciliation.qualityCodes,
+        ...eligibility.reasonCodes,
+        duplicateReason,
+        replacementReason,
+      ].filter(Boolean))],
       updatedAt: row.updatedAt,
     };
   });
