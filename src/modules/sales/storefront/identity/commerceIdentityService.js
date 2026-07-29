@@ -38,6 +38,15 @@ const normalizePhone = (value) => {
 
 const tokenHash = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
+const otpVerifierSecret = () => {
+  const configured = String(process.env.COMMERCE_OTP_VERIFIER_SECRET || '').trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    fail('COMMERCE_OTP_VERIFIER_NOT_CONFIGURED', 'Commerce OTP verifier secret is not configured', 503);
+  }
+  return 'development-commerce-otp-verifier-secret';
+};
+
 const resolveContext = async ({ slug, sessionToken }) => {
   const storefront = await repository.findStorefrontBySlug(normalizeSlug(slug));
   if (!storefront) fail('COMMERCE_IDENTITY_STOREFRONT_NOT_FOUND', 'Storefront was not found', 404);
@@ -54,7 +63,7 @@ const requestCommitmentIdentity = async ({ slug, sessionToken, phone }) => {
   const context = await resolveContext({ slug, sessionToken });
   const phoneE164 = normalizePhone(phone);
   const otp = otpProvider.generateOtp();
-  const otpHash = otpProvider.hashOtp(otp);
+  const otpHash = otpProvider.hashOtp({ challengeSecret: otpVerifierSecret(), otp });
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
   const challenge = await repository.createChallenge({
     sessionId: context.sessionId,
@@ -63,7 +72,7 @@ const requestCommitmentIdentity = async ({ slug, sessionToken, phone }) => {
     otpHash,
     expiresAt,
   });
-  await otpProvider.deliverOtp({ phoneE164, otp, purpose: PURPOSE });
+  await otpProvider.sendOtp({ phoneNormalized: phoneE164, otp, purpose: PURPOSE });
   return {
     challengeId: challenge.id,
     status: challenge.status,
@@ -87,7 +96,11 @@ const verifyCommitmentIdentity = async ({ slug, sessionToken, challengeId, otp }
       fail('COMMERCE_IDENTITY_CHALLENGE_EXPIRED', 'Identity challenge has expired', 410);
     }
 
-    const valid = otpProvider.verifyOtp(candidate, challenge.otpHash);
+    const valid = otpProvider.verifyOtp({
+      challengeSecret: otpVerifierSecret(),
+      otp: candidate,
+      expectedHash: challenge.otpHash,
+    });
     if (!valid) {
       const updated = await repository.registerFailedAttempt({ challengeId: id, maxAttempts: MAX_ATTEMPTS }, tx);
       if (updated?.status === 'LOCKED') fail('COMMERCE_IDENTITY_CHALLENGE_LOCKED', 'Identity challenge is locked', 423);
