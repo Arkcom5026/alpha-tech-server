@@ -2,10 +2,13 @@
 
 const repository = require('./inputTaxOverviewRepository');
 const { PERIOD_VIEWS, createEmptyOverview } = require('./inputTaxOverviewContract');
+const {
+  MONEY_TOLERANCE,
+  createReconciliationProjection,
+} = require('../reconciliation/inputTaxReconciliationContract');
 
 const ACTIVE_STATUSES = new Set(['DRAFT', 'ISSUED', 'APPROVED']);
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'VOIDED', 'REPLACED']);
-const RECONCILIATION_TOLERANCE = 0.01;
 
 const positiveInt = (value, code, fieldName) => {
   const parsed = Number(value);
@@ -53,11 +56,54 @@ const supplierTaxId = (document) => normalizeText(
 );
 const isCancelled = (document) => CANCELLED_STATUSES.has(String(document.status || '').toUpperCase());
 const isActive = (document) => ACTIVE_STATUSES.has(String(document.status || '').toUpperCase()) || !isCancelled(document);
-const diff = (left, right) => Math.abs(amount(left) - amount(right));
-const isMatched = (document) => document.linkedReceiptCount > 0
-  && diff(document.subtotalAmount, document.allocatedSubtotal) <= RECONCILIATION_TOLERANCE
-  && diff(document.vatAmount, document.allocatedVatAmount) <= RECONCILIATION_TOLERANCE
-  && diff(document.totalAmount, document.allocatedTotalAmount) <= RECONCILIATION_TOLERANCE;
+const variance = (documentValue, allocatedValue) => amount(documentValue) - amount(allocatedValue);
+const withinTolerance = (value) => Math.abs(amount(value)) <= amount(MONEY_TOLERANCE);
+
+const projectDocumentReconciliation = (document) => {
+  const documentAmount = Object.freeze({
+    subtotalAmount: money(document.subtotalAmount),
+    vatAmount: money(document.vatAmount),
+    totalAmount: money(document.totalAmount),
+  });
+  const allocatedAmount = Object.freeze({
+    subtotalAmount: money(document.allocatedSubtotal),
+    vatAmount: money(document.allocatedVatAmount),
+    totalAmount: money(document.allocatedTotalAmount),
+  });
+  const amountVariance = Object.freeze({
+    subtotalAmount: money(variance(document.subtotalAmount, document.allocatedSubtotal)),
+    vatAmount: money(variance(document.vatAmount, document.allocatedVatAmount)),
+    totalAmount: money(variance(document.totalAmount, document.allocatedTotalAmount)),
+  });
+  const hasLinks = document.linkedReceiptCount > 0;
+  const matched = hasLinks
+    && withinTolerance(amountVariance.subtotalAmount)
+    && withinTolerance(amountVariance.vatAmount)
+    && withinTolerance(amountVariance.totalAmount);
+  const overAllocated = hasLinks && [
+    amountVariance.subtotalAmount,
+    amountVariance.vatAmount,
+    amountVariance.totalAmount,
+  ].some((value) => amount(value) < -amount(MONEY_TOLERANCE));
+  const status = !hasLinks
+    ? 'UNLINKED'
+    : (matched ? 'RECONCILED' : (overAllocated ? 'OVER_ALLOCATED' : 'PARTIALLY_RECONCILED'));
+  const qualityCodes = [
+    !hasLinks ? 'UNLINKED_DOCUMENT' : null,
+    hasLinks && !matched ? 'ALLOCATION_MISMATCH' : null,
+    overAllocated ? 'OVER_ALLOCATED' : null,
+    !supplierTaxId(document) ? 'MISSING_SUPPLIER_TAX_ID' : null,
+    !normalizeText(document.documentNumber) ? 'MISSING_INVOICE_NUMBER' : null,
+  ].filter(Boolean);
+  return createReconciliationProjection({
+    status,
+    receiptCount: document.linkedReceiptCount,
+    documentAmount,
+    allocatedAmount,
+    variance: amountVariance,
+    qualityCodes,
+  });
+};
 
 const percentChange = (current, previous) => {
   if (amount(previous) === 0) return { value: null, reason: 'NO_COMPARABLE_BASE' };
@@ -66,14 +112,22 @@ const percentChange = (current, previous) => {
 
 const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, documents, previousDocuments }) => {
   const result = createEmptyOverview({ branchId, periodView, periodFrom, periodTo });
-  const activeDocuments = documents.filter(isActive);
+  const activeDocuments = documents.filter(isActive).map((row) => ({
+    ...row,
+    reconciliation: projectDocumentReconciliation(row),
+  }));
   const cancelledDocuments = documents.filter(isCancelled);
-  const previousActive = previousDocuments.filter(isActive);
+  const previousActive = previousDocuments.filter(isActive).map((row) => ({
+    ...row,
+    reconciliation: projectDocumentReconciliation(row),
+  }));
   const sum = (rows, field) => rows.reduce((total, row) => total + amount(row[field]), 0);
-  const reconciled = activeDocuments.filter(isMatched);
-  const unlinked = activeDocuments.filter((row) => row.linkedReceiptCount === 0);
-  const mismatched = activeDocuments.filter((row) => row.linkedReceiptCount > 0 && !isMatched(row));
-  const blocked = [...unlinked, ...mismatched];
+  const reconciled = activeDocuments.filter((row) => row.reconciliation.status === 'RECONCILED');
+  const unlinked = activeDocuments.filter((row) => row.reconciliation.status === 'UNLINKED');
+  const partiallyReconciled = activeDocuments.filter((row) => row.reconciliation.status === 'PARTIALLY_RECONCILED');
+  const overAllocated = activeDocuments.filter((row) => row.reconciliation.status === 'OVER_ALLOCATED');
+  const mismatched = [...partiallyReconciled, ...overAllocated];
+  const blocked = activeDocuments.filter((row) => !row.reconciliation.canApprove);
   const ready = reconciled;
 
   result.headline.documentCount = documents.length;
@@ -87,7 +141,10 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.headline.blockedVatAmount = money(sum(blocked, 'vatAmount'));
 
   const previousVat = sum(previousActive, 'vatAmount');
-  const previousClaimableVat = sum(previousActive.filter(isMatched), 'vatAmount');
+  const previousClaimableVat = sum(
+    previousActive.filter((row) => row.reconciliation.status === 'RECONCILED'),
+    'vatAmount',
+  );
   const vatComparison = percentChange(result.headline.vatAmount, previousVat);
   const claimComparison = percentChange(result.headline.claimableVatAmount, previousClaimableVat);
   result.comparison.previousDocumentVatAmount = money(previousVat);
@@ -104,26 +161,27 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.reconciliation.allocationMatchedDocumentCount = reconciled.length;
   result.reconciliation.allocationMismatchDocumentCount = mismatched.length;
   result.reconciliation.allocationDifferenceAmount = money(mismatched.reduce(
-    (total, row) => total + diff(row.totalAmount, row.allocatedTotalAmount), 0,
+    (total, row) => total + Math.abs(amount(row.reconciliation.variance.totalAmount)), 0,
   ));
   result.reconciliation.unreconciledVatAmount = money(sum(blocked, 'vatAmount'));
 
-  const missingTaxId = activeDocuments.filter((row) => !supplierTaxId(row));
-  const missingNumber = activeDocuments.filter((row) => !normalizeText(row.documentNumber));
-  const attentionIds = new Set([...unlinked, ...mismatched, ...missingTaxId, ...missingNumber].map((row) => row.id));
+  const missingTaxId = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_SUPPLIER_TAX_ID'));
+  const missingNumber = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes('MISSING_INVOICE_NUMBER'));
+  const attentionDocuments = activeDocuments.filter((row) => row.reconciliation.qualityCodes.length > 0);
   result.quality.missingSupplierTaxIdCount = missingTaxId.length;
   result.quality.missingInvoiceNumberCount = missingNumber.length;
-  result.quality.attentionItemCount = attentionIds.size;
-  result.quality.hasAttentionItems = attentionIds.size > 0;
+  result.quality.attentionItemCount = attentionDocuments.length;
+  result.quality.hasAttentionItems = attentionDocuments.length > 0;
 
   result.filingReadiness.readyDocumentCount = ready.length;
   result.filingReadiness.blockedDocumentCount = blocked.length;
   result.filingReadiness.readyVatAmount = money(sum(ready, 'vatAmount'));
   result.filingReadiness.blockedVatAmount = money(sum(blocked, 'vatAmount'));
-  result.filingReadiness.blockerSummary = [
-    { code: 'UNLINKED_DOCUMENT', documentCount: unlinked.length, vatAmount: money(sum(unlinked, 'vatAmount')) },
-    { code: 'ALLOCATION_MISMATCH', documentCount: mismatched.length, vatAmount: money(sum(mismatched, 'vatAmount')) },
-  ].filter((item) => item.documentCount > 0);
+  const blockerCodes = ['UNLINKED_DOCUMENT', 'ALLOCATION_MISMATCH', 'OVER_ALLOCATED'];
+  result.filingReadiness.blockerSummary = blockerCodes.map((code) => {
+    const rows = activeDocuments.filter((row) => row.reconciliation.qualityCodes.includes(code));
+    return { code, documentCount: rows.length, vatAmount: money(sum(rows, 'vatAmount')) };
+  }).filter((item) => item.documentCount > 0);
 
   const group = (keyFn) => {
     const map = new Map();
@@ -147,30 +205,33 @@ const aggregateDocuments = ({ branchId, periodView, periodFrom, periodTo, docume
   result.byDocumentType = group((row) => row.documentType || 'UNKNOWN');
   result.bySourceType = group((row) => row.sourceTypes.length ? row.sourceTypes.join('+') : 'UNLINKED');
   result.bySupplier = group((row) => supplierName(row)).sort((a, b) => amount(b.vatAmount) - amount(a.vatAmount)).slice(0, 20);
-  result.recentDocuments = documents.slice(0, 10).map((row) => ({
-    taxDocumentId: row.id,
-    documentType: row.documentType,
-    documentNumber: row.documentNumber,
-    documentDate: row.issuedAt,
-    receivedAt: row.occurredAt,
-    supplier: { name: supplierName(row), taxId: supplierTaxId(row) || null },
-    amounts: {
-      subtotalAmount: row.subtotalAmount,
-      vatAmount: row.vatAmount,
-      totalAmount: row.totalAmount,
-    },
-    sourceTypes: row.sourceTypes,
-    linkedReceiptCount: row.linkedReceiptCount,
-    reconciliationStatus: row.linkedReceiptCount === 0 ? 'UNLINKED' : (isMatched(row) ? 'MATCHED' : 'MISMATCHED'),
-    filingStatus: 'NOT_SELECTED',
-    attentionReasons: [
-      row.linkedReceiptCount === 0 ? 'UNLINKED_DOCUMENT' : null,
-      row.linkedReceiptCount > 0 && !isMatched(row) ? 'ALLOCATION_MISMATCH' : null,
-      !supplierTaxId(row) ? 'MISSING_SUPPLIER_TAX_ID' : null,
-      !normalizeText(row.documentNumber) ? 'MISSING_INVOICE_NUMBER' : null,
-    ].filter(Boolean),
-    updatedAt: row.updatedAt,
-  }));
+  const activeById = new Map(activeDocuments.map((row) => [row.id, row]));
+  result.recentDocuments = documents.slice(0, 10).map((row) => {
+    const activeRow = activeById.get(row.id);
+    const reconciliation = activeRow
+      ? activeRow.reconciliation
+      : projectDocumentReconciliation(row);
+    return {
+      taxDocumentId: row.id,
+      documentType: row.documentType,
+      documentNumber: row.documentNumber,
+      documentDate: row.issuedAt,
+      receivedAt: row.occurredAt,
+      supplier: { name: supplierName(row), taxId: supplierTaxId(row) || null },
+      amounts: {
+        subtotalAmount: row.subtotalAmount,
+        vatAmount: row.vatAmount,
+        totalAmount: row.totalAmount,
+      },
+      sourceTypes: row.sourceTypes,
+      linkedReceiptCount: row.linkedReceiptCount,
+      reconciliationStatus: reconciliation.status,
+      reconciliation,
+      filingStatus: 'NOT_SELECTED',
+      attentionReasons: reconciliation.qualityCodes,
+      updatedAt: row.updatedAt,
+    };
+  });
   return result;
 };
 
@@ -211,4 +272,4 @@ const getInputTaxOverview = async (input = {}) => {
   });
 };
 
-module.exports = Object.freeze({ aggregateDocuments, getInputTaxOverview });
+module.exports = Object.freeze({ aggregateDocuments, getInputTaxOverview, projectDocumentReconciliation });
