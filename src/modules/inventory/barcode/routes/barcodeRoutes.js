@@ -4,9 +4,6 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  markReceiptAsCompleted,
-} = require('../../../../../controllers/barcodeController');
-const {
   generateMissingBarcodes,
 } = require('../generate/generateBarcodeController');
 const {
@@ -27,6 +24,9 @@ const {
 const {
   auditReceiptBarcodes,
 } = require('../audit/barcodeAuditController');
+const {
+  markReceiptAsCompleted,
+} = require('../completion/receiptCompletionController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
