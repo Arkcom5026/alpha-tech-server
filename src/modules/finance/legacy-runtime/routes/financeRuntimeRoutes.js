@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 
-const financeController = require('../../controllers/financeController');
+const financeController = require('../../../../../controllers/financeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const dailyClosingRoutes = require('../../../../../src/features/finance/dailyClosing.routes');
 
