@@ -54,16 +54,18 @@ const requestCommitmentIdentity = async ({ slug, sessionToken, phone }) => {
   const context = await resolveContext({ slug, sessionToken });
   const phoneE164 = normalizePhone(phone);
   const otp = otpProvider.generateOtp();
-  const otpHash = otpProvider.hashOtp(otp);
+  const challengeSecret = crypto.randomBytes(32).toString('base64url');
+  const otpHash = otpProvider.hashOtp({ challengeSecret, otp });
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
   const challenge = await repository.createChallenge({
     sessionId: context.sessionId,
     purpose: PURPOSE,
     phoneE164,
     otpHash,
+    challengeSecret,
     expiresAt,
   });
-  await otpProvider.deliverOtp({ phoneE164, otp, purpose: PURPOSE });
+  await otpProvider.sendOtp({ phoneNormalized: phoneE164, otp, purpose: PURPOSE });
   return {
     challengeId: challenge.id,
     status: challenge.status,
@@ -87,7 +89,11 @@ const verifyCommitmentIdentity = async ({ slug, sessionToken, challengeId, otp }
       fail('COMMERCE_IDENTITY_CHALLENGE_EXPIRED', 'Identity challenge has expired', 410);
     }
 
-    const valid = otpProvider.verifyOtp(candidate, challenge.otpHash);
+    const valid = otpProvider.verifyOtp({
+      challengeSecret: challenge.challengeSecret,
+      otp: candidate,
+      expectedHash: challenge.otpHash,
+    });
     if (!valid) {
       const updated = await repository.registerFailedAttempt({ challengeId: id, maxAttempts: MAX_ATTEMPTS }, tx);
       if (updated?.status === 'LOCKED') fail('COMMERCE_IDENTITY_CHALLENGE_LOCKED', 'Identity challenge is locked', 423);
