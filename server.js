@@ -260,9 +260,16 @@ app.use((err, req, res, _next) => {
   res.status(statusCode).json({
     ok: false,
     error: code,
+    code,
     message: err?.message || 'Internal server error',
+    details: err?.details || null,
     requestId: req.id,
   });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
 
 module.exports = app;
