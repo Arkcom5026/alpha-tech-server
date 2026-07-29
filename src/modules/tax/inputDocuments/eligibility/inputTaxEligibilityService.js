@@ -9,6 +9,7 @@ const CANCELLED_STATUSES = new Set(['CANCELLED', 'VOIDED']);
 const projectInputTaxEligibility = ({ document, reconciliation, duplicate, replacement }) => {
   const grossVatAmount = amount(document?.vatAmount ?? document?.taxAmount);
   const snapshot = document?.snapshot || {};
+  const filing = document?.filing || null;
   const configuredRate = Number(snapshot.inputTaxEligibilityRate);
   const hasConfiguredRate = Number.isFinite(configuredRate) && configuredRate >= 0 && configuredRate <= 100;
   const eligibilityRate = hasConfiguredRate ? configuredRate : 100;
@@ -52,6 +53,22 @@ const projectInputTaxEligibility = ({ document, reconciliation, duplicate, repla
       reasonCodes: ['ALLOCATION_MISMATCH'],
     });
   }
+
+  if (filing && ['SELECTED', 'FILED'].includes(normalizeStatus(filing.status))) {
+    const durableStatus = normalizeStatus(filing.status) === 'FILED' ? 'FILED' : 'SELECTED_FOR_FILING';
+    const eligibleVatAmount = amount(filing.claimedVatAmount);
+    return createEligibilityProjection({
+      status: durableStatus,
+      grossVatAmount,
+      eligibleVatAmount,
+      ineligibleVatAmount: Math.max(0, grossVatAmount - eligibleVatAmount),
+      eligibilityRate: grossVatAmount === 0 ? 0 : (eligibleVatAmount / grossVatAmount) * 100,
+      reasonCodes,
+      decidedAt: filing.selectedAt || null,
+      decidedByEmployeeId: snapshot.inputTaxEligibilityDecidedByEmployeeId || null,
+    });
+  }
+
   if (['INELIGIBLE', 'DEFERRED', 'SELECTED_FOR_FILING', 'FILED'].includes(manualStatus)) {
     const eligibleVatAmount = manualStatus === 'INELIGIBLE' ? 0 : grossVatAmount * (eligibilityRate / 100);
     return createEligibilityProjection({
