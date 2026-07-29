@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
 
+const { getCart, getBranchPrices } = require('../controllers/cartQueryController');
 const {
-  getCart,
   addToCart,
   removeFromCart,
-  clearCart,
-  mergeCart,
   updateCartItem,
-  getBranchPrices,
-} = require('../../../../../controllers/cartController');
+} = require('../controllers/cartItemController');
+const { clearCart, mergeCart } = require('../controllers/cartLifecycleController');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 router.use(verifyToken);
