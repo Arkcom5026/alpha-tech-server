@@ -1,5 +1,7 @@
-const fs = require('fs');
-const path = require('path');
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 
@@ -17,7 +19,7 @@ const walk = (directory) => {
 
 describe('barcode root controller retirement', () => {
   test('legacy root controller is physically removed', () => {
-    expect(fs.existsSync(path.join(root, 'controllers/barcodeController.js'))).toBe(false);
+    assert.equal(fs.existsSync(path.join(root, 'controllers/barcodeController.js')), false);
   });
 
   test('runtime source files do not reference the retired controller', () => {
@@ -43,7 +45,7 @@ describe('barcode root controller retirement', () => {
         : [];
     });
 
-    expect(violations).toEqual([]);
+    assert.deepEqual(violations, []);
   });
 
   test('barcode routes are owned only by vertical slices', () => {
@@ -53,12 +55,12 @@ describe('barcode root controller retirement', () => {
     );
     const route = fs.readFileSync(routePath, 'utf8');
 
-    expect(route).toContain("require('../generate/generateBarcodeController')");
-    expect(route).toContain("require('../query/receiptBarcodeQueryController')");
-    expect(route).toContain("require('../print/barcodePrintController')");
-    expect(route).toContain("require('../scan/barcodeScanController')");
-    expect(route).toContain("require('../audit/barcodeAuditController')");
-    expect(route).toContain("require('../completion/receiptCompletionController')");
-    expect(route).not.toContain('controllers/barcodeController');
+    assert.match(route, /require\('\.\.\/generate\/generateBarcodeController'\)/);
+    assert.match(route, /require\('\.\.\/query\/receiptBarcodeQueryController'\)/);
+    assert.match(route, /require\('\.\.\/print\/barcodePrintController'\)/);
+    assert.match(route, /require\('\.\.\/scan\/barcodeScanController'\)/);
+    assert.match(route, /require\('\.\.\/audit\/barcodeAuditController'\)/);
+    assert.match(route, /require\('\.\.\/completion\/receiptCompletionController'\)/);
+    assert.doesNotMatch(route, /controllers\/barcodeController/);
   });
 });
