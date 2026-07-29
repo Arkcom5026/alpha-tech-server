@@ -1,106 +1,137 @@
-# ProductReservation Lifecycle Persistence Authority — Slice 2
+'use strict';
 
-## Mission
+const { prisma, Prisma } = require('../../../../../lib/prisma');
 
-Extend the canonical ProductReservation foundation with additive lifecycle persistence authority required for replay-safe transitions and exact-once stock release.
+const normalizeLimit = (value, fallback = 50, maximum = 100) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, maximum);
+};
 
-## Repository Finding
+const listMerchantReservations = async ({ branchId, statuses, limit }, db = prisma) => {
+  const normalizedLimit = normalizeLimit(limit);
+  const statusFilter = Array.isArray(statuses) && statuses.length
+    ? Prisma.sql`AND reservation."status" IN (${Prisma.join(statuses)})`
+    : Prisma.empty;
 
-The canonical ProductReservation foundation now establishes the aggregate, items, commitment vocabulary, branch ownership, and lifecycle status vocabulary.
+  const rows = await db.$queryRaw(Prisma.sql`
+    SELECT reservation."id", reservation."code", reservation."status",
+           reservation."orderSource", reservation."fulfillmentMethod",
+           reservation."totalAmount", reservation."depositAmount",
+           reservation."expiresAt", reservation."stockReleasedAt",
+           reservation."version", reservation."createdAt", reservation."updatedAt",
+           COUNT(item."id")::INTEGER AS "itemCount",
+           COALESCE(SUM(item."quantity"), 0) AS "totalQuantity"
+    FROM "ProductReservation" reservation
+    LEFT JOIN "ProductReservationItem" item
+      ON item."reservationId" = reservation."id"
+     AND item."isActive" = TRUE
+    WHERE reservation."branchId" = ${branchId}
+      ${statusFilter}
+    GROUP BY reservation."id"
+    ORDER BY reservation."createdAt" DESC, reservation."id" DESC
+    LIMIT ${normalizedLimit}
+  `);
 
-However, the current canonical model does not yet persist:
+  return rows.map((row) => ({
+    ...row,
+    id: Number(row.id),
+    version: Number(row.version),
+    itemCount: Number(row.itemCount),
+    totalQuantity: Number(row.totalQuantity),
+    totalAmount: Number(row.totalAmount),
+    depositAmount: Number(row.depositAmount),
+  }));
+};
 
-- lifecycle command replay identity
-- transition history
-- stock release completion authority
-- actor and reason audit
-- optimistic transition version
+const getMerchantReservationDetail = async ({ reservationId, branchId }, db = prisma) => {
+  const reservations = await db.$queryRaw(Prisma.sql`
+    SELECT reservation.*
+    FROM "ProductReservation" reservation
+    WHERE reservation."id" = ${reservationId}
+      AND reservation."branchId" = ${branchId}
+    LIMIT 1
+  `);
+  const reservation = reservations[0];
+  if (!reservation) return null;
 
-Without those fields or equivalent durable records, a repository adapter cannot prove exact-once stock release after retries, process restarts, or concurrent commands.
+  const [items, timeline] = await Promise.all([
+    db.$queryRaw(Prisma.sql`
+      SELECT item."id", item."lineId", item."lineType", item."productId",
+             item."stockItemId", item."simpleLotId", item."quantity",
+             item."basePrice", item."discount", item."price", item."vatAmount",
+             item."remark", item."isActive", item."createdAt", item."updatedAt",
+             product."name" AS "productName"
+      FROM "ProductReservationItem" item
+      JOIN "Product" product ON product."id" = item."productId"
+      WHERE item."reservationId" = ${reservationId}
+      ORDER BY item."id"
+    `),
+    db.$queryRaw(Prisma.sql`
+      SELECT event."id", command."commandType", event."fromStatus", event."toStatus",
+             event."actorId", event."reason", event."occurredAt", event."createdAt"
+      FROM "ProductReservationLifecycleEvent" event
+      JOIN "ProductReservationLifecycleCommand" command
+        ON command."id" = event."commandId"
+      WHERE event."reservationId" = ${reservationId}
+        AND event."branchId" = ${branchId}
+      ORDER BY event."occurredAt", event."id"
+    `),
+  ]);
 
-## Required Additive Authority
+  return {
+    reservation: {
+      ...reservation,
+      id: Number(reservation.id),
+      version: Number(reservation.version),
+      totalBeforeDiscount: Number(reservation.totalBeforeDiscount),
+      totalDiscount: Number(reservation.totalDiscount),
+      totalAmount: Number(reservation.totalAmount),
+      depositAmount: Number(reservation.depositAmount),
+    },
+    items: items.map((item) => ({
+      ...item,
+      id: Number(item.id),
+      productId: Number(item.productId),
+      stockItemId: item.stockItemId == null ? null : Number(item.stockItemId),
+      simpleLotId: item.simpleLotId == null ? null : Number(item.simpleLotId),
+      quantity: Number(item.quantity),
+      basePrice: Number(item.basePrice),
+      discount: Number(item.discount),
+      price: Number(item.price),
+      vatAmount: Number(item.vatAmount),
+    })),
+    timeline: timeline.map((event) => ({
+      ...event,
+      id: Number(event.id),
+      actorId: event.actorId == null ? null : Number(event.actorId),
+    })),
+  };
+};
 
-### ProductReservation
+const findExpiredCandidates = async ({ branchId = null, now, limit }, db = prisma) => {
+  const normalizedLimit = normalizeLimit(limit, 100, 500);
+  const branchFilter = branchId == null ? Prisma.empty : Prisma.sql`AND "branchId" = ${branchId}`;
+  const rows = await db.$queryRaw(Prisma.sql`
+    SELECT "id", "branchId", "version", "expiresAt"
+    FROM "ProductReservation"
+    WHERE "status" = 'ACTIVE'
+      AND "expiresAt" IS NOT NULL
+      AND "expiresAt" <= ${now}
+      ${branchFilter}
+    ORDER BY "expiresAt", "id"
+    LIMIT ${normalizedLimit}
+  `);
+  return rows.map((row) => ({
+    id: Number(row.id),
+    branchId: Number(row.branchId),
+    version: Number(row.version),
+    expiresAt: row.expiresAt,
+  }));
+};
 
-- `stockReleasedAt DateTime?`
-- `version Int @default(1)`
-- lifecycle command relation
-- lifecycle event relation
-
-### ProductReservationLifecycleCommand
-
-Durable idempotency record scoped to reservation and command key.
-
-Required fields:
-
-- reservationId
-- branchId
-- commandKey
-- commandType
-- fromStatus
-- toStatus
-- stockReleased
-- actorId
-- reason
-- occurredAt
-- createdAt
-
-Required invariant:
-
-- unique `(reservationId, commandKey)`
-
-### ProductReservationLifecycleEvent
-
-Immutable transition audit record.
-
-Required fields:
-
-- reservationId
-- branchId
-- commandId
-- fromStatus
-- toStatus
-- actorId
-- reason
-- occurredAt
-- createdAt
-
-## Transaction Contract
-
-One lifecycle transaction must perform the following atomically:
-
-1. lock reservation under `reservationId + branchId`
-2. resolve command replay
-3. validate transition against current status
-4. for CANCEL or EXPIRE, release each active reservation line exactly once
-5. decrement `StockBalance.reserved` with underflow protection
-6. append `StockMovement(RELEASE)` per product line
-7. set `stockReleasedAt`
-8. update reservation status and increment version
-9. insert lifecycle command authority
-10. insert lifecycle event
-
-## Exact-once Rule
-
-`stockReleasedAt` and the unique lifecycle command record are complementary safeguards:
-
-- command uniqueness prevents the same command key from executing twice
-- `stockReleasedAt` prevents a different terminal command from releasing the same stock twice
-- the transaction boundary ensures status, stock, movement, and replay evidence commit together
-
-## Boundary
-
-This slice does not create Sale, Payment, Delivery, or customer-account authority.
-
-HTTP routes, scheduler execution, and merchant queue surfaces remain subsequent slices.
-
-## Verification State
-
-```text
-Canonical ProductReservation foundation: PRESENT
-Lifecycle application service: PRESENT
-Lifecycle persistence authority: DESIGNED — IMPLEMENTATION NEXT
-Runtime verification: NOT PASS
-Operational verification: NOT PASS
-Production impact: NONE
-```
+module.exports = Object.freeze({
+  listMerchantReservations,
+  getMerchantReservationDetail,
+  findExpiredCandidates,
+});

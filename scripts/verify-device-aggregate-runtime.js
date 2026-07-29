@@ -55,13 +55,20 @@ assertContains(schema, 'model DeviceIntakeAudit {', 'Device intake audit model')
 assertContains(schema, '@@unique([branchId, barcode])', 'branch-scoped device barcode identity');
 assertContains(schema, 'deviceId', 'repair and claim device identity field');
 
-const packageJson = read('package.json');
-assertContains(packageJson, '"prestart": "npm run db:ensure-device-intake"', 'device foundation prestart authority');
-assertContains(packageJson, '"db:ensure-device-intake": "node scripts/ensure-device-intake-foundation.js"', 'device foundation command');
+const packageJson = JSON.parse(read('package.json'));
+const prestart = packageJson.scripts?.prestart || '';
+const ensureDeviceIntake = packageJson.scripts?.['db:ensure-device-intake'];
+
+assertContains(prestart, 'npm run db:ensure-device-intake', 'device foundation prestart authority');
+if (ensureDeviceIntake === 'node scripts/ensure-device-intake-foundation.js') {
+  pass('device foundation command');
+} else {
+  fail('device foundation command is missing');
+}
 
 const foundation = read('scripts/ensure-device-intake-foundation.js');
 assertContains(foundation, "require('dotenv').config();", 'device foundation environment loading');
-assertContains(foundation, "process.env.DATABASE_URL || process.env.DIRECT_URL", 'device foundation runtime database preference');
+assertContains(foundation, 'process.env.DATABASE_URL || process.env.DIRECT_URL', 'device foundation runtime database preference');
 assertContains(foundation, 'Device foundation connection authority', 'device foundation connection authority evidence');
 assertContains(foundation, "['localhost', '127.0.0.1', '::1']", 'device foundation local SSL policy');
 

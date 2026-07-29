@@ -46,12 +46,13 @@ test('overview query remains branch-safe and computes missing count', async () =
   assert.equal(result.body.session, session);
 });
 
-test('stock audit route authority moves to inventory audit module', () => {
-  const rootRoute = fs.readFileSync(path.resolve(__dirname, '../../../../routes/stockAuditRoutes.js'), 'utf8');
+test('stock audit route authority is owned and mounted by inventory audit module', () => {
+  const server = fs.readFileSync(path.resolve(__dirname, '../../../../server.js'), 'utf8');
   const moduleRoute = fs.readFileSync(path.resolve(__dirname, 'routes/stockAuditRoutes.js'), 'utf8');
 
-  assert.match(rootRoute, /modules\/inventory\/audit\/routes\/stockAuditRoutes/);
+  assert.match(server, /require\('\.\/src\/modules\/inventory\/audit\/routes\/stockAuditRoutes'\)/);
+  assert.match(server, /app\.use\('\/api\/stock-audit', stockAuditRoutes\)/);
   assert.match(moduleRoute, /query\/active\/getActiveAuditController/);
   assert.match(moduleRoute, /query\/overview\/getAuditOverviewController/);
-  assert.doesNotMatch(rootRoute, /controllers\/stockAuditController/);
+  assert.doesNotMatch(server, /controllers\/stockAuditController/);
 });
