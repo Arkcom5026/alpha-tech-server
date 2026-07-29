@@ -5,10 +5,12 @@ const {
   getCustomerByPhone,
   getCustomerByName,
   getCustomerByUserId,
-  createCustomer,
+} = require('../controllers/customerQueryController');
+const { createCustomer } = require('../controllers/customerCreateController');
+const {
   updateCustomerProfile,
   updateCustomerProfileOnline,
-} = require('../../../../controllers/customerController');
+} = require('../controllers/customerUpdateController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
