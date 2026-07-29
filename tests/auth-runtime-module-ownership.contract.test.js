@@ -5,17 +5,18 @@ describe('auth runtime module ownership', () => {
   const root = path.resolve(__dirname, '..');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const moduleRoutes = fs.readFileSync(
-    path.join(root, 'src/modules/auth/routes/authRuntimeRoutes.js'),
+    path.join(root, 'src/modules/auth/routes/authRoutes.js'),
     'utf8',
   );
 
-  test('server mounts /api/auth from the module-owned runtime route', () => {
-    expect(server).toContain("require('./src/modules/auth/routes/authRuntimeRoutes')");
+  test('server mounts /api/auth from the single canonical module route', () => {
+    expect(server).toContain("require('./src/modules/auth/routes/authRoutes')");
+    expect(server).not.toContain("require('./src/modules/auth/routes/authRuntimeRoutes')");
     expect(server).not.toContain("require('./routes/authRoutes')");
     expect(server).toContain("app.use('/api/auth', authRoutes)");
   });
 
-  test('module route preserves the existing auth endpoint surface', () => {
+  test('canonical module route preserves the current auth endpoint surface', () => {
     const expectedRoutes = [
       "router.post('/login'",
       "router.post('/register'",
@@ -34,7 +35,13 @@ describe('auth runtime module ownership', () => {
     }
   });
 
-  test('module route preserves auth middleware and refresh-cookie transport', () => {
+  test('canonical route retains tenant-login responsibility', () => {
+    expect(moduleRoutes).toContain("router.post('/:tenant_slug/auth/login'");
+    expect(moduleRoutes).toContain("require('../../../middlewares/tenantContext')");
+    expect(moduleRoutes).toContain("require('../controllers/authController')");
+  });
+
+  test('canonical module route preserves auth middleware and refresh-cookie transport', () => {
     expect(moduleRoutes).toContain("require('../../../../middlewares/verifyToken')");
     expect(moduleRoutes).toContain("require('../../../../middlewares/authTrace')");
     expect(moduleRoutes).toContain("path: '/api/auth'");
@@ -42,10 +49,16 @@ describe('auth runtime module ownership', () => {
     expect(moduleRoutes).toContain('httpOnly: true');
   });
 
-  test('module route remains a compatibility adapter over the current controllers', () => {
+  test('canonical route keeps the current controllers behind an explicit migration boundary', () => {
     expect(moduleRoutes).toContain("require('../../../../controllers/authController')");
     expect(moduleRoutes).toContain(
       "require('../../../../controllers/employeeOnboardingController')",
     );
+  });
+
+  test('duplicate module runtime route has been retired', () => {
+    expect(
+      fs.existsSync(path.join(root, 'src/modules/auth/routes/authRuntimeRoutes.js')),
+    ).toBe(false);
   });
 });
