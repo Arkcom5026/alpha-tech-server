@@ -6,6 +6,7 @@ const express = require('express');
 const legacyAuthController = require('../../../../controllers/authController');
 const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
 const loginController = require('../login/loginController');
+const registrationController = require('../registration/registrationController');
 const sessionController = require('../session/sessionController');
 const passwordController = require('../password/passwordController');
 const tenantAuthController = require('../controllers/authController');
@@ -70,13 +71,16 @@ const resolveLegacyHandler = (key) => {
   return null;
 };
 
-const register = ensureLegacyFn('register');
 const addSubEmployee = employeeOnboardingController.addSubEmployee;
 const findUserByEmail = resolveLegacyHandler('findUserByEmail');
 const getMe = ensureLegacyFn('getMe');
 
 if (typeof loginController.login !== 'function') {
   throw new Error('[authRoutes] loginController.login must be a function');
+}
+
+if (typeof registrationController.register !== 'function') {
+  throw new Error('[authRoutes] registrationController.register must be a function');
 }
 
 for (const handlerName of ['refreshSession', 'logoutSession', 'revokeSession']) {
@@ -103,7 +107,7 @@ if (typeof findUserByEmail !== 'function') {
 
 // Current canonical /api/auth contract.
 router.post('/login', loginController.login);
-router.post('/register', register);
+router.post('/register', registrationController.register);
 router.post('/refresh', traceRefreshRequest, sessionController.refreshSession);
 router.post('/logout', sessionController.logoutSession);
 router.post('/add-sub-employee', verifyToken, addSubEmployee);
