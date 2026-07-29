@@ -1,0 +1,61 @@
+// Partner Store Capability Prisma projection
+// Persistence authority is introduced by migration 20260729143000_partner_store_capability_foundation.
+
+model PartnerStoreCapability {
+  id                    Int                       @id @default(autoincrement())
+  branchId              Int                       @unique
+  storefrontEnabled     Boolean                   @default(false)
+  storefrontSlug        String?                   @unique
+  displayName           String?
+  contactPhone          String?
+  pickupEnabled         Boolean                   @default(true)
+  deliveryEnabled       Boolean                   @default(false)
+  deliveryFeeMode       OnlineDeliveryFeeMode?
+  fixedDeliveryFee      Decimal?                  @db.Decimal(12, 2)
+  serviceAreaMode       StoreServiceAreaMode      @default(PICKUP_ONLY)
+  maxDeliveryDistanceKm Decimal?                  @db.Decimal(8, 2)
+  preparationSlaMinutes Int?
+  pickupInstruction     String?
+  deliveryInstruction   String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  serviceAreas          PartnerStoreServiceArea[]
+
+  @@index([storefrontEnabled])
+  @@index([pickupEnabled, deliveryEnabled])
+}
+
+model PartnerStoreServiceArea {
+  id           Int                  @id @default(autoincrement())
+  capabilityId Int
+  areaType     StoreServiceAreaType
+  areaCode     String
+  areaName     String?
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  capability   PartnerStoreCapability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([capabilityId, areaType, areaCode])
+  @@index([areaType, areaCode, active])
+}
+
+enum OnlineDeliveryFeeMode {
+  FREE
+  FIXED
+  NEGOTIATED
+}
+
+enum StoreServiceAreaMode {
+  PICKUP_ONLY
+  ADMIN_AREAS
+  DISTANCE
+  NATIONWIDE
+}
+
+enum StoreServiceAreaType {
+  PROVINCE
+  DISTRICT
+  SUBDISTRICT
+  POSTAL_CODE
+}
