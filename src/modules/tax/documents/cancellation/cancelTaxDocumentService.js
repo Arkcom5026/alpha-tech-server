@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const documentRepository = require('../repository/taxDocumentRepository');
+const { assertPeriodAllowsCancel } = require('../../outputTax/period/guard/outputTaxPeriodGuard');
 
 const normalizeText = (value) => String(value || '').trim();
 
@@ -72,6 +73,11 @@ const cancelTaxDocument = async ({
         statusCode: 409,
       });
     }
+
+    await assertPeriodAllowsCancel({
+      branchId: normalizedBranchId,
+      occurredAt: current.occurredAt || current.issuedAt || normalizedCancelledAt,
+    }, tx);
 
     const cancelled = await documentRepository.updateStatus({
       branchId: normalizedBranchId,
