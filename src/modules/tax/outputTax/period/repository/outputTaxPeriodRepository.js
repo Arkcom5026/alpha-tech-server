@@ -215,17 +215,40 @@ const list = async ({ branchId, status = null, year = null, limit = 50, offset =
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
-  const rows = await tx.$queryRaw(Prisma.sql`
-    SELECT *
-    FROM "OutputTaxPeriod"
-    WHERE "branchId" = ${Number(branchId)}
-      AND (${status}::text IS NULL OR "status" = ${status})
-      AND (${year}::int IS NULL OR "year" = ${year == null ? null : Number(year)})
-    ORDER BY "year" DESC, "month" DESC, "id" DESC
-    LIMIT ${safeLimit} OFFSET ${safeOffset}
-  `);
+  const [rows, countRows] = await Promise.all([
+    tx.$queryRaw(Prisma.sql`
+      SELECT *
+      FROM "OutputTaxPeriod"
+      WHERE "branchId" = ${Number(branchId)}
+        AND (${status}::text IS NULL OR "status" = ${status})
+        AND (${year}::int IS NULL OR "year" = ${year == null ? null : Number(year)})
+      ORDER BY "year" DESC, "month" DESC, "id" DESC
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
+    `),
+    tx.$queryRaw(Prisma.sql`
+      SELECT COUNT(*)::int AS "total"
+      FROM "OutputTaxPeriod"
+      WHERE "branchId" = ${Number(branchId)}
+        AND (${status}::text IS NULL OR "status" = ${status})
+        AND (${year}::int IS NULL OR "year" = ${year == null ? null : Number(year)})
+    `),
+  ]);
 
-  return rows.map(mapPeriodRow);
+  const total = Number(countRows[0]?.total || 0);
+  return Object.freeze({
+    schemaVersion: 'OUTPUT_TAX_PERIOD_LIST_V1',
+    items: Object.freeze(rows.map(mapPeriodRow)),
+    page: Object.freeze({
+      limit: safeLimit,
+      offset: safeOffset,
+      total,
+      hasMore: safeOffset + rows.length < total,
+    }),
+    filters: Object.freeze({
+      status: status || null,
+      year: year == null ? null : Number(year),
+    }),
+  });
 };
 
 module.exports = Object.freeze({
