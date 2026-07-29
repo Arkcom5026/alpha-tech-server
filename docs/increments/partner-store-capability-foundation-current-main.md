@@ -8,7 +8,8 @@ Reconstruct the minimum Partner Store Capability foundation on top of current `m
 
 - Issue #71 — Commerce Platform Foundation
 - Issue #78 — Partner Store Capability Foundation — Current-main Reconstruction
-- PR #72 — dependent Public Storefront working area
+- PR #79 — current Working Area
+- PR #72 — dependent Public Storefront Working Area
 - PR #48 — historical contract and migration evidence only
 
 ## Increment Policy
@@ -29,26 +30,126 @@ Base SHA at bootstrap:
 c38aef64e208fa9e627649ab084c3e348762465a
 ```
 
-## Approved Scope
+Current implementation SHA:
 
-- Reconstruct only the minimum Partner Store Capability persistence/runtime authority required by PR #72.
-- Preserve evidence-supported semantics from PR #48 without merging, rebasing, or wholesale cherry-picking its history.
-- Use additive and non-destructive Prisma migration semantics.
-- Establish branch/store publication, pickup, delivery-fee, and service-area policy authority.
-- Add focused migration and contract verification.
-- Record exact source, base, implementation, and tested SHA evidence.
+```text
+4583fb22fba9412601c53f1b33457563ca946ad0
+```
 
-## Required Capability
+## Implemented Scope
 
-- Stable storefront slug
-- Customer-safe display name and contact details
-- Enabled/published state
-- Pickup enabled state
-- Delivery enabled state
-- Delivery fee mode and fixed fee where applicable
-- Service-area mode
-- Explicit service-area rows where applicable
-- Branch ownership and isolation
+### Persistence foundation
+
+- Additive Partner Store Capability migration
+- Delivery-fee and service-area enums
+- One capability row per branch
+- Explicit service-area rows
+- Foreign-key, uniqueness, consistency-check, and lookup-index authority
+- Existing branches remain unpublished by default
+
+### Internal runtime authority
+
+```text
+GET /api/partner-store/capability
+PUT /api/partner-store/capability
+
+verifyToken
+→ employee-context guard
+→ controller
+→ policy service
+→ repository
+→ Prisma
+```
+
+Runtime files:
+
+```text
+src/modules/partnerStore/controllers/partnerStoreCapabilityController.js
+src/modules/partnerStore/repositories/partnerStoreCapabilityRepository.js
+src/modules/partnerStore/routes/partnerStoreCapabilityRoutes.js
+src/modules/partnerStore/services/partnerStoreCapabilityService.js
+```
+
+Runtime mount:
+
+```text
+/api/partner-store
+```
+
+### Branch authority
+
+Branch scope is derived only from authenticated employee context:
+
+```text
+req.employee.branchId
+or
+req.user.branchId
+```
+
+The runtime does not accept `branchId` from URL parameters or request payloads.
+
+### Runtime policy authority
+
+- Enabled storefront requires a non-empty storefront slug.
+- Disabled delivery requires `PICKUP_ONLY`.
+- Enabled delivery requires a delivery fee mode and a non-pickup service-area mode.
+- `FIXED` delivery requires a positive fixed fee.
+- Fixed fee is rejected for non-`FIXED` modes.
+- `DISTANCE` service requires a positive maximum distance.
+- Maximum distance is rejected outside `DISTANCE` mode.
+- `ADMIN_AREAS` requires at least one service-area row.
+- Service-area rows are rejected outside `ADMIN_AREAS` mode.
+- Duplicate service-area identity is rejected by `areaType + areaCode`.
+- Capability upsert and service-area replacement execute in one transaction.
+
+### Repository verification wiring
+
+- `tests/partner-store-capability-foundation.contract.test.js`
+- `npm run test:partner-store-capability`
+
+## Current Changed Files
+
+```text
+docs/increments/partner-store-capability-foundation-current-main.md
+package.json
+prisma/migrations/20260729143000_partner_store_capability_foundation/migration.sql
+server.js
+src/modules/partnerStore/controllers/partnerStoreCapabilityController.js
+src/modules/partnerStore/repositories/partnerStoreCapabilityRepository.js
+src/modules/partnerStore/routes/partnerStoreCapabilityRoutes.js
+src/modules/partnerStore/services/partnerStoreCapabilityService.js
+tests/partner-store-capability-foundation.contract.test.js
+```
+
+## Local Prisma Projection Evidence
+
+Task Work previously completed targeted `prisma/schema.prisma` alignment locally at commit:
+
+```text
+948e74afadd34c9cfa2a8145e6bdcbfb39dfcfe2
+```
+
+Reported evidence:
+
+```text
+prisma validate: PASS
+prisma generate: PASS
+git diff --check: PASS
+```
+
+This local commit is not visible on the remote PR branch. Remote Prisma schema/migration alignment therefore remains pending repository evidence.
+
+## Testing Authority
+
+The project owner owns:
+
+- Test execution
+- Runtime verification
+- Representative migration application
+- Operational verification
+- Exact tested-SHA certification
+
+Repository implementation must not claim Runtime PASS, Operational PASS, or Production readiness without owner-supplied evidence.
 
 ## Explicit Non-goals
 
@@ -63,39 +164,47 @@ c38aef64e208fa9e627649ab084c3e348762465a
 - Sale conversion
 - Legacy OrderOnline replacement
 
+Public customer exposure remains owned by PR #72.
+
 ## Safety Constraints
 
-1. Start from current `main`.
-2. Do not merge, rebase, or import the diverged PR #48 branch wholesale.
-3. Apply targeted reconstruction only.
-4. Migration must be additive and non-destructive.
-5. Existing runtime and business behavior must remain unchanged.
-6. Do not introduce a competing Storefront or commerce transaction aggregate.
-7. Branch scope must be enforceable and testable.
-8. Public data exposure remains owned by PR #72.
+1. Do not merge, rebase, or import PR #48 wholesale.
+2. Apply targeted reconstruction only.
+3. Migration remains additive and non-destructive.
+4. Existing commerce transaction authority remains unchanged.
+5. Do not introduce a competing Storefront or reservation aggregate.
+6. Branch scope must remain enforceable through authenticated employee context.
+7. Public data exposure remains owned by PR #72.
+8. Do not deploy or apply production migrations without separate authorization.
 
-## Required Gates
+## Gate State
 
 ### Repository Gate
 
-- Targeted file scope
-- Accepted authority semantics documented
-- No unrelated PR #48 history imported
-- Prisma schema and migration aligned
-- Additive/non-destructive migration review
-- Contract and migration tests wired
-- `git diff --check`
+```text
+Targeted file scope: PASS
+Authority semantics documented: PASS
+Unrelated PR #48 history excluded: PASS
+Additive/non-destructive migration review: PASS
+Internal Route → Controller → Service → Repository flow: IMPLEMENTED
+Branch isolation design: IMPLEMENTED
+Focused contract wiring: PASS
+Remote Prisma schema/migration alignment: PENDING
+Owner-supplied test evidence: PENDING
+Repository Gate: PARTIAL
+```
 
-### Runtime Gate
+### Runtime Gate — Owner Authority
 
-- Dependency install succeeds in the local authority environment
-- Prisma validate and generate pass
-- Migration applies against a representative database
-- Focused foundation tests pass
-- Create/read/update policy behavior works
-- Branch isolation works
-- Enum and service-area behavior work
-- Exact tested SHA recorded
+```text
+Migration apply against representative database: PENDING
+Focused foundation tests: PENDING
+Create/read/update policy behavior: PENDING
+Branch isolation behavior: PENDING
+Enum and service-area behavior: PENDING
+Exact tested SHA: PENDING
+Runtime Gate: PENDING
+```
 
 ### Operational Enablement
 
@@ -108,13 +217,23 @@ GET /api/sales/storefronts/:slug
 → customer-safe public response
 ```
 
-## Bootstrap State
+## Current State
 
 ```text
 Repository working area: OPEN
-Implementation: NOT STARTED
-Repository Gate: PENDING
-Runtime Gate: PENDING
+Implementation: PERSISTENCE + INTERNAL RUNTIME AUTHORITY IMPLEMENTED
+Remote head SHA: 4583fb22fba9412601c53f1b33457563ca946ad0
+Remote Prisma projection: PENDING
+Repository Gate: PARTIAL
+Runtime Gate: PENDING — OWNER AUTHORITY
 Operational impact: NONE
 Production impact: NONE
 ```
+
+## Remaining Agenda
+
+1. Make the Prisma schema projection visible on the remote PR branch.
+2. Receive owner test and runtime evidence against an exact SHA.
+3. Refresh PR #72 against the completed Partner Store Capability authority.
+4. Keep PR #79 as Draft until evidence gates are satisfied.
+5. Do not merge or deploy without explicit authorization.
