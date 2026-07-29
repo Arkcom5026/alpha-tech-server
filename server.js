@@ -58,10 +58,10 @@ const cartRoutes = require('./src/modules/commerce/cart/routes/cartRoutes');
 const branchPriceRoutes = require('./src/modules/product/pricing/routes/branchPriceRoutes');
 const branchRoutes = require('./routes/branchRoutes');
 const customerDepositRoutes = require('./src/modules/finance/customer-deposit/routes/customerDepositRoutes');
-const purchaseReportRoutes = require('./routes/purchaseReportRoutes');
-const inputTaxReportRoutes = require('./routes/inputTaxReportRoutes');
+const purchaseReportRoutes = require('./src/modules/reporting/purchase/routes/purchaseReportRoutes');
+const inputTaxReportRoutes = require('./src/modules/reporting/tax/input/routes/inputTaxReportRoutes');
 const combinedBillingRoutes = require('./src/modules/finance/combined-billing/routes/combinedBillingRoutes');
-const salesReportRoutes = require('./routes/salesReportRoutes');
+const salesReportRoutes = require('./src/modules/reporting/sales/routes/salesReportRoutes');
 const uploadSlipRoutes = require('./src/modules/commerce/payment-slip/routes/uploadSlipRoutes');
 const stockAuditRoutes = require('./src/modules/inventory/audit/routes/stockAuditRoutes');
 const positionRoutes = require('./routes/positionRoutes');
@@ -83,15 +83,10 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
-  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
-
-  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-
-  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -109,13 +104,10 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
-
   const o = normalizeOrigin(origin);
   if (!o) return true;
-
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
-
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
@@ -123,11 +115,7 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-
-    if (!origin || isAllowedOrigin(origin)) {
-      return callback(null, true);
-    }
-
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -233,7 +221,6 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
-
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
   const statusCode =
     Number.isInteger(candidateStatusCode) &&
