@@ -69,8 +69,17 @@ expectIncludes(
     'findByIdForUpdate',
     'expectedVersion',
     'appendEvent',
+    'assertExpectedVersion',
+    'OUTPUT_TAX_PERIOD_CONFLICT',
+    'expectedVersion: normalizedVersion',
+    'currentVersion: current.version',
   ],
   'OutputTaxPeriod application service',
+);
+
+assert.ok(
+  (periodService.match(/assertExpectedVersion\(current, normalizedVersion\)/g) || []).length >= 3,
+  'OutputTaxPeriod request-close, close, and reopen commands must all enforce stale-version conflicts after row locking',
 );
 
 expectIncludes(
