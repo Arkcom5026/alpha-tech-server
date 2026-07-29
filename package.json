@@ -30,6 +30,7 @@
     "test:product-reservation-commitment": "node tests/product-reservation-commitment-foundation.contract.test.js && node tests/product-reservation-commitment-authority-review.contract.test.js",
     "test:store-scoped-customer-search": "node tests/store-scoped-customer-search-runtime.contract.test.js",
     "test:store-customer-create": "node tests/store-customer-create-runtime.contract.test.js",
+    "test:store-customer-update": "node tests/store-customer-update-runtime.contract.test.js",
     "test:certification": "npm run test:regression && npm run test:modules && npm run test:quick-receipt && npm run test:tax-intake && npm run test:public-storefront && npm run test:anonymous-shopping-session && npm run test:identity-at-commitment && npm run test:product-reservation-commitment && npm run verify:device-aggregate && npm run verify:tax-authority && npm run verify:repair-capability && npm run verify:product-mode-policy && npm run verify:product-stock-availability && npm run verify:product-runtime-mappers && npm run verify:product-runtime-input && npm run verify:product-inventory-authority && npm run verify:product-inventory-runtime && npm run verify:sale-simple-inventory-authority && npm run verify:simple-receive-authority && npm run verify:simple-adjustment-authority && npm run verify:simple-transfer-authority",
     "verify:product-create-compatibility": "node tests/product-create-compatibility.contract.test.js",
     "verify:product-vertical-slices": "node tests/product-vertical-slice-integration.contract.test.js",
