@@ -1,0 +1,222 @@
+// P1 Professional Access Foundation — additive Prisma fragment
+// This fragment is the repository authority for the models/enums to be merged into prisma/schema.prisma.
+// It intentionally preserves current Branch and EmployeeProfile compatibility paths.
+
+enum BusinessStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum BusinessMembershipRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum BusinessMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum ExternalOrganizationType {
+  ACCOUNTING_FIRM
+}
+
+enum ExternalOrganizationStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ExternalOrganizationMembershipRole {
+  OWNER
+  ADMIN
+  PROFESSIONAL
+  ASSISTANT
+  VIEWER
+}
+
+enum ExternalOrganizationMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum BusinessAccountingFirmAssignmentStatus {
+  PENDING_ACCEPTANCE
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+  DECLINED
+}
+
+enum DelegatedPermissionScopeStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum DelegatedPermissionBranchMode {
+  ALL_BUSINESS_BRANCHES
+  SELECTED_BRANCHES
+  NO_BRANCH_CONTEXT
+}
+
+model Business {
+  id                    Int                                @id @default(autoincrement())
+  name                  String
+  legalName             String?
+  taxId                 String?                            @db.VarChar(13)
+  status                BusinessStatus                     @default(ACTIVE)
+  createdAt             DateTime                           @default(now())
+  updatedAt             DateTime                           @updatedAt
+  branches              Branch[]
+  memberships           BusinessMembership[]
+  accountingAssignments BusinessAccountingFirmAssignment[]
+
+  @@index([status])
+  @@index([taxId])
+}
+
+model BusinessMembership {
+  id         Int                      @id @default(autoincrement())
+  businessId Int
+  userId     Int
+  role       BusinessMembershipRole
+  status     BusinessMembershipStatus @default(INVITED)
+  invitedAt  DateTime?                @default(now())
+  activatedAt DateTime?
+  suspendedAt DateTime?
+  revokedAt   DateTime?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  business   Business                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  user       User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, userId])
+  @@index([userId, status])
+  @@index([businessId, role, status])
+}
+
+model ExternalOrganization {
+  id          Int                        @id @default(autoincrement())
+  name        String
+  legalName   String?
+  taxId       String?                    @db.VarChar(13)
+  type        ExternalOrganizationType   @default(ACCOUNTING_FIRM)
+  status      ExternalOrganizationStatus @default(PENDING)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  memberships ExternalOrganizationMembership[]
+  assignments BusinessAccountingFirmAssignment[]
+
+  @@index([type, status])
+  @@index([taxId])
+}
+
+model ExternalOrganizationMembership {
+  id                     Int                                  @id @default(autoincrement())
+  externalOrganizationId Int
+  userId                 Int
+  role                   ExternalOrganizationMembershipRole
+  status                 ExternalOrganizationMembershipStatus @default(INVITED)
+  invitedAt              DateTime?                            @default(now())
+  activatedAt            DateTime?
+  suspendedAt            DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime                             @default(now())
+  updatedAt              DateTime                             @updatedAt
+  externalOrganization   ExternalOrganization                 @relation(fields: [externalOrganizationId], references: [id], onDelete: Restrict)
+  user                   User                                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([externalOrganizationId, userId])
+  @@index([userId, status])
+  @@index([externalOrganizationId, role, status])
+}
+
+model BusinessAccountingFirmAssignment {
+  id                     Int                                      @id @default(autoincrement())
+  businessId             Int
+  externalOrganizationId Int
+  status                 BusinessAccountingFirmAssignmentStatus   @default(PENDING_ACCEPTANCE)
+  requestedByUserId      Int
+  acceptedByUserId       Int?
+  revokedByUserId        Int?
+  effectiveFrom          DateTime?
+  effectiveUntil         DateTime?
+  acceptedAt             DateTime?
+  suspendedAt            DateTime?
+  revokedAt              DateTime?
+  declinedAt             DateTime?
+  expiredAt              DateTime?
+  createdAt              DateTime                                 @default(now())
+  updatedAt              DateTime                                 @updatedAt
+  business               Business                                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  externalOrganization   ExternalOrganization                     @relation(fields: [externalOrganizationId], references: [id], onDelete: Restrict)
+  requestedByUser        User                                     @relation("BusinessAccountingFirmAssignmentRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  acceptedByUser         User?                                    @relation("BusinessAccountingFirmAssignmentAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+  revokedByUser          User?                                    @relation("BusinessAccountingFirmAssignmentRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  permissionScopes       DelegatedPermissionScope[]
+
+  @@index([businessId, status])
+  @@index([externalOrganizationId, status])
+  @@index([effectiveFrom, effectiveUntil])
+}
+
+model DelegatedPermissionScope {
+  id              Int                              @id @default(autoincrement())
+  assignmentId    Int
+  status          DelegatedPermissionScopeStatus   @default(DRAFT)
+  resource        String
+  actions         String[]
+  branchMode      DelegatedPermissionBranchMode
+  branchIds       Int[]                            @default([])
+  constraints     Json?
+  effectiveFrom   DateTime?
+  effectiveUntil  DateTime?
+  grantedByUserId Int
+  revokedByUserId Int?
+  activatedAt     DateTime?
+  suspendedAt     DateTime?
+  revokedAt       DateTime?
+  expiredAt       DateTime?
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+  assignment      BusinessAccountingFirmAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  grantedByUser   User                             @relation("DelegatedPermissionScopeGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  revokedByUser   User?                            @relation("DelegatedPermissionScopeRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId, status])
+  @@index([resource, status])
+  @@index([effectiveFrom, effectiveUntil])
+}
+
+// Required additive relation fields for existing models when integrating this fragment:
+//
+// model User {
+//   businessMemberships                      BusinessMembership[]
+//   externalOrganizationMemberships          ExternalOrganizationMembership[]
+//   requestedBusinessAccountingAssignments   BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentRequestedBy")
+//   acceptedBusinessAccountingAssignments    BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentAcceptedBy")
+//   revokedBusinessAccountingAssignments     BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentRevokedBy")
+//   grantedDelegatedPermissionScopes          DelegatedPermissionScope[]          @relation("DelegatedPermissionScopeGrantedBy")
+//   revokedDelegatedPermissionScopes          DelegatedPermissionScope[]          @relation("DelegatedPermissionScopeRevokedBy")
+// }
+//
+// model Branch {
+//   businessId Int?
+//   business   Business? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+//   @@index([businessId])
+// }
+//
+// Compatibility invariant: EmployeeProfile.branchId remains unchanged in this increment.
