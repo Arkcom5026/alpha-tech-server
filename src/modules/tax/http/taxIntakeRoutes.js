@@ -7,6 +7,7 @@ const pendingInputTaxDocumentRoutes = require('../inputDocuments/pending/pending
 const inputTaxReceiptLinkRoutes = require('../inputDocuments/links/inputTaxReceiptLinkRoutes');
 const inputTaxOverviewRoutes = require('../inputDocuments/overview/inputTaxOverviewRoutes');
 const inputTaxFilingRoutes = require('../inputDocuments/filing/inputTaxFilingRoutes');
+const inputTaxDecisionRoutes = require('../inputDocuments/decisions/inputTaxDecisionRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -14,6 +15,7 @@ router.use(verifyToken);
 router.use('/input-documents/overview', inputTaxOverviewRoutes);
 router.use('/input-documents/pending', pendingInputTaxDocumentRoutes);
 router.use('/input-documents/filing', inputTaxFilingRoutes);
+router.use('/documents', inputTaxDecisionRoutes);
 router.use('/documents/:taxDocumentId/receipt-links', inputTaxReceiptLinkRoutes);
 
 router.post('/candidates/register', controller.registerCandidate);
