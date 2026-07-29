@@ -20,7 +20,15 @@ const requestPasswordReset = async ({ email, req }) => {
   const resetUrl = buildPasswordResetUrl(req, rawToken);
 
   await passwordRepository.replaceActiveResetToken({ userId: user.id, tokenHash, expiresAt });
-  await sendPasswordResetEmail({ toEmail: user.email, resetUrl });
+
+  try {
+    await sendPasswordResetEmail({ toEmail: user.email, resetUrl });
+  } catch (cause) {
+    const error = new Error('Password reset email delivery failed');
+    error.code = 'PASSWORD_RESET_MAIL_FAILED';
+    error.cause = cause;
+    throw error;
+  }
 
   return { message: GENERIC_SUCCESS_MESSAGE };
 };
