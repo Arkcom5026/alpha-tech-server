@@ -26,6 +26,16 @@ model User {
   orderOnline         OrderOnline[]
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  businessMemberships                    BusinessMembership[]
+  externalOrganizationMemberships        ExternalOrganizationMembership[]
+  requestedBusinessAccountingAssignments BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentRequestedBy")
+  acceptedBusinessAccountingAssignments  BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentAcceptedBy")
+  revokedBusinessAccountingAssignments   BusinessAccountingFirmAssignment[] @relation("BusinessAccountingFirmAssignmentRevokedBy")
+  grantedDelegatedPermissionScopes       DelegatedPermissionScope[]         @relation("DelegatedPermissionScopeGrantedBy")
+  revokedDelegatedPermissionScopes       DelegatedPermissionScope[]         @relation("DelegatedPermissionScopeRevokedBy")
+  openedTaxReviews                       TaxReviewSession[]                 @relation("TaxReviewOpenedBy")
+  resolvedTaxReviews                     TaxReviewSession[]                 @relation("TaxReviewResolvedBy")
+  authoredTaxReviewNotes                 TaxReviewNote[]                    @relation("TaxReviewNoteAuthor")
 }
 
 model EmployeeProfile {
@@ -103,6 +113,7 @@ model EmployeeProfile {
 
 model Branch {
   id                              Int                              @id @default(autoincrement())
+  businessId                      Int?
   name                            String
   address                         String
   createdAt                       DateTime                         @default(now())
@@ -163,9 +174,12 @@ model Branch {
   supplierAdvances                SupplierAdvance[]
   taxCandidates                   TaxCandidate[]
   taxDocuments                    TaxDocument[]
+  taxReviewSessions               TaxReviewSession[]
   v2StockAudits                   V2StockAudit[]
+  business                        Business?                        @relation(fields: [businessId], references: [id], onDelete: Restrict)
 
   @@index([subdistrictCode])
+  @@index([businessId])
 }
 
 model Category {
@@ -2999,4 +3013,247 @@ enum RepairDeliveryMethod {
   COURIER
   DELIVERY_BY_STORE
   OTHER
+}
+
+enum BusinessStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum BusinessMembershipRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum BusinessMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum ExternalOrganizationType {
+  ACCOUNTING_FIRM
+}
+
+enum ExternalOrganizationStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ExternalOrganizationMembershipRole {
+  OWNER
+  ADMIN
+  PROFESSIONAL
+  ASSISTANT
+  VIEWER
+}
+
+enum ExternalOrganizationMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum BusinessAccountingFirmAssignmentStatus {
+  PENDING_ACCEPTANCE
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+  DECLINED
+}
+
+enum DelegatedPermissionScopeStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum DelegatedPermissionBranchMode {
+  ALL_BUSINESS_BRANCHES
+  SELECTED_BRANCHES
+  NO_BRANCH_CONTEXT
+}
+
+enum TaxReviewSessionStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+}
+
+model Business {
+  id                    Int                                @id @default(autoincrement())
+  name                  String
+  legalName             String?
+  taxId                 String?                            @db.VarChar(13)
+  status                BusinessStatus                     @default(ACTIVE)
+  createdAt             DateTime                           @default(now())
+  updatedAt             DateTime                           @updatedAt
+  branches              Branch[]
+  memberships           BusinessMembership[]
+  accountingAssignments BusinessAccountingFirmAssignment[]
+  taxReviewSessions     TaxReviewSession[]
+
+  @@index([status])
+  @@index([taxId])
+}
+
+model BusinessMembership {
+  id          Int                      @id @default(autoincrement())
+  businessId  Int
+  userId      Int
+  role        BusinessMembershipRole
+  status      BusinessMembershipStatus @default(INVITED)
+  invitedAt   DateTime?                @default(now())
+  activatedAt DateTime?
+  suspendedAt DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  business    Business                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([businessId, userId])
+  @@index([userId, status])
+  @@index([businessId, role, status])
+}
+
+model ExternalOrganization {
+  id          Int                        @id @default(autoincrement())
+  name        String
+  legalName   String?
+  taxId       String?                    @db.VarChar(13)
+  type        ExternalOrganizationType   @default(ACCOUNTING_FIRM)
+  status      ExternalOrganizationStatus @default(PENDING)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  memberships ExternalOrganizationMembership[]
+  assignments BusinessAccountingFirmAssignment[]
+
+  @@index([type, status])
+  @@index([taxId])
+}
+
+model ExternalOrganizationMembership {
+  id                     Int                                  @id @default(autoincrement())
+  externalOrganizationId Int
+  userId                 Int
+  role                   ExternalOrganizationMembershipRole
+  status                 ExternalOrganizationMembershipStatus @default(INVITED)
+  invitedAt              DateTime?                            @default(now())
+  activatedAt            DateTime?
+  suspendedAt            DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime                             @default(now())
+  updatedAt              DateTime                             @updatedAt
+  externalOrganization   ExternalOrganization                 @relation(fields: [externalOrganizationId], references: [id], onDelete: Restrict)
+  user                   User                                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([externalOrganizationId, userId])
+  @@index([userId, status])
+  @@index([externalOrganizationId, role, status])
+}
+
+model BusinessAccountingFirmAssignment {
+  id                     Int                                    @id @default(autoincrement())
+  businessId             Int
+  externalOrganizationId Int
+  status                 BusinessAccountingFirmAssignmentStatus @default(PENDING_ACCEPTANCE)
+  requestedByUserId      Int
+  acceptedByUserId       Int?
+  revokedByUserId        Int?
+  effectiveFrom          DateTime?
+  effectiveUntil         DateTime?
+  acceptedAt             DateTime?
+  suspendedAt            DateTime?
+  revokedAt              DateTime?
+  declinedAt             DateTime?
+  expiredAt              DateTime?
+  createdAt              DateTime                               @default(now())
+  updatedAt              DateTime                               @updatedAt
+  business               Business                               @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  externalOrganization   ExternalOrganization                   @relation(fields: [externalOrganizationId], references: [id], onDelete: Restrict)
+  requestedByUser        User                                   @relation("BusinessAccountingFirmAssignmentRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  acceptedByUser         User?                                  @relation("BusinessAccountingFirmAssignmentAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+  revokedByUser          User?                                  @relation("BusinessAccountingFirmAssignmentRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  permissionScopes       DelegatedPermissionScope[]
+  taxReviewSessions      TaxReviewSession[]
+
+  @@index([businessId, status])
+  @@index([externalOrganizationId, status])
+  @@index([effectiveFrom, effectiveUntil])
+}
+
+model DelegatedPermissionScope {
+  id              Int                              @id @default(autoincrement())
+  assignmentId    Int
+  status          DelegatedPermissionScopeStatus   @default(DRAFT)
+  resource        String
+  actions         String[]
+  branchMode      DelegatedPermissionBranchMode
+  branchIds       Int[]                            @default([])
+  constraints     Json?
+  effectiveFrom   DateTime?
+  effectiveUntil  DateTime?
+  grantedByUserId Int
+  revokedByUserId Int?
+  activatedAt     DateTime?
+  suspendedAt     DateTime?
+  revokedAt       DateTime?
+  expiredAt       DateTime?
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+  assignment      BusinessAccountingFirmAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  grantedByUser   User                             @relation("DelegatedPermissionScopeGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  revokedByUser   User?                            @relation("DelegatedPermissionScopeRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId, status])
+  @@index([resource, status])
+  @@index([effectiveFrom, effectiveUntil])
+}
+
+model TaxReviewSession {
+  id               Int                    @id @default(autoincrement())
+  assignmentId     Int
+  businessId       Int
+  branchId         Int
+  taxPeriodCode    String                 @db.VarChar(7)
+  title            String
+  status           TaxReviewSessionStatus @default(OPEN)
+  openedByUserId   Int
+  resolvedByUserId Int?
+  resolvedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  assignment       BusinessAccountingFirmAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  business         Business               @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  branch           Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  openedByUser     User                   @relation("TaxReviewOpenedBy", fields: [openedByUserId], references: [id], onDelete: Restrict)
+  resolvedByUser   User?                  @relation("TaxReviewResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  notes            TaxReviewNote[]
+
+  @@index([assignmentId, status])
+  @@index([businessId, branchId, taxPeriodCode])
+}
+
+model TaxReviewNote {
+  id              Int              @id @default(autoincrement())
+  reviewSessionId Int
+  authorUserId    Int
+  message         String
+  createdAt       DateTime         @default(now())
+  reviewSession   TaxReviewSession @relation(fields: [reviewSessionId], references: [id], onDelete: Cascade)
+  authorUser      User             @relation("TaxReviewNoteAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([reviewSessionId, createdAt])
 }
