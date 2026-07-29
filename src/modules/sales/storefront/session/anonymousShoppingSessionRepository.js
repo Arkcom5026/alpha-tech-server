@@ -80,11 +80,11 @@ const upsertItem = async ({ branchId, token, productId, quantity }, db = prisma)
     JOIN "BranchPrice" bp ON bp."productId" = p."id" AND bp."branchId" = ${branchId}
     WHERE p."id" = ${productId}
       AND p."active" = TRUE
-      AND bp."active" = TRUE
+      AND bp."isActive" = TRUE
       AND bp."priceOnline" IS NOT NULL
       AND bp."priceOnline" > 0
-      AND (bp."effectiveAt" IS NULL OR bp."effectiveAt" <= CURRENT_TIMESTAMP)
-      AND (bp."expiresAt" IS NULL OR bp."expiresAt" > CURRENT_TIMESTAMP)
+      AND (bp."effectiveDate" IS NULL OR bp."effectiveDate" <= CURRENT_TIMESTAMP)
+      AND (bp."expiredDate" IS NULL OR bp."expiredDate" > CURRENT_TIMESTAMP)
     LIMIT 1
   `);
   if (!products[0]) {
