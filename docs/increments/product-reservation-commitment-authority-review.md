@@ -26,42 +26,107 @@ Public Discovery
 
 This increment owns **Server Revalidation and ProductReservation Commitment** only.
 
-## Review Scope
+## Repository Review Findings
 
-- storefront, branch, session, and identity-proof binding
-- proof expiry, replay, one-time use, and atomic consumption
-- current product publication, online-price, and stock revalidation
-- transaction and locking boundary
-- ProductReservation creation and lifecycle
-- price snapshot and reservation expiry
-- anonymous-session COMMITTED transition
-- idempotency and duplicate commitment behavior
+The existing commitment implementation already provided:
+
+- public commitment route with session, identity proof, and idempotency headers
+- storefront/branch resolution from published capability
+- transaction-scoped replay lookup
+- row locks for session, proof, items, and price authority
+- current stock availability check and durable reserved allocation
+- ProductReservation and item snapshot creation
+- stock reservation movement
+- atomic proof/challenge/session lifecycle transitions
+- 30-minute reservation expiry
 - separation from payment, Sale, fulfillment, Cart, and OrderOnline
-- migration, Prisma, and contract alignment
 
-## Architecture Constraints
+One material runtime defect and one contract defect were found:
 
-1. Client-supplied branch, price, stock, customer, or authority values are not trusted.
-2. ProductReservation is created only after server-side revalidation.
-3. Identity proof must be active, unexpired, session-bound, and consumed atomically.
-4. Anonymous shopping intent does not reserve stock before commitment.
-5. Commitment does not create payment, Sale, delivery, or fulfillment authority.
-6. Legacy Cart and OrderOnline remain unchanged.
+1. Product publication revalidation used stale `BranchPrice.active`, `effectiveAt`, and `expiresAt` columns.
+2. The foundation contract asserted those stale names, so it protected the defect instead of detecting it.
 
-## Verification Policy
+## Implemented Corrections
 
-Runtime and Operational verification are deferred under owner authority until the owner can test.
+Commitment publication revalidation now uses current authority fields:
 
-Deferred verification must remain explicit and must not be represented as PASS.
+```text
+Product.active
+BranchPrice.isActive
+BranchPrice.priceOnline > 0
+BranchPrice.effectiveDate
+BranchPrice.expiredDate
+```
 
-## Bootstrap State
+Focused contracts now verify:
+
+- stale BranchPrice fields are absent
+- replay remains bound to original session/proof hashes
+- proof, challenge, and anonymous session transitions are atomic
+- stock allocation and reservation movement are durable
+- money aggregation uses integer cents and two-decimal durable writes
+- payment, Sale, fulfillment, and legacy commerce authorities remain untouched
+
+## Focused Verification Command
+
+```text
+npm run test:product-reservation-commitment
+```
+
+This command runs:
+
+```text
+tests/product-reservation-commitment-foundation.contract.test.js
+tests/product-reservation-commitment-authority-review.contract.test.js
+```
+
+## Changed Files
+
+```text
+docs/increments/product-reservation-commitment-authority-review.md
+package.json
+src/modules/sales/storefront/commitment/productReservationCommitmentRepository.js
+tests/product-reservation-commitment-foundation.contract.test.js
+tests/product-reservation-commitment-authority-review.contract.test.js
+```
+
+## Repository Evidence
 
 ```text
 Base main SHA: bab3c7860fbd181237d23a368fef932085ed21ad
-Repository working area: CREATED
-Existing commitment implementation: PRESENT — UNVERIFIED
-Repository review: NOT STARTED
-Runtime verification: DEFERRED — OWNER AUTHORITY
-Operational verification: DEFERRED — OWNER AUTHORITY
-Production impact: NONE
+Repository implementation SHA: pending final evidence update
+Ahead of main: 6 commits after this documentation update
+Behind main: 0 commits
+Changed files: 5
+Unrelated files: NONE
 ```
+
+## Gate State
+
+### Repository Gate
+
+```text
+Current-main authority review: COMPLETE
+Targeted changed-file scope: PASS
+BranchPrice publication alignment: FIXED
+Storefront/session/proof binding: PASS BY CODE REVIEW
+Idempotency replay boundary: PASS BY CODE REVIEW
+Stock revalidation/allocation: PASS BY CODE REVIEW
+Atomic proof/challenge/session consumption: PASS BY CODE REVIEW
+Focused repository contracts: COMPLETE
+Repository Implementation: COMPLETE
+```
+
+### Runtime / Operational Gates — Deferred Owner Authority
+
+```text
+Focused contract execution: DEFERRED
+Representative commitment lifecycle: DEFERRED
+Concurrent replay/locking behavior: DEFERRED
+Stock allocation rollback behavior: DEFERRED
+Reservation expiry/release behavior: DEFERRED
+Exact tested SHA: PENDING
+Operational browser verification: DEFERRED
+```
+
+No Runtime PASS, Operational PASS, Production readiness, migration application, or deployment is claimed.
