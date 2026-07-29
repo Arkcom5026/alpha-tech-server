@@ -6,18 +6,14 @@ const forgotPassword = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     if (!email) return res.status(400).json({ message: 'กรุณากรอกอีเมล' });
 
-    try {
-      const result = await passwordService.requestPasswordReset({ email, req });
-      return res.json(result);
-    } catch (mailError) {
-      if (mailError?.message === 'Recipient email is required for password reset'
-        || mailError?.message === 'Password reset URL is required') {
-        console.error('❌ sendPasswordResetEmail error:', mailError);
-        return res.status(500).json({ message: 'ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้' });
-      }
-      throw mailError;
-    }
+    const result = await passwordService.requestPasswordReset({ email, req });
+    return res.json(result);
   } catch (error) {
+    if (error?.code === 'PASSWORD_RESET_MAIL_FAILED') {
+      console.error('❌ sendPasswordResetEmail error:', error.cause || error);
+      return res.status(500).json({ message: 'ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้' });
+    }
+
     console.error('❌ forgotPassword error:', error);
     return res.status(500).json({ message: 'ไม่สามารถดำเนินการลืมรหัสผ่านได้' });
   }
