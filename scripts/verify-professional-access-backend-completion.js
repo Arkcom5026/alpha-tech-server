@@ -32,7 +32,9 @@ for (const file of requiredFiles) {
   expect(fs.existsSync(path.join(root, file)), `Missing required Professional Access file: ${file}`);
 }
 
-const contract = read(requiredFiles[0]);
+const contractPath = path.join(root, requiredFiles[0]);
+const contractSource = read(requiredFiles[0]);
+const contract = require(contractPath);
 const authority = read(requiredFiles[1]);
 const workspaceRoutes = read(requiredFiles[2]);
 const workspaceService = read(requiredFiles[4]);
@@ -54,17 +56,69 @@ for (const token of [
   'PROFESSIONAL_ACCESS_BRANCH_MODES',
   'PROFESSIONAL_ACCESS_ENDPOINTS',
   'PROFESSIONAL_ACCESS_ERROR_CODES',
+  'ACCOUNTANT_WORKSPACE_ERROR_CODES',
+  'TAX_REVIEW_ERROR_CODES',
   'TAX_REVIEW_SESSION_STATUSES',
 ]) {
-  expect(contract.includes(token), `Public contract must export ${token}`);
+  expect(contractSource.includes(token), `Public contract must export ${token}`);
 }
+
+const authoritySuffixes = [
+  'USER_REQUIRED',
+  'ORGANIZATION_REQUIRED',
+  'BUSINESS_REQUIRED',
+  'MEMBERSHIP_REQUIRED',
+  'MEMBERSHIP_INACTIVE',
+  'ASSIGNMENT_REQUIRED',
+  'ASSIGNMENT_INACTIVE',
+  'ASSIGNMENT_NOT_STARTED',
+  'ASSIGNMENT_EXPIRED',
+  'PERMISSION_DENIED',
+  'BRANCH_INVALID',
+];
+
+for (const suffix of authoritySuffixes) {
+  expect(
+    contract.PROFESSIONAL_ACCESS_ERROR_CODES[suffix] === `PROFESSIONAL_ACCESS_${suffix}`,
+    `Shared Professional Access error registry mismatch: ${suffix}`,
+  );
+  expect(
+    contract.ACCOUNTANT_WORKSPACE_ERROR_CODES[suffix] === `ACCOUNTANT_WORKSPACE_${suffix}`,
+    `Accountant Workspace error registry mismatch: ${suffix}`,
+  );
+  expect(
+    contract.TAX_REVIEW_ERROR_CODES[suffix] === `TAX_REVIEW_${suffix}`,
+    `Tax Review error registry mismatch: ${suffix}`,
+  );
+}
+
+for (const [key, value] of Object.entries({
+  BRANCH_REQUIRED: 'TAX_REVIEW_BRANCH_REQUIRED',
+  PERIOD_INVALID: 'TAX_REVIEW_PERIOD_INVALID',
+  TITLE_REQUIRED: 'TAX_REVIEW_TITLE_REQUIRED',
+  ID_REQUIRED: 'TAX_REVIEW_ID_REQUIRED',
+  NOT_FOUND: 'TAX_REVIEW_NOT_FOUND',
+  NOTE_REQUIRED: 'TAX_REVIEW_NOTE_REQUIRED',
+  ALREADY_RESOLVED: 'TAX_REVIEW_ALREADY_RESOLVED',
+})) {
+  expect(contract.TAX_REVIEW_ERROR_CODES[key] === value, `Tax Review domain error registry mismatch: ${key}`);
+}
+
+expect(
+  workspaceService.includes("codePrefix: 'ACCOUNTANT_WORKSPACE'"),
+  'Workspace must use ACCOUNTANT_WORKSPACE error-code namespace',
+);
+expect(
+  taxReviewService.includes("codePrefix: 'TAX_REVIEW'"),
+  'Tax Review must use TAX_REVIEW error-code namespace',
+);
 
 for (const branchMode of [
   'ALL_BUSINESS_BRANCHES',
   'SELECTED_BRANCHES',
   'NO_BRANCH_CONTEXT',
 ]) {
-  expect(contract.includes(branchMode), `Missing public branch mode ${branchMode}`);
+  expect(contractSource.includes(branchMode), `Missing public branch mode ${branchMode}`);
   expect(authority.includes(branchMode), `Authority must enforce branch mode ${branchMode}`);
 }
 
