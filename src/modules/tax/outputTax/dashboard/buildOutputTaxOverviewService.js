@@ -10,6 +10,28 @@ const normalizePositiveInt = (value, code, fieldName) => {
   return parsed;
 };
 
+const normalizeYear = (value) => {
+  const year = normalizePositiveInt(value, 'OUTPUT_TAX_YEAR_REQUIRED', 'year');
+  if (year < 2000 || year > 2200) {
+    throw Object.assign(new Error('year must be between 2000 and 2200'), {
+      code: 'OUTPUT_TAX_YEAR_INVALID',
+      statusCode: 400,
+    });
+  }
+  return year;
+};
+
+const normalizeMonth = (value) => {
+  const month = normalizePositiveInt(value, 'OUTPUT_TAX_MONTH_REQUIRED', 'month');
+  if (month > 12) {
+    throw Object.assign(new Error('month must be between 1 and 12'), {
+      code: 'OUTPUT_TAX_MONTH_INVALID',
+      statusCode: 400,
+    });
+  }
+  return month;
+};
+
 const previousPeriod = (year, month) => (month === 1
   ? Object.freeze({ year: year - 1, month: 12 })
   : Object.freeze({ year, month: month - 1 }));
@@ -45,14 +67,8 @@ const buildSourceSummary = (documents) => Object.freeze(
 
 const buildOutputTaxOverview = async ({ branchId, year, month }) => {
   const normalizedBranchId = normalizePositiveInt(branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
-  const normalizedYear = normalizePositiveInt(year, 'OUTPUT_TAX_YEAR_REQUIRED', 'year');
-  const normalizedMonth = normalizePositiveInt(month, 'OUTPUT_TAX_MONTH_REQUIRED', 'month');
-  if (normalizedMonth > 12) {
-    throw Object.assign(new Error('month must be between 1 and 12'), {
-      code: 'OUTPUT_TAX_MONTH_INVALID',
-      statusCode: 400,
-    });
-  }
+  const normalizedYear = normalizeYear(year);
+  const normalizedMonth = normalizeMonth(month);
 
   const prior = previousPeriod(normalizedYear, normalizedMonth);
   const [current, previous] = await Promise.all([
@@ -66,11 +82,25 @@ const buildOutputTaxOverview = async ({ branchId, year, month }) => {
   const replacementDocumentCount = currentActiveDocuments.filter((document) => document.replacementOf).length;
 
   return Object.freeze({
-    schemaVersion: 'OUTPUT_TAX_OVERVIEW_V1',
+    schemaVersion: 'OUTPUT_TAX_OVERVIEW_V2',
+    compatibilitySchemaVersion: 'OUTPUT_TAX_OVERVIEW_V1',
     branchId: normalizedBranchId,
-    period: Object.freeze({ year: normalizedYear, month: normalizedMonth }),
+    period: Object.freeze({
+      year: normalizedYear,
+      month: normalizedMonth,
+      id: current.authority?.periodId || null,
+      status: current.authority?.status || null,
+      version: current.authority?.version || null,
+    }),
     previousPeriod: Object.freeze(prior),
     currency: current.currency,
+    authority: Object.freeze({
+      periodExists: Boolean(current.authority?.periodExists),
+      lockedForTaxWrites: Boolean(current.authority?.lockedForTaxWrites),
+      closeRequestedAt: current.authority?.closeRequestedAt || null,
+      closedAt: current.authority?.closedAt || null,
+      reopenedAt: current.authority?.reopenedAt || null,
+    }),
     headline: Object.freeze({
       documentCount: current.documentCount,
       activeDocumentCount: current.activeDocumentCount,
