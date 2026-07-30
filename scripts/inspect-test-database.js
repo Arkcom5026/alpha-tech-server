@@ -51,21 +51,23 @@ async function main() {
   try {
     await client.query('BEGIN READ ONLY');
 
-    const [identity, version, tableCount, migrations, partnerTables] = await Promise.all([
-      client.query('SELECT current_database() AS database_name, current_schema() AS schema_name'),
-      client.query('SHOW server_version'),
-      client.query("SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"),
-      queryMigrations(client),
-      client.query(
-        "SELECT " +
-        "to_regclass('public.\"PartnerStoreCapability\"') IS NOT NULL AS capability, " +
-        "to_regclass('public.\"PartnerStoreApplication\"') IS NOT NULL AS application"
-      ),
-    ]);
+    const readOnly = await client.query('SHOW transaction_read_only');
+    const identity = await client.query('SELECT current_database() AS database_name, current_schema() AS schema_name');
+    const version = await client.query('SHOW server_version');
+    const tableCount = await client.query(
+      "SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+    );
+    const migrations = await queryMigrations(client);
+    const partnerTables = await client.query(
+      "SELECT " +
+      "to_regclass('public.\\\"PartnerStoreCapability\\\"') IS NOT NULL AS capability, " +
+      "to_regclass('public.\\\"PartnerStoreApplication\\\"') IS NOT NULL AS application"
+    );
 
     console.log(JSON.stringify({
       result: 'PASS',
       authority: authority.target,
+      transactionReadOnly: readOnly.rows[0].transaction_read_only === 'on',
       postgresVersion: version.rows[0].server_version,
       schema: identity.rows[0].schema_name,
       tableCount: tableCount.rows[0].count,
