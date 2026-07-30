@@ -27,6 +27,8 @@
     "test:input-tax-overview": "node tests/input-tax-overview-v1.contract.test.js && node tests/input-tax-period-authority.integration.contract.test.js",
     "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",
     "test:partner-store-application": "node tests/partner-store-application-foundation.contract.test.js",
+    "test:partner-store-application-provisioning": "node tests/partner-store-application-provisioning.contract.test.js",
+    "verify:partner-store-application-runtime": "node scripts/verify-partner-store-application-runtime.js",
     "test:public-storefront": "node tests/public-storefront-product-discovery.contract.test.js",
     "test:anonymous-shopping-session": "node tests/anonymous-shopping-session-authority.contract.test.js",
     "test:identity-at-commitment": "node tests/identity-at-commitment-foundation.contract.test.js && node tests/identity-at-commitment-authority-review.contract.test.js",

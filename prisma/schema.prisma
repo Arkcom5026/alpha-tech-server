@@ -26,6 +26,7 @@ model User {
   orderOnline         OrderOnline[]
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedOwner")
 }
 
 model EmployeeProfile {
@@ -170,6 +171,7 @@ model Branch {
   taxCandidates                   TaxCandidate[]
   taxDocuments                    TaxDocument[]
   v2StockAudits                   V2StockAudit[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedBranch")
 
   @@index([subdistrictCode])
 }
