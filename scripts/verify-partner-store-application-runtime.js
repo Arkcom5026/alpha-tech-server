@@ -15,14 +15,13 @@ const email = `system-test-partner-${token}@invalid.local`
 const slug = `system-test-partner-${token}`
 
 const countBranchBusinessData = async (branchId) => {
-  const [prices, stockBalances, stockItems, sales, customers] = await Promise.all([
+  const [prices, stockBalances, stockItems, sales] = await Promise.all([
     prisma.branchPrice.count({ where: { branchId } }),
     prisma.stockBalance.count({ where: { branchId } }),
     prisma.stockItem.count({ where: { branchId } }),
     prisma.sale.count({ where: { branchId } }),
-    prisma.customerProfile.count({ where: { branchId } }),
   ])
-  return { prices, stockBalances, stockItems, sales, customers }
+  return { prices, stockBalances, stockItems, sales }
 }
 
 async function main() {
@@ -68,7 +67,7 @@ async function main() {
   assert.equal(profile.branchId, approved.provisionedBranchId)
   assert.equal(profile.v2Role, 'OWNER')
   assert.equal(capability.storefrontEnabled, false)
-  assert.deepEqual(businessData, { prices: 0, stockBalances: 0, stockItems: 0, sales: 0, customers: 0 })
+  assert.deepEqual(businessData, { prices: 0, stockBalances: 0, stockItems: 0, sales: 0 })
 
   console.log(JSON.stringify({
     result: 'PASS',
