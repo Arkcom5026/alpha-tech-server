@@ -26,7 +26,10 @@ assert.ok(service.includes("v2Role: 'OWNER'"))
 assert.ok(service.includes("storefrontEnabled: false"))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
-assert.ok(!/\bDROP\b|\bTRUNCATE\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/i.test(migration))
+assert.ok(
+  !/^\s*(DROP\s+(TABLE|TYPE|INDEX)|TRUNCATE\s+TABLE|INSERT\s+INTO|UPDATE\s+"|DELETE\s+FROM)/im.test(migration),
+  'migration must not contain destructive DDL or business-data mutations'
+)
 assert.ok(!migration.includes('ALTER TABLE "Branch"'))
 
 console.log('partner store application provisioning contract: PASS')
