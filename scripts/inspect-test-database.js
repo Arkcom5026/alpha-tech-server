@@ -60,8 +60,8 @@ async function main() {
     const migrations = await queryMigrations(client);
     const partnerTables = await client.query(
       "SELECT " +
-      "to_regclass('public.\\\"PartnerStoreCapability\\\"') IS NOT NULL AS capability, " +
-      "to_regclass('public.\\\"PartnerStoreApplication\\\"') IS NOT NULL AS application"
+      "to_regclass('public.\"PartnerStoreCapability\"') IS NOT NULL AS capability, " +
+      "to_regclass('public.\"PartnerStoreApplication\"') IS NOT NULL AS application"
     );
 
     console.log(JSON.stringify({
