@@ -1,0 +1,30 @@
+// Partner Store Application Foundation
+// A public application is intentionally not a Branch and grants no operating access.
+
+enum PartnerStoreApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+model PartnerStoreApplication {
+  id                       Int                           @id @default(autoincrement())
+  applicationCode          String                        @unique
+  businessName             String
+  contactName              String
+  contactPhone             String
+  contactEmail             String?
+  businessAddress          String?
+  requestedStorefrontSlug  String?
+  note                     String?
+  status                   PartnerStoreApplicationStatus @default(PENDING)
+  reviewNote               String?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([contactPhone, createdAt])
+  @@index([requestedStorefrontSlug])
+}

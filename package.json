@@ -26,6 +26,7 @@
     "test:tax-intake": "node tests/tax-intake-foundation.contract.test.js && node tests/tax-intake-http.contract.test.js && node tests/tax-lifecycle-sale-source.contract.test.js && node tests/tax-step-004-sales-publication.contract.test.js && node tests/tax-step-004-completion.contract.test.js && node tests/tax-quick-receipt-publication.contract.test.js && node prisma/migrations/20260728160000_unified_input_tax_document_mode/migration.test.js && node prisma/migrations/20260728170000_flexible_input_tax_receipt_links/migration.test.js && node tests/unified-input-tax-document-mode.contract.test.js && node tests/unified-pending-input-tax-projection.contract.test.js && node tests/flexible-input-tax-receipt-link.contract.test.js && node tests/input-tax-overview-v1.contract.test.js",
     "test:input-tax-overview": "node tests/input-tax-overview-v1.contract.test.js && node tests/input-tax-period-authority.integration.contract.test.js",
     "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",
+    "test:partner-store-application": "node tests/partner-store-application-foundation.contract.test.js",
     "test:public-storefront": "node tests/public-storefront-product-discovery.contract.test.js",
     "test:anonymous-shopping-session": "node tests/anonymous-shopping-session-authority.contract.test.js",
     "test:identity-at-commitment": "node tests/identity-at-commitment-foundation.contract.test.js && node tests/identity-at-commitment-authority-review.contract.test.js",
