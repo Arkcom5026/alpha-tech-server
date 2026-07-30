@@ -23,8 +23,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
-const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V7-R2-RETENTION';
+const JOB_VERSION = 'ALPHATECH-RECOVERY-JOB-RUNNER-V8-SAFE-DRILL';
 const ROOT_DIR = process.cwd();
 const RECOVERY_DIR = path.join(ROOT_DIR, 'recovery');
 const JOB_DIR = path.join(RECOVERY_DIR, 'jobs');
@@ -37,9 +38,12 @@ const UPLOAD_ENABLED = String(process.env.RECOVERY_UPLOAD_ENABLED || 'false').to
 const RETENTION_ENABLED = String(process.env.RECOVERY_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
 const RETENTION_APPLY = String(process.env.RECOVERY_RETENTION_APPLY || 'false').toLowerCase() === 'true';
 const STANDBY_RESTORE_ENABLED = String(process.env.RECOVERY_STANDBY_RESTORE_ENABLED || process.env.RECOVERY_RESTORE_ENABLED || 'false').toLowerCase() === 'true';
-const R2_RETENTION_ENABLED = String(process.env.RECOVERY_R2_RETENTION_ENABLED || process.env.RECOVERY_OFFSITE_RETENTION_ENABLED || process.env.RECOVERY_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
-const R2_RETENTION_APPLY = String(process.env.RECOVERY_R2_RETENTION_APPLY || process.env.RECOVERY_RETENTION_APPLY || 'false').toLowerCase() === 'true';
+const R2_RETENTION_ENABLED = String(process.env.RECOVERY_R2_RETENTION_ENABLED || process.env.RECOVERY_OFFSITE_RETENTION_ENABLED || 'false').toLowerCase() === 'true';
+const R2_RETENTION_APPLY = String(process.env.RECOVERY_R2_RETENTION_APPLY || 'false').toLowerCase() === 'true';
 const R2_RETENTION_DAYS = Number(process.env.RETENTION_R2_DAYS || process.env.RETENTION_OFFSITE_DAYS || 7);
+const RECOVERY_DRILL_APPROVAL = 'ALPHATECH_RECOVERY_DRILL';
+const LOCAL_RETENTION_APPLY_APPROVAL = 'ALPHATECH_LOCAL_RETENTION_APPLY';
+const R2_RETENTION_APPLY_APPROVAL = 'ALPHATECH_R2_RETENTION_APPLY';
 const R2_BUCKET = process.env.S3_BUCKET || process.env.R2_BUCKET;
 const R2_PREFIX = String(process.env.S3_PREFIX || process.env.R2_PREFIX || '').replace(/^\/+|\/+$/g, '');
 
@@ -57,7 +61,8 @@ function parseArgs(argv){
   const args={mode:'backup-workflow'};
   if(flags.includes('--backup-only')) args.mode='backup-only';
   if(flags.includes('--backup-workflow')||flags.includes('--backup-and-verify')) args.mode='backup-workflow';
-  if(flags.includes('--full-drill')) args.mode='full-drill';
+  if(flags.includes('--full-drill')) { args.mode='full-drill'; args.recoveryDrillRequested=true; }
+  if(flags.includes('--recovery-drill')) args.recoveryDrillRequested=true;
   if(flags.includes('--skip-health-check')) args.skipHealthCheck=true;
   if(flags.includes('--upload')) args.uploadEnabled=true;
   if(flags.includes('--no-upload')) args.uploadEnabled=false;
@@ -74,10 +79,19 @@ function parseArgs(argv){
 
 function uploadActive(args){ return args.uploadEnabled === true || (args.uploadEnabled !== false && UPLOAD_ENABLED); }
 function retentionActive(args){ return args.retentionEnabled === true || (args.retentionEnabled !== false && RETENTION_ENABLED); }
-function retentionApply(args){ return args.retentionApply === true || RETENTION_APPLY; }
-function standbyRestoreActive(args){ return args.standbyRestoreEnabled === true || (args.standbyRestoreEnabled !== false && STANDBY_RESTORE_ENABLED) || args.mode === 'full-drill'; }
+function retentionApplyRequested(args){ return args.retentionApply === true || RETENTION_APPLY; }
+function retentionApply(args){ return retentionApplyRequested(args) && process.env.RECOVERY_RETENTION_APPLY_APPROVAL === LOCAL_RETENTION_APPLY_APPROVAL; }
+function recoveryDrillRequested(args){ return args.recoveryDrillRequested === true || args.standbyRestoreEnabled === true || (args.standbyRestoreEnabled !== false && STANDBY_RESTORE_ENABLED); }
+function standbyRestoreActive(args){ return recoveryDrillRequested(args) && process.env.RECOVERY_DRILL_APPROVAL === RECOVERY_DRILL_APPROVAL; }
 function r2RetentionActive(args){ return args.r2RetentionEnabled === true || (args.r2RetentionEnabled !== false && R2_RETENTION_ENABLED); }
-function r2RetentionApply(args){ return args.r2RetentionApply === true || R2_RETENTION_APPLY; }
+function r2RetentionApplyRequested(args){ return args.r2RetentionApply === true || R2_RETENTION_APPLY; }
+function r2RetentionApply(args){ return r2RetentionApplyRequested(args) && process.env.RECOVERY_R2_RETENTION_APPLY_APPROVAL === R2_RETENTION_APPLY_APPROVAL; }
+function validateSafetyGates(args){
+  if(recoveryDrillRequested(args) && !standbyRestoreActive(args)) throw new Error(`RECOVERY_DRILL_APPROVAL must equal ${RECOVERY_DRILL_APPROVAL} before a standby restore.`);
+  if(retentionApplyRequested(args) && !retentionApply(args)) throw new Error(`RECOVERY_RETENTION_APPLY_APPROVAL must equal ${LOCAL_RETENTION_APPLY_APPROVAL} before local retention deletion.`);
+  if(r2RetentionApplyRequested(args) && !r2RetentionApply(args)) throw new Error(`RECOVERY_R2_RETENTION_APPLY_APPROVAL must equal ${R2_RETENTION_APPLY_APPROVAL} before R2 retention deletion.`);
+  if(!Number.isInteger(R2_RETENTION_DAYS) || R2_RETENTION_DAYS < 1) throw new Error('RETENTION_R2_DAYS must be a positive integer.');
+}
 
 function createLogger(jobId){
   ensureDir(LOG_DIR);
@@ -112,32 +126,34 @@ function skipStep(job,name,reason){ const s=job.workflow.steps[name]; s.status=S
 
 function acquireLock(jobId){
   ensureDir(JOB_DIR);
-  if(fs.existsSync(LOCK_FILE)) throw new Error('Recovery job lock already exists. Another job may be running.');
-  writeJson(LOCK_FILE,{jobId,createdAt:nowIso(),pid:process.pid});
+  let descriptor;
+  try { descriptor=fs.openSync(LOCK_FILE,'wx'); fs.writeFileSync(descriptor,JSON.stringify({jobId,createdAt:nowIso(),pid:process.pid},null,2),'utf8'); }
+  catch(error) { if(error.code==='EEXIST') { let holder='unknown'; try { holder=fs.readFileSync(LOCK_FILE,'utf8'); } catch(_) {} throw new Error(`Recovery job lock already exists. Inspect and remove it manually only after confirming no job is running. Holder: ${holder}`); } throw error; }
+  finally { if(descriptor!==undefined) fs.closeSync(descriptor); }
 }
 function releaseLock(){ try{ if(fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE); }catch(_){} }
-
+function redactLogText(value){ return String(value||'').replace(/(postgres(?:ql)?:\/\/[^:\s]+:)[^@\s]+@/gi,'$1***@').replace(/(S3_SECRET_ACCESS_KEY|R2_SECRET_ACCESS_KEY|DATABASE_URL|DIRECT_URL)\s*[=:]\s*[^\s]+/gi,'$1=[HIDDEN]'); }
 function runCommand(command,args,logger){
   return new Promise(resolve=>{
     logger.log(`▶️  Run: ${command} ${args.join(' ')}`);
-    const child=spawn(command,args,{cwd:ROOT_DIR,shell:true,stdio:['ignore','pipe','pipe']});
-    child.stdout.on('data',c=>{ for(const line of c.toString().split(/\r?\n/).filter(Boolean)) logger.log(`${command}: ${line}`); });
-    child.stderr.on('data',c=>{ for(const line of c.toString().split(/\r?\n/).filter(Boolean)) logger.log(`${command} stderr: ${line}`); });
-    child.on('error',e=>resolve({ok:false,exitCode:1,error:e.message||String(e)}));
+    const child=spawn(command,args,{cwd:ROOT_DIR,shell:false,stdio:['ignore','pipe','pipe']});
+    child.stdout.on('data',c=>{ for(const line of c.toString().split(/\r?\n/).filter(Boolean)) logger.log(`${command}: ${redactLogText(line)}`); });
+    child.stderr.on('data',c=>{ for(const line of c.toString().split(/\r?\n/).filter(Boolean)) logger.log(`${command} stderr: ${redactLogText(line)}`); });
+    child.on('error',e=>resolve({ok:false,exitCode:1,error:redactLogText(e.message||String(e))}));
     child.on('close',code=>resolve({ok:code===0,exitCode:code}));
   });
 }
 
-function findLatestManifest(){
+function sha256File(filePath){ const hash=crypto.createHash('sha256'); hash.update(fs.readFileSync(filePath)); return hash.digest('hex'); }
+function findLatestManifest({afterMs=0}={}){
   if(!fs.existsSync(BACKUPS_DIR)) return null;
-  return fs.readdirSync(BACKUPS_DIR).filter(f=>f.endsWith('.manifest.json')).map(f=>{
-    const p=path.join(BACKUPS_DIR,f); return {fileName:f,filePath:p,mtimeMs:fs.statSync(p).mtimeMs};
-  }).sort((a,b)=>b.mtimeMs-a.mtimeMs)[0]||null;
+  return fs.readdirSync(BACKUPS_DIR).filter(f=>f.endsWith('.manifest.json')).map(f=>{ const p=path.join(BACKUPS_DIR,f); return {fileName:f,filePath:p,mtimeMs:fs.statSync(p).mtimeMs}; }).filter(item=>item.mtimeMs>=afterMs).sort((a,b)=>b.mtimeMs-a.mtimeMs)[0]||null;
 }
 function getManifestDetails(p){
   if(!p||!fs.existsSync(p)) return null;
-  const m=readJson(p);
-  return {manifestPath:p,backupVersion:m.backupVersion||null,sqlFilePath:m.files?.sqlFilePath||null,sha256:m.files?.sha256||null,summary:m.summary||null,verification:m.verification||null};
+  const m=readJson(p); const sqlFilePath=m.files?.sqlFilePath||path.join(path.dirname(p),m.files?.sqlFileName||'');
+  const artifactOk=Boolean(sqlFilePath&&fs.existsSync(sqlFilePath)&&m.files?.sha256&&sha256File(sqlFilePath)===m.files.sha256);
+  return {manifestPath:p,createdAt:m.createdAt||null,backupVersion:m.backupVersion||null,sqlFilePath,sha256:m.files?.sha256||null,summary:m.summary||null,verification:m.verification||null,artifactVerification:{ok:artifactOk}};
 }
 
 async function stepHealthCheck(job,logger,args){
@@ -151,15 +167,14 @@ async function stepHealthCheck(job,logger,args){
   return finishStep(job,'HEALTH_CHECK',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details});
 }
 async function stepBackup(job,logger){
-  startStep(job,'BACKUP','node qb.js');
-  const result=await runCommand('node',['qb.js'],logger);
-  const latest=findLatestManifest();
-  return finishStep(job,'BACKUP',{ok:result.ok&&!!latest,exitCode:result.ok?(latest?0:11):result.exitCode,error:result.error||(!latest?'latest manifest not found after backup':null),details:{latestManifest:latest?.filePath||null,manifest:latest?getManifestDetails(latest.filePath):null}});
+  const startedMs=Date.now(); startStep(job,'BACKUP','node qb.js');
+  const result=await runCommand(process.execPath,['qb.js'],logger); const latest=findLatestManifest({afterMs:startedMs-5000}); const manifest=latest?getManifestDetails(latest.filePath):null;
+  const ok=result.ok&&!!latest&&manifest?.artifactVerification?.ok===true;
+  return finishStep(job,'BACKUP',{ok,exitCode:result.ok?(ok?0:11):result.exitCode,error:result.error||(!latest?'new manifest not found after backup':(!manifest?.artifactVerification?.ok?'new backup artifact checksum verification failed':null)),details:{backupStartedAt:new Date(startedMs).toISOString(),latestManifest:latest?.filePath||null,manifest}});
 }
 async function stepVerifyBackup(job){
-  startStep(job,'VERIFY_BACKUP','manifest.verification check');
-  const v=job.workflow.steps.BACKUP.details?.manifest?.verification||null;
-  return finishStep(job,'VERIFY_BACKUP',{ok:v?.ok===true,exitCode:v?.ok?0:22,error:v?.ok?null:'Backup manifest verification failed or missing',details:{verification:v}});
+  startStep(job,'VERIFY_BACKUP','manifest + artifact verification check'); const manifest=job.workflow.steps.BACKUP.details?.manifest||null; const v=manifest?.verification||null; const artifactOk=manifest?.artifactVerification?.ok===true; const ok=v?.ok===true&&artifactOk;
+  return finishStep(job,'VERIFY_BACKUP',{ok,exitCode:ok?0:22,error:ok?null:'Backup manifest verification or artifact checksum verification failed',details:{verification:v,artifactVerification:manifest?.artifactVerification||null}});
 }
 async function stepRestore(job,logger,args){
   if(!standbyRestoreActive(args)) return job.workflow.steps.RESTORE_RECOVERY;
@@ -173,16 +188,12 @@ async function stepRestore(job,logger,args){
 }
 async function stepVerifyRecovery(job,logger,args){
   if(!standbyRestoreActive(args)) return job.workflow.steps.VERIFY_RECOVERY;
-  startStep(job,'VERIFY_RECOVERY','node recovery/verify/qbv.js');
+  const manifestPath=job.workflow.steps.BACKUP.details?.latestManifest;
+  startStep(job,'VERIFY_RECOVERY','node recovery/verify/qbv.js --manifest <current-job-manifest>');
   const script=path.join(ROOT_DIR,'recovery','verify','qbv.js');
-  if(!fs.existsSync(script)) {
-    return finishStep(job,'VERIFY_RECOVERY',{
-      ok:true,
-      exitCode:0,
-      details:{reason:'recovery/verify/qbv.js not found; qbrs.js internal restore verification already passed'}
-    });
-  }
-  const result=await runCommand('node',['recovery/verify/qbv.js'],logger);
+  if(!fs.existsSync(script)) return finishStep(job,'VERIFY_RECOVERY',{ok:false,exitCode:41,error:'recovery/verify/qbv.js not found; recovery cannot be certified'});
+  if(!manifestPath) return finishStep(job,'VERIFY_RECOVERY',{ok:false,exitCode:42,error:'manifest missing'});
+  const result=await runCommand(process.execPath,['recovery/verify/qbv.js','--manifest',manifestPath],logger);
   const latest=path.join(ROOT_DIR,'recovery','reports','verification-report.latest.json');
   const details={latestReport:fs.existsSync(latest)?latest:null};
   return finishStep(job,'VERIFY_RECOVERY',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details});
@@ -225,6 +236,8 @@ async function stepR2Retention(job,logger,args){
   const mode = r2RetentionApply(args) ? 'APPLY' : 'DRY_RUN';
   startStep(job,'R2_RETENTION',`Cloudflare R2 retention ${mode}`);
 
+  if(!Number.isInteger(R2_RETENTION_DAYS) || R2_RETENTION_DAYS<1) return finishStep(job,'R2_RETENTION',{ok:false,exitCode:80,error:'RETENTION_R2_DAYS must be a positive integer'});
+  if(r2RetentionApply(args) && !R2_PREFIX) return finishStep(job,'R2_RETENTION',{ok:false,exitCode:80,error:'R2_PREFIX/S3_PREFIX is required before R2 retention deletion'});
   if(!R2_BUCKET) {
     return finishStep(job,'R2_RETENTION',{ok:false,exitCode:81,error:'S3_BUCKET/R2_BUCKET is missing'});
   }
@@ -316,7 +329,7 @@ async function stepR2Retention(job,logger,args){
     logger.log(`Scanned     : ${scanned.length}`);
     logger.log(`Candidates  : ${candidates.length}`);
     logger.log(`Deleted     : ${r2RetentionApply(args) ? deleted.length : 0}`);
-    logger.log(`Remaining   : ${scanned.length - candidates.length}`);
+    logger.log(`Remaining   : ${r2RetentionApply(args) ? scanned.length - deleted.length : scanned.length}`);
     logger.log(`Failed      : ${failed.length}`);
 
     return finishStep(job,'R2_RETENTION',{
@@ -330,7 +343,7 @@ async function stepR2Retention(job,logger,args){
         scannedFiles: scanned.length,
         deleteCandidates: candidates.length,
         deletedFiles: r2RetentionApply(args) ? deleted.length : 0,
-        remainingFiles: scanned.length - candidates.length,
+        remainingFiles: r2RetentionApply(args) ? scanned.length - deleted.length : scanned.length,
         failedFiles: failed,
         cutoffAt: new Date(cutoffMs).toISOString(),
       },
@@ -345,7 +358,7 @@ async function stepRetention(job,logger,args){
   if(!retentionActive(args)) return job.workflow.steps.RETENTION;
   const modeArg = retentionApply(args) ? '--apply' : '--dry-run';
   startStep(job,'RETENTION',`node recovery/retention/retentionPolicy.js ${modeArg}`);
-  const result=await runCommand('node',['recovery/retention/retentionPolicy.js',modeArg],logger);
+  const result=await runCommand(process.execPath,['recovery/retention/retentionPolicy.js',modeArg],logger);
   const latest=path.join(ROOT_DIR,'recovery','reports','retention-report.latest.json');
   const details={mode:modeArg,latestReport:fs.existsSync(latest)?latest:null};
   return finishStep(job,'RETENTION',{ok:result.ok,exitCode:result.exitCode,error:result.error||null,details});
@@ -393,6 +406,7 @@ async function main(){
   const job={jobVersion:JOB_VERSION,jobId,mode:args.mode,startedAt,finishedAt:null,durationMs:null,ok:false,exitCode:null,workflow:{status:'RUNNING',steps:initializeWorkflow(args.mode,args),overall:null}};
   let exitCode=0;
   try{
+    validateSafetyGates(args);
     acquireLock(jobId);
     logger.log('============================================================'); logger.log(`🧭 AlphaTech Recovery Retention Workflow ${JOB_VERSION}`); logger.log('============================================================'); logger.log(`Mode: ${args.mode}`);
     const health=await stepHealthCheck(job,logger,args); if(health.status===STEP_STATUS.FAIL){ exitCode=50; finalizeReport(job,args); return; }
