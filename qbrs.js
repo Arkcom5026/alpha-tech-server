@@ -22,6 +22,7 @@ const crypto = require('crypto');
 const readline = require('readline');
 const { spawn } = require('child_process');
 const { Client } = require('pg');
+const { assertTestDatabaseAuthority } = require('./recovery/testDatabaseAuthority');
 
 const DOTENV_RESTORE_PATH = path.join(process.cwd(), '.env.restore');
 const DOTENV_RECOVERY_PATH = path.join(process.cwd(), '.env.recovery');
@@ -407,7 +408,14 @@ async function main() {
   log(`✅ SQL file: ${sqlFilePath}`);
   log(`✅ SHA256 verified: ${actualSha256}`);
 
+  const authority = assertTestDatabaseAuthority({
+    targetUrl: RESTORE_DATABASE_URL,
+    requiresWriteApproval: !args.dryRun,
+    requiresResetApproval: args.resetSchema,
+  });
+
   const target = describeConnection(RESTORE_DATABASE_URL);
+  log(`🛡️ Test database authority confirmed: ${authority.target.projectRef}`);
   log(`🎯 Target DB: ${target.redacted}`);
   log(`🎯 Host: ${target.host}`);
   log(`🎯 Port: ${target.port}`);
