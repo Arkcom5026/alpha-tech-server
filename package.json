@@ -62,7 +62,9 @@
     "verify:sale-simple-inventory-authority": "node tests/sale-simple-inventory-authority.test.js",
     "verify:simple-receive-authority": "node tests/simple-receive-authority.test.js",
     "verify:simple-adjustment-authority": "node tests/simple-adjustment-authority.test.js",
-    "verify:simple-transfer-authority": "node tests/simple-transfer-authority.test.js"
+    "verify:simple-transfer-authority": "node tests/simple-transfer-authority.test.js",
+    "test:partner-store-application-http-e2e": "node tests/partner-store-application-http-e2e.contract.test.js",
+    "verify:partner-store-application-http-e2e:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-http-e2e.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
