@@ -81,6 +81,16 @@ const approveApplication = async (applicationId, ownerUserId, actorEmployeeId, r
         phone: application.contactPhone,
         slug,
         businessType: 'GENERAL',
+        category: {
+          connectOrCreate: {
+            where: { name: 'System Partner Store' },
+            create: {
+              name: 'System Partner Store',
+              active: true,
+              isSystem: true,
+            },
+          },
+        },
       },
     })
 

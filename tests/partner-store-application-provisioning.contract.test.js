@@ -25,6 +25,8 @@ for (const token of ['provisionedBranchId', 'provisionedOwnerUserId', 'decidedAt
 }
 assert.ok(service.includes("v2Role: 'OWNER'"))
 assert.ok(service.includes("storefrontEnabled: false"))
+assert.ok(service.includes("connectOrCreate"))
+assert.ok(service.includes("System Partner Store"))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
 assert.ok(
@@ -36,5 +38,6 @@ assert.ok(runtimeVerifier.includes("ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true'"
 assert.ok(runtimeVerifier.includes('system-test-partner-'))
 assert.ok(runtimeVerifier.includes('retainedTestData: true'))
 assert.ok(runtimeVerifier.includes('businessData'))
+assert.ok(!runtimeVerifier.includes('customerProfile.count'))
 
 console.log('partner store application provisioning contract: PASS')
