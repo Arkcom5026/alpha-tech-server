@@ -18,6 +18,7 @@
     "test": "npm run test:certification",
     "test:regression": "node tests/customer-receipt-auth-regression.test.js",
     "test:branch-test-tenant": "node tests/branch-test-tenant-provisioning.contract.test.js",
+    "test:branch-route-security": "node tests/branch-route-security.contract.test.js",
     "test:auth-receipt": "node tests/customer-receipt-auth-regression.test.js",
     "test:inventory": "node scripts/run-module-tests.js --list",
     "test:modules": "node scripts/run-module-tests.js",
