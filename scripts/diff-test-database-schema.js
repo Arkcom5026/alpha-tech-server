@@ -20,10 +20,10 @@ const reportPath = path.join(reportDir, 'test-database-schema-diff.latest.sql');
 
 fs.mkdirSync(reportDir, { recursive: true });
 
-const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const prismaCli = require.resolve('prisma/build/index.js');
 const result = spawnSync(
-  command,
-  ['prisma', 'migrate', 'diff', '--from-schema-datasource', 'prisma', '--to-schema-datamodel', 'prisma', '--script'],
+  process.execPath,
+  [prismaCli, 'migrate', 'diff', '--from-schema-datasource', 'prisma', '--to-schema-datamodel', 'prisma', '--script'],
   {
     cwd: process.cwd(),
     env: {
