@@ -32,6 +32,7 @@ assert.ok(restore.includes('ON_ERROR_STOP=1'));
 
 const schemaCapture = read('recovery/captureSchemaSnapshot.js');
 assert.ok(schemaCapture.includes('--schema-only'));
+assert.ok(schemaCapture.includes('--schema=public'));
 assert.ok(schemaCapture.includes('databaseModified: false'));
 assert.ok(schemaCapture.includes('PG_DUMP_PATH'));
 
