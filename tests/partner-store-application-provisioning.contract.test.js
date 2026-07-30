@@ -10,6 +10,7 @@ const service = read('src/modules/partnerStore/application/partnerStoreApplicati
 const server = read('server.js')
 const schema = read('prisma/partner-store-application.prisma')
 const migration = read('prisma/migrations/20260730043000_partner_store_application_provisioning/migration.sql')
+const runtimeVerifier = read('scripts/verify-partner-store-application-runtime.js')
 
 assert.ok(routes.includes("publicRouter.post('/', controller.submit)"))
 assert.ok(routes.includes('adminRouter.use(verifyToken, requireAdmin.superadmin)'))
@@ -31,5 +32,9 @@ assert.ok(
   'migration must not contain destructive DDL or business-data mutations'
 )
 assert.ok(!migration.includes('ALTER TABLE "Branch"'))
+assert.ok(runtimeVerifier.includes("ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true'"))
+assert.ok(runtimeVerifier.includes('system-test-partner-'))
+assert.ok(runtimeVerifier.includes('retainedTestData: true'))
+assert.ok(runtimeVerifier.includes('businessData'))
 
 console.log('partner store application provisioning contract: PASS')
