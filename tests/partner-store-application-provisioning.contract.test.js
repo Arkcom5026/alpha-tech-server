@@ -25,6 +25,8 @@ for (const token of ['provisionedBranchId', 'provisionedOwnerUserId', 'decidedAt
 }
 assert.ok(service.includes("v2Role: 'OWNER'"))
 assert.ok(service.includes("storefrontEnabled: false"))
+assert.ok(service.includes("connectOrCreate"))
+assert.ok(service.includes("System Partner Store"))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
 assert.ok(
