@@ -84,7 +84,7 @@ function uploadLocalMirror({ manifestPath, sqlPath, manifest }) {
   report.uploadManifestPath = uploadManifestPath;
   return report;
 }
-async function uploadS3Object({ client, PutObjectCommand, bucket, key, filePath, contentType }) {
+async function uploadS3Object({ client, PutObjectCommand, HeadObjectCommand, bucket, key, filePath, contentType }) {
   const sha256 = sha256File(filePath);
   const stat = fs.statSync(filePath);
   await client.send(new PutObjectCommand({
@@ -94,7 +94,11 @@ async function uploadS3Object({ client, PutObjectCommand, bucket, key, filePath,
     ContentType: contentType,
     Metadata: { sha256, alphatech: 'recovery-backup' },
   }));
-  return { key, sourcePath: filePath, sizeBytes: stat.size, sha256, verified: true };
+  const remote = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+  const remoteSha256 = remote.Metadata && remote.Metadata.sha256;
+  const remoteSizeBytes = Number(remote.ContentLength);
+  const verified = remoteSizeBytes === stat.size && remoteSha256 === sha256;
+  return { key, sourcePath: filePath, sizeBytes: stat.size, sha256, remoteSizeBytes, remoteSha256, verified };
 }
 async function uploadS3Compatible({ manifestPath, sqlPath, manifest }) {
   let sdk;
@@ -113,7 +117,7 @@ async function uploadS3Compatible({ manifestPath, sqlPath, manifest }) {
   if (!accessKeyId) throw new Error('Missing S3_ACCESS_KEY_ID / R2_ACCESS_KEY_ID');
   if (!secretAccessKey) throw new Error('Missing S3_SECRET_ACCESS_KEY / R2_SECRET_ACCESS_KEY');
 
-  const { S3Client, PutObjectCommand } = sdk;
+  const { S3Client, PutObjectCommand, HeadObjectCommand } = sdk;
   const client = new S3Client({ region, endpoint, credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true });
 
   const uploadedAt = new Date();
@@ -121,8 +125,8 @@ async function uploadS3Compatible({ manifestPath, sqlPath, manifest }) {
   const backupVersion = manifest.backupVersion || 'unknown-version';
   const baseKey = [prefix, datePart, backupVersion].filter(Boolean).join('/');
 
-  const sqlUpload = await uploadS3Object({ client, PutObjectCommand, bucket, key: baseKey + '/' + path.basename(sqlPath), filePath: sqlPath, contentType: 'application/sql' });
-  const manifestUpload = await uploadS3Object({ client, PutObjectCommand, bucket, key: baseKey + '/' + path.basename(manifestPath), filePath: manifestPath, contentType: 'application/json' });
+  const sqlUpload = await uploadS3Object({ client, PutObjectCommand, HeadObjectCommand, bucket, key: baseKey + '/' + path.basename(sqlPath), filePath: sqlPath, contentType: 'application/sql' });
+  const manifestUpload = await uploadS3Object({ client, PutObjectCommand, HeadObjectCommand, bucket, key: baseKey + '/' + path.basename(manifestPath), filePath: manifestPath, contentType: 'application/json' });
 
   return {
     uploadVersion: VERSION, provider: PROVIDER, uploadedAt: uploadedAt.toISOString(),
