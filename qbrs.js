@@ -326,9 +326,7 @@ async function resetTargetSchema(client) {
   log('🛡️ This action is intended for Recovery / Standby DB only.');
 
   await client.query(`DROP SCHEMA IF EXISTS ${quoteIdent(SCHEMA_NAME)} CASCADE;`);
-  await client.query(`CREATE SCHEMA ${quoteIdent(SCHEMA_NAME)};`);
-
-  log(`✅ Schema "${SCHEMA_NAME}" reset completed.`);
+  log(`✅ Schema "${SCHEMA_NAME}" dropped; the schema snapshot will recreate it.`);
 }
 
 async function runNodePgRestore({ connectionString, sqlFilePath }) {
