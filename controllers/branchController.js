@@ -20,6 +20,7 @@ function normalizeBranchBody(body = {}) {
     businessType: getStr(body.businessType).toUpperCase() || undefined,
     features: (body.features && typeof body.features === 'object') ? body.features : undefined,
     RBACEnabled: (typeof body.RBACEnabled === 'boolean') ? body.RBACEnabled : undefined,
+    testMode: body.testMode === true,
   };
   return out;
 }
@@ -145,11 +146,16 @@ const getBranchById = async (req, res) => {
 // POST /branches
 const createBranch = async (req, res) => {
   const BASE_BRANCH_ID = 2;
+  const TEST_BRANCH_SLUG_PREFIX = 'system-test-';
   try {
     const n = normalizeBranchBody(req.body || {});
+    const isTestBranch = n.testMode === true;
 
     if (!n.name) return res.status(400).json({ error: 'กรุณากรอกชื่อสาขา' });
     if (!n.address) return res.status(400).json({ error: 'กรุณากรอกที่อยู่สาขา' });
+    if (isTestBranch && !n.slug?.startsWith(TEST_BRANCH_SLUG_PREFIX)) {
+      return res.status(400).json({ error: 'ร้านทดสอบต้องใช้ slug ที่ขึ้นต้นด้วย system-test-' });
+    }
 
     if (n.businessType && !n.features) {
       const preset = presets[n.businessType];
@@ -168,6 +174,10 @@ const createBranch = async (req, res) => {
     });
 
     const created = await prisma.branch.create({ data });
+
+    if (isTestBranch) {
+      return res.status(201).json({ ...created, clonedPrices: 0, testMode: true });
+    }
 
     try {
       const basePrices = await prisma.branchPrice.findMany({ where: { branchId: BASE_BRANCH_ID } });
