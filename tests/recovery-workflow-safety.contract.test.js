@@ -18,7 +18,7 @@ assert.match(runner, /RECOVERY_RETENTION_APPLY_APPROVAL/);
 assert.match(runner, /RECOVERY_R2_RETENTION_APPLY_APPROVAL/);
 assert.match(runner, /openSync(LOCK_FILE,s*'wx')/);
 assert.match(runner, /shell:s*false/);
-assert.match(runner, /recovery\\/verify\\/qbv\\.js not found; recovery cannot be certified/);
+assert.match(runner, /recovery\/verify\/qbv\.js not found; recovery cannot be certified/);
 assert.match(runner, /R2_PREFIX/S3_PREFIX is required/);
 
 assert.match(restore, /assertTestDatabaseAuthority/);
