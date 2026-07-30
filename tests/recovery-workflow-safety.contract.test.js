@@ -25,7 +25,8 @@ assert.ok(restore.includes('assertTestDatabaseAuthority'));
 assert.ok(restore.includes('SCHEMA_PROVISIONING_APPROVAL'));
 assert.ok(restore.includes('RECOVERY_SCHEMA_PROVISIONING_APPROVAL'));
 assert.ok(restore.includes('shell: false'));
-assert.ok(restore.includes('npx.cmd'));
+assert.ok(restore.includes("node_modules', 'prisma', 'build', 'index.js"));
+assert.ok(restore.includes("runCommand(process.execPath, [prismaCliPath, 'db', 'push']"));
 
 assert.ok(verifier.includes('assertTestDatabaseAuthority'));
 assert.ok(verifier.includes('BEGIN READ ONLY'));

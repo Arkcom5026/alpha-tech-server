@@ -310,8 +310,12 @@ async function runPrismaDbPushForRecovery() {
   log('🧱 Running Prisma db push against Recovery DB only...');
   log('🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.');
 
-  const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  await runCommand(npxCommand, ['prisma', 'db', 'push'], {
+  const prismaCliPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
+  if (!fs.existsSync(prismaCliPath)) {
+    fail('Prisma CLI is not installed. Run npm ci before restoring the Test DB.');
+  }
+
+  await runCommand(process.execPath, [prismaCliPath, 'db', 'push'], {
     cwd: process.cwd(),
     env: recoveryEnv,
   });
