@@ -132,6 +132,12 @@ async function main() {
     assert.equal(submitted.body.success, true)
     assert.ok(submitted.body.data?.id)
 
+    const anonymousApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ ownerUserId: owner.id }),
+    })
+    assert.equal(anonymousApproval.status, 401)
+
     const adminToken = jwt.sign({ id: adminUser.id }, jwtSecret, { expiresIn: '5m' })
     const approved = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
       method: 'POST',
@@ -146,6 +152,14 @@ async function main() {
     assert.equal(approved.body.success, true)
     assert.equal(approved.body.data?.status, 'APPROVED')
     assert.ok(approved.body.data?.provisionedBranchId)
+
+    const repeatedApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ ownerUserId: owner.id }),
+    })
+    assert.equal(repeatedApproval.status, 409)
+    assert.equal(repeatedApproval.body.code, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE')
 
     const [application, profile, capability] = await Promise.all([
       prisma.partnerStoreApplication.findUnique({ where: { id: submitted.body.data.id } }),
@@ -169,6 +183,7 @@ async function main() {
         'POST /api/public/partner-store-applications',
         'POST /api/partner-store/applications/:id/approve',
       ],
+      accessControl: { anonymousApproval: 401, repeatedApproval: 409 },
     }))
   } finally {
     await stopServer(child)
