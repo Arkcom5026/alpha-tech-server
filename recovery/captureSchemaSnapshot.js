@@ -26,7 +26,9 @@ async function main() {
   fs.mkdirSync(outputDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const schemaPath = path.join(outputDir, `alphatech_schema_snapshot_${stamp}.sql`);
-  const child = spawn(pgDumpPath, ['--schema-only', '--no-owner', '--no-privileges', '--quote-all-identifiers', '--file', schemaPath], { cwd: process.cwd(), env: connectionEnvironment(sourceUrl), shell: false, stdio: ['ignore', 'ignore', 'pipe'] });
+  // The data backup exports only the application-owned public schema.  Do not
+  // include Supabase-managed schemas such as auth, storage, or vault.
+  const child = spawn(pgDumpPath, ['--schema-only', '--schema=public', '--no-owner', '--no-privileges', '--quote-all-identifiers', '--file', schemaPath], { cwd: process.cwd(), env: connectionEnvironment(sourceUrl), shell: false, stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
   await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr.trim() || `pg_dump exited with code ${code}`))); });
