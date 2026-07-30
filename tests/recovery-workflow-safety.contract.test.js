@@ -29,6 +29,7 @@ assert.ok(restore.includes('--schema-snapshot'));
 assert.ok(restore.includes('runSchemaSnapshotRestore'));
 assert.ok(restore.includes('Refusing to use Prisma db push for Recovery restore'));
 assert.ok(restore.includes('ON_ERROR_STOP=1'));
+assert.ok(restore.includes('schema snapshot will recreate it'));
 
 const schemaCapture = read('recovery/captureSchemaSnapshot.js');
 assert.ok(schemaCapture.includes('--schema-only'));
