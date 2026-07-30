@@ -21,6 +21,11 @@ model PartnerStoreApplication {
   note                     String?
   status                   PartnerStoreApplicationStatus @default(PENDING)
   reviewNote               String?
+  provisionedBranchId      Int?                          @unique
+  provisionedOwnerUserId   Int?                          @unique
+  decidedAt                DateTime?
+  provisionedBranch        Branch?                       @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
+  provisionedOwnerUser     User?                         @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
   createdAt                DateTime                      @default(now())
   updatedAt                DateTime                      @updatedAt
 
