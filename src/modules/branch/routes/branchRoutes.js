@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 
+const verifyToken = require('../../../../middlewares/verifyToken');
+const requireAdmin = require('../../../../middlewares/requireAdmin');
+
 const {
   getAllBranches,
   getBranchById,
@@ -12,8 +15,10 @@ const {
 
 router.get('/', getAllBranches);
 router.get('/:id', getBranchById);
-router.post('/', createBranch);
-router.put('/:id', updateBranch);
-router.delete('/:id', deleteBranch);
+// Branch creation and changes affect tenant boundaries. Keep reads backward-compatible,
+ // while requiring an authenticated administrator for every mutation.
+router.post('/', verifyToken, requireAdmin, createBranch);
+router.put('/:id', verifyToken, requireAdmin, updateBranch);
+router.delete('/:id', verifyToken, requireAdmin, deleteBranch);
 
 module.exports = router;
