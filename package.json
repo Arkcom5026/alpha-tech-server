@@ -48,6 +48,8 @@
     "verify:repair-capability": "node scripts/verify-repair-capability-runtime.js",
     "purge:category": "node scripts/purge-category-hierarchy.js",
     "backup": "node recovery/jobRunner.js --mode backup-workflow",
+    "verify:test-database-authority": "node scripts/verify-test-database-authority.js",
+    "test:test-database-authority": "node tests/test-database-authority.contract.test.js",
     "verify:product-mode-policy": "node tests/product-mode-policy.test.js",
     "verify:product-stock-availability": "node tests/product-stock-availability.test.js",
     "verify:product-runtime-mappers": "node tests/product-runtime-mappers.test.js",
