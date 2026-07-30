@@ -6,11 +6,14 @@ const { spawn } = require('child_process');
 const dotenv = require('dotenv');
 const { assertTestDatabaseAuthority } = require('../recovery/testDatabaseAuthority');
 
-const ALLOWED_SCRIPT = 'scripts/verify-partner-store-application-runtime.js';
+const ALLOWED_SCRIPTS = new Set([
+  'scripts/verify-partner-store-application-runtime.js',
+  'scripts/verify-partner-store-application-http-e2e.js',
+]);
 const requestedScript = process.argv[2];
 
-if (process.argv.length !== 3 || requestedScript !== ALLOWED_SCRIPT) {
-  throw new Error(`Only ${ALLOWED_SCRIPT} may run through this Test DB runtime wrapper.`);
+if (process.argv.length !== 3 || !ALLOWED_SCRIPTS.has(requestedScript)) {
+  throw new Error(`Only these scripts may run through this Test DB runtime wrapper: ${[...ALLOWED_SCRIPTS].join(', ')}.`);
 }
 
 const envPath = path.join(process.cwd(), '.env.restore');
@@ -27,6 +30,7 @@ const authority = assertTestDatabaseAuthority({
   requiresWriteApproval: true,
 });
 
+const isHttpE2E = requestedScript === 'scripts/verify-partner-store-application-http-e2e.js';
 const child = spawn(process.execPath, [path.join(process.cwd(), requestedScript)], {
   cwd: process.cwd(),
   env: {
@@ -34,6 +38,7 @@ const child = spawn(process.execPath, [path.join(process.cwd(), requestedScript)
     DATABASE_URL: targetUrl,
     DIRECT_URL: targetUrl,
     ALLOW_PARTNER_STORE_RUNTIME_TEST: 'true',
+    ALLOW_PARTNER_STORE_HTTP_E2E_TEST: isHttpE2E ? 'true' : undefined,
     ALPHATECH_RUNTIME_ENV: 'TEST',
   },
   stdio: 'inherit',
