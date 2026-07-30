@@ -33,6 +33,7 @@ if (fs.existsSync(DOTENV_RECOVERY_PATH)) {
 }
 
 const RESTORE_VERSION = 'P1-HARDENED-RESTORE-V3-NODE-PG';
+const SCHEMA_PROVISIONING_APPROVAL = 'ALPHATECH_TEST_SCHEMA_PROVISION';
 const SCHEMA_NAME = process.env.RESTORE_SCHEMA || 'public';
 const RESTORE_DATABASE_URL = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
 const LOG_DIR = process.env.RESTORE_LOG_DIR || path.join(process.cwd(), 'logs');
@@ -257,7 +258,7 @@ function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: true,
+      shell: false,
       ...options,
     });
 
@@ -281,6 +282,12 @@ function runCommand(command, args, options = {}) {
   });
 }
 
+function assertSchemaProvisioningApproval() {
+  if (process.env.RECOVERY_SCHEMA_PROVISIONING_APPROVAL !== SCHEMA_PROVISIONING_APPROVAL) {
+    fail(`RECOVERY_SCHEMA_PROVISIONING_APPROVAL must equal ${SCHEMA_PROVISIONING_APPROVAL} before Prisma db push.`);
+  }
+}
+
 async function runPrismaDbPushForRecovery() {
   if (!fs.existsSync(DOTENV_RECOVERY_PATH)) {
     fail('Missing .env.recovery. Refusing to run Prisma db push without explicit Recovery env file.');
@@ -289,6 +296,8 @@ async function runPrismaDbPushForRecovery() {
   if (!RESTORE_DATABASE_URL) {
     fail('Missing RESTORE_DATABASE_URL or RECOVERY_DATABASE_URL in .env.restore/.env.recovery.');
   }
+
+  assertSchemaProvisioningApproval();
 
   const recoveryEnv = {
     ...process.env,
@@ -301,7 +310,8 @@ async function runPrismaDbPushForRecovery() {
   log('🧱 Running Prisma db push against Recovery DB only...');
   log('🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.');
 
-  await runCommand('npx', ['prisma', 'db', 'push'], {
+  const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  await runCommand(npxCommand, ['prisma', 'db', 'push'], {
     cwd: process.cwd(),
     env: recoveryEnv,
   });
