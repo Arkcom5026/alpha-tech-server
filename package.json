@@ -50,6 +50,7 @@
     "backup": "node recovery/jobRunner.js --mode backup-workflow",
     "verify:test-database-authority": "node scripts/verify-test-database-authority.js",
     "inspect:test-database": "node scripts/inspect-test-database.js",
+    "diff:test-database-schema": "node scripts/diff-test-database-schema.js",
     "test:test-database-authority": "node tests/test-database-authority.contract.test.js",
     "verify:product-mode-policy": "node tests/product-mode-policy.test.js",
     "verify:product-stock-availability": "node tests/product-stock-availability.test.js",
