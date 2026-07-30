@@ -54,6 +54,8 @@
     "restore:recovery-bundle": "node recovery/restoreRecoveryBundle.js",
     "test:recovery-bundle": "node tests/recovery-bundle-public-legacy-tax.contract.test.js",
     "verify:test-database-authority": "node scripts/verify-test-database-authority.js",
+    "migrate:test-database": "node scripts/run-test-prisma-migrate-deploy.js",
+    "test:test-prisma-migration-runner": "node tests/test-prisma-migration-runner.contract.test.js",
     "inspect:test-database": "node scripts/inspect-test-database.js",
     "diff:test-database-schema": "node scripts/diff-test-database-schema.js",
     "test:test-database-authority": "node tests/test-database-authority.contract.test.js",
