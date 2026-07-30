@@ -36,6 +36,7 @@ const RESTORE_VERSION = 'P1-HARDENED-RESTORE-V3-NODE-PG';
 const SCHEMA_PROVISIONING_APPROVAL = 'ALPHATECH_TEST_SCHEMA_PROVISION';
 const SCHEMA_NAME = process.env.RESTORE_SCHEMA || 'public';
 const RESTORE_DATABASE_URL = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
+const PSQL_PATH = process.env.PSQL_PATH || path.join(process.env.POSTGRES_CLIENT_BIN || '', 'psql.exe');
 const LOG_DIR = process.env.RESTORE_LOG_DIR || path.join(process.cwd(), 'logs');
 const LOG_FILE = path.join(LOG_DIR, 'restore.log');
 
@@ -78,6 +79,7 @@ function parseArgs(argv) {
     dryRun: false,
     initSchema: false,
     resetSchema: false,
+    schemaSnapshotPath: null,
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -112,6 +114,12 @@ function parseArgs(argv) {
     if (arg === '--reset-schema' || arg === '--reset') {
       args.resetSchema = true;
       args.initSchema = true;
+      continue;
+    }
+
+    if (arg === '--schema-snapshot') {
+      args.schemaSnapshotPath = argv[i + 1];
+      i += 1;
       continue;
     }
 
@@ -284,13 +292,13 @@ function runCommand(command, args, options = {}) {
 
 function assertSchemaProvisioningApproval() {
   if (process.env.RECOVERY_SCHEMA_PROVISIONING_APPROVAL !== SCHEMA_PROVISIONING_APPROVAL) {
-    fail(`RECOVERY_SCHEMA_PROVISIONING_APPROVAL must equal ${SCHEMA_PROVISIONING_APPROVAL} before Prisma db push.`);
+    fail(`RECOVERY_SCHEMA_PROVISIONING_APPROVAL must equal ${SCHEMA_PROVISIONING_APPROVAL} before schema restore.`);
   }
 }
 
-async function runPrismaDbPushForRecovery() {
+async function runSchemaSnapshotRestore(schemaSnapshotPath) {
   if (!fs.existsSync(DOTENV_RECOVERY_PATH)) {
-    fail('Missing .env.recovery. Refusing to run Prisma db push without explicit Recovery env file.');
+    fail('Missing .env.recovery. Refusing schema restore without explicit Recovery env file.');
   }
 
   if (!RESTORE_DATABASE_URL) {
@@ -299,28 +307,17 @@ async function runPrismaDbPushForRecovery() {
 
   assertSchemaProvisioningApproval();
 
-  const recoveryEnv = {
-    ...process.env,
-    DATABASE_URL: RESTORE_DATABASE_URL,
-    DIRECT_URL: RESTORE_DATABASE_URL,
-    RESTORE_DATABASE_URL,
-    RECOVERY_DATABASE_URL: RESTORE_DATABASE_URL,
-  };
-
-  log('🧱 Running Prisma db push against Recovery DB only...');
-  log('🛡️ DATABASE_URL is injected from RESTORE_DATABASE_URL/RECOVERY_DATABASE_URL for this process only.');
-
-  const prismaCliPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
-  if (!fs.existsSync(prismaCliPath)) {
-    fail('Prisma CLI is not installed. Run npm ci before restoring the Test DB.');
+  if (!schemaSnapshotPath || !fs.existsSync(schemaSnapshotPath)) {
+    fail('Missing schema snapshot. Refusing to use Prisma db push for Recovery restore.');
   }
-
-  await runCommand(process.execPath, [prismaCliPath, 'db', 'push'], {
-    cwd: process.cwd(),
-    env: recoveryEnv,
-  });
-
-  log('✅ Prisma db push completed for Recovery DB.');
+  if (!PSQL_PATH || !fs.existsSync(PSQL_PATH)) {
+    fail('PSQL_PATH or POSTGRES_CLIENT_BIN must point to PostgreSQL 17 psql.exe.');
+  }
+  const url = new URL(RESTORE_DATABASE_URL);
+  const env = { ...process.env, PGHOST: url.hostname, PGPORT: url.port || '5432', PGDATABASE: decodeURIComponent(url.pathname.slice(1)), PGUSER: decodeURIComponent(url.username), PGPASSWORD: decodeURIComponent(url.password), PGSSLMODE: url.searchParams.get('sslmode') || 'require' };
+  log(`🧱 Restoring PostgreSQL schema snapshot: ${schemaSnapshotPath}`);
+  await runCommand(PSQL_PATH, ['--set', 'ON_ERROR_STOP=1', '--file', schemaSnapshotPath], { cwd: process.cwd(), env });
+  log('✅ Schema snapshot restore completed for Recovery DB.');
 }
 
 
@@ -463,7 +460,7 @@ async function main() {
       await resetClient.end().catch(() => undefined);
     }
 
-    await runPrismaDbPushForRecovery();
+    await runSchemaSnapshotRestore(args.schemaSnapshotPath);
 
     client = new Client(buildPgConnectionConfig(RESTORE_DATABASE_URL));
     try {
@@ -480,16 +477,16 @@ async function main() {
     log(`⚠️ Target database is missing ${inspection.missingExpectedTables.length} expected tables.`);
 
     if (!args.initSchema) {
-      log('💡 Run again with --init to run Prisma db push against Recovery DB only.');
+      log('💡 Run again with --init --schema-snapshot <schema.sql> to restore the production schema into Recovery DB only.');
       fail('Target schema is not ready. Restore aborted before writing data.');
     }
 
     if (!args.yes) {
-      const ok = await askYesNo('Schema is missing. Run Prisma db push on Recovery DB now? Type Y to continue:');
+      const ok = await askYesNo('Schema is missing. Restore schema snapshot on Recovery DB now? Type Y to continue:');
       if (!ok) fail('Schema init cancelled by user.', 0);
     }
 
-    await runPrismaDbPushForRecovery();
+    await runSchemaSnapshotRestore(args.schemaSnapshotPath);
 
     client = new Client(buildPgConnectionConfig(RESTORE_DATABASE_URL));
     try {
@@ -502,7 +499,7 @@ async function main() {
     printInspection(inspection);
 
     if (inspection.missingExpectedTables.length > 0) {
-      fail(`Schema is still missing ${inspection.missingExpectedTables.length} expected tables after db push.`);
+      fail(`Schema is still missing ${inspection.missingExpectedTables.length} expected tables after schema snapshot restore.`);
     }
   }
 

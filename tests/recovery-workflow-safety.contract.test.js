@@ -25,8 +25,15 @@ assert.ok(restore.includes('assertTestDatabaseAuthority'));
 assert.ok(restore.includes('SCHEMA_PROVISIONING_APPROVAL'));
 assert.ok(restore.includes('RECOVERY_SCHEMA_PROVISIONING_APPROVAL'));
 assert.ok(restore.includes('shell: false'));
-assert.ok(restore.includes("node_modules', 'prisma', 'build', 'index.js"));
-assert.ok(restore.includes("runCommand(process.execPath, [prismaCliPath, 'db', 'push']"));
+assert.ok(restore.includes('--schema-snapshot'));
+assert.ok(restore.includes('runSchemaSnapshotRestore'));
+assert.ok(restore.includes('Refusing to use Prisma db push for Recovery restore'));
+assert.ok(restore.includes('ON_ERROR_STOP=1'));
+
+const schemaCapture = read('recovery/captureSchemaSnapshot.js');
+assert.ok(schemaCapture.includes('--schema-only'));
+assert.ok(schemaCapture.includes('databaseModified: false'));
+assert.ok(schemaCapture.includes('PG_DUMP_PATH'));
 
 assert.ok(verifier.includes('assertTestDatabaseAuthority'));
 assert.ok(verifier.includes('BEGIN READ ONLY'));
