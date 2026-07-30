@@ -65,7 +65,8 @@
     "verify:simple-transfer-authority": "node tests/simple-transfer-authority.test.js",
     "test:partner-store-application-http-e2e": "node tests/partner-store-application-http-e2e.contract.test.js",
     "verify:partner-store-application-http-e2e:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-http-e2e.js",
-    "start:test-database": "node scripts/start-test-database-server.js"
+    "start:test-database": "node scripts/start-test-database-server.js",
+    "provision:test-partner-operator": "node scripts/provision-test-partner-operator.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
