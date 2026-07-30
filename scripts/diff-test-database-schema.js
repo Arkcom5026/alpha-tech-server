@@ -39,8 +39,18 @@ const output = `${result.stdout || ''}${result.stderr || ''}`;
 fs.writeFileSync(reportPath, output, 'utf8');
 
 if (result.error || result.status !== 0) {
+  const diagnostic = {
+    error: result.error ? result.error.message : null,
+    exitCode: result.status,
+    signal: result.signal,
+    reportPath,
+  };
+
   console.error('TEST_DATABASE_SCHEMA_DIFF_FAILED');
-  console.error(`Report: ${reportPath}`);
+  console.error(JSON.stringify(diagnostic, null, 2));
+  if (output.trim()) {
+    console.error(output.trim());
+  }
   process.exitCode = result.status || 1;
 } else {
   const empty = output.includes('-- This is an empty migration.');
