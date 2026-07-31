@@ -41,7 +41,7 @@ const main = async () => {
         productId: true,
         barcode: true,
         status: true,
-        qtyReceived: true,
+        qtyInitial: true,
         qtyRemaining: true,
         unitCost: true,
         receivedAt: true,
