@@ -14,13 +14,17 @@ const PASSWORD_RESET_TOKEN_EXPIRES_MINUTES = Number(
 );
 
 let bcrypt;
+let bcryptProvider = 'unknown';
 try {
   bcrypt = require('@node-rs/bcrypt');
+  bcryptProvider = 'node-rs';
 } catch (nodeRsError) {
   try {
     bcrypt = require('bcrypt');
+    bcryptProvider = 'bcrypt';
   } catch (bcryptError) {
     bcrypt = require('bcryptjs');
+    bcryptProvider = 'bcryptjs';
   }
 }
 
@@ -28,6 +32,18 @@ const bcryptHash = async (plain, rounds = 10) => {
   if (typeof bcrypt?.hash === 'function') return bcrypt.hash(plain, rounds);
   if (typeof bcrypt?.hashSync === 'function') return bcrypt.hashSync(plain, rounds);
   throw new Error('bcrypt hash function not available');
+};
+
+const bcryptCompare = async (plain, hashed) => {
+  if (typeof bcrypt?.compare === 'function') return bcrypt.compare(plain, hashed);
+  if (typeof bcrypt?.verify === 'function') {
+    try {
+      return await bcrypt.verify(plain, hashed);
+    } catch (error) {
+      return bcrypt.verify(hashed, plain);
+    }
+  }
+  throw new Error('bcrypt compare/verify function not available');
 };
 
 const normalize = (value) => (
@@ -40,6 +56,9 @@ const sha256 = (value) => crypto
   .digest('hex');
 const createRawRefreshToken = () => crypto.randomBytes(48).toString('hex');
 const createRawPasswordResetToken = () => crypto.randomBytes(32).toString('hex');
+const parseRememberMe = (value) => (
+  value === true || value === 'true' || value === 1 || value === '1'
+);
 
 const getRefreshTokenExpiresIn = (rememberMe = false) => (
   rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER_ME : REFRESH_TOKEN_EXPIRES_DEFAULT
@@ -214,6 +233,114 @@ const requireLegacyHandler = (key) => {
     throw new Error(`[sessionAuthRuntimeService] authController.${key} must resolve to a function`);
   }
   return handler;
+};
+
+const login = async (req, res) => {
+  if (!global.__bcryptProviderLogged) {
+    console.log('[auth] bcrypt provider:', bcryptProvider);
+    global.__bcryptProviderLogged = true;
+  }
+
+  try {
+    const identifier = normalize(req.body?.emailOrPhone ?? req.body?.identifier);
+    const password = normalize(req.body?.password);
+    const rememberMe = parseRememberMe(req.body?.rememberMe);
+
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'กรุณาระบุอีเมล/เบอร์โทร และรหัสผ่าน' });
+    }
+
+    const looksLikeEmail = (value) => String(value || '').includes('@');
+    const onlyDigits = (value) => String(value || '').replace(/\D/g, '');
+    const toE164TH = (digits) => {
+      if (!digits) return '';
+      if (digits.startsWith('0') && digits.length === 10) return `+66${digits.slice(1)}`;
+      return digits;
+    };
+
+    let user = null;
+    if (looksLikeEmail(identifier)) {
+      user = await repository.findLoginUserByEmail(normalizeEmail(identifier));
+    } else {
+      user = await repository.findLoginUserByLoginId(identifier);
+
+      if (!user) {
+        const digits = onlyDigits(identifier);
+        const e164 = toE164TH(digits);
+
+        if (digits) user = await repository.findLoginUserByLoginId(digits);
+        if (!user && e164 && e164 !== digits) {
+          user = await repository.findLoginUserByLoginId(e164);
+        }
+
+        if (!user && (digits || e164)) {
+          const phoneCandidates = [digits, e164].filter(Boolean);
+          let foundUserId = null;
+
+          for (const phone of phoneCandidates) {
+            const employee = await repository.findEmployeeUserIdByPhone(phone);
+            if (employee?.userId) {
+              foundUserId = employee.userId;
+              break;
+            }
+          }
+
+          if (foundUserId) user = await repository.findLoginUserById(foundUserId);
+        }
+      }
+    }
+
+    if (!user) return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้ในระบบหลังบ้าน' });
+    if (!user.employeeProfile) {
+      return res.status(403).json({
+        message: 'บัญชีนี้ไม่มีสิทธิ์เข้าใช้งานระบบจัดการหลังบ้าน (เฉพาะเจ้าของร้านและพนักงานเท่านั้น)',
+      });
+    }
+    if (!user.enabled) return res.status(403).json({ message: 'บัญชีนี้ถูกปิดใช้งาน' });
+
+    const isMatch = await bcryptCompare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
+    if (user.employeeProfile.active === false) {
+      return res.status(403).json({ message: 'โปรไฟล์พนักงานของคุณถูกปิดใช้งาน' });
+    }
+    if (user.employeeProfile.approved === false) {
+      return res.status(403).json({
+        message: 'โปรไฟล์พนักงานของคุณยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ',
+      });
+    }
+
+    const profile = user.employeeProfile;
+    const accessToken = buildToken(user);
+    const refreshTokenRecord = await createRefreshTokenRecord({
+      userId: user.id,
+      rememberMe,
+      req,
+    });
+    setRefreshTokenCookie(res, refreshTokenRecord.rawToken, rememberMe);
+
+    return res.json({
+      token: accessToken,
+      accessToken,
+      role: user.role,
+      profileType: 'employee',
+      profile: {
+        id: profile.id,
+        name: profile.name || '',
+        phone: profile.phone || '',
+        branch: profile.branch || null,
+        position: profile.position || null,
+        user: { id: user.id, email: user.email, role: user.role },
+      },
+      session: {
+        rememberMe,
+        accessTokenExpiresIn: ACCESS_TOKEN_EXPIRES,
+        refreshTokenExpiresIn: getRefreshTokenExpiresIn(rememberMe),
+      },
+    });
+  } catch (error) {
+    console.error('🔥 Login error:', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบเซิร์ฟเวอร์หลังบ้าน' });
+  }
 };
 
 const refreshSession = async (req, res) => {
@@ -508,7 +635,7 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = {
-  login: requireLegacyHandler('login'),
+  login,
   register: requireLegacyHandler('register'),
   refreshSession,
   logoutSession,
