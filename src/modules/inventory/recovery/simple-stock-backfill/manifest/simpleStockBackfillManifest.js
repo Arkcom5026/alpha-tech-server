@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const MANIFEST_VERSION = 'simple-stock-backfill-manifest-v1';
+const MANIFEST_VERSION = 'simple-stock-backfill-manifest-v2';
 
 const toNumber = (value) => {
   const number = Number(value);
@@ -35,14 +35,35 @@ const normalizeBalance = (row) => ({
   lastReceivedCost: toNumber(row.lastReceivedCost),
 });
 
-const classifyEntry = ({ balance, lotCount, movementCount }) => {
+const classifyEntry = ({
+  balance,
+  lotCount,
+  allMovementCount,
+  linkedMovementCount,
+  unlinkedMovementCount,
+}) => {
   const usableCost = balance.avgCost > 0
     ? { value: balance.avgCost, source: 'STOCK_BALANCE_AVG_COST' }
     : balance.lastReceivedCost > 0
       ? { value: balance.lastReceivedCost, source: 'STOCK_BALANCE_LAST_RECEIVED_COST' }
       : null;
 
-  if (balance.quantity > 0 && lotCount === 0 && movementCount === 0) {
+  if (allMovementCount > 0) {
+    return {
+      classification: 'MANUAL_REVIEW',
+      reasonCode: unlinkedMovementCount > 0
+        ? 'LEGACY_BALANCE_HAS_UNLINKED_STOCK_MOVEMENT_HISTORY'
+        : 'LEGACY_BALANCE_HAS_STOCK_MOVEMENT_HISTORY',
+      proposedLot: null,
+      movementEvidence: {
+        allMovementCount,
+        linkedMovementCount,
+        unlinkedMovementCount,
+      },
+    };
+  }
+
+  if (balance.quantity > 0 && lotCount === 0) {
     if (usableCost) {
       return {
         classification: 'READY_FOR_APPROVAL',
@@ -54,6 +75,11 @@ const classifyEntry = ({ balance, lotCount, movementCount }) => {
           costSource: usableCost.source,
           status: 'ACTIVE',
         },
+        movementEvidence: {
+          allMovementCount,
+          linkedMovementCount,
+          unlinkedMovementCount,
+        },
       };
     }
 
@@ -61,6 +87,11 @@ const classifyEntry = ({ balance, lotCount, movementCount }) => {
       classification: 'BLOCKED_MISSING_COST',
       reasonCode: 'LEGACY_BALANCE_WITHOUT_DEFENSIBLE_COST',
       proposedLot: null,
+      movementEvidence: {
+        allMovementCount,
+        linkedMovementCount,
+        unlinkedMovementCount,
+      },
     };
   }
 
@@ -68,6 +99,11 @@ const classifyEntry = ({ balance, lotCount, movementCount }) => {
     classification: 'MANUAL_REVIEW',
     reasonCode: 'CURRENT_DATA_DOES_NOT_MATCH_DETERMINISTIC_BACKFILL_CONTRACT',
     proposedLot: null,
+    movementEvidence: {
+      allMovementCount,
+      linkedMovementCount,
+      unlinkedMovementCount,
+    },
   };
 };
 
@@ -90,20 +126,38 @@ const buildSimpleStockBackfillManifest = ({ branchId, balances, lots, movements 
     .filter((row) => Number(row.branchId) === normalizedBranchId);
 
   const lotCountByProduct = new Map();
-  const movementCountByProduct = new Map();
+  const movementCountsByProduct = new Map();
+
   for (const row of scopedLots) {
     const productId = Number(row.productId);
     lotCountByProduct.set(productId, (lotCountByProduct.get(productId) || 0) + 1);
   }
+
   for (const row of scopedMovements) {
     const productId = Number(row.productId);
-    movementCountByProduct.set(productId, (movementCountByProduct.get(productId) || 0) + 1);
+    const current = movementCountsByProduct.get(productId) || {
+      allMovementCount: 0,
+      linkedMovementCount: 0,
+      unlinkedMovementCount: 0,
+    };
+    current.allMovementCount += 1;
+    if (row.simpleLotId == null) current.unlinkedMovementCount += 1;
+    else current.linkedMovementCount += 1;
+    movementCountsByProduct.set(productId, current);
   }
 
   const entries = scopedBalances.map((balance) => {
     const lotCount = lotCountByProduct.get(balance.productId) || 0;
-    const movementCount = movementCountByProduct.get(balance.productId) || 0;
-    const decision = classifyEntry({ balance, lotCount, movementCount });
+    const movementCounts = movementCountsByProduct.get(balance.productId) || {
+      allMovementCount: 0,
+      linkedMovementCount: 0,
+      unlinkedMovementCount: 0,
+    };
+    const decision = classifyEntry({
+      balance,
+      lotCount,
+      ...movementCounts,
+    });
     const preconditions = {
       branchId: normalizedBranchId,
       stockBalanceId: balance.id,
@@ -113,7 +167,9 @@ const buildSimpleStockBackfillManifest = ({ branchId, balances, lots, movements 
       avgCost: balance.avgCost,
       lastReceivedCost: balance.lastReceivedCost,
       lotCount,
-      movementCount,
+      allMovementCount: movementCounts.allMovementCount,
+      linkedMovementCount: movementCounts.linkedMovementCount,
+      unlinkedMovementCount: movementCounts.unlinkedMovementCount,
     };
 
     return {
@@ -123,6 +179,7 @@ const buildSimpleStockBackfillManifest = ({ branchId, balances, lots, movements 
       preconditions,
       preconditionHash: sha256(preconditions),
       proposedLot: decision.proposedLot,
+      movementEvidence: decision.movementEvidence,
     };
   });
 
