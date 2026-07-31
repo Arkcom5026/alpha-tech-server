@@ -26,11 +26,11 @@ class CreateExternalDeviceIntakeService {
     };
 
     return this.repository.transaction(async (repo) => {
-      const customer = await repo.findCustomer(payload.customerId);
+      const customer = await repo.findCustomer(actor.branchId, payload.customerId);
       if (!customer) {
         throw new RepairError(
           RepairFailureCode.CUSTOMER_NOT_FOUND,
-          'ไม่พบข้อมูลลูกค้าในระบบ',
+          'ไม่พบข้อมูลลูกค้าที่เข้าถึงได้ในสาขานี้',
           404
         );
       }
