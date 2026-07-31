@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 
 const uploadSlipMiddleware = require('../../../../../middlewares/uploadSlipMiddleware');
-const { uploadAndSaveSlip } = require('../../../../../controllers/upload/uploadSlipController');
+const { uploadAndSaveSlip } = require('../runtime/uploadSlipRuntimeController');
 
 router.post('/:id/slip/upload', uploadSlipMiddleware.single('slip'), uploadAndSaveSlip);
 
