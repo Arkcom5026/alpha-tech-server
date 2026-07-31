@@ -59,7 +59,10 @@ const routes = read('src/modules/repair/routes/repairRoutes.js');
 assertContains(routes, "'/public/tracking/:token'", 'public repair tracking endpoint');
 assertContains(routes, 'router.use(verifyToken)', 'repair staff authentication guard');
 assertContains(routes, 'router.use(loadRepairEmployeeContext)', 'repair employee context authority');
-assertContains(routes, 'allowRepairRoles', 'repair role authorization authority');
+assertContains(routes, 'allowRepairCapabilities', 'repair capability authorization authority');
+assertContains(routes, 'REPAIR_CAPABILITY', 'repair capability route declarations');
+assertNotContains(routes, 'READ_AND_INTAKE_ROLES', 'legacy broad repair read/intake role group');
+assertNotContains(routes, 'OPERATION_ROLES', 'legacy broad repair operation role group');
 assertContains(routes, "'/intakes/external-device'", 'external device intake endpoint');
 assertContains(routes, "'/jobs'", 'repair job endpoint');
 assertContains(routes, "'/jobs/:id/workflow/commands'", 'repair workflow command endpoint');
@@ -70,6 +73,19 @@ assertContains(routes, "'/warranty-claims/:claimId/status'", 'warranty claim lif
 assertContains(routes, "'/jobs/:id/handover/finalize'", 'repair handover endpoint');
 assertContains(routes, "'/jobs/:id/intake-evidence'", 'repair intake evidence endpoint');
 assertNotContains(routes, "require('../../../controllers/repair", 'legacy repair controller ownership');
+
+const authorization = read('src/modules/repair/policies/repairAuthorizationPolicy.js');
+assertContains(authorization, "READ: 'repair.read'", 'repair read capability');
+assertContains(authorization, "INTAKE: 'repair.intake'", 'repair intake capability');
+assertContains(authorization, "WORKFLOW: 'repair.workflow'", 'repair workflow capability');
+assertContains(authorization, "PARTS: 'repair.parts'", 'repair parts capability');
+assertContains(authorization, "ESTIMATE: 'repair.estimate'", 'repair estimate capability');
+assertContains(authorization, "CLAIM: 'repair.claim'", 'repair claim capability');
+assertContains(authorization, "HANDOVER: 'repair.handover'", 'repair handover capability');
+assertContains(authorization, "CUSTOMER_ACCESS: 'repair.customer-access'", 'repair customer access capability');
+assertContains(authorization, 'REPAIR_CAPABILITIES_BY_ROLE', 'repair role-to-capability matrix');
+assertContains(authorization, 'allowRepairCapabilities', 'repair capability middleware');
+assertContains(authorization, 'missingCapabilities', 'repair missing capability evidence');
 
 const workflowPolicy = read('src/modules/repair/workflow/policies/repairWorkflowPolicy.js');
 assertContains(workflowPolicy, "RECEIVED: 'RECEIVED'", 'repair received workflow state');
