@@ -9,7 +9,7 @@ const {
   getBranchPricesByBranch,
   getAllProductsWithBranchPrice,
   updateMultipleBranchPrices,
-} = require('../../../../../controllers/branchPriceController');
+} = require('../runtime/branchPriceRuntimeController');
 const { getBranchBySlug } = require('../../../../../controllers/branchController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
