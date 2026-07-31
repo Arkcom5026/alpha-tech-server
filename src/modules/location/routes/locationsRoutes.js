@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { prisma } = require('../../../../lib/prisma');
 const addressResolveController = require('../address/query/resolve/addressResolveController');
+const addressValidateController = require('../address/query/validate/addressValidateController');
 const { addressController } = require('../../../../controllers/addressController');
 
 router.use((req, res, next) => {
@@ -58,7 +59,7 @@ router.get('/subdistricts', async (req, res) => {
 });
 
 router.get('/resolve', addressResolveController.resolveAddress);
-router.get('/validate', addressController.validate);
+router.get('/validate', addressValidateController.validateAddress);
 router.get('/postcode', addressController.postcode);
 router.get('/search', addressController.search);
 router.post('/join', addressController.join);
