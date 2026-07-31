@@ -15,6 +15,9 @@ const service = requireFromRoot('src/modules/customer/update/staff/customerStaff
 const repository = requireFromRoot(
   'src/modules/customer/update/staff/customerStaffUpdateRepository.js'
 );
+const legacyController = requireFromRoot(
+  'src/modules/customer/controllers/customerUpdateController.js'
+);
 
 assert(routes, 'customer routes must resolve');
 assert.strictEqual(typeof controller.updateCustomerStaff, 'function');
@@ -22,11 +25,15 @@ assert.strictEqual(typeof service.updateCustomerStaff, 'function');
 assert.strictEqual(typeof repository.findCustomerById, 'function');
 assert.strictEqual(typeof repository.findSubdistrictPostcode, 'function');
 assert.strictEqual(typeof repository.updateCustomer, 'function');
-
-assert.throws(
-  () => requireFromRoot('src/modules/customer/controllers/customerUpdateController.js').updateCustomerProfile,
-  /undefined|not a function/,
+assert.strictEqual(
+  legacyController.updateCustomerProfile,
+  undefined,
   'legacy controller must no longer export staff update ownership'
+);
+assert.strictEqual(
+  typeof legacyController.updateCustomerProfileOnline,
+  'function',
+  'legacy controller must temporarily retain customer self update ownership'
 );
 
 console.log('customer-staff-update-slice.contract: PASS');
