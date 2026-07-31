@@ -2,11 +2,12 @@
 const express = require('express');
 const router = express.Router();
 
+const addressListController = require('../address/list/addressListController');
 const { addressController } = require('../../../../controllers/addressController');
 
-router.get('/provinces', addressController.listProvinces);
-router.get('/districts', addressController.listDistricts);
-router.get('/subdistricts', addressController.listSubdistricts);
+router.get('/provinces', addressListController.listProvinces);
+router.get('/districts', addressListController.listDistricts);
+router.get('/subdistricts', addressListController.listSubdistricts);
 
 router.get('/resolve', addressController.resolve);
 router.get('/validate', addressController.validate);
