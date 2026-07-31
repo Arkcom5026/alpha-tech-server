@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const repository = require('./sessionAuthRuntimeRepository');
-const legacyAuthController = require('../../../../../controllers/authController');
 const { sendMailAction } = require('../../../../../utils/mailSender');
 
 const ACCESS_TOKEN_EXPIRES = String(process.env.ACCESS_TOKEN_EXPIRES || '1h');
@@ -218,21 +217,142 @@ const revokeRefreshTokenFamilyChain = async ({ tokenId, tx, revokedAt = new Date
   }
 };
 
-const resolveLegacyHandler = (key) => {
-  const value = legacyAuthController?.[key];
-  if (typeof value === 'function') return value;
-  if (value && typeof value.handler === 'function') return value.handler;
-  if (value && typeof value.handle === 'function') return value.handle;
-  if (value && typeof value.fn === 'function') return value.fn;
-  return null;
-};
+const register = async (req, res) => {
+  try {
+    const shopName = normalize(req.body?.shopName);
+    const shopSlug = normalize(req.body?.shopSlug).toLowerCase();
+    const email = normalizeEmail(req.body?.email);
+    const categoryId = req.body?.categoryId ? Number(req.body.categoryId) : 1;
+    const rawPassword = `${Math.random().toString(36).slice(-10)}A1!`;
 
-const requireLegacyHandler = (key) => {
-  const handler = resolveLegacyHandler(key);
-  if (typeof handler !== 'function') {
-    throw new Error(`[sessionAuthRuntimeService] authController.${key} must resolve to a function`);
+    if (!shopName || !shopSlug || !email) {
+      return res.status(400).json({
+        message: 'กรุณาระบุชื่อร้านค้า, Shop Slug และอีเมลติดต่อหลักให้ครบถ้วน',
+      });
+    }
+
+    const existingUser = await repository.findUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({
+        message: 'อีเมลติดต่อหลักนี้ถูกลงทะเบียนในระบบแพลตฟอร์มแล้ว',
+      });
+    }
+
+    const existingBranch = await repository.findBranchBySlug(shopSlug);
+    if (existingBranch) {
+      return res.status(409).json({
+        message: 'ชื่อย่อลิงก์สาขา (Shop Slug) นี้ถูกใช้งานไปแล้ว กรุณาใช้ชื่ออื่น',
+      });
+    }
+
+    const hashedPassword = await bcryptHash(rawPassword, 10);
+    const transactionResult = await repository.runTransaction(async (tx) => {
+      const branch = await repository.createBranch({
+        name: shopName,
+        slug: shopSlug,
+        address: 'กรุณาอัปเดตที่อยู่ร้านค้า',
+        categoryId,
+        businessType: 'GENERAL',
+      }, tx);
+
+      const user = await repository.createUser({
+        email,
+        loginId: email,
+        password: hashedPassword,
+        role: 'ADMIN',
+        loginType: 'EMAIL',
+        enabled: true,
+      }, tx);
+
+      const employeeProfile = await repository.createEmployeeProfile({
+        userId: user.id,
+        branchId: branch.id,
+        name: `${shopName} (Owner)`,
+        v2Role: 'OWNER',
+        approved: true,
+        active: true,
+      }, tx);
+
+      const customerProfile = await repository.createCustomerProfile({
+        userId: user.id,
+        name: `${shopName} (พาร์ตเนอร์คู่ค้า)`,
+        type: 'ORGANIZATION',
+      }, tx);
+
+      const rawToken = createRawPasswordResetToken();
+      await repository.createPasswordResetToken({
+        userId: user.id,
+        tokenHash: sha256(rawToken),
+        expiresAt: new Date(
+          Date.now() + PASSWORD_RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000
+        ),
+      }, tx);
+
+      return { user, branch, employeeProfile, customerProfile, rawToken };
+    });
+
+    const resetUrl = buildPasswordResetUrl(req, transactionResult.rawToken);
+    const subject = `🔑 ข้อมูลบัญชีและลิงก์ตั้งค่ารหัสผ่านสำหรับร้าน ${shopName}`;
+    const text = [
+      `ยินดีต้อนรับคุณพาร์ตเนอร์ ร้าน ${shopName} ได้เปิดระบบบนแพลตฟอร์มเรียบร้อยแล้ว`,
+      '',
+      `อีเมลเข้าใช้งาน: ${email}`,
+      `รหัสผ่านชั่วคราวของคุณคือ: ${rawPassword}`,
+      '',
+      'กรุณาคลิกลิงก์ด้านล่างนี้เพื่อกำหนดรหัสผ่านส่วนตัวใหม่ก่อนเริ่มใช้งานระบบจัดการหลังบ้าน:',
+      `ลิงก์สำหรับตั้งรหัสผ่านใหม่: ${resetUrl}`,
+      '',
+      `ลิงก์ความปลอดภัยนี้จะหมดอายุภายใน ${PASSWORD_RESET_TOKEN_EXPIRES_MINUTES} นาที`,
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #0f172a; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+        <h2 style="color: #f97316; margin-bottom: 4px; font-weight: 900;">SADUAK<span style="color: #0f172a;">SABUY</span></h2>
+        <p style="font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">Hyperlocal Market Platform</p>
+        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 20px 0;" />
+        <h3 style="margin-bottom: 16px; font-size: 18px; color: #0f172a; font-weight: 800;">🎉 ยินดีต้อนรับร่วมเป็นพันธมิตรคู่ค้า!</h3>
+        <p>ระบบร้านค้า <strong>${shopName}</strong> (Shop Slug: <span style="font-family: monospace; color: #f97316;">${shopSlug}</span>) ได้รับการลงทะเบียนเปิดสิทธิ์ในระบบพอร์ทัลกลางเรียบร้อยแล้วครับ</p>
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>อีเมลล็อกอิน:</strong> ${email}</p>
+          <p style="margin: 0; font-size: 13px;"><strong>รหัสผ่านชั่วคราว:</strong> <span style="font-family: monospace; background-color: #cbd5e1; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #0f172a;">${rawPassword}</span></p>
+        </div>
+        <p style="font-size: 13px; color: #475569;">เพื่อความปลอดภัยสูงสุดของข้อมูลคลังและระบบ POS หลังร้าน กรุณากดปุ่มด้านล่างนี้เพื่อทำการ <strong>กำหนดรหัสผ่านส่วนตัวใหม่</strong> ของคุณก่อนเริ่มเข้าเซสชันจัดการบัญชีร้านค้าครับ:</p>
+        <p style="margin: 32px 0; text-align: center;">
+          <a href="${resetUrl}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(to right, #f97316, #f59e0b); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 13px; box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.3);">ตั้งรหัสผ่านใหม่และเปิดใช้งานร้านค้า</a>
+        </p>
+        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; margin: 0;">* ลิงก์ความปลอดภัยนี้จะหมดอายุภายใน ${PASSWORD_RESET_TOKEN_EXPIRES_MINUTES} นาที หากคุณไม่ได้เป็นผู้ส่งคำขอลงทะเบียนเปิดร้านค้า สามารถปล่อยละเว้นอีเมลฉบับนี้ได้ทันทีครับ</p>
+      </div>
+    `;
+
+    sendMailAction({ to: email, subject, text, html })
+      .then(() => console.log(`✉️ [Register Mail] Sent welcome credentials successfully to: ${email}`))
+      .catch((error) => console.error('❌ [Register Mail Failed]', error));
+
+    const accessToken = buildToken({
+      ...transactionResult.user,
+      employeeProfile: transactionResult.employeeProfile,
+    });
+
+    return res.status(201).json({
+      token: accessToken,
+      accessToken,
+      role: transactionResult.user.role,
+      profileType: 'employee',
+      profile: {
+        id: transactionResult.employeeProfile.id,
+        name: transactionResult.employeeProfile.name,
+        branch: transactionResult.branch,
+        customerProfileId: transactionResult.customerProfile.id,
+      },
+    });
+  } catch (error) {
+    console.error('❌ register error:', error);
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || 'ระบบหลังบ้านขัดข้อง กรุณาลองใหม่อีกครั้ง',
+    });
   }
-  return handler;
 };
 
 const login = async (req, res) => {
@@ -636,7 +756,7 @@ const resetPassword = async (req, res) => {
 
 module.exports = {
   login,
-  register: requireLegacyHandler('register'),
+  register,
   refreshSession,
   logoutSession,
   getMe,
