@@ -3,7 +3,7 @@ const router = express.Router();
 
 const customerByPhoneController = require('../query/by-phone/customerByPhoneController');
 const customerByNameController = require('../query/by-name/customerByNameController');
-const { getCustomerByUserId } = require('../controllers/customerQueryController');
+const customerSelfController = require('../query/self/customerSelfController');
 const { createCustomer } = require('../controllers/customerCreateController');
 const {
   updateCustomerProfile,
@@ -15,7 +15,7 @@ router.use(verifyToken);
 
 router.get('/by-phone/:phone', customerByPhoneController.getCustomerByPhone);
 router.get('/by-name', customerByNameController.getCustomerByName);
-router.get('/me', getCustomerByUserId);
+router.get('/me', customerSelfController.getCustomerSelf);
 
 router.post('/', createCustomer);
 router.put('/me', updateCustomerProfileOnline);
