@@ -1,4 +1,4 @@
-const { toInt } = require('../../../shared/customerControllerSupport');
+const { toInt } = require('../../shared/customerControllerSupport');
 const customerByPhoneService = require('./customerByPhoneService');
 
 async function getCustomerByPhone(req, res) {
