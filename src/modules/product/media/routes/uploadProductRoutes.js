@@ -7,7 +7,7 @@ const {
   uploadAndSaveProductImages,
   deleteProductImage,
   setProductCoverImage,
-} = require('../../../../../controllers/upload/uploadProductController');
+} = require('../runtime/uploadProductRuntimeController');
 
 const uploadProductMiddleware = require('../../../../../middlewares/uploadProductMiddleware');
 
