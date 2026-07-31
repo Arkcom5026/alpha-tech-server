@@ -1,6 +1,10 @@
 const repository = require('./listRepairJobsRepository');
 const { mapRepairJob } = require('../../mappers/repairMapper');
 const {
+  projectRepairOperationalState,
+  summarizeRepairOperations,
+} = require('../control-center/repairControlCenterPolicy');
+const {
   RepairError,
   RepairFailureCode,
 } = require('../../contracts/repairError');
@@ -42,7 +46,15 @@ class ListRepairJobsService {
   async execute(actor, query) {
     const filters = validateListQuery(query);
     const jobs = await this.repository.findMany(actor.branchId, filters);
-    return jobs.map(mapRepairJob);
+    const items = jobs.map((job) => ({
+      ...mapRepairJob(job),
+      operational: projectRepairOperationalState(job),
+    }));
+
+    return {
+      items,
+      summary: summarizeRepairOperations(items),
+    };
   }
 }
 
