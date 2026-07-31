@@ -1,5 +1,7 @@
 const addressResolveRepository = require('./addressResolveRepository');
-const { addressUtil } = require('../../../../../../utils/address');
+
+const joinAddressParts = ({ address, subdistrict, district, province, postalCode }) =>
+  [address, subdistrict, district, province, postalCode].filter(Boolean).join(' ');
 
 async function resolveAddress({ subdistrictCode, address, postalCode }) {
   const subdistrict = await addressResolveRepository.findSubdistrictAggregate(subdistrictCode);
@@ -17,7 +19,7 @@ async function resolveAddress({ subdistrictCode, address, postalCode }) {
   };
 
   if (address || result.postalCode) {
-    result.fullAddress = addressUtil.joinAddress({
+    result.fullAddress = joinAddressParts({
       address,
       subdistrict: result.subdistrictName,
       district: result.districtName,
@@ -31,4 +33,5 @@ async function resolveAddress({ subdistrictCode, address, postalCode }) {
 
 module.exports = {
   resolveAddress,
+  joinAddressParts,
 };
