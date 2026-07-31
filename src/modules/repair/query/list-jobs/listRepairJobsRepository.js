@@ -28,6 +28,21 @@ const repairJobDetailInclude = {
     },
     orderBy: { openedAt: 'desc' },
   },
+  deviceIntakes: {
+    take: 1,
+    orderBy: { receivedAt: 'desc' },
+    include: {
+      consent: true,
+      photos: {
+        select: { id: true, category: true },
+      },
+    },
+  },
+  repairDeliveries: {
+    take: 1,
+    orderBy: { deliveredAt: 'desc' },
+    select: { id: true, deliveredAt: true },
+  },
 };
 
 class ListRepairJobsRepository {
