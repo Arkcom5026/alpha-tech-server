@@ -28,6 +28,18 @@ const repairJobDetailInclude = {
     },
     orderBy: { openedAt: 'desc' },
   },
+  deviceIntakes: {
+    orderBy: { receivedAt: 'desc' },
+    take: 1,
+    include: {
+      consent: true,
+      photos: true,
+    },
+  },
+  repairDeliveries: {
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+  },
 };
 
 class ListRepairJobsRepository {
@@ -53,3 +65,4 @@ class ListRepairJobsRepository {
 
 module.exports = new ListRepairJobsRepository();
 module.exports.ListRepairJobsRepository = ListRepairJobsRepository;
+module.exports.repairJobDetailInclude = repairJobDetailInclude;
