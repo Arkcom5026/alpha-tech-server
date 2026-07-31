@@ -4,10 +4,41 @@ const {
   RepairFailureCode,
 } = require('../contracts/repairError');
 
+const REPAIR_CAPABILITY = Object.freeze({
+  READ: 'repair.read',
+  INTAKE: 'repair.intake',
+  WORKFLOW: 'repair.workflow',
+  PARTS: 'repair.parts',
+  ESTIMATE: 'repair.estimate',
+  CLAIM: 'repair.claim',
+  HANDOVER: 'repair.handover',
+  CUSTOMER_ACCESS: 'repair.customer-access',
+});
+
+const ROLE_CAPABILITIES = Object.freeze({
+  OWNER: Object.freeze(Object.values(REPAIR_CAPABILITY)),
+  MANAGER: Object.freeze(Object.values(REPAIR_CAPABILITY)),
+  CASHIER: Object.freeze([
+    REPAIR_CAPABILITY.READ,
+    REPAIR_CAPABILITY.INTAKE,
+    REPAIR_CAPABILITY.ESTIMATE,
+    REPAIR_CAPABILITY.CLAIM,
+    REPAIR_CAPABILITY.CUSTOMER_ACCESS,
+  ]),
+  TECHNICIAN: Object.freeze([
+    REPAIR_CAPABILITY.READ,
+    REPAIR_CAPABILITY.WORKFLOW,
+    REPAIR_CAPABILITY.PARTS,
+  ]),
+});
+
 const normalizeRole = (role) =>
   String(role || '')
     .trim()
     .toUpperCase();
+
+const resolveRepairCapabilities = (role) =>
+  ROLE_CAPABILITIES[normalizeRole(role)] || Object.freeze([]);
 
 const loadRepairEmployeeContext = async (req, res, next) => {
   try {
@@ -59,17 +90,47 @@ const loadRepairEmployeeContext = async (req, res, next) => {
       );
     }
 
+    const v2Role = normalizeRole(employee.v2Role);
     req.user = {
       ...req.user,
       employeeId: employee.id,
       branchId: employee.branchId,
-      v2Role: normalizeRole(employee.v2Role),
+      v2Role,
+      repairCapabilities: [...resolveRepairCapabilities(v2Role)],
     };
 
     return next();
   } catch (error) {
     return next(error);
   }
+};
+
+const allowRepairCapabilities = (...capabilities) => {
+  const requiredCapabilities = new Set(capabilities);
+
+  return (req, res, next) => {
+    const actualCapabilities = new Set(req.user?.repairCapabilities || []);
+    const missingCapabilities = Array.from(requiredCapabilities).filter(
+      (capability) => !actualCapabilities.has(capability)
+    );
+
+    if (missingCapabilities.length) {
+      return next(
+        new RepairError(
+          RepairFailureCode.FORBIDDEN,
+          'คุณไม่มีสิทธิ์สำหรับการดำเนินการนี้',
+          403,
+          {
+            requiredCapabilities: Array.from(requiredCapabilities),
+            missingCapabilities,
+            actualRole: normalizeRole(req.user?.v2Role) || null,
+          }
+        )
+      );
+    }
+
+    return next();
+  };
 };
 
 const allowRepairRoles = (...roles) => {
@@ -97,6 +158,10 @@ const allowRepairRoles = (...roles) => {
 };
 
 module.exports = {
+  REPAIR_CAPABILITY,
+  ROLE_CAPABILITIES,
+  resolveRepairCapabilities,
   loadRepairEmployeeContext,
+  allowRepairCapabilities,
   allowRepairRoles,
 };
