@@ -16,7 +16,13 @@ const inspect = async (client) => {
       to_regtype('public."SupplierPaymentLifecycleStatus"') IS NOT NULL AS lifecycle_status,
       to_regtype('public."SupplierPaymentAllocationState"') IS NOT NULL AS allocation_state,
       to_regclass('public."SupplierPaymentAllocation"') IS NOT NULL AS allocation_table,
-      to_regclass('public."SupplierPaymentAllocation_active_payment_payable_key"') IS NOT NULL AS active_key,
+      EXISTS (
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'SupplierPaymentAllocation'
+          AND indexname = 'SupplierPaymentAllocation_active_payment_payable_key'
+      ) AS active_key,
       EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'public'
