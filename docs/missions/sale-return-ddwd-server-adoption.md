@@ -19,6 +19,7 @@ Document the authoritative Sale Return lifecycle from eligibility lookup through
 - refund, approval, stock, and idempotency policies
 - eligibility, refund, and stock-movement builders
 - Sale Return history list/detail slices
+- `server.js` route mounts
 
 ## Confirmed Runtime Boundaries
 
@@ -34,13 +35,22 @@ Document the authoritative Sale Return lifecycle from eligibility lookup through
 - Reusing the same command identity with the same material request is a safe replay; changed material is a conflict.
 - Concurrent stock or command races return a completion conflict and require eligibility refresh.
 
-## Hybrid / Compatibility State Under Assessment
+## Hybrid / Compatibility Boundary Decision
 
-- Canonical nested route: `/sales/returns/...`
-- Compatibility completion route: `/sales/returns/create`
-- A legacy top-level Client API still targets `/sale-returns/...`.
-- Runtime usage must be traced before any compatibility route or legacy Client feature is retired.
-- This Mission does not authorize deletion until repository usage and backward-compatibility evidence are complete.
+Canonical route ownership is confirmed under the Sales module:
+
+- `/api/sales/returns/eligible/:saleId`
+- `/api/sales/returns/complete`
+- `/api/sales/returns/create` remains a compatibility completion path inside the canonical router.
+
+The same router is also mounted at `/api/sale-returns` in `server.js` for legacy callers.
+
+Decision:
+
+- `/api/sales/returns/...` is the canonical path for current Client runtime.
+- `/api/sale-returns/...` is a compatibility mount, not the preferred authority path.
+- Compatibility paths remain active during this DDWD Increment.
+- Retirement requires separate usage evidence and backward-compatibility approval; this Mission does not authorize deletion.
 
 ## Planned Documentation Scope
 
@@ -72,9 +82,9 @@ Document the authoritative Sale Return lifecycle from eligibility lookup through
 ## Completion Criteria
 
 - [x] Dedicated branch exists.
-- [ ] Draft PR exists.
+- [x] Draft PR exists.
 - [x] Initial runtime authority discovery is recorded.
-- [ ] Repository usage of canonical and compatibility paths is resolved.
+- [x] Repository usage of canonical and compatibility paths is resolved.
 - [ ] Workflow Contract exists.
 - [ ] Acceptance Scenarios exist.
 - [ ] Business Operation Manual exists.
@@ -85,4 +95,4 @@ Document the authoritative Sale Return lifecycle from eligibility lookup through
 
 ## Current State
 
-`IN PROGRESS` — runtime discovery has begun; documentation, Client projection, hybrid-state decision, acceptance, and merge remain pending.
+`IN PROGRESS` — runtime authority and hybrid route boundary are confirmed; documentation, Client projection, acceptance, and merge remain pending.
