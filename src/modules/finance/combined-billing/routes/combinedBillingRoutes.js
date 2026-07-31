@@ -4,8 +4,10 @@ const verifyToken = require('../../../../../middlewares/verifyToken');
 const { getCombinableSales } = require('../query/combinable-sales/getCombinableSalesController');
 const { getCombinedBillingById } = require('../query/detail/getCombinedBillingByIdController');
 const {
-  createCombinedBillingDocument,
   getCustomersWithPendingSales,
+} = require('../query/pending-customers/getCustomersWithPendingSalesController');
+const {
+  createCombinedBillingDocument,
 } = require('../../../../../controllers/combinedBillingController');
 
 const router = express.Router();
