@@ -1,8 +1,8 @@
 const express = require('express');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
+const { getCombinableSales } = require('../query/combinable-sales/getCombinableSalesController');
 const {
-  getCombinableSales,
   createCombinedBillingDocument,
   getCombinedBillingById,
   getCustomersWithPendingSales,
