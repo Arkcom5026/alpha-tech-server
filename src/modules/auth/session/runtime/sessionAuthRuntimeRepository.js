@@ -8,6 +8,15 @@ const findUserByEmail = (email) => prisma.user.findUnique({
   },
 });
 
+const findPasswordResetEligibleUserByEmail = (email) => prisma.user.findUnique({
+  where: { email },
+  select: {
+    id: true,
+    email: true,
+    enabled: true,
+  },
+});
+
 const findSessionUserById = (id) => prisma.user.findUnique({
   where: { id },
   include: {
@@ -84,11 +93,33 @@ const revokeActiveRefreshTokensByUserId = ({ userId, revokedAt }, tx = prisma) =
   data: { revokedAt },
 });
 
+const invalidateActivePasswordResetTokensByUserId = ({ userId, usedAt }, tx = prisma) => (
+  tx.passwordResetToken.updateMany({
+    where: {
+      userId,
+      usedAt: null,
+    },
+    data: { usedAt },
+  })
+);
+
 const createPasswordResetToken = (data, tx = prisma) => tx.passwordResetToken.create({ data });
 
-const findPasswordResetTokenByHash = (tokenHash) => prisma.passwordResetToken.findUnique({
-  where: { tokenHash },
-  include: { user: true },
+const findActivePasswordResetTokenByHash = (tokenHash) => prisma.passwordResetToken.findFirst({
+  where: {
+    tokenHash,
+    usedAt: null,
+    expiresAt: { gt: new Date() },
+  },
+  orderBy: { createdAt: 'desc' },
+  include: {
+    user: {
+      select: {
+        id: true,
+        enabled: true,
+      },
+    },
+  },
 });
 
 const updatePasswordResetToken = ({ id, data }, tx = prisma) => tx.passwordResetToken.update({
@@ -105,6 +136,7 @@ const runTransaction = (work) => prisma.$transaction(work);
 
 module.exports = {
   findUserByEmail,
+  findPasswordResetEligibleUserByEmail,
   findSessionUserById,
   findUserByLoginId,
   findBranchBySlug,
@@ -115,8 +147,9 @@ module.exports = {
   revokeRefreshTokensByIds,
   revokeRefreshTokenByHash,
   revokeActiveRefreshTokensByUserId,
+  invalidateActivePasswordResetTokensByUserId,
   createPasswordResetToken,
-  findPasswordResetTokenByHash,
+  findActivePasswordResetTokenByHash,
   updatePasswordResetToken,
   updateUser,
   runTransaction,
