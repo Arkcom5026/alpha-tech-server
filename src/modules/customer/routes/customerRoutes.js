@@ -5,10 +5,8 @@ const customerByPhoneController = require('../query/by-phone/customerByPhoneCont
 const customerByNameController = require('../query/by-name/customerByNameController');
 const customerSelfController = require('../query/self/customerSelfController');
 const customerCreateController = require('../create/customerCreateController');
-const {
-  updateCustomerProfile,
-  updateCustomerProfileOnline,
-} = require('../controllers/customerUpdateController');
+const customerStaffUpdateController = require('../update/staff/customerStaffUpdateController');
+const { updateCustomerProfileOnline } = require('../controllers/customerUpdateController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
@@ -19,6 +17,6 @@ router.get('/me', customerSelfController.getCustomerSelf);
 
 router.post('/', customerCreateController.createCustomer);
 router.put('/me', updateCustomerProfileOnline);
-router.put('/:id', updateCustomerProfile);
+router.put('/:id', customerStaffUpdateController.updateCustomerStaff);
 
 module.exports = router;
