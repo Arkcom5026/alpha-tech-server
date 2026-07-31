@@ -64,14 +64,14 @@ const {
   finalizeRepairHandover,
 } = require('../handover/repairHandoverController');
 const {
+  REPAIR_CAPABILITY,
   loadRepairEmployeeContext,
-  allowRepairRoles,
+  allowRepairCapabilities,
 } = require('../middlewares/repairAuthorization');
 
 const router = express.Router();
 
-const READ_AND_INTAKE_ROLES = ['OWNER', 'MANAGER', 'CASHIER'];
-const OPERATION_ROLES = ['OWNER', 'MANAGER'];
+const can = (...capabilities) => allowRepairCapabilities(...capabilities);
 
 // Customer-safe endpoint. It must remain before the staff authentication middleware.
 router.get('/public/tracking/:token', getPublicRepairTracking);
@@ -84,140 +84,95 @@ router.post('/public/tracking/:token/pickup-confirmation', confirmPublicPickup);
 router.use(verifyToken);
 router.use(loadRepairEmployeeContext);
 
-router.get(
-  '/intake-search',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  searchIntake
-);
-
-router.get(
-  '/intake-context/:lookup',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  getIntakeContext
-);
-
+router.get('/intake-search', can(REPAIR_CAPABILITY.INTAKE), searchIntake);
+router.get('/intake-context/:lookup', can(REPAIR_CAPABILITY.INTAKE), getIntakeContext);
 router.get(
   '/customers/:customerId/warranty-assets',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.INTAKE),
   listCustomerWarrantyAssets
 );
-
 router.post(
   '/intakes/external-device',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.INTAKE),
   createExternalDeviceIntake
 );
 
-router.get(
-  '/jobs',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  listRepairJobs
-);
-
-router.get(
-  '/jobs/:id',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  getRepairJobDetail
-);
-
-router.post(
-  '/jobs',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  createRepairJob
-);
+router.get('/jobs', can(REPAIR_CAPABILITY.READ), listRepairJobs);
+router.get('/jobs/:id', can(REPAIR_CAPABILITY.READ), getRepairJobDetail);
+router.post('/jobs', can(REPAIR_CAPABILITY.INTAKE), createRepairJob);
 
 router.post(
   '/jobs/:id/tracking-access',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
   createTrackingAccess
 );
-
 router.post(
   '/jobs/:id/tracking-access/rotate',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
   rotateTrackingAccess
 );
-
 router.delete(
   '/jobs/:id/tracking-access',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
   revokeTrackingAccess
 );
 
 router.get(
   '/jobs/:id/estimate-approval',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.READ),
   getLatestEstimateApproval
 );
-
 router.post(
   '/jobs/:id/estimate-approval',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.ESTIMATE),
   publishEstimateApproval
 );
-router.get(
-  '/jobs/:id/handover',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  getRepairHandover
-);
+
+router.get('/jobs/:id/handover', can(REPAIR_CAPABILITY.READ), getRepairHandover);
 router.post(
   '/jobs/:id/handover/finalize',
-  allowRepairRoles(...OPERATION_ROLES),
+  can(REPAIR_CAPABILITY.HANDOVER),
   finalizeRepairHandover
 );
 
 router.get(
   '/jobs/:id/intake-evidence',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.READ),
   getIntakeEvidence
 );
-
 router.post(
   '/jobs/:id/intake-evidence',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.INTAKE),
   intakeEvidenceUpload,
   saveIntakeEvidence
 );
 
 router.post(
   '/jobs/:id/workflow/commands',
-  allowRepairRoles(...OPERATION_ROLES),
+  can(REPAIR_CAPABILITY.WORKFLOW),
   transitionRepairWorkflow
 );
-
 router.patch(
   '/jobs/:id/status',
-  allowRepairRoles(...OPERATION_ROLES),
+  can(REPAIR_CAPABILITY.WORKFLOW),
   updateRepairJobStatus
 );
-
-router.post(
-  '/jobs/:id/parts',
-  allowRepairRoles(...OPERATION_ROLES),
-  addRepairPart
-);
+router.post('/jobs/:id/parts', can(REPAIR_CAPABILITY.PARTS), addRepairPart);
 
 router.post(
   '/jobs/:id/warranty-claims',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.CLAIM),
   openWarrantyClaim
 );
-
-router.get(
-  '/warranty-claims',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
-  listWarrantyClaims
-);
-
+router.get('/warranty-claims', can(REPAIR_CAPABILITY.READ), listWarrantyClaims);
 router.get(
   '/warranty-claims/:claimId',
-  allowRepairRoles(...READ_AND_INTAKE_ROLES),
+  can(REPAIR_CAPABILITY.READ),
   getWarrantyClaim
 );
-
 router.patch(
   '/warranty-claims/:claimId/status',
-  allowRepairRoles(...OPERATION_ROLES),
+  can(REPAIR_CAPABILITY.CLAIM),
   updateWarrantyClaimStatus
 );
 
