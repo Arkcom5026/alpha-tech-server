@@ -2,10 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const customerByPhoneController = require('../query/by-phone/customerByPhoneController');
-const {
-  getCustomerByName,
-  getCustomerByUserId,
-} = require('../controllers/customerQueryController');
+const customerByNameController = require('../query/by-name/customerByNameController');
+const { getCustomerByUserId } = require('../controllers/customerQueryController');
 const { createCustomer } = require('../controllers/customerCreateController');
 const {
   updateCustomerProfile,
@@ -16,7 +14,7 @@ const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
 
 router.get('/by-phone/:phone', customerByPhoneController.getCustomerByPhone);
-router.get('/by-name', getCustomerByName);
+router.get('/by-name', customerByNameController.getCustomerByName);
 router.get('/me', getCustomerByUserId);
 
 router.post('/', createCustomer);

@@ -1,8 +1,5 @@
 const { prisma } = require('../../../../lib/prisma');
-const {
-  toInt,
-  buildCustomerAddress,
-} = require('../shared/customerControllerSupport');
+const { buildCustomerAddress } = require('../shared/customerControllerSupport');
 
 const includeAddress = {
   user: true,
@@ -48,30 +45,6 @@ const presentCustomer = (customer, { includeCredit = true, includeType = true } 
   };
 };
 
-const getCustomerByName = async (req, res) => {
-  try {
-    const branchId = toInt(req.user?.branchId);
-    if (!branchId) return res.status(401).json({ message: 'Unauthorized (missing branchId)' });
-
-    const q = String(req.query?.q || '').trim();
-    if (!q) return res.json([]);
-
-    const customers = await prisma.customerProfile.findMany({
-      where: {
-        name: { contains: q, mode: 'insensitive' },
-        sale: { some: { branchId } },
-      },
-      take: 10,
-      include: includeAddress,
-    });
-
-    return res.json(customers.map((customer) => presentCustomer(customer)));
-  } catch (err) {
-    console.error('❌ getCustomerByName error:', err);
-    return res.status(500).json({ error: 'เกิดข้อผิดพลาดในการค้นหาลูกค้า' });
-  }
-};
-
 async function getCustomerByUserId(req, res) {
   try {
     const userId = req.user?.id;
@@ -92,6 +65,5 @@ async function getCustomerByUserId(req, res) {
 }
 
 module.exports = {
-  getCustomerByName,
   getCustomerByUserId,
 };
