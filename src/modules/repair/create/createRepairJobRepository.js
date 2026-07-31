@@ -66,6 +66,15 @@ const repairJobDetailInclude = {
   },
 };
 
+const buildCustomerBranchEvidence = (branchId) => ({
+  OR: [
+    { sale: { some: { branchId } } },
+    { repairJobs: { some: { branchId } } },
+    { deviceIntakes: { some: { branchId } } },
+    { ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } },
+  ],
+});
+
 class CreateRepairJobRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -75,9 +84,12 @@ class CreateRepairJobRepository {
     return this.prisma.$transaction((tx) => work(new CreateRepairJobRepository(tx)));
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...buildCustomerBranchEvidence(Number(branchId)),
+      },
       include: { user: true },
     });
   }
@@ -109,3 +121,4 @@ class CreateRepairJobRepository {
 
 module.exports = new CreateRepairJobRepository();
 module.exports.CreateRepairJobRepository = CreateRepairJobRepository;
+module.exports.buildCustomerBranchEvidence = buildCustomerBranchEvidence;
