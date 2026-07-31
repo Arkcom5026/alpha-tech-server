@@ -25,19 +25,20 @@ Create an authoritative business and operational guide for selling from item sel
 - business actors and branch/shop authority
 - item search and cart preparation
 - optional Held Cart snapshot and resume boundary
-- structured stock items
+- structured Stock Items
 - tracked SIMPLE products and Simple Lot authority
 - NON_STOCK SIMPLE/service-style products
 - customer and sale-type rules
 - CASH/immediate payment versus CREDIT sale
 - payment evidence and outstanding balance
 - sale completion transaction and stock mutation
-- idempotency and replay conflict behavior
+- idempotency and replay-conflict behavior
 - default receipt or delivery-note projection
-- tax-candidate publication boundary
+- downstream tax-candidate publication boundary
 - printable/history lookup and recovery guidance
 - FAQ and troubleshooting
 - documentation/runtime evidence boundary
+- operational evidence record
 
 ## Explicit Exclusion
 
@@ -48,11 +49,13 @@ Create an authoritative business and operational guide for selling from item sel
 - Workflow Contract: implemented in `docs/workflows/core-sales-workflow-contract.md`
 - Acceptance Scenarios: implemented in `docs/workflows/core-sales-acceptance-scenarios.md`
 - Business Operation Manual: implemented in `docs/workflows/core-sales-business-operation-manual.md`
-- Draft User Guide: implemented in companion Client PR #49
+- Operational Evidence Record: implemented in `docs/workflows/core-sales-operational-evidence-record.md`
+- Operational User Guide: implemented in companion Client PR #49
+- Human Operational Test Pack: implemented in companion Client PR #49
 - In-app Help: implemented in companion Client PR #49
 - Contextual Help: implemented on the main Sales workflow in companion Client PR #49
 - Focused Contract and CI Gate: implemented in companion Client PR #49
-- Workflow Assistant: separate scope; not part of this increment
+- Workflow Assistant: separate scope; not part of this Increment
 - Runtime-backed checklist: separate scope; static operational checklist is included in the documentation/help projection
 - FAQ / troubleshooting: implemented
 
@@ -67,14 +70,22 @@ The Client projection covers the same Core Sales boundaries:
 - payment and deposit evidence;
 - idempotency and uncertain-response recovery;
 - receipt/delivery-note defaults;
+- downstream tax publication and `PENDING_RETRY` recovery without duplicate Sale creation;
 - history and printable recovery;
 - explicit exclusion of Sale Return.
 
-Final Client SHA and verification evidence will be recorded during the final certification phase after implementation is complete.
+## Current-head Certification Evidence
+
+- Certified Server SHA: `239c6a41e6a9d6c44584cfeb93886a23801f85c3`
+- Server delta from the previously reviewed SHA is one documentation-only file: `docs/workflows/core-sales-operational-evidence-record.md`
+- Certified companion Client SHA: `ca7e1a18e36c22eafb3da9191aca7e09fd0f64d7`
+- Companion Client GitHub Actions run: `30668830284` — SUCCESS
+- Core Sales Help contract: PASS
+- Production Build: PASS
 
 ## Runtime Impact
 
-Documentation only. No API, Prisma, migration, stock mutation, payment posting, route, dependency, or production-data change.
+Documentation and evidence guidance only. No API, Prisma, migration, stock mutation, payment posting, route, dependency, test-runtime, or production-data change.
 
 ## Completion Criteria
 
@@ -84,12 +95,14 @@ Documentation only. No API, Prisma, migration, stock mutation, payment posting, 
 - [x] Workflow Contract exists.
 - [x] Acceptance Scenarios exist.
 - [x] Core Sales Business Operation Manual exists.
+- [x] Operational Evidence Record exists.
 - [x] Repository review confirms workflow and authority boundaries.
 - [x] Companion Client projection alignment is recorded.
-- [ ] Final Client and Server SHA certification is recorded.
-- [ ] Human Operational Test is recorded.
-- [ ] Independent review and merge decision are recorded.
+- [x] Current Client and Server SHA certification is recorded.
+- [ ] Human Operational Test is executed and recorded.
+- [ ] Independent human review is recorded.
+- [ ] Explicit merge decision is recorded.
 
 ## Current State
 
-`IN PROGRESS` — documentation and Client projection implementation are complete; final certification, Human Operational Test, independent review, and merge decision remain pending.
+`IN PROGRESS` — implementation and current-head repository/CI certification are complete. Human Operational Test, independent human review, and explicit merge approval remain pending. The PR must stay Draft and must not merge until those gates are satisfied.
