@@ -14,11 +14,16 @@ const repository = read('src/modules/location/address/query/resolve/addressResol
 for (const route of [addressRoute, locationsRoute]) {
   assert.match(route, /require\('\.\.\/address\/query\/resolve\/addressResolveController'\)/);
   assert.match(route, /router\.get\('\/resolve', addressResolveController\.resolveAddress\)/);
-  assert.doesNotMatch(route, /addressController\.resolve/);
+  assert.match(route, /addressValidateController\.validateAddress/);
+  assert.match(route, /addressPostcodeController\.postcodeAddress/);
+  assert.match(route, /addressSearchController\.searchAddress/);
+  assert.match(route, /addressJoinController\.joinAddress/);
+  assert.doesNotMatch(route, /addressController\./);
 }
 
 assert.doesNotMatch(controller, /prisma\./);
 assert.doesNotMatch(service, /prisma\./);
+assert.doesNotMatch(service, /addressUtil|utils\/address/);
 assert.match(repository, /prisma\.subdistrict\.findUnique/);
 assert.match(repository, /include: \{ district: \{ include: \{ province: true \} \} \}/);
 
@@ -29,7 +34,8 @@ assert.match(controller, /เกิดข้อผิดพลาดภายใ
 
 assert.match(service, /postalCode: postalCode \|\| subdistrict\.postcode \|\| undefined/);
 assert.match(service, /if \(address \|\| result\.postalCode\)/);
-assert.match(service, /addressUtil\.joinAddress/);
+assert.match(service, /joinAddressParts/);
+assert.match(service, /\[address, subdistrict, district, province, postalCode\]\.filter\(Boolean\)\.join\(' '\)/);
 assert.match(service, /provinceCode: subdistrict\.district\?\.provinceCode/);
 assert.match(service, /districtCode: subdistrict\.district\?\.code/);
 assert.match(service, /subdistrictCode: subdistrict\.code/);
@@ -37,14 +43,5 @@ assert.match(service, /subdistrictName: subdistrict\.nameTh/);
 assert.match(service, /districtName: subdistrict\.district\?\.nameTh/);
 assert.match(service, /provinceName: subdistrict\.district\?\.province\?\.nameTh/);
 assert.match(service, /region: subdistrict\.district\?\.province\?\.region \|\| undefined/);
-
-assert.match(addressRoute, /addressController\.validate/);
-assert.match(addressRoute, /addressController\.postcode/);
-assert.match(addressRoute, /addressController\.search/);
-assert.match(addressRoute, /addressController\.join/);
-assert.match(locationsRoute, /addressController\.validate/);
-assert.match(locationsRoute, /addressController\.postcode/);
-assert.match(locationsRoute, /addressController\.search/);
-assert.match(locationsRoute, /addressController\.join/);
 
 console.log('location-address-resolve-slice.contract: PASS');
