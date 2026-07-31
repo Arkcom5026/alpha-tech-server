@@ -8,7 +8,6 @@ const root = path.resolve(__dirname, '..');
 
 const syntaxFiles = [
   'middlewares/verifyToken.js',
-  'controllers/employeeController.js',
   'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
@@ -16,6 +15,16 @@ const syntaxFiles = [
   'routes/employeeRoutes.js',
   'routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
+  'src/modules/employee/create/createEmployeeController.js',
+  'src/modules/employee/update/updateEmployeeController.js',
+  'src/modules/employee/query/list/listEmployeeController.js',
+  'src/modules/employee/query/detail/detailEmployeeController.js',
+  'src/modules/employee/delete/deleteEmployeeController.js',
+  'src/modules/employee/status/statusEmployeeController.js',
+  'src/modules/employee/role/updateEmployeeRoleController.js',
+  'src/modules/employee/lookup/positions/positionLookupController.js',
+  'src/modules/employee/lookup/branches/branchLookupController.js',
+  'src/modules/employee/query/usersByRole/usersByRoleController.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -40,6 +49,11 @@ const assertNotContains = (source, value, label) => {
   else pass(label);
 };
 
+const assertMissing = (relativePath, label) => {
+  if (fs.existsSync(path.join(root, relativePath))) fail(`${label} still exists`);
+  else pass(label);
+};
+
 for (const relativePath of syntaxFiles) {
   const absolutePath = path.join(root, relativePath);
   try {
@@ -49,6 +63,8 @@ for (const relativePath of syntaxFiles) {
     fail(`syntax ${relativePath}: ${error.stderr?.toString().trim() || error.message}`);
   }
 }
+
+assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -85,6 +101,11 @@ assertNotContains(
   employeeModuleRoute,
   "router.post('/approve-employee', approveEmployee)",
   'live employee approval handler'
+);
+assertNotContains(
+  employeeModuleRoute,
+  'controllers/employeeController',
+  'employee module route legacy controller reference'
 );
 
 const authRoutes = read('routes/authRoutes.js');
