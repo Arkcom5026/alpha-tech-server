@@ -117,8 +117,8 @@ Repair In-App Help Center established the first accepted pattern:
 - [x] Standard document exists.
 - [x] Workflow template exists.
 - [x] Adoption mission exists.
-- [ ] Draft PR is opened.
-- [ ] Repository review confirms paths and content.
+- [x] Draft PR is opened.
+- [x] Repository review confirms paths and content.
 - [ ] Merge decision is recorded.
 
 ## Out of Scope
