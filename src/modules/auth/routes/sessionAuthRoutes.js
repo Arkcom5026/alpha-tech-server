@@ -1,7 +1,7 @@
 const express = require('express');
 
-const authController = require('../../../../controllers/authController');
-const employeeOnboardingController = require('../../../../controllers/employeeOnboardingController');
+const authController = require('../session/runtime/sessionAuthRuntimeController');
+const employeeOnboardingController = require('../../employee/onboarding/runtime/employeeOnboardingRuntimeController');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { traceRefreshRequest } = require('../../../../middlewares/authTrace');
 
