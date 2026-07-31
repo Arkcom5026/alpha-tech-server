@@ -1,13 +1,25 @@
 const prisma = require('../../../../database/prisma/client');
 
+const buildCustomerBranchEvidence = (branchId) => ({
+  OR: [
+    { sale: { some: { branchId } } },
+    { repairJobs: { some: { branchId } } },
+    { deviceIntakes: { some: { branchId } } },
+    { ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } },
+  ],
+});
+
 class CustomerWarrantyAssetsRepository {
   constructor(client = prisma) {
     this.prisma = client;
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...buildCustomerBranchEvidence(Number(branchId)),
+      },
       include: { user: true },
     });
   }
@@ -88,3 +100,4 @@ class CustomerWarrantyAssetsRepository {
 
 module.exports = new CustomerWarrantyAssetsRepository();
 module.exports.CustomerWarrantyAssetsRepository = CustomerWarrantyAssetsRepository;
+module.exports.buildCustomerBranchEvidence = buildCustomerBranchEvidence;
