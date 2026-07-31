@@ -34,7 +34,20 @@ const inspect = async (client) => {
 };
 
 const ready = (state) => Object.values(state).every(Boolean);
-const partial = (state) => Object.values(state).some(Boolean);
+const coreReady = (state) =>
+  state.lifecycle_status &&
+  state.allocation_state &&
+  state.allocation_table &&
+  state.payment_lifecycle;
+const empty = (state) => Object.values(state).every((value) => !value);
+
+const ensureActiveAllocationIndex = async (client) => {
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "SupplierPaymentAllocation_active_payment_payable_key"
+      ON "SupplierPaymentAllocation"("paymentId", "payableId")
+      WHERE "state" = 'ACTIVE'
+  `);
+};
 
 async function main() {
   const raw = process.env.DATABASE_URL || process.env.DIRECT_URL;
@@ -58,7 +71,20 @@ async function main() {
       console.log('[db] Supplier payment allocation authority is ready');
       return;
     }
-    if (partial(before)) throw new Error('Supplier payment allocation authority is partially applied');
+
+    if (coreReady(before) && !before.active_key) {
+      await ensureActiveAllocationIndex(client);
+      if (!ready(await inspect(client))) {
+        throw new Error('Supplier payment allocation authority index repair failed');
+      }
+      console.log('[db] Supplier payment allocation authority is ready');
+      return;
+    }
+
+    if (!empty(before)) {
+      throw new Error('Supplier payment allocation authority is partially applied');
+    }
+
     await client.query('BEGIN');
     try {
       await client.query(fs.readFileSync(migrationPath, 'utf8'));
