@@ -28,16 +28,8 @@ assert.match(
   /addressValidateController\.validateAddress/,
   'locations alias must use the same module-owned validate controller'
 );
-assert.doesNotMatch(
-  addressRoutes,
-  /addressController\.validate/,
-  'canonical route must not retain legacy validate ownership'
-);
-assert.doesNotMatch(
-  locationsRoutes,
-  /addressController\.validate/,
-  'locations alias must not retain legacy validate ownership'
-);
+assert.doesNotMatch(addressRoutes, /addressController\./);
+assert.doesNotMatch(locationsRoutes, /addressController\./);
 
 assert.doesNotMatch(controller, /lib\/prisma|prisma\./, 'controller must not access Prisma');
 assert.doesNotMatch(service, /lib\/prisma|prisma\./, 'service must not access Prisma');
@@ -49,11 +41,11 @@ assert.match(service, /valid:\s*Boolean\(subdistrict\)/);
 assert.match(controller, /เกิดข้อผิดพลาดในการตรวจสอบรหัสตำบล/);
 assert.match(controller, /เกิดข้อผิดพลาดภายในระบบ/);
 
-assert.match(addressRoutes, /addressController\.postcode/);
-assert.match(addressRoutes, /addressController\.search/);
-assert.match(addressRoutes, /addressController\.join/);
-assert.match(locationsRoutes, /addressController\.postcode/);
-assert.match(locationsRoutes, /addressController\.search/);
-assert.match(locationsRoutes, /addressController\.join/);
+assert.match(addressRoutes, /addressPostcodeController\.postcodeAddress/);
+assert.match(addressRoutes, /addressSearchController\.searchAddress/);
+assert.match(addressRoutes, /addressJoinController\.joinAddress/);
+assert.match(locationsRoutes, /addressPostcodeController\.postcodeAddress/);
+assert.match(locationsRoutes, /addressSearchController\.searchAddress/);
+assert.match(locationsRoutes, /addressJoinController\.joinAddress/);
 
 console.log('location-address-validate-slice.contract: PASS');
