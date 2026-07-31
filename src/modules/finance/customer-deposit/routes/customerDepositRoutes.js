@@ -11,7 +11,7 @@ const {
   getCustomerAndDepositByName,
   getCustomerAndDepositByCustomerId,
   useCustomerDeposit,
-} = require('../../../../../controllers/customerDepositController');
+} = require('../runtime/customerDepositRuntimeController');
 
 const router = express.Router();
 router.use(verifyToken);
