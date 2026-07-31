@@ -16,6 +16,28 @@ const sha256 = (value) => crypto
   .update(JSON.stringify(stableValue(value)))
   .digest('hex');
 
+const requireAuthorityText = (value, field) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    const error = new Error(`Validated dry-run authority is missing ${field}`);
+    error.code = 'UNLINKED_SIMPLE_MOVEMENT_DRY_RUN_AUTHORITY_REQUIRED';
+    error.details = { field };
+    throw error;
+  }
+  return normalized;
+};
+
+const requireAuthorityBranchId = (value) => {
+  const branchId = Number(value);
+  if (!Number.isInteger(branchId) || branchId <= 0) {
+    const error = new Error('Validated dry-run authority is missing a positive branchId');
+    error.code = 'UNLINKED_SIMPLE_MOVEMENT_DRY_RUN_AUTHORITY_REQUIRED';
+    error.details = { field: 'branchId' };
+    throw error;
+  }
+  return branchId;
+};
+
 const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
   if (!dryRunResult || dryRunResult.validation?.result !== 'VALIDATED_DRY_RUN_ONLY') {
     const error = new Error('A validated unlinked movement recovery dry run is required');
@@ -28,6 +50,20 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
     error.code = 'UNLINKED_SIMPLE_MOVEMENT_STALE_DATA';
     throw error;
   }
+
+  const branchId = requireAuthorityBranchId(dryRunResult.authority?.branchId);
+  const manifestId = requireAuthorityText(
+    dryRunResult.authority?.manifestId,
+    'manifestId'
+  );
+  const sourceSnapshotHash = requireAuthorityText(
+    dryRunResult.authority?.sourceSnapshotHash,
+    'sourceSnapshotHash'
+  );
+  const operatorIdentity = requireAuthorityText(
+    dryRunResult.validation?.operatorIdentity,
+    'operatorIdentity'
+  );
 
   const operations = (dryRunResult.readyEntries || [])
     .map((entry) => ({
@@ -77,10 +113,10 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
 
   const authority = {
     version: PLAN_VERSION,
-    branchId: dryRunResult.branchId,
-    manifestId: dryRunResult.manifestId,
-    sourceSnapshotHash: dryRunResult.sourceSnapshotHash,
-    operatorIdentity: dryRunResult.operatorIdentity,
+    branchId,
+    manifestId,
+    sourceSnapshotHash,
+    operatorIdentity,
     operations,
     totals,
   };
@@ -88,12 +124,12 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
 
   return {
     planVersion: PLAN_VERSION,
-    executionPlanId: `usmr-plan-${dryRunResult.branchId}-${executionPlanHash.slice(0, 24)}`,
+    executionPlanId: `usmr-plan-${branchId}-${executionPlanHash.slice(0, 24)}`,
     executionPlanHash,
-    branchId: dryRunResult.branchId,
-    manifestId: dryRunResult.manifestId,
-    sourceSnapshotHash: dryRunResult.sourceSnapshotHash,
-    operatorIdentity: dryRunResult.operatorIdentity,
+    branchId,
+    manifestId,
+    sourceSnapshotHash,
+    operatorIdentity,
     mode: 'PLAN_ONLY',
     mutationPerformed: false,
     executable: false,
