@@ -74,6 +74,11 @@ const findBranchBySlug = (slug) => prisma.branch.findUnique({
   where: { slug },
 });
 
+const createBranch = (data, tx = prisma) => tx.branch.create({ data });
+const createUser = (data, tx = prisma) => tx.user.create({ data });
+const createEmployeeProfile = (data, tx = prisma) => tx.employeeProfile.create({ data });
+const createCustomerProfile = (data, tx = prisma) => tx.customerProfile.create({ data });
+
 const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findUnique({
   where: { tokenHash },
   include: {
@@ -174,6 +179,10 @@ module.exports = {
   findSessionUserById,
   findUserByLoginId,
   findBranchBySlug,
+  createBranch,
+  createUser,
+  createEmployeeProfile,
+  createCustomerProfile,
   findRefreshTokenByHash,
   findRefreshTokenChildren,
   createRefreshToken,
