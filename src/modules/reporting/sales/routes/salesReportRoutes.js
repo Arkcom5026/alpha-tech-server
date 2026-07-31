@@ -8,7 +8,7 @@ const {
   getSalesList,
   getProductPerformance,
   getSalesDetail,
-} = require('../../../../../controllers/salesReportController');
+} = require('../runtime/salesReportRuntimeController');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 router.use(verifyToken);
