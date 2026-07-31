@@ -38,7 +38,7 @@ for (const forbidden of [
 
 assert.ok(routes.includes('router.use(verifyToken, requireAdministrator)'));
 assert.ok(routes.includes("['ADMIN', 'SUPERADMIN']"));
-assert.ok(routes.includes("router.get('/')"));
+assert.ok(routes.includes("router.get('/', async"));
 assert.ok(routes.includes("data.status === 'FAILED' ? 503 : 200"));
 assert.ok(server.includes("app.use('/api/system/operational-verification', operationalVerificationRoutes)"));
 
