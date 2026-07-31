@@ -3,11 +3,32 @@ const jwt = require('jsonwebtoken');
 
 const repository = require('./sessionAuthRuntimeRepository');
 const legacyAuthController = require('../../../../../controllers/authController');
+const { sendMailAction } = require('../../../../../utils/mailSender');
 
 const ACCESS_TOKEN_EXPIRES = String(process.env.ACCESS_TOKEN_EXPIRES || '1h');
 const REFRESH_TOKEN_EXPIRES_DEFAULT = String(process.env.REFRESH_TOKEN_EXPIRES_DEFAULT || '1d');
 const REFRESH_TOKEN_EXPIRES_REMEMBER_ME = String(process.env.REFRESH_TOKEN_EXPIRES_REMEMBER_ME || '30d');
 const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshToken');
+const PASSWORD_RESET_TOKEN_EXPIRES_MINUTES = Number(
+  process.env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES || 30
+);
+
+let bcrypt;
+try {
+  bcrypt = require('@node-rs/bcrypt');
+} catch (nodeRsError) {
+  try {
+    bcrypt = require('bcrypt');
+  } catch (bcryptError) {
+    bcrypt = require('bcryptjs');
+  }
+}
+
+const bcryptHash = async (plain, rounds = 10) => {
+  if (typeof bcrypt?.hash === 'function') return bcrypt.hash(plain, rounds);
+  if (typeof bcrypt?.hashSync === 'function') return bcrypt.hashSync(plain, rounds);
+  throw new Error('bcrypt hash function not available');
+};
 
 const normalize = (value) => (
   value === undefined || value === null ? '' : String(value).trim()
@@ -18,6 +39,7 @@ const sha256 = (value) => crypto
   .update(String(value || ''))
   .digest('hex');
 const createRawRefreshToken = () => crypto.randomBytes(48).toString('hex');
+const createRawPasswordResetToken = () => crypto.randomBytes(32).toString('hex');
 
 const getRefreshTokenExpiresIn = (rememberMe = false) => (
   rememberMe ? REFRESH_TOKEN_EXPIRES_REMEMBER_ME : REFRESH_TOKEN_EXPIRES_DEFAULT
@@ -55,6 +77,62 @@ const getRequestIpAddress = (req) => {
 };
 
 const getRequestUserAgent = (req) => normalize(req?.headers?.['user-agent']);
+
+const getAppBaseUrl = (req) => {
+  const envBaseUrl = normalize(process.env.APP_BASE_URL || process.env.CLIENT_URL);
+  if (envBaseUrl) return envBaseUrl;
+
+  const originHeader = normalize(req?.headers?.origin);
+  if (originHeader) return originHeader;
+
+  const forwardedProto = normalize(req?.headers?.['x-forwarded-proto']);
+  const forwardedHost = normalize(req?.headers?.['x-forwarded-host']);
+  if (forwardedProto && forwardedHost) return `${forwardedProto}://${forwardedHost}`;
+
+  const protocol = normalize(req?.protocol);
+  const host = normalize(req?.get?.('host'));
+  if (protocol && host) return `${protocol}://${host}`;
+
+  return '';
+};
+
+const buildPasswordResetUrl = (req, rawToken) => {
+  const appBaseUrl = getAppBaseUrl(req);
+  if (!appBaseUrl) return '';
+  const base = appBaseUrl.endsWith('/') ? appBaseUrl.slice(0, -1) : appBaseUrl;
+  return `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
+};
+
+const sendPasswordResetEmail = async ({ toEmail, resetUrl }) => {
+  if (!toEmail) throw new Error('Recipient email is required for password reset');
+  if (!resetUrl) throw new Error('Password reset URL is required');
+
+  const subject = 'ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ';
+  const text = [
+    'เราได้รับคำขอให้ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ',
+    '',
+    `ลิงก์สำหรับตั้งรหัสผ่านใหม่: ${resetUrl}`,
+    '',
+    `ลิงก์นี้จะหมดอายุใน ${PASSWORD_RESET_TOKEN_EXPIRES_MINUTES} นาที`,
+    'หากคุณไม่ได้เป็นผู้ส่งคำขอนี้ คุณสามารถละเว้นอีเมลฉบับนี้ได้',
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #0f172a; max-width: 560px; margin: 0 auto;">
+      <h2 style="margin-bottom: 12px;">ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ</h2>
+      <p>เราได้รับคำขอให้ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ</p>
+      <p style="margin: 24px 0;">
+        <a href="${resetUrl}" style="display: inline-block; padding: 12px 20px; background: #0f172a; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600;">ตั้งรหัสผ่านใหม่</a>
+      </p>
+      <p>หากปุ่มด้านบนไม่ทำงาน คุณสามารถคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์ได้:</p>
+      <p style="word-break: break-all; color: #2563eb;">${resetUrl}</p>
+      <p>ลิงก์นี้จะหมดอายุใน ${PASSWORD_RESET_TOKEN_EXPIRES_MINUTES} นาที</p>
+      <p style="color: #475569;">หากคุณไม่ได้เป็นผู้ส่งคำขอนี้ คุณสามารถละเว้นอีเมลฉบับนี้ได้</p>
+    </div>
+  `;
+
+  return sendMailAction({ to: toEmail, subject, text, html });
+};
 
 const buildToken = (user) => {
   const profile = user.employeeProfile || null;
@@ -332,14 +410,111 @@ const findUserByEmail = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!email) return res.status(400).json({ message: 'กรุณากรอกอีเมล' });
+
+    const genericSuccessMessage = 'หากข้อมูลของคุณมีอยู่ในระบบ เราได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่แล้ว';
+    const user = await repository.findPasswordResetEligibleUserByEmail(email);
+
+    if (!user || !user.enabled) return res.json({ message: genericSuccessMessage });
+
+    const rawToken = createRawPasswordResetToken();
+    const tokenHash = sha256(rawToken);
+    const expiresAt = new Date(
+      Date.now() + PASSWORD_RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000
+    );
+    const resetUrl = buildPasswordResetUrl(req, rawToken);
+
+    await repository.runTransaction(async (tx) => {
+      await repository.invalidateActivePasswordResetTokensByUserId({
+        userId: user.id,
+        usedAt: new Date(),
+      }, tx);
+      await repository.createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      }, tx);
+    });
+
+    try {
+      await sendPasswordResetEmail({ toEmail: user.email, resetUrl });
+    } catch (mailError) {
+      console.error('❌ sendPasswordResetEmail error:', mailError);
+      return res.status(500).json({ message: 'ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้' });
+    }
+
+    return res.json({ message: genericSuccessMessage });
+  } catch (error) {
+    console.error('❌ forgotPassword error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถดำเนินการลืมรหัสผ่านได้' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const rawToken = normalize(req.body?.token);
+    const password = normalize(req.body?.password);
+    const confirmPassword = normalize(req.body?.confirmPassword);
+
+    if (!rawToken) {
+      return res.status(400).json({ message: 'ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือไม่ครบถ้วน' });
+    }
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ message: 'กรุณากรอกรหัสผ่านใหม่และยืนยันรหัสผ่าน' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'ยืนยันรหัสผ่านไม่ตรงกัน' });
+    }
+
+    const resetRecord = await repository.findActivePasswordResetTokenByHash(
+      sha256(rawToken)
+    );
+
+    if (!resetRecord || !resetRecord.user?.enabled) {
+      return res.status(400).json({
+        message: 'ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอรีเซ็ตรหัสผ่านใหม่อีกครั้ง',
+      });
+    }
+
+    const hashedPassword = await bcryptHash(password, 10);
+    const usedAt = new Date();
+
+    await repository.runTransaction(async (tx) => {
+      await repository.updateUser({
+        id: resetRecord.user.id,
+        data: { password: hashedPassword },
+      }, tx);
+      await repository.updatePasswordResetToken({
+        id: resetRecord.id,
+        data: { usedAt },
+      }, tx);
+      await repository.invalidateActivePasswordResetTokensByUserId({
+        userId: resetRecord.user.id,
+        usedAt,
+      }, tx);
+    });
+
+    return res.json({ message: 'ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว กรุณาเข้าสู่ระบบอีกครั้ง' });
+  } catch (error) {
+    console.error('❌ resetPassword error:', error);
+    return res.status(500).json({ message: 'ไม่สามารถรีเซ็ตรหัสผ่านได้' });
+  }
+};
+
 module.exports = {
   login: requireLegacyHandler('login'),
   register: requireLegacyHandler('register'),
   refreshSession,
   logoutSession,
   getMe,
-  forgotPassword: requireLegacyHandler('forgotPassword'),
-  resetPassword: requireLegacyHandler('resetPassword'),
+  forgotPassword,
+  resetPassword,
   findUserByEmail,
   revokeSession,
 };
