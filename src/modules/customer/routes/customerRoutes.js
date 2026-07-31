@@ -6,7 +6,7 @@ const customerByNameController = require('../query/by-name/customerByNameControl
 const customerSelfController = require('../query/self/customerSelfController');
 const customerCreateController = require('../create/customerCreateController');
 const customerStaffUpdateController = require('../update/staff/customerStaffUpdateController');
-const { updateCustomerProfileOnline } = require('../controllers/customerUpdateController');
+const customerSelfUpdateController = require('../update/self/customerSelfUpdateController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
@@ -16,7 +16,7 @@ router.get('/by-name', customerByNameController.getCustomerByName);
 router.get('/me', customerSelfController.getCustomerSelf);
 
 router.post('/', customerCreateController.createCustomer);
-router.put('/me', updateCustomerProfileOnline);
+router.put('/me', customerSelfUpdateController.updateCustomerSelf);
 router.put('/:id', customerStaffUpdateController.updateCustomerStaff);
 
 module.exports = router;
