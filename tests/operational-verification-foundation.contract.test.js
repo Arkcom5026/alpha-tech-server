@@ -19,7 +19,7 @@ for (const token of [
   "to_regclass('\"ProductReservationLifecycleCommand\"')",
   "to_regclass('\"ProductReservationLifecycleEvent\"')",
   'Merchant reservation projection readiness',
-  "status: CHECK_STATUS.READY",
+  'return createCheck(key, label, CHECK_STATUS.READY, details)',
 ]) {
   assert.ok(service.includes(token), `Missing verification authority: ${token}`);
 }
