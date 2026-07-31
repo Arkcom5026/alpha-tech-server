@@ -34,6 +34,7 @@ const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findUnique({
         employeeProfile: {
           include: {
             branch: true,
+            position: true,
           },
         },
       },
@@ -41,7 +42,7 @@ const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findUnique({
   },
 });
 
-const findRefreshTokenChildren = (replacedByTokenId) => prisma.refreshToken.findMany({
+const findRefreshTokenChildren = (replacedByTokenId, tx = prisma) => tx.refreshToken.findMany({
   where: { replacedByTokenId },
   select: { id: true },
 });
@@ -55,6 +56,14 @@ const updateRefreshToken = ({ id, data }, tx = prisma) => tx.refreshToken.update
 
 const revokeRefreshTokensByIds = ({ ids, revokedAt }, tx = prisma) => tx.refreshToken.updateMany({
   where: { id: { in: ids } },
+  data: { revokedAt },
+});
+
+const revokeRefreshTokenByHash = ({ tokenHash, revokedAt }, tx = prisma) => tx.refreshToken.updateMany({
+  where: {
+    tokenHash,
+    revokedAt: null,
+  },
   data: { revokedAt },
 });
 
@@ -94,6 +103,7 @@ module.exports = {
   createRefreshToken,
   updateRefreshToken,
   revokeRefreshTokensByIds,
+  revokeRefreshTokenByHash,
   revokeActiveRefreshTokensByUserId,
   createPasswordResetToken,
   findPasswordResetTokenByHash,
