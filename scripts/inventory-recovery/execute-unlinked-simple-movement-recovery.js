@@ -3,8 +3,17 @@
 const prismaModule = require('../../lib/prisma');
 const prisma = prismaModule?.prisma || prismaModule;
 const {
+  validateUnlinkedSimpleMovementRecoveryApprovalDryRun,
+} = require('../../src/modules/inventory/recovery/unlinked-simple-movement/approval/validateUnlinkedSimpleMovementRecoveryApprovalDryRun');
+const {
+  buildUnlinkedSimpleMovementRecoveryExecutionPlan,
+} = require('../../src/modules/inventory/recovery/unlinked-simple-movement/execution-plan/buildUnlinkedSimpleMovementRecoveryExecutionPlan');
+const {
   executeUnlinkedSimpleMovementRecovery,
 } = require('../../src/modules/inventory/recovery/unlinked-simple-movement/execution/executeUnlinkedSimpleMovementRecovery');
+const {
+  UnlinkedSimpleMovementRecoveryExecutionRepository,
+} = require('../../src/modules/inventory/recovery/unlinked-simple-movement/execution/unlinkedSimpleMovementRecoveryExecutionRepository');
 
 const readArg = (name) => {
   const prefix = `--${name}=`;
@@ -33,7 +42,7 @@ const readBranchId = () => {
   return branchId;
 };
 
-const readApproved = () => {
+const requireExplicitApproval = () => {
   const value = readArg('approve');
   if (value !== 'EXECUTE_SAFE_TO_LINK') {
     const error = new Error(
@@ -42,7 +51,11 @@ const readApproved = () => {
     error.code = 'UNLINKED_SIMPLE_MOVEMENT_EXPLICIT_APPROVAL_REQUIRED';
     throw error;
   }
-  return true;
+};
+
+const loadBranchSnapshot = async (branchId) => {
+  const repository = new UnlinkedSimpleMovementRecoveryExecutionRepository(prisma);
+  return repository.loadSnapshot(branchId);
 };
 
 const main = async () => {
@@ -52,12 +65,26 @@ const main = async () => {
   const executionPlanId = requireText('plan-id');
   const executionPlanHash = requireText('plan-hash');
   const operatorIdentity = requireText('operator');
-  const approved = readApproved();
+  requireExplicitApproval();
 
+  const snapshot = await loadBranchSnapshot(branchId);
+  const dryRunResult = validateUnlinkedSimpleMovementRecoveryApprovalDryRun({
+    branchId,
+    manifestId,
+    sourceSnapshotHash,
+    operatorIdentity,
+    ...snapshot,
+  });
+  const executionPlan = buildUnlinkedSimpleMovementRecoveryExecutionPlan({
+    dryRunResult,
+  });
+
+  const repository = new UnlinkedSimpleMovementRecoveryExecutionRepository(prisma);
   const result = await executeUnlinkedSimpleMovementRecovery({
-    prisma,
+    executionPlan,
+    repository,
     approval: {
-      approved,
+      explicitApproval: true,
       branchId,
       manifestId,
       sourceSnapshotHash,
