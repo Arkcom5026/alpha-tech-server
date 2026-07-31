@@ -13,6 +13,15 @@ const repairWorkflowInclude = {
       },
     },
   },
+  deviceIntake: {
+    include: {
+      consent: true,
+      photos: {
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  },
 };
 
 class TransitionRepairWorkflowRepository {

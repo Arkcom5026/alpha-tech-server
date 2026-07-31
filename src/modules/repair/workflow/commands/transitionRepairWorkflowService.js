@@ -5,6 +5,9 @@ const {
   projectLegacyServiceStatus,
   resolveRepairWorkflowTransition,
 } = require('../policies/repairWorkflowPolicy');
+const {
+  evaluateIntakeCompletion,
+} = require('../../intake-evidence/intakeEvidencePolicy');
 
 class RepairWorkflowCommandError extends Error {
   constructor(code, message, details = {}) {
@@ -42,6 +45,22 @@ function requireText(value, field) {
 function currentWorkflowStatus(repairJob) {
   const latest = repairJob.device?.passportEvents?.[0];
   return latest?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
+}
+
+function assertIntakeCompleteForAction(repairJob, action) {
+  if (action !== 'QUEUE_DIAGNOSIS') return;
+
+  const completion = evaluateIntakeCompletion(repairJob.deviceIntake);
+  if (!completion.complete) {
+    throw new RepairWorkflowCommandError(
+      'REPAIR_INTAKE_INCOMPLETE',
+      'Repair intake evidence must be complete before diagnosis can begin',
+      {
+        repairJobId: repairJob.id,
+        completion,
+      }
+    );
+  }
 }
 
 class TransitionRepairWorkflowService {
@@ -88,6 +107,8 @@ class TransitionRepairWorkflowService {
           }
         );
       }
+
+      assertIntakeCompleteForAction(repairJob, action);
 
       const transition = resolveRepairWorkflowTransition(workflowStatus, action);
       const legacyStatus = projectLegacyServiceStatus(transition.targetStatus);
@@ -146,3 +167,4 @@ module.exports = new TransitionRepairWorkflowService();
 module.exports.RepairWorkflowCommandError = RepairWorkflowCommandError;
 module.exports.TransitionRepairWorkflowService = TransitionRepairWorkflowService;
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
+module.exports.assertIntakeCompleteForAction = assertIntakeCompleteForAction;

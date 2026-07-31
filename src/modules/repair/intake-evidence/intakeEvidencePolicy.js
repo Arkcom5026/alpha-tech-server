@@ -29,6 +29,26 @@ function parseConsent(body = {}) {
   };
 }
 
+function evaluateIntakeCompletion(intake) {
+  const hasConsent = Boolean(
+    intake?.consent?.customerSignature && intake?.consent?.signedAt
+  );
+  const photoCount = Array.isArray(intake?.photos) ? intake.photos.length : 0;
+  const hasConditionPhoto = photoCount > 0;
+  const missingRequirements = [];
+
+  if (!hasConsent) missingRequirements.push('CUSTOMER_CONSENT');
+  if (!hasConditionPhoto) missingRequirements.push('INTAKE_PHOTO');
+
+  return {
+    complete: missingRequirements.length === 0,
+    hasConsent,
+    hasConditionPhoto,
+    photoCount,
+    missingRequirements,
+  };
+}
+
 function mapEvidence(intake) {
   return {
     intakeId: intake.id,
@@ -37,7 +57,13 @@ function mapEvidence(intake) {
     receivedBy: intake.receivedBy || null,
     consent: intake.consent || null,
     photos: intake.photos || [],
+    completion: evaluateIntakeCompletion(intake),
   };
 }
 
-module.exports = { parseBoolean, parseConsent, mapEvidence };
+module.exports = {
+  parseBoolean,
+  parseConsent,
+  evaluateIntakeCompletion,
+  mapEvidence,
+};
