@@ -7,9 +7,11 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const route = read('src/modules/customer/routes/customerRoutes.js');
 const legacyController = read('src/modules/customer/controllers/customerQueryController.js');
-const controller = read(
+const controllerPath = path.join(
+  root,
   'src/modules/customer/query/by-phone/customerByPhoneController.js'
 );
+const controller = fs.readFileSync(controllerPath, 'utf8');
 const service = read(
   'src/modules/customer/query/by-phone/customerByPhoneService.js'
 );
@@ -23,6 +25,15 @@ assert.match(
 );
 assert.match(route, /router\.get\('\/by-phone\/:phone', customerByPhoneController\.getCustomerByPhone\)/);
 assert.doesNotMatch(route, /router\.get\('\/by-phone\/:phone', getCustomerByPhone\)/);
+
+assert.match(controller, /require\('\.\.\/\.\.\/shared\/customerControllerSupport'\)/);
+assert.match(service, /require\('\.\.\/\.\.\/shared\/customerControllerSupport'\)/);
+assert.doesNotMatch(controller, /require\('\.\.\/\.\.\/\.\.\/shared\/customerControllerSupport'\)/);
+assert.doesNotMatch(service, /require\('\.\.\/\.\.\/\.\.\/shared\/customerControllerSupport'\)/);
+assert.doesNotThrow(
+  () => require(controllerPath),
+  'customer by-phone controller dependency graph must resolve at startup'
+);
 
 assert.doesNotMatch(controller, /lib\/prisma|prisma\./);
 assert.doesNotMatch(service, /lib\/prisma|prisma\./);
