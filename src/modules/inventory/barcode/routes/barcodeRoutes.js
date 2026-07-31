@@ -20,10 +20,12 @@ const {
   auditReceiptBarcodes,
 } = require('../audit/barcodeAuditController');
 const {
-  markReceiptAsCompleted,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   updateSerialNumber,
+} = require('../scan-serial/barcodeScanSerialController');
+const {
+  markReceiptAsCompleted,
 } = require('../runtime/barcodeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
