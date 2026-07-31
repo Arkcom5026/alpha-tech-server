@@ -5,6 +5,8 @@ const router = express.Router();
 
 const {
   generateMissingBarcodes,
+} = require('../generation/generateMissingBarcodesController');
+const {
   getBarcodesByReceiptId,
   getBarcodesForPrintBatch,
   getReceiptsWithBarcodes,
@@ -16,7 +18,7 @@ const {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   updateSerialNumber,
-} = require('../../../../../controllers/barcodeController');
+} = require('../runtime/barcodeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
