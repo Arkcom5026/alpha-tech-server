@@ -12,6 +12,7 @@ const REFRESH_COOKIE_NAME = String(process.env.REFRESH_COOKIE_NAME || 'refreshTo
 const normalize = (value) => (
   value === undefined || value === null ? '' : String(value).trim()
 );
+const normalizeEmail = (value) => normalize(value).toLowerCase();
 const sha256 = (value) => crypto
   .createHash('sha256')
   .update(String(value || ''))
@@ -84,12 +85,7 @@ const clearRefreshTokenCookie = (res) => {
   });
 };
 
-const createRefreshTokenRecord = async ({
-  userId,
-  rememberMe = false,
-  req,
-  tx,
-}) => {
+const createRefreshTokenRecord = async ({ userId, rememberMe = false, req, tx }) => {
   const rawToken = createRawRefreshToken();
   const tokenHash = sha256(rawToken);
   const expiresAt = getRefreshTokenExpiresAt(rememberMe);
@@ -101,20 +97,10 @@ const createRefreshTokenRecord = async ({
     ipAddress: getRequestIpAddress(req) || null,
   }, tx);
 
-  return {
-    rawToken,
-    tokenHash,
-    expiresAt,
-    rememberMe,
-    refreshToken,
-  };
+  return { rawToken, tokenHash, expiresAt, rememberMe, refreshToken };
 };
 
-const revokeRefreshTokenFamilyChain = async ({
-  tokenId,
-  tx,
-  revokedAt = new Date(),
-}) => {
+const revokeRefreshTokenFamilyChain = async ({ tokenId, tx, revokedAt = new Date() }) => {
   if (!tokenId) return;
   const visited = new Set();
   const queue = [tokenId];
@@ -123,7 +109,6 @@ const revokeRefreshTokenFamilyChain = async ({
     const currentId = queue.shift();
     if (!currentId || visited.has(currentId)) continue;
     visited.add(currentId);
-
     const children = await repository.findRefreshTokenChildren(currentId, tx);
     queue.push(...children.map((item) => item.id));
   }
@@ -148,18 +133,14 @@ const resolveLegacyHandler = (key) => {
 const requireLegacyHandler = (key) => {
   const handler = resolveLegacyHandler(key);
   if (typeof handler !== 'function') {
-    throw new Error(
-      `[sessionAuthRuntimeService] authController.${key} must resolve to a function`
-    );
+    throw new Error(`[sessionAuthRuntimeService] authController.${key} must resolve to a function`);
   }
   return handler;
 };
 
 const refreshSession = async (req, res) => {
   const trace = (stage, payload = {}) => {
-    if (process.env.AUTH_TRACE === '1') {
-      console.log('[refreshSession]', stage, payload);
-    }
+    if (process.env.AUTH_TRACE === '1') console.log('[refreshSession]', stage, payload);
   };
 
   try {
@@ -182,11 +163,7 @@ const refreshSession = async (req, res) => {
     if (existingToken.revokedAt) {
       trace('TOKEN_REUSE', { tokenId: existingToken.id });
       await repository.runTransaction(async (tx) => {
-        await revokeRefreshTokenFamilyChain({
-          tokenId: existingToken.id,
-          tx,
-          revokedAt: now,
-        });
+        await revokeRefreshTokenFamilyChain({ tokenId: existingToken.id, tx, revokedAt: now });
       });
       clearRefreshTokenCookie(res);
       return res.status(401).json({ message: 'Refresh token reuse detected' });
@@ -208,10 +185,7 @@ const refreshSession = async (req, res) => {
       return res.status(401).json({ message: 'Session expired or not allowed' });
     }
 
-    if (
-      user.employeeProfile.active === false
-      || user.employeeProfile.approved === false
-    ) {
+    if (user.employeeProfile.active === false || user.employeeProfile.approved === false) {
       clearRefreshTokenCookie(res);
       return res.status(403).json({ message: 'Session is no longer allowed' });
     }
@@ -305,14 +279,67 @@ const revokeSession = async (req, res) => {
   }
 };
 
+const getMe = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const user = await repository.findSessionUserById(userId);
+    if (!user || !user.employeeProfile) {
+      return res.status(404).json({ message: 'User or EmployeeProfile not found' });
+    }
+
+    const profile = user.employeeProfile;
+    return res.json({
+      role: user.role,
+      profileType: 'employee',
+      branchId: profile.branchId || null,
+      profile: {
+        id: profile.id || null,
+        name: profile.name || '',
+        phone: profile.phone || '',
+        email: user.email || '',
+        branch: profile.branch || null,
+        position: profile.position || null,
+        branchId: profile.branchId || null,
+        user: { id: user.id, email: user.email, role: user.role },
+      },
+    });
+  } catch (error) {
+    console.error('❌ getMe error:', error);
+    return res.status(500).json({ message: 'Failed to verify session' });
+  }
+};
+
+const findUserByEmail = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.query?.email);
+    if (!email) return res.status(400).json({ message: 'กรุณาระบุอีเมล' });
+
+    const user = await repository.findUserByEmail(email);
+    if (!user) return res.status(404).json({ message: 'ไม่พบผู้ใช้อีเมลนี้' });
+
+    return res.json({
+      id: user.id,
+      email: user.email,
+      name: user.customerProfile?.name || '',
+      phone: user.customerProfile?.phone || '',
+      alreadyEmployee: Boolean(user.employeeProfile),
+    });
+  } catch (error) {
+    console.error('❌ findUserByEmail error:', error);
+    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+};
+
 module.exports = {
   login: requireLegacyHandler('login'),
   register: requireLegacyHandler('register'),
   refreshSession,
   logoutSession,
-  getMe: requireLegacyHandler('getMe'),
+  getMe,
   forgotPassword: requireLegacyHandler('forgotPassword'),
   resetPassword: requireLegacyHandler('resetPassword'),
-  findUserByEmail: requireLegacyHandler('findUserByEmail'),
+  findUserByEmail,
   revokeSession,
 };
