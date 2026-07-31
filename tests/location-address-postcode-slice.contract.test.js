@@ -14,8 +14,8 @@ assert(addressRoutes.includes("require('../address/query/postcode/addressPostcod
 assert(locationsRoutes.includes("require('../address/query/postcode/addressPostcodeController')"));
 assert(addressRoutes.includes("router.get('/postcode', addressPostcodeController.postcodeAddress)"));
 assert(locationsRoutes.includes("router.get('/postcode', addressPostcodeController.postcodeAddress)"));
-assert(!addressRoutes.includes("router.get('/postcode', addressController.postcode)"));
-assert(!locationsRoutes.includes("router.get('/postcode', addressController.postcode)"));
+assert(!addressRoutes.includes('addressController.'));
+assert(!locationsRoutes.includes('addressController.'));
 
 assert(!controller.includes('prisma.'));
 assert(!service.includes('prisma.'));
@@ -27,9 +27,9 @@ assert(controller.includes("postalCode: result.postcode || null"));
 assert(controller.includes("เกิดข้อผิดพลาดในการดึงรหัสไปรษณีย์"));
 assert(controller.includes("เกิดข้อผิดพลาดภายในระบบ"));
 
-assert(addressRoutes.includes("router.get('/search', addressController.search)"));
-assert(addressRoutes.includes("router.post('/join', addressController.join)"));
-assert(locationsRoutes.includes("router.get('/search', addressController.search)"));
-assert(locationsRoutes.includes("router.post('/join', addressController.join)"));
+assert(addressRoutes.includes("router.get('/search', addressSearchController.searchAddress)"));
+assert(addressRoutes.includes("router.post('/join', addressJoinController.joinAddress)"));
+assert(locationsRoutes.includes("router.get('/search', addressSearchController.searchAddress)"));
+assert(locationsRoutes.includes("router.post('/join', addressJoinController.joinAddress)"));
 
 console.log('location-address-postcode-slice.contract: PASS');
