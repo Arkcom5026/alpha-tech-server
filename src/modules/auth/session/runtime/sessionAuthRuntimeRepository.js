@@ -3,9 +3,18 @@ const { prisma } = require('../../../../../lib/prisma');
 const findUserByEmail = (email) => prisma.user.findUnique({
   where: { email },
   include: {
+    customerProfile: true,
+    employeeProfile: true,
+  },
+});
+
+const findSessionUserById = (id) => prisma.user.findUnique({
+  where: { id },
+  include: {
     employeeProfile: {
       include: {
         branch: true,
+        position: true,
       },
     },
   },
@@ -96,6 +105,7 @@ const runTransaction = (work) => prisma.$transaction(work);
 
 module.exports = {
   findUserByEmail,
+  findSessionUserById,
   findUserByLoginId,
   findBranchBySlug,
   findRefreshTokenByHash,
