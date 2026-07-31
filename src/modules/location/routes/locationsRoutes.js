@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { prisma } = require('../../../../lib/prisma');
+const addressResolveController = require('../address/query/resolve/addressResolveController');
 const { addressController } = require('../../../../controllers/addressController');
 
 router.use((req, res, next) => {
@@ -56,7 +57,7 @@ router.get('/subdistricts', async (req, res) => {
   }
 });
 
-router.get('/resolve', addressController.resolve);
+router.get('/resolve', addressResolveController.resolveAddress);
 router.get('/validate', addressController.validate);
 router.get('/postcode', addressController.postcode);
 router.get('/search', addressController.search);
