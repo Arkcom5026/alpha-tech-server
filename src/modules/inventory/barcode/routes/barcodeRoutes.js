@@ -8,6 +8,8 @@ const {
 } = require('../generation/generateMissingBarcodesController');
 const {
   getBarcodesByReceiptId,
+} = require('../receipt-query/getBarcodesByReceiptIdController');
+const {
   getBarcodesForPrintBatch,
   getReceiptsWithBarcodes,
   searchReprintReceipts,
