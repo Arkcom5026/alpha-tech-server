@@ -45,8 +45,6 @@ const main = async () => {
         qtyRemaining: true,
         unitCost: true,
         receivedAt: true,
-        createdAt: true,
-        updatedAt: true,
       },
       orderBy: [{ productId: 'asc' }, { id: 'asc' }],
     }),
