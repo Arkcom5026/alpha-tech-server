@@ -28,10 +28,34 @@ Record evidence from the Sale Return Human Operational Test Pack and preserve th
 - Workflow Contract: `docs/workflows/sale-return-workflow-contract.md`
 - Acceptance Scenarios: `docs/workflows/sale-return-acceptance-scenarios.md`
 - Business Operation Manual: `docs/workflows/sale-return-business-operation-manual.md`
-- Client User Guide: companion Client PR
-- Human Operational Test Pack: companion Client PR
+- Client User Guide: companion Client PR #51
+- Human Operational Test Pack: companion Client PR #51
 - Canonical Server route: `/api/sales/returns/...`
 - Canonical Client owner: `src/features/sales/return`
+
+## Verified Client Repository Evidence
+
+This section records repository-level verification only. It is not Human Operational Test, Server runtime evidence, production verification, operational acceptance, or merge authorization.
+
+- Client repository: `Arkcom5026/alpha-tech-client`
+- Client PR: `#51`
+- Client branch: `docs/sale-return-ddwd-adoption`
+- Verified Client SHA: `ab14ff4f29208aea050369fac30c5d82d920f322`
+- Workflow: `Frontend Mission Control v2`
+- Workflow run ID: `30673684217`
+- Workflow run number: `1076`
+- Workflow conclusion: `SUCCESS`
+- Verified focused command: `npm run test:sale-return-help`
+- Focused result: `6 tests passed`
+- Additional successful steps:
+  - Repair Help contract
+  - Warranty Claim Help contract
+  - Quick Receipt Help contract
+  - secret injection
+  - Production Build
+- Verification review ID on Client PR: `4832889603`
+
+Repository evidence conclusion: the Sale Return Client help contract and Production Build completed successfully for the identified Client SHA. Runtime and Human Operational Test fields below remain unexecuted.
 
 ## Test Identity
 
@@ -41,12 +65,12 @@ Record evidence from the Sale Return Human Operational Test Pack and preserve th
 - Environment:
 - Environment URL:
 - Browser/device:
-- Client repository:
-- Client branch:
-- Client SHA:
-- Server repository:
-- Server branch:
-- Server SHA:
+- Client repository: `Arkcom5026/alpha-tech-client`
+- Client branch: `docs/sale-return-ddwd-adoption`
+- Client SHA: `ab14ff4f29208aea050369fac30c5d82d920f322`
+- Server repository: `Arkcom5026/alpha-tech-server`
+- Server branch: `docs/sale-return-ddwd-adoption`
+- Server SHA: `5aeac1b02d09f46e60f05382822683ba50fb3dd4`
 - Database/environment identifier:
 - Shop/branch ID:
 - Shop/branch name:
