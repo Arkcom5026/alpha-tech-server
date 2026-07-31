@@ -1,4 +1,7 @@
 const prisma = require('../../../../database/prisma/client');
+const {
+  buildCustomerBranchEvidence,
+} = require('../../policies/repairCustomerBranchAccessPolicy');
 
 const deviceSelect = {
   id: true,
@@ -120,12 +123,17 @@ class IntakeSearchRepository {
       }),
       this.prisma.customerProfile.findMany({
         where: {
-          OR: [
-            { name: insensitive },
-            { companyName: insensitive },
-            { taxId: insensitive },
-            { user: { loginId: insensitive } },
-            { user: { email: insensitive } },
+          AND: [
+            buildCustomerBranchEvidence(normalizedBranchId),
+            {
+              OR: [
+                { name: insensitive },
+                { companyName: insensitive },
+                { taxId: insensitive },
+                { user: { loginId: insensitive } },
+                { user: { email: insensitive } },
+              ],
+            },
           ],
         },
         select: customerSelect,
