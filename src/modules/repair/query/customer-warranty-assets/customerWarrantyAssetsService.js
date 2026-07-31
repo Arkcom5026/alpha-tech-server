@@ -168,12 +168,12 @@ class CustomerWarrantyAssetsService {
 
   async execute(actor, customerIdInput) {
     const customerId = requirePositiveInteger(customerIdInput, 'customerId');
-    const customer = await this.repository.findCustomer(customerId);
+    const customer = await this.repository.findCustomer(actor.branchId, customerId);
 
     if (!customer) {
       throw new RepairError(
         RepairFailureCode.CUSTOMER_NOT_FOUND,
-        'ไม่พบข้อมูลลูกค้าที่ต้องการค้นหาสินค้าประกัน',
+        'ไม่พบข้อมูลลูกค้าที่เข้าถึงได้ในสาขานี้',
         404,
         { customerId }
       );
