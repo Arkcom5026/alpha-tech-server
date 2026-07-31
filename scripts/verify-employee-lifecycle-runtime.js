@@ -14,7 +14,8 @@ const syntaxFiles = [
   'src/modules/auth/session/runtime/sessionAuthRuntimeService.js',
   'src/modules/auth/session/runtime/sessionAuthRuntimeRepository.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js',
-  'controllers/employeeOnboardingController.js',
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js',
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
@@ -71,8 +72,13 @@ for (const relativePath of syntaxFiles) {
 assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
 assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
 assertMissing('controllers/authController.js', 'legacy root auth controller retired');
+assertMissing('routes/authRoutes.js', 'legacy root auth route retired');
 assertMissing('routes/loginEmployee.js', 'legacy loginEmployee route retired');
 assertMissing('routes/currentEmployeeRoutes.js', 'legacy currentEmployee route retired');
+assertMissing(
+  'controllers/employeeOnboardingController.js',
+  'legacy root employee onboarding controller retired'
+);
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -152,16 +158,58 @@ assertNotContains(
   "require('../../../../controllers/authController')",
   'session auth route legacy auth controller reference'
 );
+assertNotContains(
+  sessionAuthRoutes,
+  'controllers/employeeOnboardingController',
+  'session auth route legacy onboarding controller reference'
+);
 
-const employeeOnboarding = read('controllers/employeeOnboardingController.js');
-assertContains(employeeOnboarding, 'canCreateEmployee', 'employee onboarding authority guard');
-assertContains(employeeOnboarding, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
-assertContains(employeeOnboarding, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
-assertContains(employeeOnboarding, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
-assertContains(employeeOnboarding, 'positionId,', 'employee onboarding position assignment');
-assertContains(employeeOnboarding, 'approved: true', 'owner-created employee auto approval');
-assertContains(employeeOnboarding, 'active: true', 'owner-created employee auto activation');
-assertContains(employeeOnboarding, 'enabled: true', 'owner-created employee user activation');
+const employeeOnboardingController = read(
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js'
+);
+const employeeOnboardingService = read(
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js'
+);
+const employeeOnboardingRepository = read(
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js'
+);
+assertContains(
+  employeeOnboardingController,
+  "require('./employeeOnboardingRuntimeService')",
+  'employee onboarding controller service boundary'
+);
+assertContains(
+  employeeOnboardingController,
+  'addSubEmployee: service.addSubEmployee',
+  'employee onboarding controller handler export'
+);
+assertContains(employeeOnboardingService, 'canCreateEmployee', 'employee onboarding authority guard');
+assertContains(employeeOnboardingService, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
+assertContains(employeeOnboardingService, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
+assertContains(
+  employeeOnboardingService,
+  "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'",
+  'employee onboarding forbidden response'
+);
+assertContains(employeeOnboardingService, 'positionId,', 'employee onboarding position assignment');
+assertContains(employeeOnboardingService, 'approved: true', 'owner-created employee auto approval');
+assertContains(employeeOnboardingService, 'active: true', 'owner-created employee auto activation');
+assertContains(employeeOnboardingService, 'enabled: true', 'owner-created employee user activation');
+assertContains(
+  employeeOnboardingService,
+  "require('./employeeOnboardingRuntimeRepository')",
+  'employee onboarding service repository boundary'
+);
+assertContains(
+  employeeOnboardingRepository,
+  'const runTransaction = (work) => prisma.$transaction(work);',
+  'employee onboarding repository transaction boundary'
+);
+assertNotContains(
+  employeeOnboardingService,
+  'controllers/employeeOnboardingController',
+  'employee onboarding service legacy controller reference'
+);
 
 const combinedBilling = read('controllers/combinedBillingController.js');
 assertNotContains(
