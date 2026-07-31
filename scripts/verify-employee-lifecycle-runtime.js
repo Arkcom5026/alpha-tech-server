@@ -7,15 +7,24 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 
 const syntaxFiles = [
+  'server.js',
   'middlewares/verifyToken.js',
-  'controllers/employeeController.js',
   'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'routes/authRoutes.js',
-  'routes/employeeRoutes.js',
-  'routes/supplierPaymentRoutes.js',
+  'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
+  'src/modules/employee/create/createEmployeeController.js',
+  'src/modules/employee/update/updateEmployeeController.js',
+  'src/modules/employee/query/list/listEmployeeController.js',
+  'src/modules/employee/query/detail/detailEmployeeController.js',
+  'src/modules/employee/delete/deleteEmployeeController.js',
+  'src/modules/employee/status/statusEmployeeController.js',
+  'src/modules/employee/role/updateEmployeeRoleController.js',
+  'src/modules/employee/lookup/positions/positionLookupController.js',
+  'src/modules/employee/lookup/branches/branchLookupController.js',
+  'src/modules/employee/query/usersByRole/usersByRoleController.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -40,6 +49,11 @@ const assertNotContains = (source, value, label) => {
   else pass(label);
 };
 
+const assertMissing = (relativePath, label) => {
+  if (fs.existsSync(path.join(root, relativePath))) fail(`${label} still exists`);
+  else pass(label);
+};
+
 for (const relativePath of syntaxFiles) {
   const absolutePath = path.join(root, relativePath);
   try {
@@ -50,6 +64,9 @@ for (const relativePath of syntaxFiles) {
   }
 }
 
+assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
+assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
+
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
 assertContains(verifyToken, "'EMPLOYEE_PROFILE_REQUIRED'", 'verifyToken employee profile guard');
@@ -59,17 +76,22 @@ assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId pro
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
 assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
-const employeeRootRoute = read('routes/employeeRoutes.js');
+const server = read('server.js');
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
 assertContains(
-  employeeRootRoute,
-  "src/modules/employee/routes/employeeRoutes",
-  'employee root route delegates to module authority'
+  server,
+  "require('./src/modules/employee/routes/employeeRoutes')",
+  'server imports canonical employee module route directly'
+);
+assertContains(
+  server,
+  "app.use('/api/employees', employeeRoutes)",
+  'server mounts canonical employee endpoint'
 );
 assertNotContains(
-  employeeRootRoute,
-  "../controllers/employeeController",
-  'employee root route legacy controller ownership'
+  server,
+  'controllers/employeeController',
+  'server legacy employee controller reference'
 );
 assertContains(
   employeeModuleRoute,
@@ -85,6 +107,11 @@ assertNotContains(
   employeeModuleRoute,
   "router.post('/approve-employee', approveEmployee)",
   'live employee approval handler'
+);
+assertNotContains(
+  employeeModuleRoute,
+  'controllers/employeeController',
+  'employee module route legacy controller reference'
 );
 
 const authRoutes = read('routes/authRoutes.js');
@@ -141,7 +168,7 @@ assertNotContains(
   'sale return profileId employee fallback'
 );
 
-const supplierPaymentRoutes = read('routes/supplierPaymentRoutes.js');
+const supplierPaymentRoutes = read('src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js');
 assertContains(
   supplierPaymentRoutes,
   'requireSupplierPaymentActor',
