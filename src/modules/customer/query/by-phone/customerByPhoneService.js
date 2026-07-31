@@ -3,7 +3,7 @@ const {
   normalizePhone,
   isValidPhone,
   buildCustomerAddress,
-} = require('../../../shared/customerControllerSupport');
+} = require('../../shared/customerControllerSupport');
 
 const presentCustomer = (customer) => {
   const subdistrictCode = customer.subdistrict?.code || null;
