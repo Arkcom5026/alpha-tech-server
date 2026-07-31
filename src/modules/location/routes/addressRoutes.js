@@ -7,7 +7,7 @@ const addressResolveController = require('../address/query/resolve/addressResolv
 const addressValidateController = require('../address/query/validate/addressValidateController');
 const addressPostcodeController = require('../address/query/postcode/addressPostcodeController');
 const addressSearchController = require('../address/query/search/addressSearchController');
-const { addressController } = require('../../../../controllers/addressController');
+const addressJoinController = require('../address/command/join/addressJoinController');
 
 router.get('/provinces', addressListController.listProvinces);
 router.get('/districts', addressListController.listDistricts);
@@ -17,6 +17,6 @@ router.get('/resolve', addressResolveController.resolveAddress);
 router.get('/validate', addressValidateController.validateAddress);
 router.get('/postcode', addressPostcodeController.postcodeAddress);
 router.get('/search', addressSearchController.searchAddress);
-router.post('/join', addressController.join);
+router.post('/join', addressJoinController.joinAddress);
 
 module.exports = router;
