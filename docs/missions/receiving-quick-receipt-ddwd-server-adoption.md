@@ -8,7 +8,7 @@ Adopt the Documentation-Driven Workflow Development Standard (DDWD) for Receivin
 
 Create an authoritative business and operational guide for receiving without PO, covering both resumable receipt sessions and one-shot completion, so Client in-app guidance remains a curated projection of verified runtime behavior.
 
-## Runtime Authority Under Review
+## Runtime Authority Reviewed
 
 - `src/modules/product/quickStock/services/QuickReceiptSessionService.js`
 - `src/modules/product/quickStock/services/QuickReceiptCompleteService.js`
@@ -17,7 +17,7 @@ Create an authoritative business and operational guide for receiving without PO,
 - inventory receiving policy and repository boundaries
 - Quick Receipt migrations and focused contracts
 
-## Planned Scope
+## Implemented Scope
 
 - business objective, actors, and responsibilities
 - branch/shop isolation
@@ -25,8 +25,8 @@ Create an authoritative business and operational guide for receiving without PO,
 - duplicate prevention and normalized delivery-note rules
 - resumable session workflow
 - one-shot small-delivery workflow
-- DRAFT, FINALIZING, COMPLETED, and CANCELLED meanings
-- product mode, quantity, barcode, and serial requirements
+- `DRAFT`, `FINALIZING`, `COMPLETED`, and `CANCELLED` meanings
+- product mode, quantity, Barcode, and Serial Number requirements
 - idempotency and collision behavior
 - tax-document capture boundary
 - interrupted-session recovery
@@ -35,12 +35,13 @@ Create an authoritative business and operational guide for receiving without PO,
 
 ## Documentation Status
 
-- Business manual: planned
-- User guide: companion Client adoption increment
-- In-app help: companion Client adoption increment
+- Business manual: implemented at `docs/workflows/receiving-quick-receipt-operation-manual.md`
+- User guide: implemented by Client PR #48
+- In-app help: implemented by Client PR #48
+- Client merge authority: `aebaf55d4edc1a31c9462a9b6f2dba07a2aec357`
 - Workflow Assistant: NOT APPLICABLE in this documentation increment
-- Runtime checklist: static operational checklist planned on Client; runtime-backed assistant is follow-up
-- FAQ / troubleshooting: planned
+- Runtime checklist: static operational checklist implemented on Client; runtime-backed assistant is follow-up
+- FAQ / troubleshooting: implemented
 
 ## Runtime Impact
 
@@ -49,9 +50,9 @@ Documentation only. No API, Prisma, migration, inventory mutation, route, or pro
 ## Completion Criteria
 
 - [x] Mission pack exists.
-- [ ] Draft PR is opened.
-- [ ] Runtime authority review is complete.
-- [ ] Receiving and Quick Receipt business operation manual exists.
-- [ ] Repository review confirms workflow and authority boundaries.
-- [ ] Companion Client projection alignment is recorded.
+- [x] Draft PR is opened.
+- [x] Runtime authority review is complete.
+- [x] Receiving and Quick Receipt business operation manual exists.
+- [x] Repository review confirms workflow and authority boundaries.
+- [x] Companion Client projection alignment is recorded.
 - [ ] Review and merge decision are recorded.
