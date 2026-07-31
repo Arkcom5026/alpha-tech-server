@@ -9,10 +9,14 @@ const root = path.resolve(__dirname, '..');
 const syntaxFiles = [
   'server.js',
   'middlewares/verifyToken.js',
+  'src/modules/auth/routes/sessionAuthRoutes.js',
+  'src/modules/auth/session/runtime/sessionAuthRuntimeController.js',
+  'src/modules/auth/session/runtime/sessionAuthRuntimeService.js',
+  'src/modules/auth/session/runtime/sessionAuthRuntimeRepository.js',
+  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js',
   'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
-  'routes/authRoutes.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
   'src/modules/employee/create/createEmployeeController.js',
@@ -66,6 +70,9 @@ for (const relativePath of syntaxFiles) {
 
 assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
 assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
+assertMissing('controllers/authController.js', 'legacy root auth controller retired');
+assertMissing('routes/loginEmployee.js', 'legacy loginEmployee route retired');
+assertMissing('routes/currentEmployeeRoutes.js', 'legacy currentEmployee route retired');
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -78,6 +85,7 @@ assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projectio
 
 const server = read('server.js');
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
+const sessionAuthRoutes = read('src/modules/auth/routes/sessionAuthRoutes.js');
 assertContains(
   server,
   "require('./src/modules/employee/routes/employeeRoutes')",
@@ -87,6 +95,21 @@ assertContains(
   server,
   "app.use('/api/employees', employeeRoutes)",
   'server mounts canonical employee endpoint'
+);
+assertContains(
+  server,
+  "require('./src/modules/auth/routes/sessionAuthRoutes')",
+  'server imports canonical session auth module route directly'
+);
+assertContains(
+  server,
+  "app.use('/api/auth', authRoutes)",
+  'server mounts canonical auth endpoint'
+);
+assertNotContains(
+  server,
+  "require('./routes/authRoutes')",
+  'server legacy auth route import'
 );
 assertNotContains(
   server,
@@ -114,16 +137,20 @@ assertNotContains(
   'employee module route legacy controller reference'
 );
 
-const authRoutes = read('routes/authRoutes.js');
 assertContains(
-  authRoutes,
-  "require('../controllers/employeeOnboardingController')",
-  'auth route canonical onboarding controller'
+  sessionAuthRoutes,
+  "require('../../employee/onboarding/runtime/employeeOnboardingRuntimeController')",
+  'session auth route module onboarding boundary'
 );
 assertContains(
-  authRoutes,
+  sessionAuthRoutes,
   "router.post('/add-sub-employee', verifyToken, addSubEmployee)",
   'canonical onboarding route guard'
+);
+assertNotContains(
+  sessionAuthRoutes,
+  "require('../../../../controllers/authController')",
+  'session auth route legacy auth controller reference'
 );
 
 const employeeOnboarding = read('controllers/employeeOnboardingController.js');
