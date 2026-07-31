@@ -8,7 +8,7 @@ const {
 } = require('../query/pending-customers/getCustomersWithPendingSalesController');
 const {
   createCombinedBillingDocument,
-} = require('../../../../../controllers/combinedBillingController');
+} = require('../create/createCombinedBillingDocumentController');
 
 const router = express.Router();
 router.use(verifyToken);
