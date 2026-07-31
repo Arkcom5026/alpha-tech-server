@@ -44,10 +44,7 @@ const loadBranchSnapshot = async (branchId) => {
       orderBy: [{ productId: 'asc' }, { id: 'asc' }],
     }),
     prisma.stockMovement.findMany({
-      where: {
-        branchId,
-        simpleLotId: { not: null },
-      },
+      where: { branchId },
       select: {
         id: true,
         branchId: true,
