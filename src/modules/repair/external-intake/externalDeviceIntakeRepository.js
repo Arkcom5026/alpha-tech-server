@@ -13,6 +13,15 @@ const repairJobInclude = {
   warrantyClaims: true,
 };
 
+const buildCustomerBranchEvidence = (branchId) => ({
+  OR: [
+    { sale: { some: { branchId } } },
+    { repairJobs: { some: { branchId } } },
+    { deviceIntakes: { some: { branchId } } },
+    { ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } },
+  ],
+});
+
 class ExternalDeviceIntakeRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -24,9 +33,12 @@ class ExternalDeviceIntakeRepository {
     );
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...buildCustomerBranchEvidence(Number(branchId)),
+      },
       include: { user: true },
     });
   }
@@ -80,3 +92,4 @@ class ExternalDeviceIntakeRepository {
 
 module.exports = new ExternalDeviceIntakeRepository();
 module.exports.ExternalDeviceIntakeRepository = ExternalDeviceIntakeRepository;
+module.exports.buildCustomerBranchEvidence = buildCustomerBranchEvidence;
