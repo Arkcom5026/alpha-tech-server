@@ -77,6 +77,14 @@ const buildSimpleStockBackfillExecutionPlan = ({ dryRunResult }) => {
     const proposedLot = entry.proposedLot || {};
     const quantity = toNumber(proposedLot.qtyRemaining);
     const unitCost = toNumber(proposedLot.unitCost);
+    const productId = Number(entry.productId);
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw createPlanError(
+        'SIMPLE_STOCK_BACKFILL_PRODUCT_ID_REQUIRED',
+        `Ready entry ${entry.entryId || index} has no authoritative productId`
+      );
+    }
 
     if (quantity <= 0 || unitCost <= 0) {
       throw createPlanError(
@@ -88,12 +96,14 @@ const buildSimpleStockBackfillExecutionPlan = ({ dryRunResult }) => {
     return {
       sequence: index + 1,
       entryId: String(entry.entryId),
+      productId,
       preconditionHash: String(entry.preconditionHash),
       actions: [
         {
           action: 'CREATE_SIMPLE_LOT',
           payload: {
             branchId,
+            productId,
             qtyInitial: quantity,
             qtyRemaining: quantity,
             unitCost,
@@ -105,6 +115,7 @@ const buildSimpleStockBackfillExecutionPlan = ({ dryRunResult }) => {
           action: 'CREATE_STOCK_MOVEMENT',
           payload: {
             branchId,
+            productId,
             qty: quantity,
             type: 'LEGACY_BACKFILL',
             refType: 'SIMPLE_STOCK_BACKFILL',
