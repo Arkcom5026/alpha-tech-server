@@ -2,6 +2,9 @@ const prisma = require('../../../database/prisma/client');
 const {
   publishDevicePassportEvent,
 } = require('../../device/passport/publish/devicePassportEventPublisher');
+const {
+  buildCustomerBranchEvidence,
+} = require('../policies/repairCustomerBranchAccessPolicy');
 
 const stockItemIntakeInclude = {
   product: { include: { brand: true, productType: true } },
@@ -75,9 +78,12 @@ class CreateRepairJobRepository {
     return this.prisma.$transaction((tx) => work(new CreateRepairJobRepository(tx)));
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...buildCustomerBranchEvidence(branchId),
+      },
       include: { user: true },
     });
   }
