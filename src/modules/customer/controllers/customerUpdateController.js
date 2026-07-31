@@ -1,6 +1,5 @@
 const { prisma } = require('../../../../lib/prisma');
 const {
-  toInt,
   omitUndefined,
   normalizePhone,
   isValidPhone,
@@ -58,102 +57,6 @@ const presentUpdatedCustomer = (customer, { includePostcode = true } = {}) => {
     phone: customer.user?.loginId || null,
     email: '',
   };
-};
-
-const updateCustomerProfile = async (req, res) => {
-  try {
-    const userContext = req.user || {};
-    const role = userContext.role || '';
-    const branchId = toInt(userContext.branchId);
-
-    if (!userContext.id) return res.status(401).json({ message: 'Unauthorized' });
-    if (!['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(role)) {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-
-    const id = toInt(req.params.id);
-    if (!id) return res.status(400).json({ message: 'รหัสลูกค้าไม่ถูกต้อง' });
-
-    const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } =
-      req.body ?? {};
-
-    if (!validateCustomerType(type)) {
-      return res.status(400).json({ message: 'ประเภทลูกค้าไม่ถูกต้อง' });
-    }
-
-    const existing = await prisma.customerProfile.findUnique({
-      where: { id },
-      include: { user: true },
-    });
-    if (!existing) return res.status(404).json({ message: 'ไม่พบข้อมูลลูกค้า' });
-
-    if (
-      existing.branchId &&
-      branchId &&
-      existing.branchId !== branchId &&
-      role !== 'SUPERADMIN'
-    ) {
-      return res.status(403).json({ message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าสาขาอื่น' });
-    }
-
-    const sanitize = (value) => (typeof value === 'string' ? value.trim() : value);
-    const profileData = Object.fromEntries(
-      Object.entries({
-        name: sanitize(name),
-        type,
-        companyName: sanitize(companyName),
-        taxId: sanitize(taxId),
-        addressDetail: sanitize(addressDetail),
-      }).filter(([, value]) => value !== undefined)
-    );
-
-    const clientPostcode =
-      req.body?.postalCode ?? req.body?.postcode
-        ? String(req.body?.postalCode ?? req.body?.postcode)
-        : undefined;
-    const postcodeError = await validateSubdistrictPostcode({
-      subdistrictCode,
-      clientPostcode,
-    });
-    if (postcodeError) return res.status(postcodeError.status).json(postcodeError.body);
-
-    await prisma.$transaction(async (tx) => {
-      await tx.customerProfile.update({
-        where: { id },
-        data: {
-          ...profileData,
-          ...(subdistrictCode !== undefined
-            ? { subdistrictCode: subdistrictCode || null }
-            : {}),
-        },
-      });
-
-      if (phone) {
-        const newPhone = normalizePhone(phone);
-        if (!isValidPhone(newPhone)) throw new Error('INVALID_PHONE');
-        await tx.user.update({ where: { id: existing.userId }, data: { loginId: newPhone } });
-      }
-    });
-
-    const full = await prisma.customerProfile.findUnique({
-      where: { id },
-      include: {
-        user: true,
-        subdistrict: { include: { district: { include: { province: true } } } },
-      },
-    });
-
-    return res.json(presentUpdatedCustomer(full));
-  } catch (error) {
-    if (error && error.code === 'P2002') {
-      return res.status(409).json({ message: 'ข้อมูลซ้ำกัน' });
-    }
-    if (error && error.message === 'INVALID_PHONE') {
-      return res.status(400).json({ message: 'รูปแบบเบอร์โทรไม่ถูกต้อง' });
-    }
-    console.error('❌ updateCustomerProfile error:', error);
-    return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตลูกค้า' });
-  }
 };
 
 const updateCustomerProfileOnline = async (req, res) => {
@@ -240,6 +143,5 @@ const updateCustomerProfileOnline = async (req, res) => {
 };
 
 module.exports = {
-  updateCustomerProfile,
   updateCustomerProfileOnline,
 };
