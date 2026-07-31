@@ -5,13 +5,13 @@ const {
 } = require('./transitionRepairWorkflowService');
 
 function completeIntake() {
-  return [{
+  return {
     consent: {
       customerSignature: 'ลูกค้าทดสอบ',
       signedAt: new Date('2026-07-27T00:00:00Z'),
     },
     photos: [{ category: 'INTAKE_CONDITION' }],
-  }];
+  };
 }
 
 function repairJob(overrides = {}) {
@@ -22,7 +22,7 @@ function repairJob(overrides = {}) {
     deviceId: 55,
     status: 'RECEIVED',
     device: { id: 55, passportEvents: [] },
-    deviceIntakes: completeIntake(),
+    deviceIntake: completeIntake(),
     ...overrides,
   };
 }
@@ -143,7 +143,7 @@ test('requires branch ownership and a linked device passport', async () => {
 });
 
 test('blocks diagnosis queue when intake evidence is incomplete', async () => {
-  const repo = repositoryFor(repairJob({ deviceIntakes: [] }));
+  const repo = repositoryFor(repairJob({ deviceIntake: null }));
   const service = new TransitionRepairWorkflowService(repo);
 
   await assert.rejects(
