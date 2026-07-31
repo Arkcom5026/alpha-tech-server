@@ -33,10 +33,14 @@ Start a new sale
 → Server creates Sale and lines inside one transaction
 → tracked inventory is mutated atomically
 → payment evidence is posted when supplied
+→ source Held Cart is converted when supplied
+→ Sale transaction commits
 → initial receipt or delivery-note default is returned
-→ tax candidate publication is attempted
+→ downstream tax-candidate publication is attempted
 → sale becomes searchable in history and printable views
 ```
+
+The completed Sale is the sales authority. Tax-candidate publication is downstream and must not cause a second Sale when it is delayed or requires retry.
 
 ## 4. Preparing a sale
 
@@ -100,7 +104,7 @@ Before completion, the system validates that:
 - net total equals total before discount minus discount;
 - VAT agrees with runtime calculation within tolerance.
 
-A mismatch is rejected before any sale, inventory, payment, or tax mutation remains.
+A mismatch is rejected before any sale, inventory, payment, or deposit mutation remains.
 
 ## 6. Held Cart workflow
 
@@ -140,9 +144,11 @@ Completion rejects a source Held Cart when:
 - it is no longer OPEN;
 - its latest lines do not match the sale command.
 
+Successful Sale completion atomically converts the source Held Cart from `OPEN` to `CONVERTED`.
+
 ### 6.4 Cancel a Held Cart
 
-Cancellation requires a reason. A cancelled or completed Held Cart must not be resumed as OPEN.
+Cancellation requires a reason. A cancelled or converted Held Cart must not be resumed as OPEN.
 
 ## 7. Immediate sale — CASH mode
 
@@ -215,7 +221,7 @@ When the total is fully covered, the payment projection becomes `PAID` and the s
 
 The completion command requires a stable command identity.
 
-Inside the completion transaction, the Server:
+Inside the Sale transaction, the Server:
 
 1. verifies safe replay or command conflict;
 2. locks and verifies the source Held Cart when supplied;
@@ -229,9 +235,11 @@ Inside the completion transaction, the Server:
 10. posts payment evidence and consumes deposits when applicable;
 11. projects payment state;
 12. records completion command authority;
-13. returns canonical completion and document defaults.
+13. converts the source Held Cart when supplied.
 
-Any failure inside the transaction rolls back the sale and tracked mutations.
+Any failure inside this transaction rolls back the Sale and tracked Sale-side mutations.
+
+After transaction commit, the Server loads the canonical result, returns document defaults, and attempts downstream tax-candidate publication.
 
 ## 12. Idempotency and retry
 
@@ -239,13 +247,15 @@ The Client keeps a stable completion identity during uncertain retry conditions.
 
 ### Safe replay
 
-When the same command ID and materially identical payload are retried, the Server returns the prior canonical result without duplicating:
+When the same command ID and materially identical payload are retried, the Server returns the prior canonical Sale result without duplicating:
 
 - Sale;
 - stock mutation;
 - payment;
 - deposit usage;
-- tax-candidate mutation.
+- Held Cart conversion.
+
+Tax-candidate registration has its own replay-safe downstream boundary.
 
 ### Command conflict
 
@@ -274,9 +284,16 @@ The employee should verify:
 
 ## 14. Tax candidate boundary
 
-After successful completion, the Server attempts to publish a sales tax candidate.
+After the Sale transaction commits, the Server attempts to publish a sales tax candidate.
 
-The tax candidate is a downstream tax-intake boundary. It does not replace the completed Sale as sales authority, and failure handling must not invent a second Sale.
+Possible publication results include:
+
+- `REGISTERED` — candidate was created;
+- `REPLAYED` — existing candidate authority was returned safely;
+- `SKIPPED` — the Sale was not tax-ready or required identity was absent;
+- `PENDING_RETRY` — downstream tax intake failed and requires reconciliation or retry.
+
+The completed Sale remains the sales authority when tax publication is `SKIPPED` or `PENDING_RETRY`. Employees must verify the Sale in history and must not submit another Sale merely to recreate the tax candidate.
 
 Tax review, tax document lifecycle, tax period closing, and filing are separate workflows.
 
@@ -375,6 +392,12 @@ Cause: active payment evidence remains below the canonical total.
 
 Recovery: inspect total, paid, and balance evidence; post the missing payment before retrying.
 
+### Tax publication pending retry
+
+Cause: the Sale completed, but downstream tax-intake publication failed.
+
+Recovery: verify the completed Sale in history, preserve its Sale ID/code, and use the tax reconciliation or retry path. Do not create another Sale.
+
 ## 17. Employee checklist
 
 Before confirmation:
@@ -397,8 +420,9 @@ After confirmation:
 - verify the returned sale code;
 - verify payment and outstanding status;
 - open the expected receipt or delivery note;
-- confirm the sale is searchable in current-branch history;
-- do not create a duplicate sale after an uncertain response without checking history.
+- confirm the Sale is searchable in current-branch history;
+- review the tax-publication result when surfaced;
+- do not create a duplicate Sale after an uncertain response or tax-publication failure without checking history.
 
 ## 18. Acceptance boundary
 
@@ -414,6 +438,7 @@ Before acceptance, a human operator records:
 - Held Cart resume/revalidation evidence;
 - structured, SIMPLE, and NON_STOCK behavior where available;
 - receipt/delivery-note and printable history evidence;
+- tax-publication result where observable;
 - PASS/FAIL and unresolved defects.
 
 Core Sales remains pending operational acceptance until that evidence is recorded and reviewed.
