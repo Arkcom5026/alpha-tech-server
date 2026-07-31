@@ -74,7 +74,7 @@ assertContains(routes, "'/jobs/:id/handover/finalize'", 'repair handover endpoin
 assertContains(routes, "'/jobs/:id/intake-evidence'", 'repair intake evidence endpoint');
 assertNotContains(routes, "require('../../../controllers/repair", 'legacy repair controller ownership');
 
-const authorization = read('src/modules/repair/policies/repairAuthorizationPolicy.js');
+const authorization = read('src/modules/repair/middlewares/repairAuthorization.js');
 assertContains(authorization, "READ: 'repair.read'", 'repair read capability');
 assertContains(authorization, "INTAKE: 'repair.intake'", 'repair intake capability');
 assertContains(authorization, "WORKFLOW: 'repair.workflow'", 'repair workflow capability');
