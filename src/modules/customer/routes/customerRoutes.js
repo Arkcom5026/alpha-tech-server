@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const customerByPhoneController = require('../query/by-phone/customerByPhoneController');
 const {
-  getCustomerByPhone,
   getCustomerByName,
   getCustomerByUserId,
 } = require('../controllers/customerQueryController');
@@ -15,7 +15,7 @@ const {
 const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
 
-router.get('/by-phone/:phone', getCustomerByPhone);
+router.get('/by-phone/:phone', customerByPhoneController.getCustomerByPhone);
 router.get('/by-name', getCustomerByName);
 router.get('/me', getCustomerByUserId);
 
