@@ -105,11 +105,13 @@ const validateSimpleStockBackfillApprovalDryRun = ({
     },
     readyEntries: readyEntries.map((entry) => ({
       entryId: entry.entryId,
+      productId: Number(entry.preconditions?.productId),
       preconditionHash: entry.preconditionHash,
       proposedLot: entry.proposedLot,
     })),
     blockedEntries: blockedEntries.map((entry) => ({
       entryId: entry.entryId,
+      productId: Number(entry.preconditions?.productId),
       classification: entry.classification,
       reasonCode: entry.reasonCode,
       preconditionHash: entry.preconditionHash,
