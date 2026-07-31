@@ -17,6 +17,49 @@ const readBranchId = () => {
   return branchId;
 };
 
+const classifyBackfill = ({ balance, productLots, productMovements, difference }) => {
+  const quantity = toNumber(balance?.quantity);
+  const avgCost = toNumber(balance?.avgCost);
+  const lastReceivedCost = toNumber(balance?.lastReceivedCost);
+  const usableCost = avgCost > 0 ? avgCost : lastReceivedCost > 0 ? lastReceivedCost : null;
+
+  if (quantity > 0 && productLots.length === 0 && productMovements.length === 0 && difference === quantity) {
+    if (usableCost) {
+      return {
+        classification: 'READY_FOR_PREVIEW_BACKFILL',
+        reason: 'Positive legacy StockBalance exists without SimpleLot or SimpleLot movement history, and a usable balance cost is available.',
+        proposedLot: {
+          qtyInitial: quantity,
+          qtyRemaining: quantity,
+          unitCost: usableCost,
+          costSource: avgCost > 0 ? 'STOCK_BALANCE_AVG_COST' : 'STOCK_BALANCE_LAST_RECEIVED_COST',
+          status: 'ACTIVE',
+          source: 'LEGACY_BACKFILL_PREVIEW',
+        },
+      };
+    }
+
+    return {
+      classification: 'BLOCKED_MISSING_COST',
+      reason: 'Positive legacy StockBalance exists without SimpleLot or SimpleLot movement history, but no defensible positive cost is available.',
+      proposedLot: {
+        qtyInitial: quantity,
+        qtyRemaining: quantity,
+        unitCost: null,
+        costSource: null,
+        status: 'ACTIVE',
+        source: 'LEGACY_BACKFILL_PREVIEW',
+      },
+    };
+  }
+
+  return {
+    classification: 'REQUIRES_MANUAL_REVIEW',
+    reason: 'Existing lot or movement evidence, non-positive balance, or a mixed reconciliation state prevents deterministic legacy backfill.',
+    proposedLot: null,
+  };
+};
+
 const main = async () => {
   const branchId = readBranchId();
 
@@ -96,10 +139,17 @@ const main = async () => {
     const difference = balanceQuantity - lotRemaining;
     const missingCostLots = activeLots.filter((lot) => toNumber(lot.unitCost) <= 0);
     const movementNet = productMovements.reduce((sum, movement) => sum + toNumber(movement.qty), 0);
+    const backfillPreview = classifyBackfill({
+      balance,
+      productLots,
+      productMovements,
+      difference,
+    });
 
     return {
       productId,
       productName: balance?.product?.name || null,
+      productMode: balance?.product?.mode || null,
       inventoryBehavior: balance?.product?.inventoryBehavior || null,
       stockBalance: balance ? {
         id: balance.id,
@@ -125,6 +175,7 @@ const main = async () => {
           return acc;
         }, {}),
       },
+      backfillPreview,
       lots: productLots,
       movements: productMovements,
     };
@@ -146,6 +197,15 @@ const main = async () => {
     missingCostQuantity: 0,
   });
 
+  const classificationSummary = contributors.reduce((acc, row) => {
+    const key = row.backfillPreview.classification;
+    const current = acc[key] || { productCount: 0, quantity: 0 };
+    current.productCount += 1;
+    current.quantity += toNumber(row.backfillPreview.proposedLot?.qtyRemaining);
+    acc[key] = current;
+    return acc;
+  }, {});
+
   const report = {
     mode: 'PREVIEW_ONLY',
     mutationPerformed: false,
@@ -153,6 +213,7 @@ const main = async () => {
     generatedAt: new Date().toISOString(),
     formula: 'StockBalance.quantity - SUM(ACTIVE SimpleLot.qtyRemaining)',
     totals,
+    classificationSummary,
     contributorCount: contributors.length,
     contributors,
   };
