@@ -4,7 +4,7 @@
 
 - Workflow: Core Sales
 - Owning domain: `sales`
-- Scope: item selection through sale completion, immediate payment or credit creation, initial document defaults, tax-candidate publication, and later printable/history lookup
+- Scope: item selection through sale completion, immediate payment or credit creation, initial document defaults, downstream tax-candidate publication, and later printable/history lookup
 - Explicit exclusion: Sale Return, stock reversal, refund, and return approval
 
 ## 2. Actors
@@ -76,12 +76,15 @@ Prepare cart
 → mutate tracked inventory atomically
 → post payment evidence
 → project payment status as PAID
-→ choose receipt document defaults
-→ publish sale tax candidate
-→ return canonical completion result
+→ convert source Held Cart when supplied
+→ commit Sale transaction
+→ return canonical completion and receipt defaults
+→ attempt downstream tax-candidate publication
 ```
 
 A successful immediate sale reports `completionStatus = COMPLETED_PAID` and defaults to `RECEIPT`.
+
+The Sale transaction is authoritative before tax-candidate publication. A downstream tax-publication failure returns `PENDING_RETRY` and must not cause the employee to create a duplicate Sale.
 
 ## 7. Alternative path — credit sale
 
@@ -94,8 +97,10 @@ Prepare cart
 → submit stable commandId
 → complete inventory and Sale transaction
 → create outstanding sale
+→ convert source Held Cart when supplied
+→ commit Sale transaction
 → default initial document to DELIVERY_NOTE
-→ publish sale tax candidate according to runtime projection
+→ attempt downstream tax-candidate publication when the Sale status is tax-ready
 ```
 
 Rules:
@@ -105,6 +110,7 @@ Rules:
 - The runtime may derive due date from customer payment terms.
 - Initial completion may report `COMPLETED_CREDIT`, `UNPAID`, or an outstanding balance.
 - A later settlement can close the sale only after non-cancelled payment evidence reaches the canonical total.
+- Tax-candidate publication may be skipped when the current Sale status is not tax-ready.
 
 ## 8. Held Cart contract
 
@@ -115,6 +121,7 @@ Held Cart is optional and remains a snapshot, not inventory ownership.
 - Revalidation checks current item availability and current branch price.
 - A completion sourced from Held Cart must match the latest line snapshot.
 - A changed, cancelled, or non-open cart blocks completion.
+- Successful completion atomically converts the source Held Cart from `OPEN` to `CONVERTED`.
 - Price changes or unavailable stock require employee review before retry.
 
 ## 9. Inventory behavior
@@ -154,9 +161,10 @@ Held Cart is optional and remains a snapshot, not inventory ownership.
 
 - Completion requires a stable command ID.
 - The normalized request generates a request hash.
-- Reusing the same command ID with the same hash returns the canonical prior result.
+- Reusing the same command ID with the same hash returns the canonical prior Sale result.
 - Reusing the same command ID with a different payload is a conflict.
 - Client retry after timeout should preserve the same command ID only for the same unchanged command.
+- Tax-candidate registration has its own replay-safe downstream boundary and does not redefine Sale authority.
 
 ## 12. Outputs
 
@@ -168,7 +176,13 @@ Successful completion produces:
 - `COMPLETED_PAID` or `COMPLETED_CREDIT`
 - receipt or delivery-note document defaults
 - idempotency replay information
-- tax-candidate publication result
+- downstream tax-publication result:
+  - `REGISTERED`
+  - `REPLAYED`
+  - `SKIPPED`
+  - `PENDING_RETRY`
+
+A `PENDING_RETRY` tax result means the Sale remains completed and tax intake requires a downstream retry path; it does not authorize creating another Sale.
 
 ## 13. History and printable recovery
 
@@ -192,6 +206,7 @@ Successful completion produces:
 | Payment evidence below CASH total | Complete payment evidence before immediate completion |
 | Same command ID with changed payload | Generate a new command ID for the changed command |
 | Timeout after submission | Retry the identical command with the same command ID |
+| Tax publication `PENDING_RETRY` | Verify the Sale in history; do not resubmit the Sale; use the tax retry/reconciliation path |
 | Printable sale not found | Verify branch, search filters, and non-cancelled status |
 
 ## 15. Permissions and isolation
