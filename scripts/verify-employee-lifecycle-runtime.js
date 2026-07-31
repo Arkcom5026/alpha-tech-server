@@ -10,7 +10,6 @@ const syntaxFiles = [
   'server.js',
   'middlewares/verifyToken.js',
   'controllers/employeeOnboardingController.js',
-  'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'routes/authRoutes.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
@@ -25,6 +24,9 @@ const syntaxFiles = [
   'src/modules/employee/lookup/positions/positionLookupController.js',
   'src/modules/employee/lookup/branches/branchLookupController.js',
   'src/modules/employee/query/usersByRole/usersByRoleController.js',
+  'src/modules/finance/combined-billing/query/combinable-sales/getCombinableSalesController.js',
+  'src/modules/finance/combined-billing/query/detail/getCombinedBillingByIdController.js',
+  'src/modules/finance/combined-billing/query/pending-customers/getCustomersWithPendingSalesController.js',
   'src/modules/product/create/controllers/productCreateController.js',
   'src/modules/product/quickStock/controllers/quickStockController.js',
   'src/modules/sales/return/controllers/saleReturnController.js',
@@ -66,6 +68,7 @@ for (const relativePath of syntaxFiles) {
 
 assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
 assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
+assertMissing('controllers/combinedBillingController.js', 'legacy combined billing controller retired');
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -88,11 +91,8 @@ assertContains(
   "app.use('/api/employees', employeeRoutes)",
   'server mounts canonical employee endpoint'
 );
-assertNotContains(
-  server,
-  'controllers/employeeController',
-  'server legacy employee controller reference'
-);
+assertNotContains(server, 'controllers/employeeController', 'server legacy employee controller reference');
+assertNotContains(server, 'controllers/combinedBillingController', 'server legacy combined billing controller reference');
 assertContains(
   employeeModuleRoute,
   'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
@@ -136,9 +136,13 @@ assertContains(employeeOnboarding, 'approved: true', 'owner-created employee aut
 assertContains(employeeOnboarding, 'active: true', 'owner-created employee auto activation');
 assertContains(employeeOnboarding, 'enabled: true', 'owner-created employee user activation');
 
-const combinedBilling = read('controllers/combinedBillingController.js');
+const combinedBillingControllers = [
+  'src/modules/finance/combined-billing/query/combinable-sales/getCombinableSalesController.js',
+  'src/modules/finance/combined-billing/query/detail/getCombinedBillingByIdController.js',
+  'src/modules/finance/combined-billing/query/pending-customers/getCustomersWithPendingSalesController.js',
+].map(read).join('\n');
 assertNotContains(
-  combinedBilling,
+  combinedBillingControllers,
   'req.user?.employeeId || req.user?.id',
   'combined billing User.id employee fallback'
 );
@@ -169,11 +173,7 @@ assertNotContains(
 );
 
 const supplierPaymentRoutes = read('src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js');
-assertContains(
-  supplierPaymentRoutes,
-  'requireSupplierPaymentActor',
-  'supplier payment actor route guard'
-);
+assertContains(supplierPaymentRoutes, 'requireSupplierPaymentActor', 'supplier payment actor route guard');
 
 const schema = read('prisma/schema.prisma');
 const employeeProfileBlock = schema.match(/model\s+EmployeeProfile\s*\{[\s\S]*?\n\}/)?.[0] || '';
