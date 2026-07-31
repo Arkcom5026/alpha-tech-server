@@ -4,6 +4,16 @@ const {
   TransitionRepairWorkflowService,
 } = require('./transitionRepairWorkflowService');
 
+function completeIntake() {
+  return {
+    consent: {
+      customerSignature: 'ลูกค้าทดสอบ',
+      signedAt: new Date('2026-07-27T00:00:00Z'),
+    },
+    photos: [{ category: 'INTAKE_CONDITION' }],
+  };
+}
+
 function repairJob(overrides = {}) {
   return {
     id: 41,
@@ -12,6 +22,7 @@ function repairJob(overrides = {}) {
     deviceId: 55,
     status: 'RECEIVED',
     device: { id: 55, passportEvents: [] },
+    deviceIntake: completeIntake(),
     ...overrides,
   };
 }
@@ -129,4 +140,19 @@ test('requires branch ownership and a linked device passport', async () => {
     ),
     (error) => error.code === 'REPAIR_DEVICE_REQUIRED'
   );
+});
+
+test('blocks diagnosis queue when intake evidence is incomplete', async () => {
+  const repo = repositoryFor(repairJob({ deviceIntake: null }));
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 3, employeeId: 7 },
+      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'incomplete' }
+    ),
+    (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
 });

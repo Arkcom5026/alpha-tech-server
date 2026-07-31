@@ -55,7 +55,7 @@ test('create repository owns customer, stock, technician, repair and passport wr
   const calls = {};
   const repository = new CreateRepairJobRepository({
     customerProfile: {
-      findUnique(args) { calls.customer = args; return Promise.resolve(null); },
+      findFirst(args) { calls.customer = args; return Promise.resolve(null); },
     },
     stockItem: {
       findUnique(args) { calls.stock = args; return Promise.resolve(null); },
@@ -71,7 +71,7 @@ test('create repository owns customer, stock, technician, repair and passport wr
     },
   });
 
-  await repository.findCustomer('8');
+  await repository.findCustomer(3, '8');
   await repository.findStockItemForIntake('12');
   await repository.findTechnician('5');
   await repository.create({ branchId: 3, customerId: 8 });
@@ -85,7 +85,9 @@ test('create repository owns customer, stock, technician, repair and passport wr
     title: 'เปิดใบงานซ่อม',
   });
 
-  assert.deepEqual(calls.customer.where, { id: 8 });
+  assert.equal(calls.customer.where.id, 8);
+  assert.ok(Array.isArray(calls.customer.where.OR));
+  assert.equal(calls.customer.where.OR.length, 4);
   assert.deepEqual(calls.stock.where, { id: 12 });
   assert.ok(calls.stock.include.devices);
   assert.ok(calls.stock.include.repairJobs);
@@ -103,7 +105,8 @@ test('create service validates customer and creates a RECEIVED branch-owned job'
   const service = new CreateRepairJobService({
     transaction(work) {
       return work({
-        findCustomer(customerId) {
+        findCustomer(branchId, customerId) {
+          assert.equal(branchId, 3);
           assert.equal(customerId, 8);
           return Promise.resolve({ id: 8 });
         },

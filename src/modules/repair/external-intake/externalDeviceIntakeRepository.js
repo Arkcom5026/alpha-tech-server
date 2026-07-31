@@ -2,6 +2,9 @@ const prisma = require('../../../database/prisma/client');
 const {
   publishDevicePassportEvent,
 } = require('../../device/passport/publish/devicePassportEventPublisher');
+const {
+  buildCustomerBranchEvidence,
+} = require('../policies/repairCustomerBranchAccessPolicy');
 
 const repairJobInclude = {
   branch: true,
@@ -24,9 +27,12 @@ class ExternalDeviceIntakeRepository {
     );
   }
 
-  findCustomer(customerId) {
-    return this.prisma.customerProfile.findUnique({
-      where: { id: Number(customerId) },
+  findCustomer(branchId, customerId) {
+    return this.prisma.customerProfile.findFirst({
+      where: {
+        id: Number(customerId),
+        ...buildCustomerBranchEvidence(branchId),
+      },
       include: { user: true },
     });
   }

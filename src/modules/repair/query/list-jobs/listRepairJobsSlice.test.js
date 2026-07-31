@@ -25,6 +25,9 @@ function jobFixture(overrides = {}) {
     estimatedCost: 500,
     depositPaid: 100,
     technician: null,
+    technicianId: null,
+    deviceIntakes: [],
+    repairDeliveries: [],
     partsUsed: [],
     warrantyClaims: [],
     createdAt: new Date('2026-07-01T00:00:00Z'),
@@ -61,6 +64,8 @@ test('list jobs repository always scopes by branch and normalized filters', asyn
   assert.equal(received.take, 25);
   assert.equal(received.skip, 5);
   assert.deepEqual(received.orderBy, { createdAt: 'desc' });
+  assert.ok(received.include.deviceIntakes);
+  assert.ok(received.include.repairDeliveries);
 });
 
 test('list jobs validation normalizes and clamps query values', () => {
@@ -82,7 +87,7 @@ test('list jobs validation normalizes and clamps query values', () => {
   );
 });
 
-test('list jobs service calls slice repository and maps jobs', async () => {
+test('list jobs service returns mapped items and server-owned operational summary', async () => {
   let received;
   const service = new ListRepairJobsService({
     findMany(branchId, filters) {
@@ -99,7 +104,11 @@ test('list jobs service calls slice repository and maps jobs', async () => {
   assert.equal(received.branchId, 4);
   assert.equal(received.filters.status, 'RECEIVED');
   assert.equal(received.filters.limit, 20);
-  assert.equal(result[0].id, 12);
-  assert.equal(result[0].customerName, 'Customer A');
-  assert.equal(result[0].estimatedCost, 500);
+  assert.equal(result.items[0].id, 12);
+  assert.equal(result.items[0].customerName, 'Customer A');
+  assert.equal(result.items[0].estimatedCost, 500);
+  assert.ok(result.items[0].operational);
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.summary.active, 1);
+  assert.equal(result.summary.unassigned, 1);
 });
