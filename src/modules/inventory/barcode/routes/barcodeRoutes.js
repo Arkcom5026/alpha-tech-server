@@ -17,8 +17,10 @@ const {
   markBarcodesAsPrinted,
 } = require('../print-reprint/barcodePrintReprintController');
 const {
-  markReceiptAsCompleted,
   auditReceiptBarcodes,
+} = require('../audit/barcodeAuditController');
+const {
+  markReceiptAsCompleted,
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   updateSerialNumber,
