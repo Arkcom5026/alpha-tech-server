@@ -8,7 +8,7 @@ Adopt the Documentation-Driven Workflow Development Standard (DDWD) for the Warr
 
 Create the authoritative business and operational guide for Warranty Claim so Client in-app guidance can remain a curated projection of verified workflow behavior.
 
-## Planned Scope
+## Implemented Scope
 
 - business objective and actors
 - branch/shop/tenant authority boundary
@@ -22,12 +22,13 @@ Create the authoritative business and operational guide for Warranty Claim so Cl
 
 ## Documentation Status
 
-- Business manual: planned
-- User guide: companion Client adoption increment
-- In-app help: companion Client adoption increment
+- Business manual: implemented at `docs/workflows/warranty-claim-operation-manual.md`
+- User guide: implemented by Client PR #47
+- In-app help: implemented by Client PR #47
+- Client merge authority: `e4153de8737205487957872d93a1e0ce65269c9c`
 - Workflow Assistant: NOT APPLICABLE in this documentation increment
 - Runtime checklist: NOT APPLICABLE in this documentation increment; runtime-backed checklist requires a separate implementation increment
-- FAQ / troubleshooting: planned
+- FAQ / troubleshooting: implemented
 
 ## Runtime Impact
 
@@ -36,8 +37,8 @@ Documentation only. No API, Prisma, migration, lifecycle transition, or producti
 ## Completion Criteria
 
 - [x] Mission pack exists.
-- [ ] Draft PR is opened.
-- [ ] Warranty Claim business operation manual exists.
-- [ ] Repository review confirms workflow and authority boundaries.
-- [ ] Companion Client projection alignment is recorded.
+- [x] Draft PR is opened.
+- [x] Warranty Claim business operation manual exists.
+- [x] Repository review confirms workflow and authority boundaries.
+- [x] Companion Client projection alignment is recorded.
 - [ ] Review and merge decision are recorded.
