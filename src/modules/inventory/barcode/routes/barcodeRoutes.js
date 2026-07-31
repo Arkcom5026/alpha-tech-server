@@ -26,7 +26,7 @@ const {
 } = require('../scan-serial/barcodeScanSerialController');
 const {
   markReceiptAsCompleted,
-} = require('../runtime/barcodeController');
+} = require('../receipt-completion/barcodeReceiptCompletionController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
