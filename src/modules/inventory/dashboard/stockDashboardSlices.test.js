@@ -20,6 +20,7 @@ test('overview repository keeps every inventory source branch-scoped', async () 
   const repository = new GetStockDashboardOverviewRepository({
     stockItem: {
       groupBy: async (query) => { received.push(query); return []; },
+      aggregate: async (query) => { received.push(query); return { _sum: {}, _count: { _all: 0 } }; },
       count: async (query) => { received.push(query); return 0; },
     },
     stockBalance: {
@@ -27,6 +28,7 @@ test('overview repository keeps every inventory source branch-scoped', async () 
     },
     simpleLot: {
       aggregate: async (query) => { received.push(query); return { _sum: {}, _count: { _all: 0 } }; },
+      findMany: async (query) => { received.push(query); return []; },
     },
   });
 
@@ -34,12 +36,13 @@ test('overview repository keeps every inventory source branch-scoped', async () 
   const end = new Date('2026-07-28T00:00:00.000Z');
   await Promise.all([
     repository.getStructuredByStatus(7),
+    repository.getStructuredValuation(7),
     repository.countSoldToday(7, start, end),
     repository.getSimpleSummary(7),
     repository.getLotSummary(7),
   ]);
 
-  assert.ok(received.length >= 4);
+  assert.ok(received.length >= 7);
   assert.ok(received.every((query) => query.where.branchId === 7));
 });
 
@@ -50,9 +53,16 @@ test('overview service preserves legacy and richer dashboard projections', async
       { status: 'CLAIMED', _count: { _all: 2 } },
       { status: 'MISSING_PENDING_REVIEW', _count: { _all: 1 } },
     ],
+    getStructuredValuation: async () => ({ quantity: 3, costValue: 1500, missingCostCount: 1 }),
     countSoldToday: async () => 4,
     getSimpleSummary: async () => ({ productCount: 2, qtyOnHand: 10, qtyReserved: 3, netAvailable: 7 }),
-    getLotSummary: async () => ({ activeLotCount: 1, qtyRemaining: 5 }),
+    getLotSummary: async () => ({
+      activeLotCount: 1,
+      qtyRemaining: 5,
+      costValue: 500,
+      missingCostLotCount: 0,
+      missingCostQuantity: 0,
+    }),
   });
 
   const result = await service.execute(5, new Date('2026-07-27T10:00:00.000Z'));
@@ -61,7 +71,10 @@ test('overview service preserves legacy and richer dashboard projections', async
   assert.equal(result.missingPendingReview, 1);
   assert.equal(result.soldToday, 4);
   assert.equal(result.structured.total, 6);
+  assert.equal(result.structured.costValue, 1500);
   assert.equal(result.simple.netAvailable, 7);
+  assert.equal(result.valuation.totalCostValue, 2000);
+  assert.equal(result.dataQuality.hasIncompleteValuation, true);
   assert.equal(result.branchId, 5);
 });
 
