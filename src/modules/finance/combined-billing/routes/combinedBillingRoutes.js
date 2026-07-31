@@ -2,9 +2,9 @@ const express = require('express');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const { getCombinableSales } = require('../query/combinable-sales/getCombinableSalesController');
+const { getCombinedBillingById } = require('../query/detail/getCombinedBillingByIdController');
 const {
   createCombinedBillingDocument,
-  getCombinedBillingById,
   getCustomersWithPendingSales,
 } = require('../../../../../controllers/combinedBillingController');
 
