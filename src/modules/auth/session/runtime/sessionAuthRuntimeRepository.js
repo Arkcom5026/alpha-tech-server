@@ -1,11 +1,41 @@
 const { prisma } = require('../../../../../lib/prisma');
 
+const includeSessionProfiles = {
+  customerProfile: true,
+  employeeProfile: {
+    include: {
+      branch: true,
+      position: true,
+    },
+  },
+};
+
 const findUserByEmail = (email) => prisma.user.findUnique({
   where: { email },
   include: {
     customerProfile: true,
     employeeProfile: true,
   },
+});
+
+const findLoginUserByEmail = (email) => prisma.user.findUnique({
+  where: { email },
+  include: includeSessionProfiles,
+});
+
+const findLoginUserByLoginId = (loginId) => prisma.user.findFirst({
+  where: { loginId },
+  include: includeSessionProfiles,
+});
+
+const findEmployeeUserIdByPhone = (phone) => prisma.employeeProfile.findFirst({
+  where: { phone },
+  select: { userId: true },
+});
+
+const findLoginUserById = (id) => prisma.user.findUnique({
+  where: { id },
+  include: includeSessionProfiles,
 });
 
 const findPasswordResetEligibleUserByEmail = (email) => prisma.user.findUnique({
@@ -136,6 +166,10 @@ const runTransaction = (work) => prisma.$transaction(work);
 
 module.exports = {
   findUserByEmail,
+  findLoginUserByEmail,
+  findLoginUserByLoginId,
+  findEmployeeUserIdByPhone,
+  findLoginUserById,
   findPasswordResetEligibleUserByEmail,
   findSessionUserById,
   findUserByLoginId,
