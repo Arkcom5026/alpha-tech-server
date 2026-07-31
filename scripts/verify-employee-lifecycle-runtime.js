@@ -7,13 +7,13 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 
 const syntaxFiles = [
+  'server.js',
   'middlewares/verifyToken.js',
   'controllers/employeeOnboardingController.js',
   'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'routes/authRoutes.js',
-  'routes/employeeRoutes.js',
-  'routes/supplierPaymentRoutes.js',
+  'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
   'src/modules/employee/create/createEmployeeController.js',
   'src/modules/employee/update/updateEmployeeController.js',
@@ -65,6 +65,7 @@ for (const relativePath of syntaxFiles) {
 }
 
 assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
+assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -75,17 +76,22 @@ assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId pro
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
 assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
-const employeeRootRoute = read('routes/employeeRoutes.js');
+const server = read('server.js');
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
 assertContains(
-  employeeRootRoute,
-  "src/modules/employee/routes/employeeRoutes",
-  'employee root route delegates to module authority'
+  server,
+  "require('./src/modules/employee/routes/employeeRoutes')",
+  'server imports canonical employee module route directly'
+);
+assertContains(
+  server,
+  "app.use('/api/employees', employeeRoutes)",
+  'server mounts canonical employee endpoint'
 );
 assertNotContains(
-  employeeRootRoute,
-  "../controllers/employeeController",
-  'employee root route legacy controller ownership'
+  server,
+  'controllers/employeeController',
+  'server legacy employee controller reference'
 );
 assertContains(
   employeeModuleRoute,
@@ -162,7 +168,7 @@ assertNotContains(
   'sale return profileId employee fallback'
 );
 
-const supplierPaymentRoutes = read('routes/supplierPaymentRoutes.js');
+const supplierPaymentRoutes = read('src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js');
 assertContains(
   supplierPaymentRoutes,
   'requireSupplierPaymentActor',
