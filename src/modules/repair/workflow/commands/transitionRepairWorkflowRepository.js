@@ -4,6 +4,20 @@ const {
 } = require('../../../device/passport/publish/devicePassportEventPublisher');
 
 const repairWorkflowInclude = {
+  branch: true,
+  customer: { include: { user: true } },
+  stockItem: {
+    include: {
+      product: { include: { brand: true, productType: true } },
+      purchaseOrderReceiptItem: {
+        include: { receipt: { include: { supplier: true } } },
+      },
+      saleItems: {
+        include: { sale: { include: { customer: { include: { user: true } } } } },
+        orderBy: { sale: { soldAt: 'desc' } },
+      },
+    },
+  },
   device: {
     include: {
       passportEvents: {
@@ -12,6 +26,18 @@ const repairWorkflowInclude = {
         take: 1,
       },
     },
+  },
+  technician: true,
+  partsUsed: { include: { product: true } },
+  warrantyClaims: {
+    include: {
+      supplier: true,
+      events: {
+        include: { performedBy: true },
+        orderBy: { occurredAt: 'asc' },
+      },
+    },
+    orderBy: { openedAt: 'desc' },
   },
 };
 

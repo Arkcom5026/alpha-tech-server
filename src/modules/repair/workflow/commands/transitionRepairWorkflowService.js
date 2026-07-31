@@ -1,4 +1,5 @@
 const repository = require('./transitionRepairWorkflowRepository');
+const { mapRepairJob } = require('../../mappers/repairMapper');
 const {
   REPAIR_WORKFLOW_STATUS,
   getAvailableRepairWorkflowActions,
@@ -136,7 +137,7 @@ class TransitionRepairWorkflowService {
         terminal: transition.terminal,
         passportEventId: event.id,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
-        repairJob: updated,
+        repairJob: mapRepairJob(updated),
       };
     });
   }
