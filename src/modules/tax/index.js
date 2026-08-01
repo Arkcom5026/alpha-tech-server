@@ -31,6 +31,11 @@ module.exports = Object.freeze({
     transition:
       require('./documents/lifecycle/transitionTaxDocumentService').transitionTaxDocument,
   }),
+  expenses: Object.freeze({
+    routes: require('./expenses/taxExpenseRoutes'),
+    categoryService: require('./expenses/categories/taxExpenseCategoryService'),
+    expenseService: require('./expenses/expenses/taxExpenseService'),
+  }),
   periods: Object.freeze({
     routes: require('./periods/taxPeriodRoutes'),
     service: require('./periods/taxPeriodService'),

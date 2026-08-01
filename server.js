@@ -83,6 +83,7 @@ const customerReceiptRoutes = require('./src/modules/finance/customer-receipt/ro
 const productTypeBrandRoutes = require('./src/modules/brand/routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
+const taxExpenseRoutes = require('./src/modules/tax/expenses/taxExpenseRoutes');
 const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 const missingCostResolutionReadRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionReadRoutes');
 const missingCostResolutionMutationRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionMutationRoutes');
@@ -227,6 +228,7 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/upload-product', uploadProductRoutes);
 app.use('/api/tax', taxIntakeRoutes);
+app.use('/api/tax', taxExpenseRoutes);
 app.use('/api/tax', taxPeriodRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
 app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionReadRoutes);
