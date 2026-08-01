@@ -85,6 +85,7 @@ const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
 const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 const missingCostResolutionReadRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionReadRoutes');
+const missingCostResolutionMutationRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionMutationRoutes');
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 
 // ===================== Middleware =====================
@@ -227,6 +228,7 @@ app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
 app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionReadRoutes);
+app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionMutationRoutes);
 app.use('/api/system/operational-verification', operationalVerificationRoutes);
 
 // ===================== Errors =====================
