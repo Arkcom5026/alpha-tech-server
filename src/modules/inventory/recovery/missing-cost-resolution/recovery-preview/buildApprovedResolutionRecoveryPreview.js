@@ -34,9 +34,7 @@ const requirePositiveCost = (value) => {
 };
 
 const buildApprovedResolutionRecoveryPreview = ({ resolution, currentSource, operatorIdentity }) => {
-  if (!resolution) {
-    fail('MISSING_COST_RESOLUTION_NOT_FOUND', 'Missing cost resolution was not found');
-  }
+  if (!resolution) fail('MISSING_COST_RESOLUTION_NOT_FOUND', 'Missing cost resolution was not found');
   if (resolution.status !== 'APPROVED') {
     fail('MISSING_COST_RESOLUTION_NOT_APPROVED', 'Only an approved resolution can produce a recovery preview');
   }
@@ -54,11 +52,14 @@ const buildApprovedResolutionRecoveryPreview = ({ resolution, currentSource, ope
 
   const evidenceHash = requireText(evidence.evidenceHash, 'evidence.evidenceHash');
   const proposedUnitCost = requirePositiveCost(evidence.proposedUnitCost);
+  const approvedByEmployeeId = requirePositiveInteger(
+    evidence.approvalSnapshot?.approvedByEmployeeId,
+    'evidence.approvalSnapshot.approvedByEmployeeId'
+  );
+  const approvalIdentity = `employee:${approvedByEmployeeId}`;
   const operator = requireText(operatorIdentity, 'operatorIdentity');
 
-  if (!currentSource) {
-    fail('MISSING_COST_RECOVERY_SOURCE_NOT_FOUND', 'Current inventory source was not found');
-  }
+  if (!currentSource) fail('MISSING_COST_RECOVERY_SOURCE_NOT_FOUND', 'Current inventory source was not found');
 
   const staleReasons = [];
   const compare = (actual, expected, code) => {
@@ -79,6 +80,7 @@ const buildApprovedResolutionRecoveryPreview = ({ resolution, currentSource, ope
     sourceSnapshotHash,
     evidenceHash,
     proposedUnitCost,
+    approvalIdentity,
     operatorIdentity: operator,
     currentSource: {
       branchId: Number(currentSource.branchId),
@@ -104,6 +106,7 @@ const buildApprovedResolutionRecoveryPreview = ({ resolution, currentSource, ope
     sourceSnapshotHash,
     evidenceHash,
     proposedUnitCost,
+    approvalIdentity,
     operatorIdentity: operator,
     validation: {
       stale: staleReasons.length > 0,

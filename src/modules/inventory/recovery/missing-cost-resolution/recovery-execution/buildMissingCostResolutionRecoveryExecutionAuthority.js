@@ -11,9 +11,7 @@ const fail = (code, message, details = undefined) => {
 
 const requireText = (value, field) => {
   const normalized = String(value || '').trim();
-  if (!normalized) {
-    fail('MISSING_COST_RECOVERY_EXECUTION_INVALID_AUTHORITY', `${field} is required`, { field });
-  }
+  if (!normalized) fail('MISSING_COST_RECOVERY_EXECUTION_INVALID_AUTHORITY', `${field} is required`, { field });
   return normalized;
 };
 
@@ -29,20 +27,14 @@ const requirePlan = (plan) => {
   if (!plan || plan.validation?.result !== 'VALIDATED_APPROVAL_PLAN_ONLY') {
     fail('MISSING_COST_RECOVERY_VALIDATED_PLAN_REQUIRED', 'A validated approval plan is required');
   }
-  if (plan.validation?.stale) {
-    fail('MISSING_COST_RECOVERY_STALE_PLAN', 'Stale approval plan cannot produce execution authority');
-  }
+  if (plan.validation?.stale) fail('MISSING_COST_RECOVERY_STALE_PLAN', 'Stale approval plan cannot produce execution authority');
   if (plan.mutationPerformed || plan.approvedForMutation || plan.executable) {
     fail('MISSING_COST_RECOVERY_PLAN_STATE_INVALID', 'Plan-only authority was already mutated or promoted');
   }
   return plan;
 };
 
-const buildMissingCostResolutionRecoveryExecutionAuthority = ({
-  plan,
-  approval,
-  executorIdentity,
-}) => {
+const buildMissingCostResolutionRecoveryExecutionAuthority = ({ plan, approval, executorIdentity }) => {
   const validatedPlan = requirePlan(plan);
   const branchId = requirePositiveInteger(validatedPlan.branchId, 'plan.branchId');
   const resolutionId = requirePositiveInteger(validatedPlan.resolutionId, 'plan.resolutionId');
@@ -54,16 +46,8 @@ const buildMissingCostResolutionRecoveryExecutionAuthority = ({
   const sourceSnapshotHash = requireText(validatedPlan.sourceSnapshotHash, 'plan.sourceSnapshotHash');
   const evidenceHash = requireText(validatedPlan.evidenceHash, 'plan.evidenceHash');
   const operatorIdentity = requireText(validatedPlan.operatorIdentity, 'plan.operatorIdentity');
+  const approvalIdentity = requireText(validatedPlan.approvalIdentity, 'plan.approvalIdentity');
   const executor = requireText(executorIdentity, 'executorIdentity');
-
-  const approvedPlanId = requireText(approval?.executionPlanId, 'approval.executionPlanId');
-  const approvedPlanHash = requireText(approval?.executionPlanHash, 'approval.executionPlanHash');
-  const approvedPreviewId = requireText(approval?.previewId, 'approval.previewId');
-  const approvedPreviewHash = requireText(approval?.previewHash, 'approval.previewHash');
-  const approvedSourceSnapshotHash = requireText(approval?.sourceSnapshotHash, 'approval.sourceSnapshotHash');
-  const approvedEvidenceHash = requireText(approval?.evidenceHash, 'approval.evidenceHash');
-  const approvedOperatorIdentity = requireText(approval?.operatorIdentity, 'approval.operatorIdentity');
-  const approvalIdentity = requireText(approval?.approvalIdentity, 'approval.approvalIdentity');
   const idempotencyKey = requireText(approval?.idempotencyKey, 'approval.idempotencyKey');
 
   const expectedAuthority = {
@@ -76,13 +60,13 @@ const buildMissingCostResolutionRecoveryExecutionAuthority = ({
     operatorIdentity,
   };
   const suppliedAuthority = {
-    executionPlanId: approvedPlanId,
-    executionPlanHash: approvedPlanHash,
-    previewId: approvedPreviewId,
-    previewHash: approvedPreviewHash,
-    sourceSnapshotHash: approvedSourceSnapshotHash,
-    evidenceHash: approvedEvidenceHash,
-    operatorIdentity: approvedOperatorIdentity,
+    executionPlanId: requireText(approval?.executionPlanId, 'approval.executionPlanId'),
+    executionPlanHash: requireText(approval?.executionPlanHash, 'approval.executionPlanHash'),
+    previewId: requireText(approval?.previewId, 'approval.previewId'),
+    previewHash: requireText(approval?.previewHash, 'approval.previewHash'),
+    sourceSnapshotHash: requireText(approval?.sourceSnapshotHash, 'approval.sourceSnapshotHash'),
+    evidenceHash: requireText(approval?.evidenceHash, 'approval.evidenceHash'),
+    operatorIdentity: requireText(approval?.operatorIdentity, 'approval.operatorIdentity'),
   };
 
   for (const field of Object.keys(expectedAuthority)) {
@@ -96,10 +80,7 @@ const buildMissingCostResolutionRecoveryExecutionAuthority = ({
   }
 
   if (approvalIdentity === operatorIdentity || approvalIdentity === executor) {
-    fail(
-      'MISSING_COST_RECOVERY_SEPARATE_EXECUTION_APPROVAL_REQUIRED',
-      'Approval identity must be separate from the plan operator and execution actor'
-    );
+    fail('MISSING_COST_RECOVERY_SEPARATE_EXECUTION_APPROVAL_REQUIRED', 'Approved reviewer must be separate from the plan operator and execution actor');
   }
 
   const authority = {
@@ -127,10 +108,7 @@ const buildMissingCostResolutionRecoveryExecutionAuthority = ({
     executionAuthorityId: `mcr-exec-${branchId}-${resolutionId}-${executionAuthorityHash.slice(0, 24)}`,
     executionAuthorityHash,
     mode: 'EXECUTION_AUTHORITY_ONLY',
-    validation: {
-      result: 'VALIDATED_EXECUTION_AUTHORITY_ONLY',
-      stale: false,
-    },
+    validation: { result: 'VALIDATED_EXECUTION_AUTHORITY_ONLY', stale: false },
     mutationPerformed: false,
     executable: false,
     approvedForMutation: false,
@@ -141,6 +119,7 @@ const buildMissingCostResolutionRecoveryExecutionAuthority = ({
       exactPlanAuthorityRequired: true,
       exactApprovedEvidenceRequired: true,
       separateApprovalRequired: true,
+      approvalIdentityIsServerOwned: true,
       mutationRequiresRepositoryIncrement: true,
     },
   });

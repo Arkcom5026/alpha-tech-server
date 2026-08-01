@@ -15,6 +15,7 @@ const plan = {
   sourceSnapshotHash: 'snapshot-hash',
   evidenceHash: 'evidence-hash',
   operatorIdentity: 'employee:40',
+  approvalIdentity: 'employee:41',
   operations: [{ sequence: 1, operationType: 'APPLY_APPROVED_UNIT_COST_TO_RECOVERY_AUTHORITY' }],
   totals: { operationCount: 1, totalQuantity: 5, totalInventoryValue: 625 },
   mutationPerformed: false,
@@ -30,23 +31,16 @@ const approval = {
   sourceSnapshotHash: plan.sourceSnapshotHash,
   evidenceHash: plan.evidenceHash,
   operatorIdentity: plan.operatorIdentity,
-  approvalIdentity: 'employee:41',
   idempotencyKey: 'mcr-execution-7-11-001',
 };
 
-const first = buildMissingCostResolutionRecoveryExecutionAuthority({
-  plan,
-  approval,
-  executorIdentity: 'employee:42',
-});
-const second = buildMissingCostResolutionRecoveryExecutionAuthority({
-  plan,
-  approval,
-  executorIdentity: 'employee:42',
-});
+const first = buildMissingCostResolutionRecoveryExecutionAuthority({ plan, approval, executorIdentity: 'employee:42' });
+const second = buildMissingCostResolutionRecoveryExecutionAuthority({ plan, approval, executorIdentity: 'employee:42' });
 
 assert.equal(first.executionAuthorityHash, second.executionAuthorityHash);
 assert.equal(first.executionAuthorityId, second.executionAuthorityId);
+assert.equal(first.approvalIdentity, plan.approvalIdentity);
+assert.equal(first.transactionContract.approvalIdentityIsServerOwned, true);
 assert.equal(first.validation.result, 'VALIDATED_EXECUTION_AUTHORITY_ONLY');
 assert.equal(first.mutationPerformed, false);
 assert.equal(first.executable, false);
@@ -62,14 +56,14 @@ assert.throws(() => buildMissingCostResolutionRecoveryExecutionAuthority({
 }), (error) => error.code === 'MISSING_COST_RECOVERY_APPROVAL_STALE');
 
 assert.throws(() => buildMissingCostResolutionRecoveryExecutionAuthority({
-  plan,
-  approval: { ...approval, approvalIdentity: plan.operatorIdentity },
+  plan: { ...plan, approvalIdentity: plan.operatorIdentity },
+  approval,
   executorIdentity: 'employee:42',
 }), (error) => error.code === 'MISSING_COST_RECOVERY_SEPARATE_EXECUTION_APPROVAL_REQUIRED');
 
 assert.throws(() => buildMissingCostResolutionRecoveryExecutionAuthority({
-  plan,
-  approval: { ...approval, approvalIdentity: 'employee:42' },
+  plan: { ...plan, approvalIdentity: 'employee:42' },
+  approval,
   executorIdentity: 'employee:42',
 }), (error) => error.code === 'MISSING_COST_RECOVERY_SEPARATE_EXECUTION_APPROVAL_REQUIRED');
 
