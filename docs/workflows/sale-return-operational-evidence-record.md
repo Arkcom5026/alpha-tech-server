@@ -4,7 +4,7 @@
 
 `UNEXECUTED`
 
-This file is an evidence template only. Its existence does not mean the Sale Return workflow has passed Human Operational Test, Runtime Certification, production verification, accounting verification, or tax verification.
+This file records repository and certification evidence while preserving Human Operational Test as a separate evidence class. Its existence does not mean the Sale Return workflow has passed Human Operational Test, production verification, accounting verification, or tax verification.
 
 Do not change the status to `EXECUTED` until actual tests are performed against identified Client and Server SHAs in a known environment.
 
@@ -28,19 +28,19 @@ Record evidence from the Sale Return Human Operational Test Pack and preserve th
 - Workflow Contract: `docs/workflows/sale-return-workflow-contract.md`
 - Acceptance Scenarios: `docs/workflows/sale-return-acceptance-scenarios.md`
 - Business Operation Manual: `docs/workflows/sale-return-business-operation-manual.md`
-- Client User Guide: companion Client PR #51
-- Human Operational Test Pack: companion Client PR #51
+- Client User Guide: merged Client PR #51
+- Human Operational Test Pack: merged Client PR #51
 - Canonical Server route: `/api/sales/returns/...`
 - Canonical Client owner: `src/features/sales/return`
 
 ## Verified Client Repository Evidence
 
-This section records repository-level verification only. It is not Human Operational Test, Server runtime evidence, production verification, operational acceptance, or merge authorization.
+This section records repository-level verification only. It is not Human Operational Test, Server runtime evidence, production verification, or operational acceptance.
 
 - Client repository: `Arkcom5026/alpha-tech-client`
 - Client PR: `#51`
-- Client branch: `docs/sale-return-ddwd-adoption`
-- Verified Client SHA: `ab14ff4f29208aea050369fac30c5d82d920f322`
+- Verified Client PR head SHA: `ab14ff4f29208aea050369fac30c5d82d920f322`
+- Client merge commit: `bc8c4d621051f1135a4545da210ae27682daa974`
 - Workflow: `Frontend Mission Control v2`
 - Workflow run ID: `30673684217`
 - Workflow run number: `1076`
@@ -55,7 +55,44 @@ This section records repository-level verification only. It is not Human Operati
   - Production Build
 - Verification review ID on Client PR: `4832889603`
 
-Repository evidence conclusion: the Sale Return Client help contract and Production Build completed successfully for the identified Client SHA. Runtime and Human Operational Test fields below remain unexecuted.
+Repository evidence conclusion: the Sale Return Client help contract and Production Build completed successfully for the identified Client SHA.
+
+## Merge Evidence
+
+- Client PR #51: `MERGED`
+- Client merge commit: `bc8c4d621051f1135a4545da210ae27682daa974`
+- Server PR #211: `MERGED`
+- Server merge commit: `75db731cf63dcf93443c83ff60e534f2a023a8a1`
+- Explicit human merge authorization: recorded in the working conversation before merge
+
+## Final ALDE Certification Evidence
+
+This section records merged-source certification only. It does not replace Human Operational Test or production business evidence.
+
+- Workflow: `ALDE Local Certification`
+- Workflow run ID: `30676041877`
+- Source branch: `main`
+- Source SHA / certified Client head: `52f5bf548803989a816ffa300c9d992ee11b8c65`
+- Certified Server head: `75db731cf63dcf93443c83ff60e534f2a023a8a1`
+- Mode: `SyncAndCertify`
+- Runner: `ALDE-WIN01`
+- Runner OS/architecture: `Windows / X64`
+- Started at: `2026-08-01T00:40:46.6112875Z`
+- Finished at: `2026-08-01T00:42:49.2201961Z`
+- Result Bridge published at: `2026-08-01T00:42:58.3769185Z`
+- Result: `PASS`
+- Engine exit code: `0`
+- Pipeline exit code: `0`
+- Failed gate count: `0`
+- Regression count: `0`
+- Environment blocker count: `0`
+- Safety guard count: `0`
+- Unclassified failure count: `0`
+- Authority interpretation: `All certification gates passed.`
+- Direct Partner Store runtime write verifier: intentionally `SKIP`
+- Dedicated Partner Store Test DB runtime verifier: `PASS`
+
+Certification conclusion: merged Client and Server source completed ALDE `SyncAndCertify` successfully. Human Operational Test and production business evidence remain unexecuted.
 
 ## Test Identity
 
@@ -66,11 +103,12 @@ Repository evidence conclusion: the Sale Return Client help contract and Product
 - Environment URL:
 - Browser/device:
 - Client repository: `Arkcom5026/alpha-tech-client`
-- Client branch: `docs/sale-return-ddwd-adoption`
-- Client SHA: `ab14ff4f29208aea050369fac30c5d82d920f322`
+- Client branch: `main`
+- Client SHA to use for Human Operational Test: `52f5bf548803989a816ffa300c9d992ee11b8c65`
+- Client Sale Return merge commit: `bc8c4d621051f1135a4545da210ae27682daa974`
 - Server repository: `Arkcom5026/alpha-tech-server`
-- Server branch: `docs/sale-return-ddwd-adoption`
-- Server SHA: `5aeac1b02d09f46e60f05382822683ba50fb3dd4`
+- Server branch: `main`
+- Server SHA to use for Human Operational Test: `75db731cf63dcf93443c83ff60e534f2a023a8a1`
 - Database/environment identifier:
 - Shop/branch ID:
 - Shop/branch name:
@@ -309,12 +347,12 @@ Choose one:
 - Operational owner:
 - Reviewer:
 - Date/time:
-- Explicit merge authorization recorded separately: Yes / No
+- Explicit merge authorization recorded separately: Yes
 
 ## Evidence Integrity Rules
 
 1. Never fill fields with assumed values.
-2. Never copy CI success into Human Operational Test results.
+2. Never copy CI or ALDE success into Human Operational Test results.
 3. Never treat repository review as proof of stock, refund, database, tax, or accounting behavior.
 4. Certified SHAs must match the runtime actually tested.
 5. Evidence from another shop/branch cannot substitute for current-branch isolation verification.
