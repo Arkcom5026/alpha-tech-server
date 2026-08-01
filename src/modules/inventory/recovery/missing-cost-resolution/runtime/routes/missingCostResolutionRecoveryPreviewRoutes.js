@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.use(verifyToken);
 router.get('/:resolutionId/recovery-preview', controller.getPreview);
+router.get('/:resolutionId/recovery-approval-plan', controller.getApprovalPlan);
 
 module.exports = router;
