@@ -10,6 +10,8 @@ const {
 } = require('../src/modules/inventory/recovery/unlinked-simple-movement/execution-plan/buildUnlinkedSimpleMovementRecoveryExecutionPlan');
 const {
   UnlinkedSimpleMovementRecoveryExecutionRepository,
+  RECOVERY_TRANSACTION_TIMEOUT_MS,
+  RECOVERY_TRANSACTION_MAX_WAIT_MS,
 } = require('../src/modules/inventory/recovery/unlinked-simple-movement/execution/unlinkedSimpleMovementRecoveryExecutionRepository');
 
 const branchId = 2;
@@ -66,6 +68,7 @@ const approval = {
 };
 
 const updateCalls = [];
+const transactionCalls = [];
 const fakeClient = {
   stockBalance: {
     findMany: async () => balances,
@@ -81,7 +84,10 @@ const fakeClient = {
       return { count: args.where.id.in.length };
     },
   },
-  $transaction: async (work) => work(fakeClient),
+  $transaction: async (work, options) => {
+    transactionCalls.push(options);
+    return work(fakeClient);
+  },
 };
 
 (async () => {
@@ -90,12 +96,19 @@ const fakeClient = {
   assert.strictEqual(typeof repository.revalidateExecutionPlan, 'function');
   assert.strictEqual(typeof repository.linkExistingMovements, 'function');
   assert.strictEqual(typeof repository.recordExecutionAudit, 'function');
+  assert.strictEqual(RECOVERY_TRANSACTION_TIMEOUT_MS, 300000);
+  assert.strictEqual(RECOVERY_TRANSACTION_MAX_WAIT_MS, 30000);
 
   let transactionRepository = null;
   await repository.transaction(async (txRepository) => {
     transactionRepository = txRepository;
   });
   assert.ok(transactionRepository instanceof UnlinkedSimpleMovementRecoveryExecutionRepository);
+  assert.deepStrictEqual(transactionCalls[0], {
+    isolationLevel: 'Serializable',
+    timeout: RECOVERY_TRANSACTION_TIMEOUT_MS,
+    maxWait: RECOVERY_TRANSACTION_MAX_WAIT_MS,
+  });
 
   const revalidation = await repository.revalidateExecutionPlan({
     executionPlan,
