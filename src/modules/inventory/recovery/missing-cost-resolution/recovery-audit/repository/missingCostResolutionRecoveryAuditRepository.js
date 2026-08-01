@@ -1,4 +1,4 @@
-const prisma = require('../../../../../../../database/prisma/client');
+const prisma = require('../../../../../../database/prisma/client');
 
 class MissingCostResolutionRecoveryAuditRepository {
   constructor(client = prisma) {
