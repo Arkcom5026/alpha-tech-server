@@ -16,7 +16,22 @@ const syntaxFiles = [
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js',
-  'controllers/branchPriceController.js',
+  'src/modules/product/pricing/routes/branchPriceRoutes.js',
+  'src/modules/product/pricing/runtime/branchPriceRuntimeController.js',
+  'src/modules/product/pricing/runtime/branchPriceRuntimeService.js',
+  'src/modules/product/pricing/runtime/branchPriceRuntimeRepository.js',
+  'src/modules/branch/routes/branchRoutes.js',
+  'src/modules/branch/runtime/branchRuntimeController.js',
+  'src/modules/branch/runtime/branchRuntimeService.js',
+  'src/modules/branch/runtime/branchRuntimeRepository.js',
+  'src/modules/reporting/tax/input/routes/inputTaxReportRoutes.js',
+  'src/modules/reporting/tax/input/runtime/inputTaxReportRuntimeController.js',
+  'src/modules/reporting/tax/input/runtime/inputTaxReportRuntimeService.js',
+  'src/modules/reporting/tax/input/runtime/inputTaxReportRuntimeRepository.js',
+  'src/modules/finance/routes/financeRuntimeRoutes.js',
+  'src/modules/finance/runtime/financeRuntimeController.js',
+  'src/modules/finance/runtime/financeRuntimeService.js',
+  'src/modules/finance/runtime/financeRuntimeRepository.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
   'src/modules/employee/create/createEmployeeController.js',
@@ -68,20 +83,32 @@ for (const relativePath of syntaxFiles) {
   }
 }
 
-assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
-assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
-assertMissing(
-  'controllers/combinedBillingController.js',
-  'legacy combined billing controller retired'
-);
-assertMissing('controllers/authController.js', 'legacy root auth controller retired');
-assertMissing('routes/authRoutes.js', 'legacy root auth route retired');
-assertMissing('routes/loginEmployee.js', 'legacy loginEmployee route retired');
-assertMissing('routes/currentEmployeeRoutes.js', 'legacy currentEmployee route retired');
-assertMissing(
-  'controllers/employeeOnboardingController.js',
-  'legacy root employee onboarding controller retired'
-);
+const retiredRootFiles = [
+  ['controllers/employeeController.js', 'legacy employee controller retired'],
+  ['routes/employeeRoutes.js', 'legacy employee root route wrapper retired'],
+  ['controllers/combinedBillingController.js', 'legacy combined billing controller retired'],
+  ['controllers/authController.js', 'legacy root auth controller retired'],
+  ['routes/authRoutes.js', 'legacy root auth route retired'],
+  ['routes/loginEmployee.js', 'legacy loginEmployee route retired'],
+  ['routes/currentEmployeeRoutes.js', 'legacy currentEmployee route retired'],
+  ['controllers/employeeOnboardingController.js', 'legacy root employee onboarding controller retired'],
+  ['controllers/branchPriceController.js', 'legacy root branch price controller retired'],
+  ['controllers/branchController.js', 'legacy root branch controller retired'],
+  ['controllers/inputTaxReportController.js', 'legacy root input tax report controller retired'],
+  ['controllers/financeController.js', 'legacy root finance controller retired'],
+  ['controllers/productTypeController.js', 'legacy root product type controller retired'],
+  ['controllers/brandController.js', 'legacy root brand controller retired'],
+  ['controllers/stockAuditController.js', 'legacy root stock audit controller retired'],
+  ['controllers/receiptSimpleController.js', 'legacy root receipt simple controller retired'],
+  ['controllers/superAdminCategoryController.js', 'legacy root super admin category controller retired'],
+  ['routes/productRoutes.js', 'legacy root product route wrapper retired'],
+  ['routes/productTypeRoutes.js', 'legacy root product type route retired'],
+  ['routes/brandRoutes.js', 'legacy root brand route retired'],
+  ['routes/catalogRoutes.js', 'legacy root catalog route retired'],
+  ['routes/taxReportRoutes.js', 'legacy root tax report route retired'],
+];
+
+for (const [relativePath, label] of retiredRootFiles) assertMissing(relativePath, label);
 
 const verifyToken = read('middlewares/verifyToken.js');
 assertContains(verifyToken, "'USER_DISABLED'", 'verifyToken USER_DISABLED guard');
@@ -95,157 +122,72 @@ assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projectio
 const server = read('server.js');
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
 const sessionAuthRoutes = read('src/modules/auth/routes/sessionAuthRoutes.js');
-assertContains(
-  server,
-  "require('./src/modules/employee/routes/employeeRoutes')",
-  'server imports canonical employee module route directly'
-);
-assertContains(
-  server,
-  "app.use('/api/employees', employeeRoutes)",
-  'server mounts canonical employee endpoint'
-);
-assertContains(
-  server,
-  "require('./src/modules/auth/routes/sessionAuthRoutes')",
-  'server imports canonical session auth module route directly'
-);
-assertContains(
-  server,
-  "app.use('/api/auth', authRoutes)",
-  'server mounts canonical auth endpoint'
-);
-assertNotContains(
-  server,
-  "require('./routes/authRoutes')",
-  'server legacy auth route import'
-);
-assertNotContains(
-  server,
-  'controllers/employeeController',
-  'server legacy employee controller reference'
-);
-assertContains(
-  employeeModuleRoute,
-  'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED',
-  'employee approval compatibility endpoint'
-);
-assertContains(
-  employeeModuleRoute,
-  "canonicalEndpoint: '/api/auth/add-sub-employee'",
-  'canonical employee creation endpoint declaration'
-);
-assertNotContains(
-  employeeModuleRoute,
-  "router.post('/approve-employee', approveEmployee)",
-  'live employee approval handler'
-);
-assertNotContains(
-  employeeModuleRoute,
-  'controllers/employeeController',
-  'employee module route legacy controller reference'
-);
+const branchPriceRoute = read('src/modules/product/pricing/routes/branchPriceRoutes.js');
+const branchRoute = read('src/modules/branch/routes/branchRoutes.js');
+const inputTaxRoute = read('src/modules/reporting/tax/input/routes/inputTaxReportRoutes.js');
+const financeRoute = read('src/modules/finance/routes/financeRuntimeRoutes.js');
 
-assertContains(
-  sessionAuthRoutes,
-  "require('../../employee/onboarding/runtime/employeeOnboardingRuntimeController')",
-  'session auth route module onboarding boundary'
-);
-assertContains(
-  sessionAuthRoutes,
-  "router.post('/add-sub-employee', verifyToken, addSubEmployee)",
-  'canonical onboarding route guard'
-);
-assertNotContains(
-  sessionAuthRoutes,
-  "require('../../../../controllers/authController')",
-  'session auth route legacy auth controller reference'
-);
-assertNotContains(
-  sessionAuthRoutes,
-  'controllers/employeeOnboardingController',
-  'session auth route legacy onboarding controller reference'
-);
+assertContains(server, "require('./src/modules/employee/routes/employeeRoutes')", 'server imports canonical employee module route directly');
+assertContains(server, "app.use('/api/employees', employeeRoutes)", 'server mounts canonical employee endpoint');
+assertContains(server, "require('./src/modules/auth/routes/sessionAuthRoutes')", 'server imports canonical session auth module route directly');
+assertContains(server, "app.use('/api/auth', authRoutes)", 'server mounts canonical auth endpoint');
+assertContains(server, "require('./src/modules/finance/routes/financeRuntimeRoutes')", 'server imports canonical finance route directly');
+assertContains(server, "app.use('/api/finance', financeRoutes)", 'server mounts canonical finance endpoint');
+assertNotContains(server, "require('./routes/authRoutes')", 'server legacy auth route import');
+assertNotContains(server, 'controllers/employeeController', 'server legacy employee controller reference');
+assertNotContains(server, 'legacy-runtime', 'server legacy-runtime reference');
 
-const employeeOnboardingController = read(
-  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js'
-);
-const employeeOnboardingService = read(
-  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js'
-);
-const employeeOnboardingRepository = read(
-  'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js'
-);
-assertContains(
-  employeeOnboardingController,
-  "require('./employeeOnboardingRuntimeService')",
-  'employee onboarding controller service boundary'
-);
-assertContains(
-  employeeOnboardingController,
-  'addSubEmployee: service.addSubEmployee',
-  'employee onboarding controller handler export'
-);
+assertContains(employeeModuleRoute, 'EMPLOYEE_APPROVAL_WORKFLOW_DEPRECATED', 'employee approval compatibility endpoint');
+assertContains(employeeModuleRoute, "canonicalEndpoint: '/api/auth/add-sub-employee'", 'canonical employee creation endpoint declaration');
+assertNotContains(employeeModuleRoute, "router.post('/approve-employee', approveEmployee)", 'live employee approval handler');
+assertNotContains(employeeModuleRoute, 'controllers/employeeController', 'employee module route legacy controller reference');
+
+assertContains(sessionAuthRoutes, "require('../../employee/onboarding/runtime/employeeOnboardingRuntimeController')", 'session auth route module onboarding boundary');
+assertContains(sessionAuthRoutes, "router.post('/add-sub-employee', verifyToken, addSubEmployee)", 'canonical onboarding route guard');
+assertNotContains(sessionAuthRoutes, "require('../../../../controllers/authController')", 'session auth route legacy auth controller reference');
+assertNotContains(sessionAuthRoutes, 'controllers/employeeOnboardingController', 'session auth route legacy onboarding controller reference');
+
+assertContains(branchPriceRoute, "require('../runtime/branchPriceRuntimeController')", 'branch price route runtime boundary');
+assertNotContains(branchPriceRoute, 'controllers/branchPriceController', 'branch price route legacy controller reference');
+assertContains(branchRoute, "require('../runtime/branchRuntimeController')", 'branch route runtime boundary');
+assertNotContains(branchRoute, 'controllers/branchController', 'branch route legacy controller reference');
+assertContains(inputTaxRoute, "require('../runtime/inputTaxReportRuntimeController')", 'input tax route runtime boundary');
+assertNotContains(inputTaxRoute, 'controllers/inputTaxReportController', 'input tax route legacy controller reference');
+assertContains(financeRoute, "require('../runtime/financeRuntimeController')", 'finance route runtime boundary');
+assertNotContains(financeRoute, 'legacy-runtime', 'finance route legacy-runtime reference');
+
+const employeeOnboardingController = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js');
+const employeeOnboardingService = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js');
+const employeeOnboardingRepository = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js');
+assertContains(employeeOnboardingController, "require('./employeeOnboardingRuntimeService')", 'employee onboarding controller service boundary');
+assertContains(employeeOnboardingController, 'addSubEmployee: service.addSubEmployee', 'employee onboarding controller handler export');
 assertContains(employeeOnboardingService, 'canCreateEmployee', 'employee onboarding authority guard');
 assertContains(employeeOnboardingService, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
 assertContains(employeeOnboardingService, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
-assertContains(
-  employeeOnboardingService,
-  "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'",
-  'employee onboarding forbidden response'
-);
+assertContains(employeeOnboardingService, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
 assertContains(employeeOnboardingService, 'positionId,', 'employee onboarding position assignment');
 assertContains(employeeOnboardingService, 'approved: true', 'owner-created employee auto approval');
 assertContains(employeeOnboardingService, 'active: true', 'owner-created employee auto activation');
 assertContains(employeeOnboardingService, 'enabled: true', 'owner-created employee user activation');
-assertContains(
-  employeeOnboardingService,
-  "require('./employeeOnboardingRuntimeRepository')",
-  'employee onboarding service repository boundary'
-);
-assertContains(
-  employeeOnboardingRepository,
-  'const runTransaction = (work) => prisma.$transaction(work);',
-  'employee onboarding repository transaction boundary'
-);
-assertNotContains(
-  employeeOnboardingService,
-  'controllers/employeeOnboardingController',
-  'employee onboarding service legacy controller reference'
-);
-
+assertContains(employeeOnboardingService, "require('./employeeOnboardingRuntimeRepository')", 'employee onboarding service repository boundary');
+assertContains(employeeOnboardingRepository, 'const runTransaction = (work) => prisma.$transaction(work);', 'employee onboarding repository transaction boundary');
+assertNotContains(employeeOnboardingService, 'controllers/employeeOnboardingController', 'employee onboarding service legacy controller reference');
 
 const productCreate = read('src/modules/product/create/controllers/productCreateController.js');
 assertNotContains(productCreate, 'req.user?.activeProfileId', 'product create activeProfileId fallback');
 assertNotContains(productCreate, 'req.user?.id', 'product create User.id employee fallback');
 
 const quickStock = read('src/modules/product/quickStock/controllers/quickStockController.js');
-assertNotContains(
-  quickStock,
-  'req.user?.employeeId || req.user?.id',
-  'quick stock User.id employee fallback'
-);
+assertNotContains(quickStock, 'req.user?.employeeId || req.user?.id', 'quick stock User.id employee fallback');
 
-const branchPrice = read('controllers/branchPriceController.js');
-assertNotContains(
-  branchPrice,
-  'toInt(req.user?.id) || toInt(req.user?.employeeId)',
-  'branch price User.id updatedBy precedence'
-);
+const branchPriceController = read('src/modules/product/pricing/runtime/branchPriceRuntimeController.js');
+assertNotContains(branchPriceController, 'toInt(req.user?.id) || toInt(req.user?.employeeId)', 'branch price User.id updatedBy precedence');
 
 const saleReturn = read('src/modules/sales/return/controllers/saleReturnController.js');
-assertNotContains(
-  saleReturn,
-  'req.user?.employeeId || req.user?.profileId',
-  'sale return profileId employee fallback'
-);
+assertNotContains(saleReturn, 'req.user?.employeeId || req.user?.profileId', 'sale return profileId employee fallback');
 
 const supplierPaymentRoutes = read('src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js');
-assertContains(
-  supplierPaymentRoutes,
-  'requireSupplierPaymentActor',
-  'supplier payment actor route guard'
-);
+assertContains(supplierPaymentRoutes, 'requireSupplierPaymentActor', 'supplier payment actor route guard');
 
 const schema = read('prisma/schema.prisma');
 const employeeProfileBlock = schema.match(/model\s+EmployeeProfile\s*\{[\s\S]*?\n\}/)?.[0] || '';
@@ -260,4 +202,3 @@ if (process.exitCode) {
 }
 
 console.log('\nEMPLOYEE LIFECYCLE VERIFICATION: PASS');
-
