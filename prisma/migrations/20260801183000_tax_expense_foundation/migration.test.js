@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const sql = fs.readFileSync(path.join(__dirname, 'migration.sql'), 'utf8');
+for (const type of ['TaxExpenseStatus','TaxExpenseCounterpartyType','TaxExpenseVatTreatment','TaxExpenseCitTreatment','TaxExpenseWhtTreatment','TaxExpenseEvidenceStatus','TaxExpenseAssessmentStatus','TaxExpenseAttachmentType','TaxExpenseLifecycleEventType']) assert.ok(sql.includes(`CREATE TYPE "${type}" AS ENUM`));
+for (const table of ['TaxExpenseCategory','TaxExpense','TaxExpenseItem','TaxExpenseAssessment','TaxExpenseLifecycleEvent','TaxExpenseAttachment']) assert.ok(sql.includes(`CREATE TABLE "${table}"`));
+for (const name of ['TaxExpense_branchId_expenseNumber_key','TaxExpenseItem_taxExpenseId_lineNumber_key','TaxExpenseAssessment_taxExpenseId_version_key','TaxExpenseAttachment_taxExpenseId_sha256_key']) assert.ok(sql.includes(`"${name}"`));
+assert.ok(sql.includes('FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT'));
+assert.doesNotMatch(sql,/^\s*(DROP|TRUNCATE|DELETE\s+FROM|UPDATE\s+|INSERT\s+INTO|ALTER\s+TABLE[\s\S]*?\bDROP\b|ALTER\s+COLUMN|RENAME)\b/im);
+assert.doesNotMatch(sql,/\b(SimpleLot|StockMovement|StockBalance)\b/);
+console.log('Tax Expense migration contract: PASS');
