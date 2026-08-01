@@ -73,7 +73,8 @@
     "verify:partner-store-application-http-e2e:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-http-e2e.js",
     "start:test-database": "node scripts/start-test-database-server.js",
     "provision:test-partner-operator": "node scripts/provision-test-partner-operator.js",
-    "test:recovery-workflow-safety": "node tests/recovery-workflow-safety.contract.test.js"
+    "test:recovery-workflow-safety": "node tests/recovery-workflow-safety.contract.test.js",
+    "verify:tax-expense-recovery-clone": "node scripts/verify-tax-expense-recovery-clone.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
