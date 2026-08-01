@@ -1,72 +1,160 @@
-# Missing Cost Resolution — Runtime Mutation Workflow
+const assert = require('assert');
+const {
+  assertExpectedAuthority,
+  assertSeparateApprover,
+  assertTransitionEventType,
+} = require('../src/modules/inventory/recovery/missing-cost-resolution/runtime/policy/missingCostResolutionMutationPolicy');
+const {
+  MissingCostResolutionMutationRepository,
+} = require('../src/modules/inventory/recovery/missing-cost-resolution/runtime/repository/missingCostResolutionMutationRepository');
 
-Related issue: #228
+assert.doesNotThrow(() => assertExpectedAuthority({
+  resolution: {
+    branchId: 7,
+    status: 'DRAFT',
+    currentVersion: 2,
+    sourceSnapshotHash: 'snapshot-1',
+  },
+  branchId: 7,
+  expectedStatus: 'DRAFT',
+  expectedVersion: 2,
+  expectedSnapshotHash: 'snapshot-1',
+}));
 
-## Mission
+assert.throws(() => assertExpectedAuthority({
+  resolution: { branchId: 8, status: 'DRAFT', currentVersion: 2, sourceSnapshotHash: 'snapshot-1' },
+  branchId: 7,
+}), (error) => error.code === 'MISSING_COST_RESOLUTION_NOT_FOUND' && error.statusCode === 404);
 
-Implement the branch-scoped runtime mutation workflow for Missing Cost Resolution on top of the certified domain, persistence, and read foundations, without mutating inventory.
+assert.throws(() => assertExpectedAuthority({
+  resolution: { branchId: 7, status: 'SUBMITTED', currentVersion: 3, sourceSnapshotHash: 'snapshot-2' },
+  branchId: 7,
+  expectedStatus: 'DRAFT',
+  expectedVersion: 2,
+  expectedSnapshotHash: 'snapshot-1',
+}), (error) => error.code === 'MISSING_COST_RESOLUTION_STALE_STATUS' && error.statusCode === 409);
 
-## Increment Scope
+assert.throws(() => assertSeparateApprover({
+  resolution: { createdByEmployeeId: 41 },
+  actorEmployeeId: 41,
+  toStatus: 'APPROVED',
+}), (error) => error.code === 'MISSING_COST_RESOLUTION_SELF_APPROVAL_FORBIDDEN');
 
-- Create a draft resolution from an existing branch-owned candidate.
-- Append immutable/versioned cost evidence.
-- Submit a resolution for review.
-- Approve, reject, return for correction, and cancel according to explicit lifecycle policy.
-- Append one lifecycle audit event for every accepted transition.
-- Enforce authenticated actor and current branch authority.
-- Enforce expected status, current version, candidate snapshot hash, and evidence hash.
-- Add mutation repositories, services, controllers, routes, and targeted tests.
+assert.strictEqual(assertTransitionEventType('APPROVED'), 'APPROVED');
+assert.throws(() => assertTransitionEventType('UNKNOWN'), (error) => error.code === 'MISSING_COST_RESOLUTION_INVALID_TRANSITION');
 
-## Lifecycle
+const calls = [];
+const tx = {
+  stockBalance: {
+    findFirst: async (args) => {
+      calls.push(['stockBalance.findFirst', args]);
+      return { id: 5 };
+    },
+  },
+  missingCostResolution: {
+    create: async (args) => {
+      calls.push(['missingCostResolution.create', args]);
+      return { id: 11, ...args.data };
+    },
+    findFirst: async (args) => {
+      calls.push(['missingCostResolution.findFirst', args]);
+      return {
+        id: 11,
+        branchId: 7,
+        status: 'DRAFT',
+        currentVersion: 1,
+        sourceSnapshotHash: 'snapshot-1',
+        createdByEmployeeId: 40,
+        versions: [{ id: 21, evidenceHash: 'evidence-1' }],
+      };
+    },
+    updateMany: async (args) => {
+      calls.push(['missingCostResolution.updateMany', args]);
+      return { count: 1 };
+    },
+  },
+  missingCostResolutionVersion: {
+    create: async (args) => {
+      calls.push(['missingCostResolutionVersion.create', args]);
+      return { id: 21, ...args.data };
+    },
+    update: async (args) => {
+      calls.push(['missingCostResolutionVersion.update', args]);
+      return args.data;
+    },
+  },
+  missingCostResolutionEvent: {
+    create: async (args) => {
+      calls.push(['missingCostResolutionEvent.create', args]);
+      return { id: 31, ...args.data };
+    },
+  },
+};
+const client = { $transaction: async (work) => work(tx) };
+const repository = new MissingCostResolutionMutationRepository(client);
 
-- `DRAFT -> SUBMITTED`
-- `SUBMITTED -> APPROVED`
-- `SUBMITTED -> REJECTED`
-- `SUBMITTED -> RETURNED_FOR_CORRECTION`
-- `RETURNED_FOR_CORRECTION -> DRAFT`
-- `DRAFT | RETURNED_FOR_CORRECTION -> CANCELLED` only when policy permits
+(async () => {
+  const draft = await repository.createDraft({
+    branchId: 7,
+    stockBalanceId: 5,
+    productId: 9,
+    sourceAuditId: 'audit-1',
+    sourceSnapshotHash: 'snapshot-1',
+    candidateId: 'candidate-1',
+    candidateIdentityHash: 'identity-1',
+    candidateEntryId: 'entry-1',
+    actorEmployeeId: 40,
+  });
+  assert.strictEqual(draft.status, 'DRAFT');
+  assert.strictEqual(calls[0][1].where.branchId, 7);
+  assert.strictEqual(calls[0][1].where.productId, 9);
 
-Repeated or skipped transitions must fail deterministically.
+  const versionResult = await repository.appendEvidenceVersion({
+    branchId: 7,
+    resolutionId: 11,
+    expectedStatus: 'DRAFT',
+    expectedVersion: 1,
+    expectedSnapshotHash: 'snapshot-1',
+    actorEmployeeId: 40,
+    sourceType: 'SUPPLIER_DOCUMENT',
+    sourceReference: 'INV-001',
+    evidenceSummary: 'Supplier invoice',
+    proposedUnitCost: 125,
+    effectiveDate: '2026-08-01T00:00:00.000Z',
+    confidence: 'HIGH',
+    rationale: 'Verified supplier document',
+    evidenceHash: 'evidence-1',
+  });
+  assert.strictEqual(versionResult.currentVersion, 2);
+  const versionUpdate = calls.find(([name]) => name === 'missingCostResolution.updateMany');
+  assert.strictEqual(versionUpdate[1].where.branchId, 7);
+  assert.strictEqual(versionUpdate[1].where.currentVersion, 1);
 
-## Evidence Rules
+  calls.length = 0;
+  const transitionResult = await repository.transition({
+    branchId: 7,
+    resolutionId: 11,
+    actorEmployeeId: 42,
+    expectedStatus: 'DRAFT',
+    expectedVersion: 1,
+    expectedSnapshotHash: 'snapshot-1',
+    expectedEvidenceHash: 'evidence-1',
+    toStatus: 'SUBMITTED',
+    reasonCode: 'READY_FOR_REVIEW',
+  });
+  assert.strictEqual(transitionResult.status, 'SUBMITTED');
+  const transitionUpdate = calls.find(([name]) => name === 'missingCostResolution.updateMany');
+  assert.deepStrictEqual(transitionUpdate[1].where, {
+    id: 11,
+    branchId: 7,
+    status: 'DRAFT',
+    currentVersion: 1,
+  });
+  assert(calls.some(([name, args]) => name === 'missingCostResolutionEvent.create' && args.data.eventType === 'SUBMITTED'));
+  assert(!calls.some(([name]) => ['simpleLot.create', 'stockMovement.create', 'stockBalance.update'].includes(name)));
 
-- Evidence history is immutable.
-- Corrections create a new evidence version.
-- Prior versions must never be updated or deleted.
-- Approval records the exact approved evidence version and approval snapshot.
-- Approval authorizes cost evidence only; it must not write inventory.
-
-## Data Isolation
-
-`Branch` means an independent store/tenant. Every command must derive `branchId` from the authenticated/current actor context and scope all reads and writes by that branch. Missing and cross-branch records must share the same non-leaking failure contract.
-
-## Concurrency and Stale Data
-
-Every command must validate the expected status/version and the relevant candidate/evidence hashes before writing. Stale commands must fail before any mutation. Accepted commands must update the resolution and append the audit event atomically.
-
-## Safety Boundary
-
-- No `SimpleLot` creation.
-- No `StockMovement` mutation.
-- No `StockBalance` mutation.
-- No recovery preview, plan, or execution trigger.
-- No automatic zero-cost fallback.
-- No cross-store aggregation.
-- No Production database mutation during development or certification.
-
-## Verification
-
-- Lifecycle policy contract tests.
-- Repository atomicity and branch-isolation tests.
-- Immutable evidence version tests.
-- Optimistic/stale-data rejection tests.
-- Route/authentication contract tests.
-- Existing Missing Cost foundation, persistence, and read regressions.
-- Existing inventory recovery regressions.
-- Prisma multi-file validate/generate.
-- Backend CI and startup verification.
-- Post-merge ALDE `SyncAndCertify` with exact SHA evidence.
-
-## Completion Authority
-
-This increment is complete only after the PR is merged to `main`, Backend CI passes, ALDE `SyncAndCertify` succeeds for the merged server SHA, and evidence confirms that no inventory or Production mutation occurred.
+  console.log('Missing Cost Resolution mutation repository foundation contract: PASS');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

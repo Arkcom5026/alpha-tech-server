@@ -1,4 +1,4 @@
-const productRoutes = require('../../../routes/productRoutes')
+const productRoutes = require('./routes/productRoutes')
 const templateProductSearchRoutes = require('./templateSearch/routes/templateProductSearchRoutes')
 const { productTraceRoutes } = require('./trace')
 const quickStockRoutes = require('./quickStock/routes/quickStockRoutes')

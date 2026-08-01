@@ -1,0 +1,160 @@
+const bcrypt = require('bcryptjs');
+
+const repository = require('./employeeOnboardingRuntimeRepository');
+
+const normalize = (value) => String(value || '').trim();
+const normalizeEmail = (value) => normalize(value).toLowerCase();
+const normalizeUpper = (value) => normalize(value).toUpperCase();
+const toPositiveInt = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const canCreateEmployee = (actor = {}) => {
+  const systemRole = normalizeUpper(actor.role);
+  const employeeRole = normalizeUpper(actor.employeeRole || actor.v2Role);
+
+  return Boolean(
+    actor.isSuperAdmin
+    || systemRole === 'SUPERADMIN'
+    || systemRole === 'ADMIN'
+    || employeeRole === 'OWNER'
+    || employeeRole === 'MANAGER'
+  );
+};
+
+const addSubEmployee = async (req, res) => {
+  try {
+    const actor = req.user || {};
+
+    if (!canCreateEmployee(actor)) {
+      return res.status(403).json({
+        code: 'EMPLOYEE_ONBOARDING_FORBIDDEN',
+        message: 'เฉพาะเจ้าของร้าน ผู้ดูแลระบบ หรือผู้จัดการร้านเท่านั้นที่เพิ่มพนักงานใหม่ได้',
+      });
+    }
+
+    const branchId = toPositiveInt(actor.branchId || actor.employeeProfile?.branchId);
+    if (!branchId) {
+      return res.status(403).json({
+        code: 'EMPLOYEE_ONBOARDING_BRANCH_REQUIRED',
+        message: 'บัญชีผู้สร้างพนักงานไม่ได้ผูกกับสาขาที่ใช้งาน',
+      });
+    }
+
+    const name = normalize(req.body?.name);
+    const email = normalizeEmail(req.body?.email);
+    const password = normalize(req.body?.password);
+    const phone = normalize(req.body?.phone) || null;
+    const v2Role = normalizeUpper(req.body?.v2Role);
+    const positionId = toPositiveInt(req.body?.positionId);
+
+    if (!name || !email || !password || !v2Role || !positionId) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_ONBOARDING_FIELDS_REQUIRED',
+        message: 'กรุณากรอกชื่อ อีเมล รหัสผ่าน บทบาทในร้าน และตำแหน่งงานให้ครบถ้วน',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_PASSWORD_TOO_SHORT',
+        message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
+      });
+    }
+
+    if (!['MANAGER', 'CASHIER'].includes(v2Role)) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_STORE_ROLE_INVALID',
+        message: 'บทบาทในร้านต้องเป็น MANAGER หรือ CASHIER',
+      });
+    }
+
+    const [existingUser, position] = await Promise.all([
+      repository.findUserByEmail(email),
+      repository.findPositionById(positionId),
+    ]);
+
+    if (existingUser) {
+      return res.status(409).json({
+        code: 'EMPLOYEE_EMAIL_ALREADY_EXISTS',
+        message: 'อีเมลนี้ถูกลงทะเบียนใช้งานในระบบแล้ว',
+      });
+    }
+
+    if (!position) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_POSITION_NOT_FOUND',
+        message: 'ไม่พบตำแหน่งงานที่เลือก กรุณาโหลดรายการตำแหน่งใหม่',
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const created = await repository.runTransaction(async (tx) => {
+      const user = await repository.createUser({
+        email,
+        loginId: email,
+        password: passwordHash,
+        role: 'EMPLOYEE',
+        loginType: 'EMAIL',
+        enabled: true,
+      }, tx);
+
+      const employeeProfile = await repository.createEmployeeProfile({
+        userId: user.id,
+        branchId,
+        positionId,
+        name,
+        phone,
+        v2Role,
+        approved: true,
+        active: true,
+      }, tx);
+
+      await repository.createCustomerProfile({
+        userId: user.id,
+        name,
+        type: 'INDIVIDUAL',
+      }, tx);
+
+      return { user, employeeProfile };
+    });
+
+    console.log(
+      `👥 [Employee Onboarding] "${name}" created for Branch ID: ${branchId}, Position ID: ${positionId}`,
+    );
+
+    return res.status(201).json({
+      ok: true,
+      message: `สร้างบัญชีพนักงาน "${name}" สำเร็จและพร้อมใช้งานทันที`,
+      data: {
+        userId: created.user.id,
+        employeeId: created.employeeProfile.id,
+        name: created.employeeProfile.name,
+        email: created.user.email,
+        phone: created.employeeProfile.phone,
+        v2Role: created.employeeProfile.v2Role,
+        positionId: created.employeeProfile.positionId,
+        position: created.employeeProfile.position,
+        branchId: created.employeeProfile.branchId,
+        branch: created.employeeProfile.branch,
+        approved: created.employeeProfile.approved,
+        active: created.employeeProfile.active,
+        enabled: created.user.enabled,
+      },
+    });
+  } catch (error) {
+    console.error('❌ employee onboarding error:', error);
+    return res.status(500).json({
+      ok: false,
+      code: 'EMPLOYEE_ONBOARDING_FAILED',
+      message: 'ไม่สามารถสร้างบัญชีพนักงานได้ กรุณาลองใหม่อีกครั้ง',
+    });
+  }
+};
+
+module.exports = {
+  addSubEmployee,
+  canCreateEmployee,
+};

@@ -10,7 +10,7 @@ const {
   listProductTypeBrands,
   attachBrandToProductType,
   detachBrandFromProductType,
-} = require('../controllers/brandController');
+} = require('../runtime/brandRuntimeController');
 
 router.use(verifyToken);
 

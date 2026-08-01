@@ -10,12 +10,10 @@ const crypto = require('crypto');
 dotenv.config();
 const app = express();
 
-// Trust proxy (Render / reverse proxy)
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.disable('etag');
 
-// Request ID (for logs / support)
 app.use((req, res, next) => {
   req.id = crypto.randomUUID
     ? crypto.randomUUID()
@@ -24,8 +22,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===================== Routes =====================
-const authRoutes = require('./routes/authRoutes');
+const authRoutes = require('./src/modules/auth/routes/sessionAuthRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
 const superAdminCategoryRoutes = require('./src/modules/category/routes/superAdminCategoryRoutes');
@@ -78,7 +75,7 @@ const locationsRoutes = require('./src/modules/location/routes/locationsRoutes')
 const receiptSimpleRoutes = require('./src/modules/procurement/receipt/simple/routes/receiptSimpleRoutes');
 const quickReceiptRoutes = require('./src/modules/inventory/quick-receipt/routes/quickReceiptRoutes');
 const stockRoutes = require('./src/modules/inventory/dashboard/routes/stockDashboardRoutes');
-const financeRoutes = require('./src/modules/finance/legacy-runtime/routes/financeRuntimeRoutes');
+const financeRoutes = require('./src/modules/finance/routes/financeRuntimeRoutes');
 const customerReceiptRoutes = require('./src/modules/finance/customer-receipt/routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./src/modules/brand/routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
@@ -88,7 +85,6 @@ const missingCostResolutionReadRoutes = require('./src/modules/inventory/recover
 const missingCostResolutionMutationRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionMutationRoutes');
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 
-// ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
@@ -163,7 +159,6 @@ app.use('/api', (_req, res, next) => {
 const { traceRequest } = require('./middlewares/authTrace');
 app.use('/api', traceRequest);
 
-// ===================== API =====================
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -230,7 +225,6 @@ app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutio
 app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionMutationRoutes);
 app.use('/api/system/operational-verification', operationalVerificationRoutes);
 
-// ===================== Errors =====================
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
@@ -241,11 +235,16 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
+
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
-  const statusCode = Number.isInteger(candidateStatusCode) && candidateStatusCode >= 400 && candidateStatusCode <= 599
-    ? candidateStatusCode
-    : 500;
+  const statusCode =
+    Number.isInteger(candidateStatusCode) &&
+    candidateStatusCode >= 400 &&
+    candidateStatusCode <= 599
+      ? candidateStatusCode
+      : 500;
   const code = err?.code || 'INTERNAL_SERVER_ERROR';
+
   res.status(statusCode).json({
     ok: false,
     error: code,
