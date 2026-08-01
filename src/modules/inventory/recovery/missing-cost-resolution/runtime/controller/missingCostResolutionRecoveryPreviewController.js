@@ -1,4 +1,7 @@
-const service = require('../service/missingCostResolutionRecoveryPreviewService');
+const service = require('../../recovery-preview/service/missingCostResolutionRecoveryPreviewService');
+const {
+  buildMissingCostResolutionRecoveryApprovalPlan,
+} = require('../../recovery-plan/buildMissingCostResolutionRecoveryApprovalPlan');
 
 const buildOperatorIdentity = (user) => {
   const employeeId = Number(user?.employeeId || user?.id);
@@ -11,10 +14,29 @@ const buildOperatorIdentity = (user) => {
 
 const getPreview = async (req, res, next) => {
   try {
-    const result = await service.getPreview({
+    const operatorIdentity = buildOperatorIdentity(req.user);
+    const result = await service.buildPreview({
       branchId: req.user?.branchId,
       resolutionId: req.params.resolutionId,
-      operatorIdentity: buildOperatorIdentity(req.user),
+      operatorIdentity,
+    });
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getApprovalPlan = async (req, res, next) => {
+  try {
+    const operatorIdentity = buildOperatorIdentity(req.user);
+    const preview = await service.buildPreview({
+      branchId: req.user?.branchId,
+      resolutionId: req.params.resolutionId,
+      operatorIdentity,
+    });
+    const result = buildMissingCostResolutionRecoveryApprovalPlan({
+      preview,
+      operatorIdentity,
     });
     return res.json(result);
   } catch (error) {
@@ -24,5 +46,6 @@ const getPreview = async (req, res, next) => {
 
 module.exports = {
   getPreview,
+  getApprovalPlan,
   buildOperatorIdentity,
 };
