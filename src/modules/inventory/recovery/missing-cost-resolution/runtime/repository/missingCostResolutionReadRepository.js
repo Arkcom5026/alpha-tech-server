@@ -1,4 +1,4 @@
-const prisma = require('../../../../../../../database/prisma/client');
+const prisma = require('../../../../../../database/prisma/client');
 
 const resolutionInclude = {
   product: { select: { id: true, name: true, sku: true } },
