@@ -1,4 +1,4 @@
-const prisma = require('../../../../../../../database/prisma/client');
+const prisma = require('../../../../../../database/prisma/client');
 const { sha256 } = require('../../contracts/missingCostResolutionContract');
 
 const createError = (code, message, details = undefined) => {
