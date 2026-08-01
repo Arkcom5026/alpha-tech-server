@@ -1,4 +1,4 @@
-/* eslint-env node */
+﻿/* eslint-env node */
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -16,7 +16,6 @@ const syntaxFiles = [
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js',
-  'controllers/combinedBillingController.js',
   'controllers/branchPriceController.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
@@ -71,6 +70,10 @@ for (const relativePath of syntaxFiles) {
 
 assertMissing('controllers/employeeController.js', 'legacy employee controller retired');
 assertMissing('routes/employeeRoutes.js', 'legacy employee root route wrapper retired');
+assertMissing(
+  'controllers/combinedBillingController.js',
+  'legacy combined billing controller retired'
+);
 assertMissing('controllers/authController.js', 'legacy root auth controller retired');
 assertMissing('routes/authRoutes.js', 'legacy root auth route retired');
 assertMissing('routes/loginEmployee.js', 'legacy loginEmployee route retired');
@@ -211,12 +214,6 @@ assertNotContains(
   'employee onboarding service legacy controller reference'
 );
 
-const combinedBilling = read('controllers/combinedBillingController.js');
-assertNotContains(
-  combinedBilling,
-  'req.user?.employeeId || req.user?.id',
-  'combined billing User.id employee fallback'
-);
 
 const productCreate = read('src/modules/product/create/controllers/productCreateController.js');
 assertNotContains(productCreate, 'req.user?.activeProfileId', 'product create activeProfileId fallback');
@@ -263,3 +260,4 @@ if (process.exitCode) {
 }
 
 console.log('\nEMPLOYEE LIFECYCLE VERIFICATION: PASS');
+
