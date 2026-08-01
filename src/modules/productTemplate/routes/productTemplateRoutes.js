@@ -15,7 +15,7 @@ const {
   archiveProductTemplate,
   restoreProductTemplate,
   toggleProductTemplateActive,
-} = require('../controllers/productTemplateController');
+} = require('../runtime/productTemplateRuntimeController');
 
 router.use(verifyToken);
 
