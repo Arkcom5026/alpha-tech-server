@@ -10,7 +10,7 @@ const {
   archiveCategory,
   restoreCategory,
   getCategoryDropdowns,
-} = require('../controllers/categoryController');
+} = require('../runtime/categoryRuntimeController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../middlewares/requireAdmin');
