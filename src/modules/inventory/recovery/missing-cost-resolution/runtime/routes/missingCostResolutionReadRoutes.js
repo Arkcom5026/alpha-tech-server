@@ -1,5 +1,5 @@
 const express = require('express');
-const verifyToken = require('../../../../../../middlewares/verifyToken');
+const verifyToken = require('../../../../../../../middlewares/verifyToken');
 const controller = require('../controller/missingCostResolutionReadController');
 
 const router = express.Router();
