@@ -45,11 +45,12 @@ assert.strictEqual(safe.mode, 'PREVIEW_ONLY');
 assert.strictEqual(safe.mutationPerformed, false);
 assert.strictEqual(safe.entries.length, 1);
 assert.strictEqual(safe.entries[0].classification, 'SAFE_TO_LINK');
-assert.strictEqual(safe.entries[0].proposedLot.qtyInitial, 5);
-assert.strictEqual(safe.entries[0].proposedLot.qtyRemaining, 5);
-assert.strictEqual(safe.entries[0].proposedLot.unitCost, 100);
-assert.deepStrictEqual(safe.entries[0].movementIds, [1]);
-assert.ok(safe.entries[0].movementEvidenceHash);
+assert.strictEqual(safe.entries[0].proposedRecovery.qtyInitial, 5);
+assert.strictEqual(safe.entries[0].proposedRecovery.qtyRemaining, 5);
+assert.strictEqual(safe.entries[0].proposedRecovery.unitCost, 100);
+assert.deepStrictEqual(safe.entries[0].proposedRecovery.movementIdsToLink, [1]);
+assert.deepStrictEqual(safe.entries[0].preconditions.movementIds, [1]);
+assert.ok(safe.entries[0].preconditions.movementEvidenceHash);
 assert.ok(safe.entries[0].preconditionHash);
 assert.ok(safe.sourceSnapshotHash);
 assert.ok(safe.manifestId);
@@ -88,8 +89,8 @@ const branchIsolation = build({
     movement({ id: 99, branchId: 3, qty: 999 }),
   ],
 });
-assert.strictEqual(branchIsolation.entries[0].movementIds.length, 1);
-assert.deepStrictEqual(branchIsolation.entries[0].movementIds, [1]);
+assert.strictEqual(branchIsolation.entries[0].preconditions.movementIds.length, 1);
+assert.deepStrictEqual(branchIsolation.entries[0].preconditions.movementIds, [1]);
 
 const deterministicA = build();
 const deterministicB = build();
