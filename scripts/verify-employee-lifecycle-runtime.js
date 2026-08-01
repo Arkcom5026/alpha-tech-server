@@ -32,6 +32,28 @@ const syntaxFiles = [
   'src/modules/finance/runtime/financeRuntimeController.js',
   'src/modules/finance/runtime/financeRuntimeService.js',
   'src/modules/finance/runtime/financeRuntimeRepository.js',
+  'src/modules/unit/routes/unitRoutes.js',
+  'src/modules/unit/runtime/unitRuntimeController.js',
+  'src/modules/unit/runtime/unitRuntimeService.js',
+  'src/modules/unit/runtime/unitRuntimeRepository.js',
+  'src/modules/position/routes/positionRoutes.js',
+  'src/modules/position/runtime/positionRuntimeController.js',
+  'src/modules/position/runtime/positionRuntimeService.js',
+  'src/modules/position/runtime/positionRuntimeRepository.js',
+  'src/modules/category/routes/categoryRoutes.js',
+  'src/modules/category/runtime/categoryRuntimeController.js',
+  'src/modules/category/runtime/categoryRuntimeService.js',
+  'src/modules/category/runtime/categoryRuntimeRepository.js',
+  'src/modules/productTemplate/routes/productTemplateRoutes.js',
+  'src/modules/productTemplate/runtime/productTemplateRuntimeController.js',
+  'src/modules/productTemplate/runtime/productTemplateRuntimeService.js',
+  'src/modules/productTemplate/runtime/productTemplateRuntimeRepository.js',
+  'src/modules/brand/routes/brandRoutes.js',
+  'src/modules/brand/routes/productTypeBrandRoutes.js',
+  'src/modules/brand/runtime/brandRuntimeController.js',
+  'src/modules/brand/runtime/brandRuntimeService.js',
+  'src/modules/brand/runtime/brandRuntimeRepository.js',
+  'src/modules/product/profile/routes/productProfileRoutes.js',
   'src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js',
   'src/modules/employee/routes/employeeRoutes.js',
   'src/modules/employee/create/createEmployeeController.js',
@@ -98,6 +120,7 @@ const retiredRootFiles = [
   ['controllers/financeController.js', 'legacy root finance controller retired'],
   ['controllers/productTypeController.js', 'legacy root product type controller retired'],
   ['controllers/brandController.js', 'legacy root brand controller retired'],
+  ['controllers/productTypeBrandController.js', 'legacy root product type brand controller retired'],
   ['controllers/stockAuditController.js', 'legacy root stock audit controller retired'],
   ['controllers/receiptSimpleController.js', 'legacy root receipt simple controller retired'],
   ['controllers/superAdminCategoryController.js', 'legacy root super admin category controller retired'],
@@ -106,6 +129,27 @@ const retiredRootFiles = [
   ['routes/brandRoutes.js', 'legacy root brand route retired'],
   ['routes/catalogRoutes.js', 'legacy root catalog route retired'],
   ['routes/taxReportRoutes.js', 'legacy root tax report route retired'],
+  ['src/modules/auth/controllers/authController.js', 'obsolete module auth controller retired'],
+  ['src/modules/auth/services/authService.js', 'obsolete module auth service retired'],
+  ['src/modules/unit/controllers/unitController.js', 'legacy unit controller retired'],
+  ['src/modules/position/controllers/positionController.js', 'legacy position controller retired'],
+  ['src/modules/category/controllers/categoryController.js', 'legacy category controller retired'],
+  ['src/modules/productTemplate/controllers/productTemplateController.js', 'legacy product template controller retired'],
+  ['src/modules/brand/controllers/brandController.js', 'legacy brand module controller retired'],
+  ['src/modules/product/profile/controllers/productProfileController.js', 'redundant product profile controller retired'],
+  ['src/modules/finance/legacy-runtime/routes/financeRuntimeRoutes.js', 'legacy finance runtime route retired'],
+  ['src/modules/finance/legacy-runtime/financeRuntimeController.js', 'legacy finance runtime controller retired'],
+  ['src/modules/finance/legacy-runtime/financeRuntimeService.js', 'legacy finance runtime service retired'],
+  ['src/modules/finance/legacy-runtime/financeRuntimeRepository.js', 'legacy finance runtime repository retired'],
+  ['src/modules/finance/legacy-runtime/financeRuntimeSlice.test.js', 'legacy finance runtime test retired'],
+  ['src/modules/finance/routes/financeRoutes.js', 'duplicate finance route retired'],
+  ['src/modules/finance/controllers/financeController.js', 'duplicate finance controller retired'],
+  ['src/modules/finance/services/financeService.js', 'duplicate finance service retired'],
+  ['src/features/finance/dailyClosing.routes.js', 'legacy daily closing route retired'],
+  ['src/features/finance/financeRoutes.js', 'legacy feature finance bridge retired'],
+  ['src/modules/product/controllers/templateProductSearchController.js', 'duplicate template product search controller retired'],
+  ['src/modules/product/services/templateProductSearchService.js', 'duplicate template product search service retired'],
+  ['src/modules/product/repositories/productTemplateRepository.js', 'duplicate template product search repository retired'],
 ];
 
 for (const [relativePath, label] of retiredRootFiles) assertMissing(relativePath, label);
@@ -126,6 +170,13 @@ const branchPriceRoute = read('src/modules/product/pricing/routes/branchPriceRou
 const branchRoute = read('src/modules/branch/routes/branchRoutes.js');
 const inputTaxRoute = read('src/modules/reporting/tax/input/routes/inputTaxReportRoutes.js');
 const financeRoute = read('src/modules/finance/routes/financeRuntimeRoutes.js');
+const unitRoute = read('src/modules/unit/routes/unitRoutes.js');
+const positionRoute = read('src/modules/position/routes/positionRoutes.js');
+const categoryRoute = read('src/modules/category/routes/categoryRoutes.js');
+const productTemplateRoute = read('src/modules/productTemplate/routes/productTemplateRoutes.js');
+const brandRoute = read('src/modules/brand/routes/brandRoutes.js');
+const productTypeBrandRoute = read('src/modules/brand/routes/productTypeBrandRoutes.js');
+const productProfileRoute = read('src/modules/product/profile/routes/productProfileRoutes.js');
 
 assertContains(server, "require('./src/modules/employee/routes/employeeRoutes')", 'server imports canonical employee module route directly');
 assertContains(server, "app.use('/api/employees', employeeRoutes)", 'server mounts canonical employee endpoint');
@@ -155,6 +206,14 @@ assertContains(inputTaxRoute, "require('../runtime/inputTaxReportRuntimeControll
 assertNotContains(inputTaxRoute, 'controllers/inputTaxReportController', 'input tax route legacy controller reference');
 assertContains(financeRoute, "require('../runtime/financeRuntimeController')", 'finance route runtime boundary');
 assertNotContains(financeRoute, 'legacy-runtime', 'finance route legacy-runtime reference');
+assertContains(unitRoute, "require('../runtime/unitRuntimeController')", 'unit route runtime boundary');
+assertContains(positionRoute, "require('../runtime/positionRuntimeController')", 'position route runtime boundary');
+assertContains(categoryRoute, "require('../runtime/categoryRuntimeController')", 'category route runtime boundary');
+assertContains(productTemplateRoute, "require('../runtime/productTemplateRuntimeController')", 'product template route runtime boundary');
+assertContains(brandRoute, "require('../runtime/brandRuntimeController')", 'brand route runtime boundary');
+assertContains(productTypeBrandRoute, "require('../runtime/brandRuntimeController')", 'product type brand compatibility runtime boundary');
+assertContains(productProfileRoute, "code: 'PRODUCT_PROFILE_REMOVED'", 'product profile retirement boundary');
+assertNotContains(productProfileRoute, 'productProfileController', 'product profile redundant controller reference');
 
 const employeeOnboardingController = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js');
 const employeeOnboardingService = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js');
