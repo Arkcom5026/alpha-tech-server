@@ -9,6 +9,9 @@ const {
   buildUnlinkedSimpleMovementRecoveryExecutionPlan,
 } = require('../execution-plan/buildUnlinkedSimpleMovementRecoveryExecutionPlan');
 
+const RECOVERY_TRANSACTION_TIMEOUT_MS = 300000;
+const RECOVERY_TRANSACTION_MAX_WAIT_MS = 30000;
+
 class UnlinkedSimpleMovementRecoveryExecutionRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -17,7 +20,11 @@ class UnlinkedSimpleMovementRecoveryExecutionRepository {
   transaction(work) {
     return this.prisma.$transaction(
       (tx) => work(new UnlinkedSimpleMovementRecoveryExecutionRepository(tx)),
-      { isolationLevel: 'Serializable', timeout: 30000, maxWait: 10000 }
+      {
+        isolationLevel: 'Serializable',
+        timeout: RECOVERY_TRANSACTION_TIMEOUT_MS,
+        maxWait: RECOVERY_TRANSACTION_MAX_WAIT_MS,
+      }
     );
   }
 
@@ -197,3 +204,5 @@ class UnlinkedSimpleMovementRecoveryExecutionRepository {
 
 module.exports = new UnlinkedSimpleMovementRecoveryExecutionRepository();
 module.exports.UnlinkedSimpleMovementRecoveryExecutionRepository = UnlinkedSimpleMovementRecoveryExecutionRepository;
+module.exports.RECOVERY_TRANSACTION_TIMEOUT_MS = RECOVERY_TRANSACTION_TIMEOUT_MS;
+module.exports.RECOVERY_TRANSACTION_MAX_WAIT_MS = RECOVERY_TRANSACTION_MAX_WAIT_MS;
