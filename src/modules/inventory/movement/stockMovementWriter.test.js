@@ -14,7 +14,7 @@ const REPOSITORY_ROOT = path.resolve(__dirname, '../../../..');
 const walkJavaScriptFiles = (directory) => {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
   return entries.flatMap((entry) => {
-    if (entry.name === 'node_modules' || entry.name === '.git') return [];
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'artifacts') return [];
     const absolutePath = path.join(directory, entry.name);
     if (entry.isDirectory()) return walkJavaScriptFiles(absolutePath);
     return entry.isFile() && entry.name.endsWith('.js') ? [absolutePath] : [];
