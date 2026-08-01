@@ -9,7 +9,7 @@ const {
   getAllSuperAdminCategories,
   createSuperAdminCategory,
   updateSuperAdminCategory,
-} = require('../../../../controllers/superAdminCategoryController');
+} = require('../super-admin/runtime/superAdminCategoryRuntimeController');
 
 const router = express.Router();
 
