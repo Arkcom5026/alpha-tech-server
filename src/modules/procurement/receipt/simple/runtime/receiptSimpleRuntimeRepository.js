@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../../../lib/prisma');
+const { prisma } = require('../../../../../lib/prisma');
 
 const findBranchFeatures = (branchId) =>
   prisma.branch.findUnique({
