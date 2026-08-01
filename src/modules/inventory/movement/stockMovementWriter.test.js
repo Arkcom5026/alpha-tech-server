@@ -74,9 +74,9 @@ test('empty movement batches are a no-op and never call Prisma', async () => {
   assert.equal(called, false);
 });
 
-test('writer refuses clients without stock movement persistence capability', async () => {
-  await assert.rejects(() => createStockMovement({}, {}), /stockMovement\.create/);
-  await assert.rejects(() => createStockMovements({}, [{}]), /stockMovement\.createMany/);
+test('writer refuses clients without stock movement persistence capability', () => {
+  assert.throws(() => createStockMovement({}, {}), /Prisma stockMovement client is required/);
+  assert.throws(() => createStockMovements({}, [{}]), /Prisma stockMovement client is required/);
 });
 
 test('quick stock repository delegates movement persistence to inventory authority', () => {
@@ -103,6 +103,7 @@ test('the shared Prisma singleton installs inventory movement authority', () => 
 test('remaining stock movement runtimes use the authorized Prisma singleton', () => {
   const runtimePaths = [
     '../../../../controllers/purchaseOrderReceiptSimpleController.js',
+    '../recovery/simple-stock-backfill/execution/simpleStockBackfillExecutionRepository.js',
     '../simple-stock/adjust/simpleStockAdjustmentRepository.js',
     '../simple-stock/transfer/simpleStockTransferRepository.js',
     '../stock-item/receive/stockItemReceiveSlices.js',
@@ -135,6 +136,7 @@ test('repository production runtime cannot add an unregistered direct stock move
   const writerPath = path.resolve(__dirname, 'stockMovementWriter.js');
   const allowedRuntimeWriters = new Set([
     path.resolve(REPOSITORY_ROOT, 'controllers/purchaseOrderReceiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/recovery/simple-stock-backfill/execution/simpleStockBackfillExecutionRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/stock-item/receive/stockItemReceiveSlices.js'),
