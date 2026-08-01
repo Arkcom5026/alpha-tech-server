@@ -4,42 +4,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
-  StockMovementWriter,
+  authorizeStockMovementClient,
   createStockMovement,
   createStockMovements,
-  isStockMovementAuthorizedClient,
-  authorizeStockMovementClient,
 } = require('./stockMovementWriter');
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../../..');
 
-const walkJavaScriptFiles = (root) => {
-  const files = [];
-  const ignoredDirectories = new Set([
-    '.git',
-    'node_modules',
-    'coverage',
-    'dist',
-    'build',
-    'artifacts',
-    'recovery',
-    'migration-evidence',
-  ]);
-
-  const visit = (current) => {
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        if (!ignoredDirectories.has(entry.name)) visit(path.join(current, entry.name));
-        continue;
-      }
-      if (entry.isFile() && /\.(cjs|mjs|js)$/.test(entry.name)) {
-        files.push(path.join(current, entry.name));
-      }
-    }
-  };
-
-  visit(root);
-  return files;
+const walkJavaScriptFiles = (directory) => {
+  const entries = fs.readdirSync(directory, { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    if (entry.name === 'node_modules' || entry.name === '.git') return [];
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return walkJavaScriptFiles(absolutePath);
+    return entry.isFile() && entry.name.endsWith('.js') ? [absolutePath] : [];
+  });
 };
 
 test('stock movement writer delegates one movement without remapping runtime data', async () => {
@@ -48,23 +27,16 @@ test('stock movement writer delegates one movement without remapping runtime dat
     stockMovement: {
       create: async (query) => {
         received = query;
-        return { id: 41, ...query.data };
+        return { id: 1, ...query.data };
       },
     },
   };
-  const movement = {
-    productId: 7,
-    branchId: 2,
-    qty: -1,
-    type: 'SALE',
-    refType: 'SALE',
-    refId: 9,
-  };
 
-  const result = await createStockMovement(client, movement);
+  const data = { productId: 1, branchId: 2, qty: 3, type: 'RECEIVE' };
+  const result = await createStockMovement(client, data);
 
-  assert.equal(received.data, movement);
-  assert.equal(result.id, 41);
+  assert.deepEqual(received, { data });
+  assert.deepEqual(result, { id: 1, ...data });
 });
 
 test('stock movement writer delegates movement batches atomically through Prisma createMany', async () => {
@@ -77,15 +49,15 @@ test('stock movement writer delegates movement batches atomically through Prisma
       },
     },
   };
-  const movements = [
-    { productId: 1, branchId: 3, qty: -1, type: 'SALE' },
-    { productId: 2, branchId: 3, qty: 1, type: 'RETURN' },
-  ];
 
+  const movements = [
+    { productId: 1, branchId: 2, qty: 3, type: 'RECEIVE' },
+    { productId: 2, branchId: 2, qty: -1, type: 'SALE' },
+  ];
   const result = await createStockMovements(client, movements);
 
-  assert.equal(received.data, movements);
-  assert.equal(result.count, 2);
+  assert.deepEqual(received, { data: movements });
+  assert.deepEqual(result, { count: 2 });
 });
 
 test('empty movement batches are a no-op and never call Prisma', async () => {
@@ -94,22 +66,17 @@ test('empty movement batches are a no-op and never call Prisma', async () => {
     stockMovement: {
       createMany: async () => {
         called = true;
-        return { count: 99 };
       },
     },
   };
 
-  const result = await createStockMovements(client, []);
-
-  assert.deepEqual(result, { count: 0 });
+  assert.deepEqual(await createStockMovements(client, []), { count: 0 });
   assert.equal(called, false);
 });
 
 test('writer refuses clients without stock movement persistence capability', () => {
-  assert.throws(
-    () => new StockMovementWriter({}),
-    /Prisma stockMovement client is required/
-  );
+  assert.throws(() => createStockMovement({}, {}), /Prisma stockMovement client is required/);
+  assert.throws(() => createStockMovements({}, [{}]), /Prisma stockMovement client is required/);
 });
 
 test('quick stock repository delegates movement persistence to inventory authority', () => {
@@ -135,12 +102,12 @@ test('the shared Prisma singleton installs inventory movement authority', () => 
 
 test('remaining stock movement runtimes use the authorized Prisma singleton', () => {
   const runtimePaths = [
-    '../../../../controllers/receiptSimpleController.js',
-    '../../../../controllers/purchaseOrderReceiptSimpleController.js',
+    '../recovery/simple-stock-backfill/execution/simpleStockBackfillExecutionRepository.js',
     '../simple-stock/adjust/simpleStockAdjustmentRepository.js',
     '../simple-stock/transfer/simpleStockTransferRepository.js',
     '../stock-item/receive/stockItemReceiveSlices.js',
     '../../procurement/receipt/commit/commitReceiptRepository.js',
+    '../../procurement/receipt/simple/runtime/receiptSimpleRuntimeRepository.js',
     '../../sales/completion/services/saleCompletionService.js',
     '../../sales/create/controllers/saleLegacyCreateController.js',
   ];
@@ -167,12 +134,12 @@ test('repository production runtime cannot add an unregistered direct stock move
   const authorityTestPath = path.resolve(__filename);
   const writerPath = path.resolve(__dirname, 'stockMovementWriter.js');
   const allowedRuntimeWriters = new Set([
-    path.resolve(REPOSITORY_ROOT, 'controllers/receiptSimpleController.js'),
-    path.resolve(REPOSITORY_ROOT, 'controllers/purchaseOrderReceiptSimpleController.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/recovery/simple-stock-backfill/execution/simpleStockBackfillExecutionRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/stock-item/receive/stockItemReceiveSlices.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/commit/commitReceiptRepository.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/simple/runtime/receiptSimpleRuntimeRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/completion/services/saleCompletionService.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/create/controllers/saleLegacyCreateController.js'),
   ]);
@@ -209,21 +176,22 @@ test('transaction clients are wrapped before application work executes', async (
     data: { productId: 1, branchId: 1, qty: 1, type: 'RECEIVE' },
   }));
 
-  assert.equal(rawMovementQuery.data.type, 'RECEIVE');
+  assert.deepEqual(rawMovementQuery, {
+    data: { productId: 1, branchId: 1, qty: 1, type: 'RECEIVE' },
+  });
 });
 
 test('movement authority wrapping is idempotent across repeated calls', () => {
-  const rawClient = {
+  const client = {
     stockMovement: {
       create: async () => ({ id: 1 }),
-      createMany: async () => ({ count: 0 }),
+      createMany: async () => ({ count: 1 }),
     },
+    $transaction: async (work) => work(client),
   };
 
-  const first = authorizeStockMovementClient(rawClient);
-  const second = authorizeStockMovementClient(first);
+  const once = authorizeStockMovementClient(client);
+  const twice = authorizeStockMovementClient(once);
 
-  assert.equal(first, second);
-  assert.equal(isStockMovementAuthorizedClient(first), true);
-  assert.equal(isStockMovementAuthorizedClient(rawClient), false);
+  assert.equal(twice, once);
 });

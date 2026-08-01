@@ -9,8 +9,8 @@ const {
   getBranchPricesByBranch,
   getAllProductsWithBranchPrice,
   updateMultipleBranchPrices,
-} = require('../../../../../controllers/branchPriceController');
-const { getBranchBySlug } = require('../../../../../controllers/branchController');
+} = require('../runtime/branchPriceRuntimeController');
+const { getBranchBySlug } = require('../../../branch/runtime/branchRuntimeController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);

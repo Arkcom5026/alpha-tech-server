@@ -2,28 +2,27 @@
 const express = require('express');
 const router = express.Router();
 
-const {
-  createProductProfile,
-  getAllProductProfiles,
-  getProductProfileById,
-  updateProductProfile,
-  archiveProductProfile,
-  restoreProductProfile,
-  getProductProfileDropdowns,
-} = require('../controllers/productProfileController');
-
 const verifyToken = require('../../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../../middlewares/requireAdmin');
 
+// ProductProfile/ProductTemplate models are absent from the current Prisma schema.
+// Preserve the authenticated API surface with an explicit retirement response.
+const retired = (_req, res) =>
+  res.status(410).json({
+    error: 'FEATURE_RETIRED',
+    code: 'PRODUCT_PROFILE_REMOVED',
+    message: 'ProductProfile ถูกถอดออกจาก Product Runtime ปัจจุบันแล้ว',
+  });
+
 router.use(verifyToken);
 
-router.get('/dropdowns', getProductProfileDropdowns);
-router.get('/', getAllProductProfiles);
-router.get('/:id', getProductProfileById);
+router.get('/dropdowns', retired);
+router.get('/', retired);
+router.get('/:id', retired);
 
-router.post('/', requireAdmin, createProductProfile);
-router.patch('/:id', requireAdmin, updateProductProfile);
-router.patch('/:id/archive', requireAdmin, archiveProductProfile);
-router.patch('/:id/restore', requireAdmin, restoreProductProfile);
+router.post('/', requireAdmin, retired);
+router.patch('/:id', requireAdmin, retired);
+router.patch('/:id/archive', requireAdmin, retired);
+router.patch('/:id/restore', requireAdmin, retired);
 
 module.exports = router;

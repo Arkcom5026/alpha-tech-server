@@ -1,0 +1,82 @@
+const { prisma } = require('../../../../../lib/prisma');
+
+const createDeposit = (data) => prisma.customerDeposit.create({
+  data,
+  include: { customer: { include: { user: true } } },
+});
+
+const findActiveDepositsByBranch = (branchId) => prisma.customerDeposit.findMany({
+  where: { branchId, status: 'ACTIVE' },
+  orderBy: { createdAt: 'desc' },
+  include: { customer: { include: { user: true } } },
+});
+
+const findActiveDepositByIdAndBranch = ({ id, branchId }) => prisma.customerDeposit.findFirst({
+  where: { id, branchId, status: 'ACTIVE' },
+  include: { customer: { include: { user: true } } },
+});
+
+const findCustomerByPhone = ({ phone, branchId }) => prisma.customerProfile.findFirst({
+  where: { user: { loginId: phone } },
+  include: {
+    user: true,
+    subdistrict: { include: { district: { include: { province: true } } } },
+    customerDeposits: {
+      where: { branchId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    },
+  },
+});
+
+const findCustomersByName = ({ query, branchId }) => prisma.customerProfile.findMany({
+  where: {
+    OR: [
+      { name: { contains: query, mode: 'insensitive' } },
+      { companyName: { contains: query, mode: 'insensitive' } },
+    ],
+  },
+  take: 10,
+  orderBy: [{ companyName: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+  include: {
+    user: true,
+    subdistrict: { include: { district: { include: { province: true } } } },
+    customerDeposits: {
+      where: { branchId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    },
+  },
+});
+
+const findCustomerById = ({ customerId, branchId }) => prisma.customerProfile.findFirst({
+  where: { id: customerId },
+  include: {
+    user: true,
+    subdistrict: { include: { district: { include: { province: true } } } },
+    customerDeposits: {
+      where: { branchId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    },
+  },
+});
+
+const updateDepositById = ({ id, data }) => prisma.customerDeposit.update({
+  where: { id },
+  data,
+  include: { customer: { include: { user: true } } },
+});
+
+const deleteDepositById = (id) => prisma.customerDeposit.delete({ where: { id } });
+
+const runTransaction = (callback, options) => prisma.$transaction(callback, options);
+
+module.exports = {
+  createDeposit,
+  findActiveDepositsByBranch,
+  findActiveDepositByIdAndBranch,
+  findCustomerByPhone,
+  findCustomersByName,
+  findCustomerById,
+  updateDepositById,
+  deleteDepositById,
+  runTransaction,
+};

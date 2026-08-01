@@ -25,7 +25,7 @@ app.use((req, res, next) => {
 });
 
 // ===================== Routes =====================
-const authRoutes = require('./routes/authRoutes');
+const authRoutes = require('./src/modules/auth/routes/sessionAuthRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
 const superAdminCategoryRoutes = require('./src/modules/category/routes/superAdminCategoryRoutes');
@@ -78,7 +78,7 @@ const locationsRoutes = require('./src/modules/location/routes/locationsRoutes')
 const receiptSimpleRoutes = require('./src/modules/procurement/receipt/simple/routes/receiptSimpleRoutes');
 const quickReceiptRoutes = require('./src/modules/inventory/quick-receipt/routes/quickReceiptRoutes');
 const stockRoutes = require('./src/modules/inventory/dashboard/routes/stockDashboardRoutes');
-const financeRoutes = require('./src/modules/finance/legacy-runtime/routes/financeRuntimeRoutes');
+const financeRoutes = require('./src/modules/finance/routes/financeRuntimeRoutes');
 const customerReceiptRoutes = require('./src/modules/finance/customer-receipt/routes/customerReceiptRoutes');
 const productTypeBrandRoutes = require('./src/modules/brand/routes/productTypeBrandRoutes');
 const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
@@ -92,15 +92,10 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
-  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
-
-  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-
-  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -118,13 +113,10 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
-
   const o = normalizeOrigin(origin);
   if (!o) return true;
-
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
-
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
@@ -132,11 +124,7 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-
-    if (!origin || isAllowedOrigin(origin)) {
-      return callback(null, true);
-    }
-
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -193,13 +181,11 @@ mountProductModule(app);
 
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
-
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
-
 app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);

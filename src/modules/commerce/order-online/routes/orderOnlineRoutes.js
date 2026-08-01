@@ -16,7 +16,7 @@ const {
   submitOrderOnlinePaymentSlip,
   getOrderOnlineByBranch,
   getOrderOnlineSummary,
-} = require('../../../../../controllers/orderOnlineController');
+} = require('../runtime/orderOnlineRuntimeController');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 router.use(verifyToken);

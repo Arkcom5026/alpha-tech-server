@@ -5,18 +5,28 @@ const router = express.Router();
 
 const {
   generateMissingBarcodes,
+} = require('../generation/generateMissingBarcodesController');
+const {
   getBarcodesByReceiptId,
+} = require('../receipt-query/getBarcodesByReceiptIdController');
+const {
   getBarcodesForPrintBatch,
   getReceiptsWithBarcodes,
   searchReprintReceipts,
   reprintBarcodes,
-  markReceiptAsCompleted,
   markBarcodesAsPrinted,
+} = require('../print-reprint/barcodePrintReprintController');
+const {
   auditReceiptBarcodes,
+} = require('../audit/barcodeAuditController');
+const {
   getReceiptsReadyToScanSN,
   getReceiptsReadyToScan,
   updateSerialNumber,
-} = require('../../../../../controllers/barcodeController');
+} = require('../scan-serial/barcodeScanSerialController');
+const {
+  markReceiptAsCompleted,
+} = require('../receipt-completion/barcodeReceiptCompletionController');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
