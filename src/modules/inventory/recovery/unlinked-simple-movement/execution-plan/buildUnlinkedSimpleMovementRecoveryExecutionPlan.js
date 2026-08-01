@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 
-const PLAN_VERSION = 'unlinked-simple-movement-recovery-plan-v1';
+const PLAN_VERSION = 'unlinked-simple-movement-recovery-plan-v2';
+const RECOVERY_BARCODE_PREFIX = 'RCV-USMR';
 
 const stableValue = (value) => {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -38,6 +39,26 @@ const requireAuthorityBranchId = (value) => {
   return branchId;
 };
 
+const buildRecoveryBarcode = ({
+  branchId,
+  productId,
+  stockBalanceId,
+  movementEvidenceHash,
+}) => {
+  const authorityHash = sha256({
+    namespace: RECOVERY_BARCODE_PREFIX,
+    branchId: Number(branchId),
+    productId: Number(productId),
+    stockBalanceId: Number(stockBalanceId),
+    movementEvidenceHash: requireAuthorityText(
+      movementEvidenceHash,
+      'movementEvidenceHash'
+    ),
+  });
+
+  return `${RECOVERY_BARCODE_PREFIX}-${Number(branchId)}-${Number(productId)}-${authorityHash.slice(0, 20)}`;
+};
+
 const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
   if (!dryRunResult || dryRunResult.validation?.result !== 'VALIDATED_DRY_RUN_ONLY') {
     const error = new Error('A validated unlinked movement recovery dry run is required');
@@ -66,35 +87,55 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
   );
 
   const operations = (dryRunResult.readyEntries || [])
-    .map((entry) => ({
-      sequence: 0,
-      operationType: 'CREATE_SIMPLE_LOT_AND_LINK_EXISTING_MOVEMENT',
-      entryId: entry.entryId,
-      branchId: entry.preconditions.branchId,
-      stockBalanceId: entry.preconditions.stockBalanceId,
-      productId: entry.preconditions.productId,
-      preconditionHash: entry.preconditionHash,
-      movementEvidenceHash: entry.preconditions.movementEvidenceHash,
-      createLot: {
-        qtyInitial: entry.proposedRecovery.qtyInitial,
-        qtyRemaining: entry.proposedRecovery.qtyRemaining,
-        unitCost: entry.proposedRecovery.unitCost,
-        costSource: entry.proposedRecovery.costSource,
-        status: entry.proposedRecovery.status,
-      },
-      linkExistingMovementIds: [...entry.proposedRecovery.movementIdsToLink]
-        .map(Number)
-        .sort((a, b) => a - b),
-      impact: {
-        quantity: Number(entry.proposedRecovery.qtyRemaining),
-        unitCost: Number(entry.proposedRecovery.unitCost),
-        inventoryValue:
-          Number(entry.proposedRecovery.qtyRemaining)
-          * Number(entry.proposedRecovery.unitCost),
-      },
-    }))
+    .map((entry) => {
+      const operationBranchId = Number(entry.preconditions.branchId);
+      const stockBalanceId = Number(entry.preconditions.stockBalanceId);
+      const productId = Number(entry.preconditions.productId);
+      const movementEvidenceHash = entry.preconditions.movementEvidenceHash;
+
+      return {
+        sequence: 0,
+        operationType: 'CREATE_SIMPLE_LOT_AND_LINK_EXISTING_MOVEMENT',
+        entryId: entry.entryId,
+        branchId: operationBranchId,
+        stockBalanceId,
+        productId,
+        preconditionHash: entry.preconditionHash,
+        movementEvidenceHash,
+        createLot: {
+          barcode: buildRecoveryBarcode({
+            branchId: operationBranchId,
+            productId,
+            stockBalanceId,
+            movementEvidenceHash,
+          }),
+          qtyInitial: entry.proposedRecovery.qtyInitial,
+          qtyRemaining: entry.proposedRecovery.qtyRemaining,
+          unitCost: entry.proposedRecovery.unitCost,
+          costSource: entry.proposedRecovery.costSource,
+          status: entry.proposedRecovery.status,
+        },
+        linkExistingMovementIds: [...entry.proposedRecovery.movementIdsToLink]
+          .map(Number)
+          .sort((a, b) => a - b),
+        impact: {
+          quantity: Number(entry.proposedRecovery.qtyRemaining),
+          unitCost: Number(entry.proposedRecovery.unitCost),
+          inventoryValue:
+            Number(entry.proposedRecovery.qtyRemaining)
+            * Number(entry.proposedRecovery.unitCost),
+        },
+      };
+    })
     .sort((a, b) => a.productId - b.productId || a.stockBalanceId - b.stockBalanceId)
     .map((operation, index) => ({ ...operation, sequence: index + 1 }));
+
+  const barcodeSet = new Set(operations.map((operation) => operation.createLot.barcode));
+  if (barcodeSet.size !== operations.length) {
+    const error = new Error('Deterministic recovery barcodes must be unique within the plan');
+    error.code = 'UNLINKED_SIMPLE_MOVEMENT_RECOVERY_BARCODE_COLLISION';
+    throw error;
+  }
 
   const totals = operations.reduce((result, operation) => {
     result.operationCount += 1;
@@ -146,6 +187,7 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
         'executionPlanHash',
         'operatorIdentity',
       ],
+      deterministicBarcodeRequired: true,
       staleDataMustAbort: true,
       mutationRequiresSeparateIncrement: true,
     },
@@ -154,6 +196,8 @@ const buildUnlinkedSimpleMovementRecoveryExecutionPlan = ({ dryRunResult }) => {
 
 module.exports = {
   PLAN_VERSION,
+  RECOVERY_BARCODE_PREFIX,
+  buildRecoveryBarcode,
   buildUnlinkedSimpleMovementRecoveryExecutionPlan,
   sha256,
 };

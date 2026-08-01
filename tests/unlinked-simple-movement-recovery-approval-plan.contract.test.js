@@ -7,6 +7,8 @@ const {
 } = require('../src/modules/inventory/recovery/unlinked-simple-movement/approval/validateUnlinkedSimpleMovementRecoveryApprovalDryRun');
 const {
   PLAN_VERSION,
+  RECOVERY_BARCODE_PREFIX,
+  buildRecoveryBarcode,
   buildUnlinkedSimpleMovementRecoveryExecutionPlan,
 } = require('../src/modules/inventory/recovery/unlinked-simple-movement/execution-plan/buildUnlinkedSimpleMovementRecoveryExecutionPlan');
 
@@ -82,7 +84,8 @@ assert.strictEqual(
 const firstPlan = buildUnlinkedSimpleMovementRecoveryExecutionPlan({ dryRunResult: dryRun });
 const secondPlan = buildUnlinkedSimpleMovementRecoveryExecutionPlan({ dryRunResult: dryRun });
 
-assert.strictEqual(PLAN_VERSION, 'unlinked-simple-movement-recovery-plan-v1');
+assert.strictEqual(PLAN_VERSION, 'unlinked-simple-movement-recovery-plan-v2');
+assert.strictEqual(RECOVERY_BARCODE_PREFIX, 'RCV-USMR');
 assert.deepStrictEqual(firstPlan, secondPlan);
 assert.strictEqual(firstPlan.branchId, branchId);
 assert.strictEqual(firstPlan.manifestId, manifest.manifestId);
@@ -110,11 +113,26 @@ assert.deepStrictEqual(firstPlan.operations[0].linkExistingMovementIds, [1000]);
 assert.strictEqual(firstPlan.operations[0].createLot.qtyInitial, 5);
 assert.strictEqual(firstPlan.operations[0].createLot.qtyRemaining, 5);
 assert.strictEqual(firstPlan.operations[0].createLot.unitCost, 20);
+assert.ok(firstPlan.operations[0].createLot.barcode.startsWith('RCV-USMR-2-100-'));
+assert.strictEqual(
+  firstPlan.operations[0].createLot.barcode,
+  secondPlan.operations[0].createLot.barcode
+);
+assert.strictEqual(
+  firstPlan.operations[0].createLot.barcode,
+  buildRecoveryBarcode({
+    branchId,
+    productId: 100,
+    stockBalanceId: 10,
+    movementEvidenceHash: firstPlan.operations[0].movementEvidenceHash,
+  })
+);
 assert.strictEqual(firstPlan.blockedEntries.length, 1);
 assert.strictEqual(
   firstPlan.blockedEntries[0].classification,
   'BLOCKED_MISSING_COST'
 );
+assert.strictEqual(firstPlan.approvalContract.deterministicBarcodeRequired, true);
 assert.strictEqual(firstPlan.approvalContract.mutationRequiresSeparateIncrement, true);
 
 const staleDryRun = validateUnlinkedSimpleMovementRecoveryApprovalDryRun({
