@@ -85,6 +85,7 @@ const taxPeriodRoutes = require('./src/modules/tax/periods/taxPeriodRoutes');
 const taxIntakeRoutes = require('./src/modules/tax/http/taxIntakeRoutes');
 const simpleStockRoutes = require('./src/modules/inventory/simple-stock/routes/simpleStockRoutes');
 const missingCostResolutionReadRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionReadRoutes');
+const missingCostResolutionMutationRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionMutationRoutes');
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 
 // ===================== Middleware =====================
@@ -92,15 +93,10 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
 const allowedOrigins = [
-  // Local dev
   'http://localhost:5173',
   'http://localhost:3000',
-
-  // Primary web domains
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
-
-  // Vercel (production + common preview patterns for this project)
   'https://alpha-tech-client.vercel.app',
   'https://alpha-tech-client-git-main-arkcoms-projects.vercel.app',
 ];
@@ -118,13 +114,10 @@ const normalizeOrigin = (value) => {
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
-
   const o = normalizeOrigin(origin);
   if (!o) return true;
-
   const allowed = allowedOrigins.map(normalizeOrigin);
   if (allowed.includes(o)) return true;
-
   const raw = origin.trim().replace(/\/$/, '');
   return allowedOriginRegexes.some((r) => r.test(raw));
 };
@@ -132,11 +125,7 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-
-    if (!origin || isAllowedOrigin(origin)) {
-      return callback(null, true);
-    }
-
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     console.warn(`🚨 CORS Blocked for origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -190,16 +179,13 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 mountProductModule(app);
-
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
-
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);
 app.use('/api/stock-items', stockItemRoutes);
 app.use('/api/barcodes', barcodeRoutes);
-
 app.use('/api/sales/storefronts', publicStorefrontRoutes);
 app.use('/api/sales/storefronts/:slug/session', anonymousShoppingSessionRoutes);
 app.use('/api/sales/storefronts/:slug/identity', commerceIdentityRoutes);
@@ -241,6 +227,7 @@ app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax', taxPeriodRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
 app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionReadRoutes);
+app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionMutationRoutes);
 app.use('/api/system/operational-verification', operationalVerificationRoutes);
 
 // ===================== Errors =====================
@@ -254,16 +241,11 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
-
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
-  const statusCode =
-    Number.isInteger(candidateStatusCode) &&
-    candidateStatusCode >= 400 &&
-    candidateStatusCode <= 599
-      ? candidateStatusCode
-      : 500;
+  const statusCode = Number.isInteger(candidateStatusCode) && candidateStatusCode >= 400 && candidateStatusCode <= 599
+    ? candidateStatusCode
+    : 500;
   const code = err?.code || 'INTERNAL_SERVER_ERROR';
-
   res.status(statusCode).json({
     ok: false,
     error: code,
