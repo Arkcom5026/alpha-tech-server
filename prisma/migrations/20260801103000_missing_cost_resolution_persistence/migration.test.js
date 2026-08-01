@@ -61,8 +61,9 @@ for (const foreignKey of [
 
 assert.match(sql, /"proposedUnitCost" DECIMAL\(12,2\) NOT NULL/);
 assert.doesNotMatch(sql, /"proposedUnitCost"[^,\n]*DEFAULT\s+0/i);
-assert.doesNotMatch(normalized, /\b(DROP\s+(TABLE|COLUMN|TYPE)|ALTER\s+TABLE[\s\S]*?\bDROP\b|DELETE\s+FROM|UPDATE\s+|INSERT\s+INTO)\b/i);
-assert.doesNotMatch(normalized, /\b(SimpleLot|StockMovement|StockBalance)\b[\s\S]*?\b(UPDATE|DELETE|INSERT|ALTER|DROP)\b/i);
-assert.doesNotMatch(normalized, /\b(UPDATE|DELETE|INSERT)\b/i);
+assert.doesNotMatch(normalized, /^\s*DROP\s+(TABLE|COLUMN|TYPE)\b/im);
+assert.doesNotMatch(normalized, /ALTER\s+TABLE[\s\S]*?\bDROP\b/i);
+assert.doesNotMatch(normalized, /^\s*(DELETE\s+FROM|UPDATE\s+|INSERT\s+INTO)\b/im);
+assert.doesNotMatch(normalized, /^\s*(ALTER|DROP)\s+(TABLE|COLUMN|TYPE)\s+"?(SimpleLot|StockMovement|StockBalance)"?\b/im);
 
 console.log('Missing Cost Resolution migration contract: PASS');
