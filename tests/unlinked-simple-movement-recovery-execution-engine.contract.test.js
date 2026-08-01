@@ -3,6 +3,7 @@ const {
   executeUnlinkedSimpleMovementRecovery,
 } = require('../src/modules/inventory/recovery/unlinked-simple-movement/execution/executeUnlinkedSimpleMovementRecovery');
 
+const recoveryBarcode = 'RCV-USMR-2-100-1234567890abcdef1234';
 const executionPlan = {
   mode: 'PLAN_ONLY',
   branchId: 2,
@@ -28,6 +29,7 @@ const executionPlan = {
     preconditionHash: 'precondition-hash',
     movementEvidenceHash: 'movement-evidence-hash',
     createLot: {
+      barcode: recoveryBarcode,
       qtyInitial: 5,
       qtyRemaining: 5,
       unitCost: 20,
@@ -111,6 +113,7 @@ const buildRepository = ({
   assert.strictEqual(result.mutationPerformed, true);
   assert.strictEqual(result.operationResults.length, 1);
   assert.strictEqual(result.operationResults[0].simpleLotId, 9001);
+  assert.strictEqual(result.operationResults[0].barcode, recoveryBarcode);
   assert.deepStrictEqual(result.operationResults[0].linkedMovementIds, [1000]);
   assert.strictEqual(repository.calls[0], 'transaction');
   assert.strictEqual(repository.calls[1], 'revalidateExecutionPlan');
@@ -119,6 +122,7 @@ const buildRepository = ({
   assert.deepStrictEqual(createCall.createSimpleLot, {
     branchId: 2,
     productId: 100,
+    barcode: recoveryBarcode,
     qtyInitial: 5,
     qtyRemaining: 5,
     unitCost: 20,
@@ -159,6 +163,30 @@ const buildRepository = ({
     }),
     (error) => error.code === 'UNLINKED_SIMPLE_MOVEMENT_EXECUTION_AUTHORITY_MISMATCH'
   );
+
+  const missingBarcodeRepository = buildRepository();
+  const missingBarcodePlan = {
+    ...executionPlan,
+    operations: [{
+      ...executionPlan.operations[0],
+      createLot: {
+        ...executionPlan.operations[0].createLot,
+        barcode: '',
+      },
+    }],
+  };
+  await assert.rejects(
+    () => executeUnlinkedSimpleMovementRecovery({
+      executionPlan: missingBarcodePlan,
+      approval,
+      repository: missingBarcodeRepository,
+    }),
+    (error) => (
+      error.code === 'UNLINKED_SIMPLE_MOVEMENT_EXECUTION_APPROVAL_REQUIRED'
+      && error.details?.field === 'createLot.barcode'
+    )
+  );
+  assert.deepStrictEqual(missingBarcodeRepository.calls, []);
 
   await assert.rejects(
     () => executeUnlinkedSimpleMovementRecovery({
