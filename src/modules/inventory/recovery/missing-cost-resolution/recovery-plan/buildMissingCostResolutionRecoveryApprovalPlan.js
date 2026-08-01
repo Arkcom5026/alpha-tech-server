@@ -48,6 +48,7 @@ const buildMissingCostResolutionRecoveryApprovalPlan = ({ preview, operatorIdent
   const productId = requirePositiveInteger(preview.productId, 'preview.productId');
   const sourceSnapshotHash = requireText(preview.sourceSnapshotHash, 'preview.sourceSnapshotHash');
   const evidenceHash = requireText(preview.evidenceHash, 'preview.evidenceHash');
+  const approvalIdentity = requireText(preview.approvalIdentity, 'preview.approvalIdentity');
   const previewId = requireText(preview.previewId, 'preview.previewId');
   const previewHash = requireText(preview.previewHash, 'preview.previewHash');
   const unitCost = requirePositiveNumber(preview.proposedRecovery?.unitCost, 'preview.proposedRecovery.unitCost');
@@ -81,6 +82,7 @@ const buildMissingCostResolutionRecoveryApprovalPlan = ({ preview, operatorIdent
     productId,
     sourceSnapshotHash,
     evidenceHash,
+    approvalIdentity,
     previewId,
     previewHash,
     operatorIdentity: operator,
@@ -99,6 +101,7 @@ const buildMissingCostResolutionRecoveryApprovalPlan = ({ preview, operatorIdent
     productId,
     sourceSnapshotHash,
     evidenceHash,
+    approvalIdentity,
     previewId,
     previewHash,
     operatorIdentity: operator,
@@ -118,6 +121,7 @@ const buildMissingCostResolutionRecoveryApprovalPlan = ({ preview, operatorIdent
     approvedForMutation: false,
     approvalContract: {
       requiresExplicitApproval: true,
+      serverOwnedApprovalIdentity: true,
       requiredApprovalInputs: [
         'executionPlanId',
         'executionPlanHash',
