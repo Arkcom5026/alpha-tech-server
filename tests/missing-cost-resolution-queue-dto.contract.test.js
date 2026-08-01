@@ -13,33 +13,41 @@ const {
 
 const branchId = 2;
 
-const makeEntry = (entryId, stockBalanceId, productId, overrides = {}) => ({
-  entryId,
-  classification: 'BLOCKED_MISSING_COST',
-  reasonCode: 'NO_DEFENSIBLE_COST_FOR_RECOVERY_LOT',
-  preconditions: {
-    branchId,
-    stockBalanceId,
-    productId,
-    quantity: 3,
-    reserved: 0,
-    avgCost: 0,
-    lastReceivedCost: 0,
-    movementCount: 1,
-    movementIds: [1000 + stockBalanceId],
-    movementEvidenceHash: `movement-${stockBalanceId}`,
-    ...overrides.preconditions,
-  },
-  preconditionHash: `precondition-${stockBalanceId}`,
-  movementSummary: {
-    movementCount: 1,
-    movementNetQuantity: -1,
-    balanceQuantity: 3,
-    difference: -4,
-    ...overrides.movementSummary,
-  },
-  ...overrides,
-});
+const makeEntry = (entryId, stockBalanceId, productId, overrides = {}) => {
+  const {
+    preconditions: preconditionOverrides = {},
+    movementSummary: movementSummaryOverrides = {},
+    ...entryOverrides
+  } = overrides;
+
+  return {
+    entryId,
+    classification: 'BLOCKED_MISSING_COST',
+    reasonCode: 'NO_DEFENSIBLE_COST_FOR_RECOVERY_LOT',
+    preconditions: {
+      branchId,
+      stockBalanceId,
+      productId,
+      quantity: 3,
+      reserved: 0,
+      avgCost: 0,
+      lastReceivedCost: 0,
+      movementCount: 1,
+      movementIds: [1000 + stockBalanceId],
+      movementEvidenceHash: `movement-${stockBalanceId}`,
+      ...preconditionOverrides,
+    },
+    preconditionHash: `precondition-${stockBalanceId}`,
+    movementSummary: {
+      movementCount: 1,
+      movementNetQuantity: -1,
+      balanceQuantity: 3,
+      difference: -4,
+      ...movementSummaryOverrides,
+    },
+    ...entryOverrides,
+  };
+};
 
 const audit = {
   branchId,
@@ -95,6 +103,8 @@ assert.deepStrictEqual(
   queue.candidates.map((candidate) => candidate.stockBalanceId),
   [1, 3]
 );
+assert.ok(queue.candidates.every((candidate) => candidate.branchId === branchId));
+assert.ok(!queue.candidates.some((candidate) => candidate.entryId === 'branch-9-balance-4'));
 assert.strictEqual(queue.candidates[0].status, 'UNRESOLVED');
 assert.strictEqual(queue.candidates[1].status, 'DRAFT');
 assert.strictEqual(queue.safetyContract.excludesApprovedAndRecovered, true);
