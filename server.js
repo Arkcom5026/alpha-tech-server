@@ -10,10 +10,12 @@ const crypto = require('crypto');
 dotenv.config();
 const app = express();
 
+// Trust proxy (Render / reverse proxy)
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.disable('etag');
 
+// Request ID (for logs / support)
 app.use((req, res, next) => {
   req.id = crypto.randomUUID
     ? crypto.randomUUID()
@@ -22,6 +24,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// ===================== Routes =====================
 const authRoutes = require('./src/modules/auth/routes/sessionAuthRoutes');
 const productTypeRoutes = require('./src/modules/productType/routes/productTypeRoutes');
 const categoryRoutes = require('./src/modules/category/routes/categoryRoutes');
@@ -85,6 +88,7 @@ const missingCostResolutionReadRoutes = require('./src/modules/inventory/recover
 const missingCostResolutionMutationRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionMutationRoutes');
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 
+// ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
@@ -159,6 +163,7 @@ app.use('/api', (_req, res, next) => {
 const { traceRequest } = require('./middlewares/authTrace');
 app.use('/api', traceRequest);
 
+// ===================== API =====================
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -174,6 +179,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/product-type-brands', productTypeBrandRoutes);
 app.use('/api/product-templates', productTemplateRoutes);
 mountProductModule(app);
+
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
@@ -225,6 +231,7 @@ app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutio
 app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionMutationRoutes);
 app.use('/api/system/operational-verification', operationalVerificationRoutes);
 
+// ===================== Errors =====================
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
