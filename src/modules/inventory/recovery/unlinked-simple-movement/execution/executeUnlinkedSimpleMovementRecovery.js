@@ -53,6 +53,20 @@ const validatePlanAuthority = ({ executionPlan, approval }) => {
   }
 };
 
+const validateOperationBarcodes = (operations) => {
+  const seen = new Set();
+  for (const operation of operations || []) {
+    const barcode = requireText(operation?.createLot?.barcode, 'createLot.barcode');
+    if (seen.has(barcode)) {
+      const error = new Error('Duplicate deterministic recovery barcode in execution plan');
+      error.code = 'UNLINKED_SIMPLE_MOVEMENT_RECOVERY_BARCODE_COLLISION';
+      error.details = { barcode };
+      throw error;
+    }
+    seen.add(barcode);
+  }
+};
+
 const executeUnlinkedSimpleMovementRecovery = async ({
   executionPlan,
   approval,
@@ -72,6 +86,7 @@ const executeUnlinkedSimpleMovementRecovery = async ({
   }
 
   validatePlanAuthority({ executionPlan, approval: normalizedApproval });
+  validateOperationBarcodes(executionPlan.operations);
 
   return repository.transaction(async (txRepository) => {
     const revalidation = await txRepository.revalidateExecutionPlan({
@@ -101,6 +116,7 @@ const executeUnlinkedSimpleMovementRecovery = async ({
       const lot = await txRepository.createSimpleLot({
         branchId: operation.branchId,
         productId: operation.productId,
+        barcode: operation.createLot.barcode,
         qtyInitial: operation.createLot.qtyInitial,
         qtyRemaining: operation.createLot.qtyRemaining,
         unitCost: operation.createLot.unitCost,
@@ -129,6 +145,7 @@ const executeUnlinkedSimpleMovementRecovery = async ({
         entryId: operation.entryId,
         productId: operation.productId,
         simpleLotId: lot.id,
+        barcode: operation.createLot.barcode,
         linkedMovementIds: operation.linkExistingMovementIds,
         quantity: operation.impact.quantity,
         inventoryValue: operation.impact.inventoryValue,
