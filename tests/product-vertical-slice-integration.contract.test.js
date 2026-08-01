@@ -28,18 +28,19 @@ for (const file of requiredFiles) {
 }
 
 const forbiddenFiles = [
+  'routes/productRoutes.js',
   'src/modules/product/runtime/controllers/operationalProductRuntimeController.js',
   'src/modules/product/runtime/services/operationalProductRuntimeService.js',
   'src/modules/product/controllers/operationalProductRuntimeController.js',
 ]
 
 for (const file of forbiddenFiles) {
-  assert.equal(exists(file), false, `Broad Product runtime authority must remain removed: ${file}`)
+  assert.equal(exists(file), false, `Retired Product runtime file must remain absent: ${file}`)
 }
 
-const legacyRoute = read('routes/productRoutes.js')
-assert.match(legacyRoute, /src\/modules\/product\/routes\/productRoutes/)
-assert.doesNotMatch(legacyRoute, /operationalProductRuntimeController/)
+const productModule = read('src/modules/product/index.js')
+assert.match(productModule, /require\('\.\/routes\/productRoutes'\)/)
+assert.doesNotMatch(productModule, /require\('\.\.\/\.\.\/\.\.\/routes\/productRoutes'\)/)
 
 const route = read('src/modules/product/routes/productRoutes.js')
 assert.match(route, /productPosQueryController\.searchProducts/)
