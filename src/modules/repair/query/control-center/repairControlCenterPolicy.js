@@ -18,18 +18,25 @@ function hoursBetween(fromValue, toValue = new Date()) {
   return Math.max(0, (to.getTime() - from.getTime()) / 36e5);
 }
 
+function hasIntakeConditionPhoto(deviceIntake) {
+  return (deviceIntake?.photos || []).some((photo) =>
+    String(photo.category || '').toUpperCase() === 'INTAKE_CONDITION'
+  );
+}
+
+function isIntakeComplete(job) {
+  return Boolean(
+    job?.deviceIntake?.consent && hasIntakeConditionPhoto(job.deviceIntake)
+  );
+}
+
 function projectRepairOperationalState(job, now = new Date()) {
   const status = String(job?.status || '').toUpperCase();
   const ageHours = hoursBetween(job?.updatedAt || job?.createdAt, now);
   const slaHours = SLA_HOURS_BY_STATUS[status] || null;
   const overdue = Boolean(slaHours && ageHours > slaHours);
   const terminal = ACTIVE_TERMINAL_STATUSES.has(status);
-  const intakeIncomplete = Boolean(job?.deviceIntake) && (
-    !job.deviceIntake.consent ||
-    !(job.deviceIntake.photos || []).some((photo) =>
-      String(photo.category || '').toUpperCase() === 'INTAKE_CONDITION'
-    )
-  );
+  const intakeIncomplete = !isIntakeComplete(job);
 
   const exceptions = [];
   if (!terminal && !job?.technicianId) exceptions.push('UNASSIGNED_TECHNICIAN');
@@ -49,6 +56,7 @@ function projectRepairOperationalState(job, now = new Date()) {
     ageHours: Number(ageHours.toFixed(2)),
     slaHours,
     overdue,
+    intakeComplete: !intakeIncomplete,
     exceptions,
     priority: overdue ? 'HIGH' : exceptions.length ? 'MEDIUM' : 'NORMAL',
   };
@@ -83,6 +91,8 @@ function summarizeRepairOperations(items = []) {
 module.exports = {
   SLA_HOURS_BY_STATUS,
   hoursBetween,
+  hasIntakeConditionPhoto,
+  isIntakeComplete,
   projectRepairOperationalState,
   summarizeRepairOperations,
 };
