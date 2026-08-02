@@ -13,6 +13,8 @@ const packageJson = JSON.parse(read('package.json'));
 
 assert.match(fixture, /assertTestDatabaseAuthority\([\s\S]*requiresWriteApproval: true/);
 assert.match(fixture, /POS_SALE_E2E_FIXTURE_APPROVAL/);
+assert.match(fixture, /delete authorityEnv\.DATABASE_URL/);
+assert.match(fixture, /delete authorityEnv\.DIRECT_URL/);
 assert.match(fixture, /ALPHATECH_POS_SALE_E2E_FIXTURE/);
 assert.match(fixture, /status: 'IN_STOCK'/);
 assert.match(fixture, /SYSTEM_POS_SALE_E2E/);
