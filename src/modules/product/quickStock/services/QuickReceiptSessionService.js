@@ -3,6 +3,7 @@ const crypto = require('node:crypto')
 const { QuickStockRepository, toInt } = require('../repositories/quickStockRepository')
 const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy')
 const { normalizeInputTaxDocumentMode } = require('../../../tax/inputDocuments/contracts/inputTaxDocumentModeContract')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const normalizeDeliveryNote = (value) => String(value || '').trim().replace(/\s+/g, '').toUpperCase()
 const cleanText = (value) => String(value || '').trim()
@@ -201,10 +202,17 @@ class QuickReceiptSessionService {
     return this.getReceipt(receiptId, branchId)
   }
 
-  async finalize(receiptId, branchId, employeeId, commandKey) {
+  async finalize(receiptId, actor = {}, commandKey) {
     const id = toInt(receiptId)
-    const brId = toInt(branchId)
-    const empId = toInt(employeeId)
+    const authorityActor = {
+      branchId: toInt(actor.branchId),
+      employeeId: toInt(actor.employeeId),
+      role: actor.role,
+      v2Role: actor.v2Role,
+    }
+    const baseAuthority = priceAuthorityPolicy.assertActor(authorityActor)
+    const brId = baseAuthority.branchId
+    const empId = baseAuthority.employeeId
     const key = cleanText(commandKey)
     if (!key) throw makeError('ต้องมี X-Idempotency-Key', 400, 'IDEMPOTENCY_KEY_REQUIRED')
 
@@ -228,10 +236,21 @@ class QuickReceiptSessionService {
 
       const allBarcodes = []
       const allSerials = []
+      const lineAuthorities = new Map()
       for (const line of items) {
         const product = await this.inventory.findOperationalProductInBranch({ db: tx, productId: line.productId, branchId: brId })
         if (!product) throw makeError(`ไม่พบสินค้า ${line.productId} ในสาขาปัจจุบัน`, 404, 'OPERATIONAL_PRODUCT_REQUIRED')
         const policy = assertProductCanReceive(product)
+        const pricePayload = {
+          costPrice: line.costPrice,
+          priceRetail: line.priceRetail,
+          ...(line.priceWholesale != null ? { priceWholesale: line.priceWholesale } : {}),
+          ...(line.priceTechnician != null ? { priceTechnician: line.priceTechnician } : {}),
+          ...(line.priceOnline != null ? { priceOnline: line.priceOnline } : {}),
+        }
+        const lineAuthority = priceAuthorityPolicy.assertPricePayload({ actor: authorityActor, payload: pricePayload })
+        lineAuthorities.set(Number(line.id), { authority: lineAuthority, pricePayload })
+
         const units = Array.isArray(line.items) ? line.items : []
         if (policy.mode === 'STRUCTURED' && units.length !== Number(line.quantity)) {
           throw makeError(`จำนวน Barcode ของ ${product.name} ไม่ตรงกับจำนวนรับเข้า`, 400, 'BARCODE_QUANTITY_MISMATCH')
@@ -262,16 +281,20 @@ class QuickReceiptSessionService {
         const product = await this.inventory.findOperationalProductInBranch({ db: tx, productId: line.productId, branchId: brId })
         const policy = assertProductCanReceive(product)
         const qty = Number(line.quantity)
-        const cost = Number(line.costPrice)
+        const lineAuthority = lineAuthorities.get(Number(line.id))
+        const authority = lineAuthority.authority
+        const pricePayload = lineAuthority.pricePayload
+        const cost = Number(pricePayload.costPrice)
         const units = Array.isArray(line.items) ? line.items : []
         await this.inventory.upsertBranchPriceManual({
-          db: tx, productId: product.id, branchId: brId,
+          db: tx,
+          productId: product.id,
+          branchId: authority.branchId,
+          employeeId: authority.employeeId,
           data: {
-            costPrice: cost, priceRetail: line.priceRetail,
-            ...(line.priceWholesale != null ? { priceWholesale: line.priceWholesale } : {}),
-            ...(line.priceTechnician != null ? { priceTechnician: line.priceTechnician } : {}),
-            ...(line.priceOnline != null ? { priceOnline: line.priceOnline } : {}),
+            ...pricePayload,
             isActive: true,
+            updatedBy: authority.employeeId,
           },
         })
 
@@ -279,25 +302,25 @@ class QuickReceiptSessionService {
         if (policy.mode === 'STRUCTURED') {
           await this.inventory.createStockItems({ db: tx, data: units.map((unit) => ({
             barcode: cleanText(unit.barcode), serialNumber: cleanText(unit.serialNumber) || null,
-            costPrice: cost, productId: product.id, branchId: brId, status: 'IN_STOCK',
-            scannedByEmployeeId: empId, receivedAt: now, scannedAt: now, source: 'MANUAL',
+            costPrice: cost, productId: product.id, branchId: authority.branchId, status: 'IN_STOCK',
+            scannedByEmployeeId: authority.employeeId, receivedAt: now, scannedAt: now, source: 'MANUAL',
             remark: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}`,
           })) })
         } else {
           const lot = await this.inventory.createSimpleLot({ db: tx, data: {
-            productId: product.id, branchId: brId, barcode: `QR-${id}-${line.id}-${Date.now()}`,
+            productId: product.id, branchId: authority.branchId, barcode: `QR-${id}-${line.id}-${Date.now()}`,
             qtyInitial: qty, qtyRemaining: qty, unitCost: cost, status: 'ACTIVE', receivedAt: now,
           } })
           simpleLotId = lot.id
         }
 
         await this.inventory.createStockMovement({ db: tx, data: {
-          productId: product.id, branchId: brId, qty, type: 'RECEIVE', refType: 'QUICK_RECEIPT',
-          refId: id, simpleLotId, performedByEmployeeId: empId,
+          productId: product.id, branchId: authority.branchId, qty, type: 'RECEIVE', refType: 'QUICK_RECEIPT',
+          refId: id, simpleLotId, performedByEmployeeId: authority.employeeId,
           note: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}`,
           createdAt: now,
         } })
-        await this.inventory.upsertStockBalance({ db: tx, productId: product.id, branchId: brId, quantity: qty, lastReceivedCost: cost, avgCost: cost })
+        await this.inventory.upsertStockBalance({ db: tx, productId: product.id, branchId: authority.branchId, quantity: qty, lastReceivedCost: cost, avgCost: cost })
       }
 
       const requestHash = crypto.createHash('sha256').update(`${id}:${brId}:${key}`).digest('hex')
