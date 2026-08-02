@@ -9,6 +9,7 @@ const { assertTestDatabaseAuthority } = require('../recovery/testDatabaseAuthori
 const ALLOWED_SCRIPTS = new Set([
   'scripts/verify-partner-store-application-runtime.js',
   'scripts/verify-partner-store-application-http-e2e.js',
+  'scripts/provision-pos-sale-e2e-fixture.js',
 ]);
 const requestedScript = process.argv[2];
 
