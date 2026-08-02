@@ -184,8 +184,35 @@ model Branch {
   missingCostResolutions               MissingCostResolution[]
   taxExpenseCategories                 TaxExpenseCategory[]
   taxExpenses                          TaxExpense[]
+  taxIssuerProfile                     TaxIssuerProfile?
 
   @@index([subdistrictCode])
+}
+
+enum TaxIssuerProfileStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+}
+
+model TaxIssuerProfile {
+  id                         Int                    @id @default(autoincrement())
+  branchId                   Int                    @unique
+  legalName                  String?
+  taxId                      String?                @db.VarChar(13)
+  registeredAddress          String?
+  branchCode                 String                 @default("00000") @db.VarChar(5)
+  isHeadOffice               Boolean                @default(false)
+  shortTaxInvoicePrefix      String?
+  fullTaxInvoicePrefix       String?
+  nextShortTaxInvoiceNumber  Int                    @default(1)
+  nextFullTaxInvoiceNumber   Int                    @default(1)
+  status                     TaxIssuerProfileStatus @default(DRAFT)
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  branch                     Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([status])
 }
 
 model Category {
