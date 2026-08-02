@@ -28,6 +28,13 @@ const repairJobDetailInclude = {
     },
     orderBy: { openedAt: 'desc' },
   },
+  deviceIntake: {
+    include: {
+      consent: true,
+      photos: true,
+    },
+  },
+  delivery: true,
 };
 
 class UpdateRepairJobStatusRepository {
@@ -106,3 +113,4 @@ class UpdateRepairJobStatusRepository {
 
 module.exports = new UpdateRepairJobStatusRepository();
 module.exports.UpdateRepairJobStatusRepository = UpdateRepairJobStatusRepository;
+module.exports.repairJobDetailInclude = repairJobDetailInclude;
