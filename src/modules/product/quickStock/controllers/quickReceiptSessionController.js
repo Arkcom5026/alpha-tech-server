@@ -75,7 +75,7 @@ exports.detail = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.createDraft(req.body || {}, actor.branchId, actor.employeeId)
+    const data = await service.createDraft(req.body || {}, actor)
     return res.status(201).json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
@@ -93,7 +93,7 @@ exports.complete = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.updateDraft(req.params.id, req.body || {}, actor.branchId)
+    const data = await service.updateDraft(req.params.id, req.body || {}, actor)
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
@@ -107,7 +107,7 @@ exports.addItem = async (req, res) => {
 exports.deleteItem = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.deleteItem(req.params.id, req.params.itemId, actor.branchId)
+    const data = await service.deleteItem(req.params.id, req.params.itemId, actor)
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
