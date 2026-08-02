@@ -520,10 +520,11 @@ model Supplier {
   supplierPayableAdjustments SupplierPayableAdjustment[]
   supplierAdvances     SupplierAdvance[]
   warrantyClaims       WarrantyClaim[]
-  taxExpenses          TaxExpense[]
+  taxExpenses          TaxExpense[] @relation("TaxExpenseSupplier")
   capabilities         SupplierCapabilityAssignment[]
 
   @@unique([branchId, name])
+  @@unique([id, branchId])
 }
 
 model SupplierCapabilityAssignment {
@@ -3394,9 +3395,10 @@ model TaxExpenseCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  items     TaxExpenseItem[]
+  items     TaxExpenseItem[] @relation("TaxExpenseItemCategory")
 
   @@unique([branchId, code])
+  @@unique([id, branchId])
   @@index([branchId, active])
 }
 
@@ -3425,14 +3427,15 @@ model TaxExpense {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
   branch               Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  supplier             Supplier?                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplier             Supplier?                 @relation("TaxExpenseSupplier", fields: [supplierId, branchId], references: [id, branchId], onDelete: Restrict)
   createdByEmployee    EmployeeProfile           @relation("TaxExpenseCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
-  items                TaxExpenseItem[]
+  items                TaxExpenseItem[]          @relation("TaxExpenseItemExpense")
   assessments          TaxExpenseAssessment[]
   lifecycleEvents      TaxExpenseLifecycleEvent[]
   attachments          TaxExpenseAttachment[]
 
   @@unique([branchId, expenseNumber])
+  @@unique([id, branchId])
   @@index([branchId, status, expenseDate])
   @@index([branchId, supplierId])
   @@index([branchId, documentNumber])
@@ -3443,6 +3446,7 @@ model TaxExpenseItem {
   id                  Int                   @id @default(autoincrement())
   taxExpenseId        Int
   categoryId          Int
+  branchId            Int
   lineNumber          Int
   description         String
   quantity            Decimal               @default(1) @db.Decimal(14, 2)
@@ -3455,10 +3459,11 @@ model TaxExpenseItem {
   withholdingTaxRate  Decimal?              @db.Decimal(5, 2)
   withholdingTaxAmount Decimal               @default(0) @db.Decimal(14, 2)
   createdAt           DateTime              @default(now())
-  taxExpense          TaxExpense            @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
-  category            TaxExpenseCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  taxExpense          TaxExpense            @relation("TaxExpenseItemExpense", fields: [taxExpenseId, branchId], references: [id, branchId], onDelete: Restrict)
+  category            TaxExpenseCategory    @relation("TaxExpenseItemCategory", fields: [categoryId, branchId], references: [id, branchId], onDelete: Restrict)
 
   @@unique([taxExpenseId, lineNumber])
+  @@index([branchId])
   @@index([categoryId])
 }
 
