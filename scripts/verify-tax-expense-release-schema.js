@@ -79,7 +79,7 @@ async function main() {
         port: url.port || '5432',
         database: url.pathname.slice(1),
 
-    process.exitCode = missingTables.length || missingMigrations.length ? 2 : 0;
+    process.exitCode = (missingTables.length || missingMigrations.length) ? 2 : 0;
   } finally {
     await client.end();
   }
