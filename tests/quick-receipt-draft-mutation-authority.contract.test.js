@@ -20,7 +20,8 @@ test('quick receipt draft creation requires centralized authenticated actor auth
 
 test('quick receipt draft update is branch-scoped by normalized authority', () => {
   assert.match(serviceSource, /async updateDraft\(receiptId, payload, actor = \{\}\)/)
-  assert.match(serviceSource, /getReceipt\(receiptId, authority\.branchId\)/)
+  assert.match(serviceSource, /getReceipt\(receiptId, authority\)/)
+  assert.doesNotMatch(serviceSource, /getReceipt\(receiptId, authority\.branchId\)/)
   assert.match(serviceSource, /toInt\(receiptId\), authority\.branchId/)
   assert.doesNotMatch(serviceSource, /async updateDraft\(receiptId, payload, branchId\)/)
 })
