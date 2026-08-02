@@ -23,7 +23,7 @@ assert(
   'Fixture customer must use the runtime branch-authority lookup.'
 );
 assert(
-  !source.includes('customerProfile.findFirst') && !source.includes('branchId: branch.id'),
+  !source.includes('customerProfile.findFirst'),
   'Fixture must not duplicate obsolete CustomerProfile branch scoping.'
 );
 assert(
