@@ -14,7 +14,10 @@ if (!fs.existsSync(envPath)) throw new Error('Missing .env.restore.');
 dotenv.config({ path: envPath, override: true });
 
 const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
-assertTestDatabaseAuthority({ targetUrl, env: process.env, requiresWriteApproval: true });
+const authorityEnv = { ...process.env };
+delete authorityEnv.DATABASE_URL;
+delete authorityEnv.DIRECT_URL;
+assertTestDatabaseAuthority({ targetUrl, env: authorityEnv, requiresWriteApproval: true });
 
 if (process.env.POS_SALE_E2E_FIXTURE_APPROVAL !== APPROVAL) {
   throw new Error(`Set POS_SALE_E2E_FIXTURE_APPROVAL=${APPROVAL} before provisioning POS Sale E2E data.`);
