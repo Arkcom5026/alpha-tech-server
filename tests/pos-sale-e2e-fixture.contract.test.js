@@ -19,6 +19,8 @@ assert.match(fixture, /ALPHATECH_POS_SALE_E2E_FIXTURE/);
 assert.match(fixture, /status: 'IN_STOCK'/);
 assert.match(fixture, /SYSTEM_POS_SALE_E2E/);
 assert.match(fixture, /crypto\.randomBytes/);
+assert.match(fixture, /role: 'ADMIN'/);
+assert.doesNotMatch(fixture, /role: 'SUPERADMIN'/);
 assert.match(wrapper, /provision-pos-sale-e2e-fixture\.js/);
 assert.equal(
   packageJson.scripts['provision:pos-sale-e2e-fixture'],
