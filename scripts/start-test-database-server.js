@@ -27,15 +27,20 @@ const child = spawn(process.execPath, ['server.js'], {
     DATABASE_URL: targetUrl,
     DIRECT_URL: targetUrl,
     ALPHATECH_RUNTIME_ENV: 'TEST',
+    CORS_ALLOW_ALL: 'true',
     PORT: process.env.TEST_API_PORT || '3000',
   },
   stdio: 'inherit',
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => {
-    if (child.exitCode === null) child.kill(signal);
+  process.on('SIGINT', () => {
+    if (child.exitCode === null) child.kill('SIGINT');
   });
+  process.on('SIGTERM', () => {
+    if (child.exitCode === null) child.kill('SIGTERM');
+  });
+  break;
 }
 
 child.on('error', (error) => {
