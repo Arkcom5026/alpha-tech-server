@@ -26,7 +26,8 @@
     "test:price-authority": "node tests/price-authority-policy-foundation.contract.test.js && node tests/product-pricing-service-authority.contract.test.js && node tests/branch-price-runtime-authority.contract.test.js && node tests/effective-price-resolution.contract.test.js && node tests/product-maintenance-price-authority.contract.test.js && node tests/quick-stock-price-authority.contract.test.js && node tests/quick-stock-item-cost-authority.contract.test.js && node tests/quick-receipt-finalize-price-authority.contract.test.js && node tests/quick-receipt-complete-price-authority.contract.test.js && node tests/quick-receipt-add-item-price-authority.contract.test.js && node tests/quick-receipt-draft-mutation-authority.contract.test.js && node tests/quick-receipt-cancel-actor-authority.contract.test.js && node tests/quick-receipt-read-authority.contract.test.js && node tests/quick-receipt-complete-actor-continuity.contract.test.js && node tests/quick-receipt-session-actor-only-authority.contract.test.js",
     "test:tax-intake": "node tests/tax-intake-foundation.contract.test.js && node tests/tax-intake-http.contract.test.js && node tests/tax-lifecycle-sale-source.contract.test.js && node tests/tax-step-004-sales-publication.contract.test.js && node tests/tax-step-004-completion.contract.test.js && node tests/tax-quick-receipt-publication.contract.test.js && node prisma/migrations/20260728160000_unified_input_tax_document_mode/migration.test.js && node prisma/migrations/20260728170000_flexible_input_tax_receipt_links/migration.test.js && node tests/unified-input-tax-document-mode.contract.test.js && node tests/unified-pending-input-tax-projection.contract.test.js && node tests/flexible-input-tax-receipt-link.contract.test.js && node tests/input-tax-overview-v1.contract.test.js",
     "test:input-tax-overview": "node tests/input-tax-overview-v1.contract.test.js && node tests/input-tax-period-authority.integration.contract.test.js",
-    "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",    "test:supplier-capability": "node prisma/migrations/20260802103000_supplier_capability_foundation/migration.test.js",
+    "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",
+    "test:supplier-capability": "node prisma/migrations/20260802103000_supplier_capability_foundation/migration.test.js",
     "test:tax-expense-tenant-isolation": "node prisma/migrations/20260802113000_tax_expense_tenant_isolation/migration.test.js",
     "test:tax-expense-runtime": "node tests/tax-expense-runtime.contract.test.js",
     "verify:tax-expense-tenant-preflight": "node scripts/verify-tax-expense-tenant-preflight.js",
@@ -79,7 +80,9 @@
     "verify:partner-store-application-http-e2e:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-http-e2e.js",
     "start:test-database": "node scripts/start-test-database-server.js",
     "provision:test-partner-operator": "node scripts/provision-test-partner-operator.js",
-    "test:recovery-workflow-safety": "node tests/recovery-workflow-safety.contract.test.js"
+    "test:recovery-workflow-safety": "node tests/recovery-workflow-safety.contract.test.js",
+    "test:pos-sale-e2e-fixture": "node tests/pos-sale-e2e-fixture.contract.test.js",
+    "provision:pos-sale-e2e-fixture": "node scripts/run-test-database-runtime.js scripts/provision-pos-sale-e2e-fixture.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
