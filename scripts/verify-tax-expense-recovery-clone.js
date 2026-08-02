@@ -60,6 +60,8 @@ async function main() {
     const rowCountMismatches = [];
 
     for (const [key, expected] of Object.entries(manifest.tableCounts || {})) {
+      // Release migrations append their own ledger rows, so they are verified separately below.
+      if (key === 'public._prisma_migrations') continue;
       const [schema, table] = key.split('.', 2);
       const result = await client.query(
         `SELECT COUNT(*)::bigint AS count FROM ${quote(schema)}.${quote(table)}`,
@@ -70,7 +72,10 @@ async function main() {
 
     const tablePresence = {};
     for (const table of NEW_TABLES) {
-      const result = await client.query(`SELECT to_regclass('public.${table}') IS NOT NULL AS present`);
+      const result = await client.query(
+        'SELECT to_regclass($1) IS NOT NULL AS present',
+        [`public.${quote(table)}`],
+      );
       tablePresence[table] = result.rows[0].present;
     }
 
@@ -95,7 +100,7 @@ async function main() {
       result: passed ? 'PASS' : 'FAIL',
       databaseModified: false,
       authority: authority.target,
-      originalTablesChecked: Object.keys(manifest.tableCounts || {}).length,
+      originalTablesChecked: Object.keys(manifest.tableCounts || {}).filter((key) => key !== 'public._prisma_migrations').length,
       rowCountMismatches,
       newTables: tablePresence,
       appliedMigrations,
