@@ -77,13 +77,7 @@ async function main() {
       authority: {
         host: url.hostname,
         port: url.port || '5432',
-        database: url.pathname.replace(/^\\//, ''),
-      },
-      tables,
-      appliedMigrations,
-      missingTables,
-      missingMigrations,
-    }, null, 2));
+        database: url.pathname.slice(1),
 
     process.exitCode = missingTables.length || missingMigrations.length ? 2 : 0;
   } finally {
