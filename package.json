@@ -83,7 +83,9 @@
     "test:recovery-workflow-safety": "node tests/recovery-workflow-safety.contract.test.js",
     "test:pos-sale-e2e-fixture": "node tests/pos-sale-e2e-fixture.contract.test.js",
     "provision:pos-sale-e2e-fixture": "node scripts/run-test-database-runtime.js scripts/provision-pos-sale-e2e-fixture.js",
-    "test:auth-refresh-token-repository": "node tests/auth-refresh-token-repository.contract.test.js"
+    "test:auth-refresh-token-repository": "node tests/auth-refresh-token-repository.contract.test.js",
+    "test:pos-sale-e2e-outcome": "node tests/pos-sale-e2e-outcome.contract.test.js",
+    "verify:pos-sale-e2e-outcome": "node scripts/verify-pos-sale-e2e-outcome.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
