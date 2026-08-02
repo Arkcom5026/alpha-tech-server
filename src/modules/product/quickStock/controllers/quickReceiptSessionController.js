@@ -100,7 +100,7 @@ exports.update = async (req, res) => {
 exports.addItem = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.addItem(req.params.id, req.body || {}, actor.branchId)
+    const data = await service.addItem(req.params.id, req.body || {}, actor)
     return res.status(201).json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
