@@ -9,6 +9,7 @@ const repositoryPath = require.resolve('../src/modules/product/pricing/runtime/b
 const calls = []
 const repositoryStub = {
   D: (value) => value,
+  findBranchProduct: async ({ productId, branchId }) => ({ id: productId, branchId }),
   upsertBranchPrice: async (input) => {
     calls.push({ type: 'single', input })
     return input
