@@ -26,7 +26,8 @@ const registerTaxCandidate = async (input) => {
     const mapped = mapCandidateToTaxDocumentDraft({
       candidate,
       documentNumber: registration.sourceDocumentNo || `${registration.sourceType}-${registration.sourceId}`,
-      issuerTaxId: snapshot.issuerTaxId || snapshot.counterpartyTaxId,
+      issuerTaxId: snapshot.issuerTaxId || null,
+      counterpartyTaxId: snapshot.counterpartyTaxId || null,
       documentType: input.documentType,
     });
 
@@ -45,7 +46,7 @@ const registerTaxCandidate = async (input) => {
       candidateId: candidate.id,
       documentType: mapped.documentType,
       documentNumber: mapped.documentNumber,
-      counterpartyTaxId: mapped.issuerTaxId,
+      counterpartyTaxId: mapped.counterpartyTaxId,
       identityKey: mapped.identityKey,
       status: mapped.status,
       issuedAt: snapshot.issuedAt || null,
