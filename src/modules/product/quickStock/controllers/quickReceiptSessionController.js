@@ -17,7 +17,6 @@ const normalizeError = (error) => {
   const isInventoryIdentity = /StockItem_barcode_ci_unique|SimpleLot_barcode_ci_unique|StockItem_serialNumber_ci_unique|barcode|serialNumber/i.test(databaseText)
   const isCheckViolation = databaseCode === '23514' || /check constraint/i.test(databaseText)
   const isTaxConstraint = /QuickReceiptSession_(tax_mode|tax_pricing|subtotal|vat_amount|total_amount)_check/i.test(databaseText)
-
   if (isUniqueViolation && isInventoryIdentity) {
     const conflict = new Error('Barcode หรือ Serial Number นี้มีอยู่ในระบบแล้ว')
     conflict.statusCode = 409
@@ -45,8 +44,8 @@ const sendError = (res, rawError) => {
 }
 const requireActor = (req, res) => {
   const actor = getActor(req)
-  if (!actor.branchId || !actor.employeeId) {
-    res.status(403).json({ success: false, code: 'EMPLOYEE_CONTEXT_REQUIRED', message: 'ไม่พบสาขาหรือพนักงานผู้ทำรายการ' })
+  if (!actor.branchId || !actor.employeeId || !(actor.role || actor.v2Role)) {
+    res.status(403).json({ success: false, code: 'PRICE_ACTOR_CONTEXT_REQUIRED', message: 'ไม่พบบริบทสาขา พนักงาน หรือบทบาทผู้ทำรายการ' })
     return null
   }
   return actor
@@ -61,14 +60,14 @@ const makeConflict = (message, code) => {
 exports.list = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.listReceipts({ branchId: actor.branchId, ...req.query })
+    const data = await service.listReceipts({ actor, ...req.query })
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
 exports.detail = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.getReceipt(req.params.id, actor.branchId)
+    const data = await service.getReceipt(req.params.id, actor)
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
@@ -82,11 +81,7 @@ exports.create = async (req, res) => {
 exports.complete = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await completeService.complete(
-      req.body || {},
-      actor,
-      req.get('X-Idempotency-Key')
-    )
+    const data = await completeService.complete(req.body || {}, actor, req.get('X-Idempotency-Key'))
     return res.status(201).json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
@@ -114,22 +109,11 @@ exports.deleteItem = async (req, res) => {
 exports.finalize = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.finalize(
-      req.params.id,
-      actor,
-      req.get('X-Idempotency-Key')
-    )
+    const data = await service.finalize(req.params.id, actor, req.get('X-Idempotency-Key'))
     if (Number(data?.id) !== Number(req.params.id)) {
-      throw makeConflict(
-        'X-Idempotency-Key นี้ถูกใช้ยืนยันใบรับสินค้าอื่นแล้ว',
-        'IDEMPOTENCY_KEY_CONFLICT'
-      )
+      throw makeConflict('X-Idempotency-Key นี้ถูกใช้ยืนยันใบรับสินค้าอื่นแล้ว', 'IDEMPOTENCY_KEY_CONFLICT')
     }
-    const taxIntake = await publishQuickReceiptTaxCandidate({
-      receipt: data,
-      branchId: actor.branchId,
-      employeeId: actor.employeeId,
-    })
+    const taxIntake = await publishQuickReceiptTaxCandidate({ receipt: data, branchId: actor.branchId, employeeId: actor.employeeId })
     return res.json({ success: true, data: { ...data, taxIntake } })
   } catch (error) { return sendError(res, error) }
 }
