@@ -136,7 +136,7 @@ exports.finalize = async (req, res) => {
 exports.cancel = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.cancel(req.params.id, actor.branchId, req.body?.reason)
+    const data = await service.cancel(req.params.id, actor, req.body?.reason)
     return res.json({ success: true, data })
   } catch (error) { return sendError(res, error) }
 }
