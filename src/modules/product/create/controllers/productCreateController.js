@@ -18,6 +18,13 @@ const getEmployeeId = (req) =>
   req.user?.employeeId ||
   null
 
+const getRole = (req) =>
+  req.employee?.v2Role ||
+  req.employee?.role ||
+  req.user?.v2Role ||
+  req.user?.role ||
+  null
+
 const sendError = (res, error, fallback = 'PRODUCT_CREATE_RUNTIME_ERROR') => {
   const status = error?.status || error?.statusCode || 500
   if (status >= 500) console.error('❌ productCreate runtime error:', error)
@@ -33,6 +40,7 @@ const sendError = (res, error, fallback = 'PRODUCT_CREATE_RUNTIME_ERROR') => {
 const requireEmployeeContext = (req, res) => {
   const branchId = getBranchId(req)
   const employeeId = getEmployeeId(req)
+  const role = getRole(req)
 
   if (!branchId) {
     res.status(403).json({
@@ -54,7 +62,17 @@ const requireEmployeeContext = (req, res) => {
     return null
   }
 
-  return { branchId, employeeId }
+  if (!role) {
+    res.status(403).json({
+      success: false,
+      error: 'PRICE_ROLE_CONTEXT_REQUIRED',
+      code: 'PRICE_ROLE_CONTEXT_REQUIRED',
+      message: 'ไม่พบบทบาทผู้ทำรายการราคา',
+    })
+    return null
+  }
+
+  return { branchId, employeeId, role }
 }
 
 const getDropdowns = async (req, res) => {
@@ -109,6 +127,7 @@ const createLocalProduct = async (req, res) => {
     const result = await productCreateService.createLocalOperationalProduct({
       branchId: actor.branchId,
       employeeId: actor.employeeId,
+      role: actor.role,
       data: req.body || {},
     })
     return res.status(201).json(result)
