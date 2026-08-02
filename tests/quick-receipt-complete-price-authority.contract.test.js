@@ -43,18 +43,43 @@ assert.match(
 )
 assert.match(
   serviceSource,
+  /actor:\s*authority/,
+  'every receipt line validation must use normalized authority'
+)
+assert.match(
+  serviceSource,
   /lineIndex: index/,
   'price failures must identify the failing receipt line'
 )
 assert.match(
   serviceSource,
-  /this\.sessions\.createDraft\(payload, authority\.branchId, authority\.employeeId\)/,
-  'draft ownership must come from normalized authority'
+  /this\.sessions\.createDraft\(payload, authority\)/,
+  'draft ownership must receive the same normalized authority object'
+)
+assert.match(
+  serviceSource,
+  /this\.sessions\.addItem\(receipt\.id, line, authority\)/,
+  'item preparation must receive the same normalized authority object'
 )
 assert.match(
   serviceSource,
   /this\.sessions\.finalize\(receipt\.id, authority, key\)/,
   'finalization must receive the same normalized authority'
+)
+assert.match(
+  serviceSource,
+  /this\.sessions\.getReceipt\(receipt\.id, authority\)/,
+  'compensation read must receive the same normalized authority'
+)
+assert.match(
+  serviceSource,
+  /this\.sessions\.cancel\([\s\S]*receipt\.id,[\s\S]*authority,/,
+  'compensation cancellation must receive the same normalized authority'
+)
+assert.doesNotMatch(
+  serviceSource,
+  /this\.sessions\.createDraft\(payload, authority\.branchId, authority\.employeeId\)/,
+  'complete must not decompose normalized authority into primitive branch and employee values'
 )
 assert.doesNotMatch(
   serviceSource,
