@@ -87,7 +87,8 @@
     "test:auth-refresh-token-repository": "node tests/auth-refresh-token-repository.contract.test.js",
     "test:pos-sale-e2e-outcome": "node tests/pos-sale-e2e-outcome.contract.test.js",
     "verify:pos-sale-e2e-outcome": "node scripts/verify-pos-sale-e2e-outcome.js",
-    "test:output-tax-document-identity": "node tests/output-tax-document-identity.contract.test.js"
+    "test:output-tax-document-identity": "node tests/output-tax-document-identity.contract.test.js",
+    "test:tax-issuer-profile": "node prisma/migrations/20260802190000_tax_issuer_profile_foundation/migration.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
