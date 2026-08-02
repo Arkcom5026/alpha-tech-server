@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const { assertTestDatabaseAuthority } = require('../../../../recovery/testDatabaseAuthority');
+const { assertTestDatabaseAuthority } = require('../../../../../recovery/testDatabaseAuthority');
 
 const APPROVAL = 'ALPHATECH_REPAIR_INTAKE_E2E_FIXTURE';
 const envPath = path.join(process.cwd(), '.env.restore');
@@ -36,7 +36,7 @@ if (!Number.isInteger(customerId) || customerId <= 0) {
 
 process.env.DATABASE_URL = targetUrl;
 process.env.DIRECT_URL = targetUrl;
-const { prisma } = require('../../../../lib/prisma');
+const { prisma } = require('../../../../../lib/prisma');
 const {
   CreateExternalDeviceIntakeService,
 } = require('../../external-intake/createExternalDeviceIntakeService');
