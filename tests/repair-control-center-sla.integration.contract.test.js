@@ -33,14 +33,23 @@ for (const exception of [
 }
 
 assert(
-  repository.includes('deviceIntakes:') &&
+  repository.includes('deviceIntake:') &&
     repository.includes('consent: true') &&
     repository.includes('photos: true'),
-  'Control center repository must load intake completion evidence'
+  'Control center repository must load singular intake completion evidence'
 );
 assert(
-  repository.includes('repairDeliveries:'),
-  'Control center repository must load delivery evidence'
+  repository.includes('delivery: true'),
+  'Control center repository must load singular delivery evidence'
+);
+assert(
+  !repository.includes('deviceIntakes:') &&
+    !repository.includes('repairDeliveries:'),
+  'Control center repository must not use retired plural RepairJob relations'
+);
+assert(
+  policy.includes('job?.deviceIntake') && policy.includes('!job?.delivery'),
+  'Control center policy must consume singular RepairJob relations'
 );
 assert(
   service.includes('projectRepairOperationalState(job)'),
