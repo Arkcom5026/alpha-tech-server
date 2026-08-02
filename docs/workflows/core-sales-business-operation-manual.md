@@ -272,6 +272,14 @@ The completion result provides initial document defaults:
 
 Document rendering and descriptions must include both structured `items` and `simpleItems` where relevant.
 
+### Tax document eligibility
+
+A tax invoice is permitted only when the Sale payment projection is `PAID`.
+
+- `PAID` Sale: the employee may issue a short tax invoice or a full tax invoice according to the selected document option and available customer identity.
+- `UNPAID` or partially paid Sale: the employee may issue or print a Delivery Note, but must not issue a short tax invoice or a full tax invoice.
+- Credit or organization Sale: the initial document is a Delivery Note. After settlement reaches the canonical Sale total and the projection becomes `PAID`, tax-document intake may proceed.
+- The Server rejects a Sale tax-intake request before it creates a Tax Candidate when the payment projection is not `PAID`.
 The employee should verify:
 
 - customer and company details;
@@ -284,7 +292,7 @@ The employee should verify:
 
 ## 14. Tax candidate boundary
 
-After the Sale transaction commits, the Server attempts to publish a sales tax candidate.
+After the Sale transaction commits, the Server may attempt to publish a sales tax candidate only when the Sale payment projection is `PAID`. An unpaid or partially paid Sale is not eligible for tax intake.
 
 Possible publication results include:
 
@@ -412,6 +420,7 @@ Before confirmation:
 - Held Cart warnings and changed prices are resolved;
 - CASH payment evidence equals the net total;
 - CREDIT has a customer and no forbidden immediate payment;
+- unpaid or partially paid Sale uses Delivery Note only; no tax invoice is issued;
 - deposit belongs to the selected customer and branch;
 - document option matches the transaction.
 
