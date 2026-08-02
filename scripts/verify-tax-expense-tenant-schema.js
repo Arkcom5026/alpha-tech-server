@@ -44,9 +44,9 @@ async function main() {
     const definitions = Object.fromEntries(constraints.rows.map((row) => [row.conname, row.definition]));
     const missingConstraints = REQUIRED_CONSTRAINTS.filter((name) => !definitions[name]);
     const checks = {
-      supplierSameBranch: /FOREIGN KEY \("supplierId", "branchId"\) REFERENCES "Supplier"\("id", "branchId"\)/.test(definitions.TaxExpense_supplierId_branchId_fkey || ''),
-      itemParentSameBranch: /FOREIGN KEY \("taxExpenseId", "branchId"\) REFERENCES "TaxExpense"\("id", "branchId"\)/.test(definitions.TaxExpenseItem_taxExpenseId_branchId_fkey || ''),
-      itemCategorySameBranch: /FOREIGN KEY \("categoryId", "branchId"\) REFERENCES "TaxExpenseCategory"\("id", "branchId"\)/.test(definitions.TaxExpenseItem_categoryId_branchId_fkey || ''),
+      supplierSameBranch: /FOREIGN KEY \("supplierId", "branchId"\) REFERENCES "Supplier"\((?:"id"|id), "branchId"\)/.test(definitions.TaxExpense_supplierId_branchId_fkey || ''),
+      itemParentSameBranch: /FOREIGN KEY \("taxExpenseId", "branchId"\) REFERENCES "TaxExpense"\((?:"id"|id), "branchId"\)/.test(definitions.TaxExpenseItem_taxExpenseId_branchId_fkey || ''),
+      itemCategorySameBranch: /FOREIGN KEY \("categoryId", "branchId"\) REFERENCES "TaxExpenseCategory"\((?:"id"|id), "branchId"\)/.test(definitions.TaxExpenseItem_categoryId_branchId_fkey || ''),
       itemBranchIdRequired: branchColumn.rows[0].present,
     };
     const failedChecks = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
