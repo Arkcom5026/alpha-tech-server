@@ -59,11 +59,12 @@ async function main() {
   });
   if (!branch?.slug) throw new Error('The operator branch must have a slug.');
 
-  const customer = await prisma.customerProfile.findFirst({
-    where: { id: customerId, branchId: branch.id },
-    select: { id: true, branchId: true },
-  });
-  if (!customer) throw new Error('The configured customer is not available in the operator branch.');
+  const customer = await externalRepository.findCustomer(branch.id, customerId);
+  if (!customer) {
+    throw new Error(
+      'The configured customer has no branch-authority evidence for the operator branch.'
+    );
+  }
 
   const service = new CreateExternalDeviceIntakeService(externalRepository);
   const created = await service.execute(
