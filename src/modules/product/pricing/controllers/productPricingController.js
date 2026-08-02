@@ -2,6 +2,7 @@ const productPricingService = require('../services/productPricingService')
 
 const getBranchId = (req) => req.employee?.branchId || req.user?.branchId || req.branchId
 const getEmployeeId = (req) => req.employee?.id || req.user?.employeeId || null
+const getRole = (req) => req.employee?.v2Role || req.user?.role || req.user?.v2Role || null
 
 const sendError = (res, error, fallback = 'PRODUCT_PRICING_ERROR') => {
   const status = error?.status || error?.statusCode || 500
@@ -12,8 +13,15 @@ const sendError = (res, error, fallback = 'PRODUCT_PRICING_ERROR') => {
     error: error?.code || fallback,
     code: error?.code || fallback,
     message: error?.message || fallback,
+    ...(error?.detail !== undefined ? { detail: error.detail } : {}),
   })
 }
+
+const actorFromRequest = (req) => ({
+  branchId: getBranchId(req),
+  employeeId: getEmployeeId(req),
+  role: getRole(req),
+})
 
 const getProductPrices = async (req, res) => {
   try {
@@ -31,8 +39,7 @@ const updateProductPrices = async (req, res) => {
   try {
     const result = await productPricingService.savePrice({
       productId: req.params.productId,
-      branchId: getBranchId(req),
-      employeeId: getEmployeeId(req),
+      actor: actorFromRequest(req),
       data: req.body || {},
       requireCorePrices: false,
     })
@@ -46,8 +53,7 @@ const addProductPrice = async (req, res) => {
   try {
     const result = await productPricingService.savePrice({
       productId: req.params.productId,
-      branchId: getBranchId(req),
-      employeeId: getEmployeeId(req),
+      actor: actorFromRequest(req),
       data: req.body || {},
       requireCorePrices: true,
     })
@@ -62,6 +68,7 @@ const deleteProductPrice = async (req, res) => {
     const result = await productPricingService.removePrice({
       productId: req.params.productId,
       priceId: req.params.priceId,
+      actor: actorFromRequest(req),
     })
     return res.json(result)
   } catch (error) {
