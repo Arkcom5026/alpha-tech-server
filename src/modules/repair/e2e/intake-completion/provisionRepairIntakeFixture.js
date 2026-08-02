@@ -23,12 +23,12 @@ if (process.env.REPAIR_INTAKE_E2E_FIXTURE_APPROVAL !== APPROVAL) {
 
 const required = (name) => {
   const value = String(process.env[name] || '').trim();
-  if (!value) throw new Error(`Missing ${name} in .env.restore.`);
+  if (!value) throw new Error(`Missing ${name} in process environment or .env.restore.`);
   return value;
 };
 
 const operatorEmail = required('REPAIR_INTAKE_E2E_OPERATOR_EMAIL').toLowerCase();
-const operatorPassword = required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD');
+required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD');
 const customerId = Number(required('REPAIR_INTAKE_E2E_CUSTOMER_ID'));
 if (!Number.isInteger(customerId) || customerId <= 0) {
   throw new Error('REPAIR_INTAKE_E2E_CUSTOMER_ID must be a positive integer.');
@@ -96,7 +96,6 @@ async function main() {
       employeeId: employee.id,
       customerId: customer.id,
       operatorEmail,
-      operatorPassword,
       repairJobId: created.repairJob.id,
       repairJobNo: created.repairJob.jobNo,
       deviceId: created.device.id,
@@ -105,7 +104,6 @@ async function main() {
     },
     browserEnvironment: {
       E2E_TEST_USERNAME: operatorEmail,
-      E2E_TEST_PASSWORD: operatorPassword,
       REPAIR_INTAKE_E2E_BRANCH_SLUG: branch.slug,
       REPAIR_INTAKE_E2E_JOB_ID: String(created.repairJob.id),
       REPAIR_INTAKE_E2E_JOB_NO: created.repairJob.jobNo,
