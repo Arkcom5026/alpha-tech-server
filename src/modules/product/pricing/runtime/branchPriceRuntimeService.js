@@ -7,6 +7,15 @@ const toInt = (value) => (
     : Number(value)
 );
 
+const makeError = (code, status = 400, message = code, detail) => {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  error.statusCode = status;
+  if (detail !== undefined) error.detail = detail;
+  return error;
+};
+
 const pickPriceUpdate = (source = {}) => {
   const update = {};
 
@@ -45,6 +54,18 @@ const validateDateOrder = (effectiveDate, expiredDate) => {
   const effective = effectiveDate ? new Date(effectiveDate) : null;
   const expired = expiredDate ? new Date(expiredDate) : null;
   return { effective, expired, valid: !(effective && expired && expired < effective) };
+};
+
+const assertProductOwnedByBranch = async ({ productId, branchId, index }) => {
+  const product = await repository.findBranchProduct({ productId, branchId });
+  if (!product) {
+    throw makeError(
+      'PRICE_PRODUCT_NOT_FOUND_IN_BRANCH',
+      404,
+      'ไม่พบสินค้าในสาขาของผู้ทำรายการ',
+      { productId, branchId, ...(index === undefined ? {} : { index }) },
+    );
+  }
 };
 
 const buildProductWhere = ({
@@ -116,15 +137,18 @@ const getActiveBranchPrice = ({ branchId, productId }) => (
 
 const upsertBranchPrice = async ({ actor, input }) => {
   const productId = toInt(input.productId);
-  const retailValue = input.retailPrice ?? input.priceRetail;
-  const dates = validateDateOrder(input.effectiveDate, input.expiredDate);
-  priceAuthorityPolicy.assertPricePayload({
+  if (!productId) throw makeError('INVALID_PRODUCT_ID', 400, 'productId ไม่ถูกต้อง');
+
+  const authority = priceAuthorityPolicy.assertPricePayload({
     actor,
     payload: canonicalPricePayload(input),
     effectiveDate: input.effectiveDate,
     expiredDate: input.expiredDate,
   });
+  await assertProductOwnedByBranch({ productId, branchId: authority.branchId });
 
+  const retailValue = input.retailPrice ?? input.priceRetail;
+  const dates = validateDateOrder(input.effectiveDate, input.expiredDate);
   const pricePatch = pickPriceUpdate(input);
   const createData = {
     costPrice: repository.D(input.costPrice),
@@ -140,8 +164,8 @@ const upsertBranchPrice = async ({ actor, input }) => {
 
   return repository.upsertBranchPrice({
     productId,
-    branchId: actor.branchId,
-    employeeId: actor.employeeId,
+    branchId: authority.branchId,
+    employeeId: authority.employeeId,
     pricePatch,
     createData,
   });
@@ -189,30 +213,32 @@ const getAllProductsWithBranchPrice = async ({ branchId, query }) => {
 };
 
 const updateMultipleBranchPrices = async ({ actor, updates }) => {
-  priceAuthorityPolicy.assertActor(actor);
-  const operations = updates.map((item, index) => {
+  const authority = priceAuthorityPolicy.assertActor(actor);
+  const normalized = [];
+
+  for (let index = 0; index < updates.length; index += 1) {
+    const item = updates[index];
     const productId = toInt(item?.product?.id || item?.productId);
     if (!productId) {
-      const error = new Error('productId ไม่ถูกต้องในรายการราคาแบบกลุ่ม');
-      error.code = 'INVALID_PRODUCT_ID';
-      error.status = 400;
-      error.statusCode = 400;
-      error.detail = { index };
-      throw error;
+      throw makeError('INVALID_PRODUCT_ID', 400, 'productId ไม่ถูกต้องในรายการราคาแบบกลุ่ม', { index });
     }
 
     priceAuthorityPolicy.assertPricePayload({
-      actor,
+      actor: authority,
       payload: canonicalPricePayload(item),
       effectiveDate: item?.effectiveDate,
       expiredDate: item?.expiredDate,
     });
-    const dates = validateDateOrder(item?.effectiveDate, item?.expiredDate);
+    await assertProductOwnedByBranch({ productId, branchId: authority.branchId, index });
+    normalized.push({ item, productId });
+  }
 
+  const operations = normalized.map(({ item, productId }) => {
+    const dates = validateDateOrder(item?.effectiveDate, item?.expiredDate);
     return repository.buildUpsertOperation({
       productId,
-      branchId: actor.branchId,
-      employeeId: actor.employeeId,
+      branchId: authority.branchId,
+      employeeId: authority.employeeId,
       update: pickPriceUpdate(item),
       create: {
         costPrice: repository.D(item.costPrice),
