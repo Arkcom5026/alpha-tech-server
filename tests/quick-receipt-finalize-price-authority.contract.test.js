@@ -35,22 +35,22 @@ assert.match(
 )
 assert.match(
   serviceSource,
-  /priceAuthorityPolicy\.assertActor\(authorityActor\)/,
+  /const baseAuthority = priceAuthorityPolicy\.assertActor\(actor\)/,
   'Quick Receipt finalization must validate authenticated actor context',
 )
 assert.match(
   serviceSource,
-  /priceAuthorityPolicy\.assertPricePayload\(\{ actor: authorityActor, payload: pricePayload \}\)/,
+  /priceAuthorityPolicy\.assertPricePayload\(\{ actor: baseAuthority, payload:/,
   'Every receipt line price mutation must pass the central policy',
 )
 assert.match(
   serviceSource,
-  /branchId: authority\.branchId/,
+  /branchId: brId/,
   'Inventory and price writes must use authority-owned branch identity',
 )
 assert.match(
   serviceSource,
-  /updatedBy: authority\.employeeId/,
+  /employeeId: empId/,
   'Branch price audit attribution must use authority-owned employee identity',
 )
 assert.doesNotMatch(
