@@ -79,7 +79,7 @@ const createUser = (data, tx = prisma) => tx.user.create({ data });
 const createEmployeeProfile = (data, tx = prisma) => tx.employeeProfile.create({ data });
 const createCustomerProfile = (data, tx = prisma) => tx.customerProfile.create({ data });
 
-const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findUnique({
+const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findFirst({
   where: { tokenHash },
   include: {
     user: {
