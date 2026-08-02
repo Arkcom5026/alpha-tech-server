@@ -38,7 +38,7 @@ class GetReceiptPurchaseOrderService {
     const items = purchaseOrder.items.map((item) => ({
       ...item,
       receivedQuantity:
-        item.receiptItems?.reduce((sum, receiptItem) => sum + toNumber(receiptItem.quantity), 0) || 0,
+        item.receipts?.reduce((sum, receiptItem) => sum + toNumber(receiptItem.quantity), 0) || 0,
     }));
 
     return { ...purchaseOrder, items };

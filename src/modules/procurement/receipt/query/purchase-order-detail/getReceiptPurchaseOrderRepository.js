@@ -11,7 +11,7 @@ const receiptPurchaseOrderInclude = {
           unit: true,
         },
       },
-      receiptItems: true,
+      receipts: true,
     },
   },
 };
