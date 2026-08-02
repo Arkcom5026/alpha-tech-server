@@ -7,6 +7,8 @@ const completeService = new QuickReceiptCompleteService()
 const getActor = (req) => ({
   branchId: req.employee?.branchId || req.user?.branchId || null,
   employeeId: req.employee?.id || req.user?.employeeId || null,
+  role: req.employee?.role || req.user?.role || null,
+  v2Role: req.employee?.v2Role || req.user?.v2Role || null,
 })
 const normalizeError = (error) => {
   const databaseCode = error?.meta?.code || error?.code
@@ -38,7 +40,7 @@ const sendError = (res, rawError) => {
     success: false,
     code: error?.code || 'QUICK_RECEIPT_FAILED',
     message: error?.message || 'ดำเนินการรับสินค้าด่วนไม่สำเร็จ',
-    details: error?.details,
+    details: error?.details || error?.detail,
   })
 }
 const requireActor = (req, res) => {
@@ -113,7 +115,11 @@ exports.deleteItem = async (req, res) => {
 exports.finalize = async (req, res) => {
   try {
     const actor = requireActor(req, res); if (!actor) return
-    const data = await service.finalize(req.params.id, actor.branchId, actor.employeeId, req.get('X-Idempotency-Key'))
+    const data = await service.finalize(
+      req.params.id,
+      actor,
+      req.get('X-Idempotency-Key')
+    )
     if (Number(data?.id) !== Number(req.params.id)) {
       throw makeConflict(
         'X-Idempotency-Key นี้ถูกใช้ยืนยันใบรับสินค้าอื่นแล้ว',
