@@ -78,6 +78,12 @@ async function main() {
         host: url.hostname,
         port: url.port || '5432',
         database: url.pathname.slice(1),
+      },
+      tables,
+      appliedMigrations,
+      missingTables,
+      missingMigrations,
+    }, null, 2));
 
     process.exitCode = (missingTables.length || missingMigrations.length) ? 2 : 0;
   } finally {
