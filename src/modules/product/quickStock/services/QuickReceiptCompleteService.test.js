@@ -9,21 +9,24 @@ const makeService = ({ priorCommands = [], priorReceipt = null } = {}) => {
   const service = new QuickReceiptCompleteService(prisma)
   const calls = []
   service.sessions = {
-    createDraft: async (payload, branchId, employeeId) => {
-      calls.push(['createDraft', payload.deliveryNoteNumber, branchId, employeeId])
+    createDraft: async (payload, actor) => {
+      calls.push(['createDraft', payload.deliveryNoteNumber, actor.branchId, actor.employeeId, actor.role])
       return { id: 77, status: 'DRAFT', items: [] }
     },
-    addItem: async (receiptId, line, branchId) => {
-      calls.push(['addItem', receiptId, line.productId, branchId])
+    addItem: async (receiptId, line, actor) => {
+      calls.push(['addItem', receiptId, line.productId, actor.branchId, actor.employeeId, actor.role])
       return { id: receiptId, status: 'DRAFT' }
     },
-    finalize: async (receiptId, branchId, employeeId, commandKey) => {
-      calls.push(['finalize', receiptId, branchId, employeeId, commandKey])
+    finalize: async (receiptId, actor, commandKey) => {
+      calls.push(['finalize', receiptId, actor.branchId, actor.employeeId, actor.role, commandKey])
       return { id: receiptId, status: 'COMPLETED' }
     },
-    getReceipt: async () => priorReceipt || ({ id: 77, status: 'DRAFT' }),
-    cancel: async (receiptId, branchId, reason) => {
-      calls.push(['cancel', receiptId, branchId, reason])
+    getReceipt: async (receiptId, actor) => {
+      calls.push(['getReceipt', receiptId, actor.branchId, actor.employeeId, actor.role])
+      return priorReceipt || ({ id: receiptId, status: 'DRAFT' })
+    },
+    cancel: async (receiptId, actor, reason) => {
+      calls.push(['cancel', receiptId, actor.branchId, actor.employeeId, actor.role, reason])
       return { id: receiptId, status: 'CANCELLED' }
     },
   }
@@ -45,6 +48,8 @@ const completePayload = {
   ],
 }
 
+const actor = { branchId: 3, employeeId: 9, role: 'ADMIN' }
+
 ;(async () => {
   {
     const { service, calls } = makeService()
@@ -54,14 +59,14 @@ const completePayload = {
         ...completePayload.items,
         { productId: 202, quantity: 2, costPrice: 50, priceRetail: 80, items: [] },
       ],
-    }, 3, 9, 'cmd-001')
+    }, actor, 'cmd-001')
 
     assert.equal(result.status, 'COMPLETED')
     assert.deepEqual(calls, [
-      ['createDraft', 'DN-001', 3, 9],
-      ['addItem', 77, 101, 3],
-      ['addItem', 77, 202, 3],
-      ['finalize', 77, 3, 9, 'cmd-001'],
+      ['createDraft', 'DN-001', 3, 9, 'ADMIN'],
+      ['addItem', 77, 101, 3, 9, 'ADMIN'],
+      ['addItem', 77, 202, 3, 9, 'ADMIN'],
+      ['finalize', 77, 3, 9, 'ADMIN', 'cmd-001'],
     ])
   }
 
@@ -74,17 +79,17 @@ const completePayload = {
     }
 
     await assert.rejects(
-      () => service.complete({ ...completePayload, deliveryNoteNumber: 'DN-FAIL' }, 3, 9, 'cmd-fail'),
+      () => service.complete({ ...completePayload, deliveryNoteNumber: 'DN-FAIL' }, actor, 'cmd-fail'),
       (error) => error.code === 'LINE_FAILED'
     )
     assert.equal(calls.at(-1)[0], 'cancel')
-    assert.match(calls.at(-1)[3], /ONE_SHOT_PREPARATION_FAILED: LINE_FAILED/)
+    assert.match(calls.at(-1)[5], /ONE_SHOT_PREPARATION_FAILED: LINE_FAILED/)
   }
 
   {
     const { service } = makeService()
     await assert.rejects(
-      () => service.complete({ items: [] }, 3, 9, 'cmd-empty'),
+      () => service.complete({ items: [] }, actor, 'cmd-empty'),
       (error) => error.code === 'RECEIPT_ITEMS_REQUIRED' && error.statusCode === 400
     )
   }
@@ -100,9 +105,9 @@ const completePayload = {
       priorReceipt,
     })
 
-    const replay = await service.complete(completePayload, 3, 9, 'cmd-replay')
+    const replay = await service.complete(completePayload, actor, 'cmd-replay')
     assert.equal(replay.id, 77)
-    assert.deepEqual(calls, [])
+    assert.deepEqual(calls, [['getReceipt', 77, 3, 9, 'ADMIN']])
   }
 
   {
@@ -117,7 +122,7 @@ const completePayload = {
     })
 
     await assert.rejects(
-      () => service.complete({ ...completePayload, deliveryNoteNumber: 'DN-OTHER' }, 3, 9, 'cmd-conflict'),
+      () => service.complete({ ...completePayload, deliveryNoteNumber: 'DN-OTHER' }, actor, 'cmd-conflict'),
       (error) => error.code === 'IDEMPOTENCY_KEY_CONFLICT' && error.statusCode === 409
     )
   }
