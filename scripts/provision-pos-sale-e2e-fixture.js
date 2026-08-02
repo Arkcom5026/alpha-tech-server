@@ -65,8 +65,8 @@ async function main() {
 
     const user = await tx.user.upsert({
       where: { email: operatorEmail },
-      update: { password: passwordHash, role: 'SUPERADMIN', enabled: true },
-      create: { email: operatorEmail, password: passwordHash, role: 'SUPERADMIN', enabled: true },
+      update: { password: passwordHash, role: 'ADMIN', enabled: true },
+      create: { email: operatorEmail, password: passwordHash, role: 'ADMIN', enabled: true },
       select: { id: true },
     });
 
