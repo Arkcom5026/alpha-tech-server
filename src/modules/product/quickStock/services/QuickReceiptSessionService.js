@@ -27,12 +27,9 @@ class QuickReceiptSessionService {
     this.inventory = new QuickStockRepository(prisma)
   }
 
-  async getReceipt(receiptId, actorOrBranchId, db = this.prisma) {
+  async getReceipt(receiptId, actor = {}, db = this.prisma) {
     const id = toInt(receiptId)
-    const authority = actorOrBranchId && typeof actorOrBranchId === 'object'
-      ? priceAuthorityPolicy.assertActor(actorOrBranchId)
-      : { branchId: toInt(actorOrBranchId) }
-    const brId = authority.branchId
+    const authority = priceAuthorityPolicy.assertActor(actor)
     const receipts = await db.$queryRawUnsafe(
       `SELECT r.*, s."name" AS "supplierName"
        FROM "QuickReceiptSession" r
@@ -40,7 +37,7 @@ class QuickReceiptSessionService {
        WHERE r."id" = $1 AND r."branchId" = $2
        LIMIT 1`,
       id,
-      brId
+      authority.branchId
     )
     if (!receipts.length) throw makeError('ไม่พบรายการรับสินค้าด่วน', 404, 'QUICK_RECEIPT_NOT_FOUND')
 
@@ -52,7 +49,7 @@ class QuickReceiptSessionService {
        WHERE i."receiptId" = $1 AND r."branchId" = $2
        ORDER BY i."id" ASC`,
       id,
-      brId
+      authority.branchId
     )
 
     return { ...receipts[0], items }
@@ -121,12 +118,12 @@ class QuickReceiptSessionService {
       cleanText(payload?.taxPricingMode).toUpperCase() || null, asMoney(payload?.documentSubtotal),
       asMoney(payload?.documentVatAmount), asMoney(payload?.documentTotalAmount), authority.employeeId
     )
-    return this.getReceipt(created[0].id, authority.branchId)
+    return this.getReceipt(created[0].id, authority)
   }
 
   async updateDraft(receiptId, payload, actor = {}) {
     const authority = priceAuthorityPolicy.assertActor(actor)
-    const receipt = await this.getReceipt(receiptId, authority.branchId)
+    const receipt = await this.getReceipt(receiptId, authority)
     if (receipt.status !== 'DRAFT') throw makeError('แก้ไขได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
 
     const supplierId = toInt(payload?.supplierId ?? receipt.supplierId)
@@ -151,7 +148,7 @@ class QuickReceiptSessionService {
       asMoney(payload?.documentTotalAmount ?? receipt.documentTotalAmount),
       toInt(receiptId), authority.branchId
     )
-    return this.getReceipt(receiptId, authority.branchId)
+    return this.getReceipt(receiptId, authority)
   }
 
   normalizeItemPayload(payload) {
@@ -170,20 +167,20 @@ class QuickReceiptSessionService {
 
   async addItem(receiptId, payload, actor = {}) {
     const authority = priceAuthorityPolicy.assertPricePayload({ actor, payload: { costPrice: payload?.costPrice, priceRetail: payload?.priceRetail, priceWholesale: payload?.priceWholesale, priceTechnician: payload?.priceTechnician, priceOnline: payload?.priceOnline } })
-    const receipt = await this.getReceipt(receiptId, authority.branchId)
+    const receipt = await this.getReceipt(receiptId, authority)
     if (receipt.status !== 'DRAFT') throw makeError('เพิ่มสินค้าได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
     const item = this.normalizeItemPayload(payload)
     await this.prisma.$queryRawUnsafe(`INSERT INTO "QuickReceiptSessionItem" ("receiptId","productId","quantity","costPrice","priceRetail","priceWholesale","priceTechnician","priceOnline","note","items","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,CURRENT_TIMESTAMP)`, toInt(receiptId), item.productId, item.quantity, item.costPrice, item.priceRetail, item.priceWholesale, item.priceTechnician, item.priceOnline, item.note, JSON.stringify(item.items))
     await this.prisma.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1 AND "branchId"=$2`, toInt(receiptId), authority.branchId)
-    return this.getReceipt(receiptId, authority.branchId)
+    return this.getReceipt(receiptId, authority)
   }
 
   async deleteItem(receiptId, itemId, actor = {}) {
     const authority = priceAuthorityPolicy.assertActor(actor)
-    const receipt = await this.getReceipt(receiptId, authority.branchId)
+    const receipt = await this.getReceipt(receiptId, authority)
     if (receipt.status !== 'DRAFT') throw makeError('ลบสินค้าได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
     await this.prisma.$executeRawUnsafe(`DELETE FROM "QuickReceiptSessionItem" i USING "QuickReceiptSession" r WHERE i."id"=$1 AND i."receiptId"=$2 AND r."id"=i."receiptId" AND r."branchId"=$3`, toInt(itemId), toInt(receiptId), authority.branchId)
-    return this.getReceipt(receiptId, authority.branchId)
+    return this.getReceipt(receiptId, authority)
   }
 
   async finalize(receiptId, actor = {}, commandKey) {
@@ -198,8 +195,8 @@ class QuickReceiptSessionService {
       if (!locked.length) throw makeError('ไม่พบรายการรับสินค้าด่วน', 404, 'QUICK_RECEIPT_NOT_FOUND')
       const receipt = locked[0]
       const existingCommand = await tx.$queryRawUnsafe(`SELECT * FROM "QuickReceiptFinalizeCommand" WHERE "branchId"=$1 AND "commandKey"=$2 LIMIT 1`, brId, key)
-      if (existingCommand.length) return this.getReceipt(existingCommand[0].receiptId, brId, tx)
-      if (receipt.status === 'COMPLETED') return this.getReceipt(id, brId, tx)
+      if (existingCommand.length) return this.getReceipt(existingCommand[0].receiptId, baseAuthority, tx)
+      if (receipt.status === 'COMPLETED') return this.getReceipt(id, baseAuthority, tx)
       if (receipt.status !== 'DRAFT') throw makeError('รายการนี้ไม่อยู่ในสถานะที่ยืนยันได้', 409, 'QUICK_RECEIPT_NOT_FINALIZABLE')
       const items = await tx.$queryRawUnsafe(`SELECT * FROM "QuickReceiptSessionItem" WHERE "receiptId"=$1 ORDER BY "id" ASC`, id)
       if (!items.length) throw makeError('ยังไม่มีสินค้าในใบรับ', 400, 'RECEIPT_ITEMS_REQUIRED')
@@ -238,16 +235,16 @@ class QuickReceiptSessionService {
       const requestHash = crypto.createHash('sha256').update(`${id}:${brId}:${key}`).digest('hex')
       await tx.$executeRawUnsafe(`INSERT INTO "QuickReceiptFinalizeCommand" ("receiptId","branchId","commandKey","requestHash") VALUES ($1,$2,$3,$4)`, id, brId, key, requestHash)
       await tx.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "status"='COMPLETED', "completedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1`, id)
-      return this.getReceipt(id, brId, tx)
+      return this.getReceipt(id, baseAuthority, tx)
     }, { timeout: 30000 })
   }
 
   async cancel(receiptId, actor = {}, reason) {
     const authority = priceAuthorityPolicy.assertActor(actor)
-    const receipt = await this.getReceipt(receiptId, authority.branchId)
+    const receipt = await this.getReceipt(receiptId, authority)
     if (receipt.status !== 'DRAFT') throw makeError('ยกเลิกได้เฉพาะรายการ DRAFT', 409, 'QUICK_RECEIPT_NOT_CANCELLABLE')
     await this.prisma.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "status"='CANCELLED', "cancelledAt"=CURRENT_TIMESTAMP, "cancelReason"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$2 AND "branchId"=$3`, cleanText(reason) || null, toInt(receiptId), authority.branchId)
-    return this.getReceipt(receiptId, authority.branchId)
+    return this.getReceipt(receiptId, authority)
   }
 }
 
