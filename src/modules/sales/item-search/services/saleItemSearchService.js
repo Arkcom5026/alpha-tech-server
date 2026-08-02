@@ -1,4 +1,5 @@
 const saleItemSearchRepository = require('../repositories/saleItemSearchRepository');
+const effectivePricePolicy = require('../../../product/pricing/policies/effectivePricePolicy');
 
 class SaleItemSearchError extends Error {
   constructor(status, code, message, details = undefined) {
@@ -16,17 +17,33 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const pricesOf = (product) => {
+const pricesOf = (product, branchId) => {
   const price = product?.branchPrice?.[0];
+  if (!price) {
+    throw new SaleItemSearchError(
+      409,
+      'ACTIVE_BRANCH_PRICE_NOT_FOUND',
+      'ไม่พบราคาที่ใช้งานสำหรับสินค้านี้ในร้านปัจจุบัน',
+      { branchId, productId: product?.id ?? null },
+    );
+  }
+
+  const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
+    row: price,
+    priceType,
+    branchId,
+    productId: product?.id,
+  });
+
   return {
-    retail: toNumber(price?.priceRetail),
-    wholesale: toNumber(price?.priceWholesale),
-    technician: toNumber(price?.priceTechnician),
-    online: toNumber(price?.priceOnline),
+    retail: resolve('retail'),
+    wholesale: resolve('wholesale'),
+    technician: resolve('technician'),
+    online: resolve('online'),
   };
 };
 
-const mapStockItem = (stockItem) => ({
+const mapStockItem = (stockItem, branchId) => ({
   type: 'STOCK',
   lineType: 'STOCK_ITEM',
   productId: stockItem.productId,
@@ -36,10 +53,10 @@ const mapStockItem = (stockItem) => ({
   quantityAvailable: 1,
   status: stockItem.status,
   product: stockItem.product,
-  prices: pricesOf(stockItem.product),
+  prices: pricesOf(stockItem.product, branchId),
 });
 
-const mapSimpleLot = (simpleLot) => ({
+const mapSimpleLot = (simpleLot, branchId) => ({
   type: 'SIMPLE',
   lineType: 'SIMPLE',
   productId: simpleLot.productId,
@@ -50,7 +67,7 @@ const mapSimpleLot = (simpleLot) => ({
   qtyRemaining: toNumber(simpleLot.qtyRemaining),
   status: simpleLot.status,
   product: simpleLot.product,
-  prices: pricesOf(simpleLot.product),
+  prices: pricesOf(simpleLot.product, branchId),
 });
 
 const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRepository }) => {
@@ -69,7 +86,7 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
         { type: 'STOCK', status: stockItem.status, stockItemId: stockItem.id }
       );
     }
-    return { items: [mapStockItem(stockItem)] };
+    return { items: [mapStockItem(stockItem, branchId)] };
   }
 
   const simpleLot = await repository.findSimpleLotByBarcode({ branchId, barcode });
@@ -103,7 +120,7 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
     );
   }
 
-  return { items: [mapSimpleLot(simpleLot)] };
+  return { items: [mapSimpleLot(simpleLot, branchId)] };
 };
 
 module.exports = {
