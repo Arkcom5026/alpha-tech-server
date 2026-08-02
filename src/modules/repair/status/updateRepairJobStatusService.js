@@ -13,6 +13,15 @@ const { mapRepairJob } = require('../mappers/repairMapper');
 const {
   buildStatusChangedEvent,
 } = require('../customer-timeline/repairCustomerTimelinePolicy');
+const {
+  isIntakeComplete,
+} = require('../query/control-center/repairControlCenterPolicy');
+
+const INTAKE_REQUIRED_STATUSES = new Set([
+  'IN_PROGRESS',
+  'WAITING_PARTS',
+  'COMPLETED',
+]);
 
 class UpdateRepairJobStatusService {
   constructor(statusRepository = repository) {
@@ -43,6 +52,19 @@ class UpdateRepairJobStatusService {
       }
 
       assertRepairTransition(job.status, payload.status);
+
+      if (INTAKE_REQUIRED_STATUSES.has(payload.status) && !isIntakeComplete(job)) {
+        throw new RepairError(
+          RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE,
+          'กรุณาบันทึกความยินยอมและรูปสภาพเครื่องตอนรับเข้าก่อนดำเนินงานต่อ',
+          409,
+          {
+            repairJobId: job.id,
+            nextStatus: payload.status,
+            requiredEvidence: ['CONSENT', 'INTAKE_CONDITION_PHOTO'],
+          }
+        );
+      }
 
       if (payload.technicianId) {
         const technician = await repo.findTechnician(payload.technicianId);
@@ -86,3 +108,4 @@ class UpdateRepairJobStatusService {
 
 module.exports = new UpdateRepairJobStatusService();
 module.exports.UpdateRepairJobStatusService = UpdateRepairJobStatusService;
+module.exports.INTAKE_REQUIRED_STATUSES = INTAKE_REQUIRED_STATUSES;
