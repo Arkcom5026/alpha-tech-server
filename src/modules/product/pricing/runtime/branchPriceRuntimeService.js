@@ -1,4 +1,5 @@
 const repository = require('./branchPriceRuntimeRepository');
+const priceAuthorityPolicy = require('../policies/priceAuthorityPolicy');
 
 const toInt = (value) => (
   value === undefined || value === null || value === ''
@@ -31,6 +32,14 @@ const pickPriceUpdate = (source = {}) => {
 
   return update;
 };
+
+const canonicalPricePayload = (source = {}) => ({
+  costPrice: source.costPrice,
+  priceRetail: source.retailPrice ?? source.priceRetail,
+  priceWholesale: source.wholesalePrice ?? source.priceWholesale,
+  priceTechnician: source.technicianPrice ?? source.priceTechnician,
+  priceOnline: source.priceOnline,
+});
 
 const validateDateOrder = (effectiveDate, expiredDate) => {
   const effective = effectiveDate ? new Date(effectiveDate) : null;
@@ -109,6 +118,12 @@ const upsertBranchPrice = async ({ actor, input }) => {
   const productId = toInt(input.productId);
   const retailValue = input.retailPrice ?? input.priceRetail;
   const dates = validateDateOrder(input.effectiveDate, input.expiredDate);
+  priceAuthorityPolicy.assertPricePayload({
+    actor,
+    payload: canonicalPricePayload(input),
+    effectiveDate: input.effectiveDate,
+    expiredDate: input.expiredDate,
+  });
 
   const pricePatch = pickPriceUpdate(input);
   const createData = {
@@ -174,33 +189,44 @@ const getAllProductsWithBranchPrice = async ({ branchId, query }) => {
 };
 
 const updateMultipleBranchPrices = async ({ actor, updates }) => {
-  const operations = updates
-    .map((item) => {
-      const productId = toInt(item?.product?.id || item?.productId);
-      if (!productId) return null;
+  priceAuthorityPolicy.assertActor(actor);
+  const operations = updates.map((item, index) => {
+    const productId = toInt(item?.product?.id || item?.productId);
+    if (!productId) {
+      const error = new Error('productId ไม่ถูกต้องในรายการราคาแบบกลุ่ม');
+      error.code = 'INVALID_PRODUCT_ID';
+      error.status = 400;
+      error.statusCode = 400;
+      error.detail = { index };
+      throw error;
+    }
 
-      const dates = validateDateOrder(item?.effectiveDate, item?.expiredDate);
-      if (!dates.valid) return null;
+    priceAuthorityPolicy.assertPricePayload({
+      actor,
+      payload: canonicalPricePayload(item),
+      effectiveDate: item?.effectiveDate,
+      expiredDate: item?.expiredDate,
+    });
+    const dates = validateDateOrder(item?.effectiveDate, item?.expiredDate);
 
-      return repository.buildUpsertOperation({
-        productId,
-        branchId: actor.branchId,
-        employeeId: actor.employeeId,
-        update: pickPriceUpdate(item),
-        create: {
-          costPrice: repository.D(item.costPrice),
-          priceRetail: repository.D(item.retailPrice ?? item.priceRetail),
-          priceWholesale: repository.D(item.wholesalePrice ?? item.priceWholesale),
-          priceTechnician: repository.D(item.technicianPrice ?? item.priceTechnician),
-          priceOnline: repository.D(item.priceOnline),
-          effectiveDate: dates.effective,
-          expiredDate: dates.expired,
-          note: item.note || null,
-          isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
-        },
-      });
-    })
-    .filter(Boolean);
+    return repository.buildUpsertOperation({
+      productId,
+      branchId: actor.branchId,
+      employeeId: actor.employeeId,
+      update: pickPriceUpdate(item),
+      create: {
+        costPrice: repository.D(item.costPrice),
+        priceRetail: repository.D(item.retailPrice ?? item.priceRetail),
+        priceWholesale: repository.D(item.wholesalePrice ?? item.priceWholesale),
+        priceTechnician: repository.D(item.technicianPrice ?? item.priceTechnician),
+        priceOnline: repository.D(item.priceOnline),
+        effectiveDate: dates.effective,
+        expiredDate: dates.expired,
+        note: item.note || null,
+        isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
+      },
+    });
+  });
 
   return repository.bulkUpsertBranchPrices({ operations });
 };
