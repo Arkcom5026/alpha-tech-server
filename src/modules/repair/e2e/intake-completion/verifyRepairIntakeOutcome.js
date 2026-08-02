@@ -57,7 +57,6 @@ async function main() {
             select: {
               id: true,
               customerSignature: true,
-              confirmed: true,
               signedAt: true,
             },
           },
@@ -88,7 +87,10 @@ async function main() {
     return fail('DeviceIntake customer/device authority does not match RepairJob.', { job, intake });
   }
 
-  if (!intake.consent?.confirmed || intake.consent.customerSignature !== 'Repair E2E Customer') {
+  if (
+    intake.consent?.customerSignature !== 'Repair E2E Customer'
+    || !intake.consent?.signedAt
+  ) {
     return fail('Required customer consent evidence is incomplete.', { consent: intake.consent });
   }
 
