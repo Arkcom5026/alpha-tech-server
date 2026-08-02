@@ -28,18 +28,26 @@ const pricesOf = (product, branchId) => {
     );
   }
 
-  const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
-    row: price,
-    priceType,
-    branchId,
-    productId: product?.id,
-  });
+  const resolveOptional = (priceType) => {
+    try {
+      return effectivePricePolicy.resolveEffectivePrice({
+        row: price,
+        priceType,
+        context: { branchId, productId: product?.id },
+      }).price;
+    } catch (error) {
+      if (error?.code === 'PRICE_VALUE_MISSING' || error?.code === 'PRICE_VALUE_NOT_EFFECTIVE') {
+        return null;
+      }
+      throw error;
+    }
+  };
 
   return {
-    retail: resolve('retail'),
-    wholesale: resolve('wholesale'),
-    technician: resolve('technician'),
-    online: resolve('online'),
+    retail: resolveOptional('retail'),
+    wholesale: resolveOptional('wholesale'),
+    technician: resolveOptional('technician'),
+    online: resolveOptional('online'),
   };
 };
 
