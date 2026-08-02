@@ -151,3 +151,35 @@ test('sale completion contract preserves simpleLotId and never uses barcode as F
   assert.equal(command.sale.items[0].stockItemId, null);
   assert.equal(Object.hasOwn(command.sale.items[0], 'barcode'), false);
 });
+
+test('POS barcode search keeps available in-store prices when online price is unset', async () => {
+  const repository = {
+    findStockItemByBarcode: async () => ({
+      id: 422,
+      productId: 99,
+      barcode: 'STOCK-422',
+      status: 'IN_STOCK',
+      product: {
+        ...product,
+        id: 99,
+        mode: 'STRUCTURED',
+        branchPrice: [{
+          priceRetail: 107,
+          priceWholesale: 107,
+          priceTechnician: 107,
+          priceOnline: null,
+        }],
+      },
+    }),
+    findSimpleLotByBarcode: async () => null,
+  };
+
+  const result = await searchSaleItems({ branchId: 1, query: 'STOCK-422', repository });
+
+  assert.deepEqual(result.items[0].prices, {
+    retail: 107,
+    wholesale: 107,
+    technician: 107,
+    online: null,
+  });
+});
