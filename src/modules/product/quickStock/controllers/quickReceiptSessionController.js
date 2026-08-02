@@ -84,8 +84,7 @@ exports.complete = async (req, res) => {
     const actor = requireActor(req, res); if (!actor) return
     const data = await completeService.complete(
       req.body || {},
-      actor.branchId,
-      actor.employeeId,
+      actor,
       req.get('X-Idempotency-Key')
     )
     return res.status(201).json({ success: true, data })
