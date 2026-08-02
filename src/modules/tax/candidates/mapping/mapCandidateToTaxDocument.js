@@ -13,7 +13,13 @@ const SOURCE_TO_DOCUMENT_TYPE = Object.freeze({
   MANUAL: 'OTHER',
 });
 
-const mapCandidateToTaxDocumentDraft = ({ candidate, documentNumber, issuerTaxId, documentType }) => {
+const mapCandidateToTaxDocumentDraft = ({
+  candidate,
+  documentNumber,
+  issuerTaxId,
+  counterpartyTaxId,
+  documentType,
+}) => {
   if (!candidate || typeof candidate !== 'object') {
     throw Object.assign(new Error('candidate is required'), { code: 'TAX_CANDIDATE_REQUIRED' });
   }
@@ -29,6 +35,7 @@ const mapCandidateToTaxDocumentDraft = ({ candidate, documentNumber, issuerTaxId
 
   return Object.freeze({
     ...identity,
+    counterpartyTaxId: String(counterpartyTaxId || '').trim().replace(/\D/g, '') || null,
     status: 'DRAFT',
     sourceType: candidate.sourceType,
     sourceId: candidate.sourceId,
