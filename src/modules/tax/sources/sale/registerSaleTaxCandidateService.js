@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const { registerTaxCandidate } = require('../../intake/registerTaxCandidateService');
+const { assertSaleTaxDocumentEligibility } = require('./saleTaxDocumentEligibilityPolicy');
 
 const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -46,6 +47,8 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       statusCode: 409,
     });
   }
+
+  assertSaleTaxDocumentEligibility(sale);
 
   const gross = Number(sale.totalAmount || 0);
   const taxAmount = Number(sale.vat || 0);
