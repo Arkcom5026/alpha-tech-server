@@ -28,18 +28,13 @@ const repairJobDetailInclude = {
     },
     orderBy: { openedAt: 'desc' },
   },
-  deviceIntakes: {
-    orderBy: { receivedAt: 'desc' },
-    take: 1,
+  deviceIntake: {
     include: {
       consent: true,
       photos: true,
     },
   },
-  repairDeliveries: {
-    orderBy: { createdAt: 'desc' },
-    take: 1,
-  },
+  delivery: true,
 };
 
 class ListRepairJobsRepository {

@@ -24,9 +24,9 @@ function projectRepairOperationalState(job, now = new Date()) {
   const slaHours = SLA_HOURS_BY_STATUS[status] || null;
   const overdue = Boolean(slaHours && ageHours > slaHours);
   const terminal = ACTIVE_TERMINAL_STATUSES.has(status);
-  const intakeIncomplete = Boolean(job?.deviceIntakes?.[0]) && (
-    !job.deviceIntakes[0].consent ||
-    !(job.deviceIntakes[0].photos || []).some((photo) =>
+  const intakeIncomplete = Boolean(job?.deviceIntake) && (
+    !job.deviceIntake.consent ||
+    !(job.deviceIntake.photos || []).some((photo) =>
       String(photo.category || '').toUpperCase() === 'INTAKE_CONDITION'
     )
   );
@@ -38,7 +38,7 @@ function projectRepairOperationalState(job, now = new Date()) {
   if (status === 'IN_PROGRESS' && Number(job?.estimatedCost || 0) > 0) {
     exceptions.push('WAITING_CUSTOMER_APPROVAL');
   }
-  if (status === 'COMPLETED' && !job?.repairDeliveries?.length) {
+  if (status === 'COMPLETED' && !job?.delivery) {
     exceptions.push('WAITING_CUSTOMER_PICKUP');
   }
   if (overdue) exceptions.push('SLA_OVERDUE');

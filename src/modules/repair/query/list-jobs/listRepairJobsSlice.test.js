@@ -26,8 +26,8 @@ function jobFixture(overrides = {}) {
     depositPaid: 100,
     technician: null,
     technicianId: null,
-    deviceIntakes: [],
-    repairDeliveries: [],
+    deviceIntake: null,
+    delivery: null,
     partsUsed: [],
     warrantyClaims: [],
     createdAt: new Date('2026-07-01T00:00:00Z'),
@@ -64,8 +64,8 @@ test('list jobs repository always scopes by branch and normalized filters', asyn
   assert.equal(received.take, 25);
   assert.equal(received.skip, 5);
   assert.deepEqual(received.orderBy, { createdAt: 'desc' });
-  assert.ok(received.include.deviceIntakes);
-  assert.ok(received.include.repairDeliveries);
+  assert.ok(received.include.deviceIntake);
+  assert.equal(received.include.delivery, true);
 });
 
 test('list jobs validation normalizes and clamps query values', () => {
