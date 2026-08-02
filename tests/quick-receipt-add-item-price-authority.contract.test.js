@@ -30,9 +30,10 @@ const controllerSource = fs.readFileSync(controllerPath, 'utf8')
 
 assert.match(serviceSource, /async addItem\(receiptId, payload, actor = \{\}\)/)
 assert.match(serviceSource, /priceAuthorityPolicy\.assertPricePayload\(\{/)
-assert.match(serviceSource, /const receipt = await this\.getReceipt\(receiptId, authority\.branchId\)/)
+assert.match(serviceSource, /const receipt = await this\.getReceipt\(receiptId, authority\)/)
 assert.match(serviceSource, /WHERE "id"=\$1 AND "branchId"=\$2/)
 assert.doesNotMatch(serviceSource, /async addItem\(receiptId, payload, branchId\)/)
+assert.doesNotMatch(serviceSource, /this\.getReceipt\(receiptId, authority\.branchId\)/)
 
 assert.match(controllerSource, /service\.addItem\(req\.params\.id, req\.body \|\| \{\}, actor\)/)
 assert.doesNotMatch(controllerSource, /service\.addItem\(req\.params\.id, req\.body \|\| \{\}, actor\.branchId\)/)
