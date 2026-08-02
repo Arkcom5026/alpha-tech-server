@@ -13,18 +13,19 @@ const listProductPrices = ({ productId, branchId, db } = {}) => {
   return client.branchPrice.findMany({
     where: {
       productId: toInt(productId),
-      ...(toInt(branchId) ? { branchId: toInt(branchId) } : {}),
+      branchId: toInt(branchId),
     },
     orderBy: [{ branchId: 'asc' }, { id: 'asc' }],
   })
 }
 
-const findProductPrice = ({ priceId, productId, db } = {}) => {
+const findProductPrice = ({ priceId, productId, branchId, db } = {}) => {
   const client = getDb(db)
   return client.branchPrice.findFirst({
     where: {
       id: toInt(priceId),
       productId: toInt(productId),
+      branchId: toInt(branchId),
     },
   })
 }
@@ -54,12 +55,13 @@ const upsertBranchPrice = ({ productId, branchId, employeeId, payload, db } = {}
   })
 }
 
-const deleteProductPrice = ({ priceId, productId, db } = {}) => {
+const deleteProductPrice = ({ priceId, productId, branchId, db } = {}) => {
   const client = getDb(db)
   return client.branchPrice.deleteMany({
     where: {
       id: toInt(priceId),
       productId: toInt(productId),
+      branchId: toInt(branchId),
     },
   })
 }
