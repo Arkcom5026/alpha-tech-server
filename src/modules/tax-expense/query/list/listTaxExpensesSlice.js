@@ -3,6 +3,8 @@
 const { prisma } = require('../../../../../lib/prisma');
 const { branchIdFromToken, sendError } = require('../../shared/taxExpenseContext');
 
+const validDate = (value) => value instanceof Date && !Number.isNaN(value.getTime());
+
 class ListTaxExpensesRepository {
   constructor(client = prisma) { this.prisma = client; }
   findMany(branchId, query) {
@@ -10,6 +12,11 @@ class ListTaxExpensesRepository {
     const status = String(query?.status || '').trim().toUpperCase();
     const fromDate = query?.fromDate ? new Date(query.fromDate) : null;
     const toDate = query?.toDate ? new Date(query.toDate) : null;
+    const expenseDate = {
+      ...(validDate(fromDate) ? { gte: fromDate } : {}),
+      ...(validDate(toDate) ? { lte: toDate } : {}),
+    };
+
     return this.prisma.taxExpense.findMany({
       where: {
         branchId,
@@ -19,12 +26,7 @@ class ListTaxExpensesRepository {
           { documentNumber: { contains: q, mode: 'insensitive' } },
           { counterpartyName: { contains: q, mode: 'insensitive' } },
         ] } : {}),
-        ...(!Number.isNaN(fromDate?.getTime()) || !Number.isNaN(toDate?.getTime()) ? {
-          expenseDate: {
-            ...(!Number.isNaN(fromDate?.getTime()) ? { gte: fromDate } : {}),
-            ...(!Number.isNaN(toDate?.getTime()) ? { lte: toDate } : {}),
-          },
-        } : {}),
+        ...(Object.keys(expenseDate).length ? { expenseDate } : {}),
       },
       select: {
         id: true, expenseNumber: true, documentNumber: true, expenseDate: true,
