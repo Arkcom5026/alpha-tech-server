@@ -44,6 +44,14 @@ const findActiveBranchPrice = ({ branchId, productId, now }) => prisma.branchPri
   orderBy: [{ effectiveDate: 'desc' }, { updatedAt: 'desc' }],
 });
 
+const findBranchProduct = ({ branchId, productId }) => prisma.product.findFirst({
+  where: {
+    id: productId,
+    productType: { branchId },
+  },
+  select: { id: true },
+});
+
 const upsertBranchPrice = ({ productId, branchId, employeeId, pricePatch, createData }) => (
   prisma.branchPrice.upsert({
     where: { productId_branchId: { productId, branchId } },
@@ -84,6 +92,7 @@ module.exports = {
   Prisma,
   D,
   findActiveBranchPrice,
+  findBranchProduct,
   upsertBranchPrice,
   findProducts,
   countProducts,
