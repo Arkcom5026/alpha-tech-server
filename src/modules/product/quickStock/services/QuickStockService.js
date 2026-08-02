@@ -30,8 +30,43 @@ class QuickStockService {
     const traceId = this.makeTraceId('QS-AIO')
     const branchId = toInt(actor.branchId)
     const empId = toInt(actor.employeeId)
+    const runtimePolicy = decideOperationalProductMode({ mode: data.mode, trackSerialNumber: data.trackSerialNumber, noSN: data.noSN, inventoryBehavior: data.inventoryBehavior })
+    assertProductCanReceive(runtimePolicy)
+    const isSN = runtimePolicy.mode === 'STRUCTURED'
+
+    if (isSN && (!Array.isArray(data.items) || !data.items.length)) {
+      throw Object.assign(new Error('กรุณาส่งข้อมูลรายการคีย์สแกน Serial Number และราคาทุนรายชิ้น'), { statusCode: 400, code: 'ITEMS_REQUIRED' })
+    }
+
+    const itemCosts = isSN
+      ? data.items.map((item, index) => {
+        const costPrice = Number(item?.costPrice)
+        try {
+          priceAuthorityPolicy.assertPricePayload({
+            actor: { branchId, employeeId: empId, role: actor.role, v2Role: actor.v2Role },
+            payload: { costPrice },
+          })
+        } catch (error) {
+          error.detail = { ...(error.detail || {}), index }
+          throw error
+        }
+        return costPrice
+      })
+      : [Number(data?.lotCostPrice)]
+
+    const initialCostPrice = itemCosts[0]
+    const hasMixedItemCosts = itemCosts.some((value) => Math.abs(value - initialCostPrice) > 0.0001)
+    if (hasMixedItemCosts) {
+      throw Object.assign(new Error('ราคาทุนรายชิ้นต้องเท่ากันเมื่อใช้เป็นราคาทุนเริ่มต้นของสินค้า'), {
+        statusCode: 409,
+        status: 409,
+        code: 'QUICK_STOCK_MIXED_ITEM_COST_NOT_ALLOWED',
+        detail: { costs: itemCosts },
+      })
+    }
+
     const pricePayload = {
-      costPrice: Array.isArray(data?.items) && data.items.length ? Number(data.items[0]?.costPrice) : Number(data?.lotCostPrice),
+      costPrice: initialCostPrice,
       priceRetail: data?.priceRetail,
       priceWholesale: data?.priceWholesale,
       priceTechnician: data?.priceTechnician,
@@ -50,9 +85,6 @@ class QuickStockService {
         brandId = existingBrand?.id || (await this.repository.createBrand({ db: tx, name: data.brandName, normalizedName })).id
       }
 
-      const runtimePolicy = decideOperationalProductMode({ mode: data.mode, trackSerialNumber: data.trackSerialNumber, noSN: data.noSN, inventoryBehavior: data.inventoryBehavior })
-      assertProductCanReceive(runtimePolicy)
-      const isSN = runtimePolicy.mode === 'STRUCTURED'
       const product = await this.repository.createProduct({ db: tx, data: { name: data.productName.trim(), productTypeId: toInt(data.productTypeId), brandId, mode: runtimePolicy.mode, trackSerialNumber: runtimePolicy.trackSerialNumber, noSN: runtimePolicy.noSN, inventoryBehavior: runtimePolicy.inventoryBehavior, saleBarcode: runtimePolicy.mode === 'SIMPLE' ? String(data.saleBarcode || data.productBarcode || '').trim() || null : null, active: true } })
 
       await this.repository.createBranchPrice({ db: tx, data: { productId: product.id, branchId: authority.branchId, costPrice: pricePayload.costPrice, priceRetail: pricePayload.priceRetail, priceWholesale: pricePayload.priceWholesale, priceTechnician: pricePayload.priceTechnician, priceOnline: pricePayload.priceOnline, updatedBy: authority.employeeId, isActive: true } })
@@ -60,18 +92,17 @@ class QuickStockService {
       let totalAddedQty = 0
       let lastCost = 0
       if (isSN) {
-        if (!Array.isArray(data.items) || !data.items.length) throw Object.assign(new Error('กรุณาส่งข้อมูลรายการคีย์สแกน Serial Number และราคาทุนรายชิ้น'), { statusCode: 400, code: 'ITEMS_REQUIRED' })
         totalAddedQty = data.items.length
-        lastCost = Number(data.items[0]?.costPrice)
+        lastCost = initialCostPrice
         const now = new Date()
-        const stockItemsData = data.items.map((item, index) => ({ barcode: (item.barcode || data.productBarcode || `BAR-${product.id}-${Date.now()}-${index + 1}`).trim(), serialNumber: item.serialNumber ? item.serialNumber.trim() : null, costPrice: Number(item.costPrice), productId: product.id, branchId: authority.branchId, status: 'IN_STOCK', scannedByEmployeeId: authority.employeeId, receivedAt: now, scannedAt: now }))
+        const stockItemsData = data.items.map((item, index) => ({ barcode: (item.barcode || data.productBarcode || `BAR-${product.id}-${Date.now()}-${index + 1}`).trim(), serialNumber: item.serialNumber ? item.serialNumber.trim() : null, costPrice: itemCosts[index], productId: product.id, branchId: authority.branchId, status: 'IN_STOCK', scannedByEmployeeId: authority.employeeId, receivedAt: now, scannedAt: now }))
         await this.repository.createStockItems({ db: tx, data: stockItemsData })
         await this.repository.createStockMovements({ db: tx, data: stockItemsData.map((item) => ({ productId: product.id, branchId: authority.branchId, qty: 1, type: 'RECEIVE', note: `นำเข้าด่วน (โหมดระบุเลข SN): ${item.serialNumber || item.barcode || 'ไม่มี'}`, createdAt: now })) })
       } else {
         const qty = parseInt(data.lotQuantity)
         if (!qty || qty <= 0) throw Object.assign(new Error('กรุณาระบุจำนวนสินค้าที่ต้องการรับเข้าสต๊อกสำหรับสินค้าประเภทไม่มี SN'), { statusCode: 400, code: 'LOT_QUANTITY_REQUIRED' })
         totalAddedQty = qty
-        lastCost = Number(data.lotCostPrice)
+        lastCost = initialCostPrice
         const isolatedBarcode = `${(data.productBarcode || `LOT-${product.id}`).trim()}-B${authority.branchId}`
         const quickLot = await this.repository.createSimpleLot({ db: tx, data: { productId: product.id, branchId: authority.branchId, barcode: isolatedBarcode, qtyInitial: qty, qtyRemaining: qty, unitCost: lastCost, status: 'ACTIVE', receivedAt: new Date() } })
         await this.repository.createStockMovement({ db: tx, data: { productId: product.id, branchId: authority.branchId, qty, type: 'RECEIVE', simpleLotId: quickLot.id, note: `นำเข้าล็อตสินค้าด่วน (SIMPLE Mode) รหัสอ้างอิงคลัง: ${isolatedBarcode}` } })
