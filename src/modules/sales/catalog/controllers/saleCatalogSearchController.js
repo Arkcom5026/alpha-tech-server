@@ -2,6 +2,7 @@
 
 const prismaModule = require('../../../../../lib/prisma')
 const prisma = prismaModule?.prisma || prismaModule
+const effectivePricePolicy = require('../../../product/pricing/policies/effectivePricePolicy')
 
 const toInt = (value) => {
   const parsed = Number(value)
@@ -19,12 +20,30 @@ const normalizeInventoryBehavior = (product) => {
   return configured === 'NON_STOCK' ? 'NON_STOCK' : 'TRACKED'
 }
 
-const pricesOf = (branchPrice) => ({
-  retail: toNumber(branchPrice?.priceRetail),
-  wholesale: toNumber(branchPrice?.priceWholesale),
-  technician: toNumber(branchPrice?.priceTechnician),
-  online: toNumber(branchPrice?.priceOnline),
-})
+const pricesOf = (branchPrice, { branchId, productId } = {}) => {
+  if (!branchPrice) {
+    const error = new Error('ไม่พบราคาที่ใช้งานสำหรับสินค้านี้ในร้านปัจจุบัน')
+    error.code = 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
+    error.status = 409
+    error.statusCode = 409
+    error.detail = { branchId, productId }
+    throw error
+  }
+
+  const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
+    row: branchPrice,
+    priceType,
+    branchId,
+    productId,
+  })
+
+  return {
+    retail: resolve('retail'),
+    wholesale: resolve('wholesale'),
+    technician: resolve('technician'),
+    online: resolve('online'),
+  }
+}
 
 const setNoStoreHeaders = (res) => {
   res.set({
@@ -69,7 +88,7 @@ const resolveExactStockItem = async ({ branchId, query }) => {
       lineType: 'STOCK_ITEM',
       stockItemId: item.id,
       inventoryBehavior: 'TRACKED',
-      prices: pricesOf(branchPrice),
+      prices: pricesOf(branchPrice, { branchId, productId: item.productId }),
     }],
   }
 }
@@ -121,7 +140,7 @@ const resolveExactSimpleLot = async ({ branchId, query }) => {
       product,
       inventoryBehavior: 'TRACKED',
       qtyRemaining,
-      prices: pricesOf(branchPrice),
+      prices: pricesOf(branchPrice, { branchId, productId: product.id }),
     }],
   }
 }
@@ -179,7 +198,7 @@ const findSimpleProducts = async ({ branchId, query, take = 20 }) => {
       barcode: String(configuredBarcode || ''),
       inventoryBehavior,
       qtyRemaining: inventoryBehavior === 'NON_STOCK' ? null : qtyRemaining,
-      prices: pricesOf(product.branchPrice?.[0]),
+      prices: pricesOf(product.branchPrice?.[0], { branchId, productId: product.id }),
     }]
   })
 }
@@ -212,7 +231,7 @@ const findStockItems = async ({ branchId, query, take = 20 }) => {
     lineType: 'STOCK_ITEM',
     stockItemId: item.id,
     inventoryBehavior: 'TRACKED',
-    prices: pricesOf(priceMap.get(item.productId)),
+    prices: pricesOf(priceMap.get(item.productId), { branchId, productId: item.productId }),
   }))
 }
 
@@ -245,7 +264,12 @@ const searchSaleCatalog = async (req, res) => {
     return res.json(result)
   } catch (error) {
     console.error('[searchSaleCatalog] error:', error)
-    return res.status(500).json({ code: 'SALE_CATALOG_SEARCH_FAILED', message: 'เกิดข้อผิดพลาดในการค้นหาสินค้าหรือบริการ' })
+    const statusCode = error?.statusCode || error?.status || 500
+    return res.status(statusCode).json({
+      code: error?.code || 'SALE_CATALOG_SEARCH_FAILED',
+      message: error?.message || 'เกิดข้อผิดพลาดในการค้นหาสินค้าหรือบริการ',
+      detail: error?.detail,
+    })
   }
 }
 

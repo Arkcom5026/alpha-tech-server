@@ -34,10 +34,14 @@ const cloneProductFromTemplateCore = async (tx, {
   targetBranchId,
   templateBranchCode = TEMPLATE_BRANCH_CODE,
   updatedBy = null,
+  employeeId = null,
+  role,
+  v2Role,
   forceNew = false,
 } = {}) => {
   const tplId = toPositiveInt(templateProductId)
   const branchId = toPositiveInt(targetBranchId)
+  const actorEmployeeId = toPositiveInt(employeeId ?? updatedBy)
 
   if (!tplId) {
     throw Object.assign(new Error('INVALID_TEMPLATE_PRODUCT_ID'), {
@@ -107,7 +111,9 @@ const cloneProductFromTemplateCore = async (tx, {
     templateProduct,
     newProductId,
     targetBranchId: branchId,
-    updatedBy,
+    employeeId: actorEmployeeId,
+    role,
+    v2Role,
   })
 
   await afterCloneHooks(tx, {
@@ -142,6 +148,9 @@ const cloneProductFromTemplate = async ({
   targetBranchId,
   templateBranchCode = TEMPLATE_BRANCH_CODE,
   updatedBy = null,
+  employeeId = null,
+  role,
+  v2Role,
   forceNew = false,
 } = {}) => {
   const payload = {
@@ -149,6 +158,9 @@ const cloneProductFromTemplate = async ({
     targetBranchId,
     templateBranchCode,
     updatedBy,
+    employeeId,
+    role,
+    v2Role,
     forceNew,
   }
 

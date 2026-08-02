@@ -38,8 +38,9 @@ const procurementReceipt = read('src/modules/procurement/receipt/commit/commitRe
 const stockItemReceive = read('src/modules/inventory/stock-item/receive/stockItemReceiveSlices.js')
 
 assert(!quickStock.includes('AIO_06_CREATE_STOCK_ITEMS_FOR_SIMPLE'))
+assert(quickStock.includes('const runtimePolicy = decideOperationalProductMode('))
 assert(quickStock.includes('assertProductCanReceive(runtimePolicy)'))
-assert(quickStock.includes('const runtimePolicy = assertProductCanReceive(product)'))
+assert(!quickStock.includes('const runtimePolicy = assertProductCanReceive(product)'))
 assert(quickStockRepository.includes('inventoryBehavior: true'))
 assert(procurementReceipt.includes('assertProductCanReceive(product)'))
 assert(procurementReceipt.includes("refType: 'PURCHASE_RECEIPT'"))

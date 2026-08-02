@@ -3,6 +3,7 @@
 // CommonJS only.
 
 const { prisma, Prisma } = require('../../../../../lib/prisma')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const TEMPLATE_BRANCH_CODE = 'T01'
 
@@ -144,6 +145,8 @@ const cloneProductFromTemplate = async ({
   targetBranchId,
   templateBranchCode = TEMPLATE_BRANCH_CODE,
   updatedBy = null,
+  role,
+  v2Role,
   forceNew = false,
 } = {}) => {
   const tplProductId = toInt(templateProductId)
@@ -226,10 +229,36 @@ const cloneProductFromTemplate = async ({
       })
     }
 
+    const sourcePrice = templateProduct.branchPrice?.[0]
+    if (!sourcePrice) {
+      throw Object.assign(new Error('TEMPLATE_BRANCH_PRICE_REQUIRED'), {
+        status: 409,
+        code: 'TEMPLATE_BRANCH_PRICE_REQUIRED',
+      })
+    }
+
+    const authority = priceAuthorityPolicy.assertPricePayload({
+      actor: {
+        branchId,
+        employeeId: updatedBy,
+        role,
+        v2Role,
+      },
+      payload: {
+        costPrice: sourcePrice.costPrice,
+        priceOnline: sourcePrice.priceOnline,
+        priceRetail: sourcePrice.priceRetail,
+        priceTechnician: sourcePrice.priceTechnician,
+        priceWholesale: sourcePrice.priceWholesale,
+      },
+      effectiveDate: sourcePrice.effectiveDate,
+      expiredDate: sourcePrice.expiredDate,
+    })
+
     const targetProductTypeId = await ensureTargetProductType(
       tx,
       templateProduct.productTypeId,
-      branchId
+      authority.branchId
     )
 
     await cloneProductTypeBrandMapping(tx, templateProduct.productTypeId, targetProductTypeId)
@@ -237,7 +266,7 @@ const cloneProductFromTemplate = async ({
     if (!forceNew) {
       const existing = await findExistingBranchProduct(tx, {
         templateProduct,
-        targetBranchId: branchId,
+        targetBranchId: authority.branchId,
         targetProductTypeId,
       })
 
@@ -247,7 +276,7 @@ const cloneProductFromTemplate = async ({
           cloned: false,
           productId: existing.id,
           templateProductId: templateProduct.id,
-          targetBranchId: branchId,
+          targetBranchId: authority.branchId,
           message: 'PRODUCT_ALREADY_EXISTS_IN_TARGET_BRANCH',
         }
       }
@@ -287,22 +316,20 @@ const cloneProductFromTemplate = async ({
       select: { id: true },
     })
 
-    const bp = templateProduct.branchPrice?.[0] || {}
-
     await tx.branchPrice.create({
       data: {
         productId: created.id,
-        branchId,
-        effectiveDate: bp.effectiveDate ?? null,
-        expiredDate: bp.expiredDate ?? null,
+        branchId: authority.branchId,
+        effectiveDate: sourcePrice.effectiveDate ?? null,
+        expiredDate: sourcePrice.expiredDate ?? null,
         note: `Cloned from template product ${templateProduct.id}`,
-        updatedBy,
-        isActive: typeof bp.isActive === 'boolean' ? bp.isActive : true,
-        costPrice: bp.costPrice ?? 0,
-        priceOnline: bp.priceOnline ?? null,
-        priceRetail: bp.priceRetail ?? null,
-        priceTechnician: bp.priceTechnician ?? null,
-        priceWholesale: bp.priceWholesale ?? null,
+        updatedBy: authority.employeeId,
+        isActive: typeof sourcePrice.isActive === 'boolean' ? sourcePrice.isActive : true,
+        costPrice: sourcePrice.costPrice,
+        priceOnline: sourcePrice.priceOnline ?? null,
+        priceRetail: sourcePrice.priceRetail ?? null,
+        priceTechnician: sourcePrice.priceTechnician ?? null,
+        priceWholesale: sourcePrice.priceWholesale ?? null,
       },
     })
 
@@ -312,7 +339,7 @@ const cloneProductFromTemplate = async ({
       productId: created.id,
       templateProductId: templateProduct.id,
       templateBranchId: templateBranch.id,
-      targetBranchId: branchId,
+      targetBranchId: authority.branchId,
       targetProductTypeId,
     }
   }, { timeout: 20000 })

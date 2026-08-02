@@ -3,6 +3,7 @@
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 const contract = require('../contracts/posHeldCartContract');
 const repository = require('../repositories/posHeldCartRepository');
+const effectivePricePolicy = require('../../../product/pricing/policies/effectivePricePolicy');
 
 const actor = (input) => ({
   branchId: contract.positiveInt(input.branchId, 'branchId'),
@@ -33,11 +34,13 @@ const cancel = (input) => prisma.$transaction((tx) => repository.cancel({
   reason: contract.text(input.reason, 500) || contract.fail('Cancellation reason is required', 'HELD_CART_CANCEL_REASON_REQUIRED'),
 }, tx));
 
-const currentPrice = (row, priceType) => Number(
-  priceType === 'wholesale' ? row.priceWholesale
-    : priceType === 'technician' ? row.priceTechnician
-      : row.priceRetail,
-) || 0;
+const resolveLinePrice = ({ row, priceType, branchId, productId, lineKey }) => (
+  effectivePricePolicy.resolveEffectivePrice({
+    row,
+    priceType,
+    context: { branchId, productId, lineKey },
+  }).price
+);
 
 const revalidate = async (input) => {
   const branchId = contract.positiveInt(input.branchId, 'branchId');
@@ -57,8 +60,8 @@ const revalidate = async (input) => {
         LIMIT 1
       `);
       const row = rows[0];
-      const price = row ? currentPrice(row, cart.priceType) : 0;
       const available = !!row && Number(row.branchId) === branchId && row.status === 'IN_STOCK' && row.active;
+      const price = resolveLinePrice({ row, priceType: cart.priceType, branchId, productId: line.productId, lineKey: line.lineKey });
       results.push({ lineKey: line.lineKey, available, code: available ? 'READY' : 'STOCK_ITEM_UNAVAILABLE', currentPrice: price, priceChanged: Math.abs(price - line.unitPrice) > 0.01 });
       continue;
     }
@@ -83,7 +86,7 @@ const revalidate = async (input) => {
     );
     const balanceAvailable = nonStock || Number(row?.quantity || 0) - Number(row?.reserved || 0) + 0.0001 >= line.quantity;
     const available = !!row && row.active && row.mode === 'SIMPLE' && lotAvailable && balanceAvailable;
-    const price = row ? currentPrice(row, cart.priceType) : 0;
+    const price = resolveLinePrice({ row, priceType: cart.priceType, branchId, productId: line.productId, lineKey: line.lineKey });
     results.push({ lineKey: line.lineKey, available, code: available ? 'READY' : 'SIMPLE_QUANTITY_UNAVAILABLE', currentPrice: price, priceChanged: Math.abs(price - line.unitPrice) > 0.01 });
   }
   return {

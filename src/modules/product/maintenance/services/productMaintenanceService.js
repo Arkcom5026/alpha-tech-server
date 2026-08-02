@@ -1,5 +1,6 @@
 const repo = require('../repositories/productMaintenanceRepository')
 const { decideOperationalProductMode } = require('../../runtime/policies/operationalProductModePolicy')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return undefined
@@ -42,6 +43,14 @@ const pickBranchPricePayload = (data = {}) => {
   return Object.values(flat).some((value) => value !== undefined) ? flat : null
 }
 
+const canonicalPricePayload = (branchPrice = {}) => ({
+  costPrice: toNumberOrUndefined(branchPrice.costPrice),
+  priceWholesale: toNumberOrUndefined(branchPrice.priceWholesale),
+  priceTechnician: toNumberOrUndefined(branchPrice.priceTechnician),
+  priceRetail: toNumberOrUndefined(branchPrice.priceRetail),
+  priceOnline: toNumberOrUndefined(branchPrice.priceOnline),
+})
+
 const assertOperationalTypeAndCategory = async ({ db, productTypeId, categoryId, branchId } = {}) => {
   const type = await repo.findOperationalProductType({ db, productTypeId, branchId })
   if (!type) throw makeError('PRODUCT_TYPE_NOT_FOUND_IN_BRANCH', 400)
@@ -54,11 +63,18 @@ const assertOperationalTypeAndCategory = async ({ db, productTypeId, categoryId,
   return { productTypeId: Number(type.id), categoryId: derivedCategoryId }
 }
 
-const updateOperationalProduct = async ({ productId, branchId, data = {} } = {}) => {
+const updateOperationalProduct = async ({ productId, actor = {}, data = {} } = {}) => {
   const id = toInt(productId)
-  const brId = toInt(branchId)
   if (!id) throw makeError('INVALID_ID', 400)
-  if (!brId) throw makeError('unauthorized', 401)
+
+  const branchPrice = pickBranchPricePayload(data)
+  const authority = branchPrice
+    ? priceAuthorityPolicy.assertPricePayload({
+        actor,
+        payload: canonicalPricePayload(branchPrice),
+      })
+    : priceAuthorityPolicy.assertActor(actor)
+  const brId = authority.branchId
 
   const shouldOverrideMode = ['mode', 'stockMode', 'stockBehavior', 'noSN', 'trackSerialNumber', 'inventoryBehavior']
     .some((key) => data[key] !== undefined)
@@ -111,26 +127,20 @@ const updateOperationalProduct = async ({ productId, branchId, data = {} } = {})
       learnLater = { productTypeId: typeCheck.productTypeId, brandId: toInt(data.brandId) }
     }
 
-    const branchPrice = pickBranchPricePayload(data)
     if (branchPrice) {
+      const pricePayload = canonicalPricePayload(branchPrice)
       await repo.upsertBranchPrice({
         db: tx,
         productId: id,
-        branchId: brId,
+        branchId: authority.branchId,
         update: {
-          costPrice: toNumberOrUndefined(branchPrice.costPrice),
-          priceWholesale: toNumberOrUndefined(branchPrice.priceWholesale),
-          priceTechnician: toNumberOrUndefined(branchPrice.priceTechnician),
-          priceRetail: toNumberOrUndefined(branchPrice.priceRetail),
-          priceOnline: toNumberOrUndefined(branchPrice.priceOnline),
+          ...pricePayload,
+          updatedBy: authority.employeeId,
           isActive: typeof branchPrice.isActive === 'boolean' ? branchPrice.isActive : undefined,
         },
         create: {
-          costPrice: toNumberOrUndefined(branchPrice.costPrice) ?? 0,
-          priceWholesale: toNumberOrUndefined(branchPrice.priceWholesale) ?? 0,
-          priceTechnician: toNumberOrUndefined(branchPrice.priceTechnician) ?? 0,
-          priceRetail: toNumberOrUndefined(branchPrice.priceRetail) ?? 0,
-          priceOnline: toNumberOrUndefined(branchPrice.priceOnline) ?? 0,
+          ...pricePayload,
+          updatedBy: authority.employeeId,
           isActive: typeof branchPrice.isActive === 'boolean' ? branchPrice.isActive : true,
         },
       })

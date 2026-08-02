@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../../../lib/prisma')
 const repo = require('../repositories/productCreateRepository')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const toInt = repo.toInt
 const toMoneyOrNull = repo.toMoneyOrNull
@@ -119,22 +120,34 @@ const validateCreatePayload = (data = {}) => {
   const costPrice = toMoneyOrNull(branchPrice.costPrice)
   const priceRetail = toMoneyOrNull(branchPrice.priceRetail)
 
-  if (costPrice === null || costPrice < 0) throw makeError('COST_PRICE_REQUIRED', 400)
+  if (costPrice === null || costPrice <= 0) throw makeError('COST_PRICE_REQUIRED', 400)
   if (priceRetail === null || priceRetail <= 0) throw makeError('PRICE_RETAIL_REQUIRED', 400)
 
   return { name, productTypeId, brandId, unitId, branchPrice }
 }
 
-const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} } = {}) => {
+const createLocalOperationalProduct = async ({ branchId, employeeId, role, v2Role, data = {} } = {}) => {
   const brId = getBranchContext({ branchId })
   const empId = toInt(employeeId)
   const validated = validateCreatePayload(data)
+  const authority = priceAuthorityPolicy.assertPricePayload({
+    actor: { branchId: brId, employeeId: empId, role, v2Role },
+    payload: {
+      costPrice: validated.branchPrice.costPrice,
+      priceRetail: validated.branchPrice.priceRetail,
+      priceWholesale: validated.branchPrice.priceWholesale,
+      priceTechnician: validated.branchPrice.priceTechnician,
+      priceOnline: validated.branchPrice.priceOnline,
+    },
+    effectiveDate: validated.branchPrice.effectiveDate,
+    expiredDate: validated.branchPrice.expiredDate,
+  })
   const mode = normalizeMode(data.mode || data.stockMode || data.stockBehavior)
 
   const result = await prisma.$transaction(async (tx) => {
     const branchProductType = await repo.findBranchProductTypeById({
       db: tx,
-      branchId: brId,
+      branchId: authority.branchId,
       productTypeId: validated.productTypeId,
     })
 
@@ -168,10 +181,10 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} }
     const branchPrice = await repo.upsertBranchPrice({
       db: tx,
       productId: product.id,
-      branchId: brId,
+      branchId: authority.branchId,
       payload: {
         ...validated.branchPrice,
-        updatedBy: empId,
+        updatedBy: authority.employeeId,
         note: 'Product Create Runtime',
       },
     })
@@ -197,7 +210,7 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, data = {} }
     },
     branchPrice: result.branchPrice,
     runtime: {
-      branchId: brId,
+      branchId: authority.branchId,
       ensuredProductTypeId: result.branchProductType.id,
       sourceProductTypeId: null,
       flow: 'PRODUCT_CREATE_RUNTIME',

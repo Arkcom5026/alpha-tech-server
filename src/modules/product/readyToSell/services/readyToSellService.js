@@ -1,5 +1,6 @@
 const { prisma } = require('../../../../lib/prisma')
 const { normStr, toInt } = require('../../runtime/shared/operationalProductInput')
+const effectivePricePolicy = require('../../pricing/policies/effectivePricePolicy')
 
 const requireBranchId = (branchId) => {
   const brId = toInt(branchId)
@@ -10,6 +11,31 @@ const requireBranchId = (branchId) => {
     throw error
   }
   return brId
+}
+
+const resolvePrices = (branchPrice, { branchId, productId } = {}) => {
+  if (!branchPrice) {
+    const error = new Error('ไม่พบราคาที่ใช้งานสำหรับสินค้านี้ในร้านปัจจุบัน')
+    error.code = 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
+    error.status = 409
+    error.statusCode = 409
+    error.detail = { branchId, productId }
+    throw error
+  }
+
+  const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
+    row: branchPrice,
+    priceType,
+    branchId,
+    productId,
+  })
+
+  return {
+    retail: resolve('retail'),
+    wholesale: resolve('wholesale'),
+    technician: resolve('technician'),
+    online: resolve('online'),
+  }
 }
 
 const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', mode = 'ALL', page = 1, pageSize = 25, db = prisma } = {}) => {
@@ -39,7 +65,19 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
       const productIds = grouped.map((group) => group.productId)
       const products = await db.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true, name: true, brandId: true, brand: { select: { id: true, name: true } }, unitId: true, unit: { select: { id: true, name: true } } },
+        select: {
+          id: true,
+          name: true,
+          brandId: true,
+          brand: { select: { id: true, name: true } },
+          unitId: true,
+          unit: { select: { id: true, name: true } },
+          branchPrice: {
+            where: { branchId: brId, isActive: true },
+            take: 1,
+            select: { priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true },
+          },
+        },
       })
       const productMap = new Map(products.map((product) => [product.id, product]))
       const structuredBarcodeRows = productIds.length ? await db.stockItem.findMany({
@@ -61,9 +99,11 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
           unit: product?.unit ? { id: product.unit.id, name: product.unit.name } : null,
           qty, receivedAt: group._max.receivedAt ?? null,
           displayCode: qty <= 1 ? previewBarcode || '-' : 'หลายบาร์โค้ด', hasDetails: true,
+          prices: resolvePrices(product?.branchPrice?.[0], { branchId: brId, productId: group.productId }),
         }
       })
     } catch (error) {
+      if (error?.code?.startsWith('PRICE_') || error?.code === 'ACTIVE_BRANCH_PRICE_NOT_FOUND') throw error
       console.error('❌ structured ready-to-sell summary failed:', error)
       structuredItems = []
     }
@@ -79,7 +119,11 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
       select: {
         id: true, name: true, inventoryBehavior: true, saleBarcode: true, brandId: true,
         brand: { select: { id: true, name: true } }, unitId: true, unit: { select: { id: true, name: true } },
-        branchPrice: { where: { branchId: brId, isActive: true }, take: 1, select: { id: true } },
+        branchPrice: {
+          where: { branchId: brId, isActive: true },
+          take: 1,
+          select: { priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true },
+        },
         stockBalances: { where: { branchId: brId }, take: 1, select: { quantity: true, reserved: true, updatedAt: true } },
       },
     })
@@ -95,6 +139,7 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
         unitId: product.unitId ?? product.unit?.id ?? null, unitName: product.unit?.name ?? null,
         unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
         qty: nonStock ? null : available, receivedAt: balance?.updatedAt ?? null, status: 'IN_STOCK', hasDetails: false,
+        prices: resolvePrices(product.branchPrice?.[0], { branchId: brId, productId: product.id }),
       }]
     })
   }
@@ -126,11 +171,20 @@ const getReadyToSellStructuredDetails = async ({ branchId, productId, q = '', db
         id: true, name: true, productConfig: true, brand: { select: { id: true, name: true } }, unitId: true,
         unit: { select: { id: true, name: true } },
         productType: { select: { id: true, name: true, globalProductType: { select: { category: { select: { id: true, name: true } } } } } },
-        branchPrice: { where: { branchId: brId }, select: { costPrice: true, priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true, isActive: true, updatedAt: true }, take: 1 },
+        branchPrice: { where: { branchId: brId, isActive: true }, select: { costPrice: true, priceRetail: true, priceWholesale: true, priceTechnician: true, priceOnline: true, isActive: true, updatedAt: true }, take: 1 },
       } },
     },
   })
-  return { items, total: items.length }
+
+  const projected = items.map((item) => ({
+    ...item,
+    product: {
+      ...item.product,
+      prices: resolvePrices(item.product?.branchPrice?.[0], { branchId: brId, productId: id }),
+    },
+  }))
+
+  return { items: projected, total: projected.length }
 }
 
-module.exports = { getReadyToSell, getReadyToSellStructuredDetails }
+module.exports = { getReadyToSell, getReadyToSellStructuredDetails, resolvePrices }
