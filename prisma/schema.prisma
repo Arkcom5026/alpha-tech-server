@@ -481,6 +481,11 @@ model V2StockAuditItem {
   stockAudit   V2StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
 }
 
+enum SupplierCapability {
+  PROCUREMENT
+  EXPENSE_PAYEE
+}
+
 model Supplier {
   id                   Int                    @id @default(autoincrement())
   name                 String
@@ -516,8 +521,21 @@ model Supplier {
   supplierAdvances     SupplierAdvance[]
   warrantyClaims       WarrantyClaim[]
   taxExpenses          TaxExpense[]
+  capabilities         SupplierCapabilityAssignment[]
 
   @@unique([branchId, name])
+}
+
+model SupplierCapabilityAssignment {
+  id         Int                @id @default(autoincrement())
+  supplierId Int
+  capability SupplierCapability
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  supplier   Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@unique([supplierId, capability])
+  @@index([capability, supplierId])
 }
 
 model Bank {
