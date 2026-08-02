@@ -17,6 +17,15 @@ const publishSaleTaxCandidate = async ({ sale, branchId, employeeId }) => {
     return Object.freeze({ status: 'SKIPPED', reason: 'SALE_NOT_TAX_READY', saleId });
   }
 
+  if (!taxModule.intake.isSaleTaxDocumentEligible(sale)) {
+    return Object.freeze({
+      status: 'SKIPPED',
+      reason: 'SALE_PAYMENT_NOT_TAX_ELIGIBLE',
+      saleId,
+      paymentStatus: taxModule.intake.normalizeSalePaymentStatus(sale?.statusPayment) || null,
+    });
+  }
+
   try {
     const result = await taxModule.intake.registerSaleCandidate({
       branchId: normalizedBranchId,
