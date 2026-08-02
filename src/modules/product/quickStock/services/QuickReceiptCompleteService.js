@@ -105,7 +105,7 @@ class QuickReceiptCompleteService {
       key
     )
     if (priorCommands.length) {
-      const priorReceipt = await this.sessions.getReceipt(priorCommands[0].receiptId, authority.branchId)
+      const priorReceipt = await this.sessions.getReceipt(priorCommands[0].receiptId, authority)
       const priorHash = payloadHash(priorReceipt)
       if (priorHash !== incomingHash) {
         throw makeError(
@@ -119,19 +119,19 @@ class QuickReceiptCompleteService {
 
     let receipt = null
     try {
-      receipt = await this.sessions.createDraft(payload, authority.branchId, authority.employeeId)
+      receipt = await this.sessions.createDraft(payload, authority)
       for (const line of lines) {
-        receipt = await this.sessions.addItem(receipt.id, line, authority.branchId)
+        receipt = await this.sessions.addItem(receipt.id, line, authority)
       }
       return await this.sessions.finalize(receipt.id, authority, key)
     } catch (error) {
       if (receipt?.id) {
         try {
-          const latest = await this.sessions.getReceipt(receipt.id, authority.branchId)
+          const latest = await this.sessions.getReceipt(receipt.id, authority)
           if (latest.status === 'DRAFT') {
             await this.sessions.cancel(
               receipt.id,
-              authority.branchId,
+              authority,
               `ONE_SHOT_PREPARATION_FAILED: ${error?.code || error?.message || 'UNKNOWN'}`
             )
           }
