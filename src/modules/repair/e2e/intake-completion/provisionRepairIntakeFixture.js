@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const { assertTestDatabaseAuthority } = require('../../../../../recovery/testDatabaseAuthority');
 
@@ -28,7 +29,7 @@ const required = (name) => {
 };
 
 const operatorEmail = required('REPAIR_INTAKE_E2E_OPERATOR_EMAIL').toLowerCase();
-required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD');
+const operatorPassword = required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD');
 const customerId = Number(required('REPAIR_INTAKE_E2E_CUSTOMER_ID'));
 if (!Number.isInteger(customerId) || customerId <= 0) {
   throw new Error('REPAIR_INTAKE_E2E_CUSTOMER_ID must be a positive integer.');
@@ -52,6 +53,15 @@ async function main() {
   if (!employee?.id || !employee.branchId || !employee.active || !employee.approved) {
     throw new Error('The configured operator is not an active approved employee with a branch.');
   }
+
+  const passwordHash = await bcrypt.hash(operatorPassword, 12);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: passwordHash,
+      enabled: true,
+    },
+  });
 
   const branch = await prisma.branch.findUnique({
     where: { id: Number(employee.branchId) },
