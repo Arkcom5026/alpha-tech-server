@@ -11,7 +11,7 @@ const {
   RepairFailureCode,
 } = require('../contracts/repairError');
 
-function jobFixture(status = 'RECEIVED') {
+function jobFixture(status = 'RECEIVED', overrides = {}) {
   return {
     id: 31,
     jobNo: 'RE-4-20260727-TEST0031',
@@ -29,12 +29,18 @@ function jobFixture(status = 'RECEIVED') {
     technician: null,
     partsUsed: [],
     warrantyClaims: [],
+    deviceIntake: {
+      consent: { id: 1 },
+      photos: [{ id: 1, category: 'INTAKE_CONDITION' }],
+    },
+    delivery: null,
     createdAt: new Date('2026-07-01T00:00:00Z'),
     updatedAt: new Date('2026-07-01T00:00:00Z'),
+    ...overrides,
   };
 }
 
-test('status repository keeps lookup branch-safe and update scoped by job id', async () => {
+test('status repository keeps lookup branch-safe and loads intake authority', async () => {
   let findArgs;
   let updateArgs;
   const repo = new UpdateRepairJobStatusRepository({
@@ -48,6 +54,9 @@ test('status repository keeps lookup branch-safe and update scoped by job id', a
   await repo.updateJob('31', { status: 'IN_PROGRESS' });
 
   assert.deepEqual(findArgs.where, { id: 31, branchId: 4 });
+  assert.ok(findArgs.include.deviceIntake);
+  assert.equal(findArgs.include.deviceIntake.include.consent, true);
+  assert.equal(findArgs.include.deviceIntake.include.photos, true);
   assert.deepEqual(updateArgs.where, { id: 31 });
   assert.deepEqual(updateArgs.data, { status: 'IN_PROGRESS' });
 });
@@ -63,6 +72,46 @@ test('status service validates job id before transaction access', async () => {
     (error) => error.code === RepairFailureCode.INVALID_INPUT
   );
   assert.equal(called, false);
+});
+
+test('status service rejects active work when intake evidence is missing', async () => {
+  let updated = false;
+  const service = new UpdateRepairJobStatusService({
+    transaction(work) {
+      return work({
+        findJob: () => Promise.resolve(jobFixture('RECEIVED', { deviceIntake: null })),
+        updateJob: () => { updated = true; },
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => service.execute({ branchId: 4 }, 31, { status: 'IN_PROGRESS' }),
+    (error) =>
+      error.code === RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE &&
+      error.statusCode === 409
+  );
+  assert.equal(updated, false);
+});
+
+test('status service rejects intake without consent or condition photo', async () => {
+  for (const deviceIntake of [
+    { consent: null, photos: [{ category: 'INTAKE_CONDITION' }] },
+    { consent: { id: 1 }, photos: [{ category: 'OTHER' }] },
+  ]) {
+    const service = new UpdateRepairJobStatusService({
+      transaction(work) {
+        return work({
+          findJob: () => Promise.resolve(jobFixture('RECEIVED', { deviceIntake })),
+        });
+      },
+    });
+
+    await assert.rejects(
+      () => service.execute({ branchId: 4 }, 31, { status: 'IN_PROGRESS' }),
+      (error) => error.code === RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE
+    );
+  }
 });
 
 test('status service applies transition and records timeline event atomically', async () => {
