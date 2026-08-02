@@ -1,5 +1,6 @@
 const { Prisma } = require('../../../../../lib/prisma')
 const repo = require('../repositories/productPricingRepository')
+const priceAuthorityPolicy = require('../policies/priceAuthorityPolicy')
 
 const makeError = (code, status = 400, message = code) => {
   const error = new Error(message)
@@ -66,20 +67,38 @@ const listPrices = async ({ productId, branchId } = {}) => {
   return repo.listProductPrices({ productId: productIdValue, branchId })
 }
 
-const savePrice = async ({ productId, branchId, employeeId, data = {}, requireCorePrices = false } = {}) => {
+const savePrice = async ({
+  productId,
+  branchId,
+  employeeId,
+  role,
+  v2Role,
+  data = {},
+  requireCorePrices = false,
+} = {}) => {
   const productIdValue = repo.toInt(productId)
   const branchIdValue = repo.toInt(branchId)
   const employeeIdValue = repo.toInt(employeeId)
 
   if (!productIdValue) throw makeError('INVALID_PRODUCT_ID', 400)
-  if (!branchIdValue) throw makeError('BRANCH_CONTEXT_REQUIRED', 403, 'ไม่พบสาขาของพนักงานผู้ทำรายการ')
-  if (!employeeIdValue) throw makeError('EMPLOYEE_CONTEXT_REQUIRED', 403, 'ไม่พบข้อมูลพนักงานผู้ทำรายการ')
 
   const payload = normalizePricePayload(data, { requireCorePrices })
+  const authority = priceAuthorityPolicy.assertPricePayload({
+    actor: {
+      branchId: branchIdValue,
+      employeeId: employeeIdValue,
+      role,
+      v2Role,
+    },
+    payload,
+    effectiveDate: payload.effectiveDate,
+    expiredDate: payload.expiredDate,
+  })
+
   return repo.upsertBranchPrice({
     productId: productIdValue,
-    branchId: branchIdValue,
-    employeeId: employeeIdValue,
+    branchId: authority.branchId,
+    employeeId: authority.employeeId,
     payload,
   })
 }
