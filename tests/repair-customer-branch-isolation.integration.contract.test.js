@@ -17,13 +17,15 @@ const warrantyRepository = read('src/modules/repair/query/customer-warranty-asse
 const warrantyService = read('src/modules/repair/query/customer-warranty-assets/customerWarrantyAssetsService.js');
 
 for (const evidence of [
-  "{ sale: { some: { branchId } } }",
+  "{ sales: { some: { branchId } } }",
   "{ repairJobs: { some: { branchId } } }",
   "{ deviceIntakes: { some: { branchId } } }",
   "{ ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } }",
 ]) {
   assert(policy.includes(evidence), `Missing branch evidence: ${evidence}`);
 }
+
+assert(!policy.includes("{ sale: { some: { branchId } } }"), 'Legacy singular sale relation must not return');
 
 for (const source of [searchRepository, createRepository, externalRepository, warrantyRepository]) {
   assert(source.includes('repairCustomerBranchAccessPolicy'), 'Repository must use the central branch access policy');
