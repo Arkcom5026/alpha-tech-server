@@ -5,6 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const routes = require('../src/modules/tax-expense/routes/taxExpenseRoutes');
+const {
+  ListTaxExpensesRepository,
+} = require('../src/modules/tax-expense/query/list/listTaxExpensesSlice');
 
 const routeContracts = routes.stack
   .filter((layer) => layer.route)
@@ -30,5 +33,30 @@ assert.match(createSource, /where:\s*\{\s*branchId,\s*active:\s*true,/);
 assert.match(createSource, /items:\s*\{\s*create:/);
 assert.match(createSource, /lifecycleEvents:\s*\{\s*create:/);
 assert.match(contextSource, /branchId is required from authenticated token/);
+
+const calls = [];
+const repository = new ListTaxExpensesRepository({
+  taxExpense: {
+    findMany: (options) => {
+      calls.push(options);
+      return options;
+    },
+  },
+});
+
+repository.findMany(2, {});
+assert.deepEqual(calls.at(-1).where, { branchId: 2 });
+assert.equal(Object.hasOwn(calls.at(-1).where, 'expenseDate'), false);
+
+repository.findMany(2, { fromDate: '2026-08-01' });
+assert.ok(calls.at(-1).where.expenseDate.gte instanceof Date);
+assert.equal(Object.hasOwn(calls.at(-1).where.expenseDate, 'lte'), false);
+
+repository.findMany(2, { toDate: '2026-08-03' });
+assert.ok(calls.at(-1).where.expenseDate.lte instanceof Date);
+assert.equal(Object.hasOwn(calls.at(-1).where.expenseDate, 'gte'), false);
+
+repository.findMany(2, { fromDate: 'invalid', toDate: '' });
+assert.equal(Object.hasOwn(calls.at(-1).where, 'expenseDate'), false);
 
 console.log('Tax expense runtime contract: PASS');
