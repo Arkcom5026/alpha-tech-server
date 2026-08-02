@@ -18,6 +18,16 @@ const jwtSecret = crypto.randomBytes(32).toString('hex')
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
+async function synchronizeUserIdentitySequence() {
+  await prisma.$executeRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('"User"', 'id'),
+      COALESCE((SELECT MAX(id) FROM "User"), 1),
+      EXISTS (SELECT 1 FROM "User")
+    )
+  `)
+}
+
 async function waitForServer(child) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     if (child.exitCode !== null) throw new Error(`Test HTTP server exited before readiness (code ${child.exitCode}).`)
@@ -54,6 +64,8 @@ async function request(path, options = {}) {
 }
 
 async function main() {
+  await synchronizeUserIdentitySequence()
+
   const adminBranch = await prisma.branch.create({
     data: {
       name: `system-test http admin ${token}`,
