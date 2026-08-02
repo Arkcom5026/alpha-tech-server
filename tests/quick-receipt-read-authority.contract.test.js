@@ -10,13 +10,15 @@ const controllerPath = path.join(__dirname, '../src/modules/product/quickStock/c
 const service = fs.readFileSync(servicePath, 'utf8')
 const controller = fs.readFileSync(controllerPath, 'utf8')
 
-assert.match(service, /async getReceipt\(receiptId, actorOrBranchId/)
-assert.match(service, /priceAuthorityPolicy\.assertActor\(actorOrBranchId\)/)
+assert.match(service, /async getReceipt\(receiptId, actor = \{\}, db = this\.prisma\)/)
+assert.match(service, /const authority = priceAuthorityPolicy\.assertActor\(actor\)/)
 assert.match(service, /JOIN "QuickReceiptSession" r ON r\."id" = i\."receiptId"/)
 assert.match(service, /WHERE i\."receiptId" = \$1 AND r\."branchId" = \$2/)
 assert.match(service, /async listReceipts\(\{ actor = \{\}/)
 assert.match(service, /const authority = priceAuthorityPolicy\.assertActor\(actor\)/)
 assert.match(service, /authority\.branchId/)
+assert.doesNotMatch(service, /async getReceipt\(receiptId, actorOrBranchId/)
+assert.doesNotMatch(service, /priceAuthorityPolicy\.assertActor\(actorOrBranchId\)/)
 
 assert.match(controller, /service\.listReceipts\(\{ actor, \.\.\.req\.query \}\)/)
 assert.match(controller, /service\.getReceipt\(req\.params\.id, actor\)/)
