@@ -78,9 +78,8 @@ class QuickReceiptSessionService {
     )
   }
 
-  async createDraft(payload, branchId, employeeId) {
-    const brId = toInt(branchId)
-    const empId = toInt(employeeId)
+  async createDraft(payload, actor = {}) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
     const supplierId = toInt(payload?.supplierId)
     const deliveryNoteNumber = cleanText(payload?.deliveryNoteNumber)
     const normalized = normalizeDeliveryNote(deliveryNoteNumber)
@@ -94,13 +93,12 @@ class QuickReceiptSessionService {
          AND "normalizedDeliveryNoteNumber" = $3
          AND "status" IN ('DRAFT','FINALIZING','COMPLETED')
        LIMIT 1`,
-      brId,
+      authority.branchId,
       supplierId,
       normalized
     )
     if (existing.length) {
-      const error = makeError('พบรายการรับสินค้าของ Supplier และเลขใบส่งของนี้แล้ว', 409, 'QUICK_RECEIPT_DUPLICATE', existing[0])
-      throw error
+      throw makeError('พบรายการรับสินค้าของ Supplier และเลขใบส่งของนี้แล้ว', 409, 'QUICK_RECEIPT_DUPLICATE', existing[0])
     }
 
     const taxMode = normalizeInputTaxDocumentMode(payload?.taxDocumentMode || 'NOT_RECEIVED')
@@ -112,17 +110,18 @@ class QuickReceiptSessionService {
          "documentTotalAmount", "createdById", "updatedAt"
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,CURRENT_TIMESTAMP)
        RETURNING *`,
-      makeCode(), brId, supplierId, deliveryNoteNumber, normalized,
+      makeCode(), authority.branchId, supplierId, deliveryNoteNumber, normalized,
       asDate(payload?.deliveryNoteDate), cleanText(payload?.note) || null, taxMode,
       cleanText(payload?.supplierTaxInvoiceNumber) || null, asDate(payload?.supplierTaxInvoiceDate),
       cleanText(payload?.taxPricingMode).toUpperCase() || null, asMoney(payload?.documentSubtotal),
-      asMoney(payload?.documentVatAmount), asMoney(payload?.documentTotalAmount), empId
+      asMoney(payload?.documentVatAmount), asMoney(payload?.documentTotalAmount), authority.employeeId
     )
-    return this.getReceipt(created[0].id, brId)
+    return this.getReceipt(created[0].id, authority.branchId)
   }
 
-  async updateDraft(receiptId, payload, branchId) {
-    const receipt = await this.getReceipt(receiptId, branchId)
+  async updateDraft(receiptId, payload, actor = {}) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
+    const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('แก้ไขได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
 
     const supplierId = toInt(payload?.supplierId ?? receipt.supplierId)
@@ -145,9 +144,9 @@ class QuickReceiptSessionService {
       asMoney(payload?.documentSubtotal ?? receipt.documentSubtotal),
       asMoney(payload?.documentVatAmount ?? receipt.documentVatAmount),
       asMoney(payload?.documentTotalAmount ?? receipt.documentTotalAmount),
-      toInt(receiptId), toInt(branchId)
+      toInt(receiptId), authority.branchId
     )
-    return this.getReceipt(receiptId, branchId)
+    return this.getReceipt(receiptId, authority.branchId)
   }
 
   normalizeItemPayload(payload) {
@@ -200,31 +199,28 @@ class QuickReceiptSessionService {
     )
     await this.prisma.$executeRawUnsafe(
       `UPDATE "QuickReceiptSession" SET "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1 AND "branchId"=$2`,
-      toInt(receiptId),
-      authority.branchId
+      toInt(receiptId), authority.branchId
     )
     return this.getReceipt(receiptId, authority.branchId)
   }
 
-  async deleteItem(receiptId, itemId, branchId) {
-    const receipt = await this.getReceipt(receiptId, branchId)
+  async deleteItem(receiptId, itemId, actor = {}) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
+    const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('ลบสินค้าได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
     await this.prisma.$executeRawUnsafe(
-      `DELETE FROM "QuickReceiptSessionItem" WHERE "id"=$1 AND "receiptId"=$2`,
-      toInt(itemId), toInt(receiptId)
+      `DELETE FROM "QuickReceiptSessionItem" i
+       USING "QuickReceiptSession" r
+       WHERE i."id"=$1 AND i."receiptId"=$2
+         AND r."id"=i."receiptId" AND r."branchId"=$3`,
+      toInt(itemId), toInt(receiptId), authority.branchId
     )
-    return this.getReceipt(receiptId, branchId)
+    return this.getReceipt(receiptId, authority.branchId)
   }
 
   async finalize(receiptId, actor = {}, commandKey) {
     const id = toInt(receiptId)
-    const authorityActor = {
-      branchId: toInt(actor.branchId),
-      employeeId: toInt(actor.employeeId),
-      role: actor.role,
-      v2Role: actor.v2Role,
-    }
-    const baseAuthority = priceAuthorityPolicy.assertActor(authorityActor)
+    const baseAuthority = priceAuthorityPolicy.assertActor(actor)
     const brId = baseAuthority.branchId
     const empId = baseAuthority.employeeId
     const key = cleanText(commandKey)
