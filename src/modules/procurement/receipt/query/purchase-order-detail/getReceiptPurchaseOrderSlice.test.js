@@ -38,9 +38,9 @@ test('service computes receivedQuantity using all receipt items', async () => {
     items: [
       {
         id: 10,
-        receiptItems: [{ quantity: decimalLike }, { quantity: '1.5' }],
+        receipts: [{ quantity: decimalLike }, { quantity: '1.5' }],
       },
-      { id: 11, receiptItems: [] },
+      { id: 11, receipts: [] },
     ],
   };
   const service = new GetReceiptPurchaseOrderService({
