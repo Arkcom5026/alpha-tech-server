@@ -2,11 +2,12 @@ const { Prisma } = require('../../../../../lib/prisma')
 const repo = require('../repositories/productPricingRepository')
 const priceAuthorityPolicy = require('../policies/priceAuthorityPolicy')
 
-const makeError = (code, status = 400, message = code) => {
+const makeError = (code, status = 400, message = code, detail) => {
   const error = new Error(message)
   error.code = code
   error.status = status
   error.statusCode = status
+  if (detail !== undefined) error.detail = detail
   return error
 }
 
@@ -61,35 +62,31 @@ const normalizePricePayload = (source = {}, { requireCorePrices = false } = {}) 
   return payload
 }
 
-const listPrices = async ({ productId, branchId } = {}) => {
-  const productIdValue = repo.toInt(productId)
-  if (!productIdValue) throw makeError('INVALID_PRODUCT_ID', 400)
-  return repo.listProductPrices({ productId: productIdValue, branchId })
+const normalizeActor = (input = {}) => {
+  const source = input.actor || input
+  return {
+    branchId: repo.toInt(source.branchId),
+    employeeId: repo.toInt(source.employeeId),
+    role: source.role,
+    v2Role: source.v2Role,
+  }
 }
 
-const savePrice = async ({
-  productId,
-  branchId,
-  employeeId,
-  role,
-  v2Role,
-  data = {},
-  requireCorePrices = false,
-} = {}) => {
+const listPrices = async ({ productId, branchId } = {}) => {
   const productIdValue = repo.toInt(productId)
   const branchIdValue = repo.toInt(branchId)
-  const employeeIdValue = repo.toInt(employeeId)
+  if (!productIdValue) throw makeError('INVALID_PRODUCT_ID', 400)
+  if (!branchIdValue) throw makeError('PRICE_BRANCH_CONTEXT_REQUIRED', 403, 'ไม่พบสาขาของผู้ทำรายการ')
+  return repo.listProductPrices({ productId: productIdValue, branchId: branchIdValue })
+}
 
+const savePrice = async ({ productId, data = {}, requireCorePrices = false, ...input } = {}) => {
+  const productIdValue = repo.toInt(productId)
   if (!productIdValue) throw makeError('INVALID_PRODUCT_ID', 400)
 
   const payload = normalizePricePayload(data, { requireCorePrices })
   const authority = priceAuthorityPolicy.assertPricePayload({
-    actor: {
-      branchId: branchIdValue,
-      employeeId: employeeIdValue,
-      role,
-      v2Role,
-    },
+    actor: normalizeActor(input),
     payload,
     effectiveDate: payload.effectiveDate,
     expiredDate: payload.expiredDate,
@@ -103,15 +100,34 @@ const savePrice = async ({
   })
 }
 
-const removePrice = async ({ productId, priceId } = {}) => {
+const removePrice = async ({ productId, priceId, ...input } = {}) => {
   const productIdValue = repo.toInt(productId)
   const priceIdValue = repo.toInt(priceId)
   if (!productIdValue) throw makeError('INVALID_PRODUCT_ID', 400)
   if (!priceIdValue) throw makeError('INVALID_PRICE_ID', 400)
 
-  const existing = await repo.findProductPrice({ productId: productIdValue, priceId: priceIdValue })
+  const authority = priceAuthorityPolicy.assertActor(normalizeActor(input))
+  if (!['OWNER', 'ADMIN', 'SUPERADMIN'].includes(authority.role)) {
+    throw makeError(
+      'PRICE_DELETE_FORBIDDEN',
+      403,
+      'บทบาทนี้ไม่มีสิทธิ์ลบราคา',
+      { role: authority.role },
+    )
+  }
+
+  const existing = await repo.findProductPrice({
+    productId: productIdValue,
+    priceId: priceIdValue,
+    branchId: authority.branchId,
+  })
   if (!existing) throw makeError('PRICE_NOT_FOUND', 404)
-  await repo.deleteProductPrice({ productId: productIdValue, priceId: priceIdValue })
+
+  await repo.deleteProductPrice({
+    productId: productIdValue,
+    priceId: priceIdValue,
+    branchId: authority.branchId,
+  })
   return { ok: true, success: true, deletedId: priceIdValue }
 }
 
