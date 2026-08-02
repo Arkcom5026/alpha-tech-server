@@ -71,8 +71,7 @@ const manager = { branchId: 2, employeeId: 36, role: 'MANAGER' }
     }),
     (error) => error.code === 'PRICE_MUTATION_FORBIDDEN',
   )
-  assert.equal(calls.length, 1)
-  assert.equal(calls[0].type, 'build')
+  assert.equal(calls.length, 0)
 
   calls.length = 0
   await assert.rejects(
