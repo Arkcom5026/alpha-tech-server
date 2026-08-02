@@ -27,9 +27,12 @@ class QuickReceiptSessionService {
     this.inventory = new QuickStockRepository(prisma)
   }
 
-  async getReceipt(receiptId, branchId, db = this.prisma) {
+  async getReceipt(receiptId, actorOrBranchId, db = this.prisma) {
     const id = toInt(receiptId)
-    const brId = toInt(branchId)
+    const authority = actorOrBranchId && typeof actorOrBranchId === 'object'
+      ? priceAuthorityPolicy.assertActor(actorOrBranchId)
+      : { branchId: toInt(actorOrBranchId) }
+    const brId = authority.branchId
     const receipts = await db.$queryRawUnsafe(
       `SELECT r.*, s."name" AS "supplierName"
        FROM "QuickReceiptSession" r
@@ -45,16 +48,18 @@ class QuickReceiptSessionService {
       `SELECT i.*, p."name" AS "productName", p."mode", p."trackSerialNumber"
        FROM "QuickReceiptSessionItem" i
        JOIN "Product" p ON p."id" = i."productId"
-       WHERE i."receiptId" = $1
+       JOIN "QuickReceiptSession" r ON r."id" = i."receiptId"
+       WHERE i."receiptId" = $1 AND r."branchId" = $2
        ORDER BY i."id" ASC`,
-      id
+      id,
+      brId
     )
 
     return { ...receipts[0], items }
   }
 
-  async listReceipts({ branchId, supplierId, deliveryNoteNumber, status = 'DRAFT' } = {}) {
-    const brId = toInt(branchId)
+  async listReceipts({ actor = {}, supplierId, deliveryNoteNumber, status = 'DRAFT' } = {}) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
     const supplier = toInt(supplierId)
     const normalized = normalizeDeliveryNote(deliveryNoteNumber)
     return this.prisma.$queryRawUnsafe(
@@ -71,7 +76,7 @@ class QuickReceiptSessionService {
        GROUP BY r."id", s."name"
        ORDER BY r."updatedAt" DESC
        LIMIT 100`,
-      brId,
+      authority.branchId,
       supplier || null,
       normalized,
       cleanText(status).toUpperCase()
@@ -154,53 +159,22 @@ class QuickReceiptSessionService {
     const costPrice = asMoney(payload?.costPrice)
     const priceRetail = asMoney(payload?.priceRetail)
     const rawItems = Array.isArray(payload?.items) ? payload.items : []
-    const items = rawItems.map((item) => ({
-      barcode: cleanText(item?.barcode),
-      serialNumber: cleanText(item?.serialNumber) || null,
-    })).filter((item) => item.barcode)
+    const items = rawItems.map((item) => ({ barcode: cleanText(item?.barcode), serialNumber: cleanText(item?.serialNumber) || null })).filter((item) => item.barcode)
     const quantity = toInt(payload?.quantity) || items.length
-
     if (!productId) throw makeError('กรุณาระบุสินค้า', 400, 'PRODUCT_REQUIRED')
     if (!costPrice || costPrice <= 0) throw makeError('ราคาทุนต้องมากกว่า 0', 400, 'COST_PRICE_REQUIRED')
     if (!priceRetail || priceRetail <= 0) throw makeError('ราคาขายปลีกต้องมากกว่า 0', 400, 'PRICE_RETAIL_REQUIRED')
     if (!quantity || quantity <= 0) throw makeError('จำนวนรับเข้าต้องมากกว่า 0', 400, 'QUANTITY_REQUIRED')
-
-    return {
-      productId, quantity, costPrice, priceRetail,
-      priceWholesale: asMoney(payload?.priceWholesale),
-      priceTechnician: asMoney(payload?.priceTechnician),
-      priceOnline: asMoney(payload?.priceOnline),
-      note: cleanText(payload?.note) || null,
-      items,
-    }
+    return { productId, quantity, costPrice, priceRetail, priceWholesale: asMoney(payload?.priceWholesale), priceTechnician: asMoney(payload?.priceTechnician), priceOnline: asMoney(payload?.priceOnline), note: cleanText(payload?.note) || null, items }
   }
 
   async addItem(receiptId, payload, actor = {}) {
-    const authority = priceAuthorityPolicy.assertPricePayload({
-      actor,
-      payload: {
-        costPrice: payload?.costPrice,
-        priceRetail: payload?.priceRetail,
-        priceWholesale: payload?.priceWholesale,
-        priceTechnician: payload?.priceTechnician,
-        priceOnline: payload?.priceOnline,
-      },
-    })
+    const authority = priceAuthorityPolicy.assertPricePayload({ actor, payload: { costPrice: payload?.costPrice, priceRetail: payload?.priceRetail, priceWholesale: payload?.priceWholesale, priceTechnician: payload?.priceTechnician, priceOnline: payload?.priceOnline } })
     const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('เพิ่มสินค้าได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
     const item = this.normalizeItemPayload(payload)
-    await this.prisma.$queryRawUnsafe(
-      `INSERT INTO "QuickReceiptSessionItem" (
-         "receiptId","productId","quantity","costPrice","priceRetail","priceWholesale",
-         "priceTechnician","priceOnline","note","items","updatedAt"
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,CURRENT_TIMESTAMP)`,
-      toInt(receiptId), item.productId, item.quantity, item.costPrice, item.priceRetail,
-      item.priceWholesale, item.priceTechnician, item.priceOnline, item.note, JSON.stringify(item.items)
-    )
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE "QuickReceiptSession" SET "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1 AND "branchId"=$2`,
-      toInt(receiptId), authority.branchId
-    )
+    await this.prisma.$queryRawUnsafe(`INSERT INTO "QuickReceiptSessionItem" ("receiptId","productId","quantity","costPrice","priceRetail","priceWholesale","priceTechnician","priceOnline","note","items","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,CURRENT_TIMESTAMP)`, toInt(receiptId), item.productId, item.quantity, item.costPrice, item.priceRetail, item.priceWholesale, item.priceTechnician, item.priceOnline, item.note, JSON.stringify(item.items))
+    await this.prisma.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1 AND "branchId"=$2`, toInt(receiptId), authority.branchId)
     return this.getReceipt(receiptId, authority.branchId)
   }
 
@@ -208,13 +182,7 @@ class QuickReceiptSessionService {
     const authority = priceAuthorityPolicy.assertActor(actor)
     const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('ลบสินค้าได้เฉพาะรายการสถานะ DRAFT', 409, 'QUICK_RECEIPT_NOT_EDITABLE')
-    await this.prisma.$executeRawUnsafe(
-      `DELETE FROM "QuickReceiptSessionItem" i
-       USING "QuickReceiptSession" r
-       WHERE i."id"=$1 AND i."receiptId"=$2
-         AND r."id"=i."receiptId" AND r."branchId"=$3`,
-      toInt(itemId), toInt(receiptId), authority.branchId
-    )
+    await this.prisma.$executeRawUnsafe(`DELETE FROM "QuickReceiptSessionItem" i USING "QuickReceiptSession" r WHERE i."id"=$1 AND i."receiptId"=$2 AND r."id"=i."receiptId" AND r."branchId"=$3`, toInt(itemId), toInt(receiptId), authority.branchId)
     return this.getReceipt(receiptId, authority.branchId)
   }
 
@@ -225,124 +193,51 @@ class QuickReceiptSessionService {
     const empId = baseAuthority.employeeId
     const key = cleanText(commandKey)
     if (!key) throw makeError('ต้องมี X-Idempotency-Key', 400, 'IDEMPOTENCY_KEY_REQUIRED')
-
     return this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRawUnsafe(
-        `SELECT * FROM "QuickReceiptSession" WHERE "id"=$1 AND "branchId"=$2 FOR UPDATE`, id, brId
-      )
+      const locked = await tx.$queryRawUnsafe(`SELECT * FROM "QuickReceiptSession" WHERE "id"=$1 AND "branchId"=$2 FOR UPDATE`, id, brId)
       if (!locked.length) throw makeError('ไม่พบรายการรับสินค้าด่วน', 404, 'QUICK_RECEIPT_NOT_FOUND')
       const receipt = locked[0]
-      const existingCommand = await tx.$queryRawUnsafe(
-        `SELECT * FROM "QuickReceiptFinalizeCommand" WHERE "branchId"=$1 AND "commandKey"=$2 LIMIT 1`, brId, key
-      )
+      const existingCommand = await tx.$queryRawUnsafe(`SELECT * FROM "QuickReceiptFinalizeCommand" WHERE "branchId"=$1 AND "commandKey"=$2 LIMIT 1`, brId, key)
       if (existingCommand.length) return this.getReceipt(existingCommand[0].receiptId, brId, tx)
       if (receipt.status === 'COMPLETED') return this.getReceipt(id, brId, tx)
       if (receipt.status !== 'DRAFT') throw makeError('รายการนี้ไม่อยู่ในสถานะที่ยืนยันได้', 409, 'QUICK_RECEIPT_NOT_FINALIZABLE')
-
-      const items = await tx.$queryRawUnsafe(
-        `SELECT * FROM "QuickReceiptSessionItem" WHERE "receiptId"=$1 ORDER BY "id" ASC`, id
-      )
+      const items = await tx.$queryRawUnsafe(`SELECT * FROM "QuickReceiptSessionItem" WHERE "receiptId"=$1 ORDER BY "id" ASC`, id)
       if (!items.length) throw makeError('ยังไม่มีสินค้าในใบรับ', 400, 'RECEIPT_ITEMS_REQUIRED')
-
       const allBarcodes = []
       const allSerials = []
       for (const [lineIndex, line] of items.entries()) {
-        try {
-          priceAuthorityPolicy.assertPricePayload({
-            actor: baseAuthority,
-            payload: {
-              costPrice: line.costPrice,
-              priceRetail: line.priceRetail,
-              priceWholesale: line.priceWholesale,
-              priceTechnician: line.priceTechnician,
-              priceOnline: line.priceOnline,
-            },
-          })
-        } catch (error) {
-          error.detail = { ...(error.detail || {}), lineIndex, lineId: line.id }
-          throw error
-        }
-
+        try { priceAuthorityPolicy.assertPricePayload({ actor: baseAuthority, payload: { costPrice: line.costPrice, priceRetail: line.priceRetail, priceWholesale: line.priceWholesale, priceTechnician: line.priceTechnician, priceOnline: line.priceOnline } }) } catch (error) { error.detail = { ...(error.detail || {}), lineIndex, lineId: line.id }; throw error }
         const product = await this.inventory.findOperationalProductInBranch({ db: tx, productId: line.productId, branchId: brId })
         if (!product) throw makeError(`ไม่พบสินค้า ${line.productId} ในสาขาปัจจุบัน`, 404, 'OPERATIONAL_PRODUCT_REQUIRED')
         const policy = assertProductCanReceive(product)
         const units = Array.isArray(line.items) ? line.items : []
-        if (policy.mode === 'STRUCTURED' && units.length !== Number(line.quantity)) {
-          throw makeError(`จำนวน Barcode ของ ${product.name} ไม่ตรงกับจำนวนรับเข้า`, 400, 'BARCODE_QUANTITY_MISMATCH')
-        }
-        for (const unit of units) {
-          const barcode = cleanText(unit?.barcode)
-          const serial = cleanText(unit?.serialNumber)
-          if (barcode) allBarcodes.push(barcode)
-          if (serial) allSerials.push(serial)
-        }
+        if (policy.mode === 'STRUCTURED' && units.length !== Number(line.quantity)) throw makeError(`จำนวน Barcode ของ ${product.name} ไม่ตรงกับจำนวนรับเข้า`, 400, 'BARCODE_QUANTITY_MISMATCH')
+        for (const unit of units) { const barcode = cleanText(unit?.barcode); const serial = cleanText(unit?.serialNumber); if (barcode) allBarcodes.push(barcode); if (serial) allSerials.push(serial) }
       }
-
-      if (new Set(allBarcodes.map((value) => value.toLowerCase())).size !== allBarcodes.length) {
-        throw makeError('พบ Barcode ซ้ำภายในใบรับ', 409, 'DUPLICATE_BARCODE_IN_RECEIPT')
-      }
+      if (new Set(allBarcodes.map((value) => value.toLowerCase())).size !== allBarcodes.length) throw makeError('พบ Barcode ซ้ำภายในใบรับ', 409, 'DUPLICATE_BARCODE_IN_RECEIPT')
       const { existingBarcodeSet } = await this.inventory.findExistingBarcodes({ db: tx, barcodes: allBarcodes })
       if (existingBarcodeSet.size) throw makeError('พบ Barcode ที่มีอยู่ในระบบแล้ว', 409, 'BARCODE_ALREADY_EXISTS')
-      if (new Set(allSerials.map((value) => value.toLowerCase())).size !== allSerials.length) {
-        throw makeError('พบ Serial Number ซ้ำภายในใบรับ', 409, 'DUPLICATE_SERIAL_IN_RECEIPT')
-      }
+      if (new Set(allSerials.map((value) => value.toLowerCase())).size !== allSerials.length) throw makeError('พบ Serial Number ซ้ำภายในใบรับ', 409, 'DUPLICATE_SERIAL_IN_RECEIPT')
       const existingSerials = await this.inventory.findExistingSerialNumbers({ db: tx, serialNumbers: allSerials })
       if (existingSerials.length) throw makeError('พบ Serial Number ที่มีอยู่ในระบบแล้ว', 409, 'SERIAL_ALREADY_EXISTS')
-
       await tx.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "status"='FINALIZING', "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1`, id)
       const now = new Date()
-
       for (const line of items) {
         const product = await this.inventory.findOperationalProductInBranch({ db: tx, productId: line.productId, branchId: brId })
         const policy = assertProductCanReceive(product)
         const qty = Number(line.quantity)
         const cost = Number(line.costPrice)
         const units = Array.isArray(line.items) ? line.items : []
-        await this.inventory.upsertBranchPriceManual({
-          db: tx, productId: product.id, branchId: brId,
-          data: {
-            costPrice: cost, priceRetail: line.priceRetail,
-            ...(line.priceWholesale != null ? { priceWholesale: line.priceWholesale } : {}),
-            ...(line.priceTechnician != null ? { priceTechnician: line.priceTechnician } : {}),
-            ...(line.priceOnline != null ? { priceOnline: line.priceOnline } : {}),
-            updatedBy: empId,
-            isActive: true,
-          },
-        })
-
+        await this.inventory.upsertBranchPriceManual({ db: tx, productId: product.id, branchId: brId, employeeId: empId, data: { costPrice: cost, priceRetail: line.priceRetail, ...(line.priceWholesale != null ? { priceWholesale: line.priceWholesale } : {}), ...(line.priceTechnician != null ? { priceTechnician: line.priceTechnician } : {}), ...(line.priceOnline != null ? { priceOnline: line.priceOnline } : {}), isActive: true } })
         let simpleLotId = null
-        if (policy.mode === 'STRUCTURED') {
-          await this.inventory.createStockItems({ db: tx, data: units.map((unit) => ({
-            barcode: cleanText(unit.barcode), serialNumber: cleanText(unit.serialNumber) || null,
-            costPrice: cost, productId: product.id, branchId: brId, status: 'IN_STOCK',
-            scannedByEmployeeId: empId, receivedAt: now, scannedAt: now, source: 'MANUAL',
-            remark: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}`,
-          })) })
-        } else {
-          const lot = await this.inventory.createSimpleLot({ db: tx, data: {
-            productId: product.id, branchId: brId, barcode: `QR-${id}-${line.id}-${Date.now()}`,
-            qtyInitial: qty, qtyRemaining: qty, unitCost: cost, status: 'ACTIVE', receivedAt: now,
-          } })
-          simpleLotId = lot.id
-        }
-
-        await this.inventory.createStockMovement({ db: tx, data: {
-          productId: product.id, branchId: brId, qty, type: 'RECEIVE', refType: 'QUICK_RECEIPT',
-          refId: id, simpleLotId, performedByEmployeeId: empId,
-          note: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}`,
-          createdAt: now,
-        } })
+        if (policy.mode === 'STRUCTURED') await this.inventory.createStockItems({ db: tx, data: units.map((unit) => ({ barcode: cleanText(unit.barcode), serialNumber: cleanText(unit.serialNumber) || null, costPrice: cost, productId: product.id, branchId: brId, status: 'IN_STOCK', scannedByEmployeeId: empId, receivedAt: now, scannedAt: now, source: 'MANUAL', remark: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}` })) })
+        else { const lot = await this.inventory.createSimpleLot({ db: tx, data: { productId: product.id, branchId: brId, barcode: `QR-${id}-${line.id}-${Date.now()}`, qtyInitial: qty, qtyRemaining: qty, unitCost: cost, status: 'ACTIVE', receivedAt: now } }); simpleLotId = lot.id }
+        await this.inventory.createStockMovement({ db: tx, data: { productId: product.id, branchId: brId, qty, type: 'RECEIVE', refType: 'QUICK_RECEIPT', refId: id, simpleLotId, performedByEmployeeId: empId, note: `Quick Receipt ${receipt.code} | Delivery Note ${receipt.deliveryNoteNumber}`, createdAt: now } })
         await this.inventory.upsertStockBalance({ db: tx, productId: product.id, branchId: brId, quantity: qty, lastReceivedCost: cost, avgCost: cost })
       }
-
       const requestHash = crypto.createHash('sha256').update(`${id}:${brId}:${key}`).digest('hex')
-      await tx.$executeRawUnsafe(
-        `INSERT INTO "QuickReceiptFinalizeCommand" ("receiptId","branchId","commandKey","requestHash") VALUES ($1,$2,$3,$4)`,
-        id, brId, key, requestHash
-      )
-      await tx.$executeRawUnsafe(
-        `UPDATE "QuickReceiptSession" SET "status"='COMPLETED', "completedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1`, id
-      )
+      await tx.$executeRawUnsafe(`INSERT INTO "QuickReceiptFinalizeCommand" ("receiptId","branchId","commandKey","requestHash") VALUES ($1,$2,$3,$4)`, id, brId, key, requestHash)
+      await tx.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "status"='COMPLETED', "completedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1`, id)
       return this.getReceipt(id, brId, tx)
     }, { timeout: 30000 })
   }
@@ -351,18 +246,7 @@ class QuickReceiptSessionService {
     const authority = priceAuthorityPolicy.assertActor(actor)
     const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('ยกเลิกได้เฉพาะรายการ DRAFT', 409, 'QUICK_RECEIPT_NOT_CANCELLABLE')
-    await this.prisma.$queryRawUnsafe(
-      `UPDATE "QuickReceiptSession" SET
-         "status"='CANCELLED',
-         "cancelledAt"=CURRENT_TIMESTAMP,
-         "cancelReason"=$1,
-         "updatedAt"=CURRENT_TIMESTAMP
-       WHERE "id"=$2 AND "branchId"=$3
-       RETURNING "id"`,
-      cleanText(reason) || null,
-      toInt(receiptId),
-      authority.branchId
-    )
+    await this.prisma.$executeRawUnsafe(`UPDATE "QuickReceiptSession" SET "status"='CANCELLED', "cancelledAt"=CURRENT_TIMESTAMP, "cancelReason"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$2 AND "branchId"=$3`, cleanText(reason) || null, toInt(receiptId), authority.branchId)
     return this.getReceipt(receiptId, authority.branchId)
   }
 }
