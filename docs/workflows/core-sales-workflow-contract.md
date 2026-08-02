@@ -100,7 +100,7 @@ Prepare cart
 → convert source Held Cart when supplied
 → commit Sale transaction
 → default initial document to DELIVERY_NOTE
-→ attempt downstream tax-candidate publication when the Sale status is tax-ready
+→ do not publish a tax candidate until later settlement projects payment status as PAID
 ```
 
 Rules:
@@ -110,7 +110,8 @@ Rules:
 - The runtime may derive due date from customer payment terms.
 - Initial completion may report `COMPLETED_CREDIT`, `UNPAID`, or an outstanding balance.
 - A later settlement can close the sale only after non-cancelled payment evidence reaches the canonical total.
-- Tax-candidate publication may be skipped when the current Sale status is not tax-ready.
+- A short tax invoice or full tax invoice is forbidden until the payment projection is `PAID`.
+- Before `PAID`, the permitted initial document is `DELIVERY_NOTE`; tax-candidate publication is not attempted.
 
 ## 8. Held Cart contract
 
