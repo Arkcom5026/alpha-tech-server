@@ -1,6 +1,7 @@
 const crypto = require('node:crypto')
 
 const QuickReceiptSessionService = require('./QuickReceiptSessionService')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const cleanText = (value) => String(value || '').trim()
 const normalizeDeliveryNote = (value) => cleanText(value).replace(/\s+/g, '').toUpperCase()
@@ -62,32 +63,49 @@ const payloadHash = (payload) => crypto
   .update(JSON.stringify(canonicalPayload(payload)))
   .digest('hex')
 
-/**
- * One HTTP command for the small-delivery workflow.
- *
- * Inventory mutation remains all-or-nothing because SessionService.finalize()
- * owns the inventory transaction. Receipt preparation is compensating-safe:
- * an incomplete preparation is cancelled so it cannot be resumed accidentally.
- */
 class QuickReceiptCompleteService {
   constructor(prisma) {
     this.prisma = prisma
     this.sessions = new QuickReceiptSessionService(prisma)
   }
 
-  async complete(payload, branchId, employeeId, commandKey) {
+  async complete(payload, actor = {}, commandKey) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
     const key = cleanText(commandKey)
     if (!key) throw makeError('ต้องมี X-Idempotency-Key', 400, 'IDEMPOTENCY_KEY_REQUIRED')
+
+    const lines = Array.isArray(payload?.items) ? payload.items : []
+    if (!lines.length) {
+      throw makeError('ยังไม่มีสินค้าในใบรับ', 400, 'RECEIPT_ITEMS_REQUIRED')
+    }
+
+    for (const [index, line] of lines.entries()) {
+      try {
+        priceAuthorityPolicy.assertPricePayload({
+          actor: authority,
+          payload: {
+            costPrice: line?.costPrice,
+            priceRetail: line?.priceRetail,
+            priceWholesale: line?.priceWholesale,
+            priceTechnician: line?.priceTechnician,
+            priceOnline: line?.priceOnline,
+          },
+        })
+      } catch (error) {
+        error.detail = { ...(error.detail || {}), lineIndex: index }
+        throw error
+      }
+    }
 
     const incomingHash = payloadHash(payload)
     const priorCommands = await this.prisma.$queryRawUnsafe(
       `SELECT "receiptId" FROM "QuickReceiptFinalizeCommand"
        WHERE "branchId"=$1 AND "commandKey"=$2 LIMIT 1`,
-      Number(branchId),
+      authority.branchId,
       key
     )
     if (priorCommands.length) {
-      const priorReceipt = await this.sessions.getReceipt(priorCommands[0].receiptId, branchId)
+      const priorReceipt = await this.sessions.getReceipt(priorCommands[0].receiptId, authority.branchId)
       const priorHash = payloadHash(priorReceipt)
       if (priorHash !== incomingHash) {
         throw makeError(
@@ -99,32 +117,25 @@ class QuickReceiptCompleteService {
       return priorReceipt
     }
 
-    const lines = Array.isArray(payload?.items) ? payload.items : []
-    if (!lines.length) {
-      throw makeError('ยังไม่มีสินค้าในใบรับ', 400, 'RECEIPT_ITEMS_REQUIRED')
-    }
-
     let receipt = null
     try {
-      receipt = await this.sessions.createDraft(payload, branchId, employeeId)
+      receipt = await this.sessions.createDraft(payload, authority.branchId, authority.employeeId)
       for (const line of lines) {
-        receipt = await this.sessions.addItem(receipt.id, line, branchId)
+        receipt = await this.sessions.addItem(receipt.id, line, authority.branchId)
       }
-      return await this.sessions.finalize(receipt.id, branchId, employeeId, key)
+      return await this.sessions.finalize(receipt.id, authority, key)
     } catch (error) {
       if (receipt?.id) {
         try {
-          const latest = await this.sessions.getReceipt(receipt.id, branchId)
+          const latest = await this.sessions.getReceipt(receipt.id, authority.branchId)
           if (latest.status === 'DRAFT') {
             await this.sessions.cancel(
               receipt.id,
-              branchId,
+              authority.branchId,
               `ONE_SHOT_PREPARATION_FAILED: ${error?.code || error?.message || 'UNKNOWN'}`
             )
           }
-        } catch (_cleanupError) {
-          // Preserve the originating failure. A remaining DRAFT is recoverable and auditable.
-        }
+        } catch (_cleanupError) {}
       }
       throw error
     }
