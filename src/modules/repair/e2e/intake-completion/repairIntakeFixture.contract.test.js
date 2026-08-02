@@ -30,10 +30,15 @@ assert(
   source.includes('CreateExternalDeviceIntakeService'),
   'Fixture must use the real repair external-intake service.'
 );
+
+const outputStart = source.indexOf('console.log(JSON.stringify({');
+assert(outputStart >= 0, 'Fixture must emit a structured JSON result.');
+const outputSource = source.slice(outputStart);
 assert(
-  !source.includes('operatorPassword,') && !source.includes('E2E_TEST_PASSWORD: operatorPassword'),
+  !outputSource.includes('operatorPassword') && !outputSource.includes('E2E_TEST_PASSWORD'),
   'Fixture output must not expose the operator password.'
 );
+
 assert(
   !source.includes('PRODUCTION_DATABASE_URL'),
   'Fixture must not introduce a production database path.'
