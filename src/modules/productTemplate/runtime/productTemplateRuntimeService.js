@@ -1,20 +1,9 @@
 const repository = require('./productTemplateRuntimeRepository');
+const priceAuthorityPolicy = require('../../product/pricing/policies/priceAuthorityPolicy');
 
 const toPositiveInt = (value, fallback = null) => {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : fallback;
-};
-
-const toNonNegativeDecimal = (value) => {
-  if (value === undefined || value === null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : null;
-};
-
-const toNonNegativeInt = (value) => {
-  if (value === undefined || value === null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? Math.round(number) : null;
 };
 
 const normalizeText = (value) => String(value || '').trim();
@@ -97,38 +86,67 @@ const resolveTemplateBranch = async (query = {}) => {
   return branch;
 };
 
-const syncTemplatePriceSnapshot = async (productId, templateBranchId, payload = {}) => {
+const canonicalPricePayload = (payload = {}) => ({
+  costPrice: payload.costPrice,
+  priceRetail: payload.priceRetail,
+  priceOnline: payload.priceOnline,
+  priceTechnician: payload.priceTechnician,
+  priceWholesale: payload.priceWholesale,
+});
+
+const syncTemplatePriceSnapshot = async (productId, templateBranchId, payload = {}, actor = {}) => {
   if (!hasPriceSnapshotPayload(payload)) return null;
+
+  const authority = priceAuthorityPolicy.assertPricePayload({
+    actor: {
+      branchId: templateBranchId,
+      employeeId: actor.employeeId,
+      role: actor.role,
+      v2Role: actor.v2Role,
+    },
+    payload: canonicalPricePayload(payload),
+  });
 
   const existing = await repository.findPriceSnapshot({
     productId,
-    branchId: templateBranchId,
+    branchId: authority.branchId,
   });
-  const fallbackCostPrice = existing?.costPrice != null ? Number(existing.costPrice) : 0;
-  const update = { isActive: true, note: 'Template price snapshot' };
 
-  if (payload.costPrice !== undefined) {
-    update.costPrice = toNonNegativeDecimal(payload.costPrice) ?? fallbackCostPrice;
+  const update = {
+    isActive: true,
+    note: 'Template price snapshot',
+    updatedBy: authority.employeeId,
+  };
+
+  for (const field of priceAuthorityPolicy.PRICE_FIELDS) {
+    if (payload[field] !== undefined) update[field] = payload[field];
   }
-  if (payload.priceRetail !== undefined) update.priceRetail = toNonNegativeInt(payload.priceRetail);
-  if (payload.priceOnline !== undefined) update.priceOnline = toNonNegativeInt(payload.priceOnline);
-  if (payload.priceTechnician !== undefined) update.priceTechnician = toNonNegativeInt(payload.priceTechnician);
-  if (payload.priceWholesale !== undefined) update.priceWholesale = toNonNegativeInt(payload.priceWholesale);
+
+  const create = {
+    productId: Number(productId),
+    branchId: authority.branchId,
+    costPrice: update.costPrice ?? existing?.costPrice,
+    priceRetail: update.priceRetail ?? existing?.priceRetail ?? null,
+    priceOnline: update.priceOnline ?? existing?.priceOnline ?? null,
+    priceTechnician: update.priceTechnician ?? existing?.priceTechnician ?? null,
+    priceWholesale: update.priceWholesale ?? existing?.priceWholesale ?? null,
+    isActive: true,
+    note: 'Template price snapshot',
+    updatedBy: authority.employeeId,
+  };
+
+  if (create.costPrice === undefined || create.costPrice === null) {
+    const error = new Error('Template cost price is required before creating a price snapshot');
+    error.code = 'TEMPLATE_COST_PRICE_REQUIRED';
+    error.status = 400;
+    error.statusCode = 400;
+    throw error;
+  }
 
   return repository.upsertPriceSnapshot({
     productId,
-    branchId: templateBranchId,
-    create: {
-      productId: Number(productId),
-      branchId: Number(templateBranchId),
-      costPrice: update.costPrice ?? fallbackCostPrice,
-      priceRetail: update.priceRetail ?? null,
-      priceOnline: update.priceOnline ?? null,
-      priceTechnician: update.priceTechnician ?? null,
-      priceWholesale: update.priceWholesale ?? null,
-      isActive: true,
-      note: 'Template price snapshot',
-    },
+    branchId: authority.branchId,
+    create,
     update,
   });
 };
@@ -172,7 +190,7 @@ const getTemplateById = async (id, query = {}) => {
 const createTemplate = async (payload = {}, query = {}) => {
   const templateBranch = await resolveTemplateBranch(query);
   const template = await repository.createTemplate({ templateBranchId: templateBranch.id, payload });
-  await syncTemplatePriceSnapshot(template.id, templateBranch.id, payload);
+  await syncTemplatePriceSnapshot(template.id, templateBranch.id, payload, query.actor || query);
   const refreshed = await repository.findById({ id: template.id, templateBranchId: templateBranch.id });
   return mapTemplate(refreshed || template, templateBranch);
 };
@@ -186,7 +204,7 @@ const updateTemplate = async (id, payload = {}, query = {}) => {
     error.code = 'PRODUCT_TEMPLATE_NOT_FOUND';
     throw error;
   }
-  await syncTemplatePriceSnapshot(id, templateBranch.id, payload);
+  await syncTemplatePriceSnapshot(id, templateBranch.id, payload, query.actor || query);
   const refreshed = await repository.findById({ id, templateBranchId: templateBranch.id });
   return mapTemplate(refreshed || template, templateBranch);
 };
@@ -213,4 +231,5 @@ module.exports = {
   createTemplate,
   updateTemplate,
   setActive,
+  syncTemplatePriceSnapshot,
 };
