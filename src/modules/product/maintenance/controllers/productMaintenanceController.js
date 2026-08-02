@@ -1,11 +1,18 @@
 const { Prisma } = require('../../../../../lib/prisma')
 const { updateOperationalProduct } = require('../services/productMaintenanceService')
 
+const getActor = (req) => ({
+  branchId: req.employee?.branchId || req.user?.branchId || req.branchId,
+  employeeId: req.employee?.id || req.user?.employeeId || null,
+  role: req.employee?.role || req.employee?.v2Role || req.user?.role || req.user?.v2Role,
+  v2Role: req.employee?.v2Role || req.user?.v2Role,
+})
+
 const updateProduct = async (req, res) => {
   try {
     const result = await updateOperationalProduct({
       productId: req.params.id,
-      branchId: req.user?.branchId,
+      actor: getActor(req),
       data: req.body || {},
     })
 
@@ -19,7 +26,14 @@ const updateProduct = async (req, res) => {
     }
 
     const status = error?.status || error?.statusCode
-    if (status) return res.status(status).json({ error: error.code || error.message || 'ERROR' })
+    if (status) {
+      return res.status(status).json({
+        error: error.code || error.message || 'ERROR',
+        code: error.code || error.message || 'ERROR',
+        message: error.message || error.code || 'ERROR',
+        detail: error.detail,
+      })
+    }
 
     return res.status(500).json({ error: 'Internal server error' })
   }
