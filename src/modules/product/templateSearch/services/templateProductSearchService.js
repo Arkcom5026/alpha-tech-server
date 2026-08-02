@@ -5,6 +5,7 @@ const {
   DEFAULT_TEMPLATE_BRANCH_CODE,
   ProductTemplateRepository,
 } = require('../repositories/productTemplateSearchRepository')
+const effectivePricePolicy = require('../../pricing/policies/effectivePricePolicy')
 
 const toPositiveInt = (value) => {
   const n = Number(value)
@@ -36,6 +37,22 @@ class TemplateProductSearchService {
 
   mapTemplateProduct(product, templateBranch) {
     const bp = product.branchPrice?.[0] || null
+    if (!bp) {
+      const error = new Error('ไม่พบราคาที่ใช้งานสำหรับสินค้าแม่แบบนี้')
+      error.code = 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
+      error.status = 409
+      error.statusCode = 409
+      error.detail = { branchId: templateBranch.id, productId: product.id }
+      throw error
+    }
+
+    const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
+      row: bp,
+      priceType,
+      branchId: templateBranch.id,
+      productId: product.id,
+    })
+
     const cover = product.productImages?.[0] || null
     const category = product.productType?.globalProductType?.category || null
 
@@ -62,13 +79,13 @@ class TemplateProductSearchService {
       unitName: product.unit?.name ?? null,
       unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
       imageUrl: cover?.secure_url || cover?.url || null,
-      costPrice: bp?.costPrice != null ? Number(bp.costPrice) : 0,
-      priceRetail: bp?.priceRetail != null ? Number(bp.priceRetail) : 0,
-      priceOnline: bp?.priceOnline != null ? Number(bp.priceOnline) : 0,
-      priceTechnician: bp?.priceTechnician != null ? Number(bp.priceTechnician) : 0,
-      priceWholesale: bp?.priceWholesale != null ? Number(bp.priceWholesale) : 0,
-      hasPrice: !!bp,
-      branchPriceActive: bp?.isActive ?? false,
+      costPrice: Number(bp.costPrice),
+      priceRetail: resolve('retail'),
+      priceOnline: resolve('online'),
+      priceTechnician: resolve('technician'),
+      priceWholesale: resolve('wholesale'),
+      hasPrice: true,
+      branchPriceActive: bp.isActive === true,
     }
   }
 
