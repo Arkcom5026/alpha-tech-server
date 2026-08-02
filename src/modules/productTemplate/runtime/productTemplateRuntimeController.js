@@ -10,6 +10,20 @@ const sendError = (res, error, fallbackMessage, fallbackCode) => {
   });
 };
 
+const getBranchId = (req) => req.employee?.branchId || req.user?.branchId || req.branchId || null;
+const getEmployeeId = (req) => req.employee?.id || req.user?.employeeId || null;
+const getRole = (req) => req.employee?.v2Role || req.employee?.role || req.user?.v2Role || req.user?.role || null;
+
+const buildAuthorityQuery = (req) => ({
+  ...(req.query || {}),
+  actor: {
+    branchId: getBranchId(req),
+    employeeId: getEmployeeId(req),
+    role: getRole(req),
+    v2Role: getRole(req),
+  },
+});
+
 const getAllProductTemplates = async (req, res) => {
   try {
     const result = await service.listTemplates(req.query || {});
@@ -30,7 +44,7 @@ const getProductTemplateById = async (req, res) => {
 
 const createProductTemplate = async (req, res) => {
   try {
-    const template = await service.createTemplate(req.body || {}, req.query || {});
+    const template = await service.createTemplate(req.body || {}, buildAuthorityQuery(req));
     return res.status(201).json({ success: true, data: template, item: template });
   } catch (error) {
     return sendError(res, error, 'ไม่สามารถสร้าง Product Template ได้', 'PRODUCT_TEMPLATE_CREATE_FAILED');
@@ -39,7 +53,7 @@ const createProductTemplate = async (req, res) => {
 
 const updateProductTemplate = async (req, res) => {
   try {
-    const template = await service.updateTemplate(req.params.id, req.body || {}, req.query || {});
+    const template = await service.updateTemplate(req.params.id, req.body || {}, buildAuthorityQuery(req));
     return res.status(200).json({ success: true, data: template, item: template });
   } catch (error) {
     return sendError(res, error, 'ไม่สามารถอัปเดต Product Template ได้', 'PRODUCT_TEMPLATE_UPDATE_FAILED');
