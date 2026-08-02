@@ -347,15 +347,23 @@ class QuickReceiptSessionService {
     }, { timeout: 30000 })
   }
 
-  async cancel(receiptId, branchId, reason) {
-    const receipt = await this.getReceipt(receiptId, branchId)
+  async cancel(receiptId, actor = {}, reason) {
+    const authority = priceAuthorityPolicy.assertActor(actor)
+    const receipt = await this.getReceipt(receiptId, authority.branchId)
     if (receipt.status !== 'DRAFT') throw makeError('ยกเลิกได้เฉพาะรายการ DRAFT', 409, 'QUICK_RECEIPT_NOT_CANCELLABLE')
     await this.prisma.$queryRawUnsafe(
-      `UPDATE "QuickReceiptSession" SET "status"='CANCELLED', "cancelledAt"=CURRENT_TIMESTAMP,
-       "cancelReason"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$2 AND "branchId"=$3`,
-      cleanText(reason) || null, toInt(receiptId), toInt(branchId)
+      `UPDATE "QuickReceiptSession" SET
+         "status"='CANCELLED',
+         "cancelledAt"=CURRENT_TIMESTAMP,
+         "cancelReason"=$1,
+         "updatedAt"=CURRENT_TIMESTAMP
+       WHERE "id"=$2 AND "branchId"=$3
+       RETURNING "id"`,
+      cleanText(reason) || null,
+      toInt(receiptId),
+      authority.branchId
     )
-    return this.getReceipt(receiptId, branchId)
+    return this.getReceipt(receiptId, authority.branchId)
   }
 }
 
