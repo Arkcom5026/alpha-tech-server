@@ -12,6 +12,7 @@ const { assertTestDatabaseAuthority } = require('./testDatabaseAuthority');
 require('dotenv').config({ path: path.join(process.cwd(), '.env.restore') });
 
 const EXPECTED_SCHEMAS = ['public', 'legacy_tax'];
+const RESET_CONFIRMATION = 'ALPHATECH_TEST_DB_RESET';
 const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
 const psqlPath = process.env.PSQL_PATH || path.join(process.env.POSTGRES_CLIENT_BIN || '', 'psql.exe');
 
@@ -31,7 +32,10 @@ function clientConfig(value) {
 }
 
 function parseArgs(argv) {
-  const result = { manifestPath: null, yes: false };
+  const result = {
+    manifestPath: String(process.env.RESTORE_BUNDLE_MANIFEST || '').trim() || null,
+    yes: process.env.RESTORE_DATABASE_RESET_CONFIRMATION === RESET_CONFIRMATION,
+  };
   for (let index = 2; index < argv.length; index += 1) {
     if (argv[index] === '--manifest') { result.manifestPath = argv[++index]; continue; }
     if (argv[index] === '--yes') { result.yes = true; continue; }
@@ -52,8 +56,8 @@ function runPsql(sqlPath) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  if (!args.yes) fail('Explicit --yes is required before resetting the Test database.');
-  if (!args.manifestPath) fail('Usage: node recovery/restoreRecoveryBundle.js --manifest <bundle.manifest.json> --yes');
+  if (!args.yes) fail('Explicit --yes or RESTORE_DATABASE_RESET_CONFIRMATION is required before resetting the Test database.');
+  if (!args.manifestPath) fail('Usage: node recovery/restoreRecoveryBundle.js --manifest <bundle.manifest.json> --yes, or set RESTORE_BUNDLE_MANIFEST.');
   if (!targetUrl) fail('RESTORE_DATABASE_URL or RECOVERY_DATABASE_URL is required.');
   if (!psqlPath || !fs.existsSync(psqlPath)) fail('PSQL_PATH or POSTGRES_CLIENT_BIN must point to PostgreSQL 17 psql.exe.');
   assertTestDatabaseAuthority({ targetUrl, requiresWriteApproval: true, requiresResetApproval: true });
