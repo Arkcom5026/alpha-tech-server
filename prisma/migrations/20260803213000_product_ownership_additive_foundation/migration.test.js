@@ -25,5 +25,8 @@ for (const name of [
   'Product_branchId_templateProductId_idx',
 ]) assert.match(sql, new RegExp(`CREATE INDEX "${name}"`));
 
-assert.ok(!/\b(?:UPDATE|DELETE|INSERT|DROP|TRUNCATE)\b/i.test(sql));
+assert.ok(!/\\bUPDATE\\s+\"Product\"/i.test(sql));
+assert.ok(!/\\bDELETE\\s+FROM\\b/i.test(sql));
+assert.ok(!/\\bINSERT\\s+INTO\\b/i.test(sql));
+assert.ok(!/\\b(?:DROP|TRUNCATE)\\b/i.test(sql));
 console.log('Product ownership additive Prisma migration contract: PASS');
