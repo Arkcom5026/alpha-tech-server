@@ -22,6 +22,7 @@ assert.match(service, /TAX_ISSUER_PROFILE_ACTIVATION_INCOMPLETE/);
 assert.match(service, /exactly 13 digits/);
 assert.match(service, /TAX_ISSUER_PROFILE_FIELD_FORBIDDEN/);
 assert.match(service, /EDITABLE_FIELDS/);
+assert.match(service, /creditNotePrefix/);
 assert.ok(repository.includes("require('../../../../lib/prisma')"));
 assert.ok(repository.includes('taxIssuerProfile.upsert'));
 assert.match(taxRoutes, /issuer-profile/);
