@@ -1,14 +1,18 @@
 const repository = require('./createProductTemplateCandidateRepository')
 const {
+  resolveProductOwnershipEvidence,
+} = require('./resolveProductOwnershipEvidence')
+const {
   createHttpError,
   toPositiveInt,
   assertSuperAdmin,
   resolveActorEmployeeId,
 } = require('../shared/productTemplateCandidatePolicy')
 
-const buildCatalogSafeSnapshot = (product) => ({
+const buildCatalogSafeSnapshot = (product, sourceBranchId, ownershipResolution) => ({
   sourceProductId: product.id,
-  sourceBranchId: product.branchId,
+  sourceBranchId,
+  ownershipResolution,
   name: product.name,
   active: product.active,
   productType: product.productType
@@ -35,10 +39,48 @@ const buildCatalogSafeSnapshot = (product) => ({
   unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
 })
 
+const throwOwnershipError = (resolution) => {
+  if (resolution.status === 'CANONICAL_MISMATCH') {
+    throw createHttpError(
+      409,
+      'Source branch does not match canonical Product ownership',
+      'SOURCE_PRODUCT_BRANCH_MISMATCH'
+    )
+  }
+  if (resolution.status === 'CROSS_BRANCH_CONFLICT') {
+    throw createHttpError(
+      409,
+      'Source product has evidence in more than one independent store',
+      'SOURCE_PRODUCT_CROSS_BRANCH_CONFLICT'
+    )
+  }
+  if (resolution.status === 'EVIDENCE_MISMATCH') {
+    throw createHttpError(
+      409,
+      'Source branch does not match the product ownership evidence',
+      'SOURCE_PRODUCT_EVIDENCE_MISMATCH'
+    )
+  }
+  if (resolution.status === 'NO_EVIDENCE') {
+    throw createHttpError(
+      409,
+      'Source product has no usable store ownership evidence',
+      'SOURCE_PRODUCT_OWNERSHIP_MISSING'
+    )
+  }
+
+  throw createHttpError(
+    400,
+    'sourceBranchId is required',
+    'SOURCE_BRANCH_ID_REQUIRED'
+  )
+}
+
 const createCandidate = async ({ user, payload }) => {
   assertSuperAdmin(user)
 
   const sourceProductId = toPositiveInt(payload?.sourceProductId, 'sourceProductId')
+  const sourceBranchId = toPositiveInt(payload?.sourceBranchId, 'sourceBranchId')
   const targetTemplateBranchId = toPositiveInt(
     payload?.targetTemplateBranchId,
     'targetTemplateBranchId'
@@ -48,14 +90,22 @@ const createCandidate = async ({ user, payload }) => {
   if (!sourceProduct) {
     throw createHttpError(404, 'Source product was not found', 'SOURCE_PRODUCT_NOT_FOUND')
   }
-  if (!sourceProduct.branchId) {
-    throw createHttpError(
-      409,
-      'Source product has no canonical branch ownership',
-      'SOURCE_PRODUCT_OWNERSHIP_MISSING'
-    )
+
+  const evidence = sourceProduct.branchId
+    ? { branchPriceBranchIds: [], stockItemBranchIds: [] }
+    : await repository.findProductOwnershipEvidence({ sourceProductId })
+
+  const ownershipResolution = resolveProductOwnershipEvidence({
+    canonicalBranchId: sourceProduct.branchId,
+    requestedSourceBranchId: sourceBranchId,
+    ...evidence,
+  })
+
+  if (!['CANONICAL', 'SINGLE_BRANCH_EVIDENCE'].includes(ownershipResolution.status)) {
+    throwOwnershipError(ownershipResolution)
   }
 
+  const resolvedSourceBranchId = ownershipResolution.branchId
   const targetTemplateBranch = await repository.findTemplateBranch({ targetTemplateBranchId })
   if (!targetTemplateBranch) {
     throw createHttpError(
@@ -64,7 +114,7 @@ const createCandidate = async ({ user, payload }) => {
       'INVALID_TEMPLATE_BRANCH'
     )
   }
-  if (sourceProduct.branchId === targetTemplateBranch.id) {
+  if (resolvedSourceBranchId === targetTemplateBranch.id) {
     throw createHttpError(
       409,
       'A template-owned product cannot be submitted as a store candidate',
@@ -73,12 +123,20 @@ const createCandidate = async ({ user, payload }) => {
   }
 
   const actorEmployeeId = resolveActorEmployeeId(user)
-  const sourceSnapshot = buildCatalogSafeSnapshot(sourceProduct)
+  const sourceSnapshot = buildCatalogSafeSnapshot(
+    sourceProduct,
+    resolvedSourceBranchId,
+    ownershipResolution.status
+  )
 
   return repository.createCandidateWithEvent({
     actorEmployeeId,
+    ownershipResolution: {
+      mode: ownershipResolution.status,
+      evidenceBranchIds: ownershipResolution.evidenceBranchIds,
+    },
     data: {
-      sourceBranchId: sourceProduct.branchId,
+      sourceBranchId: resolvedSourceBranchId,
       sourceProductId: sourceProduct.id,
       targetTemplateBranchId: targetTemplateBranch.id,
       sourceSnapshot,
@@ -91,5 +149,6 @@ const createCandidate = async ({ user, payload }) => {
 
 module.exports = {
   buildCatalogSafeSnapshot,
+  throwOwnershipError,
   createCandidate,
 }
