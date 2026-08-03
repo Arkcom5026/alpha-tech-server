@@ -76,34 +76,49 @@ const repository = {
   assert.strictEqual(item.priceTechnician, 135)
   assert.strictEqual(item.priceOnline, 145)
   assert.strictEqual(item.hasPrice, true)
+  assert.strictEqual(item.priceReady, true)
+  assert.deepStrictEqual(item.missingPriceFields, [])
   assert.strictEqual(calls.length, 4)
   assert(calls.every((call) => call.branchId === 9 && call.productId === 44))
 
   repository.searchTemplateProducts = async () => [{ id: 45, name: 'Missing Price', branchPrice: [] }]
-  await assert.rejects(
-    () => service.searchTemplateProducts({}),
-    (error) => error.code === 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
-      && error.status === 409
-      && error.detail?.branchId === 9
-      && error.detail?.productId === 45,
-  )
+  const [missingPrice] = await service.searchTemplateProducts({})
+  assert.strictEqual(missingPrice.costPrice, null)
+  assert.strictEqual(missingPrice.priceRetail, null)
+  assert.strictEqual(missingPrice.priceWholesale, null)
+  assert.strictEqual(missingPrice.priceTechnician, null)
+  assert.strictEqual(missingPrice.priceOnline, null)
+  assert.strictEqual(missingPrice.hasPrice, false)
+  assert.strictEqual(missingPrice.priceReady, false)
+  assert.deepStrictEqual(missingPrice.missingPriceFields, [
+    'costPrice',
+    'priceRetail',
+    'priceWholesale',
+    'priceTechnician',
+    'priceOnline',
+  ])
 
   repository.searchTemplateProducts = async () => [{
     id: 46,
-    name: 'Zero Price',
+    name: 'Incomplete Price',
     branchPrice: [{
       costPrice: 100,
       priceRetail: 0,
       priceWholesale: 140,
-      priceTechnician: 135,
+      priceTechnician: null,
       priceOnline: 145,
       isActive: true,
     }],
   }]
-  await assert.rejects(
-    () => service.searchTemplateProducts({}),
-    (error) => error.code === 'PRICE_VALUE_NOT_EFFECTIVE',
-  )
+  const [incompletePrice] = await service.searchTemplateProducts({})
+  assert.strictEqual(incompletePrice.costPrice, 100)
+  assert.strictEqual(incompletePrice.priceRetail, null)
+  assert.strictEqual(incompletePrice.priceWholesale, 140)
+  assert.strictEqual(incompletePrice.priceTechnician, null)
+  assert.strictEqual(incompletePrice.priceOnline, 145)
+  assert.strictEqual(incompletePrice.hasPrice, false)
+  assert.strictEqual(incompletePrice.priceReady, false)
+  assert.deepStrictEqual(incompletePrice.missingPriceFields, ['priceRetail', 'priceTechnician'])
 
   console.log('template-product-search-price-authority.contract.test.js: PASS')
 })().catch((error) => {
