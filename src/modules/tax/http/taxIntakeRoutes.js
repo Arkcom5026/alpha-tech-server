@@ -18,6 +18,7 @@ router.use('/issuer-profile', taxIssuerProfileRoutes);
 
 router.post('/candidates/register', controller.registerCandidate);
 router.post('/candidates/register-sale/:saleId', controller.registerSaleCandidate);
+router.post('/candidates/register-sale-return/:saleReturnId', controller.registerSaleReturnCandidate);
 router.get('/candidates', controller.listCandidates);
 router.get('/documents', controller.listDocuments);
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
