@@ -1,7 +1,6 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
-const { projectOutputTaxCreditNotePrintableDocument } = require('../creditNote/print/projectOutputTaxCreditNotePrintableDocumentService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -29,20 +28,9 @@ const mapLine = ({ id, quantity, basePrice, discount, price, vatAmount, descript
   barcode,
 });
 
-const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) => {
+const projectOutputTaxCreditNotePrintableDocument = async ({ branchId, taxDocumentId }) => {
   const normalizedBranchId = positiveInt(branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const normalizedDocumentId = positiveInt(taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
-
-  const documentType = await prisma.taxDocument.findFirst({
-    where: { id: normalizedDocumentId, branchId: normalizedBranchId },
-    select: { documentType: true },
-  });
-  if (documentType?.documentType === 'OUTPUT_TAX_CREDIT_NOTE') {
-    return projectOutputTaxCreditNotePrintableDocument({
-      branchId: normalizedBranchId,
-      taxDocumentId: normalizedDocumentId,
-    });
-  }
 
   const document = await prisma.taxDocument.findFirst({
     where: { id: normalizedDocumentId, branchId: normalizedBranchId },
@@ -51,7 +39,6 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       branchId: true,
       documentType: true,
       status: true,
-      taxInvoiceKind: true,
       issuedAt: true,
       issuedDocumentNumber: true,
       issuedSequence: true,
@@ -61,40 +48,69 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       taxAmount: true,
       totalAmount: true,
       currency: true,
-      candidate: {
-        select: { sourceType: true, sourceId: true },
+      originalTaxDocument: {
+        select: {
+          id: true,
+          branchId: true,
+          documentType: true,
+          status: true,
+          taxInvoiceKind: true,
+          issuedAt: true,
+          issuedDocumentNumber: true,
+          candidate: { select: { sourceType: true, sourceId: true } },
+        },
+      },
+      saleReturn: {
+        select: {
+          id: true,
+          branchId: true,
+          saleId: true,
+          status: true,
+          completedAt: true,
+          refundedAmount: true,
+          deductedAmount: true,
+          isFullyRefunded: true,
+        },
       },
     },
   });
 
   if (!document) fail('TAX_DOCUMENT_NOT_FOUND', 'Tax document not found', 404);
   if (
-    document.documentType !== 'OUTPUT_TAX_INVOICE'
+    document.documentType !== 'OUTPUT_TAX_CREDIT_NOTE'
     || document.status !== 'REGISTERED'
-    || !document.taxInvoiceKind
     || !document.issuerSnapshot
     || !document.issuedDocumentNumber
+    || !document.originalTaxDocument
+    || !document.saleReturn
   ) {
-    fail(
-      'TAX_DOCUMENT_NOT_PRINTABLE',
-      'Only a registered issued output tax document may be printed',
-      409,
-    );
-  }
-  if (document.candidate?.sourceType !== 'SALE') {
-    fail('TAX_OUTPUT_PRINT_SOURCE_UNSUPPORTED', 'Output tax document must be sourced from a sale', 409);
+    fail('TAX_CREDIT_NOTE_NOT_PRINTABLE', 'Only a registered issued credit note may be printed', 409);
   }
 
-  const saleId = positiveInt(document.candidate.sourceId, 'TAX_SOURCE_SALE_NOT_FOUND', 'saleId');
+  const original = document.originalTaxDocument;
+  const saleReturn = document.saleReturn;
+  if (
+    original.branchId !== normalizedBranchId
+    || saleReturn.branchId !== normalizedBranchId
+    || original.documentType !== 'OUTPUT_TAX_INVOICE'
+    || original.status !== 'REGISTERED'
+    || original.candidate?.sourceType !== 'SALE'
+    || Number(original.candidate.sourceId) !== Number(saleReturn.saleId)
+    || saleReturn.status !== 'COMPLETED'
+    || saleReturn.isFullyRefunded !== true
+    || amount(saleReturn.deductedAmount) !== 0
+    || amount(saleReturn.refundedAmount) !== amount(original.totalAmount)
+  ) {
+    fail('TAX_CREDIT_NOTE_PROJECTION_INTEGRITY_FAILED', 'Credit-note links no longer meet full-return requirements', 409);
+  }
+
+  const saleId = positiveInt(original.candidate.sourceId, 'TAX_SOURCE_SALE_NOT_FOUND', 'saleId');
   const sale = await prisma.sale.findFirst({
     where: { id: saleId, branchId: normalizedBranchId },
     select: {
       id: true,
       code: true,
       soldAt: true,
-      status: true,
-      paid: true,
-      statusPayment: true,
       customer: {
         select: { name: true, companyName: true, taxId: true },
       },
@@ -128,11 +144,7 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       },
     },
   });
-
   if (!sale) fail('TAX_SOURCE_SALE_NOT_FOUND', 'Sale not found', 404);
-  if (sale.paid !== true || sale.statusPayment !== 'PAID') {
-    fail('TAX_OUTPUT_PRINT_PAYMENT_REQUIRED', 'A fully paid sale is required to print an output tax invoice', 409);
-  }
 
   const lines = [
     ...sale.items.map((item) => mapLine({
@@ -149,17 +161,11 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
     })),
   ];
 
-  const invoiceKind = document.taxInvoiceKind;
-  const recipient = invoiceKind === 'FULL' ? document.recipientSnapshot : null;
-  if (invoiceKind === 'FULL' && !recipient) {
-    fail('TAX_OUTPUT_PRINT_RECIPIENT_MISSING', 'Full tax invoice has no recipient snapshot', 409);
-  }
-
   return Object.freeze({
     document: {
       id: document.id,
-      type: invoiceKind === 'FULL' ? 'FULL_TAX_INVOICE' : 'SHORT_TAX_INVOICE',
-      title: invoiceKind === 'FULL' ? 'ใบกำกับภาษี' : 'ใบกำกับภาษีอย่างย่อ',
+      type: 'CREDIT_NOTE',
+      title: 'ใบลดหนี้',
       number: document.issuedDocumentNumber,
       sequence: Number(document.issuedSequence),
       issuedAt: document.issuedAt,
@@ -169,7 +175,18 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       totalAmount: amount(document.totalAmount),
     },
     issuer: document.issuerSnapshot,
-    recipient,
+    recipient: document.recipientSnapshot || null,
+    originalInvoice: {
+      id: original.id,
+      kind: original.taxInvoiceKind,
+      number: original.issuedDocumentNumber,
+      issuedAt: original.issuedAt,
+    },
+    saleReturn: {
+      id: saleReturn.id,
+      completedAt: saleReturn.completedAt,
+      refundedAmount: amount(saleReturn.refundedAmount),
+    },
     sale: {
       id: sale.id,
       code: sale.code,
@@ -182,4 +199,4 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
   });
 };
 
-module.exports = Object.freeze({ projectOutputTaxPrintableDocument });
+module.exports = Object.freeze({ projectOutputTaxCreditNotePrintableDocument });

@@ -207,6 +207,8 @@ model TaxIssuerProfile {
   fullTaxInvoicePrefix       String?
   nextShortTaxInvoiceNumber  Int                    @default(1)
   nextFullTaxInvoiceNumber   Int                    @default(1)
+  creditNotePrefix           String?
+  nextCreditNoteNumber       Int                    @default(1)
   status                     TaxIssuerProfileStatus @default(DRAFT)
   createdAt                  DateTime               @default(now())
   updatedAt                  DateTime               @updatedAt
@@ -1144,6 +1146,7 @@ model SaleReturn {
   items                 SaleReturnItem[]
   saleReturnItemSimples SaleReturnItemSimple[]
   completionCommand     SaleReturnCompletionCommand?
+  creditNoteTaxDocument TaxDocument?               @relation("TaxDocumentCreditNoteSaleReturn")
 
   @@index([saleId, returnedAt])
   @@index([branchId, returnedAt])
@@ -2440,6 +2443,8 @@ model TaxDocument {
   issuedSequence      Int?
   issuerSnapshot      Json?
   recipientSnapshot   Json?
+  originalTaxDocumentId Int?                       @unique
+  saleReturnId         Int?                         @unique
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @default(now())
   branch              Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -2447,6 +2452,9 @@ model TaxDocument {
   issuerProfile       TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
   lifecycleEvents     TaxDocumentLifecycleEvent[]
   inputTaxFilingItems InputTaxFilingItem[]
+  originalTaxDocument TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
+  creditNote          TaxDocument?                 @relation("TaxDocumentCreditNote")
+  saleReturn          SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)
 
   @@index([branchId, status, occurredAt])
   @@index([branchId, documentType, documentNumber])

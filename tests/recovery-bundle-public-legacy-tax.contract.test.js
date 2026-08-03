@@ -19,6 +19,8 @@ assert.ok(restore.includes('DROP SCHEMA IF EXISTS "public" CASCADE'));
 assert.ok(restore.includes('DROP SCHEMA IF EXISTS "legacy_tax" CASCADE'));
 assert.ok(restore.includes('ON_ERROR_STOP=1'));
 assert.ok(restore.includes('Row-count verification failed'));
+assert.ok(restore.includes('RESTORE_BUNDLE_MANIFEST'));
+assert.ok(restore.includes('RESTORE_DATABASE_RESET_CONFIRMATION'));
 assert.ok(!/process\.env\.DATABASE_URL\b/.test(restore));
 
 console.log('recovery bundle public + legacy_tax contract: PASS');

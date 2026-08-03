@@ -21,6 +21,7 @@ const projectReturnLines = (saleReturn) => [
 
 const mapSaleReturnResult = ({ saleReturn, commandId, replayed }) => ({
   saleReturnId: saleReturn.id,
+  branchId: saleReturn.branchId,
   code: saleReturn.code,
   saleId: saleReturn.saleId,
   returnedAt: saleReturn.returnedAt,

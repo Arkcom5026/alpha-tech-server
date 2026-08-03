@@ -7,6 +7,7 @@ const buildSaleReturnEligibility = (sale) => ({
     soldAt: sale.soldAt,
     customer: sale.customer,
     totalAmount: number(sale.totalAmount),
+    isTaxInvoice: Boolean(sale.isTaxInvoice),
   },
   serializedItems: sale.items.map((item) => ({
     saleItemId: item.id,

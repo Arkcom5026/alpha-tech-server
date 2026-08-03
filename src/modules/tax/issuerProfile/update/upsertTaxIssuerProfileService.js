@@ -10,6 +10,7 @@ const EDITABLE_FIELDS = new Set([
   'isHeadOffice',
   'shortTaxInvoicePrefix',
   'fullTaxInvoicePrefix',
+  'creditNotePrefix',
   'status',
 ]);
 
@@ -84,6 +85,9 @@ const normalizeData = (input = {}) => {
   }
   if (Object.prototype.hasOwnProperty.call(input, 'fullTaxInvoicePrefix')) {
     data.fullTaxInvoicePrefix = optionalText(input.fullTaxInvoicePrefix, 'fullTaxInvoicePrefix', 100);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'creditNotePrefix')) {
+    data.creditNotePrefix = optionalText(input.creditNotePrefix, 'creditNotePrefix', 100);
   }
   if (Object.prototype.hasOwnProperty.call(input, 'taxId')) data.taxId = normalizeTaxId(input.taxId);
   if (Object.prototype.hasOwnProperty.call(input, 'branchCode')) data.branchCode = normalizeBranchCode(input.branchCode);

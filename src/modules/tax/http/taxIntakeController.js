@@ -92,6 +92,19 @@ const issueOutputTaxDocument = handle((req) => service.issueOutputTaxDocument({
 }));
 
 
+const issueOutputTaxCreditNote = handle((req) => service.issueOutputTaxCreditNote({
+  branchId: resolveBranchId(req, req.body),
+  taxDocumentId: req.params.taxDocumentId,
+  saleReturnId: req.body?.saleReturnId,
+  actorEmployeeId: actorEmployeeId(req),
+}), 201);
+
+const issueOutputTaxCreditNoteForSaleReturn = handle((req) => service.issueOutputTaxCreditNoteForSaleReturn({
+  branchId: resolveBranchId(req, req.body),
+  saleReturnId: req.params.saleReturnId,
+  actorEmployeeId: actorEmployeeId(req),
+}), 201);
+
 const transitionDocument = handle((req) => service.transitionTaxDocument({
   branchId: resolveBranchId(req, req.body),
   taxDocumentId: req.params.taxDocumentId,
@@ -104,6 +117,8 @@ module.exports = Object.freeze({
   getDocumentDetail,
   getPrintableOutputTaxDocument,
   issueOutputTaxDocument,
+  issueOutputTaxCreditNote,
+  issueOutputTaxCreditNoteForSaleReturn,
   listCandidates,
   listDocuments,
   registerCandidate,
