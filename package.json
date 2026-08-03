@@ -91,7 +91,8 @@
     "test:output-tax-atomic-issuance": "node prisma/migrations/20260803203000_output_tax_atomic_issuance/migration.test.js && node tests/output-tax-atomic-issuance.contract.test.js",
     "test:tax-issuer-profile": "node prisma/migrations/20260802190000_tax_issuer_profile_foundation/migration.test.js && node tests/tax-issuer-profile-runtime.contract.test.js",
     "test:tax-issuer-profile-runtime": "node tests/tax-issuer-profile-runtime.contract.test.js",
-    "verify:tax-issuer-profile-schema": "node scripts/verify-tax-issuer-profile-schema.js"
+    "verify:tax-issuer-profile-schema": "node scripts/verify-tax-issuer-profile-schema.js",
+    "verify:output-tax-issuance-schema": "node scripts/verify-output-tax-issuance-schema.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
