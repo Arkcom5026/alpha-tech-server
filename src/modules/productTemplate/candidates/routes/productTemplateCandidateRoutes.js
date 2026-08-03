@@ -1,0 +1,30 @@
+const express = require('express')
+const verifyToken = require('../../../../../middlewares/verifyToken')
+const {
+  createProductTemplateCandidate,
+} = require('../create/createProductTemplateCandidateController')
+const {
+  listProductTemplateCandidates,
+} = require('../query/list/listProductTemplateCandidatesController')
+const {
+  getProductTemplateCandidate,
+} = require('../query/detail/getProductTemplateCandidateController')
+
+const router = express.Router()
+
+const requireSuperAdmin = (req, res, next) => {
+  const role = String(req.user?.role || '').trim().toUpperCase()
+  if (role !== 'SUPERADMIN') {
+    return res.status(403).json({ error: 'Forbidden', code: 'SUPERADMIN_REQUIRED' })
+  }
+  return next()
+}
+
+router.use(verifyToken)
+router.use(requireSuperAdmin)
+
+router.get('/', listProductTemplateCandidates)
+router.post('/', createProductTemplateCandidate)
+router.get('/:id', getProductTemplateCandidate)
+
+module.exports = router
