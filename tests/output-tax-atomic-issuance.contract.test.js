@@ -13,6 +13,7 @@ const controller = read('src/modules/tax/http/taxIntakeController.js');
 const routes = read('src/modules/tax/http/taxIntakeRoutes.js');
 const schema = read('prisma/schema.prisma');
 
+assert.match(issueService, /forUpdate: true/);
 assert.match(issueService, /FOR UPDATE/);
 assert.match(issueService, /TAX_ISSUER_PROFILE_NOT_ACTIVE/);
 assert.match(issueService, /TAX_DOCUMENT_ALREADY_ISSUED/);
@@ -21,6 +22,8 @@ assert.match(issueService, /assertSaleTaxDocumentEligibility/);
 assert.match(issueService, /nextShortTaxInvoiceNumber/);
 assert.match(issueService, /nextFullTaxInvoiceNumber/);
 assert.match(issueService, /issuedDocumentNumber/);
+assert.match(repository, /forUpdate/);
+assert.match(repository, /FOR UPDATE OF d/);
 assert.match(repository, /issuerProfileId/);
 assert.match(repository, /issuerSnapshot/);
 assert.match(repository, /issuedSequence/);
