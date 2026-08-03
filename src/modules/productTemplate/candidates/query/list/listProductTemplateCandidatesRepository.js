@@ -19,8 +19,8 @@ const CANDIDATE_LIST_SELECT = {
   sourceProduct: { select: { id: true, name: true, branchId: true } },
   targetTemplateBranch: { select: { id: true, name: true, branchCode: true } },
   targetTemplateProduct: { select: { id: true, name: true, branchId: true } },
-  createdByEmployee: { select: { id: true, firstName: true, lastName: true } },
-  reviewedByEmployee: { select: { id: true, firstName: true, lastName: true } },
+  createdByEmployee: { select: { id: true, name: true } },
+  reviewedByEmployee: { select: { id: true, name: true } },
   _count: { select: { events: true } },
 }
 
