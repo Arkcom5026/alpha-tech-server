@@ -14,6 +14,8 @@ const completeSaleController = async (req, res) => {
     await saleCustomerAccessService.assertAccessible({
       customerId: command.sale.customerId,
       branchId,
+      employeeId,
+      customerFirstAssociationToken: command.sale.customerFirstAssociationToken,
     });
     const result = await completeSale({ command, branchId, employeeId });
     const taxIntake = await publishSaleTaxCandidate({
