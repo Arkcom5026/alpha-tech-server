@@ -1,13 +1,9 @@
-function buildCustomerBranchEvidence(branchIdInput) {
-  const branchId = Number(branchIdInput);
-  return {
-    OR: [
-      { sales: { some: { branchId } } },
-      { repairJobs: { some: { branchId } } },
-      { deviceIntakes: { some: { branchId } } },
-      { ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } },
-    ],
-  };
-}
+const {
+  buildCustomerBranchEvidence,
+  buildCustomerBranchAccessWhere,
+} = require('../../customer/policies/customerBranchAccessPolicy');
 
-module.exports = { buildCustomerBranchEvidence };
+module.exports = {
+  buildCustomerBranchEvidence,
+  buildCustomerBranchAccessWhere,
+};
