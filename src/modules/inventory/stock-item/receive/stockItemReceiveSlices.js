@@ -118,6 +118,18 @@ async function receiveStockItem(req, res) {
         },
       })
       await tx.barcodeReceiptItem.update({ where: { id: barcodeItem.id }, data: { status: 'SN_RECEIVED', stockItem: { connect: { id: created.id } } } })
+      await tx.stockMovement.create({
+        data: {
+          productId: product.id,
+          branchId,
+          stockItemId: created.id,
+          qty: 1,
+          type: 'RECEIVE',
+          refType: 'PURCHASE_RECEIPT',
+          refId: barcodeItem.receiptItem?.receiptId || null,
+          note: `รับสินค้า STRUCTURED จาก Barcode ${normalizedBarcode}`,
+        },
+      })
       await tx.stockBalance.upsert({
         where: { productId_branchId: { productId: product.id, branchId } },
         update: { quantity: { increment: 1 } },
@@ -205,6 +217,18 @@ async function receiveAllPendingNoSN(req, res) {
             },
           })
           await tx.barcodeReceiptItem.update({ where: { id: entry.id }, data: { status: 'SN_RECEIVED', stockItem: { connect: { id: created.id } } } })
+          await tx.stockMovement.create({
+            data: {
+              productId: entry.productId,
+              branchId,
+              stockItemId: created.id,
+              qty: 1,
+              type: 'RECEIVE',
+              refType: 'PURCHASE_RECEIPT',
+              refId: receiptId,
+              note: `รับสินค้า STRUCTURED จาก Barcode ${entry.barcode}`,
+            },
+          })
           await tx.stockBalance.upsert({
             where: { productId_branchId: { productId: entry.productId, branchId } },
             update: { quantity: { increment: 1 } }, create: { productId: entry.productId, branchId, quantity: 1, reserved: 0 },
