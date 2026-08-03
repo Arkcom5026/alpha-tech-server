@@ -6,12 +6,8 @@ const {
   buildCustomerAddress,
 } = require('../shared/customerControllerSupport');
 const {
-  buildCustomerBranchAccessWhere,
-} = require('../policies/customerBranchAccessPolicy');
-const {
   issueCustomerFirstAssociationToken,
 } = require('../policies/customerFirstAssociationTokenPolicy');
-const { prisma } = require('../../../../lib/prisma');
 
 function presentCustomer(customer, { includeCredit = true, firstAssociationToken = null } = {}) {
   const subdistrictCode = customer.subdistrict?.code || null;
@@ -89,9 +85,9 @@ async function createCustomer(input = {}, actor = {}) {
   if (existingUser) {
     const existingProfile = await repository.findCustomerByUserId(existingUser.id);
     if (existingProfile) {
-      const accessible = await prisma.customerProfile.findFirst({
-        where: buildCustomerBranchAccessWhere({ customerId: existingProfile.id, branchId }),
-        select: { id: true },
+      const accessible = await repository.findAccessibleCustomer({
+        customerId: existingProfile.id,
+        branchId,
       });
       if (!accessible) {
         throw buildError(409, {
