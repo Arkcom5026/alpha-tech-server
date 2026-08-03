@@ -24,6 +24,7 @@ router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
 router.get('/documents/:taxDocumentId/printable', controller.getPrintableOutputTaxDocument);
 router.post('/documents/:taxDocumentId/issue', controller.issueOutputTaxDocument);
 router.post('/documents/:taxDocumentId/credit-note', controller.issueOutputTaxCreditNote);
+router.post('/credit-notes/from-sale-return/:saleReturnId', controller.issueOutputTaxCreditNoteForSaleReturn);
 router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
 
 module.exports = router;
