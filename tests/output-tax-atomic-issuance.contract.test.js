@@ -23,7 +23,7 @@ assert.match(issueService, /nextShortTaxInvoiceNumber/);
 assert.match(issueService, /nextFullTaxInvoiceNumber/);
 assert.match(issueService, /issuedDocumentNumber/);
 assert.match(repository, /findByIdForUpdate/);
-assert.match(repository, /FOR UPDATE OF d/);
+assert.match(repository, /LIMIT 1 FOR UPDATE/);
 assert.match(repository, /issuerProfileId/);
 assert.match(repository, /issuerSnapshot/);
 assert.match(repository, /issuedSequence/);
