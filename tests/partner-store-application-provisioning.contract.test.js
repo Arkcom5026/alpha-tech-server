@@ -6,7 +6,9 @@ const root = path.join(__dirname, '..')
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 
 const routes = read('src/modules/partnerStore/application/partnerStoreApplicationRoutes.js')
+const controller = read('src/modules/partnerStore/application/partnerStoreApplicationController.js')
 const service = read('src/modules/partnerStore/application/partnerStoreApplicationService.js')
+const repository = read('src/modules/partnerStore/application/partnerStoreApplicationRepository.js')
 const server = read('server.js')
 const schema = read('prisma/partner-store-application.prisma')
 const migration = read('prisma/migrations/20260730043000_partner_store_application_provisioning/migration.sql')
@@ -18,17 +20,43 @@ assert.ok(routes.includes("adminRouter.post('/:id/approve', controller.approve)"
 assert.ok(routes.includes("adminRouter.post('/:id/reject', controller.reject)"))
 assert.ok(server.includes("'/api/public/partner-store-applications'"))
 assert.ok(server.includes("'/api/partner-store/applications'"))
+assert.ok(!controller.includes('req.body?.ownerUserId'))
 
 for (const token of ['provisionedBranchId', 'provisionedOwnerUserId', 'decidedAt']) {
   assert.ok(schema.includes(token), `application schema must retain ${token}`)
   assert.ok(migration.includes(`"${token}"`), `migration must add ${token}`)
 }
+
+assert.ok(service.includes("const bcrypt = require('bcryptjs')"))
+assert.ok(service.includes("password.length < 8"))
+assert.ok(service.includes('bcrypt.hash(password, 10)'))
+assert.ok(service.includes("enabled: false"))
+assert.ok(service.includes('provisionedOwnerUserId: owner.id'))
+assert.ok(service.includes("status: { in: ['PENDING', 'UNDER_REVIEW', 'APPROVED'] }"))
 assert.ok(service.includes("v2Role: 'OWNER'"))
+assert.ok(service.includes("data: { role: 'ADMIN', enabled: true }"))
 assert.ok(service.includes("storefrontEnabled: false"))
 assert.ok(service.includes("connectOrCreate"))
 assert.ok(service.includes("System Partner Store"))
+assert.ok(service.includes("provisionedOwnerUserId: null"))
+assert.ok(service.includes('await tx.user.delete'))
+assert.ok(service.includes('PARTNER_STORE_OWNER_CLEANUP_UNSAFE'))
+assert.ok(service.includes('const resolveReservedOwner = async'))
+assert.ok(service.includes("where: { email: text(application.contactEmail).toLowerCase() }"))
+assert.ok(service.includes('PARTNER_STORE_OWNER_RECOVERY_UNSAFE'))
+assert.ok(service.includes("recoverableOwner.role !== 'EMPLOYEE'"))
+assert.ok(service.includes('data: { provisionedOwnerUserId: recoverableOwner.id }'))
+assert.ok(service.includes('const owner = await resolveReservedOwner(application, tx)'))
+assert.ok(service.includes('provisionedOwnerUserId: owner.id'))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
+
+const publicSelectMatch = repository.match(/const publicSelect = \{([\s\S]*?)\n\}/)
+assert.ok(publicSelectMatch, 'repository must define a public application projection')
+assert.ok(!publicSelectMatch[1].includes('provisionedOwnerUserId'), 'public projection must hide reserved owner user id')
+assert.ok(repository.includes('const adminSelect = {'))
+assert.ok(repository.includes('provisionedOwnerUserId: true'))
+
 assert.ok(
   !/^\s*(DROP\s+(TABLE|TYPE|INDEX)|TRUNCATE\s+TABLE|INSERT\s+INTO|UPDATE\s+"|DELETE\s+FROM)/im.test(migration),
   'migration must not contain destructive DDL or business-data mutations'
@@ -36,7 +64,10 @@ assert.ok(
 assert.ok(!migration.includes('ALTER TABLE "Branch"'))
 assert.ok(runtimeVerifier.includes("ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true'"))
 assert.ok(runtimeVerifier.includes('system-test-partner-'))
-assert.ok(runtimeVerifier.includes('retainedTestData: true'))
+assert.ok(runtimeVerifier.includes('applicationRepository.findById'))
+assert.ok(runtimeVerifier.includes('publicResponseHidesOwnerUserId: true'))
+assert.ok(runtimeVerifier.includes('cleanedStalePendingApplications'))
+assert.ok(runtimeVerifier.includes('retainedApprovedTestData: true'))
 assert.ok(runtimeVerifier.includes('businessData'))
 assert.ok(!runtimeVerifier.includes('customerProfile.count'))
 

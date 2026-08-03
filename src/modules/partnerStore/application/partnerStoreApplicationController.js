@@ -30,7 +30,6 @@ exports.approve = async (req, res) => {
   try {
     const data = await service.approveApplication(
       Number(req.params.id),
-      req.body?.ownerUserId,
       req.employee?.id || req.user?.employeeId || null,
       req.body?.reviewNote
     )
