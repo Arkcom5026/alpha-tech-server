@@ -6,6 +6,9 @@ const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxD
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 const {
+  registerSaleReturnTaxCandidate,
+} = require('../sources/saleReturn/registerSaleReturnTaxCandidateService');
+const {
   projectInputTaxReconciliation,
 } = require('../inputDocuments/reconciliation/inputTaxDocumentReconciliationService');
 
@@ -53,6 +56,7 @@ module.exports = Object.freeze({
   getDocumentDetail,
   listCandidates,
   listDocuments,
+  registerSaleReturnTaxCandidate,
   registerSaleTaxCandidate,
   registerTaxCandidate,
   transitionTaxDocument,
