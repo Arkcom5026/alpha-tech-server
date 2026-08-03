@@ -4,6 +4,7 @@ const candidateRepository = require('../candidates/repository/taxCandidateReposi
 const documentRepository = require('../documents/repository/taxDocumentRepository');
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
 const { issueOutputTaxDocument } = require('../documents/issue/issueOutputTaxDocumentService');
+const { projectOutputTaxPrintableDocument } = require('../documents/print/projectOutputTaxPrintableDocumentService');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 const {
@@ -54,6 +55,7 @@ module.exports = Object.freeze({
   getDocumentDetail,
   issueOutputTaxDocument,
   listCandidates,
+  projectOutputTaxPrintableDocument,
   listDocuments,
   registerSaleTaxCandidate,
   registerTaxCandidate,
