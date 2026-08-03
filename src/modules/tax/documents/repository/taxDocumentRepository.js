@@ -37,7 +37,7 @@ const findByIdForUpdate = async ({ branchId, taxDocumentId }, tx = prisma) => {
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
-const findDetailById = async ({ branchId, taxDocumentId }, tx = prisma) => {
+const findDetailById = async ({ branchId, taxDocumentId }, tx = prisma, { forUpdate = false } = {}) => {
   const documents = await tx.$queryRaw(Prisma.sql`
     SELECT d.*, row_to_json(c.*) AS candidate
     FROM "TaxDocument" d
@@ -45,6 +45,7 @@ const findDetailById = async ({ branchId, taxDocumentId }, tx = prisma) => {
     WHERE d."id" = ${Number(taxDocumentId)}
       AND d."branchId" = ${Number(branchId)}
     LIMIT 1
+    ${forUpdate ? Prisma.sql`FOR UPDATE OF d` : Prisma.empty}
   `);
   if (!documents[0]) return null;
 
