@@ -10,6 +10,7 @@ if (process.env.ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true') {
 
 const { prisma } = require('../lib/prisma')
 const applicationService = require('../src/modules/partnerStore/application/partnerStoreApplicationService')
+const applicationRepository = require('../src/modules/partnerStore/application/partnerStoreApplicationRepository')
 
 const token = crypto.randomBytes(6).toString('hex')
 const email = `system-test-partner-${token}@invalid.local`
@@ -27,8 +28,42 @@ const countBranchBusinessData = async (branchId) => {
   return { prices, stockBalances, stockItems, sales }
 }
 
+const cleanupStalePendingRuntimeApplications = async () => {
+  const stale = await prisma.partnerStoreApplication.findMany({
+    where: {
+      status: 'PENDING',
+      contactEmail: { startsWith: 'system-test-partner-', endsWith: '@invalid.local' },
+      businessAddress: { in: ['SYSTEM TEST ONLY', 'SYSTEM TEST REJECTION ONLY'] },
+    },
+    select: { id: true, provisionedOwnerUserId: true },
+  })
+
+  let cleaned = 0
+  for (const item of stale) {
+    await prisma.$transaction(async (tx) => {
+      const owner = item.provisionedOwnerUserId
+        ? await tx.user.findUnique({
+            where: { id: item.provisionedOwnerUserId },
+            include: { employeeProfile: true },
+          })
+        : null
+
+      await tx.partnerStoreApplication.delete({ where: { id: item.id } })
+
+      if (owner && owner.enabled === false && !owner.employeeProfile) {
+        await tx.user.delete({ where: { id: owner.id } })
+      }
+    })
+    cleaned += 1
+  }
+
+  return cleaned
+}
+
 async function main() {
-  const application = await applicationService.createApplication({
+  const cleanedStalePendingApplications = await cleanupStalePendingRuntimeApplications()
+
+  const publicApplication = await applicationService.createApplication({
     businessName: `system-test partner ${token}`,
     contactName: 'System Test Owner',
     contactPhone: '0000000000',
@@ -39,10 +74,15 @@ async function main() {
     note: 'Runtime verification only. Do not use for operations.',
   })
 
+  assert.equal(publicApplication.provisionedOwnerUserId, undefined)
+
+  const application = await applicationRepository.findById(publicApplication.id)
+  assert.ok(application)
   assert.ok(application.provisionedOwnerUserId)
 
+  const ownerUserId = application.provisionedOwnerUserId
   const reservedOwner = await prisma.user.findUnique({
-    where: { id: application.provisionedOwnerUserId },
+    where: { id: ownerUserId },
     include: { employeeProfile: true },
   })
 
@@ -63,14 +103,14 @@ async function main() {
 
   const [storedApplication, activeOwner, profile, capability, businessData] = await Promise.all([
     prisma.partnerStoreApplication.findUnique({ where: { id: application.id } }),
-    prisma.user.findUnique({ where: { id: application.provisionedOwnerUserId } }),
-    prisma.employeeProfile.findUnique({ where: { userId: application.provisionedOwnerUserId } }),
+    prisma.user.findUnique({ where: { id: ownerUserId } }),
+    prisma.employeeProfile.findUnique({ where: { userId: ownerUserId } }),
     prisma.partnerStoreCapability.findUnique({ where: { branchId: approved.provisionedBranchId } }),
     countBranchBusinessData(approved.provisionedBranchId),
   ])
 
   assert.equal(storedApplication.provisionedBranchId, approved.provisionedBranchId)
-  assert.equal(storedApplication.provisionedOwnerUserId, application.provisionedOwnerUserId)
+  assert.equal(storedApplication.provisionedOwnerUserId, ownerUserId)
   assert.equal(activeOwner.enabled, true)
   assert.equal(activeOwner.role, 'ADMIN')
   assert.equal(profile.branchId, approved.provisionedBranchId)
@@ -81,7 +121,7 @@ async function main() {
   assert.equal(capability.storefrontEnabled, false)
   assert.deepEqual(businessData, { prices: 0, stockBalances: 0, stockItems: 0, sales: 0 })
 
-  const rejectedApplication = await applicationService.createApplication({
+  const publicRejectedApplication = await applicationService.createApplication({
     businessName: `system-test rejected partner ${token}`,
     contactName: 'Rejected System Test Owner',
     contactPhone: '0000000001',
@@ -92,7 +132,10 @@ async function main() {
     note: 'Runtime rejection cleanup verification only.',
   })
 
+  const rejectedApplication = await applicationRepository.findById(publicRejectedApplication.id)
   const rejectedOwnerId = rejectedApplication.provisionedOwnerUserId
+  assert.ok(rejectedOwnerId)
+
   const rejected = await applicationService.rejectApplication(
     rejectedApplication.id,
     'system-test rejection cleanup verification'
@@ -112,10 +155,12 @@ async function main() {
     result: 'PASS',
     applicationCode: application.applicationCode,
     branchId: approved.provisionedBranchId,
-    ownerUserId: application.provisionedOwnerUserId,
+    ownerUserId,
+    publicResponseHidesOwnerUserId: true,
     ownerEnabledBeforeApproval: false,
     ownerEnabledAfterApproval: true,
     rejectionCleanup: 'PASS',
+    cleanedStalePendingApplications,
     retainedApprovedTestData: true,
     retainedRejectedApplication: true,
     businessData,
