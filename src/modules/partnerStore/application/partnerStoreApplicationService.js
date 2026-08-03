@@ -96,6 +96,38 @@ const listApplications = (status) => {
   return repository.list(value || undefined)
 }
 
+const resolveReservedOwner = async (application, tx) => {
+  const reservedOwnerId = Number(application.provisionedOwnerUserId)
+  if (Number.isInteger(reservedOwnerId) && reservedOwnerId > 0) {
+    return tx.user.findUnique({
+      where: { id: reservedOwnerId },
+      include: { employeeProfile: true },
+    })
+  }
+
+  const recoverableOwner = await tx.user.findUnique({
+    where: { email: text(application.contactEmail).toLowerCase() },
+    include: { employeeProfile: true },
+  })
+
+  if (!recoverableOwner) {
+    fail(409, 'PARTNER_STORE_OWNER_NOT_RESERVED', 'ใบสมัครนี้ยังไม่มีบัญชีเจ้าของร้านที่พร้อมเปิดใช้งาน กรุณาให้ผู้สมัครส่งใบสมัครใหม่')
+  }
+  if (recoverableOwner.enabled || recoverableOwner.employeeProfile) {
+    fail(409, 'PARTNER_STORE_OWNER_RECOVERY_UNSAFE', 'พบบัญชีอีเมลเดียวกันแต่บัญชีถูกใช้งานแล้ว ไม่สามารถผูกกับใบสมัครนี้อัตโนมัติได้')
+  }
+  if (recoverableOwner.role !== 'EMPLOYEE') {
+    fail(409, 'PARTNER_STORE_OWNER_RECOVERY_UNSAFE', 'พบบัญชีอีเมลเดียวกันแต่บทบาทบัญชีไม่ตรงกับบัญชีสำรองของเจ้าของร้าน')
+  }
+
+  await tx.partnerStoreApplication.update({
+    where: { id: application.id },
+    data: { provisionedOwnerUserId: recoverableOwner.id },
+  })
+
+  return recoverableOwner
+}
+
 const approveApplication = async (applicationId, actorEmployeeId, reviewNote) =>
   repository.withTransaction(async (tx) => {
     const application = await repository.findById(applicationId, tx)
@@ -104,15 +136,7 @@ const approveApplication = async (applicationId, actorEmployeeId, reviewNote) =>
       fail(409, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE', 'ใบสมัครนี้ไม่สามารถอนุมัติได้')
     }
 
-    const ownerId = Number(application.provisionedOwnerUserId)
-    if (!Number.isInteger(ownerId) || ownerId <= 0) {
-      fail(409, 'PARTNER_STORE_OWNER_NOT_RESERVED', 'ใบสมัครนี้ยังไม่มีบัญชีเจ้าของร้านที่พร้อมเปิดใช้งาน')
-    }
-
-    const owner = await tx.user.findUnique({
-      where: { id: ownerId },
-      include: { employeeProfile: true },
-    })
+    const owner = await resolveReservedOwner(application, tx)
     if (!owner) fail(409, 'PARTNER_STORE_OWNER_INVALID', 'ไม่พบบัญชีเจ้าของร้านของใบสมัครนี้')
     if (owner.enabled) fail(409, 'PARTNER_STORE_OWNER_ALREADY_ENABLED', 'บัญชีเจ้าของร้านนี้ถูกเปิดใช้งานไปแล้ว')
     if (owner.employeeProfile) fail(409, 'PARTNER_STORE_OWNER_ALREADY_ASSIGNED', 'ผู้ใช้นี้มีสังกัดร้านอยู่แล้ว')
@@ -172,6 +196,7 @@ const approveApplication = async (applicationId, actorEmployeeId, reviewNote) =>
         status: 'APPROVED',
         reviewNote: text(reviewNote) || null,
         provisionedBranchId: branch.id,
+        provisionedOwnerUserId: owner.id,
         decidedAt: new Date(),
       },
       select: {
