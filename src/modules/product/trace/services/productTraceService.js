@@ -48,12 +48,10 @@ const getProductTraceByLookup = async ({ lookup, branchId, actor }) => {
   const claims = buildProductTraceClaims(stockItem)
   const repairs = buildProductTraceRepairs(stockItem, permissions)
   const summary = buildProductTraceSummary({ stockItem, returns, permissions })
-  const simpleSales = stockItem.saleItemsSimple || []
   const timeline = mapProductTraceTimeline(buildProductTraceTimeline({
     stockItem,
     procurement,
     sales,
-    simpleSales,
     returns,
     claims,
     repairs,

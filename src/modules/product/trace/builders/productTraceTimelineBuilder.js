@@ -59,6 +59,20 @@ const buildProductTraceTimeline = ({ stockItem, procurement, sales, simpleSales,
       actor: saleReturn.employee, amount: permissions.canViewFinancials ? item.refundAmount : null,
       status: saleReturn.status, metadata: { returnType: saleReturn.returnType, resultingStockStatus: 'IN_STOCK' },
     }))
+
+    for (const refund of item.refundTransactions || []) events.push(createProductTraceTimelineEvent({
+      id: `refunded-${saleReturn.id}-${refund.id}`,
+      type: ProductTraceEventType.PRODUCT_REFUNDED,
+      category: ProductTraceEventCategory.RETURN,
+      occurredAt: refund.refundedAt || saleReturn.returnedAt,
+      title: 'คืนเงินให้ลูกค้า',
+      description: refund.note || null,
+      document: { type: 'SALE_RETURN', id: saleReturn.id, code: saleReturn.code },
+      actor: refund.refundedBy || saleReturn.refundedBy || saleReturn.employee || null,
+      amount: permissions.canViewFinancials ? refund.amount : null,
+      status: saleReturn.status,
+      metadata: { method: refund.method || null, deductedAmount: refund.deducted ?? null },
+    }))
   }
 
   for (const item of simpleReturns || []) events.push(createProductTraceTimelineEvent({
