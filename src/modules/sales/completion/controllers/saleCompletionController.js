@@ -1,5 +1,6 @@
 const { validateSaleCompletionRequest } = require('../validators/saleCompletionValidator');
 const { completeSale } = require('../services/saleCompletionService');
+const saleCustomerAccessService = require('../services/saleCustomerAccessService');
 const { publishSaleTaxCandidate } = require('../services/publishSaleTaxCandidateService');
 
 const completeSaleController = async (req, res) => {
@@ -10,6 +11,10 @@ const completeSaleController = async (req, res) => {
       return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch and employee are required' });
     }
     const command = validateSaleCompletionRequest(req.body);
+    await saleCustomerAccessService.assertAccessible({
+      customerId: command.sale.customerId,
+      branchId,
+    });
     const result = await completeSale({ command, branchId, employeeId });
     const taxIntake = await publishSaleTaxCandidate({
       sale: result.sale,
