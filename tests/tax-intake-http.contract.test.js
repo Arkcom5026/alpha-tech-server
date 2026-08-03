@@ -10,6 +10,7 @@ assert.strictEqual(typeof controller.registerSaleCandidate, 'function');
 assert.strictEqual(typeof controller.listCandidates, 'function');
 assert.strictEqual(typeof controller.listDocuments, 'function');
 assert.strictEqual(typeof controller.getDocumentDetail, 'function');
+assert.strictEqual(typeof controller.issueOutputTaxDocument, 'function');
 assert.strictEqual(typeof controller.transitionDocument, 'function');
 
 const routeContracts = routes.stack
@@ -25,6 +26,7 @@ assert.deepStrictEqual(routeContracts, [
   { path: '/candidates', methods: ['get'] },
   { path: '/documents', methods: ['get'] },
   { path: '/documents/:taxDocumentId', methods: ['get'] },
+  { path: '/documents/:taxDocumentId/issue', methods: ['post'] },
   { path: '/documents/:taxDocumentId/transition', methods: ['post'] },
 ]);
 
@@ -34,6 +36,7 @@ assert.strictEqual(typeof tax.intake.service.registerSaleTaxCandidate, 'function
 assert.strictEqual(typeof tax.intake.service.listCandidates, 'function');
 assert.strictEqual(typeof tax.intake.service.listDocuments, 'function');
 assert.strictEqual(typeof tax.intake.service.getDocumentDetail, 'function');
+assert.strictEqual(typeof tax.intake.service.issueOutputTaxDocument, 'function');
 assert.strictEqual(typeof tax.intake.service.transitionTaxDocument, 'function');
 
 console.log('Tax intake HTTP contract: PASS');
