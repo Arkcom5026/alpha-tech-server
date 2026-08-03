@@ -130,10 +130,22 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
   }
 });
 
+test('controlled repair script keeps its scoped movement-repair guards', () => {
+  const scriptPath = path.resolve(REPOSITORY_ROOT, 'scripts/repair-stock-receipt-receive-movements.js');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+
+  assert.match(source, /ALLOW_MAIN_DATABASE_STOCK_RECEIPT_REPAIR/);
+  assert.match(source, /CONFIRM_STOCK_RECEIPT_REPAIR_SCOPE/);
+  assert.match(source, /prisma\.\$transaction/);
+  assert.match(source, /stockMovement\.findFirst/);
+  assert.match(source, /stockMovement\.create/);
+});
+
 test('repository production runtime cannot add an unregistered direct stock movement writer', () => {
   const authorityTestPath = path.resolve(__filename);
   const writerPath = path.resolve(__dirname, 'stockMovementWriter.js');
   const allowedRuntimeWriters = new Set([
+    path.resolve(REPOSITORY_ROOT, 'scripts/repair-stock-receipt-receive-movements.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/recovery/simple-stock-backfill/execution/simpleStockBackfillExecutionRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/adjust/simpleStockAdjustmentRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js'),
