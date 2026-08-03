@@ -5,7 +5,7 @@
 - Repository: `Arkcom5026/alpha-tech-server`
 - Working branch: `feature/product-template-candidate-prisma-foundation`
 - Stacked base branch: `feature/brand-tenant-ownership-additive-foundation`
-- Required starting SHA: `309762668bef2745c995802642323e7509b94cca`
+- Required source SHA: `d8ea6bf8cd6bae80c6b8bc477eeb9dfb5106c7cf`
 - Mission type: Prisma additive foundation only
 - Runtime/API/FE work: forbidden
 - Data backfill/database mutation: forbidden
@@ -81,8 +81,8 @@ model ProductTemplateCandidate {
   sourceProduct         Product  @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
   targetTemplateBranch  Branch   @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
   targetTemplateProduct Product? @relation("ProductTemplateCandidateTargetProduct", fields: [targetTemplateProductId], references: [id])
-  createdByEmployee     Employee? @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
-  reviewedByEmployee    Employee? @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
+  createdByEmployee     EmployeeProfile? @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
+  reviewedByEmployee    EmployeeProfile? @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
   events                ProductTemplateCandidateEvent[]
 
   @@index([sourceBranchId, sourceProductId])
@@ -103,7 +103,7 @@ model ProductTemplateCandidateEvent {
   createdAt       DateTime                           @default(now())
 
   candidate     ProductTemplateCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  actorEmployee Employee?                 @relation("ProductTemplateCandidateEventActor", fields: [actorEmployeeId], references: [id])
+  actorEmployee EmployeeProfile?          @relation("ProductTemplateCandidateEventActor", fields: [actorEmployeeId], references: [id])
 
   @@index([candidateId, createdAt])
   @@index([eventType, createdAt])
@@ -117,7 +117,7 @@ Add only the reverse relations Prisma requires to existing models:
 
 - `Branch`: source candidates and target-template candidates using distinct relation names.
 - `Product`: source candidates and target-template candidates using distinct relation names.
-- `Employee`: created candidates, reviewed candidates, and candidate events using distinct relation names.
+- `EmployeeProfile`: created candidates, reviewed candidates, and candidate events using distinct relation names. This is the locked actor model; do not use `Employee`, `User`, or another model.
 
 Do not rename or repurpose existing relations.
 
