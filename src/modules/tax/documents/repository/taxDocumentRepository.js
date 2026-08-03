@@ -96,6 +96,40 @@ const updateStatus = async ({ branchId, taxDocumentId, expectedStatus, targetSta
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const issueOutputTaxDocument = async ({
+  branchId,
+  taxDocumentId,
+  issuerProfileId,
+  taxInvoiceKind,
+  issuedDocumentNumber,
+  issuedSequence,
+  issuerSnapshot,
+  recipientSnapshot,
+  counterpartyTaxId,
+}, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    UPDATE "TaxDocument"
+    SET
+      "status" = 'REGISTERED',
+      "issuedAt" = CURRENT_TIMESTAMP,
+      "issuerProfileId" = ${Number(issuerProfileId)},
+      "taxInvoiceKind" = ${taxInvoiceKind}::"TaxInvoiceKind",
+      "issuedDocumentNumber" = ${issuedDocumentNumber},
+      "issuedSequence" = ${Number(issuedSequence)},
+      "issuerSnapshot" = ${JSON.stringify(issuerSnapshot)}::jsonb,
+      "recipientSnapshot" = ${recipientSnapshot ? JSON.stringify(recipientSnapshot) : null}::jsonb,
+      "counterpartyTaxId" = ${counterpartyTaxId || null},
+      "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${Number(taxDocumentId)}
+      AND "branchId" = ${Number(branchId)}
+      AND "status" = 'DRAFT'
+      AND "issuerProfileId" IS NULL
+    RETURNING *
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
+
 const appendLifecycleEvent = async ({ taxDocumentId, fromStatus, toStatus, reason, actorEmployeeId, metadata }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxDocumentLifecycleEvent" (
