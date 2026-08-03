@@ -5,9 +5,12 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { assertTestDatabaseAuthority } = require('../recovery/testDatabaseAuthority');
 
-const receiptId = Number(process.argv[2]);
-const expectedBranchId = Number(process.argv[3]);
-const expectations = process.argv.slice(4).map((value) => {
+const args = process.argv.slice(2);
+const runtimeMode = args[0] === '--runtime';
+const values = runtimeMode ? args.slice(1) : args;
+const receiptId = Number(values[0]);
+const expectedBranchId = Number(values[1]);
+const expectations = values.slice(2).map((value) => {
   const [barcode, rawSerial = 'NULL'] = String(value).split(':');
   return {
     barcode: String(barcode || '').trim(),
@@ -16,7 +19,7 @@ const expectations = process.argv.slice(4).map((value) => {
 }).filter((item) => item.barcode);
 
 if (!Number.isInteger(receiptId) || receiptId <= 0) {
-  throw new Error('Usage: node scripts/verify-stock-receipt-e2e-outcome.js <receiptId> <branchId> <barcode:serial|NULL> [...]');
+  throw new Error('Usage: node scripts/verify-stock-receipt-e2e-outcome.js [--runtime] <receiptId> <branchId> <barcode:serial|NULL> [...]');
 }
 if (!Number.isInteger(expectedBranchId) || expectedBranchId <= 0) {
   throw new Error('Expected branchId must be a positive integer.');
@@ -25,21 +28,47 @@ if (!expectations.length) {
   throw new Error('At least one barcode expectation is required.');
 }
 
-const envPath = path.join(process.cwd(), '.env.restore');
-if (!fs.existsSync(envPath)) throw new Error('Missing .env.restore.');
+let targetUrl;
+let authority;
 
-dotenv.config({ path: envPath, override: true });
-const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
-const authorityEnv = { ...process.env };
-delete authorityEnv.DATABASE_URL;
-delete authorityEnv.DIRECT_URL;
-const authority = assertTestDatabaseAuthority({ targetUrl, env: authorityEnv });
+if (runtimeMode) {
+  if (process.env.ALLOW_MAIN_DATABASE_READONLY_VERIFICATION !== 'YES') {
+    throw new Error('Runtime DB verification requires ALLOW_MAIN_DATABASE_READONLY_VERIFICATION=YES.');
+  }
+
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false });
+  targetUrl = process.env.DATABASE_URL;
+  if (!targetUrl) throw new Error('DATABASE_URL is missing for runtime verification.');
+
+  const parsed = new URL(targetUrl);
+  authority = {
+    mode: 'RUNTIME_READ_ONLY',
+    target: {
+      host: parsed.hostname,
+      port: parsed.port || '5432',
+      database: parsed.pathname.replace(/^\//, '') || null,
+      projectRef: parsed.hostname.split('.')[1] || null,
+    },
+  };
+} else {
+  const envPath = path.join(process.cwd(), '.env.restore');
+  if (!fs.existsSync(envPath)) throw new Error('Missing .env.restore.');
+
+  dotenv.config({ path: envPath, override: true });
+  targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
+  const authorityEnv = { ...process.env };
+  delete authorityEnv.DATABASE_URL;
+  delete authorityEnv.DIRECT_URL;
+  authority = assertTestDatabaseAuthority({ targetUrl, env: authorityEnv });
+}
 
 process.env.DATABASE_URL = targetUrl;
 process.env.DIRECT_URL = targetUrl;
 const { prisma } = require('../lib/prisma');
 
 const outputAuthority = () => ({
+  mode: authority.mode || 'TEST_DATABASE',
   host: authority.target.host,
   port: authority.target.port,
   database: authority.target.database,
@@ -50,6 +79,7 @@ const finish = (result, details) => {
   console.log(JSON.stringify({
     result,
     databaseModified: false,
+    transactionReadOnly: true,
     authority: outputAuthority(),
     receiptId,
     expectedBranchId,
@@ -58,8 +88,8 @@ const finish = (result, details) => {
   if (result !== 'PASS') process.exitCode = 2;
 };
 
-async function main() {
-  const receipt = await prisma.purchaseOrderReceipt.findUnique({
+async function verify(tx) {
+  const receipt = await tx.purchaseOrderReceipt.findUnique({
     where: { id: receiptId },
     select: { id: true, branchId: true, code: true },
   });
@@ -73,7 +103,7 @@ async function main() {
   }
 
   const barcodes = expectations.map((item) => item.barcode);
-  const rows = await prisma.barcodeReceiptItem.findMany({
+  const rows = await tx.barcodeReceiptItem.findMany({
     where: { barcode: { in: barcodes } },
     select: {
       id: true,
@@ -132,7 +162,7 @@ async function main() {
     }
 
     const balance = productId
-      ? await prisma.stockBalance.findUnique({
+      ? await tx.stockBalance.findUnique({
           where: { productId_branchId: { productId, branchId: expectedBranchId } },
           select: { productId: true, branchId: true, quantity: true, reserved: true },
         })
@@ -140,7 +170,7 @@ async function main() {
     if (!balance) itemFailures.push('STOCK_BALANCE_MISSING');
 
     const movements = row.stockItem
-      ? await prisma.stockMovement.findMany({
+      ? await tx.stockMovement.findMany({
           where: {
             branchId: expectedBranchId,
             productId: row.stockItem.productId,
@@ -168,12 +198,7 @@ async function main() {
     if (!movements.length) itemFailures.push('RECEIVE_STOCK_MOVEMENT_MISSING');
 
     if (itemFailures.length) failures.push({ barcode: expected.barcode, reasons: itemFailures });
-    evidence.push({
-      expected,
-      barcodeReceiptItem: row,
-      stockBalance: balance,
-      receiveMovements: movements,
-    });
+    evidence.push({ expected, barcodeReceiptItem: row, stockBalance: balance, receiveMovements: movements });
   }
 
   if (failures.length) {
@@ -190,6 +215,13 @@ async function main() {
     receipt,
     evidence,
   });
+}
+
+async function main() {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+    await verify(tx);
+  }, { timeout: 30000 });
 }
 
 main()
