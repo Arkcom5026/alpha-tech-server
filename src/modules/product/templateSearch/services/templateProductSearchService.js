@@ -14,6 +14,17 @@ const toPositiveInt = (value) => {
 
 const normalizeText = (value) => String(value || '').trim()
 
+const OPTIONAL_PRICE_ERROR_CODES = new Set([
+  'PRICE_VALUE_MISSING',
+  'PRICE_VALUE_NOT_EFFECTIVE',
+])
+
+const toOptionalNumber = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? number : null
+}
+
 class TemplateProductSearchService {
   constructor(prisma, repository = null) {
     if (!prisma && !repository) {
@@ -37,24 +48,37 @@ class TemplateProductSearchService {
 
   mapTemplateProduct(product, templateBranch) {
     const bp = product.branchPrice?.[0] || null
-    if (!bp) {
-      const error = new Error('ไม่พบราคาที่ใช้งานสำหรับสินค้าแม่แบบนี้')
-      error.code = 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
-      error.status = 409
-      error.statusCode = 409
-      error.detail = { branchId: templateBranch.id, productId: product.id }
-      throw error
-    }
 
-    const resolve = (priceType) => effectivePricePolicy.resolveEffectivePrice({
-      row: bp,
-      priceType,
-      branchId: templateBranch.id,
-      productId: product.id,
-    })
+    const resolveOptionalPrice = (priceType) => {
+      if (!bp) return null
+
+      try {
+        return effectivePricePolicy.resolveEffectivePrice({
+          row: bp,
+          priceType,
+          branchId: templateBranch.id,
+          productId: product.id,
+        })
+      } catch (error) {
+        if (OPTIONAL_PRICE_ERROR_CODES.has(error?.code)) return null
+        throw error
+      }
+    }
 
     const cover = product.productImages?.[0] || null
     const category = product.productType?.globalProductType?.category || null
+    const costPrice = toOptionalNumber(bp?.costPrice)
+    const priceRetail = resolveOptionalPrice('retail')
+    const priceOnline = resolveOptionalPrice('online')
+    const priceTechnician = resolveOptionalPrice('technician')
+    const priceWholesale = resolveOptionalPrice('wholesale')
+
+    const missingPriceFields = []
+    if (costPrice === null) missingPriceFields.push('costPrice')
+    if (priceRetail === null) missingPriceFields.push('priceRetail')
+    if (priceWholesale === null) missingPriceFields.push('priceWholesale')
+    if (priceTechnician === null) missingPriceFields.push('priceTechnician')
+    if (priceOnline === null) missingPriceFields.push('priceOnline')
 
     return {
       id: product.id,
@@ -79,13 +103,15 @@ class TemplateProductSearchService {
       unitName: product.unit?.name ?? null,
       unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
       imageUrl: cover?.secure_url || cover?.url || null,
-      costPrice: Number(bp.costPrice),
-      priceRetail: resolve('retail'),
-      priceOnline: resolve('online'),
-      priceTechnician: resolve('technician'),
-      priceWholesale: resolve('wholesale'),
-      hasPrice: true,
-      branchPriceActive: bp.isActive === true,
+      costPrice,
+      priceRetail,
+      priceOnline,
+      priceTechnician,
+      priceWholesale,
+      hasPrice: costPrice !== null && priceRetail !== null,
+      priceReady: missingPriceFields.length === 0,
+      missingPriceFields,
+      branchPriceActive: bp?.isActive === true,
     }
   }
 
