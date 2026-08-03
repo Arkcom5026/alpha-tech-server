@@ -76,6 +76,15 @@ jobs:
             -name '*.js' -print0 | \
           xargs -0 -n1 node --check
 
+      - name: Run Sale Customer Search E2E contracts
+        run: |
+          node tests/customer-unified-search-slice.contract.test.js
+          node tests/customer-create-first-association.contract.test.js
+          node tests/sale-completion-customer-branch-guard.contract.test.js
+          node tests/sale-customer-first-association.contract.test.js
+          node tests/repair-customer-authority-regression.contract.test.js
+          node tests/pos-sale-e2e-outcome.contract.test.js
+
       - name: Run backend tests
         run: npm test
 

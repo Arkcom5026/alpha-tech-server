@@ -98,9 +98,7 @@ const parseCompleteSaleCommand = (body = {}) => {
   if (!items.length) throw new SalesError(400, 'SALE_ITEMS_REQUIRED', 'At least one sale item is required');
 
   const normalizedItems = items.map(normalizeSaleLine);
-  const stockIds = normalizedItems
-    .filter((item) => item.lineType === 'STOCK_ITEM')
-    .map((item) => item.stockItemId);
+  const stockIds = normalizedItems.filter((item) => item.lineType === 'STOCK_ITEM').map((item) => item.stockItemId);
   if (new Set(stockIds).size !== stockIds.length) {
     throw new SalesError(400, 'DUPLICATE_STOCK_ITEM', 'The same stock item cannot be sold twice');
   }
@@ -129,6 +127,9 @@ const parseCompleteSaleCommand = (body = {}) => {
   }
 
   const customerId = sale.customerId == null ? null : Number(sale.customerId);
+  const customerFirstAssociationToken = sale.customerFirstAssociationToken
+    ? String(sale.customerFirstAssociationToken)
+    : null;
   const sourceHeldCartId = sale.sourceHeldCartId == null
     ? null
     : positiveInteger(sale.sourceHeldCartId, 'sourceHeldCartId');
@@ -168,9 +169,19 @@ const parseCompleteSaleCommand = (body = {}) => {
   const command = {
     commandKey,
     sale: {
-      customerId, sourceHeldCartId, totalBeforeDiscount, totalDiscount, totalAmount, vat, vatRate,
-      note: sale.note || null, items: normalizedItems, mode,
-      isCredit: mode === 'CREDIT', isTaxInvoice: mode === 'CREDIT' ? false : !!sale.isTaxInvoice,
+      customerId,
+      customerFirstAssociationToken,
+      sourceHeldCartId,
+      totalBeforeDiscount,
+      totalDiscount,
+      totalAmount,
+      vat,
+      vatRate,
+      note: sale.note || null,
+      items: normalizedItems,
+      mode,
+      isCredit: mode === 'CREDIT',
+      isTaxInvoice: mode === 'CREDIT' ? false : !!sale.isTaxInvoice,
       saleType: sale.saleType || undefined,
       deliveryNoteMode: sale.deliveryNoteMode || undefined,
     },

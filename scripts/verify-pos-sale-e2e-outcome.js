@@ -6,10 +6,8 @@ const dotenv = require('dotenv');
 const { assertTestDatabaseAuthority } = require('../recovery/testDatabaseAuthority');
 
 const barcode = String(process.argv[2] || '').trim();
+const expectedCustomerPhone = String(process.argv[3] || '').replace(/\D/g, '');
 if (!barcode) {
-  // Repository-wide certification discovers every verify:* script without
-  // workflow-specific fixture arguments. In that context, run the static
-  // safety/authority contract instead of pretending a Browser outcome exists.
   require('../tests/pos-sale-e2e-outcome.contract.test');
   console.log('POS Sale E2E runtime outcome: SKIP (stock barcode not supplied; contract verified).');
   return;
@@ -40,6 +38,7 @@ const fail = (message, details = {}) => {
       projectRef: authority.target.projectRef,
     },
     stockBarcode: barcode,
+    expectedCustomerPhone: expectedCustomerPhone || null,
     message,
     details,
   }, null, 2));
@@ -65,10 +64,18 @@ async function main() {
             select: {
               id: true,
               branchId: true,
+              customerId: true,
               status: true,
               paid: true,
               statusPayment: true,
               totalAmount: true,
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                  user: { select: { loginId: true } },
+                },
+              },
             },
           },
         },
@@ -108,6 +115,24 @@ async function main() {
     });
   }
 
+  if (!sale.customerId || sale.customer?.id !== sale.customerId) {
+    return fail('Sale customer evidence is missing or inconsistent.', {
+      saleId: sale.id,
+      customerId: sale.customerId,
+      customer: sale.customer,
+    });
+  }
+
+  const persistedPhone = String(sale.customer?.user?.loginId || '').replace(/\D/g, '');
+  if (expectedCustomerPhone && persistedPhone !== expectedCustomerPhone) {
+    return fail('Sale customer phone does not match the Browser fixture.', {
+      saleId: sale.id,
+      customerId: sale.customerId,
+      expectedCustomerPhone,
+      persistedPhone,
+    });
+  }
+
   const movement = stockItem.stockMovements.find((item) => (
     item.branchId === stockItem.branchId
     && item.stockItemId === stockItem.id
@@ -141,10 +166,17 @@ async function main() {
     sale: {
       id: sale.id,
       branchId: sale.branchId,
+      customerId: sale.customerId,
       status: sale.status,
       paid: sale.paid,
       statusPayment: sale.statusPayment,
       totalAmount: Number(sale.totalAmount),
+    },
+    customer: {
+      id: sale.customer.id,
+      name: sale.customer.name,
+      phone: persistedPhone,
+      branchEvidenceSaleId: sale.id,
     },
     movement: {
       id: movement.id,

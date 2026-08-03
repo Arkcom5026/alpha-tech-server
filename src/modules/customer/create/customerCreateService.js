@@ -5,8 +5,11 @@ const {
   isValidPhone,
   buildCustomerAddress,
 } = require('../shared/customerControllerSupport');
+const {
+  issueCustomerFirstAssociationToken,
+} = require('../policies/customerFirstAssociationTokenPolicy');
 
-function presentCustomer(customer, { includeCredit = true } = {}) {
+function presentCustomer(customer, { includeCredit = true, firstAssociationToken = null } = {}) {
   const subdistrictCode = customer.subdistrict?.code || null;
   const districtCode =
     customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
@@ -35,6 +38,7 @@ function presentCustomer(customer, { includeCredit = true } = {}) {
           creditBalance: customer.creditBalance,
         }
       : {}),
+    ...(firstAssociationToken ? { firstAssociationToken } : {}),
   };
 }
 
@@ -45,7 +49,13 @@ function buildError(statusCode, payload) {
   return error;
 }
 
-async function createCustomer(input = {}) {
+async function createCustomer(input = {}, actor = {}) {
+  const branchId = Number(actor.branchId);
+  const employeeId = Number(actor.employeeId);
+  if (!Number.isInteger(branchId) || branchId <= 0 || !Number.isInteger(employeeId) || employeeId <= 0) {
+    throw buildError(401, { code: 'UNAUTHORIZED', message: 'Authenticated store and employee are required' });
+  }
+
   const {
     name,
     phone,
@@ -75,6 +85,16 @@ async function createCustomer(input = {}) {
   if (existingUser) {
     const existingProfile = await repository.findCustomerByUserId(existingUser.id);
     if (existingProfile) {
+      const accessible = await repository.findAccessibleCustomer({
+        customerId: existingProfile.id,
+        branchId,
+      });
+      if (!accessible) {
+        throw buildError(409, {
+          code: 'CUSTOMER_PHONE_NOT_AVAILABLE_IN_BRANCH',
+          message: 'ไม่สามารถเพิ่มลูกค้าด้วยเบอร์นี้ในร้านปัจจุบันได้',
+        });
+      }
       return { statusCode: 200, body: presentCustomer(existingProfile) };
     }
   }
@@ -108,7 +128,16 @@ async function createCustomer(input = {}) {
     },
   });
 
-  return { statusCode: 201, body: presentCustomer(result) };
+  const firstAssociationToken = issueCustomerFirstAssociationToken({
+    customerId: result.id,
+    branchId,
+    employeeId,
+  });
+
+  return {
+    statusCode: 201,
+    body: presentCustomer(result, { firstAssociationToken }),
+  };
 }
 
 module.exports = { createCustomer };

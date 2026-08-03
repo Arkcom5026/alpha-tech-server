@@ -1,4 +1,7 @@
 const { prisma } = require('../../../../lib/prisma');
+const {
+  buildCustomerBranchAccessWhere,
+} = require('../policies/customerBranchAccessPolicy');
 
 const includeCustomerGraph = {
   user: true,
@@ -13,6 +16,13 @@ function findCustomerByUserId(userId) {
   return prisma.customerProfile.findFirst({
     where: { userId },
     include: includeCustomerGraph,
+  });
+}
+
+function findAccessibleCustomer({ customerId, branchId }) {
+  return prisma.customerProfile.findFirst({
+    where: buildCustomerBranchAccessWhere({ customerId, branchId }),
+    select: { id: true },
   });
 }
 
@@ -56,6 +66,7 @@ function createCustomerProfile({ existingUser, normalizedPhone, hashedPassword, 
 module.exports = {
   findUserByPhone,
   findCustomerByUserId,
+  findAccessibleCustomer,
   findSubdistrictByCode,
   createCustomerProfile,
 };

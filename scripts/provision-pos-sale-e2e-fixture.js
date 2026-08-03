@@ -41,6 +41,9 @@ const { prisma } = require('../lib/prisma');
 
 async function main() {
   const runToken = crypto.randomBytes(8).toString('hex').toUpperCase();
+  const customerDigits = BigInt(`0x${runToken}`).toString().slice(-8).padStart(8, '0');
+  const customerPhone = `09${customerDigits}`;
+  const customerName = `System Test POS Customer ${runToken}`;
   const passwordHash = await bcrypt.hash(operatorPassword, 12);
 
   const fixture = await prisma.$transaction(async (tx) => {
@@ -142,6 +145,8 @@ async function main() {
       branchSlug: fixture.branch.slug,
       employeeId: fixture.employee.id,
       operatorEmail,
+      customerName,
+      customerPhone,
       productId: fixture.product.id,
       productBarcode: fixture.product.saleBarcode,
       stockItemId: fixture.stockItem.id,
@@ -150,7 +155,7 @@ async function main() {
       expectedRetailTotal: 107,
     },
     retainedTestData: true,
-    safety: 'A fresh Test-DB-only stock item is created for every run; no production data is read or written.',
+    safety: 'A fresh Test-DB-only stock item and customer identity are generated for every run; the customer is created only through the real POS browser flow.',
   }));
 }
 
