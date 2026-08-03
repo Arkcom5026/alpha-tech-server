@@ -23,6 +23,7 @@ const serviceSource = fs.readFileSync(servicePath, 'utf8');
 const repositorySource = fs.readFileSync(repositoryPath, 'utf8');
 const policySource = fs.readFileSync(policyPath, 'utf8');
 const repairPolicySource = fs.readFileSync(repairPolicyPath, 'utf8');
+const { isPhoneLikeQuery } = require(servicePath);
 
 assert.match(routeSource, /router\.get\('\/search',\s*customerSearchController\.searchCustomers\)/);
 assert.match(controllerSource, /req\.user\?\.branchId/);
@@ -31,6 +32,10 @@ assert.doesNotMatch(controllerSource, /prisma\./);
 assert.match(serviceSource, /CUSTOMER_SEARCH_QUERY_TOO_SHORT/);
 assert.match(serviceSource, /results:\s*customers\.map/);
 assert.doesNotMatch(serviceSource, /stockItem|serialNumber|imei|serviceTag/i);
+assert.equal(isPhoneLikeQuery('081-234-5678'), true);
+assert.equal(isPhoneLikeQuery('+66 81 234 5678'), true);
+assert.equal(isPhoneLikeQuery('user123@example.com'), false);
+assert.equal(isPhoneLikeQuery('Company 123'), false);
 assert.match(repositorySource, /buildCustomerBranchEvidence\(branchId\)/);
 assert.match(repositorySource, /customerProfile\.findMany/);
 assert.match(repositorySource, /companyName/);
