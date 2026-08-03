@@ -112,6 +112,9 @@ model EmployeeProfile {
   assessedTaxExpenses                   TaxExpenseAssessment[]      @relation("TaxExpenseAssessmentAssessedBy")
   performedTaxExpenseEvents             TaxExpenseLifecycleEvent[]  @relation("TaxExpenseLifecycleEventActor")
   uploadedTaxExpenseAttachments         TaxExpenseAttachment[]      @relation("TaxExpenseAttachmentUploadedBy")
+  productTemplateCandidatesCreated      ProductTemplateCandidate[]  @relation("ProductTemplateCandidateCreatedBy")
+  productTemplateCandidatesReviewed     ProductTemplateCandidate[]  @relation("ProductTemplateCandidateReviewedBy")
+  productTemplateCandidateEvents        ProductTemplateCandidateEvent[] @relation("ProductTemplateCandidateEventActor")
 }
 
 model Branch {
@@ -187,6 +190,8 @@ model Branch {
   taxExpenseCategories                 TaxExpenseCategory[]
   taxExpenses                          TaxExpense[]
   taxIssuerProfile                     TaxIssuerProfile?
+  sourceProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceBranch")
+  targetProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetBranch")
 
   @@index([subdistrictCode])
 }
@@ -346,6 +351,8 @@ model Product {
   productReservationItems  ProductReservationItem[]
   v2StockAuditItems        V2StockAuditItem[]
   missingCostResolutions   MissingCostResolution[]
+  sourceProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceProduct")
+  targetProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetProduct")
 
   @@index([mode, active])
   @@index([mode, inventoryBehavior, active])
@@ -3590,4 +3597,72 @@ model TaxExpenseAttachment {
 
   @@unique([taxExpenseId, sha256])
   @@index([uploadedByEmployeeId])
+}
+
+enum ProductTemplateCandidateStatus {
+  DRAFT
+  UNDER_REVIEW
+  REJECTED
+  PROMOTED
+  MERGED
+  CANCELLED
+}
+
+enum ProductTemplateCandidateEventType {
+  CREATED
+  REVIEW_STARTED
+  PROPOSED_DATA_UPDATED
+  REJECTED
+  PROMOTED
+  MERGED
+  CANCELLED
+}
+
+model ProductTemplateCandidate {
+  id                      Int                            @id @default(autoincrement())
+  sourceBranchId          Int
+  sourceProductId         Int
+  targetTemplateBranchId  Int
+  targetTemplateProductId Int?
+  status                  ProductTemplateCandidateStatus @default(DRAFT)
+  sourceSnapshot          Json
+  proposedTemplateData    Json?
+  duplicateAssessment     Json?
+  createdByEmployeeId     Int?
+  reviewedByEmployeeId    Int?
+  decisionNote            String?
+  reviewedAt              DateTime?
+  promotedAt              DateTime?
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+  sourceBranch            Branch                         @relation("ProductTemplateCandidateSourceBranch", fields: [sourceBranchId], references: [id])
+  sourceProduct           Product                        @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
+  targetTemplateBranch    Branch                         @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
+  targetTemplateProduct   Product?                       @relation("ProductTemplateCandidateTargetProduct", fields: [targetTemplateProductId], references: [id])
+  createdByEmployee       EmployeeProfile?              @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
+  reviewedByEmployee      EmployeeProfile?              @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
+  events                  ProductTemplateCandidateEvent[]
+
+  @@index([sourceBranchId, sourceProductId])
+  @@index([targetTemplateBranchId, status])
+  @@index([status, createdAt])
+  @@index([targetTemplateProductId])
+}
+
+model ProductTemplateCandidateEvent {
+  id              Int                               @id @default(autoincrement())
+  candidateId     Int
+  eventType       ProductTemplateCandidateEventType
+  previousStatus  ProductTemplateCandidateStatus?
+  resultingStatus ProductTemplateCandidateStatus
+  actorEmployeeId Int?
+  note            String?
+  metadata        Json?
+  createdAt       DateTime                          @default(now())
+  candidate       ProductTemplateCandidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  actorEmployee   EmployeeProfile?                  @relation("ProductTemplateCandidateEventActor", fields: [actorEmployeeId], references: [id])
+
+  @@index([candidateId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorEmployeeId])
 }
