@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
+const { projectOutputTaxCreditNotePrintableDocument } = require('../creditNote/print/projectOutputTaxCreditNotePrintableDocumentService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -31,6 +32,17 @@ const mapLine = ({ id, quantity, basePrice, discount, price, vatAmount, descript
 const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) => {
   const normalizedBranchId = positiveInt(branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
   const normalizedDocumentId = positiveInt(taxDocumentId, 'TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId');
+
+  const documentType = await prisma.taxDocument.findFirst({
+    where: { id: normalizedDocumentId, branchId: normalizedBranchId },
+    select: { documentType: true },
+  });
+  if (documentType?.documentType === 'OUTPUT_TAX_CREDIT_NOTE') {
+    return projectOutputTaxCreditNotePrintableDocument({
+      branchId: normalizedBranchId,
+      taxDocumentId: normalizedDocumentId,
+    });
+  }
 
   const document = await prisma.taxDocument.findFirst({
     where: { id: normalizedDocumentId, branchId: normalizedBranchId },
