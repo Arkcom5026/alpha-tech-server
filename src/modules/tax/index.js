@@ -1,6 +1,7 @@
 'use strict';
 
 const saleTaxDocumentEligibilityPolicy = require('./sources/sale/saleTaxDocumentEligibilityPolicy');
+const saleReturnTaxCandidate = require('./sources/saleReturn/registerSaleReturnTaxCandidateService');
 
 module.exports = Object.freeze({
   inputDocuments: Object.freeze({
@@ -18,6 +19,7 @@ module.exports = Object.freeze({
     registerCandidate: require('./intake/registerTaxCandidateService').registerTaxCandidate,
     registerSaleCandidate:
       require('./sources/sale/registerSaleTaxCandidateService').registerSaleTaxCandidate,
+    registerSaleReturnCandidate: saleReturnTaxCandidate.registerSaleReturnTaxCandidate,
     registerPurchaseReceiptCandidate:
       require('./sources/purchaseReceipt/registerPurchaseReceiptTaxCandidateService').registerPurchaseReceiptTaxCandidate,
     isSaleTaxDocumentEligible: saleTaxDocumentEligibilityPolicy.isSaleTaxDocumentEligible,
