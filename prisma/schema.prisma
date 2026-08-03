@@ -147,6 +147,7 @@ model Branch {
   paymentCodeCounter              PaymentCodeCounter[]
   productTypes                    ProductType[]
   products                        Product[]
+  brands                          Brand[]
   positions                       Position[]
   pos                             PurchaseOrder[]
   purchaseOrderReceipt            PurchaseOrderReceipt[]
@@ -286,14 +287,19 @@ model Brand {
   id                Int                @id @default(autoincrement())
   name              String
   normalizedName    String             @unique
+  branchId          Int?
   active            Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   products          Product[]
   productTypeBrands ProductTypeBrand[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
 
   @@index([active])
   @@index([name])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, normalizedName])
 }
 
 model Product {
