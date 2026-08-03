@@ -1,6 +1,6 @@
 'use strict';
 
-const { prisma } = require('../../../../../../lib/prisma');
+const { prisma } = require('../../../../../lib/prisma');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
