@@ -14,58 +14,55 @@ Deliver the first real backend capability for the platform-governed flow:
 
 ## E2E slice
 
-1. Superadmin submits a source store Product and target SYSTEM TEMPLATE Branch.
+1. Superadmin submits `sourceProductId`, explicit `sourceBranchId`, and target SYSTEM TEMPLATE Branch.
 2. Server verifies SUPERADMIN authority from authenticated `req.user`.
-3. Server loads the source Product and catalog relations without stock, serial, price, cost, supplier, customer, sales, purchase, tax, repair, claim, reservation, or other operational data.
-4. Server verifies that the source Product belongs to the supplied independent source Branch.
-5. Server verifies that the target branch is the approved SYSTEM TEMPLATE workspace using existing branch semantics; no target is inferred silently.
+3. Server loads the source Product and catalog relations without price values, stock details, serials, costs, supplier, customer, sales, purchase, tax, repair, claim, reservation, or other operational payloads.
+4. Server resolves source ownership read-only:
+   - Canonical `Product.branchId` is authoritative when present.
+   - When canonical ownership is null, only distinct branch identities from `BranchPrice` and `StockItem` may be used as temporary evidence.
+   - Exactly one evidence branch must exist and must match the explicitly supplied `sourceBranchId`.
+   - Multiple evidence branches are a cross-store conflict and must be rejected.
+   - No evidence is an ownership-missing conflict.
+5. Server verifies that the target branch is the approved SYSTEM TEMPLATE workspace; no target is inferred silently.
 6. Server writes `ProductTemplateCandidate` and the initial append-only `CREATED` event in one Prisma transaction.
 7. Superadmin can list candidates and read candidate detail with events.
 
 ## Required HTTP surface
 
-- `POST /api/superadmin/product-template-candidates`
-- `GET /api/superadmin/product-template-candidates`
-- `GET /api/superadmin/product-template-candidates/:id`
+- `POST /api/product-templates/candidates`
+- `GET /api/product-templates/candidates`
+- `GET /api/product-templates/candidates/:id`
 
 ## Responsibility structure
 
 ```text
-src/modules/product-template-candidate/
+src/modules/productTemplate/candidates/
   shared/
   create/
-    createProductTemplateCandidateContract.js
-    createProductTemplateCandidateRepository.js
-    createProductTemplateCandidateService.js
-    createProductTemplateCandidateController.js
   query/list/
-    listProductTemplateCandidatesRepository.js
-    listProductTemplateCandidatesService.js
-    listProductTemplateCandidatesController.js
   query/detail/
-    getProductTemplateCandidateRepository.js
-    getProductTemplateCandidateService.js
-    getProductTemplateCandidateController.js
   routes/
-    productTemplateCandidateRoutes.js
 ```
 
 ## Locked safety rules
 
 - SUPERADMIN only.
 - Source Product is read-only and must never be mutated.
-- `sourceBranchId` and `sourceProductId` must match the canonical Product ownership relation.
-- Product with null ownership is not eligible in this slice; return a deterministic conflict requiring ownership resolution.
+- `sourceBranchId` is explicit input and may never be inferred silently for the caller.
+- Canonical `Product.branchId` always overrides fallback evidence.
+- Fallback ownership resolution is read-only and does not backfill Product.
 - Source and target branches must be distinct.
 - Snapshot allowlist only. Never serialize a full Prisma Product object.
+- Ownership-resolution mode may be stored as governance metadata, but branch price values, stock rows, serials, and costs must never enter the snapshot.
 - Candidate creation and CREATED event are atomic.
-- No duplicate uniqueness is invented in this slice; historical candidates remain allowed by schema. Service may report active candidates but must not silently merge them.
+- No duplicate uniqueness is invented in this slice; historical candidates remain allowed by schema.
 - No promotion, merge, reject, review transition, ProductTemplate mutation, physical asset copy, media copy, Product/Brand backfill, Prisma change, or migration.
-- The two active stores remain independent tenants. No cross-store operational projection is permitted.
+- The two active stores remain independent tenants. Any multi-branch evidence is rejected rather than aggregated.
 
 ## Verification
 
 - Fixture/contract tests for SUPERADMIN guard and route ownership.
+- Pure resolver tests covering canonical, single-branch evidence, mismatch, no evidence, and cross-branch conflict.
 - Service tests for snapshot allowlist and source ownership mismatch.
 - Repository contract for atomic candidate + CREATED event transaction.
 - List/detail projection tests proving forbidden operational fields are absent.
