@@ -6,6 +6,7 @@ const root = path.join(__dirname, '..')
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 
 const routes = read('src/modules/partnerStore/application/partnerStoreApplicationRoutes.js')
+const controller = read('src/modules/partnerStore/application/partnerStoreApplicationController.js')
 const service = read('src/modules/partnerStore/application/partnerStoreApplicationService.js')
 const server = read('server.js')
 const schema = read('prisma/partner-store-application.prisma')
@@ -18,15 +19,27 @@ assert.ok(routes.includes("adminRouter.post('/:id/approve', controller.approve)"
 assert.ok(routes.includes("adminRouter.post('/:id/reject', controller.reject)"))
 assert.ok(server.includes("'/api/public/partner-store-applications'"))
 assert.ok(server.includes("'/api/partner-store/applications'"))
+assert.ok(!controller.includes('req.body?.ownerUserId'))
 
 for (const token of ['provisionedBranchId', 'provisionedOwnerUserId', 'decidedAt']) {
   assert.ok(schema.includes(token), `application schema must retain ${token}`)
   assert.ok(migration.includes(`"${token}"`), `migration must add ${token}`)
 }
+
+assert.ok(service.includes("const bcrypt = require('bcryptjs')"))
+assert.ok(service.includes("password.length < 8"))
+assert.ok(service.includes('bcrypt.hash(password, 10)'))
+assert.ok(service.includes("enabled: false"))
+assert.ok(service.includes('provisionedOwnerUserId: owner.id'))
+assert.ok(service.includes("status: { in: ['PENDING', 'UNDER_REVIEW', 'APPROVED'] }"))
 assert.ok(service.includes("v2Role: 'OWNER'"))
+assert.ok(service.includes("data: { role: 'ADMIN', enabled: true }"))
 assert.ok(service.includes("storefrontEnabled: false"))
 assert.ok(service.includes("connectOrCreate"))
 assert.ok(service.includes("System Partner Store"))
+assert.ok(service.includes("provisionedOwnerUserId: null"))
+assert.ok(service.includes('await tx.user.delete'))
+assert.ok(service.includes('PARTNER_STORE_OWNER_CLEANUP_UNSAFE'))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
 assert.ok(
