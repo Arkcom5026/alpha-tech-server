@@ -23,7 +23,10 @@ assert.match(issueService, /originalTaxDocumentId/);
 assert.match(issueService, /saleReturnId/);
 assert.match(issueService, /OUTPUT_TAX_CREDIT_NOTE/);
 assert.match(issueService, /replayed: true/);
+assert.match(issueService, /issueOutputTaxCreditNoteForSaleReturn/);
+assert.match(issueService, /TAX_CREDIT_NOTE_ORIGINAL_DOCUMENT_NOT_FOUND/);
 assert.match(controller, /issueOutputTaxCreditNote/);
 assert.match(controller, /saleReturnId: req\.body\?\.saleReturnId/);
+assert.match(controller, /issueOutputTaxCreditNoteForSaleReturn/);
 
 console.log('Output tax credit-note issuance runtime contract: PASS');
