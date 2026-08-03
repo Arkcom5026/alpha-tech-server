@@ -119,7 +119,7 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
     const document = await documentRepository.findDetailById({
       branchId: normalizedBranchId,
       taxDocumentId: normalizedDocumentId,
-    }, tx);
+    }, tx, { forUpdate: true });
     if (!document) fail('TAX_DOCUMENT_NOT_FOUND', 'Tax document not found', 404);
 
     if (document.issuerProfileId) {
