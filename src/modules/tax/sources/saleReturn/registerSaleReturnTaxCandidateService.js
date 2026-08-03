@@ -55,7 +55,6 @@ const registerSaleReturnTaxCandidate = async ({ branchId, saleReturnId, actorEmp
       totalRefund: true,
       refundedAmount: true,
       deductedAmount: true,
-      isFullyRefunded: true,
       sale: {
         select: {
           id: true,
@@ -87,8 +86,8 @@ const registerSaleReturnTaxCandidate = async ({ branchId, saleReturnId, actorEmp
       statusCode: 409,
     });
   }
-  if (toMoney(saleReturn.totalRefund) <= 0 || !saleReturn.isFullyRefunded) {
-    throw Object.assign(new Error('Only fully refunded Sale Return values can create a Credit Note candidate'), {
+  if (toMoney(saleReturn.totalRefund) <= 0 || toMoney(saleReturn.refundedAmount) !== toMoney(saleReturn.totalRefund)) {
+    throw Object.assign(new Error('Only a fully refunded Sale Return value can create a Credit Note candidate'), {
       code: 'TAX_SALE_RETURN_FULL_REFUND_REQUIRED',
       statusCode: 409,
     });
