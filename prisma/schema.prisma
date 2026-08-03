@@ -320,7 +320,7 @@ model Product {
   orderOnlineItem          OrderOnlineItem[]
   brand                    Brand?                     @relation(fields: [brandId], references: [id])
   productType              ProductType?               @relation(fields: [productTypeId], references: [id])
-  branch                   Branch?                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch                   Branch?                    @relation(fields: [branchId], references: [id])
   templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onUpdate: NoAction)
   clonedProducts           Product[]                  @relation("ProductTemplateClone")
   unit                     Unit?                      @relation(fields: [unitId], references: [id])
