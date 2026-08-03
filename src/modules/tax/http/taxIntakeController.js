@@ -77,6 +77,11 @@ const getDocumentDetail = handle((req) => service.getDocumentDetail({
   taxDocumentId: req.params.taxDocumentId,
 }));
 
+const getPrintableOutputTaxDocument = handle((req) => service.projectOutputTaxPrintableDocument({
+  branchId: resolveBranchId(req, req.query),
+  taxDocumentId: req.params.taxDocumentId,
+}));
+
 const issueOutputTaxDocument = handle((req) => service.issueOutputTaxDocument({
   branchId: resolveBranchId(req, req.body),
   taxDocumentId: req.params.taxDocumentId,
@@ -95,6 +100,7 @@ const transitionDocument = handle((req) => service.transitionTaxDocument({
 
 module.exports = Object.freeze({
   getDocumentDetail,
+  getPrintableOutputTaxDocument,
   issueOutputTaxDocument,
   listCandidates,
   listDocuments,
