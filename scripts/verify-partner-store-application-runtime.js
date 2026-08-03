@@ -11,6 +11,7 @@ if (process.env.ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true') {
 const { prisma } = require('../lib/prisma')
 const applicationService = require('../src/modules/partnerStore/application/partnerStoreApplicationService')
 const applicationRepository = require('../src/modules/partnerStore/application/partnerStoreApplicationRepository')
+const authService = require('../src/modules/auth/session/runtime/sessionAuthRuntimeService')
 
 const token = crypto.randomBytes(6).toString('hex')
 const email = `system-test-partner-${token}@invalid.local`
@@ -26,6 +27,40 @@ const countBranchBusinessData = async (branchId) => {
     prisma.sale.count({ where: { branchId } }),
   ])
   return { prices, stockBalances, stockItems, sales }
+}
+
+const invokeLogin = async ({ identifier, password: plainPassword }) => {
+  const result = { statusCode: 200, body: null, cookies: [] }
+  const req = {
+    body: {
+      emailOrPhone: identifier,
+      password: plainPassword,
+      rememberMe: false,
+    },
+    headers: { 'user-agent': 'partner-store-runtime-verifier' },
+    ip: '127.0.0.1',
+    socket: { remoteAddress: '127.0.0.1' },
+  }
+  const res = {
+    status(code) {
+      result.statusCode = code
+      return this
+    },
+    json(body) {
+      result.body = body
+      return this
+    },
+    cookie(name, value, options) {
+      result.cookies.push({ name, value, options })
+      return this
+    },
+    clearCookie() {
+      return this
+    },
+  }
+
+  await authService.login(req, res)
+  return result
 }
 
 const cleanupStalePendingRuntimeApplications = async () => {
@@ -92,6 +127,11 @@ async function main() {
   assert.equal(reservedOwner.employeeProfile, null)
   assert.equal(await bcrypt.compare(password, reservedOwner.password), true)
 
+  const loginBeforeApproval = await invokeLogin({ identifier: email, password })
+  assert.equal(loginBeforeApproval.statusCode, 403)
+  assert.ok(loginBeforeApproval.body?.message)
+  assert.equal(Boolean(loginBeforeApproval.body?.accessToken), false)
+
   const approved = await applicationService.approveApplication(
     application.id,
     null,
@@ -120,6 +160,15 @@ async function main() {
   assert.equal(capability.branchId, approved.provisionedBranchId)
   assert.equal(capability.storefrontEnabled, false)
   assert.deepEqual(businessData, { prices: 0, stockBalances: 0, stockItems: 0, sales: 0 })
+
+  const loginAfterApproval = await invokeLogin({ identifier: email, password })
+  assert.equal(loginAfterApproval.statusCode, 200)
+  assert.ok(loginAfterApproval.body?.accessToken)
+  assert.equal(loginAfterApproval.body?.role, 'ADMIN')
+  assert.equal(loginAfterApproval.body?.profileType, 'employee')
+  assert.equal(loginAfterApproval.body?.profile?.user?.id, ownerUserId)
+  assert.equal(loginAfterApproval.body?.profile?.branch?.id, approved.provisionedBranchId)
+  assert.ok(loginAfterApproval.cookies.length > 0)
 
   const publicRejectedApplication = await applicationService.createApplication({
     businessName: `system-test rejected partner ${token}`,
@@ -159,6 +208,9 @@ async function main() {
     publicResponseHidesOwnerUserId: true,
     ownerEnabledBeforeApproval: false,
     ownerEnabledAfterApproval: true,
+    loginBeforeApprovalStatus: loginBeforeApproval.statusCode,
+    loginAfterApprovalStatus: loginAfterApproval.statusCode,
+    loginBranchAuthority: loginAfterApproval.body.profile.branch.id,
     rejectionCleanup: 'PASS',
     cleanedStalePendingApplications,
     retainedApprovedTestData: true,
