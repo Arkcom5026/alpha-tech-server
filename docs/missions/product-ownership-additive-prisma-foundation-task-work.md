@@ -64,7 +64,7 @@ Add:
 
 ```prisma
 branchId Int?
-branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+branch   Branch? @relation(fields: [branchId], references: [id])
 ```
 
 Use the repository's existing formatting conventions.
@@ -96,8 +96,10 @@ ALTER TABLE "Product"
 ADD CONSTRAINT "Product_branchId_fkey"
 FOREIGN KEY ("branchId")
 REFERENCES "Branch"("id")
-ON DELETE RESTRICT
+ON DELETE SET NULL
 ON UPDATE CASCADE;
+
+The `SET NULL` action is Prisma-generated behavior for this nullable additive foundation. It is not a permanent Branch lifecycle policy and this increment makes no lifecycle decision.
 
 CREATE INDEX "Product_branchId_idx"
 ON "Product"("branchId");
@@ -217,7 +219,7 @@ Return exact evidence for:
 PASS only when all are true:
 
 1. `Product.branchId` is nullable.
-2. `Product.branch` points to `Branch` with `onDelete: Restrict`.
+2. `Product.branch` points to `Branch` without explicit `onDelete` or `onUpdate`; the migration records Prisma's generated FK behavior.
 3. `Branch.products` reverse relation exists.
 4. The four agreed indexes exist.
 5. Exactly one additive migration implements only this foundation.
