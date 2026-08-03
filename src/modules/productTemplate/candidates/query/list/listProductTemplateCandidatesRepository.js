@@ -24,16 +24,29 @@ const CANDIDATE_LIST_SELECT = {
   _count: { select: { events: true } },
 }
 
-const listCandidates = ({ where, skip, take }) =>
+const listCandidates = ({ where, summaryWhere, skip, take, orderBy }) =>
   prisma.$transaction([
     prisma.productTemplateCandidate.findMany({
       where,
       select: CANDIDATE_LIST_SELECT,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy,
       skip,
       take,
     }),
     prisma.productTemplateCandidate.count({ where }),
+    prisma.productTemplateCandidate.groupBy({
+      by: ['status'],
+      where: summaryWhere,
+      _count: { _all: true },
+    }),
+    prisma.productTemplateCandidate.groupBy({
+      by: ['reviewedByEmployeeId', 'status'],
+      where: {
+        ...summaryWhere,
+        reviewedByEmployeeId: { not: null },
+      },
+      _count: { _all: true },
+    }),
   ])
 
 module.exports = {
