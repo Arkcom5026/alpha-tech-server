@@ -99,7 +99,7 @@
     "test:tax-issuer-profile-runtime": "node tests/tax-issuer-profile-runtime.contract.test.js",
     "verify:tax-issuer-profile-schema": "node scripts/verify-tax-issuer-profile-schema.js",
     "test:product-trace-stock-item-history": "node tests/product-trace-stock-item-sale-return-history.contract.test.js && node tests/product-trace-return-projection.test.js && node tests/product-trace-historical-event-status.test.js",
-    "test:output-tax-credit-note": "node tests/output-tax-credit-note-eligibility.contract.test.js"
+    "test:output-tax-credit-note": "node prisma/migrations/20260803140000_output_tax_credit_note_foundation/migration.test.js && node tests/output-tax-credit-note-eligibility.contract.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",
