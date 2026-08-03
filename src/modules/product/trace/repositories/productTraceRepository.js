@@ -28,15 +28,6 @@ const saleItemInclude = {
   },
 }
 
-const simpleSaleInclude = {
-  sale: {
-    include: {
-      employee: { select: { id: true, name: true } },
-      customer: { include: { user: { select: { id: true, email: true, loginId: true } } } },
-    },
-  },
-}
-
 const productTraceInclude = {
   product: {
     include: {
@@ -60,8 +51,9 @@ const productTraceInclude = {
       purchaseOrderItem: { include: { purchaseOrder: { include: { supplier: true, employee: { select: { id: true, name: true } } } } } },
     },
   },
+  // StockItem Trace is for one serialized unit. Simple-product history must be queried
+  // from its own product/lot projection, not as a relation on StockItem.
   saleItems: { include: saleItemInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
-  saleItemsSimple: { include: simpleSaleInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   stockMovements: {
     include: { performedBy: { select: { id: true, name: true } } },
     orderBy: { occurredAt: 'asc' },
