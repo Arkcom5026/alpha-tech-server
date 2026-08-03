@@ -146,6 +146,7 @@ model Branch {
   payment                         Payment[]
   paymentCodeCounter              PaymentCodeCounter[]
   productTypes                    ProductType[]
+  products                        Product[]
   positions                       Position[]
   pos                             PurchaseOrder[]
   purchaseOrderReceipt            PurchaseOrderReceipt[]
@@ -313,11 +314,13 @@ model Product {
   unitId                   Int?
   warrantyDays             Int?
   templateProductId        Int?
+  branchId                 Int?
   branchPrice              BranchPrice[]
   cartItems                CartItem[]
   orderOnlineItem          OrderOnlineItem[]
   brand                    Brand?                     @relation(fields: [brandId], references: [id])
   productType              ProductType?               @relation(fields: [productTypeId], references: [id])
+  branch                   Branch?                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
   templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onUpdate: NoAction)
   clonedProducts           Product[]                  @relation("ProductTemplateClone")
   unit                     Unit?                      @relation(fields: [unitId], references: [id])
@@ -344,6 +347,10 @@ model Product {
   @@index([productTypeId])
   @@index([brandId])
   @@index([templateProductId])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, productTypeId])
+  @@index([branchId, templateProductId])
 }
 
 model BranchPrice {
