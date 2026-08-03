@@ -195,6 +195,11 @@ enum TaxIssuerProfileStatus {
   SUSPENDED
 }
 
+enum TaxInvoiceKind {
+  SHORT
+  FULL
+}
+
 model TaxIssuerProfile {
   id                         Int                    @id @default(autoincrement())
   branchId                   Int                    @unique
@@ -211,6 +216,7 @@ model TaxIssuerProfile {
   createdAt                  DateTime               @default(now())
   updatedAt                  DateTime               @updatedAt
   branch                     Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  issuedTaxDocuments         TaxDocument[]          @relation("TaxDocumentIssuerProfile")
 
   @@index([status])
 }
@@ -2428,15 +2434,25 @@ model TaxDocument {
   taxAmount           Decimal                     @default(0) @db.Decimal(14, 2)
   totalAmount         Decimal                     @default(0) @db.Decimal(14, 2)
   snapshot            Json                        @default("{}")
+  taxInvoiceKind      TaxInvoiceKind?
+  issuerProfileId     Int?
+  issuedDocumentNumber String?
+  issuedSequence      Int?
+  issuerSnapshot      Json?
+  recipientSnapshot   Json?
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @default(now())
   branch              Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
   candidate           TaxCandidate?               @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  issuerProfile       TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
   lifecycleEvents     TaxDocumentLifecycleEvent[]
   inputTaxFilingItems InputTaxFilingItem[]
 
   @@index([branchId, status, occurredAt])
   @@index([branchId, documentType, documentNumber])
+  @@index([issuerProfileId])
+  @@unique([issuerProfileId, taxInvoiceKind, issuedSequence])
+  @@unique([issuerProfileId, taxInvoiceKind, issuedDocumentNumber])
 }
 
 model TaxDocumentLifecycleEvent {
