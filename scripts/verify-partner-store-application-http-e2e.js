@@ -15,17 +15,21 @@ const token = crypto.randomBytes(6).toString('hex')
 const port = 41000 + crypto.randomInt(1000)
 const baseUrl = `http://127.0.0.1:${port}`
 const jwtSecret = crypto.randomBytes(32).toString('hex')
+const ownerEmail = `system-test-http-owner-${token}@invalid.local`
+const ownerPassword = `System-Test-${token}-A9!`
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
-async function synchronizeUserIdentitySequence() {
-  await prisma.$executeRawUnsafe(`
-    SELECT setval(
-      pg_get_serial_sequence('"User"', 'id'),
-      COALESCE((SELECT MAX(id) FROM "User"), 1),
-      EXISTS (SELECT 1 FROM "User")
-    )
-  `)
+async function synchronizeIdentitySequences() {
+  for (const tableName of ['User', 'EmployeeProfile']) {
+    await prisma.$executeRawUnsafe(`
+      SELECT setval(
+        pg_get_serial_sequence('"${tableName}"', 'id'),
+        COALESCE((SELECT MAX(id) FROM "${tableName}"), 1),
+        EXISTS (SELECT 1 FROM "${tableName}")
+      )
+    `)
+  }
 }
 
 async function waitForServer(child) {
@@ -64,7 +68,7 @@ async function request(path, options = {}) {
 }
 
 async function main() {
-  await synchronizeUserIdentitySequence()
+  await synchronizeIdentitySequences()
 
   const adminBranch = await prisma.branch.create({
     data: {
@@ -103,16 +107,6 @@ async function main() {
     select: { id: true },
   })
 
-  const owner = await prisma.user.create({
-    data: {
-      email: `system-test-http-owner-${token}@invalid.local`,
-      password: crypto.randomBytes(32).toString('hex'),
-      role: 'CUSTOMER',
-      enabled: true,
-    },
-    select: { id: true },
-  })
-
   const child = spawn(process.execPath, ['server.js'], {
     cwd: process.cwd(),
     env: {
@@ -133,7 +127,8 @@ async function main() {
         businessName: `system-test HTTP partner ${token}`,
         contactName: 'System Test Owner',
         contactPhone: '0000000000',
-        contactEmail: `system-test-http-owner-${token}@invalid.local`,
+        contactEmail: ownerEmail,
+        password: ownerPassword,
         businessAddress: 'SYSTEM TEST ONLY',
         requestedStorefrontSlug: `system-test-http-partner-${token}`,
         note: 'HTTP E2E verification only. Do not use for operations.',
@@ -144,9 +139,20 @@ async function main() {
     assert.equal(submitted.body.success, true)
     assert.ok(submitted.body.data?.id)
 
+    const pendingApplication = await prisma.partnerStoreApplication.findUnique({
+      where: { id: submitted.body.data.id },
+      select: { provisionedOwnerUserId: true },
+    })
+    assert.ok(pendingApplication?.provisionedOwnerUserId)
+
+    const ownerUserId = pendingApplication.provisionedOwnerUserId
+    const reservedOwnerBeforeApproval = await prisma.user.findUnique({ where: { id: ownerUserId } })
+    assert.equal(reservedOwnerBeforeApproval.enabled, false)
+    assert.equal(reservedOwnerBeforeApproval.email, ownerEmail)
+
     const anonymousApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ ownerUserId: owner.id }),
+      body: JSON.stringify({ reviewNote: 'Anonymous approval must be rejected' }),
     })
     assert.equal(anonymousApproval.status, 401)
 
@@ -154,10 +160,7 @@ async function main() {
     const approved = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
-      body: JSON.stringify({
-        ownerUserId: owner.id,
-        reviewNote: 'System Test HTTP E2E approval',
-      }),
+      body: JSON.stringify({ reviewNote: 'System Test HTTP E2E approval' }),
     })
 
     assert.equal(approved.status, 200)
@@ -168,19 +171,22 @@ async function main() {
     const repeatedApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
-      body: JSON.stringify({ ownerUserId: owner.id }),
+      body: JSON.stringify({ reviewNote: 'Repeated approval must be rejected' }),
     })
     assert.equal(repeatedApproval.status, 409)
     assert.equal(repeatedApproval.body.code, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE')
 
-    const [application, profile, capability] = await Promise.all([
+    const [application, ownerAfterApproval, profile, capability] = await Promise.all([
       prisma.partnerStoreApplication.findUnique({ where: { id: submitted.body.data.id } }),
-      prisma.employeeProfile.findUnique({ where: { userId: owner.id } }),
+      prisma.user.findUnique({ where: { id: ownerUserId } }),
+      prisma.employeeProfile.findUnique({ where: { userId: ownerUserId } }),
       prisma.partnerStoreCapability.findUnique({ where: { branchId: approved.body.data.provisionedBranchId } }),
     ])
 
     assert.equal(application.status, 'APPROVED')
-    assert.equal(application.provisionedOwnerUserId, owner.id)
+    assert.equal(application.provisionedOwnerUserId, ownerUserId)
+    assert.equal(ownerAfterApproval.enabled, true)
+    assert.equal(ownerAfterApproval.role, 'ADMIN')
     assert.equal(profile.branchId, approved.body.data.provisionedBranchId)
     assert.equal(profile.v2Role, 'OWNER')
     assert.equal(capability.storefrontEnabled, false)
@@ -189,7 +195,10 @@ async function main() {
       result: 'PASS',
       applicationCode: application.applicationCode,
       branchId: application.provisionedBranchId,
-      ownerUserId: owner.id,
+      ownerUserId,
+      ownerEnabledBeforeApproval: false,
+      ownerEnabledAfterApproval: true,
+      clientOwnerUserIdIgnored: true,
       retainedTestData: true,
       httpRoutes: [
         'POST /api/public/partner-store-applications',
