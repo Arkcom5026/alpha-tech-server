@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 const routes = read('src/modules/partnerStore/application/partnerStoreApplicationRoutes.js')
 const controller = read('src/modules/partnerStore/application/partnerStoreApplicationController.js')
 const service = read('src/modules/partnerStore/application/partnerStoreApplicationService.js')
+const repository = read('src/modules/partnerStore/application/partnerStoreApplicationRepository.js')
 const server = read('server.js')
 const schema = read('prisma/partner-store-application.prisma')
 const migration = read('prisma/migrations/20260730043000_partner_store_application_provisioning/migration.sql')
@@ -42,6 +43,13 @@ assert.ok(service.includes('await tx.user.delete'))
 assert.ok(service.includes('PARTNER_STORE_OWNER_CLEANUP_UNSAFE'))
 assert.ok(!service.includes('branchPrice.findMany'))
 assert.ok(!service.includes('branchPrice.createMany'))
+
+const publicSelectMatch = repository.match(/const publicSelect = \{([\s\S]*?)\n\}/)
+assert.ok(publicSelectMatch, 'repository must define a public application projection')
+assert.ok(!publicSelectMatch[1].includes('provisionedOwnerUserId'), 'public projection must hide reserved owner user id')
+assert.ok(repository.includes('const adminSelect = {'))
+assert.ok(repository.includes('provisionedOwnerUserId: true'))
+
 assert.ok(
   !/^\s*(DROP\s+(TABLE|TYPE|INDEX)|TRUNCATE\s+TABLE|INSERT\s+INTO|UPDATE\s+"|DELETE\s+FROM)/im.test(migration),
   'migration must not contain destructive DDL or business-data mutations'
@@ -49,7 +57,10 @@ assert.ok(
 assert.ok(!migration.includes('ALTER TABLE "Branch"'))
 assert.ok(runtimeVerifier.includes("ALLOW_PARTNER_STORE_RUNTIME_TEST !== 'true'"))
 assert.ok(runtimeVerifier.includes('system-test-partner-'))
-assert.ok(runtimeVerifier.includes('retainedTestData: true'))
+assert.ok(runtimeVerifier.includes('applicationRepository.findById'))
+assert.ok(runtimeVerifier.includes('publicResponseHidesOwnerUserId: true'))
+assert.ok(runtimeVerifier.includes('cleanedStalePendingApplications'))
+assert.ok(runtimeVerifier.includes('retainedApprovedTestData: true'))
 assert.ok(runtimeVerifier.includes('businessData'))
 assert.ok(!runtimeVerifier.includes('customerProfile.count'))
 
