@@ -62,6 +62,15 @@ const registerSaleCandidate = handle(
   201,
 );
 
+const registerSaleReturnCandidate = handle(
+  (req) => service.registerSaleReturnTaxCandidate({
+    branchId: resolveBranchId(req, req.body),
+    saleReturnId: req.params.saleReturnId,
+    actorEmployeeId: actorEmployeeId(req),
+  }),
+  201,
+);
+
 const listCandidates = handle((req) => service.listCandidates({
   ...req.query,
   branchId: resolveBranchId(req, req.query),
@@ -91,5 +100,6 @@ module.exports = Object.freeze({
   listDocuments,
   registerCandidate,
   registerSaleCandidate,
+  registerSaleReturnCandidate,
   transitionDocument,
 });
