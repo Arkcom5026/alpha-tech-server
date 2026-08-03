@@ -193,6 +193,7 @@ module.exports = Object.freeze({
   findDetailById,
   create,
   updateStatus,
+  issueOutputTaxDocument,
   appendLifecycleEvent,
   list,
 });
