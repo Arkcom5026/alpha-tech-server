@@ -18,6 +18,9 @@ const {
 const {
   mergeProductTemplateCandidate,
 } = require('../promotion/merge/mergeProductTemplateCandidateController')
+const {
+  promoteProductTemplateCandidate,
+} = require('../promotion/promote/promoteProductTemplateCandidateController')
 
 const router = express.Router()
 
@@ -37,6 +40,7 @@ router.post('/', createProductTemplateCandidate)
 router.post('/:id/start-review', startProductTemplateCandidateReview)
 router.post('/:id/reject', rejectProductTemplateCandidate)
 router.post('/:id/merge', mergeProductTemplateCandidate)
+router.post('/:id/promote', promoteProductTemplateCandidate)
 router.get('/:id', getProductTemplateCandidate)
 
 module.exports = router
