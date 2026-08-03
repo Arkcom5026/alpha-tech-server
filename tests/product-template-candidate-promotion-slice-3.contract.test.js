@@ -78,7 +78,9 @@ for (const field of allowedProductFields) {
   assert.match(productCreateSource, new RegExp(`\\b${field}\\s*:`), `Missing allowed field ${field}`)
 }
 
-const forbiddenOperationalTerms = [
+// Check forbidden operational fields as complete object keys. This intentionally allows
+// the catalog policy field trackSerialNumber while still rejecting a serialNumber payload.
+const forbiddenOperationalFields = [
   'costPrice',
   'priceRetail',
   'priceOnline',
@@ -98,8 +100,12 @@ const forbiddenOperationalTerms = [
   'productImage',
   'branchPrice',
 ]
-for (const term of forbiddenOperationalTerms) {
-  assert.doesNotMatch(productCreateSource, new RegExp(term, 'i'), `Forbidden operational field: ${term}`)
+for (const field of forbiddenOperationalFields) {
+  assert.doesNotMatch(
+    productCreateSource,
+    new RegExp(`\\b${field}\\s*:`, 'i'),
+    `Forbidden operational field: ${field}`
+  )
 }
 
 // Service-owned input normalization and explicit payload contract.
