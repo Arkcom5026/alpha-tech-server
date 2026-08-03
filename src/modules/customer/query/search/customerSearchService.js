@@ -3,6 +3,7 @@ const { buildCustomerAddress } = require('../../shared/customerControllerSupport
 
 const normalizeQuery = (value) => String(value || '').trim();
 const compactDigits = (value) => value.replace(/\D/g, '');
+const isPhoneLikeQuery = (value) => /^[\d\s()+-]+$/.test(value);
 
 const presentCustomer = (customer) => ({
   id: customer.id,
@@ -42,15 +43,15 @@ async function searchCustomers({ branchId, rawQuery }) {
     };
   }
 
-  const numeric = /^\d+$/.test(compactDigits(query));
-  const effectiveQuery = numeric ? compactDigits(query) : query;
-  const minimum = numeric ? 4 : 2;
+  const phoneLike = isPhoneLikeQuery(query);
+  const effectiveQuery = phoneLike ? compactDigits(query) : query;
+  const minimum = phoneLike ? 4 : 2;
   if (effectiveQuery.length < minimum) {
     return {
       status: 400,
       body: {
         code: 'CUSTOMER_SEARCH_QUERY_TOO_SHORT',
-        message: numeric
+        message: phoneLike
           ? 'กรุณากรอกตัวเลขอย่างน้อย 4 หลัก'
           : 'กรุณากรอกคำค้นหาอย่างน้อย 2 ตัวอักษร',
       },
@@ -73,4 +74,4 @@ async function searchCustomers({ branchId, rawQuery }) {
   };
 }
 
-module.exports = { searchCustomers, presentCustomer };
+module.exports = { searchCustomers, presentCustomer, isPhoneLikeQuery };
