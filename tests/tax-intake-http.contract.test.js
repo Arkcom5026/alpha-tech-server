@@ -7,6 +7,7 @@ const tax = require('../src/modules/tax');
 
 assert.strictEqual(typeof controller.registerCandidate, 'function');
 assert.strictEqual(typeof controller.registerSaleCandidate, 'function');
+assert.strictEqual(typeof controller.registerSaleReturnCandidate, 'function');
 assert.strictEqual(typeof controller.listCandidates, 'function');
 assert.strictEqual(typeof controller.listDocuments, 'function');
 assert.strictEqual(typeof controller.getDocumentDetail, 'function');
@@ -22,6 +23,7 @@ const routeContracts = routes.stack
 assert.deepStrictEqual(routeContracts, [
   { path: '/candidates/register', methods: ['post'] },
   { path: '/candidates/register-sale/:saleId', methods: ['post'] },
+  { path: '/candidates/register-sale-return/:saleReturnId', methods: ['post'] },
   { path: '/candidates', methods: ['get'] },
   { path: '/documents', methods: ['get'] },
   { path: '/documents/:taxDocumentId', methods: ['get'] },
@@ -31,6 +33,7 @@ assert.deepStrictEqual(routeContracts, [
 assert.strictEqual(tax.intake.routes, routes);
 assert.strictEqual(typeof tax.intake.service.registerTaxCandidate, 'function');
 assert.strictEqual(typeof tax.intake.service.registerSaleTaxCandidate, 'function');
+assert.strictEqual(typeof tax.intake.service.registerSaleReturnTaxCandidate, 'function');
 assert.strictEqual(typeof tax.intake.service.listCandidates, 'function');
 assert.strictEqual(typeof tax.intake.service.listDocuments, 'function');
 assert.strictEqual(typeof tax.intake.service.getDocumentDetail, 'function');
