@@ -33,7 +33,8 @@ class SaleCustomerAccessService {
       });
 
     if (firstAssociationAllowed) {
-      return this.repository.findCustomerById(Number(customerId));
+      const firstAssociationCustomer = await this.repository.findCustomerById(Number(customerId));
+      if (firstAssociationCustomer) return firstAssociationCustomer;
     }
 
     throw new SaleCompletionError(
