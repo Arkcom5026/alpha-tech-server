@@ -9,6 +9,12 @@ const {
 const {
   getProductTemplateCandidate,
 } = require('../query/detail/getProductTemplateCandidateController')
+const {
+  startProductTemplateCandidateReview,
+} = require('../review/start/startProductTemplateCandidateReviewController')
+const {
+  rejectProductTemplateCandidate,
+} = require('../review/reject/rejectProductTemplateCandidateController')
 
 const router = express.Router()
 
@@ -25,6 +31,8 @@ router.use(requireSuperAdmin)
 
 router.get('/', listProductTemplateCandidates)
 router.post('/', createProductTemplateCandidate)
+router.post('/:id/start-review', startProductTemplateCandidateReview)
+router.post('/:id/reject', rejectProductTemplateCandidate)
 router.get('/:id', getProductTemplateCandidate)
 
 module.exports = router
