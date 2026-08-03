@@ -2450,9 +2450,9 @@ model TaxDocument {
 
   @@index([branchId, status, occurredAt])
   @@index([branchId, documentType, documentNumber])
-  @@index([issuerProfileId])
-  @@unique([issuerProfileId, taxInvoiceKind, issuedSequence])
-  @@unique([issuerProfileId, taxInvoiceKind, issuedDocumentNumber])
+  @@index([issuerProfileId], map: "TaxDocument_issuerProfileId_idx")
+  @@unique([issuerProfileId, taxInvoiceKind, issuedSequence], map: "TaxDocument_issuer_kind_sequence_key")
+  @@unique([issuerProfileId, taxInvoiceKind, issuedDocumentNumber], map: "TaxDocument_issuer_kind_number_key")
 }
 
 model TaxDocumentLifecycleEvent {
