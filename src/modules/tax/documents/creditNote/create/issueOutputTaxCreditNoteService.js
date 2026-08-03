@@ -1,7 +1,7 @@
 'use strict';
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
-const { assertOutputTaxCreditNoteEligibility } = require('../creditNote/saleReturnCreditNoteEligibilityPolicy');
+const { assertOutputTaxCreditNoteEligibility } = require('../saleReturnCreditNoteEligibilityPolicy');
 
 const fail = (code, message, statusCode = 409) => {
   const error = new Error(message);
@@ -98,11 +98,16 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
     const candidate = original.candidateId
       ? await tx.taxCandidate.findUnique({ where: { id: Number(original.candidateId) } })
       : null;
+    if (!candidate || candidate.sourceType !== 'SALE') {
+      fail('TAX_CREDIT_NOTE_SOURCE_UNSUPPORTED', 'The original tax invoice must be sourced from a sale');
+    }
     const saleReturn = await loadReturnForCreditNote({
       branchId: normalizedBranchId,
       saleReturnId: normalizedSaleReturnId,
     }, tx);
-    if (!saleReturn) fail('TAX_CREDIT_NOTE_RETURN_NOT_FOUND', 'Sale return was not found', 404);
+    if (!saleReturn || !saleReturn.sale) {
+      fail('TAX_CREDIT_NOTE_RETURN_NOT_FOUND', 'Sale return was not found', 404);
+    }
 
     assertOutputTaxCreditNoteEligibility({
       originalTaxDocument: original,
@@ -174,6 +179,9 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
     });
 
     return Object.freeze({ replayed: false, document });
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    timeout: 30000,
   });
 };
 
