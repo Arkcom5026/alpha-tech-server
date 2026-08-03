@@ -1,0 +1,29 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const root = path.resolve(__dirname, '..', '..', '..');
+const schema = fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8');
+const sql = fs.readFileSync(path.join(__dirname, 'migration.sql'), 'utf8');
+
+assert.match(schema, /model Branch \{[\s\S]*?\n\s+products\s+Product\[\]/);
+assert.match(schema, /model Product \{[\s\S]*?\n\s+branchId\s+Int\?/);
+assert.match(schema, /branch\s+Branch\?\s+@relation\(fields: \[branchId\], references: \[id\], onDelete: Restrict\)/);
+assert.match(schema, /@@index\(\[branchId\]\)/);
+assert.match(schema, /@@index\(\[branchId, active\]\)/);
+assert.match(schema, /@@index\(\[branchId, productTypeId\]\)/);
+assert.match(schema, /@@index\(\[branchId, templateProductId\]\)/);
+
+assert.match(sql, /ALTER TABLE "Product" ADD COLUMN "branchId" INTEGER/);
+assert.match(sql, /FOREIGN KEY \("branchId"\) REFERENCES "Branch"\("id"\) ON DELETE RESTRICT ON UPDATE CASCADE/);
+for (const name of [
+  'Product_branchId_idx',
+  'Product_branchId_active_idx',
+  'Product_branchId_productTypeId_idx',
+  'Product_branchId_templateProductId_idx',
+]) assert.match(sql, new RegExp(`CREATE INDEX "${name}"`));
+
+assert.ok(!/\b(?:UPDATE|DELETE|INSERT|DROP|TRUNCATE)\b/i.test(sql));
+console.log('Product ownership additive Prisma migration contract: PASS');
