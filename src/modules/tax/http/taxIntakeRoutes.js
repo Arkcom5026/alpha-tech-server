@@ -23,6 +23,7 @@ router.get('/documents', controller.listDocuments);
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
 router.get('/documents/:taxDocumentId/printable', controller.getPrintableOutputTaxDocument);
 router.post('/documents/:taxDocumentId/issue', controller.issueOutputTaxDocument);
+router.post('/documents/:taxDocumentId/credit-note', controller.issueOutputTaxCreditNote);
 router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
 
 module.exports = router;
