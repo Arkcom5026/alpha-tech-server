@@ -47,9 +47,18 @@ const createApplication = async (payload = {}) => {
     }
 
     if (requestedStorefrontSlug) {
-      const existingBranch = await tx.branch.findUnique({ where: { slug: requestedStorefrontSlug }, select: { id: true } })
-      if (existingBranch) {
-        fail(409, 'PARTNER_STORE_SLUG_ALREADY_EXISTS', 'ชื่อย่อหน้าร้านนี้ถูกใช้งานแล้ว กรุณาเลือกชื่อใหม่')
+      const [existingBranch, pendingApplication] = await Promise.all([
+        tx.branch.findUnique({ where: { slug: requestedStorefrontSlug }, select: { id: true } }),
+        tx.partnerStoreApplication.findFirst({
+          where: {
+            requestedStorefrontSlug,
+            status: { in: ['PENDING', 'UNDER_REVIEW', 'APPROVED'] },
+          },
+          select: { id: true },
+        }),
+      ])
+      if (existingBranch || pendingApplication) {
+        fail(409, 'PARTNER_STORE_SLUG_ALREADY_EXISTS', 'ชื่อย่อหน้าร้านนี้ถูกใช้งานหรือมีผู้ขอใช้งานแล้ว กรุณาเลือกชื่อใหม่')
       }
     }
 
@@ -105,6 +114,7 @@ const approveApplication = async (applicationId, actorEmployeeId, reviewNote) =>
       include: { employeeProfile: true },
     })
     if (!owner) fail(409, 'PARTNER_STORE_OWNER_INVALID', 'ไม่พบบัญชีเจ้าของร้านของใบสมัครนี้')
+    if (owner.enabled) fail(409, 'PARTNER_STORE_OWNER_ALREADY_ENABLED', 'บัญชีเจ้าของร้านนี้ถูกเปิดใช้งานไปแล้ว')
     if (owner.employeeProfile) fail(409, 'PARTNER_STORE_OWNER_ALREADY_ASSIGNED', 'ผู้ใช้นี้มีสังกัดร้านอยู่แล้ว')
 
     const slug = application.requestedStorefrontSlug || `partner-${application.id}`
@@ -177,15 +187,41 @@ const approveApplication = async (applicationId, actorEmployeeId, reviewNote) =>
 
 const rejectApplication = async (applicationId, reviewNote) => {
   const note = requireText({ reviewNote }, 'reviewNote', 'กรุณาระบุเหตุผลที่ไม่อนุมัติ')
-  const application = await repository.findById(applicationId)
-  if (!application) fail(404, 'PARTNER_STORE_APPLICATION_NOT_FOUND', 'ไม่พบใบสมัครร้านพาร์ทเนอร์')
-  if (application.status !== 'PENDING' && application.status !== 'UNDER_REVIEW') {
-    fail(409, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE', 'ใบสมัครนี้ไม่สามารถปฏิเสธได้')
-  }
-  return require('../../../../lib/prisma').prisma.partnerStoreApplication.update({
-    where: { id: application.id },
-    data: { status: 'REJECTED', reviewNote: note, decidedAt: new Date() },
-    select: { id: true, applicationCode: true, status: true, reviewNote: true, decidedAt: true },
+
+  return repository.withTransaction(async (tx) => {
+    const application = await repository.findById(applicationId, tx)
+    if (!application) fail(404, 'PARTNER_STORE_APPLICATION_NOT_FOUND', 'ไม่พบใบสมัครร้านพาร์ทเนอร์')
+    if (application.status !== 'PENDING' && application.status !== 'UNDER_REVIEW') {
+      fail(409, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE', 'ใบสมัครนี้ไม่สามารถปฏิเสธได้')
+    }
+
+    const ownerId = Number(application.provisionedOwnerUserId)
+    if (Number.isInteger(ownerId) && ownerId > 0) {
+      const owner = await tx.user.findUnique({
+        where: { id: ownerId },
+        include: { employeeProfile: true },
+      })
+      if (owner?.enabled || owner?.employeeProfile) {
+        fail(409, 'PARTNER_STORE_OWNER_CLEANUP_UNSAFE', 'ไม่สามารถปฏิเสธใบสมัครได้ เนื่องจากบัญชีเจ้าของร้านถูกใช้งานแล้ว')
+      }
+    }
+
+    const rejected = await tx.partnerStoreApplication.update({
+      where: { id: application.id },
+      data: {
+        status: 'REJECTED',
+        reviewNote: note,
+        provisionedOwnerUserId: null,
+        decidedAt: new Date(),
+      },
+      select: { id: true, applicationCode: true, status: true, reviewNote: true, decidedAt: true },
+    })
+
+    if (Number.isInteger(ownerId) && ownerId > 0) {
+      await tx.user.delete({ where: { id: ownerId } })
+    }
+
+    return rejected
   })
 }
 
