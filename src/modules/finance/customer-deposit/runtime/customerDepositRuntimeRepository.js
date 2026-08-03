@@ -1,4 +1,7 @@
 const { prisma } = require('../../../../../lib/prisma');
+const {
+  buildCustomerBranchEvidence,
+} = require('../../../customer/policies/customerBranchAccessPolicy');
 
 const createDeposit = (data) => prisma.customerDeposit.create({
   data,
@@ -17,7 +20,12 @@ const findActiveDepositByIdAndBranch = ({ id, branchId }) => prisma.customerDepo
 });
 
 const findCustomerByPhone = ({ phone, branchId }) => prisma.customerProfile.findFirst({
-  where: { user: { loginId: phone } },
+  where: {
+    AND: [
+      buildCustomerBranchEvidence(branchId),
+      { user: { loginId: phone } },
+    ],
+  },
   include: {
     user: true,
     subdistrict: { include: { district: { include: { province: true } } } },
@@ -30,9 +38,14 @@ const findCustomerByPhone = ({ phone, branchId }) => prisma.customerProfile.find
 
 const findCustomersByName = ({ query, branchId }) => prisma.customerProfile.findMany({
   where: {
-    OR: [
-      { name: { contains: query, mode: 'insensitive' } },
-      { companyName: { contains: query, mode: 'insensitive' } },
+    AND: [
+      buildCustomerBranchEvidence(branchId),
+      {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { companyName: { contains: query, mode: 'insensitive' } },
+        ],
+      },
     ],
   },
   take: 10,
@@ -48,7 +61,10 @@ const findCustomersByName = ({ query, branchId }) => prisma.customerProfile.find
 });
 
 const findCustomerById = ({ customerId, branchId }) => prisma.customerProfile.findFirst({
-  where: { id: customerId },
+  where: {
+    id: customerId,
+    ...buildCustomerBranchEvidence(branchId),
+  },
   include: {
     user: true,
     subdistrict: { include: { district: { include: { province: true } } } },
