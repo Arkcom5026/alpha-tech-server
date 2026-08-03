@@ -21,6 +21,7 @@ router.post('/candidates/register-sale/:saleId', controller.registerSaleCandidat
 router.get('/candidates', controller.listCandidates);
 router.get('/documents', controller.listDocuments);
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
+router.get('/documents/:taxDocumentId/printable', controller.getPrintableOutputTaxDocument);
 router.post('/documents/:taxDocumentId/issue', controller.issueOutputTaxDocument);
 router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
 
