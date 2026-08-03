@@ -15,6 +15,8 @@ const files = {
   warrantyAssets: 'src/modules/repair/query/customer-warranty-assets/customerWarrantyAssetsRepository.js',
 };
 
+const branchEvidenceCall = /buildCustomerBranchEvidence\((?:normalizedBranchId|branchId)\)/;
+
 test('Repair customer consumers preserve the shared branch authority boundary', () => {
   Object.values(files).forEach((relativePath) => {
     assert.equal(fs.existsSync(path.join(root, relativePath)), true, `${relativePath} must exist`);
@@ -36,7 +38,7 @@ test('Repair customer consumers preserve the shared branch authority boundary', 
     .map(read)
     .forEach((source) => {
       assert.match(source, /repairCustomerBranchAccessPolicy/);
-      assert.match(source, /buildCustomerBranchEvidence\(branchId\)/);
+      assert.match(source, branchEvidenceCall);
       assert.doesNotMatch(source, /customerProfile\.findUnique/);
     });
 });
@@ -47,6 +49,8 @@ test('Repair persistence and warranty queries remain explicitly branch scoped', 
   const warrantyAssets = read(files.warrantyAssets);
   const intakeSearch = read(files.intakeSearch);
 
+  assert.match(intakeSearch, /const normalizedBranchId = Number\(branchId\)/);
+  assert.match(intakeSearch, /buildCustomerBranchEvidence\(normalizedBranchId\)/);
   assert.match(createRepairJob, /findCustomer\(branchId, customerId\)/);
   assert.match(externalIntake, /findCustomer\(branchId, customerId\)/);
   assert.match(warrantyAssets, /findCustomer\(branchId, customerId\)/);
@@ -54,5 +58,4 @@ test('Repair persistence and warranty queries remain explicitly branch scoped', 
   assert.match(externalIntake, /branchId:\s*Number\(branchId\)/);
   assert.match(warrantyAssets, /branchId:\s*Number\(branchId\)/);
   assert.match(warrantyAssets, /customerId:\s*Number\(customerId\)/);
-  assert.match(intakeSearch, /branchId/);
 });
