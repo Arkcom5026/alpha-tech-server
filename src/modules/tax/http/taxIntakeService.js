@@ -3,6 +3,7 @@
 const candidateRepository = require('../candidates/repository/taxCandidateRepository');
 const documentRepository = require('../documents/repository/taxDocumentRepository');
 const { transitionTaxDocument } = require('../documents/lifecycle/transitionTaxDocumentService');
+const { issueOutputTaxDocument } = require('../documents/issue/issueOutputTaxDocumentService');
 const { registerTaxCandidate } = require('../intake/registerTaxCandidateService');
 const { registerSaleTaxCandidate } = require('../sources/sale/registerSaleTaxCandidateService');
 const {
@@ -51,6 +52,7 @@ const getDocumentDetail = async (input) => {
 
 module.exports = Object.freeze({
   getDocumentDetail,
+  issueOutputTaxDocument,
   listCandidates,
   listDocuments,
   registerSaleTaxCandidate,
