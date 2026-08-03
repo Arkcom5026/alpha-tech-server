@@ -22,8 +22,8 @@ assert.match(service, /TAX_ISSUER_PROFILE_ACTIVATION_INCOMPLETE/);
 assert.match(service, /exactly 13 digits/);
 assert.match(service, /TAX_ISSUER_PROFILE_FIELD_FORBIDDEN/);
 assert.match(service, /EDITABLE_FIELDS/);
-assert.match(repository, /require\('\.\.\/\.\.\/\.\.\/lib\/prisma'\)/);
-assert.match(repository, /taxIssuerProfile\.upsert/);
+assert.ok(repository.includes("require('../../../../lib/prisma')"));
+assert.match(repository, /taxIssuerProfile\\.upsert/);
 assert.match(taxRoutes, /issuer-profile/);
 
 console.log('Tax issuer profile runtime contract: PASS');
