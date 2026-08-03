@@ -185,4 +185,50 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
   });
 };
 
-module.exports = Object.freeze({ issueOutputTaxCreditNote });
+const issueOutputTaxCreditNoteForSaleReturn = async ({ branchId, saleReturnId, actorEmployeeId }) => {
+  const normalizedBranchId = positiveInt(branchId, 'TAX_BRANCH_REQUIRED');
+  const normalizedSaleReturnId = positiveInt(saleReturnId, 'TAX_CREDIT_NOTE_RETURN_REQUIRED');
+
+  const saleReturn = await prisma.saleReturn.findFirst({
+    where: { id: normalizedSaleReturnId, branchId: normalizedBranchId },
+    select: { saleId: true },
+  });
+  if (!saleReturn) fail('TAX_CREDIT_NOTE_RETURN_NOT_FOUND', 'Sale return was not found', 404);
+
+  const candidate = await prisma.taxCandidate.findFirst({
+    where: {
+      branchId: normalizedBranchId,
+      sourceType: 'SALE',
+      sourceId: String(saleReturn.saleId),
+    },
+    select: { id: true },
+  });
+  if (!candidate) {
+    fail('TAX_CREDIT_NOTE_ORIGINAL_DOCUMENT_NOT_FOUND', 'No sale tax candidate was found for this sale return', 404);
+  }
+
+  const original = await prisma.taxDocument.findFirst({
+    where: {
+      branchId: normalizedBranchId,
+      candidateId: candidate.id,
+      documentType: 'OUTPUT_TAX_INVOICE',
+      status: 'REGISTERED',
+    },
+    select: { id: true },
+  });
+  if (!original) {
+    fail('TAX_CREDIT_NOTE_ORIGINAL_DOCUMENT_NOT_FOUND', 'No issued output tax invoice was found for this sale return', 404);
+  }
+
+  return issueOutputTaxCreditNote({
+    branchId: normalizedBranchId,
+    taxDocumentId: original.id,
+    saleReturnId: normalizedSaleReturnId,
+    actorEmployeeId,
+  });
+};
+
+module.exports = Object.freeze({
+  issueOutputTaxCreditNote,
+  issueOutputTaxCreditNoteForSaleReturn,
+});
