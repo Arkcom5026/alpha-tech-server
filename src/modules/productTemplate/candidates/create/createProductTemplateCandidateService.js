@@ -82,7 +82,7 @@ const createCandidate = async ({ user, payload }) => {
       sourceProductId: sourceProduct.id,
       targetTemplateBranchId: targetTemplateBranch.id,
       sourceSnapshot,
-      proposedTemplateData: payload?.proposedTemplateData || null,
+      proposedTemplateData: null,
       duplicateAssessment: null,
       createdByEmployeeId: actorEmployeeId,
     },
