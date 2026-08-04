@@ -1,7 +1,9 @@
 const {
   auditDiscovery,
-  GROUP_REVIEW_STATUS,
 } = require('../../discovery/auditProductTemplateDiscoveryService')
+const {
+  GROUP_REVIEW_STATUS,
+} = require('../../discovery/groupProductTemplateDiscovery')
 const {
   createHttpError,
 } = require('../../shared/productTemplateCandidatePolicy')
