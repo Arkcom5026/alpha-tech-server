@@ -17,9 +17,9 @@ for (const token of [
   'router.use(verifyToken, ensureMerchantContext)',
   'req.user.branchId',
   'req.user.employeeId',
-  "router.get('/')",
-  "router.get('/:reservationId')",
-  "router.post('/:reservationId/lifecycle')",
+  "router.get('/',",
+  "router.get('/:reservationId',",
+  "router.post('/:reservationId/lifecycle',",
 ]) assert.ok(routes.includes(token), `Missing merchant route authority: ${token}`);
 
 for (const token of [
