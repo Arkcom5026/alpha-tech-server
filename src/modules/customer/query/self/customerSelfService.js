@@ -26,15 +26,34 @@ const presentCustomer = (customer) => {
   };
 };
 
-async function getCustomerSelf({ userId, role }) {
+async function getCustomerSelf({ userId, role, customerProfileId }) {
   if (role !== 'CUSTOMER') {
     return { status: 403, body: { message: 'Forbidden' } };
   }
 
-  const customer = await customerSelfRepository.findCustomerByUserId({ userId });
+  if (!customerProfileId) {
+    return {
+      status: 409,
+      body: {
+        code: 'ACTIVE_CUSTOMER_PROFILE_REQUIRED',
+        message: 'กรุณาเลือกร้านก่อนเปิดข้อมูลลูกค้า',
+      },
+    };
+  }
+
+  const customer = await customerSelfRepository.findActiveCustomerProfile({
+    customerProfileId,
+    userId,
+  });
 
   if (!customer) {
-    return { status: 404, body: { message: 'ไม่พบข้อมูลลูกค้า' } };
+    return {
+      status: 404,
+      body: {
+        code: 'CUSTOMER_PROFILE_NOT_FOUND',
+        message: 'ไม่พบข้อมูลลูกค้าสำหรับร้านที่เลือก',
+      },
+    };
   }
 
   return { status: 200, body: presentCustomer(customer) };
