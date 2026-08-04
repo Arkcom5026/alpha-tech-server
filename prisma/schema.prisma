@@ -21,7 +21,7 @@ model User {
   loginId             String?              @unique
   loginType           LoginType            @default(PHONE)
   cart                Cart[]
-  customerProfile     CustomerProfile?
+  customerProfiles    CustomerProfile[]
   employeeProfile     EmployeeProfile?
   orderOnline         OrderOnline[]
   passwordResetTokens PasswordResetToken[]
@@ -1717,7 +1717,7 @@ model CustomerProfile {
   id                        Int                       @id @default(autoincrement())
   name                      String?
   picture                   String?
-  userId                    Int                       @unique
+  userId                    Int
   branchId                  Int?
   createdAt                 DateTime                  @default(now())
   updatedAt                 DateTime                  @updatedAt
@@ -1731,14 +1731,12 @@ model CustomerProfile {
   addressDetail             String?
   depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
   outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
-
   cart                      Cart[]
   combinedBillingDocuments  CombinedBillingDocument[]
   customerDeposits          CustomerDeposit[]
   subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
   user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   customerReceipts          CustomerReceipt[]
   orders                    Order[]
   orderOnlines              OrderOnline[]
@@ -1753,6 +1751,8 @@ model CustomerProfile {
   posHeldCarts              PosHeldCart[]
   productReservations       ProductReservation[]
 
+  @@unique([branchId, userId])
+  @@index([userId])
   @@index([subdistrictCode])
   @@index([branchId])
 }
