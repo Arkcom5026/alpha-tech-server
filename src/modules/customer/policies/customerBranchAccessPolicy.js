@@ -1,17 +1,15 @@
-function buildCustomerBranchEvidence(branchIdInput) {
+function normalizeBranchId(branchIdInput) {
   const branchId = Number(branchIdInput);
-  if (!Number.isInteger(branchId) || branchId <= 0) {
+  return Number.isInteger(branchId) && branchId > 0 ? branchId : null;
+}
+
+function buildCustomerBranchEvidence(branchIdInput) {
+  const branchId = normalizeBranchId(branchIdInput);
+  if (!branchId) {
     return { id: { equals: -1 } };
   }
 
-  return {
-    OR: [
-      { sales: { some: { branchId } } },
-      { repairJobs: { some: { branchId } } },
-      { deviceIntakes: { some: { branchId } } },
-      { ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } },
-    ],
-  };
+  return { branchId };
 }
 
 function buildCustomerBranchAccessWhere({ customerId, branchId }) {
