@@ -34,8 +34,8 @@ test('registers lists details and manages a branch-owned device', async () => {
   assert.equal(detail.workstationId, 'pos-front')
 })
 
-test('denies cross-store detail access', async () => {
-  await assert.rejects(
+test('denies cross-store detail access', () => {
+  assert.throws(
     () => service.detail({ user: branch3, deviceId }),
     { code: 'STORE_DEVICE_NOT_FOUND', statusCode: 404 },
   )
@@ -46,8 +46,8 @@ test('revokes device and clears workstation assignment', async () => {
   assert.equal(revoked.connectionState, 'REVOKED')
   const detail = await service.detail({ user: branch2, deviceId })
   assert.equal(detail.workstationId, null)
-  await assert.rejects(
+  assert.throws(
     () => service.assignWorkstation({ user: branch2, deviceId, payload: { workstationId: 'pos-other' } }),
-    { code: 'STORE_DEVICE_REVOKED' },
+    { code: 'STORE_DEVICE_REVOKED', statusCode: 400 },
   )
 })
