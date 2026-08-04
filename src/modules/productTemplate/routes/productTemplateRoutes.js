@@ -6,6 +6,7 @@ const router = express.Router();
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../middlewares/requireAdmin');
+const productTemplateCandidateRoutes = require('../candidates/routes/productTemplateCandidateRoutes');
 
 const {
   getAllProductTemplates,
@@ -17,6 +18,7 @@ const {
   toggleProductTemplateActive,
 } = require('../runtime/productTemplateRuntimeController');
 
+router.use('/candidates', productTemplateCandidateRoutes);
 router.use(verifyToken);
 
 router.get('/', getAllProductTemplates);
