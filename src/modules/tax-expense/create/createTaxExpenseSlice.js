@@ -3,8 +3,10 @@
 const { prisma } = require('../../../../lib/prisma');
 const {
   asMoney,
+  asOptionalDate,
   asOptionalText,
   asPositiveInt,
+  asRequiredDate,
   asRequiredText,
   branchIdFromToken,
   employeeIdFromToken,
@@ -75,13 +77,11 @@ class CreateTaxExpenseService {
       throw error;
     }
     const documentNumber = asRequiredText(input?.documentNumber, 'documentNumber');
-    const expenseDate = input?.expenseDate ? new Date(input.expenseDate) : new Date();
-    if (Number.isNaN(expenseDate.getTime())) {
-      const error = new Error('expenseDate ไม่ถูกต้อง');
-      error.statusCode = 400;
-      error.code = 'TAX_EXPENSE_VALIDATION_ERROR';
-      throw error;
-    }
+    const expenseDate = input?.expenseDate
+      ? asRequiredDate(input.expenseDate, 'expenseDate')
+      : new Date();
+    const documentDate = asOptionalDate(input?.documentDate, 'documentDate') || expenseDate;
+    const receivedAt = asOptionalDate(input?.receivedAt, 'receivedAt') || new Date();
     const items = normalizeItems(input?.items);
 
     return this.prisma.$transaction(async (tx) => {
@@ -116,6 +116,12 @@ class CreateTaxExpenseService {
       const vatAmount = items.reduce((sum, item) => sum + Number(item.vatAmount), 0);
       const withholdingTaxAmount = items.reduce((sum, item) => sum + Number(item.withholdingTaxAmount), 0);
       const totalAmount = subtotalAmount + vatAmount;
+      if (withholdingTaxAmount > totalAmount) {
+        const error = new Error('ภาษีหัก ณ ที่จ่ายต้องไม่เกินยอดรวมค่าใช้จ่าย');
+        error.statusCode = 400;
+        error.code = 'TAX_EXPENSE_WITHHOLDING_EXCEEDS_TOTAL';
+        throw error;
+      }
       const paymentDueAmount = totalAmount - withholdingTaxAmount;
       const expenseNumber = await buildExpenseNumber(tx, branchId, expenseDate);
 
@@ -128,9 +134,9 @@ class CreateTaxExpenseService {
           counterpartyName: supplier.name,
           counterpartyTaxId: supplier.taxId,
           documentNumber,
-          documentDate: input?.documentDate ? new Date(input.documentDate) : expenseDate,
+          documentDate,
           expenseDate,
-          receivedAt: input?.receivedAt ? new Date(input.receivedAt) : new Date(),
+          receivedAt,
           status: 'RECORDED',
           evidenceStatus: 'PENDING_REVIEW',
           currency: 'THB',
