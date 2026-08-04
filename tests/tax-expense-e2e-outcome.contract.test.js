@@ -26,6 +26,12 @@ assert.match(source, /WITHHOLDING_MISMATCH/);
 assert.match(source, /TOTAL_MISMATCH/);
 assert.match(source, /PAYMENT_DUE_MISMATCH/);
 assert.match(source, /RECORDED_LIFECYCLE_MISSING/);
-assert.doesNotMatch(source, /\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bTRUNCATE\b/i);
+
+// Inspect concrete SQL mutation forms rather than JavaScript keywords such as
+// `delete authorityEnv.DATABASE_URL`, which are part of credential isolation.
+assert.doesNotMatch(source, /\bINSERT\s+INTO\b/i);
+assert.doesNotMatch(source, /\bUPDATE\s+(?:"|[a-z_])/i);
+assert.doesNotMatch(source, /\bDELETE\s+FROM\b/i);
+assert.doesNotMatch(source, /\bTRUNCATE(?:\s+TABLE)?\s+(?:"|[a-z_])/i);
 
 console.log('Tax Expense E2E outcome contract: PASS');
