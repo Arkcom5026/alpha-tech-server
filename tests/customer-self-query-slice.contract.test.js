@@ -26,8 +26,13 @@ assert.doesNotThrow(
 
 assert.doesNotMatch(controller, /lib\/prisma|prisma\./);
 assert.doesNotMatch(service, /lib\/prisma|prisma\./);
-assert.match(repository, /prisma\.customerProfile\.findUnique/);
-assert.match(repository, /where:\s*\{\s*userId\s*\}/);
+assert.match(controller, /customerProfileId:\s*req\.user\?\.customerProfileId/);
+assert.match(service, /ACTIVE_CUSTOMER_PROFILE_REQUIRED/);
+assert.match(service, /findActiveCustomerProfile/);
+assert.match(repository, /prisma\.customerProfile\.findFirst/);
+assert.match(repository, /id:\s*profileId/);
+assert.match(repository, /userId:\s*platformUserId/);
+assert.doesNotMatch(repository, /findUnique\([\s\S]*where:\s*\{\s*userId\s*\}/);
 assert.match(service, /role !== 'CUSTOMER'/);
 assert.match(service, /Forbidden/);
 assert.match(service, /ไม่พบข้อมูลลูกค้า/);
