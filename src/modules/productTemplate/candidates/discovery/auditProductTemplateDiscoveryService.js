@@ -4,6 +4,10 @@ const {
 } = require('../../repositories/productTemplateRepository')
 const repository = require('./auditProductTemplateDiscoveryRepository')
 const {
+  GROUP_REVIEW_STATUS,
+  groupUnmatchedDiscoveryItems,
+} = require('./groupProductTemplateDiscovery')
+const {
   assertSuperAdmin,
   createHttpError,
 } = require('../shared/productTemplateCandidatePolicy')
@@ -65,13 +69,18 @@ const emptySummary = () => ({
   unmatched: 0,
 })
 
+const emptyGroupSummary = () => ({
+  groups: 0,
+  ready: 0,
+  productTypeReviewRequired: 0,
+  sourceProducts: 0,
+})
+
 const auditDiscovery = async ({ user, query = {} }) => {
   assertSuperAdmin(user)
   const businessType = normalizeBusinessType(query.businessType)
   const templateBranchCode = resolveTemplateBranchCode(businessType)
 
-  // Business type is a platform workspace selector. Template ownership is resolved by
-  // the canonical Template Branch code; its categoryId is the Store/Template boundary.
   const templateBranch = await repository.findTemplateBranchByCode({
     branchCode: templateBranchCode,
   })
@@ -97,6 +106,8 @@ const auditDiscovery = async ({ user, query = {} }) => {
       storeBranches: [],
       templateBranches: [templateBranch],
       summary: emptySummary(),
+      groupSummary: emptyGroupSummary(),
+      groups: [],
       items: [],
     }
   }
@@ -183,6 +194,12 @@ const auditDiscovery = async ({ user, query = {} }) => {
 
   const count = (classification) =>
     items.filter((item) => item.classification === classification).length
+  const unmatchedItems = items.filter(
+    (item) => item.classification === DISCOVERY_CLASSIFICATION.UNMATCHED
+  )
+  const groups = groupUnmatchedDiscoveryItems(unmatchedItems)
+  const groupCount = (reviewStatus) =>
+    groups.filter((group) => group.reviewStatus === reviewStatus).length
 
   return {
     businessType,
@@ -196,8 +213,20 @@ const auditDiscovery = async ({ user, query = {} }) => {
       linkedTemplate: count(DISCOVERY_CLASSIFICATION.LINKED_TEMPLATE),
       matchedUnlinked: count(DISCOVERY_CLASSIFICATION.MATCHED_UNLINKED),
       candidateOpen: count(DISCOVERY_CLASSIFICATION.CANDIDATE_OPEN),
-      unmatched: count(DISCOVERY_CLASSIFICATION.UNMATCHED),
+      unmatched: unmatchedItems.length,
     },
+    groupSummary: {
+      groups: groups.length,
+      ready: groupCount(GROUP_REVIEW_STATUS.READY),
+      productTypeReviewRequired: groupCount(
+        GROUP_REVIEW_STATUS.PRODUCT_TYPE_REVIEW_REQUIRED
+      ),
+      sourceProducts: groups.reduce(
+        (total, group) => total + group.sourceProductCount,
+        0
+      ),
+    },
+    groups,
     items,
   }
 }
