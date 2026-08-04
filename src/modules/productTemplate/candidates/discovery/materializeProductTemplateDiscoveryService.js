@@ -5,6 +5,9 @@ const {
   GROUP_REVIEW_STATUS,
 } = require('./groupProductTemplateDiscovery')
 const {
+  createCandidate,
+} = require('../create/createProductTemplateCandidateService')
+const {
   assertSuperAdmin,
   createHttpError,
 } = require('../shared/productTemplateCandidatePolicy')
@@ -22,6 +25,66 @@ const toLimit = (value) => {
   return number
 }
 
+const isDuplicateCandidateError = (error) =>
+  error?.code === 'P2002' ||
+  error?.code === 'PRODUCT_TEMPLATE_CANDIDATE_ALREADY_EXISTS' ||
+  error?.status === 409
+
+const materializeGroupCandidates = async ({ user, templateBranchId, groups }) => {
+  const created = []
+  const skipped = []
+  const failed = []
+
+  for (const group of groups) {
+    const groupCreated = []
+    const groupSkipped = []
+    const groupFailed = []
+
+    for (const sourceProduct of group.sourceProducts || []) {
+      try {
+        const result = await createCandidate({
+          user,
+          payload: {
+            sourceProductId: sourceProduct.id,
+            sourceBranchId: sourceProduct.branchId,
+            targetTemplateBranchId: templateBranchId,
+          },
+        })
+        groupCreated.push({
+          candidateId: result.candidate.id,
+          sourceProductId: sourceProduct.id,
+          sourceBranchId: sourceProduct.branchId,
+        })
+      } catch (error) {
+        const evidence = {
+          sourceProductId: sourceProduct.id,
+          sourceBranchId: sourceProduct.branchId,
+          code: error?.code || 'PRODUCT_TEMPLATE_GROUP_MATERIALIZATION_FAILED',
+          message: error?.message || 'Candidate materialization failed',
+        }
+        if (isDuplicateCandidateError(error)) groupSkipped.push(evidence)
+        else groupFailed.push(evidence)
+      }
+    }
+
+    if (groupCreated.length) {
+      created.push({
+        groupKey: group.groupKey,
+        candidateCount: groupCreated.length,
+        candidates: groupCreated,
+      })
+    }
+    if (groupSkipped.length) {
+      skipped.push({ groupKey: group.groupKey, products: groupSkipped })
+    }
+    if (groupFailed.length) {
+      failed.push({ groupKey: group.groupKey, products: groupFailed })
+    }
+  }
+
+  return { created, skipped, failed }
+}
+
 const materializeDiscovery = async ({ user, payload = {} }) => {
   assertSuperAdmin(user)
 
@@ -37,16 +100,16 @@ const materializeDiscovery = async ({ user, payload = {} }) => {
     (group) => group.reviewStatus === GROUP_REVIEW_STATUS.PRODUCT_TYPE_REVIEW_REQUIRED
   )
 
-  if (apply) {
-    throw createHttpError(
-      409,
-      'Grouped Candidate materialization is not enabled until group review and persistence authority are approved',
-      'GROUPED_CANDIDATE_MATERIALIZATION_NOT_ENABLED'
-    )
-  }
+  const materialized = apply
+    ? await materializeGroupCandidates({
+        user,
+        templateBranchId: audit.templateBranch.id,
+        groups: eligibleGroups,
+      })
+    : { created: [], skipped: [], failed: [] }
 
   return {
-    mode: 'GROUPED_DRY_RUN',
+    mode: apply ? 'GROUPED_APPLY' : 'GROUPED_DRY_RUN',
     businessType: audit.businessType,
     templateBranch: audit.templateBranch,
     categoryId: audit.categoryId,
@@ -58,13 +121,16 @@ const materializeDiscovery = async ({ user, payload = {} }) => {
     ),
     reviewRequiredGroupCount: reviewRequiredGroups.length,
     groups: eligibleGroups,
-    created: [],
-    failed: [],
+    created: materialized.created,
+    skipped: materialized.skipped,
+    failed: materialized.failed,
   }
 }
 
 module.exports = {
   toBoolean,
   toLimit,
+  isDuplicateCandidateError,
+  materializeGroupCandidates,
   materializeDiscovery,
 }
