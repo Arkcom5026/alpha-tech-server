@@ -6,14 +6,6 @@ const searchSaleItemsController = async (req, res) => {
     const query = String(req.query?.query || '').trim();
     const result = await searchSaleItems({ branchId, query });
 
-    if (!result.items.length) {
-      return res.status(404).json({
-        code: 'SALE_ITEM_NOT_FOUND',
-        message: 'ไม่พบสินค้าที่พร้อมขายจากบาร์โค้ดนี้',
-        items: [],
-      });
-    }
-
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       Pragma: 'no-cache',
@@ -21,7 +13,10 @@ const searchSaleItemsController = async (req, res) => {
       'Surrogate-Control': 'no-store',
     });
 
-    return res.json(result);
+    return res.json({
+      ...result,
+      message: result.items.length ? null : 'ไม่พบสินค้าที่พร้อมขายจากข้อมูลค้นหานี้',
+    });
   } catch (error) {
     const status = Number(error?.status) || 500;
     if (status >= 500) {
