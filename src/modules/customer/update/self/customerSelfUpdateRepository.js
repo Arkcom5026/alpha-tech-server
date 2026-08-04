@@ -6,31 +6,39 @@ const findSubdistrictPostcode = async (subdistrictCode) =>
     select: { postcode: true },
   });
 
-const findCustomerByUserId = async (userId) =>
-  prisma.customerProfile.findUnique({
-    where: { userId },
+const findActiveCustomerProfile = async ({ customerProfileId, userId }) => {
+  const profileId = Number(customerProfileId);
+  const platformUserId = Number(userId);
+
+  if (
+    !Number.isInteger(profileId) ||
+    profileId <= 0 ||
+    !Number.isInteger(platformUserId) ||
+    platformUserId <= 0
+  ) {
+    return null;
+  }
+
+  return prisma.customerProfile.findFirst({
+    where: {
+      id: profileId,
+      userId: platformUserId,
+    },
     include: { user: true },
   });
+};
 
 const updateCustomerSelf = async ({ userId, existing, profileData, subdistrictCode, phone }) =>
   prisma.$transaction(async (tx) => {
-    const profile = existing
-      ? await tx.customerProfile.update({
-          where: { id: existing.id },
-          data: {
-            ...profileData,
-            ...(subdistrictCode !== undefined
-              ? { subdistrictCode: subdistrictCode || null }
-              : {}),
-          },
-        })
-      : await tx.customerProfile.create({
-          data: {
-            userId,
-            ...profileData,
-            ...(subdistrictCode ? { subdistrictCode } : {}),
-          },
-        });
+    const profile = await tx.customerProfile.update({
+      where: { id: existing.id },
+      data: {
+        ...profileData,
+        ...(subdistrictCode !== undefined
+          ? { subdistrictCode: subdistrictCode || null }
+          : {}),
+      },
+    });
 
     if (phone) {
       await tx.user.update({ where: { id: userId }, data: { loginId: phone } });
@@ -39,9 +47,12 @@ const updateCustomerSelf = async ({ userId, existing, profileData, subdistrictCo
     return profile;
   });
 
-const findCustomerDetailById = async (id) =>
-  prisma.customerProfile.findUnique({
-    where: { id },
+const findCustomerDetailById = async ({ id, userId }) =>
+  prisma.customerProfile.findFirst({
+    where: {
+      id: Number(id),
+      userId: Number(userId),
+    },
     include: {
       user: true,
       subdistrict: { include: { district: { include: { province: true } } } },
@@ -50,7 +61,7 @@ const findCustomerDetailById = async (id) =>
 
 module.exports = {
   findSubdistrictPostcode,
-  findCustomerByUserId,
+  findActiveCustomerProfile,
   updateCustomerSelf,
   findCustomerDetailById,
 };
