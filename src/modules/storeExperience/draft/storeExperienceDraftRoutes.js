@@ -17,5 +17,7 @@ const allowEmployeeContext = (req, res, next) => {
 router.use(verifyToken, allowEmployeeContext);
 router.get('/draft', controller.getCurrentDraft);
 router.put('/draft', controller.saveCurrentDraft);
+router.post('/publish', controller.publishCurrentStorefront);
+router.post('/unpublish', controller.unpublishCurrentStorefront);
 
 module.exports = router;
