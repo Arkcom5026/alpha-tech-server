@@ -4,6 +4,9 @@ const {
   createProductTemplateCandidate,
 } = require('../create/createProductTemplateCandidateController')
 const {
+  auditProductTemplateDiscovery,
+} = require('../discovery/auditProductTemplateDiscoveryController')
+const {
   listProductTemplateCandidates,
 } = require('../query/list/listProductTemplateCandidatesController')
 const {
@@ -35,6 +38,7 @@ const requireSuperAdmin = (req, res, next) => {
 router.use(verifyToken)
 router.use(requireSuperAdmin)
 
+router.get('/discovery-audit', auditProductTemplateDiscovery)
 router.get('/', listProductTemplateCandidates)
 router.post('/', createProductTemplateCandidate)
 router.post('/:id/start-review', startProductTemplateCandidateReview)
