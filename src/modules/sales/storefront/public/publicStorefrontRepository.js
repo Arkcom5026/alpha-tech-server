@@ -4,7 +4,7 @@ const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const toNumber = (value) => (value == null ? null : Number(value));
 
-const publishedProductFromSql = Prisma.sql`
+const publishedProductFromSql = () => Prisma.sql`
   FROM "BranchPrice" price
   JOIN "Product" product ON product."id" = price."productId"
   LEFT JOIN "Brand" brand ON brand."id" = product."brandId"
@@ -154,8 +154,6 @@ const findPublishedBySlug = async (slug, db = prisma) => {
 
 const listPublishedProducts = async ({ branchId, search, categoryId, brandId, sort, page, pageSize }, db = prisma) => {
   const offset = (page - 1) * pageSize;
-  const filterSql = buildDiscoveryFilterSql({ search, categoryId, brandId });
-  const orderSql = buildOrderSql(sort);
 
   const [rows, counts, categoryRows, brandRows] = await Promise.all([
     db.$queryRaw(Prisma.sql`
@@ -167,7 +165,7 @@ const listPublishedProducts = async ({ branchId, search, categoryId, brandId, so
         unit."id" AS "unitId", unit."name" AS "unitName",
         image."coverImageUrl",
         GREATEST(COALESCE(balance."quantity", 0) - COALESCE(balance."reserved", 0), 0) AS "availableQuantity"
-      ${publishedProductFromSql}
+      ${publishedProductFromSql()}
       LEFT JOIN LATERAL (
         SELECT COALESCE(product_image."secure_url", product_image."url") AS "coverImageUrl"
         FROM "ProductImage" product_image
@@ -176,19 +174,19 @@ const listPublishedProducts = async ({ branchId, search, categoryId, brandId, so
         LIMIT 1
       ) image ON TRUE
       ${publishedProductWhereSql(branchId)}
-      ${filterSql}
-      ${orderSql}
+      ${buildDiscoveryFilterSql({ search, categoryId, brandId })}
+      ${buildOrderSql(sort)}
       LIMIT ${pageSize} OFFSET ${offset}
     `),
     db.$queryRaw(Prisma.sql`
       SELECT COUNT(*)::int AS "total"
-      ${publishedProductFromSql}
+      ${publishedProductFromSql()}
       ${publishedProductWhereSql(branchId)}
-      ${filterSql}
+      ${buildDiscoveryFilterSql({ search, categoryId, brandId })}
     `),
     db.$queryRaw(Prisma.sql`
       SELECT category."id", category."name", COUNT(*)::int AS "count"
-      ${publishedProductFromSql}
+      ${publishedProductFromSql()}
       ${publishedProductWhereSql(branchId)}
       AND category."id" IS NOT NULL
       GROUP BY category."id", category."name"
@@ -196,7 +194,7 @@ const listPublishedProducts = async ({ branchId, search, categoryId, brandId, so
     `),
     db.$queryRaw(Prisma.sql`
       SELECT brand."id", brand."name", COUNT(*)::int AS "count"
-      ${publishedProductFromSql}
+      ${publishedProductFromSql()}
       ${publishedProductWhereSql(branchId)}
       AND brand."id" IS NOT NULL
       GROUP BY brand."id", brand."name"
@@ -224,7 +222,7 @@ const findPublishedProductById = async ({ branchId, productId }, db = prisma) =>
       category."id" AS "categoryId", category."name" AS "categoryName",
       unit."id" AS "unitId", unit."name" AS "unitName",
       GREATEST(COALESCE(balance."quantity", 0) - COALESCE(balance."reserved", 0), 0) AS "availableQuantity"
-    ${publishedProductFromSql}
+    ${publishedProductFromSql()}
     ${publishedProductWhereSql(branchId)}
     AND product."id" = ${productId}
     LIMIT 1
