@@ -1,0 +1,25 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const read = (relativePath) => fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8')
+
+const service = read('src/modules/productTemplate/candidates/discovery/materializeProductTemplateDiscoveryService.js')
+const controller = read('src/modules/productTemplate/candidates/discovery/materializeProductTemplateDiscoveryController.js')
+const routes = read('src/modules/productTemplate/candidates/routes/productTemplateCandidateRoutes.js')
+
+assert.match(routes, /router\.post\('\/discovery-materialize',\s*materializeProductTemplateDiscovery\)/)
+assert.ok(routes.indexOf("router.post('/discovery-materialize'") < routes.indexOf("router.get('/:id'"))
+assert.match(service, /auditDiscovery\(/)
+assert.match(service, /DISCOVERY_CLASSIFICATION\.UNMATCHED/)
+assert.match(service, /createCandidate\(/)
+assert.match(service, /targetTemplateBranchId:\s*audit\.templateBranch\.id/)
+assert.match(service, /mode:\s*'DRY_RUN'/)
+assert.match(service, /mode:\s*'APPLY'/)
+assert.match(service, /apply/)
+assert.match(service, /limit/)
+assert.match(controller, /req\.user/)
+assert.doesNotMatch(service, /LINKED_TEMPLATE[^\n]*createCandidate|MATCHED_UNLINKED[^\n]*createCandidate|CANDIDATE_OPEN[^\n]*createCandidate/)
+assert.doesNotMatch(service, /costPrice|priceRetail|serialNumber|supplier|stock|sale|taxDocument/i)
+
+console.log('product-template-discovery-candidate-materialization-slice-4.contract.test.js: PASS')
