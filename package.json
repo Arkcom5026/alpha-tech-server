@@ -40,6 +40,7 @@
     "verify:partner-store-application-runtime": "node scripts/verify-partner-store-application-runtime.js",
     "verify:partner-store-application-runtime:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-runtime.js",
     "test:public-storefront": "node tests/public-storefront-product-discovery.contract.test.js",
+    "test:store-experience-draft": "node tests/store-experience-draft-editor.contract.test.js",
     "test:anonymous-shopping-session": "node tests/anonymous-shopping-session-authority.contract.test.js",
     "test:identity-at-commitment": "node tests/identity-at-commitment-foundation.contract.test.js && node tests/identity-at-commitment-authority-review.contract.test.js",
     "test:product-reservation-commitment": "node tests/product-reservation-commitment-foundation.contract.test.js && node tests/product-reservation-commitment-authority-review.contract.test.js",
