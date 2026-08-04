@@ -54,9 +54,10 @@ const productSummary = (product) => ({
   ...product,
   brandName: product?.brand?.name || null,
   productTypeName: product?.productType?.name || null,
+  coverImageUrl: product?.productImages?.[0]?.secure_url || product?.productImages?.[0]?.url || null,
 });
 
-const mapStockItem = (stockItem, branchId, matchReason = null) => ({
+const mapStockItem = (stockItem, branchId, matchReason = null, authority = null) => ({
   type: 'STOCK',
   lineType: 'STOCK_ITEM',
   productId: stockItem.productId,
@@ -67,11 +68,12 @@ const mapStockItem = (stockItem, branchId, matchReason = null) => ({
   quantityAvailable: 1,
   status: stockItem.status,
   matchReason,
+  barcodeAuthority: authority,
   product: productSummary(stockItem.product),
   prices: pricesOf(stockItem.product, branchId),
 });
 
-const mapSimpleLot = (simpleLot, branchId, matchReason = null) => ({
+const mapSimpleLot = (simpleLot, branchId, matchReason = null, authority = null) => ({
   type: 'SIMPLE',
   lineType: 'SIMPLE',
   productId: simpleLot.productId,
@@ -83,6 +85,7 @@ const mapSimpleLot = (simpleLot, branchId, matchReason = null) => ({
   qtyRemaining: toNumber(simpleLot.qtyRemaining),
   status: simpleLot.status,
   matchReason,
+  barcodeAuthority: authority,
   product: productSummary(simpleLot.product),
   prices: pricesOf(simpleLot.product, branchId),
 });
@@ -99,12 +102,17 @@ const exactReasonForSimple = (item, normalized) => (
 );
 
 const assertExactSellable = (stockItems, simpleLots) => {
-  const sellableStock = stockItems.filter((item) => item.status === 'IN_STOCK');
+  const sellableStock = stockItems.filter((item) => (
+    item.status === 'IN_STOCK'
+    && item.product?.active === true
+    && item.product?.inventoryBehavior === 'TRACKED'
+  ));
   const sellableSimple = simpleLots.filter((item) => (
     item.status === 'ACTIVE'
     && toNumber(item.qtyRemaining) > 0
     && item.product?.active === true
     && item.product?.mode === 'SIMPLE'
+    && item.product?.inventoryBehavior === 'TRACKED'
   ));
 
   if (sellableStock.length || sellableSimple.length) return { sellableStock, sellableSimple };
@@ -122,6 +130,23 @@ const assertExactSellable = (stockItems, simpleLots) => {
   return { sellableStock: [], sellableSimple: [] };
 };
 
+const uniqueByInventoryIdentity = (items) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item.type === 'STOCK' ? `stock:${item.stockItemId}` : `simple:${item.simpleLotId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const authoritySummary = (authority) => authority ? {
+  id: authority.id,
+  barcode: authority.barcode,
+  kind: authority.kind,
+  status: authority.status,
+} : null;
+
 const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRepository }) => {
   const normalizedQuery = String(query || '').trim();
   if (!Number.isInteger(branchId) || branchId <= 0 || !normalizedQuery) {
@@ -129,16 +154,43 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
   }
 
   const normalizedLower = normalizedQuery.toLowerCase();
-  const [exactStock, exactSimple] = await Promise.all([
+  const [authority, exactStock, exactSimple] = await Promise.all([
+    repository.findBarcodeAuthorityExact({ branchId, query: normalizedQuery }),
     repository.findExactStockItems({ branchId, query: normalizedQuery, take: MAX_RESULTS }),
     repository.findExactSimpleLots({ branchId, query: normalizedQuery, take: MAX_RESULTS }),
   ]);
 
-  const { sellableStock, sellableSimple } = assertExactSellable(exactStock, exactSimple);
-  const exactItems = [
-    ...sellableStock.map((item) => mapStockItem(item, branchId, exactReasonForStock(item, normalizedLower))),
-    ...sellableSimple.map((item) => mapSimpleLot(item, branchId, exactReasonForSimple(item, normalizedLower))),
-  ];
+  const authorityStock = authority?.stockItem ? [authority.stockItem] : [];
+  const authoritySimple = authority?.simpleLot ? [authority.simpleLot] : [];
+
+  if (authority && !authority.stockItem && !authority.simpleLot) {
+    throw new SaleItemSearchError(409, 'BARCODE_AUTHORITY_UNRESOLVED', 'พบบาร์โค้ดรับสินค้า แต่ยังไม่ได้เชื่อมกับสินค้าที่พร้อมขาย', {
+      barcodeReceiptItemId: authority.id,
+      barcode: authority.barcode,
+      kind: authority.kind,
+      status: authority.status,
+    });
+  }
+
+  const { sellableStock, sellableSimple } = assertExactSellable(
+    [...authorityStock, ...exactStock],
+    [...authoritySimple, ...exactSimple],
+  );
+
+  const exactItems = uniqueByInventoryIdentity([
+    ...sellableStock.map((item) => mapStockItem(
+      item,
+      branchId,
+      authority?.stockItem?.id === item.id ? 'BARCODE_AUTHORITY_EXACT' : exactReasonForStock(item, normalizedLower),
+      authority?.stockItem?.id === item.id ? authoritySummary(authority) : null,
+    )),
+    ...sellableSimple.map((item) => mapSimpleLot(
+      item,
+      branchId,
+      authority?.simpleLot?.id === item.id ? 'BARCODE_AUTHORITY_EXACT' : exactReasonForSimple(item, normalizedLower),
+      authority?.simpleLot?.id === item.id ? authoritySummary(authority) : null,
+    )),
+  ]);
 
   if (exactItems.length) {
     return {
@@ -163,10 +215,10 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
     repository.findTextSimpleLots({ branchId, terms, take: MAX_RESULTS }),
   ]);
 
-  const items = [
+  const items = uniqueByInventoryIdentity([
     ...textStock.map((item) => mapStockItem(item, branchId, 'TEXT_MATCH')),
     ...textSimple.map((item) => mapSimpleLot(item, branchId, 'TEXT_MATCH')),
-  ].slice(0, MAX_RESULTS);
+  ]).slice(0, MAX_RESULTS);
 
   return {
     query: normalizedQuery,
