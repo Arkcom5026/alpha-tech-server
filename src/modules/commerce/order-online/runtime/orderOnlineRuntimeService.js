@@ -49,8 +49,7 @@ const generateOrderOnlineCode = async (client, branchId) => {
   const today = dayjs().format('YYMMDD');
   const start = dayjs().startOf('day').toDate();
   const end = dayjs().endOf('day').toDate();
-  const count = await repository.countOrdersCreatedInRange({
-    client,
+  const count = await repository.countOrdersCreatedInRange(client, {
     branchId,
     start,
     end,
@@ -89,8 +88,7 @@ const createOrderOnline = async ({ body = {}, user = {} }) => {
   }
 
   const result = await repository.runTransaction(async (tx) => {
-    const branchPrices = await repository.findBranchPrices({
-      client: tx,
+    const branchPrices = await repository.findBranchPrices(tx, {
       branchId,
       productIds: normalized.map((item) => item.productId),
     });
@@ -133,34 +131,17 @@ const createOrderOnline = async ({ body = {}, user = {} }) => {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const code = await generateOrderOnlineCode(tx, branchId);
-        const order = await repository.createOrder({
-          client: tx,
-          data: {
-            code,
-            customerId: customerId || null,
-            branchId,
-            deliveryDate: safeDate(deliveryDate),
-            note: note || '',
-            orderOnlineItems: {
-              create: enrichedItems,
-            },
-            userId,
-          },
-          include: {
-            customer: {
-              include: {
-                subdistrict: {
-                  include: {
-                    district: { include: { province: true } },
-                  },
-                },
-              },
-            },
-            orderOnlineItems: true,
-          },
+        const order = await repository.createOrder(tx, {
+          code,
+          customerId: customerId || null,
+          branchId,
+          deliveryDate: safeDate(deliveryDate),
+          note: note || '',
+          items: enrichedItems,
+          userId,
         });
 
-        if (userId) await repository.clearCartByUser({ client: tx, userId });
+        if (userId) await repository.clearCartByUser(tx, userId);
 
         return {
           order: {
@@ -199,23 +180,14 @@ const getAllOrderOnline = async ({ branchId, status }) => {
       branchId: normalizedBranchId,
       ...(status && status !== 'ALL' ? { status } : {}),
     },
-    include: {
-      customer: {
-        include: {
-          subdistrict: {
-            include: { district: { include: { province: true } } },
-          },
-        },
-      },
-      orderOnlineItems: true,
-    },
+    mode: 'employee',
   });
 
   return {
     status: 200,
     body: orders.map((order) => ({
       ...order,
-      totalAmount: calculateOrderTotal(order.orderOnlineItems),
+      totalAmount: calculateOrderTotal(order.items),
       customerAddress: buildCustomerAddress(order.customer),
     })),
   };
@@ -229,18 +201,7 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
 
   const order = await repository.findOrderById({
     orderId: normalizedOrderId,
-    include: {
-      customer: {
-        include: {
-          subdistrict: {
-            include: { district: { include: { province: true } } },
-          },
-        },
-      },
-      orderOnlineItems: {
-        include: { product: { include: { brand: true } } },
-      },
-    },
+    mode: 'detail',
   });
   if (!order) return { status: 404, body: { error: 'ไม่พบคำสั่งซื้อ' } };
   if (order.branchId !== Number(branchId)) {
@@ -263,7 +224,7 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
       paymentNote: order.paymentNote || '',
       slipImageUrl: order.paymentSlipUrl || null,
       createdAt: order.createdAt,
-      totalAmount: calculateOrderTotal(order.orderOnlineItems),
+      totalAmount: calculateOrderTotal(order.items),
       customer: order.customer
         ? {
             id: order.customer.id,
@@ -272,7 +233,7 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
             address: buildCustomerAddress(order.customer),
           }
         : null,
-      items: order.orderOnlineItems.map((item) => {
+      items: order.items.map((item) => {
         const unitPrice = toNum(item.priceAtPurchase);
         return {
           productId: item.productId,
@@ -358,10 +319,7 @@ const getOrderOnlineByBranch = async ({ branchId }) => {
 
   const orders = await repository.findOrders({
     where: { branchId: normalizedBranchId },
-    include: {
-      customer: true,
-      orderOnlineItems: true,
-    },
+    mode: 'branch',
   });
 
   return {
@@ -374,7 +332,7 @@ const getOrderOnlineByBranch = async ({ branchId }) => {
       paymentSlipStatus: order.paymentSlipStatus,
       statusPayment: order.statusPayment,
       customerName: order.customer?.name || order.customer?.companyName || '-',
-      totalAmount: calculateOrderTotal(order.orderOnlineItems),
+      totalAmount: calculateOrderTotal(order.items),
     })),
   };
 };
@@ -387,16 +345,8 @@ const getOrderOnlineSummary = async ({ orderId, branchId }) => {
 
   const order = await repository.findOrderById({
     orderId: normalizedOrderId,
-    include: {
-      customer: {
-        include: {
-          subdistrict: {
-            include: { district: { include: { province: true } } },
-          },
-        },
-      },
-      orderOnlineItems: true,
-    },
+    branchId: Number(branchId),
+    mode: 'summary',
   });
   if (!order) return { status: 404, body: { message: 'ไม่พบคำสั่งซื้อนี้' } };
   if (order.branchId !== Number(branchId)) {
@@ -410,7 +360,7 @@ const getOrderOnlineSummary = async ({ orderId, branchId }) => {
     status: 200,
     body: {
       ...order,
-      totalAmount: calculateOrderTotal(order.orderOnlineItems),
+      totalAmount: calculateOrderTotal(order.items),
       customerAddress: buildCustomerAddress(order.customer),
     },
   };
