@@ -39,10 +39,14 @@ const findPublishedStoreBySlug = async (slug, db = prisma) => {
       capability."fixedDeliveryFee", capability."serviceAreaMode"::text AS "serviceAreaMode",
       capability."maxDeliveryDistanceKm", capability."preparationSlaMinutes",
       capability."pickupInstruction", capability."deliveryInstruction",
-      branch."name" AS "branchName", branch."address" AS "branchAddress", branch."phone" AS "branchPhone"
+      branch."name" AS "branchName", branch."address" AS "branchAddress", branch."phone" AS "branchPhone",
+      experience."themePreset", experience."themeTokens", experience."layoutPreset",
+      experience."sectionConfiguration", experience."version", experience."publishedAt"
     FROM "PartnerStoreCapability" capability
     JOIN "Branch" branch ON branch."id" = capability."branchId"
+    JOIN "StoreExperienceProfile" experience ON experience."branchId" = capability."branchId"
     WHERE capability."storefrontEnabled" = TRUE
+      AND experience."status" = 'PUBLISHED'
       AND capability."storefrontSlug" = ${slug}
     LIMIT 1
   `);
@@ -66,6 +70,14 @@ const projectStore = (store, serviceAreas) => ({
   name: store.displayName || store.branchName,
   contactPhone: store.contactPhone || store.branchPhone || null,
   address: store.branchAddress || null,
+  experience: {
+    themePreset: store.themePreset,
+    themeTokens: store.themeTokens || null,
+    layoutPreset: store.layoutPreset,
+    sectionConfiguration: store.sectionConfiguration || null,
+    version: toNumber(store.version),
+    publishedAt: store.publishedAt || null,
+  },
   fulfillment: {
     pickup: {
       enabled: Boolean(store.pickupEnabled),
