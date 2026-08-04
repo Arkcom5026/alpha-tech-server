@@ -9,10 +9,12 @@ const customerCreateController = require('../create/customerCreateController');
 const customerStaffUpdateController = require('../update/staff/customerStaffUpdateController');
 const customerSelfUpdateController = require('../update/self/customerSelfUpdateController');
 const customerManagementController = require('../management/customerManagementController');
+const platformCustomerOverviewController = require('../platform/overview/platformCustomerOverviewController');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 router.use(verifyToken);
 
+router.get('/platform/overview', platformCustomerOverviewController.getOverview);
 router.get('/management', customerManagementController.listCustomers);
 router.post('/management/unassigned/:id/claim', customerManagementController.claimLegacyCustomer);
 router.get('/search', customerSearchController.searchCustomers);
