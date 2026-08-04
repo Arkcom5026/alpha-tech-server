@@ -1,5 +1,6 @@
 const service = require('./orderOnlineRuntimeService');
 const customerAuthorityService = require('./orderOnlineCustomerAuthorityService');
+const mutationAuthorityService = require('./orderOnlineMutationAuthorityService');
 
 const send = (res, result) => res.status(result.status).json(result.body);
 
@@ -55,7 +56,7 @@ const getOrderOnlineByIdForCustomer = async (req, res) => {
 
 const updateOrderOnlineStatus = async (req, res) => {
   try {
-    return send(res, await service.updateOrderOnlineStatus({
+    return send(res, await mutationAuthorityService.updateOrderOnlineStatus({
       orderId: req.params?.id,
       body: req.body || {},
       user: req.user || {},
@@ -68,7 +69,7 @@ const updateOrderOnlineStatus = async (req, res) => {
 
 const deleteOrderOnline = async (req, res) => {
   try {
-    return send(res, await service.deleteOrderOnline({
+    return send(res, await mutationAuthorityService.deleteOrderOnline({
       orderId: req.params?.id,
       user: req.user || {},
     }));
@@ -93,9 +94,10 @@ const getOrderOnlineByCustomer = async (req, res) => {
 
 const submitOrderOnlinePaymentSlip = async (req, res) => {
   try {
-    return send(res, await service.submitOrderOnlinePaymentSlip({
+    return send(res, await mutationAuthorityService.submitOrderOnlinePaymentSlip({
       orderId: req.params?.orderId,
       body: req.body || {},
+      user: req.user || {},
     }));
   } catch (error) {
     console.error('submitOrderOnlinePaymentSlip error:', error);
