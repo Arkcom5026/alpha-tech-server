@@ -11,7 +11,7 @@ const normalizeLimit = (value, fallback = 50, maximum = 100) => {
 const listMerchantReservations = async ({ branchId, statuses, limit }, db = prisma) => {
   const normalizedLimit = normalizeLimit(limit);
   const statusFilter = Array.isArray(statuses) && statuses.length
-    ? Prisma.sql`AND reservation."status" IN (${Prisma.join(statuses)})`
+    ? Prisma.sql`AND reservation."status"::text IN (${Prisma.join(statuses)})`
     : Prisma.empty;
 
   const rows = await db.$queryRaw(Prisma.sql`
