@@ -1,7 +1,7 @@
 const { prisma } = require('../../../../../lib/prisma');
 
 const includeSessionProfiles = {
-  customerProfile: true,
+  customerProfiles: true,
   employeeProfile: {
     include: {
       branch: true,
@@ -13,7 +13,7 @@ const includeSessionProfiles = {
 const findUserByEmail = (email) => prisma.user.findUnique({
   where: { email },
   include: {
-    customerProfile: true,
+    customerProfiles: true,
     employeeProfile: true,
   },
 });
