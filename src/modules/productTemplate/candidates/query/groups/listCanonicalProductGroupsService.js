@@ -1,10 +1,10 @@
 const {
   auditDiscovery,
   GROUP_REVIEW_STATUS,
-} = require('../../../discovery/auditProductTemplateDiscoveryService')
+} = require('../../discovery/auditProductTemplateDiscoveryService')
 const {
   createHttpError,
-} = require('../../../shared/productTemplateCandidatePolicy')
+} = require('../../shared/productTemplateCandidatePolicy')
 
 const normalizePositiveInteger = (value, fallback, maximum) => {
   const parsed = Number(value ?? fallback)
