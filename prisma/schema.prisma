@@ -21,7 +21,7 @@ model User {
   loginId             String?              @unique
   loginType           LoginType            @default(PHONE)
   cart                Cart[]
-  customerProfile     CustomerProfile?
+  customerProfiles    CustomerProfile[]
   employeeProfile     EmployeeProfile?
   orderOnline         OrderOnline[]
   passwordResetTokens PasswordResetToken[]
@@ -133,6 +133,7 @@ model Branch {
   taxId                           String?                          @db.VarChar(13)
   slug                            String?                          @unique
   categoryId                      Int                              @default(1)
+
   banks                           Bank[]
   barcodeCounter                  BarcodeCounter[]
   barcodeReceiptItem              BarcodeReceiptItem[]
@@ -141,6 +142,7 @@ model Branch {
   branchPrices                    BranchPrice[]
   combinedBillingDocument         CombinedBillingDocument[]
   combinedSaleDocument            CombinedSaleDocument[]
+  customerProfiles                CustomerProfile[]
   customerDeposit                 CustomerDeposit[]
   customerReceipts                CustomerReceipt[]
   employees                       EmployeeProfile[]
@@ -1742,7 +1744,8 @@ model CustomerProfile {
   id                        Int                       @id @default(autoincrement())
   name                      String?
   picture                   String?
-  userId                    Int                       @unique
+  userId                    Int
+  branchId                  Int?
   createdAt                 DateTime                  @default(now())
   updatedAt                 DateTime                  @updatedAt
   creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
@@ -1760,6 +1763,7 @@ model CustomerProfile {
   customerDeposits          CustomerDeposit[]
   subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
   user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
   customerReceipts          CustomerReceipt[]
   orders                    Order[]
   orderOnlines              OrderOnline[]
@@ -1774,7 +1778,10 @@ model CustomerProfile {
   posHeldCarts              PosHeldCart[]
   productReservations       ProductReservation[]
 
+  @@unique([branchId, userId])
+  @@index([userId])
   @@index([subdistrictCode])
+  @@index([branchId])
 }
 
 model CustomerDeposit {

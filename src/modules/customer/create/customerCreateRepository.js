@@ -12,9 +12,14 @@ function findUserByPhone(loginId) {
   return prisma.user.findUnique({ where: { loginId } });
 }
 
-function findCustomerByUserId(userId) {
-  return prisma.customerProfile.findFirst({
-    where: { userId },
+function findCustomerByUserAndBranch({ userId, branchId }) {
+  return prisma.customerProfile.findUnique({
+    where: {
+      branchId_userId: {
+        branchId: Number(branchId),
+        userId: Number(userId),
+      },
+    },
     include: includeCustomerGraph,
   });
 }
@@ -33,7 +38,13 @@ function findSubdistrictByCode(code) {
   });
 }
 
-function createCustomerProfile({ existingUser, normalizedPhone, hashedPassword, customer }) {
+function createCustomerProfile({
+  existingUser,
+  normalizedPhone,
+  hashedPassword,
+  branchId,
+  customer,
+}) {
   return prisma.$transaction(async (tx) => {
     const user = existingUser
       ? existingUser
@@ -51,6 +62,7 @@ function createCustomerProfile({ existingUser, normalizedPhone, hashedPassword, 
       data: {
         name: customer.name,
         userId: user.id,
+        branchId: Number(branchId),
         type: customer.type || 'INDIVIDUAL',
         companyName: customer.companyName || null,
         taxId: customer.taxId || null,
@@ -65,7 +77,7 @@ function createCustomerProfile({ existingUser, normalizedPhone, hashedPassword, 
 
 module.exports = {
   findUserByPhone,
-  findCustomerByUserId,
+  findCustomerByUserAndBranch,
   findAccessibleCustomer,
   findSubdistrictByCode,
   createCustomerProfile,
