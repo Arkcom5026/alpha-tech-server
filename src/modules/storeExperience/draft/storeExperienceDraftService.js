@@ -73,7 +73,10 @@ const defaults = (branchId) => ({
   publishedAt: null,
 });
 
-const getDraftForBranch = async (branchId) => repository.findByBranchId(branchId) || defaults(branchId);
+const getDraftForBranch = async (branchId) => {
+  const existing = await repository.findByBranchId(branchId);
+  return existing || defaults(branchId);
+};
 
 const saveDraftForBranch = async (branchId, payload) => {
   const existing = await repository.findByBranchId(branchId);
