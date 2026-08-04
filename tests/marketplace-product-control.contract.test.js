@@ -1,0 +1,21 @@
+'use strict'
+
+const fs = require('fs')
+const path = require('path')
+const root = path.resolve(__dirname, '..')
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
+const repository = read('src/modules/partnerStore/onlineProductControl/onlineProductControlRepository.js')
+const service = read('src/modules/partnerStore/onlineProductControl/onlineProductControlService.js')
+const controller = read('src/modules/partnerStore/onlineProductControl/onlineProductControlController.js')
+const routes = read('src/modules/partnerStore/routes/partnerStoreCapabilityRoutes.js')
+const audit = read('src/modules/partnerStore/onlineVisibility/onlineProductVisibilityService.js')
+const assert = (condition, message) => { if (!condition) throw new Error(message) }
+assert(repository.includes('where: { branchId, productId }'), 'read must bind branch and product')
+assert(repository.includes('productId_branchId'), 'write must use branch-scoped unique authority')
+assert(!repository.includes('costPrice') && !repository.includes('priceRetail'), 'marketplace mutation must not touch accounting prices')
+assert(service.includes('priceOnline') && service.includes('isActive'), 'marketplace fields missing')
+assert(service.includes('INVALID_ONLINE_PRICE_WINDOW'), 'date window policy missing')
+assert(controller.includes('req.employee?.branchId || req.user?.branchId'), 'authenticated branch authority missing')
+assert(routes.includes("router.patch('/online-products/:productId/price'"), 'marketplace mutation route missing')
+assert(audit.includes('priceActive') && audit.includes('effectiveDate') && audit.includes('expiredDate'), 'editable audit projection missing')
+console.log('marketplace product control contract: PASS')
