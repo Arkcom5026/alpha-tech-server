@@ -15,7 +15,9 @@ const CANDIDATE_LIST_SELECT = {
   promotedAt: true,
   createdAt: true,
   updatedAt: true,
-  sourceBranch: { select: { id: true, name: true, branchCode: true } },
+  sourceBranch: {
+    select: { id: true, name: true, branchCode: true, businessType: true },
+  },
   sourceProduct: { select: { id: true, name: true, branchId: true } },
   targetTemplateBranch: { select: { id: true, name: true, branchCode: true } },
   targetTemplateProduct: { select: { id: true, name: true, branchId: true } },

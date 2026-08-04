@@ -1,3 +1,4 @@
+const { BusinessType } = require('@prisma/client')
 const repository = require('./listProductTemplateCandidatesRepository')
 const {
   createHttpError,
@@ -13,6 +14,7 @@ const ALLOWED_STATUSES = new Set([
   'MERGED',
   'CANCELLED',
 ])
+const ALLOWED_BUSINESS_TYPES = new Set(Object.values(BusinessType))
 const ALLOWED_SORT_FIELDS = new Set(['createdAt', 'updatedAt', 'reviewedAt', 'promotedAt', 'status'])
 
 const toPageNumber = (value, fallback) => {
@@ -27,6 +29,15 @@ const normalizeStatus = (value) => {
     throw createHttpError(400, 'Invalid candidate status', 'INVALID_CANDIDATE_STATUS')
   }
   return status
+}
+
+const normalizeBusinessType = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const businessType = String(value).trim().toUpperCase()
+  if (!ALLOWED_BUSINESS_TYPES.has(businessType)) {
+    throw createHttpError(400, 'Invalid business type', 'INVALID_BUSINESS_TYPE')
+  }
+  return businessType
 }
 
 const normalizeSearch = (value) => String(value || '').trim().slice(0, 200)
@@ -61,6 +72,7 @@ const listCandidates = async ({ user, query = {} }) => {
   const page = toPageNumber(query.page, 1)
   const pageSize = Math.min(toPageNumber(query.pageSize, 30), 100)
   const status = normalizeStatus(query.status)
+  const businessType = normalizeBusinessType(query.businessType)
   const q = normalizeSearch(query.q || query.search)
   const sourceBranchId = query.sourceBranchId
     ? toPositiveInt(query.sourceBranchId, 'sourceBranchId')
@@ -73,6 +85,7 @@ const listCandidates = async ({ user, query = {} }) => {
     : null
 
   const summaryWhere = {
+    ...(businessType ? { sourceBranch: { businessType } } : {}),
     ...(sourceBranchId ? { sourceBranchId } : {}),
     ...(targetTemplateBranchId ? { targetTemplateBranchId } : {}),
     ...(reviewerId ? { reviewedByEmployeeId: reviewerId } : {}),
@@ -111,6 +124,9 @@ const listCandidates = async ({ user, query = {} }) => {
 
   return {
     items,
+    filters: {
+      businessType,
+    },
     pagination: {
       page,
       pageSize,
@@ -127,8 +143,10 @@ const listCandidates = async ({ user, query = {} }) => {
 
 module.exports = {
   ALLOWED_STATUSES,
+  ALLOWED_BUSINESS_TYPES,
   ALLOWED_SORT_FIELDS,
   normalizeStatus,
+  normalizeBusinessType,
   resolveOrderBy,
   listCandidates,
 }
