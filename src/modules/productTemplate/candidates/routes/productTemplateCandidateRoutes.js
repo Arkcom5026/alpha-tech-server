@@ -13,6 +13,9 @@ const {
   listCanonicalProductGroupsController,
 } = require('../query/groups/listCanonicalProductGroupsController')
 const {
+  getCanonicalProductGroupController,
+} = require('../query/groups/getCanonicalProductGroupController')
+const {
   listProductTemplateCandidates,
 } = require('../query/list/listProductTemplateCandidatesController')
 const {
@@ -47,6 +50,7 @@ router.use(requireSuperAdmin)
 router.get('/discovery-audit', auditProductTemplateDiscovery)
 router.post('/discovery-materialize', materializeProductTemplateDiscovery)
 router.get('/groups', listCanonicalProductGroupsController)
+router.get('/groups/:groupKey', getCanonicalProductGroupController)
 router.get('/', listProductTemplateCandidates)
 router.post('/', createProductTemplateCandidate)
 router.post('/:id/start-review', startProductTemplateCandidateReview)
