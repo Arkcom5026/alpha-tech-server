@@ -32,43 +32,37 @@ const PRODUCT_DISCOVERY_SELECT = {
   },
 }
 
-const findStoreBranches = ({ businessType }) =>
-  prisma.branch.findMany({
+const BRANCH_DISCOVERY_SELECT = {
+  id: true,
+  name: true,
+  address: true,
+  branchCode: true,
+  businessType: true,
+  categoryId: true,
+}
+
+const findTemplateBranchByBusinessType = ({ businessType }) =>
+  prisma.branch.findFirst({
     where: {
       businessType,
-      NOT: {
-        OR: [
-          { address: 'SYSTEM TEMPLATE' },
-          { branchCode: { not: null } },
-        ],
-      },
+      address: 'SYSTEM TEMPLATE',
+      branchCode: { not: null },
+      categoryId: { not: null },
     },
-    select: {
-      id: true,
-      name: true,
-      branchCode: true,
-      businessType: true,
-      categoryId: true,
-    },
+    select: BRANCH_DISCOVERY_SELECT,
     orderBy: { id: 'asc' },
   })
 
-const findTemplateBranches = ({ categoryIds }) =>
+const findStoreBranchesByCategory = ({ categoryId, templateBranchId }) =>
   prisma.branch.findMany({
     where: {
-      categoryId: { in: categoryIds },
-      OR: [
-        { address: 'SYSTEM TEMPLATE' },
-        { branchCode: { not: null } },
-      ],
+      categoryId,
+      id: { not: templateBranchId },
+      address: {
+        notIn: ['SYSTEM TEMPLATE', 'SYSTEM TEST ONLY'],
+      },
     },
-    select: {
-      id: true,
-      name: true,
-      branchCode: true,
-      businessType: true,
-      categoryId: true,
-    },
+    select: BRANCH_DISCOVERY_SELECT,
     orderBy: { id: 'asc' },
   })
 
@@ -82,10 +76,10 @@ const findStoreProducts = ({ branchIds }) =>
     orderBy: [{ branchId: 'asc' }, { id: 'asc' }],
   })
 
-const findTemplateProducts = ({ templateBranchIds }) =>
+const findTemplateProducts = ({ templateBranchId }) =>
   prisma.product.findMany({
     where: {
-      branchId: { in: templateBranchIds },
+      branchId: templateBranchId,
       active: true,
     },
     select: PRODUCT_DISCOVERY_SELECT,
@@ -109,8 +103,9 @@ const findOpenCandidates = ({ sourceProductIds }) =>
 
 module.exports = {
   PRODUCT_DISCOVERY_SELECT,
-  findStoreBranches,
-  findTemplateBranches,
+  BRANCH_DISCOVERY_SELECT,
+  findTemplateBranchByBusinessType,
+  findStoreBranchesByCategory,
   findStoreProducts,
   findTemplateProducts,
   findOpenCandidates,

@@ -35,30 +35,22 @@ const buildCatalogFingerprint = (product) => {
   return `${globalProductTypeId}:${brand}:${name}`
 }
 
+const emptySummary = () => ({
+  storeProducts: 0,
+  linkedTemplate: 0,
+  matchedUnlinked: 0,
+  candidateOpen: 0,
+  unmatched: 0,
+})
+
 const auditDiscovery = async ({ user, query = {} }) => {
   assertSuperAdmin(user)
   const businessType = normalizeBusinessType(query.businessType)
 
-  const storeBranches = await repository.findStoreBranches({ businessType })
-  if (storeBranches.length === 0) {
-    return {
-      businessType,
-      storeBranches: [],
-      templateBranches: [],
-      summary: {
-        storeProducts: 0,
-        linkedTemplate: 0,
-        matchedUnlinked: 0,
-        candidateOpen: 0,
-        unmatched: 0,
-      },
-      items: [],
-    }
-  }
-
-  const categoryIds = [...new Set(storeBranches.map((branch) => branch.categoryId))]
-  const templateBranches = await repository.findTemplateBranches({ categoryIds })
-  if (templateBranches.length === 0) {
+  // UI businessType selects the platform Template Branch. The resolved Template Branch
+  // categoryId is the real Store/Template catalog boundary.
+  const templateBranch = await repository.findTemplateBranchByBusinessType({ businessType })
+  if (!templateBranch) {
     throw createHttpError(
       409,
       'No SYSTEM TEMPLATE branch exists for the selected business scope',
@@ -66,11 +58,26 @@ const auditDiscovery = async ({ user, query = {} }) => {
     )
   }
 
+  const storeBranches = await repository.findStoreBranchesByCategory({
+    categoryId: templateBranch.categoryId,
+    templateBranchId: templateBranch.id,
+  })
+
+  if (storeBranches.length === 0) {
+    return {
+      businessType,
+      categoryId: templateBranch.categoryId,
+      templateBranch,
+      storeBranches: [],
+      templateBranches: [templateBranch],
+      summary: emptySummary(),
+      items: [],
+    }
+  }
+
   const [storeProducts, templateProducts] = await Promise.all([
     repository.findStoreProducts({ branchIds: storeBranches.map((branch) => branch.id) }),
-    repository.findTemplateProducts({
-      templateBranchIds: templateBranches.map((branch) => branch.id),
-    }),
+    repository.findTemplateProducts({ templateBranchId: templateBranch.id }),
   ])
 
   const openCandidates = storeProducts.length
@@ -120,8 +127,8 @@ const auditDiscovery = async ({ user, query = {} }) => {
         name: product.name,
         branchId: product.branchId,
         branchName: product.branch?.name || null,
-        businessType: product.branch?.businessType || businessType,
-        categoryId: product.branch?.categoryId || null,
+        businessType,
+        categoryId: templateBranch.categoryId,
         productTypeId: product.productType?.id || null,
         globalProductTypeId: product.productType?.globalProductTypeId || null,
         productTypeName: product.productType?.name || null,
@@ -148,8 +155,10 @@ const auditDiscovery = async ({ user, query = {} }) => {
 
   return {
     businessType,
+    categoryId: templateBranch.categoryId,
+    templateBranch,
     storeBranches,
-    templateBranches,
+    templateBranches: [templateBranch],
     summary: {
       storeProducts: items.length,
       linkedTemplate: count(DISCOVERY_CLASSIFICATION.LINKED_TEMPLATE),
