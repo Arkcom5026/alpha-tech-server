@@ -40,6 +40,7 @@
     "verify:partner-store-application-runtime": "node scripts/verify-partner-store-application-runtime.js",
     "verify:partner-store-application-runtime:test": "node scripts/run-test-database-runtime.js scripts/verify-partner-store-application-runtime.js",
     "test:public-storefront": "node tests/public-storefront-product-discovery.contract.test.js",
+    "test:store-experience-draft": "node tests/store-experience-draft-editor.contract.test.js",
     "test:anonymous-shopping-session": "node tests/anonymous-shopping-session-authority.contract.test.js",
     "test:identity-at-commitment": "node tests/identity-at-commitment-foundation.contract.test.js && node tests/identity-at-commitment-authority-review.contract.test.js",
     "test:product-reservation-commitment": "node tests/product-reservation-commitment-foundation.contract.test.js && node tests/product-reservation-commitment-authority-review.contract.test.js",
@@ -101,7 +102,8 @@
     "test:product-trace-stock-item-history": "node tests/product-trace-stock-item-sale-return-history.contract.test.js && node tests/product-trace-return-projection.test.js && node tests/product-trace-historical-event-status.test.js",
     "test:output-tax-credit-note": "node prisma/migrations/20260803140000_output_tax_credit_note_foundation/migration.test.js && node tests/output-tax-credit-note-eligibility.contract.test.js && node tests/output-tax-credit-note-runtime.contract.test.js && node tests/output-tax-credit-note-print-projection.contract.test.js && node tests/output-tax-credit-note-outcome.contract.test.js",
     "test:output-tax-credit-note-outcome": "node tests/output-tax-credit-note-outcome.contract.test.js",
-    "verify:output-tax-credit-note-outcome": "node scripts/verify-output-tax-credit-note-outcome.js"
+    "verify:output-tax-credit-note-outcome": "node scripts/verify-output-tax-credit-note-outcome.js",
+    "test:store-experience-root": "node tests/store-experience-root-foundation.contract.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1079.0",

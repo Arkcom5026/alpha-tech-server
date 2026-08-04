@@ -192,6 +192,7 @@ model Branch {
   taxExpenseCategories                 TaxExpenseCategory[]
   taxExpenses                          TaxExpense[]
   taxIssuerProfile                     TaxIssuerProfile?
+  storeExperienceProfile               StoreExperienceProfile?
   sourceProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceBranch")
   targetProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetBranch")
 
@@ -225,6 +226,32 @@ model TaxIssuerProfile {
   issuedTaxDocuments         TaxDocument[]          @relation("TaxDocumentIssuerProfile")
 
   @@index([status])
+}
+
+
+enum StoreExperienceProfileStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  SUSPENDED
+}
+
+model StoreExperienceProfile {
+  id                   Int                          @id @default(autoincrement())
+  branchId             Int                          @unique
+  status               StoreExperienceProfileStatus @default(DRAFT)
+  themePreset          String                       @default("platform-default") @db.VarChar(80)
+  themeTokens          Json?
+  layoutPreset         String                       @default("platform-default") @db.VarChar(80)
+  sectionConfiguration Json?
+  version              Int                          @default(1)
+  publishedAt          DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  branch               Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([publishedAt])
 }
 
 model Category {

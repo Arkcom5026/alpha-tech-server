@@ -34,6 +34,10 @@ assert.match(service, /const \{ branchId: _branchId, \.\.\.publicStorefront \} =
 assert.match(repository, /FROM "PartnerStoreCapability" capability/);
 assert.match(repository, /capability\."storefrontEnabled" = TRUE/);
 assert.match(repository, /capability\."storefrontSlug" = \$\{slug\}/);
+assert.match(repository, /JOIN "StoreExperienceProfile" experience/);
+assert.match(repository, /experience\."status" = 'PUBLISHED'/);
+assert.match(repository, /themePreset: store\.themePreset/);
+assert.match(repository, /sectionConfiguration: store\.sectionConfiguration \|\| null/);
 assert.match(repository, /FROM "PartnerStoreServiceArea" area/);
 assert.match(repository, /FROM "BranchPrice" price/);
 assert.match(repository, /JOIN "Product" product/);
