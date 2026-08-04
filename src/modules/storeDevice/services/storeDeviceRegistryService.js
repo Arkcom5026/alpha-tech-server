@@ -72,4 +72,9 @@ const createStoreDeviceRegistryService = (repository = defaultRepository) => {
   return Object.freeze({ register, list, detail, rename, assignWorkstation, revoke })
 }
 
-module.exports = Object.assign(createStoreDeviceRegistryService(), { createStoreDeviceRegistryService })
+const defaultService = createStoreDeviceRegistryService()
+
+module.exports = {
+  ...defaultService,
+  createStoreDeviceRegistryService,
+}
