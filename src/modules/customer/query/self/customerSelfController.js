@@ -5,6 +5,7 @@ async function getCustomerSelf(req, res) {
     const result = await customerSelfService.getCustomerSelf({
       userId: req.user?.id,
       role: req.user?.role,
+      customerProfileId: req.user?.customerProfileId || req.user?.profileId,
     });
 
     return res.status(result.status).json(result.body);
