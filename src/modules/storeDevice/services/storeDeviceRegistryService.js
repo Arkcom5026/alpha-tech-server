@@ -1,48 +1,80 @@
 'use strict'
 
-const { createStoreDeviceRegistryAuthority } = require('../contracts/storeDeviceRegistryAuthority')
+const defaultRepository = require('../repositories/storeDeviceRegistryRepository')
+const { DEVICE_KINDS, CONNECTION_STATES, sanitizeCapabilities } = require('../contracts/storeDeviceRegistryAuthority')
 const { requireBranchAuthority } = require('../policies/storeDeviceAuthorityPolicy')
 
-const registry = createStoreDeviceRegistryAuthority()
-
-const withStatus = (action) => {
-  try {
-    return action()
-  } catch (error) {
-    if (!error.statusCode) {
-      error.statusCode = error.code === 'STORE_DEVICE_NOT_FOUND' ? 404 : 400
-    }
-    throw error
-  }
+const fail = (code, message, statusCode = 400) => Object.assign(new Error(message), { code, statusCode })
+const text = (value, field) => {
+  const result = String(value || '').trim()
+  if (!result) throw fail('STORE_DEVICE_INPUT_INVALID', `${field} is required`)
+  return result
 }
 
-const register = ({ user, payload }) => withStatus(() => registry.register({
-  ...payload,
-  branchId: requireBranchAuthority(user),
-}))
+const createStoreDeviceRegistryService = (repository = defaultRepository) => {
+  const requireDevice = async (branchId, deviceId) => {
+    const device = await repository.find(branchId, text(deviceId, 'deviceId'))
+    if (!device) throw fail('STORE_DEVICE_NOT_FOUND', 'Device not found for branch', 404)
+    return device
+  }
 
-const list = ({ user }) => registry.list(requireBranchAuthority(user))
+  const register = async ({ user, payload = {} }) => {
+    const branchId = requireBranchAuthority(user)
+    const deviceId = text(payload.deviceId, 'deviceId')
+    const gatewayId = text(payload.gatewayId, 'gatewayId')
+    const kind = text(payload.kind, 'kind')
+    if (!DEVICE_KINDS.includes(kind)) throw fail('STORE_DEVICE_KIND_UNSUPPORTED', `Unsupported device kind: ${kind}`)
 
-const detail = ({ user, deviceId }) => withStatus(() => registry.detail({
-  branchId: requireBranchAuthority(user),
-  deviceId,
-}))
+    const existing = await repository.find(branchId, deviceId)
+    if (existing && existing.gatewayId !== gatewayId) {
+      throw fail('STORE_DEVICE_GATEWAY_REASSIGNMENT_DENIED', 'Device gateway authority cannot be reassigned', 409)
+    }
+    if (existing?.revokedAt) throw fail('STORE_DEVICE_REVOKED', 'Revoked device cannot be registered again', 409)
 
-const rename = ({ user, deviceId, payload }) => withStatus(() => registry.rename({
-  branchId: requireBranchAuthority(user),
-  deviceId,
-  name: payload?.name,
-}))
+    return repository.register({
+      branchId,
+      deviceId,
+      gatewayId,
+      name: text(payload.name, 'name'),
+      kind,
+      connectionState: CONNECTION_STATES.includes(payload.connectionState) ? payload.connectionState : 'UNKNOWN',
+      capabilities: sanitizeCapabilities(payload.capabilities),
+      transportKind: payload.transportKind ? String(payload.transportKind) : null,
+      adapterKind: payload.adapterKind ? String(payload.adapterKind) : null,
+      metadata: payload.metadata || {},
+    })
+  }
 
-const assignWorkstation = ({ user, deviceId, payload }) => withStatus(() => registry.assignWorkstation({
-  branchId: requireBranchAuthority(user),
-  deviceId,
-  workstationId: payload?.workstationId,
-}))
+  const list = ({ user }) => repository.list(requireBranchAuthority(user))
+  const detail = ({ user, deviceId }) => requireDevice(requireBranchAuthority(user), deviceId)
 
-const revoke = ({ user, deviceId }) => withStatus(() => registry.revoke({
-  branchId: requireBranchAuthority(user),
-  deviceId,
-}))
+  const rename = async ({ user, deviceId, payload = {} }) => {
+    const branchId = requireBranchAuthority(user)
+    const current = await requireDevice(branchId, deviceId)
+    if (current.revokedAt) throw fail('STORE_DEVICE_REVOKED', 'Revoked device cannot be renamed', 409)
+    return repository.rename(branchId, current.deviceId, text(payload.name, 'name'))
+  }
 
-module.exports = { register, list, detail, rename, assignWorkstation, revoke }
+  const assignWorkstation = async ({ user, deviceId, payload = {} }) => {
+    const branchId = requireBranchAuthority(user)
+    const current = await requireDevice(branchId, deviceId)
+    if (current.revokedAt) throw fail('STORE_DEVICE_REVOKED', 'Revoked device cannot be assigned', 409)
+    return repository.assignWorkstation(branchId, current.deviceId, text(payload.workstationId, 'workstationId'))
+  }
+
+  const revoke = async ({ user, deviceId }) => {
+    const branchId = requireBranchAuthority(user)
+    const current = await requireDevice(branchId, deviceId)
+    if (current.revokedAt) return current
+    return repository.revoke(branchId, current.deviceId)
+  }
+
+  return Object.freeze({ register, list, detail, rename, assignWorkstation, revoke })
+}
+
+const defaultService = createStoreDeviceRegistryService()
+
+module.exports = {
+  ...defaultService,
+  createStoreDeviceRegistryService,
+}
