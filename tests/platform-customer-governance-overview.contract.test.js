@@ -14,6 +14,8 @@ const mission = read('docs/missions/platform-customer-governance-superadmin-work
 assert.match(routes, /router\.get\('\/platform\/overview'/);
 assert.match(repository, /role:\s*'CUSTOMER'/);
 assert.match(repository, /customerProfiles/);
+assert.match(repository, /createdAt:\s*true/);
+assert.match(repository, /updatedAt:\s*true/);
 assert.match(repository, /provinceCode/);
 assert.match(repository, /districtCode/);
 assert.match(repository, /branchId/);
@@ -23,6 +25,8 @@ assert.match(service, /userContext\.role/);
 assert.match(service, /SUPERADMIN/);
 assert.match(service, /MULTI_STORE/);
 assert.match(service, /UNASSIGNED/);
+assert.match(service, /profileCreatedAt/);
+assert.match(service, /profileUpdatedAt/);
 assert.match(service, /customerTypes/);
 assert.match(service, /accountStatuses/);
 assert.match(service, /platformCustomerStatus:\s*'NOT_ESTABLISHED'/);
