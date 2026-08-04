@@ -9,6 +9,27 @@ const productInclude = (branchId) => ({
   },
   brand: true,
   productType: true,
+  productImages: {
+    where: { active: true },
+    orderBy: [{ isCover: 'desc' }, { id: 'asc' }],
+    take: 1,
+  },
+});
+
+const inventoryInclude = (branchId) => ({
+  product: { include: productInclude(branchId) },
+});
+
+const findBarcodeAuthorityExact = async ({ branchId, query }) => prisma.barcodeReceiptItem.findFirst({
+  where: {
+    branchId,
+    barcode: { equals: query, mode: 'insensitive' },
+    status: { not: 'VOID' },
+  },
+  include: {
+    stockItem: { include: inventoryInclude(branchId) },
+    simpleLot: { include: inventoryInclude(branchId) },
+  },
 });
 
 const findExactStockItems = async ({ branchId, query, take = 20 }) => prisma.stockItem.findMany({
@@ -20,7 +41,7 @@ const findExactStockItems = async ({ branchId, query, take = 20 }) => prisma.sto
       { product: { saleBarcode: { equals: query, mode: 'insensitive' } } },
     ],
   },
-  include: { product: { include: productInclude(branchId) } },
+  include: inventoryInclude(branchId),
   orderBy: [{ status: 'asc' }, { id: 'asc' }],
   take,
 });
@@ -33,7 +54,7 @@ const findExactSimpleLots = async ({ branchId, query, take = 20 }) => prisma.sim
       { product: { saleBarcode: { equals: query, mode: 'insensitive' } } },
     ],
   },
-  include: { product: { include: productInclude(branchId) } },
+  include: inventoryInclude(branchId),
   orderBy: [{ status: 'asc' }, { receivedAt: 'asc' }, { id: 'asc' }],
   take,
 });
@@ -44,6 +65,7 @@ const findTextStockItems = async ({ branchId, terms, take = 40 }) => prisma.stoc
     status: 'IN_STOCK',
     product: {
       active: true,
+      inventoryBehavior: 'TRACKED',
       AND: terms.map((term) => ({
         OR: [
           { name: { contains: term, mode: 'insensitive' } },
@@ -55,7 +77,7 @@ const findTextStockItems = async ({ branchId, terms, take = 40 }) => prisma.stoc
       })),
     },
   },
-  include: { product: { include: productInclude(branchId) } },
+  include: inventoryInclude(branchId),
   orderBy: [{ productId: 'asc' }, { id: 'asc' }],
   take,
 });
@@ -68,6 +90,7 @@ const findTextSimpleLots = async ({ branchId, terms, take = 40 }) => prisma.simp
     product: {
       active: true,
       mode: 'SIMPLE',
+      inventoryBehavior: 'TRACKED',
       AND: terms.map((term) => ({
         OR: [
           { name: { contains: term, mode: 'insensitive' } },
@@ -79,12 +102,13 @@ const findTextSimpleLots = async ({ branchId, terms, take = 40 }) => prisma.simp
       })),
     },
   },
-  include: { product: { include: productInclude(branchId) } },
+  include: inventoryInclude(branchId),
   orderBy: [{ productId: 'asc' }, { receivedAt: 'asc' }, { id: 'asc' }],
   take,
 });
 
 module.exports = {
+  findBarcodeAuthorityExact,
   findExactStockItems,
   findExactSimpleLots,
   findTextStockItems,
