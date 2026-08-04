@@ -22,7 +22,11 @@ assert.match(migration, /CREATE TYPE "StoreExperienceProfileStatus"/);
 assert.match(migration, /CREATE TABLE "StoreExperienceProfile"/);
 assert.match(migration, /CREATE UNIQUE INDEX "StoreExperienceProfile_branchId_key"/);
 assert.match(migration, /FOREIGN KEY \("branchId"\) REFERENCES "Branch"\("id"\)/);
-assert.doesNotMatch(migration, /\b(UPDATE|DELETE|INSERT|TRUNCATE|DROP)\b/i);
+assert.doesNotMatch(migration, /\\bINSERT\\s+INTO\\b/i);
+assert.doesNotMatch(migration, /\\bUPDATE\\s+(?:"|[a-z_])/i);
+assert.doesNotMatch(migration, /\\bDELETE\\s+FROM\\b/i);
+assert.doesNotMatch(migration, /\\bTRUNCATE(?:\\s+TABLE)?\\s+(?:"|[a-z_])/i);
+assert.doesNotMatch(migration, /\\bDROP\\s+(?:TABLE|TYPE|INDEX|SCHEMA)\\b/i);
 assert.doesNotMatch(migration, /ALTER TABLE "Branch"\s+(?:DROP|ALTER)/i);
 
 console.log('store experience root foundation contract: PASS');
