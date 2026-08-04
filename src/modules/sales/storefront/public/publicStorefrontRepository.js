@@ -4,7 +4,7 @@ const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const toNumber = (value) => (value == null ? null : Number(value));
 
-const publishedProductSql = (branchId) => Prisma.sql`
+const publishedProductFromSql = Prisma.sql`
   FROM "BranchPrice" price
   JOIN "Product" product ON product."id" = price."productId"
   LEFT JOIN "Brand" brand ON brand."id" = product."brandId"
@@ -14,6 +14,9 @@ const publishedProductSql = (branchId) => Prisma.sql`
   LEFT JOIN "Unit" unit ON unit."id" = product."unitId"
   LEFT JOIN "StockBalance" balance
     ON balance."productId" = product."id" AND balance."branchId" = price."branchId"
+`;
+
+const publishedProductWhereSql = (branchId) => Prisma.sql`
   WHERE price."branchId" = ${branchId}
     AND price."isActive" = TRUE
     AND price."priceOnline" IS NOT NULL
@@ -161,7 +164,7 @@ const listPublishedProducts = async ({ branchId, search, page, pageSize }, db = 
         unit."id" AS "unitId", unit."name" AS "unitName",
         image."secure_url" AS "coverImageUrl",
         GREATEST(COALESCE(balance."quantity", 0) - COALESCE(balance."reserved", 0), 0) AS "availableQuantity"
-      ${publishedProductSql(branchId)}
+      ${publishedProductFromSql}
       LEFT JOIN LATERAL (
         SELECT product_image."secure_url"
         FROM "ProductImage" product_image
@@ -169,13 +172,15 @@ const listPublishedProducts = async ({ branchId, search, page, pageSize }, db = 
         ORDER BY COALESCE(product_image."isCover", FALSE) DESC, product_image."createdAt" ASC
         LIMIT 1
       ) image ON TRUE
+      ${publishedProductWhereSql(branchId)}
       ${searchSql}
       ORDER BY product."name" ASC, product."id" ASC
       LIMIT ${pageSize} OFFSET ${offset}
     `),
     db.$queryRaw(Prisma.sql`
       SELECT COUNT(*)::int AS "total"
-      ${publishedProductSql(branchId)}
+      ${publishedProductFromSql}
+      ${publishedProductWhereSql(branchId)}
       ${searchSql}
     `),
   ]);
@@ -196,7 +201,8 @@ const findPublishedProductById = async ({ branchId, productId }, db = prisma) =>
       category."id" AS "categoryId", category."name" AS "categoryName",
       unit."id" AS "unitId", unit."name" AS "unitName",
       GREATEST(COALESCE(balance."quantity", 0) - COALESCE(balance."reserved", 0), 0) AS "availableQuantity"
-    ${publishedProductSql(branchId)}
+    ${publishedProductFromSql}
+    ${publishedProductWhereSql(branchId)}
     AND product."id" = ${productId}
     LIMIT 1
   `);
