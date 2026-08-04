@@ -84,6 +84,9 @@ assert.match(migration, /StoreDeviceJobResult_branchId_leaseId_fkey/);
 assert.match(migration, /WHERE "status" IN \('OFFERED', 'ACKNOWLEDGED'\)/);
 assert.match(migration, /prevent_store_device_job_result_mutation/);
 assert.match(migration, /BEFORE UPDATE OR DELETE ON "StoreDeviceJobResult"/);
+assert.match(migration, /prevent_revoked_store_device_lease/);
+assert.match(migration, /StoreDeviceJobLease_reject_revoked_authority/);
+assert.match(migration, /A revoked gateway or session cannot obtain a device job lease/);
 
 for (const name of [
   'StoreDeviceGateway',

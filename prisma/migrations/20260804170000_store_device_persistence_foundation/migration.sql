@@ -183,3 +183,32 @@ $$;
 CREATE TRIGGER "StoreDeviceJobResult_append_only"
 BEFORE UPDATE OR DELETE ON "StoreDeviceJobResult"
 FOR EACH ROW EXECUTE FUNCTION "public"."prevent_store_device_job_result_mutation"();
+
+-- Lease acquisition is refused after either branch-scoped authority is revoked.
+CREATE FUNCTION "public"."prevent_revoked_store_device_lease"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM "StoreDeviceGateway" gateway
+    WHERE gateway."id" = NEW."gatewayId"
+      AND gateway."branchId" = NEW."branchId"
+      AND (gateway."enrollmentState" = 'REVOKED' OR gateway."revokedAt" IS NOT NULL)
+  ) OR EXISTS (
+    SELECT 1
+    FROM "StoreDeviceGatewaySession" session
+    WHERE session."id" = NEW."sessionId"
+      AND session."gatewayId" = NEW."gatewayId"
+      AND session."branchId" = NEW."branchId"
+      AND (session."state" = 'REVOKED' OR session."revokedAt" IS NOT NULL)
+  ) THEN
+    RAISE EXCEPTION 'A revoked gateway or session cannot obtain a device job lease';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "StoreDeviceJobLease_reject_revoked_authority"
+BEFORE INSERT OR UPDATE OF "branchId", "gatewayId", "sessionId" ON "StoreDeviceJobLease"
+FOR EACH ROW EXECUTE FUNCTION "public"."prevent_revoked_store_device_lease"();
