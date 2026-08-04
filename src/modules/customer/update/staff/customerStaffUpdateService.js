@@ -56,6 +56,13 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
   if (!allowedRoles.has(role)) {
     throw serviceError(403, { message: 'Forbidden' }, 'FORBIDDEN');
   }
+  if (role !== 'SUPERADMIN' && !branchId) {
+    throw serviceError(
+      403,
+      { message: 'ต้องมีอำนาจของร้านปัจจุบันเพื่อแก้ไขข้อมูลลูกค้า' },
+      'STORE_AUTHORITY_REQUIRED'
+    );
+  }
 
   const id = toInt(customerId);
   if (!id) {
@@ -72,17 +79,21 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
     throw serviceError(404, { message: 'ไม่พบข้อมูลลูกค้า' }, 'CUSTOMER_NOT_FOUND');
   }
 
-  if (
-    existing.branchId &&
-    branchId &&
-    existing.branchId !== branchId &&
-    role !== 'SUPERADMIN'
-  ) {
-    throw serviceError(
-      403,
-      { message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าสาขาอื่น' },
-      'CROSS_BRANCH_CUSTOMER_UPDATE_FORBIDDEN'
-    );
+  if (role !== 'SUPERADMIN') {
+    if (!existing.branchId) {
+      throw serviceError(
+        409,
+        { message: 'ข้อมูลลูกค้านี้ยังไม่มีร้านเจ้าของ ต้องผ่านกระบวนการกำหนดร้านก่อนแก้ไข' },
+        'CUSTOMER_BRANCH_OWNERSHIP_REQUIRED'
+      );
+    }
+    if (existing.branchId !== branchId) {
+      throw serviceError(
+        403,
+        { message: 'คุณไม่มีสิทธิ์แก้ไขลูกค้าของร้านอื่น' },
+        'CROSS_BRANCH_CUSTOMER_UPDATE_FORBIDDEN'
+      );
+    }
   }
 
   const sanitize = (value) => (typeof value === 'string' ? value.trim() : value);
