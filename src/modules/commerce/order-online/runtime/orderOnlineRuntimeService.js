@@ -49,7 +49,8 @@ const generateOrderOnlineCode = async (client, branchId) => {
   const today = dayjs().format('YYMMDD');
   const start = dayjs().startOf('day').toDate();
   const end = dayjs().endOf('day').toDate();
-  const count = await repository.countOrdersCreatedInRange(client, {
+  const count = await repository.countOrdersCreatedInRange({
+    client,
     branchId,
     start,
     end,
@@ -88,7 +89,8 @@ const createOrderOnline = async ({ body = {}, user = {} }) => {
   }
 
   const result = await repository.runTransaction(async (tx) => {
-    const branchPrices = await repository.findBranchPrices(tx, {
+    const branchPrices = await repository.findBranchPrices({
+      client: tx,
       branchId,
       productIds: normalized.map((item) => item.productId),
     });
@@ -131,17 +133,34 @@ const createOrderOnline = async ({ body = {}, user = {} }) => {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const code = await generateOrderOnlineCode(tx, branchId);
-        const order = await repository.createOrder(tx, {
-          code,
-          customerId: customerId || null,
-          branchId,
-          deliveryDate: safeDate(deliveryDate),
-          note: note || '',
-          items: enrichedItems,
-          userId,
+        const order = await repository.createOrder({
+          client: tx,
+          data: {
+            code,
+            customerId: customerId || null,
+            branchId,
+            deliveryDate: safeDate(deliveryDate),
+            note: note || '',
+            orderOnlineItems: {
+              create: enrichedItems,
+            },
+            userId,
+          },
+          include: {
+            customer: {
+              include: {
+                subdistrict: {
+                  include: {
+                    district: { include: { province: true } },
+                  },
+                },
+              },
+            },
+            orderOnlineItems: true,
+          },
         });
 
-        if (userId) await repository.clearCartByUser(tx, userId);
+        if (userId) await repository.clearCartByUser({ client: tx, userId });
 
         return {
           order: {
@@ -180,98 +199,26 @@ const getAllOrderOnline = async ({ branchId, status }) => {
       branchId: normalizedBranchId,
       ...(status && status !== 'ALL' ? { status } : {}),
     },
-    mode: 'employee',
+    include: {
+      customer: {
+        include: {
+          subdistrict: {
+            include: { district: { include: { province: true } } },
+          },
+        },
+      },
+      orderOnlineItems: true,
+    },
   });
 
   return {
     status: 200,
     body: orders.map((order) => ({
       ...order,
-      totalAmount: calculateOrderTotal(order.items),
+      totalAmount: calculateOrderTotal(order.orderOnlineItems),
       customerAddress: buildCustomerAddress(order.customer),
     })),
   };
-};
-
-const assertOrderAccess = async ({ order, userId, branchId, action }) => {
-  const normalizedBranchId = Number(branchId);
-  const isEmployee = Number.isFinite(normalizedBranchId) && normalizedBranchId > 0;
-
-  if (isEmployee) {
-    if (order.branchId !== normalizedBranchId) {
-      return {
-        status: 403,
-        body: { error: `คุณไม่มีสิทธิ์${action}คำสั่งซื้อของสาขาอื่น` },
-      };
-    }
-    return null;
-  }
-
-  const customerProfile = await repository.findCustomerProfileFirstByUserId(userId);
-  if (!customerProfile || order.customerId !== customerProfile.id) {
-    return {
-      status: 403,
-      body: { error: `คุณไม่มีสิทธิ์${action}คำสั่งซื้อนี้` },
-    };
-  }
-
-  return null;
-};
-
-const updateOrderOnlineStatus = async ({ orderId, body = {}, user = {} }) => {
-  const normalizedOrderId = Number(orderId);
-  if (!Number.isFinite(normalizedOrderId) || normalizedOrderId <= 0) {
-    return { status: 400, body: { error: 'id ไม่ถูกต้อง' } };
-  }
-
-  const order = await repository.findOrderById({ orderId: normalizedOrderId });
-  if (!order) return { status: 404, body: { error: 'ไม่พบคำสั่งซื้อ' } };
-
-  const accessError = await assertOrderAccess({
-    order,
-    userId: user.id,
-    branchId: user.branchId,
-    action: 'อัปเดต',
-  });
-  if (accessError) return accessError;
-
-  const updated = await repository.updateOrderById({
-    orderId: normalizedOrderId,
-    data: {
-      ...(body.status ? { status: body.status } : {}),
-      ...(body.statusPayment ? { statusPayment: body.statusPayment } : {}),
-      ...(body.deliveryDate !== undefined
-        ? { deliveryDate: safeDate(body.deliveryDate) }
-        : {}),
-      ...(body.note !== undefined ? { note: body.note ?? '' } : {}),
-    },
-  });
-
-  return {
-    status: 200,
-    body: { message: 'อัปเดตคำสั่งซื้อสำเร็จ', order: updated },
-  };
-};
-
-const deleteOrderOnline = async ({ orderId, user = {} }) => {
-  const normalizedOrderId = Number(orderId);
-  if (!Number.isFinite(normalizedOrderId) || normalizedOrderId <= 0) {
-    return { status: 400, body: { error: 'id ไม่ถูกต้อง' } };
-  }
-
-  const order = await repository.findOrderById({ orderId: normalizedOrderId });
-  if (!order) return { status: 404, body: { error: 'ไม่พบคำสั่งซื้อ' } };
-
-  const accessError = await assertOrderAccess({
-    order,
-    userId: user.id,
-    branchId: user.branchId,
-    action: 'ลบ',
-  });
-  if (accessError) return accessError;
-
-  await repository.deleteOrderById(normalizedOrderId);
-  return { status: 200, body: { message: 'ลบคำสั่งซื้อสำเร็จ' } };
 };
 
 const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
@@ -282,7 +229,18 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
 
   const order = await repository.findOrderById({
     orderId: normalizedOrderId,
-    mode: 'detail',
+    include: {
+      customer: {
+        include: {
+          subdistrict: {
+            include: { district: { include: { province: true } } },
+          },
+        },
+      },
+      orderOnlineItems: {
+        include: { product: { include: { brand: true } } },
+      },
+    },
   });
   if (!order) return { status: 404, body: { error: 'ไม่พบคำสั่งซื้อ' } };
   if (order.branchId !== Number(branchId)) {
@@ -305,7 +263,7 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
       paymentNote: order.paymentNote || '',
       slipImageUrl: order.paymentSlipUrl || null,
       createdAt: order.createdAt,
-      totalAmount: calculateOrderTotal(order.items),
+      totalAmount: calculateOrderTotal(order.orderOnlineItems),
       customer: order.customer
         ? {
             id: order.customer.id,
@@ -314,7 +272,7 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
             address: buildCustomerAddress(order.customer),
           }
         : null,
-      items: order.items.map((item) => {
+      items: order.orderOnlineItems.map((item) => {
         const unitPrice = toNum(item.priceAtPurchase);
         return {
           productId: item.productId,
@@ -326,106 +284,6 @@ const getOrderOnlineByIdForEmployee = async ({ orderId, branchId }) => {
         };
       }),
     },
-  };
-};
-
-const getOrderOnlineByIdForCustomer = async ({ orderId, userId }) => {
-  const normalizedOrderId = Number(orderId);
-  if (!Number.isFinite(normalizedOrderId) || normalizedOrderId <= 0) {
-    return { status: 400, body: { error: 'id ไม่ถูกต้อง' } };
-  }
-
-  const customerProfile = await repository.findCustomerProfileByUserId(userId, true);
-  if (!customerProfile) {
-    return { status: 403, body: { error: 'ไม่พบข้อมูลลูกค้า' } };
-  }
-
-  const order = await repository.findOrderById({
-    orderId: normalizedOrderId,
-    mode: 'detail',
-  });
-  if (!order || order.customerId !== customerProfile.id) {
-    return {
-      status: 403,
-      body: { error: 'คุณไม่มีสิทธิ์เข้าถึงคำสั่งซื้อนี้' },
-    };
-  }
-
-  return {
-    status: 200,
-    body: {
-      id: order.id,
-      code: order.code,
-      status: order.status,
-      statusPayment: order.statusPayment,
-      paymentSlipStatus: order.paymentSlipStatus,
-      paymentMethod: order.paymentMethod,
-      deliveryDate: order.deliveryDate,
-      createdAt: order.createdAt,
-      totalAmount: calculateOrderTotal(order.items),
-      customerAddress: buildCustomerAddress(order.customer),
-      items: order.items.map((item) => {
-        const unitPrice = toNum(item.priceAtPurchase);
-        return {
-          productId: item.productId,
-          productName: item.product?.name || '',
-          brandName: item.product?.brand?.name || null,
-          quantity: item.quantity,
-          unitPrice,
-          totalPrice: unitPrice * item.quantity,
-        };
-      }),
-    },
-  };
-};
-
-const getOrderOnlineByCustomer = async ({ userId, status }) => {
-  const customerProfile = await repository.findCustomerProfileByUserId(userId);
-  if (!customerProfile) {
-    return { status: 404, body: { error: 'ไม่พบข้อมูลลูกค้า' } };
-  }
-
-  const orders = await repository.findOrders({
-    where: {
-      customerId: customerProfile.id,
-      ...(status && status !== 'ALL' ? { status } : {}),
-    },
-    mode: 'customer',
-  });
-
-  return {
-    status: 200,
-    body: orders.map((order) => ({
-      ...order,
-      totalAmount: calculateOrderTotal(order.items),
-      paymentStatusLabel:
-        order.statusPayment === 'PAID' ? 'ชำระแล้ว' : 'ยังไม่ชำระ',
-    })),
-  };
-};
-
-const submitOrderOnlinePaymentSlip = async ({ orderId, body = {} }) => {
-  const normalizedOrderId = Number(orderId);
-  const order = await repository.findOrderById({ orderId: normalizedOrderId });
-  if (!order) return { status: 404, body: { message: 'ไม่พบคำสั่งซื้อ' } };
-  if (order.statusPayment === 'PAID') {
-    return { status: 400, body: { message: 'คำสั่งซื้อนี้ชำระเงินแล้ว' } };
-  }
-
-  const imageUrl = body.slipUrl?.url || body.slipUrl || null;
-  await repository.updateOrderById({
-    orderId: normalizedOrderId,
-    data: {
-      paymentNote: body.note || '',
-      paymentSlipUrl: imageUrl,
-      statusPayment: 'WAITING_APPROVAL',
-      paymentSlipStatus: 'WAITING_APPROVAL',
-    },
-  });
-
-  return {
-    status: 200,
-    body: { message: 'ส่งข้อมูลการชำระเงินเรียบร้อยแล้ว กรุณารอการตรวจสอบสลิป' },
   };
 };
 
@@ -500,7 +358,10 @@ const getOrderOnlineByBranch = async ({ branchId }) => {
 
   const orders = await repository.findOrders({
     where: { branchId: normalizedBranchId },
-    mode: 'branch',
+    include: {
+      customer: true,
+      orderOnlineItems: true,
+    },
   });
 
   return {
@@ -513,7 +374,7 @@ const getOrderOnlineByBranch = async ({ branchId }) => {
       paymentSlipStatus: order.paymentSlipStatus,
       statusPayment: order.statusPayment,
       customerName: order.customer?.name || order.customer?.companyName || '-',
-      totalAmount: calculateOrderTotal(order.items),
+      totalAmount: calculateOrderTotal(order.orderOnlineItems),
     })),
   };
 };
@@ -526,8 +387,16 @@ const getOrderOnlineSummary = async ({ orderId, branchId }) => {
 
   const order = await repository.findOrderById({
     orderId: normalizedOrderId,
-    branchId: Number(branchId),
-    mode: 'summary',
+    include: {
+      customer: {
+        include: {
+          subdistrict: {
+            include: { district: { include: { province: true } } },
+          },
+        },
+      },
+      orderOnlineItems: true,
+    },
   });
   if (!order) return { status: 404, body: { message: 'ไม่พบคำสั่งซื้อนี้' } };
   if (order.branchId !== Number(branchId)) {
@@ -541,7 +410,7 @@ const getOrderOnlineSummary = async ({ orderId, branchId }) => {
     status: 200,
     body: {
       ...order,
-      totalAmount: calculateOrderTotal(order.items),
+      totalAmount: calculateOrderTotal(order.orderOnlineItems),
       customerAddress: buildCustomerAddress(order.customer),
     },
   };
@@ -551,11 +420,6 @@ module.exports = {
   createOrderOnline,
   getAllOrderOnline,
   getOrderOnlineByIdForEmployee,
-  getOrderOnlineByIdForCustomer,
-  updateOrderOnlineStatus,
-  deleteOrderOnline,
-  getOrderOnlineByCustomer,
-  submitOrderOnlinePaymentSlip,
   approveOrderOnlineSlip,
   rejectOrderOnlineSlip,
   getOrderOnlineByBranch,
