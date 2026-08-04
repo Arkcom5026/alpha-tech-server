@@ -1,8 +1,15 @@
 const { prisma } = require('../../../../../lib/prisma')
 
+const OWNERSHIP_BRANCH_SELECT = {
+  id: true,
+  name: true,
+  branchCode: true,
+  businessType: true,
+  categoryId: true,
+}
+
 const PRODUCT_DISCOVERY_SELECT = {
   id: true,
-  branchId: true,
   name: true,
   active: true,
   templateProductId: true,
@@ -10,7 +17,11 @@ const PRODUCT_DISCOVERY_SELECT = {
     select: {
       id: true,
       name: true,
+      branchId: true,
       globalProductTypeId: true,
+      branch: {
+        select: OWNERSHIP_BRANCH_SELECT,
+      },
     },
   },
   brand: {
@@ -21,15 +32,6 @@ const PRODUCT_DISCOVERY_SELECT = {
     },
   },
   unit: { select: { id: true, name: true } },
-  branch: {
-    select: {
-      id: true,
-      name: true,
-      branchCode: true,
-      businessType: true,
-      categoryId: true,
-    },
-  },
 }
 
 const BRANCH_DISCOVERY_SELECT = {
@@ -66,21 +68,25 @@ const findStoreBranchesByCategory = ({ categoryId, templateBranchId }) =>
 const findStoreProducts = ({ branchIds }) =>
   prisma.product.findMany({
     where: {
-      branchId: { in: branchIds },
+      productType: {
+        branchId: { in: branchIds },
+      },
       active: true,
     },
     select: PRODUCT_DISCOVERY_SELECT,
-    orderBy: [{ branchId: 'asc' }, { id: 'asc' }],
+    orderBy: { id: 'asc' },
   })
 
 const findTemplateProducts = ({ templateBranchId }) =>
   prisma.product.findMany({
     where: {
-      branchId: templateBranchId,
+      productType: {
+        branchId: templateBranchId,
+      },
       active: true,
     },
     select: PRODUCT_DISCOVERY_SELECT,
-    orderBy: [{ branchId: 'asc' }, { id: 'asc' }],
+    orderBy: { id: 'asc' },
   })
 
 const findOpenCandidates = ({ sourceProductIds }) =>
@@ -99,6 +105,7 @@ const findOpenCandidates = ({ sourceProductIds }) =>
   })
 
 module.exports = {
+  OWNERSHIP_BRANCH_SELECT,
   PRODUCT_DISCOVERY_SELECT,
   BRANCH_DISCOVERY_SELECT,
   findTemplateBranchByCode,
