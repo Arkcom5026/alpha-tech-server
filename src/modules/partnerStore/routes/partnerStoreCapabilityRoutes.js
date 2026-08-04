@@ -4,6 +4,7 @@ const express = require('express')
 const verifyToken = require('../../../../middlewares/verifyToken')
 const controller = require('../controllers/partnerStoreCapabilityController')
 const onlineVisibilityController = require('../onlineVisibility/onlineProductVisibilityController')
+const onlineProductControlController = require('../onlineProductControl/onlineProductControlController')
 
 const router = express.Router()
 
@@ -29,5 +30,6 @@ router.use(verifyToken, allowEmployeeContext)
 router.get('/capability', controller.getCurrentBranchCapability)
 router.put('/capability', controller.saveCurrentBranchCapability)
 router.get('/online-products/visibility-audit', onlineVisibilityController.getCurrentBranchAudit)
+router.patch('/online-products/:productId/price', onlineProductControlController.updateMarketplacePrice)
 
 module.exports = router
