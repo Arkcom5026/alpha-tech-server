@@ -1,9 +1,16 @@
 const { BusinessType } = require('@prisma/client')
+const {
+  DEFAULT_TEMPLATE_BRANCH_CODE,
+} = require('../../repositories/productTemplateRepository')
 const repository = require('./auditProductTemplateDiscoveryRepository')
 const {
   assertSuperAdmin,
   createHttpError,
 } = require('../shared/productTemplateCandidatePolicy')
+
+const BUSINESS_TYPE_TEMPLATE_BRANCH_CODE = Object.freeze({
+  [BusinessType.IT]: DEFAULT_TEMPLATE_BRANCH_CODE,
+})
 
 const DISCOVERY_CLASSIFICATION = Object.freeze({
   LINKED_TEMPLATE: 'LINKED_TEMPLATE',
@@ -18,6 +25,18 @@ const normalizeBusinessType = (value) => {
     throw createHttpError(400, 'Valid businessType is required', 'INVALID_BUSINESS_TYPE')
   }
   return businessType
+}
+
+const resolveTemplateBranchCode = (businessType) => {
+  const branchCode = BUSINESS_TYPE_TEMPLATE_BRANCH_CODE[businessType]
+  if (!branchCode) {
+    throw createHttpError(
+      409,
+      'No Template Branch mapping exists for the selected business scope',
+      'TEMPLATE_BRANCH_MAPPING_NOT_CONFIGURED'
+    )
+  }
+  return branchCode
 }
 
 const normalizeCatalogText = (value) =>
@@ -46,14 +65,17 @@ const emptySummary = () => ({
 const auditDiscovery = async ({ user, query = {} }) => {
   assertSuperAdmin(user)
   const businessType = normalizeBusinessType(query.businessType)
+  const templateBranchCode = resolveTemplateBranchCode(businessType)
 
-  // UI businessType selects the platform Template Branch. The resolved Template Branch
-  // categoryId is the real Store/Template catalog boundary.
-  const templateBranch = await repository.findTemplateBranchByBusinessType({ businessType })
+  // Business type is a platform workspace selector. Template ownership is resolved by
+  // the canonical Template Branch code; its categoryId is the Store/Template boundary.
+  const templateBranch = await repository.findTemplateBranchByCode({
+    branchCode: templateBranchCode,
+  })
   if (!templateBranch) {
     throw createHttpError(
       409,
-      'No SYSTEM TEMPLATE branch exists for the selected business scope',
+      'No Template Branch exists for the selected business scope',
       'TEMPLATE_BRANCH_NOT_FOUND'
     )
   }
@@ -66,6 +88,7 @@ const auditDiscovery = async ({ user, query = {} }) => {
   if (storeBranches.length === 0) {
     return {
       businessType,
+      templateBranchCode,
       categoryId: templateBranch.categoryId,
       templateBranch,
       storeBranches: [],
@@ -155,6 +178,7 @@ const auditDiscovery = async ({ user, query = {} }) => {
 
   return {
     businessType,
+    templateBranchCode,
     categoryId: templateBranch.categoryId,
     templateBranch,
     storeBranches,
@@ -171,8 +195,10 @@ const auditDiscovery = async ({ user, query = {} }) => {
 }
 
 module.exports = {
+  BUSINESS_TYPE_TEMPLATE_BRANCH_CODE,
   DISCOVERY_CLASSIFICATION,
   normalizeBusinessType,
+  resolveTemplateBranchCode,
   normalizeCatalogText,
   buildCatalogFingerprint,
   auditDiscovery,
