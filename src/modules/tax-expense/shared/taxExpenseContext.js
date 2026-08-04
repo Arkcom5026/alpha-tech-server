@@ -32,6 +32,24 @@ const asMoney = (value, field, { allowZero = true } = {}) => {
   return parsed.toFixed(2);
 };
 
+const invalidDate = (field) => {
+  const error = new Error(`${field} ไม่ถูกต้อง`);
+  error.statusCode = 400;
+  error.code = 'TAX_EXPENSE_VALIDATION_ERROR';
+  return error;
+};
+
+const asRequiredDate = (value, field) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw invalidDate(field);
+  return parsed;
+};
+
+const asOptionalDate = (value, field) => {
+  if (value == null || String(value).trim() === '') return null;
+  return asRequiredDate(value, field);
+};
+
 const actorEmployeeId = (req) =>
   asPositiveInt(req.user?.employeeProfileId) || asPositiveInt(req.user?.employeeId);
 
@@ -69,8 +87,10 @@ const sendError = (res, error, fallbackMessage) =>
 
 module.exports = Object.freeze({
   asMoney,
+  asOptionalDate,
   asOptionalText,
   asPositiveInt,
+  asRequiredDate,
   asRequiredText,
   branchIdFromToken,
   employeeIdFromToken,
