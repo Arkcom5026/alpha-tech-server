@@ -41,12 +41,10 @@ const BRANCH_DISCOVERY_SELECT = {
   categoryId: true,
 }
 
-const findTemplateBranchByBusinessType = ({ businessType }) =>
+const findTemplateBranchByCode = ({ branchCode }) =>
   prisma.branch.findFirst({
     where: {
-      businessType,
-      address: 'SYSTEM TEMPLATE',
-      branchCode: { not: null },
+      branchCode,
     },
     select: BRANCH_DISCOVERY_SELECT,
     orderBy: { id: 'asc' },
@@ -103,7 +101,7 @@ const findOpenCandidates = ({ sourceProductIds }) =>
 module.exports = {
   PRODUCT_DISCOVERY_SELECT,
   BRANCH_DISCOVERY_SELECT,
-  findTemplateBranchByBusinessType,
+  findTemplateBranchByCode,
   findStoreBranchesByCategory,
   findStoreProducts,
   findTemplateProducts,
