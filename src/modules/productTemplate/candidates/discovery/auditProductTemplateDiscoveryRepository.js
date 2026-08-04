@@ -47,7 +47,6 @@ const findTemplateBranchByBusinessType = ({ businessType }) =>
       businessType,
       address: 'SYSTEM TEMPLATE',
       branchCode: { not: null },
-      categoryId: { not: null },
     },
     select: BRANCH_DISCOVERY_SELECT,
     orderBy: { id: 'asc' },
