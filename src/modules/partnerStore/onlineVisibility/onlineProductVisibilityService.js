@@ -14,6 +14,7 @@ const REASONS = Object.freeze({
 })
 
 const toNumber = (value) => (value == null ? null : Number(value))
+const toIso = (value) => (value ? new Date(value).toISOString() : null)
 
 const classify = (row, now) => {
   const reasons = []
@@ -44,12 +45,16 @@ const classify = (row, now) => {
 
   return {
     productId: Number(row.productId),
+    branchPriceId: Number(row.branchPriceId),
     name: row.productName,
     barcode: row.saleBarcode || null,
     brand: row.brandId ? { id: Number(row.brandId), name: row.brandName } : null,
     productType: row.productTypeId ? { id: Number(row.productTypeId), name: row.productTypeName } : null,
     category: row.categoryId ? { id: Number(row.categoryId), name: row.categoryName } : null,
     priceOnline,
+    priceActive: Boolean(row.priceActive),
+    effectiveDate: toIso(row.effectiveDate),
+    expiredDate: toIso(row.expiredDate),
     availableQuantity,
     visibleOnline,
     sellableNow: visibleOnline && availableQuantity > 0,
