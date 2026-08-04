@@ -29,7 +29,11 @@ for (const token of [
   'ProductReservationLifecycleEvent',
   'ProductReservationLifecycleCommand',
   'reservation."branchId" = ${branchId}',
+  'reservation."status"::text IN',
 ]) assert.ok(queries.includes(token), `Missing projection/query authority: ${token}`);
+
+assert.ok(!queries.includes('reservation."status" IN (${Prisma.join(statuses)})'),
+  'PostgreSQL enum status must not be compared directly with text parameters');
 
 for (const token of [
   "commandType: 'EXPIRE'",
