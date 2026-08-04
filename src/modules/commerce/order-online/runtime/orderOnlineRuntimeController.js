@@ -1,4 +1,5 @@
 const service = require('./orderOnlineRuntimeService');
+const customerAuthorityService = require('./orderOnlineCustomerAuthorityService');
 
 const send = (res, result) => res.status(result.status).json(result.body);
 
@@ -41,9 +42,10 @@ const getOrderOnlineByIdForEmployee = async (req, res) => {
 
 const getOrderOnlineByIdForCustomer = async (req, res) => {
   try {
-    return send(res, await service.getOrderOnlineByIdForCustomer({
+    return send(res, await customerAuthorityService.getOrderOnlineByIdForCustomer({
       orderId: req.params?.id,
       userId: req.user?.id,
+      customerProfileId: req.user?.customerProfileId,
     }));
   } catch (error) {
     console.error('❌ getOrderOnlineByIdForCustomer error:', error);
@@ -78,8 +80,9 @@ const deleteOrderOnline = async (req, res) => {
 
 const getOrderOnlineByCustomer = async (req, res) => {
   try {
-    return send(res, await service.getOrderOnlineByCustomer({
+    return send(res, await customerAuthorityService.getOrderOnlineByCustomer({
       userId: req.user?.id,
+      customerProfileId: req.user?.customerProfileId,
       status: req.query?.status,
     }));
   } catch (error) {
