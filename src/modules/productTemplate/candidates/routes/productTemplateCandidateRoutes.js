@@ -10,6 +10,9 @@ const {
   materializeProductTemplateDiscovery,
 } = require('../discovery/materializeProductTemplateDiscoveryController')
 const {
+  listCanonicalProductGroupsController,
+} = require('../query/groups/listCanonicalProductGroupsController')
+const {
   listProductTemplateCandidates,
 } = require('../query/list/listProductTemplateCandidatesController')
 const {
@@ -43,6 +46,7 @@ router.use(requireSuperAdmin)
 
 router.get('/discovery-audit', auditProductTemplateDiscovery)
 router.post('/discovery-materialize', materializeProductTemplateDiscovery)
+router.get('/groups', listCanonicalProductGroupsController)
 router.get('/', listProductTemplateCandidates)
 router.post('/', createProductTemplateCandidate)
 router.post('/:id/start-review', startProductTemplateCandidateReview)
