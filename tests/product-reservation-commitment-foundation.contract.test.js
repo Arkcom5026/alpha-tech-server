@@ -46,6 +46,8 @@ assertIncludes(repository, 'unitPriceCents', 'Money must be normalized before ag
 assertIncludes(repository, 'totalAmountCents', 'Reservation totals must avoid floating-point accumulation');
 assertIncludes(repository, '.toFixed(2)', 'Durable monetary writes must use two-decimal strings');
 assertIncludes(repository, 'Number.isSafeInteger', 'Money arithmetic must enforce safe numeric bounds');
+assertIncludes(repository, 'CAST(${totalAmount} AS numeric)', 'Reservation monetary strings must be cast to PostgreSQL numeric');
+assertIncludes(repository, 'CAST(${unitPrice} AS numeric)', 'Reservation-item monetary strings must be cast to PostgreSQL numeric');
 assertIncludes(repository, '"quantity" - "reserved"', 'Server must revalidate simple stock availability');
 assertIncludes(repository, '"reserved" = "reserved" +', 'Commitment must allocate stock durably');
 assertIncludes(repository, "'RESERVE'", 'Commitment must record reservation movement');
