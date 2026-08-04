@@ -3,6 +3,7 @@
 const express = require('express')
 const verifyToken = require('../../../../middlewares/verifyToken')
 const controller = require('../controllers/partnerStoreCapabilityController')
+const onlineVisibilityController = require('../onlineVisibility/onlineProductVisibilityController')
 
 const router = express.Router()
 
@@ -27,5 +28,6 @@ const allowEmployeeContext = (req, res, next) => {
 router.use(verifyToken, allowEmployeeContext)
 router.get('/capability', controller.getCurrentBranchCapability)
 router.put('/capability', controller.saveCurrentBranchCapability)
+router.get('/online-products/visibility-audit', onlineVisibilityController.getCurrentBranchAudit)
 
 module.exports = router
