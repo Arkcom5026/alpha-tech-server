@@ -1,5 +1,5 @@
-const { auditDiscovery } = require('../../../discovery/auditProductTemplateDiscoveryService')
-const { createHttpError } = require('../../../shared/productTemplateCandidatePolicy')
+const { auditDiscovery } = require('../../discovery/auditProductTemplateDiscoveryService')
+const { createHttpError } = require('../../shared/productTemplateCandidatePolicy')
 
 const decodeGroupKey = (value) => {
   const raw = String(value || '').trim()
