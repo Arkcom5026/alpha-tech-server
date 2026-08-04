@@ -159,7 +159,7 @@ const commit = async ({ branchId, sessionTokenHash, proofTokenHash, idempotencyK
       ${code}, ${branchId}, NULL, NULL, 'COMMERCE_IDENTITY',
       ${proof.id}, ${session.id}, ${idempotencyKey}, 'ACTIVE',
       'ONLINE'::"OnlineOrderSource", ${idempotencyKey}, 'PICKUP'::"OnlineFulfillmentMethod",
-      ${totalAmount}, 0, ${totalAmount}, 0,
+      CAST(${totalAmount} AS numeric), CAST(0 AS numeric), CAST(${totalAmount} AS numeric), CAST(0 AS numeric),
       ${reservationExpiresAt}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     ) RETURNING *
   `);
@@ -174,7 +174,7 @@ const commit = async ({ branchId, sessionTokenHash, proofTokenHash, idempotencyK
         "createdAt", "updatedAt"
       ) VALUES (
         ${reservation.id}, ${`PUBLIC-${index + 1}`}, 'SIMPLE', ${line.productId}, NULL, NULL,
-        ${line.quantity}, ${unitPrice}, 0, ${unitPrice}, 0, TRUE,
+        ${line.quantity}, CAST(${unitPrice} AS numeric), CAST(0 AS numeric), CAST(${unitPrice} AS numeric), CAST(0 AS numeric), TRUE,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
     `);
