@@ -14,6 +14,8 @@ function presentIdentity(user) {
       branchSlug: profile.branch?.slug || '',
       customerType: profile.type,
       displayName: profile.companyName || profile.name || '',
+      profileCreatedAt: profile.createdAt,
+      profileUpdatedAt: profile.updatedAt,
       subdistrictCode: profile.branch?.subdistrict?.code || '',
       subdistrictName: profile.branch?.subdistrict?.nameTh || '',
       districtCode: profile.branch?.subdistrict?.district?.code || '',
@@ -27,6 +29,8 @@ function presentIdentity(user) {
       customerProfileId: profile.id,
       customerType: profile.type,
       displayName: profile.companyName || profile.name || '',
+      profileCreatedAt: profile.createdAt,
+      profileUpdatedAt: profile.updatedAt,
     }));
 
   return {
@@ -56,7 +60,6 @@ function normalizeFilters(input = {}) {
   const relationshipStatus = String(input.relationshipStatus || 'ALL').toUpperCase();
   const accountStatus = String(input.accountStatus || 'ALL').toUpperCase();
   const customerType = String(input.customerType || '').toUpperCase();
-
   return {
     query: String(input.query || '').trim(),
     branchId: input.branchId || '',
@@ -72,27 +75,13 @@ function normalizeFilters(input = {}) {
 function presentFilterOptions(branches) {
   const provinces = new Map();
   const districts = new Map();
-
   const branchOptions = branches.map((branch) => {
     const district = branch.subdistrict?.district;
     const province = district?.province;
     if (province?.code) provinces.set(province.code, { code: province.code, name: province.nameTh });
-    if (district?.code) {
-      districts.set(district.code, {
-        code: district.code,
-        name: district.nameTh,
-        provinceCode: province?.code || '',
-      });
-    }
-    return {
-      id: branch.id,
-      name: branch.name,
-      slug: branch.slug || '',
-      districtCode: district?.code || '',
-      provinceCode: province?.code || '',
-    };
+    if (district?.code) districts.set(district.code, { code: district.code, name: district.nameTh, provinceCode: province?.code || '' });
+    return { id: branch.id, name: branch.name, slug: branch.slug || '', districtCode: district?.code || '', provinceCode: province?.code || '' };
   });
-
   return {
     branches: branchOptions,
     provinces: [...provinces.values()].sort((a, b) => a.name.localeCompare(b.name, 'th')),
@@ -105,24 +94,16 @@ function presentFilterOptions(branches) {
 
 async function getOverview({ userContext = {}, ...input }) {
   if (String(userContext.role || '') !== 'SUPERADMIN') {
-    return {
-      status: 403,
-      body: { code: 'PLATFORM_CUSTOMER_GOVERNANCE_FORBIDDEN', message: 'Forbidden' },
-    };
+    return { status: 403, body: { code: 'PLATFORM_CUSTOMER_GOVERNANCE_FORBIDDEN', message: 'Forbidden' } };
   }
-
   const filters = normalizeFilters(input);
   const [users, branches] = await Promise.all([
     repository.listPlatformIdentityOverview(filters),
     repository.listGovernanceFilterOptions(),
   ]);
-
   let results = users.map(presentIdentity);
-  if (filters.relationshipStatus === 'MULTI_STORE') {
-    results = results.filter((identity) => identity.storeRelationshipCount > 1);
-  }
+  if (filters.relationshipStatus === 'MULTI_STORE') results = results.filter((identity) => identity.storeRelationshipCount > 1);
   results = results.slice(0, filters.limit);
-
   return {
     status: 200,
     body: {
