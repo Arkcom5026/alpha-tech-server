@@ -83,18 +83,11 @@ async function createCustomer(input = {}, actor = {}) {
   }
 
   if (existingUser) {
-    const existingProfile = await repository.findCustomerByUserId(existingUser.id);
+    const existingProfile = await repository.findCustomerByUserAndBranch({
+      userId: existingUser.id,
+      branchId,
+    });
     if (existingProfile) {
-      const accessible = await repository.findAccessibleCustomer({
-        customerId: existingProfile.id,
-        branchId,
-      });
-      if (!accessible) {
-        throw buildError(409, {
-          code: 'CUSTOMER_PHONE_NOT_AVAILABLE_IN_BRANCH',
-          message: 'ไม่สามารถเพิ่มลูกค้าด้วยเบอร์นี้ในร้านปัจจุบันได้',
-        });
-      }
       return { statusCode: 200, body: presentCustomer(existingProfile) };
     }
   }
@@ -118,6 +111,7 @@ async function createCustomer(input = {}, actor = {}) {
     existingUser,
     normalizedPhone,
     hashedPassword,
+    branchId,
     customer: {
       name,
       type,
