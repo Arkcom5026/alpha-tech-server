@@ -1,10 +1,9 @@
 const {
   auditDiscovery,
-  DISCOVERY_CLASSIFICATION,
 } = require('./auditProductTemplateDiscoveryService')
 const {
-  createCandidate,
-} = require('../create/createProductTemplateCandidateService')
+  GROUP_REVIEW_STATUS,
+} = require('./groupProductTemplateDiscovery')
 const {
   assertSuperAdmin,
   createHttpError,
@@ -31,61 +30,36 @@ const materializeDiscovery = async ({ user, payload = {} }) => {
   const limit = toLimit(payload.limit)
 
   const audit = await auditDiscovery({ user, query: { businessType } })
-  const eligible = audit.items
-    .filter((item) => item.classification === DISCOVERY_CLASSIFICATION.UNMATCHED)
+  const eligibleGroups = audit.groups
+    .filter((group) => group.reviewStatus === GROUP_REVIEW_STATUS.READY)
     .slice(0, limit)
+  const reviewRequiredGroups = audit.groups.filter(
+    (group) => group.reviewStatus === GROUP_REVIEW_STATUS.PRODUCT_TYPE_REVIEW_REQUIRED
+  )
 
-  if (!apply) {
-    return {
-      mode: 'DRY_RUN',
-      businessType: audit.businessType,
-      templateBranch: audit.templateBranch,
-      categoryId: audit.categoryId,
-      eligibleCount: eligible.length,
-      sourceProductIds: eligible.map((item) => item.sourceProduct.id),
-      created: [],
-      failed: [],
-    }
-  }
-
-  const created = []
-  const failed = []
-
-  for (const item of eligible) {
-    try {
-      const candidate = await createCandidate({
-        user,
-        payload: {
-          sourceProductId: item.sourceProduct.id,
-          sourceBranchId: item.sourceProduct.branchId,
-          targetTemplateBranchId: audit.templateBranch.id,
-        },
-      })
-      created.push({
-        candidateId: candidate.id,
-        sourceProductId: item.sourceProduct.id,
-        sourceBranchId: item.sourceProduct.branchId,
-      })
-    } catch (error) {
-      failed.push({
-        sourceProductId: item.sourceProduct.id,
-        sourceBranchId: item.sourceProduct.branchId,
-        code: error.code || 'DISCOVERY_CANDIDATE_CREATE_FAILED',
-        message: error.message,
-      })
-    }
+  if (apply) {
+    throw createHttpError(
+      409,
+      'Grouped Candidate materialization is not enabled until group review and persistence authority are approved',
+      'GROUPED_CANDIDATE_MATERIALIZATION_NOT_ENABLED'
+    )
   }
 
   return {
-    mode: 'APPLY',
+    mode: 'GROUPED_DRY_RUN',
     businessType: audit.businessType,
     templateBranch: audit.templateBranch,
     categoryId: audit.categoryId,
-    eligibleCount: eligible.length,
-    createdCount: created.length,
-    failedCount: failed.length,
-    created,
-    failed,
+    groupSummary: audit.groupSummary,
+    eligibleGroupCount: eligibleGroups.length,
+    eligibleSourceProductCount: eligibleGroups.reduce(
+      (total, group) => total + group.sourceProductCount,
+      0
+    ),
+    reviewRequiredGroupCount: reviewRequiredGroups.length,
+    groups: eligibleGroups,
+    created: [],
+    failed: [],
   }
 }
 
