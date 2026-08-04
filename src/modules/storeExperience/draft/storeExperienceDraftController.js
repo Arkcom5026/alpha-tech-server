@@ -19,20 +19,24 @@ const sendError = (res, error) => res.status(error?.statusCode || 500).json({
   message: error?.message || 'ดำเนินการตั้งค่าหน้าร้านไม่สำเร็จ',
 });
 
-const getCurrentDraft = async (req, res) => {
+const execute = (operation) => async (req, res) => {
   try {
     const branchId = requireBranch(req, res);
     if (!branchId) return;
-    return res.json({ success: true, data: await service.getDraftForBranch(branchId) });
-  } catch (error) { return sendError(res, error); }
+    return res.json({ success: true, data: await operation(branchId, req.body || {}) });
+  } catch (error) {
+    return sendError(res, error);
+  }
 };
 
-const saveCurrentDraft = async (req, res) => {
-  try {
-    const branchId = requireBranch(req, res);
-    if (!branchId) return;
-    return res.json({ success: true, data: await service.saveDraftForBranch(branchId, req.body || {}) });
-  } catch (error) { return sendError(res, error); }
-};
+const getCurrentDraft = execute((branchId) => service.getDraftForBranch(branchId));
+const saveCurrentDraft = execute((branchId, payload) => service.saveDraftForBranch(branchId, payload));
+const publishCurrentStorefront = execute((branchId) => service.publishForBranch(branchId));
+const unpublishCurrentStorefront = execute((branchId) => service.unpublishForBranch(branchId));
 
-module.exports = { getCurrentDraft, saveCurrentDraft };
+module.exports = {
+  getCurrentDraft,
+  saveCurrentDraft,
+  publishCurrentStorefront,
+  unpublishCurrentStorefront,
+};
