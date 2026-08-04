@@ -28,7 +28,7 @@ The initial workspace must not expose by default:
 
 ## Initial API
 
-`GET /api/platform/customers/overview?q=&limit=`
+`GET /api/customers/platform/overview?q=&limit=`
 
 Authority: `SUPERADMIN` only.
 Mode: read-only.
