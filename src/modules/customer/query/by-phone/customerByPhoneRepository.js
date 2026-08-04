@@ -8,8 +8,8 @@ const includeAddress = {
 async function findBranchCustomerByPhone({ branchId, phone }) {
   return prisma.customerProfile.findFirst({
     where: {
+      branchId: Number(branchId),
       user: { loginId: phone },
-      sale: { some: { branchId } },
     },
     include: includeAddress,
   });
