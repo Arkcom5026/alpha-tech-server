@@ -54,6 +54,9 @@ const buildCatalogFingerprint = (product) => {
   return `${globalProductTypeId}:${brand}:${name}`
 }
 
+const resolveProductOwnershipBranch = (product) =>
+  product?.productType?.branch || null
+
 const emptySummary = () => ({
   storeProducts: 0,
   linkedTemplate: 0,
@@ -129,6 +132,7 @@ const auditDiscovery = async ({ user, query = {} }) => {
     const openCandidate = openCandidateByProductId.get(product.id) || null
     const fingerprint = buildCatalogFingerprint(product)
     const exactTemplate = fingerprint ? templateByFingerprint.get(fingerprint) || null : null
+    const ownershipBranch = resolveProductOwnershipBranch(product)
 
     let classification = DISCOVERY_CLASSIFICATION.UNMATCHED
     let matchedTemplate = null
@@ -142,14 +146,18 @@ const auditDiscovery = async ({ user, query = {} }) => {
       matchedTemplate = exactTemplate
     }
 
+    const matchedTemplateBranch = matchedTemplate
+      ? resolveProductOwnershipBranch(matchedTemplate)
+      : null
+
     return {
       classification,
       fingerprint,
       sourceProduct: {
         id: product.id,
         name: product.name,
-        branchId: product.branchId,
-        branchName: product.branch?.name || null,
+        branchId: ownershipBranch?.id || product.productType?.branchId || null,
+        branchName: ownershipBranch?.name || null,
         businessType,
         categoryId: templateBranch.categoryId,
         productTypeId: product.productType?.id || null,
@@ -165,8 +173,8 @@ const auditDiscovery = async ({ user, query = {} }) => {
         ? {
             id: matchedTemplate.id,
             name: matchedTemplate.name,
-            branchId: matchedTemplate.branchId,
-            branchName: matchedTemplate.branch?.name || null,
+            branchId: matchedTemplateBranch?.id || matchedTemplate.productType?.branchId || null,
+            branchName: matchedTemplateBranch?.name || null,
           }
         : null,
       openCandidate,
@@ -201,5 +209,6 @@ module.exports = {
   resolveTemplateBranchCode,
   normalizeCatalogText,
   buildCatalogFingerprint,
+  resolveProductOwnershipBranch,
   auditDiscovery,
 }
