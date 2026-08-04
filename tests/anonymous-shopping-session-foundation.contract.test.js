@@ -11,6 +11,9 @@ const assertIncludes = (source, value, message) => {
 const assertExcludes = (source, value, message) => {
   if (source.includes(value)) throw new Error(message || `Expected source to exclude: ${value}`);
 };
+const assertDoesNotMatch = (source, pattern, message) => {
+  if (pattern.test(source)) throw new Error(message || `Expected source not to match: ${pattern}`);
+};
 
 const migration = read('prisma/migrations/20260729013000_anonymous_shopping_session_foundation/migration.sql');
 const repository = read('src/modules/sales/storefront/session/anonymousShoppingSessionRepository.js');
@@ -35,11 +38,14 @@ assertIncludes(repository, 'priceOnline', 'Item mutation must use the online pub
 assertIncludes(repository, 'effectiveDate', 'Item mutation must respect publication effective time');
 assertIncludes(repository, 'expiredDate', 'Item mutation must respect publication expiry time');
 assertIncludes(repository, 'CURRENT_TIMESTAMP', 'Publication window must be evaluated by database time authority');
+assertIncludes(repository, 'reserved', 'Revalidation must account for stock already reserved elsewhere');
 assertExcludes(repository, 'branchId: Number(row.branchId)', 'Public session projection must not expose branchId');
 assertExcludes(repository, 'id: Number(row.id)', 'Public session projection must not expose internal session id');
 assertExcludes(repository, 'ProductReservation', 'Session mutation must not create a ProductReservation');
 assertExcludes(repository, 'StockMovement', 'Session mutation must not create stock movement');
-assertExcludes(repository, 'reserved', 'Session mutation must not reserve stock');
+assertDoesNotMatch(repository, /UPDATE\s+"StockItem"/i, 'Session mutation must not update stock records');
+assertDoesNotMatch(repository, /SET\s+"?reserved"?\s*=/i, 'Session mutation must not change reserved stock');
+assertDoesNotMatch(repository, /INSERT\s+INTO\s+"ProductReservation"/i, 'Session mutation must not create a reservation');
 
 assertIncludes(service, 'SESSION_TTL_HOURS = 72', 'Session expiry policy must be explicit');
 assertIncludes(service, 'MAX_ITEM_QUANTITY = 99', 'Quantity abuse limit must be explicit');
