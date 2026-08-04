@@ -39,9 +39,7 @@ function buildIdentityFilter({ query, branchId, provinceCode, districtCode, rela
 
   const relationshipFilters = {};
   const normalizedBranchId = Number(branchId);
-  if (Number.isInteger(normalizedBranchId) && normalizedBranchId > 0) {
-    relationshipFilters.branchId = normalizedBranchId;
-  }
+  if (Number.isInteger(normalizedBranchId) && normalizedBranchId > 0) relationshipFilters.branchId = normalizedBranchId;
   if (provinceCode) {
     relationshipFilters.branch = {
       ...(relationshipFilters.branch || {}),
@@ -56,16 +54,12 @@ function buildIdentityFilter({ query, branchId, provinceCode, districtCode, rela
   }
   if (customerType) relationshipFilters.type = customerType;
 
-  if (relationshipStatus === 'UNASSIGNED') {
-    relationshipFilters.branchId = null;
-  } else if (relationshipStatus === 'STORE' || relationshipStatus === 'MULTI_STORE') {
+  if (relationshipStatus === 'UNASSIGNED') relationshipFilters.branchId = null;
+  else if (relationshipStatus === 'STORE' || relationshipStatus === 'MULTI_STORE') {
     relationshipFilters.branchId = relationshipFilters.branchId ?? { not: null };
   }
 
-  if (Object.keys(relationshipFilters).length) {
-    where.customerProfiles = { some: relationshipFilters };
-  }
-
+  if (Object.keys(relationshipFilters).length) where.customerProfiles = { some: relationshipFilters };
   return where;
 }
 
@@ -89,6 +83,8 @@ function listPlatformIdentityOverview(filters = {}) {
           name: true,
           companyName: true,
           type: true,
+          createdAt: true,
+          updatedAt: true,
           branch: { select: branchLocationSelect },
         },
         orderBy: [{ branchId: 'asc' }, { id: 'asc' }],
@@ -100,10 +96,7 @@ function listPlatformIdentityOverview(filters = {}) {
 }
 
 function listGovernanceFilterOptions() {
-  return prisma.branch.findMany({
-    select: branchLocationSelect,
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
-  });
+  return prisma.branch.findMany({ select: branchLocationSelect, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
 }
 
 module.exports = { listPlatformIdentityOverview, listGovernanceFilterOptions, buildIdentityFilter };
