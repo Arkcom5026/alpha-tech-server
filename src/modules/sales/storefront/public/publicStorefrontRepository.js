@@ -34,6 +34,29 @@ const publishedProductWhereSql = (branchId) => Prisma.sql`
     AND (price."expiredDate" IS NULL OR price."expiredDate" > CURRENT_TIMESTAMP)
 `;
 
+const buildDiscoveryFilterSql = ({ search, categoryId, brandId }) => {
+  const query = String(search || '').trim();
+  return Prisma.sql`
+    ${query ? Prisma.sql`AND (
+      product."name" ILIKE ${`%${query}%`}
+      OR product."saleBarcode" ILIKE ${`%${query}%`}
+      OR brand."name" ILIKE ${`%${query}%`}
+      OR product_type."name" ILIKE ${`%${query}%`}
+      OR global_type."name" ILIKE ${`%${query}%`}
+      OR category."name" ILIKE ${`%${query}%`}
+    )` : Prisma.empty}
+    ${categoryId ? Prisma.sql`AND category."id" = ${categoryId}` : Prisma.empty}
+    ${brandId ? Prisma.sql`AND brand."id" = ${brandId}` : Prisma.empty}
+  `;
+};
+
+const buildOrderSql = (sort) => {
+  if (sort === 'price_asc') return Prisma.sql`ORDER BY price."priceOnline" ASC, product."id" ASC`;
+  if (sort === 'price_desc') return Prisma.sql`ORDER BY price."priceOnline" DESC, product."id" ASC`;
+  if (sort === 'newest') return Prisma.sql`ORDER BY product."id" DESC`;
+  return Prisma.sql`ORDER BY product."name" ASC, product."id" ASC`;
+};
+
 const findPublishedStoreBySlug = async (slug, db = prisma) => {
   const stores = await db.$queryRaw(Prisma.sql`
     SELECT capability."id", capability."branchId", capability."storefrontSlug", capability."displayName",
@@ -53,7 +76,6 @@ const findPublishedStoreBySlug = async (slug, db = prisma) => {
       AND capability."storefrontSlug" = ${slug}
     LIMIT 1
   `);
-
   return stores[0] || null;
 };
 
@@ -94,11 +116,7 @@ const projectStore = (store, serviceAreas) => ({
       serviceAreaMode: store.deliveryEnabled ? store.serviceAreaMode : null,
       maxDistanceKm: store.deliveryEnabled ? toNumber(store.maxDeliveryDistanceKm) : null,
       instruction: store.deliveryEnabled ? store.deliveryInstruction || null : null,
-      serviceAreas: serviceAreas.map((area) => ({
-        type: area.areaType,
-        code: area.areaCode,
-        name: area.areaName || null,
-      })),
+      serviceAreas: serviceAreas.map((area) => ({ type: area.areaType, code: area.areaCode, name: area.areaName || null })),
     },
   },
 });
@@ -113,18 +131,12 @@ const productRowProjection = (product) => {
     coverImageUrl: product.coverImageUrl || null,
     warrantyDays: toNumber(product.warrantyDays),
     brand: product.brandId ? { id: Number(product.brandId), name: product.brandName } : null,
-    productType: product.productTypeId
-      ? {
-          id: Number(product.productTypeId),
-          name: product.productTypeName,
-          globalType: product.globalTypeId
-            ? { id: Number(product.globalTypeId), name: product.globalTypeName, slug: product.globalTypeSlug }
-            : null,
-          category: product.categoryId
-            ? { id: Number(product.categoryId), name: product.categoryName }
-            : null,
-        }
-      : null,
+    productType: product.productTypeId ? {
+      id: Number(product.productTypeId),
+      name: product.productTypeName,
+      globalType: product.globalTypeId ? { id: Number(product.globalTypeId), name: product.globalTypeName, slug: product.globalTypeSlug } : null,
+      category: product.categoryId ? { id: Number(product.categoryId), name: product.categoryName } : null,
+    } : null,
     unit: product.unitId ? { id: Number(product.unitId), name: product.unitName } : null,
     availability: {
       available: availableQuantity > 0,
@@ -137,24 +149,15 @@ const productRowProjection = (product) => {
 const findPublishedBySlug = async (slug, db = prisma) => {
   const store = await findPublishedStoreBySlug(slug, db);
   if (!store) return null;
-  const serviceAreas = await findServiceAreas(store, db);
-  return projectStore(store, serviceAreas);
+  return projectStore(store, await findServiceAreas(store, db));
 };
 
-const listPublishedProducts = async ({ branchId, search, page, pageSize }, db = prisma) => {
-  const query = String(search || '').trim();
+const listPublishedProducts = async ({ branchId, search, categoryId, brandId, sort, page, pageSize }, db = prisma) => {
   const offset = (page - 1) * pageSize;
-  const searchSql = query
-    ? Prisma.sql`AND (
-        product."name" ILIKE ${`%${query}%`}
-        OR product."saleBarcode" ILIKE ${`%${query}%`}
-        OR brand."name" ILIKE ${`%${query}%`}
-        OR product_type."name" ILIKE ${`%${query}%`}
-        OR category."name" ILIKE ${`%${query}%`}
-      )`
-    : Prisma.empty;
+  const filterSql = buildDiscoveryFilterSql({ search, categoryId, brandId });
+  const orderSql = buildOrderSql(sort);
 
-  const [rows, counts] = await Promise.all([
+  const [rows, counts, categoryRows, brandRows] = await Promise.all([
     db.$queryRaw(Prisma.sql`
       SELECT product."id", product."name", product."saleBarcode", product."warrantyDays",
         price."priceOnline", brand."id" AS "brandId", brand."name" AS "brandName",
@@ -162,32 +165,52 @@ const listPublishedProducts = async ({ branchId, search, page, pageSize }, db = 
         global_type."id" AS "globalTypeId", global_type."name" AS "globalTypeName", global_type."slug" AS "globalTypeSlug",
         category."id" AS "categoryId", category."name" AS "categoryName",
         unit."id" AS "unitId", unit."name" AS "unitName",
-        image."secure_url" AS "coverImageUrl",
+        image."coverImageUrl",
         GREATEST(COALESCE(balance."quantity", 0) - COALESCE(balance."reserved", 0), 0) AS "availableQuantity"
       ${publishedProductFromSql}
       LEFT JOIN LATERAL (
-        SELECT product_image."secure_url"
+        SELECT COALESCE(product_image."secure_url", product_image."url") AS "coverImageUrl"
         FROM "ProductImage" product_image
         WHERE product_image."productId" = product."id" AND product_image."active" = TRUE
         ORDER BY COALESCE(product_image."isCover", FALSE) DESC, product_image."createdAt" ASC
         LIMIT 1
       ) image ON TRUE
       ${publishedProductWhereSql(branchId)}
-      ${searchSql}
-      ORDER BY product."name" ASC, product."id" ASC
+      ${filterSql}
+      ${orderSql}
       LIMIT ${pageSize} OFFSET ${offset}
     `),
     db.$queryRaw(Prisma.sql`
       SELECT COUNT(*)::int AS "total"
       ${publishedProductFromSql}
       ${publishedProductWhereSql(branchId)}
-      ${searchSql}
+      ${filterSql}
+    `),
+    db.$queryRaw(Prisma.sql`
+      SELECT category."id", category."name", COUNT(*)::int AS "count"
+      ${publishedProductFromSql}
+      ${publishedProductWhereSql(branchId)}
+      AND category."id" IS NOT NULL
+      GROUP BY category."id", category."name"
+      ORDER BY category."name" ASC
+    `),
+    db.$queryRaw(Prisma.sql`
+      SELECT brand."id", brand."name", COUNT(*)::int AS "count"
+      ${publishedProductFromSql}
+      ${publishedProductWhereSql(branchId)}
+      AND brand."id" IS NOT NULL
+      GROUP BY brand."id", brand."name"
+      ORDER BY brand."name" ASC
     `),
   ]);
 
   return {
     items: rows.map(productRowProjection),
     total: Number(counts[0]?.total || 0),
+    facets: {
+      categories: categoryRows.map((row) => ({ id: Number(row.id), name: row.name, count: Number(row.count) })),
+      brands: brandRows.map((row) => ({ id: Number(row.id), name: row.name, count: Number(row.count) })),
+    },
   };
 };
 
@@ -208,33 +231,17 @@ const findPublishedProductById = async ({ branchId, productId }, db = prisma) =>
   `);
   const product = rows[0];
   if (!product) return null;
-
   const images = await db.$queryRaw(Prisma.sql`
     SELECT image."id", image."secure_url", image."url", image."caption", image."isCover"
     FROM "ProductImage" image
     WHERE image."productId" = ${productId} AND image."active" = TRUE
     ORDER BY COALESCE(image."isCover", FALSE) DESC, image."createdAt" ASC, image."id" ASC
   `);
-
   return {
     ...productRowProjection(product),
-    price: {
-      amount: Number(product.priceOnline),
-      currency: 'THB',
-      effectiveDate: product.effectiveDate || null,
-      expiredDate: product.expiredDate || null,
-    },
-    images: images.map((image) => ({
-      id: Number(image.id),
-      url: image.secure_url || image.url,
-      caption: image.caption || null,
-      cover: Boolean(image.isCover),
-    })),
+    price: { amount: Number(product.priceOnline), currency: 'THB', effectiveDate: product.effectiveDate || null, expiredDate: product.expiredDate || null },
+    images: images.map((image) => ({ id: Number(image.id), url: image.secure_url || image.url, caption: image.caption || null, cover: Boolean(image.isCover) })),
   };
 };
 
-module.exports = Object.freeze({
-  findPublishedBySlug,
-  listPublishedProducts,
-  findPublishedProductById,
-});
+module.exports = Object.freeze({ findPublishedBySlug, listPublishedProducts, findPublishedProductById });
