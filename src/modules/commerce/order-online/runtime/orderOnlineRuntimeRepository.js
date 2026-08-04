@@ -27,21 +27,15 @@ const runTransaction = (callback, options = { timeout: 20000 }) => (
 );
 
 const findOrders = (args) => prisma.orderOnline.findMany(args);
-const findOrderById = ({ orderId, include }) => prisma.orderOnline.findUnique({ where: { id: orderId }, ...(include ? { include } : {}) });
-const updateOrderById = ({ orderId, data }) => prisma.orderOnline.update({ where: { id: orderId }, data });
+const findOrderById = ({ orderId, include }) => prisma.orderOnline.findUnique({
+  where: { id: orderId },
+  ...(include ? { include } : {}),
+});
+const updateOrderById = ({ orderId, data }) => prisma.orderOnline.update({
+  where: { id: orderId },
+  data,
+});
 const deleteOrderById = (orderId) => prisma.orderOnline.delete({ where: { id: orderId } });
-
-const findCustomerProfileByUserId = ({ userId, include, select }) => (
-  prisma.customerProfile.findUnique({
-    where: { userId },
-    ...(include ? { include } : {}),
-    ...(select ? { select } : {}),
-  })
-);
-
-const findCustomerProfileFirstByUserId = ({ userId, select }) => (
-  prisma.customerProfile.findFirst({ where: { userId }, ...(select ? { select } : {}) })
-);
 
 module.exports = {
   prisma,
@@ -54,6 +48,4 @@ module.exports = {
   findOrderById,
   updateOrderById,
   deleteOrderById,
-  findCustomerProfileByUserId,
-  findCustomerProfileFirstByUserId,
 };
