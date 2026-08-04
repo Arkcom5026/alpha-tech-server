@@ -133,6 +133,7 @@ model Branch {
   taxId                           String?                          @db.VarChar(13)
   slug                            String?                          @unique
   categoryId                      Int                              @default(1)
+
   banks                           Bank[]
   barcodeCounter                  BarcodeCounter[]
   barcodeReceiptItem              BarcodeReceiptItem[]
@@ -141,6 +142,7 @@ model Branch {
   branchPrices                    BranchPrice[]
   combinedBillingDocument         CombinedBillingDocument[]
   combinedSaleDocument            CombinedSaleDocument[]
+  customerProfiles                CustomerProfile[]
   customerDeposit                 CustomerDeposit[]
   customerReceipts                CustomerReceipt[]
   employees                       EmployeeProfile[]
@@ -1716,6 +1718,7 @@ model CustomerProfile {
   name                      String?
   picture                   String?
   userId                    Int                       @unique
+  branchId                  Int?
   createdAt                 DateTime                  @default(now())
   updatedAt                 DateTime                  @updatedAt
   creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
@@ -1728,11 +1731,14 @@ model CustomerProfile {
   addressDetail             String?
   depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
   outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
+
   cart                      Cart[]
   combinedBillingDocuments  CombinedBillingDocument[]
   customerDeposits          CustomerDeposit[]
   subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
   user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
   customerReceipts          CustomerReceipt[]
   orders                    Order[]
   orderOnlines              OrderOnline[]
@@ -1748,6 +1754,7 @@ model CustomerProfile {
   productReservations       ProductReservation[]
 
   @@index([subdistrictCode])
+  @@index([branchId])
 }
 
 model CustomerDeposit {
