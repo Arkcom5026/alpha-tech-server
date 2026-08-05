@@ -7,6 +7,7 @@ const listTaxExpenses = require('../query/list/listTaxExpensesSlice');
 const createTaxExpenseCategory = require('../category/create/createTaxExpenseCategorySlice');
 const listTaxExpenseCategories = require('../category/query/list/listTaxExpenseCategoriesSlice');
 const listExpensePayeeSuppliers = require('../query/expense-payees/listExpensePayeeSuppliersSlice');
+const expensePayeeSetup = require('../setup/expense-payee/manageExpensePayeeSetupSlice');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -14,6 +15,8 @@ router.use(verifyToken);
 router.get('/categories', listTaxExpenseCategories.handle);
 router.post('/categories', createTaxExpenseCategory.handle);
 router.get('/expense-payees', listExpensePayeeSuppliers.handle);
+router.get('/setup/suppliers', expensePayeeSetup.list);
+router.post('/setup/suppliers/:supplierId/expense-payee', expensePayeeSetup.enable);
 router.get('/', listTaxExpenses.handle);
 router.post('/', createTaxExpense.handle);
 
