@@ -52,7 +52,15 @@ assert.match(repository, /bp\."expiredDate"/);
 assert.doesNotMatch(repository, /bp\."active" = TRUE/);
 assert.doesNotMatch(repository, /bp\."effectiveAt"/);
 assert.doesNotMatch(repository, /bp\."expiresAt"/);
-assert.doesNotMatch(repository, /StockBalance|reserved|UPDATE "Stock|ProductReservation|OrderOnline|Cart"/);
+
+// Anonymous discovery may read branch-scoped availability, but it must never
+// reserve inventory or mutate operational stock/order authorities before commitment.
+assert.match(repository, /LEFT JOIN "StockBalance"/);
+assert.match(repository, /balance\."reserved"/);
+assert.doesNotMatch(repository, /(INSERT INTO|UPDATE|DELETE FROM) "StockBalance"/);
+assert.doesNotMatch(repository, /(INSERT INTO|UPDATE|DELETE FROM) "ProductReservation"/);
+assert.doesNotMatch(repository, /(INSERT INTO|UPDATE|DELETE FROM) "OrderOnline"/);
+assert.doesNotMatch(repository, /(INSERT INTO|UPDATE|DELETE FROM) "Cart"/);
 
 assert.equal(packageJson.scripts['test:anonymous-shopping-session'], 'node tests/anonymous-shopping-session-authority.contract.test.js');
 console.log('anonymous shopping session authority contract: PASS');
