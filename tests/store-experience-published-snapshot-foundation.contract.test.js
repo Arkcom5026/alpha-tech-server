@@ -35,7 +35,13 @@ assert.doesNotMatch(service, /STORE_EXPERIENCE_NOT_EDITABLE[\s\S]*ยกเล�
 includes(service, 'publishedContentConfiguration', 'publish copies merchant content snapshot');
 includes(repository, 'publishedSectionConfiguration', 'repository publishes section snapshot');
 includes(repository, 'publishedVersion', 'repository increments published version');
-includes(publicRepository, 'publishedSectionConfiguration', 'public storefront reads published sections');
-includes(publicRepository, 'publishedContentConfiguration', 'public storefront reads published merchant content');
+includes(publicRepository, 'experience."publishedThemePreset"', 'public storefront selects published theme');
+includes(publicRepository, 'experience."publishedSectionConfiguration"', 'public storefront selects published sections');
+includes(publicRepository, 'experience."publishedContentConfiguration"', 'public storefront selects published merchant content');
+includes(publicRepository, 'experience."publishedVersion" IS NOT NULL', 'public storefront requires a published snapshot');
+includes(publicRepository, 'contentConfiguration: store.publishedContentConfiguration', 'public projection exposes published content only');
+assert.doesNotMatch(publicRepository, /experience\."themePreset"/, 'public storefront must not select draft theme');
+assert.doesNotMatch(publicRepository, /experience\."sectionConfiguration"/, 'public storefront must not select draft sections');
+assert.doesNotMatch(publicRepository, /contentConfiguration:\s*store\.contentConfiguration/, 'public storefront must not project draft content');
 
 console.log('store experience published snapshot foundation contract: PASS');
