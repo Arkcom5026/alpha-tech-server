@@ -1,7 +1,7 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
-const customerCreateService = require('../../../../customer/create/customerCreateService');
+const customerCreateService = require('../../../customer/create/customerCreateService');
 
 const ALLOWED_BRANCH_ID = 13;
 const ALLOWED_BRANCH_SLUG = 'test-shop';
