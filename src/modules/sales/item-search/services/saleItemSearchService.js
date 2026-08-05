@@ -73,22 +73,26 @@ const mapStockItem = (stockItem, branchId, matchReason = null, authority = null)
   prices: pricesOf(stockItem.product, branchId),
 });
 
-const mapSimpleLot = (simpleLot, branchId, matchReason = null, authority = null) => ({
-  type: 'SIMPLE',
-  lineType: 'SIMPLE',
-  productId: simpleLot.productId,
-  stockItemId: null,
-  simpleLotId: simpleLot.id,
-  barcode: simpleLot.barcode,
-  serialNumber: null,
-  quantityAvailable: toNumber(simpleLot.qtyRemaining),
-  qtyRemaining: toNumber(simpleLot.qtyRemaining),
-  status: simpleLot.status,
-  matchReason,
-  barcodeAuthority: authority,
-  product: productSummary(simpleLot.product),
-  prices: pricesOf(simpleLot.product, branchId),
-});
+const mapSimpleLot = (simpleLot, branchId, matchReason = null, authority = null) => {
+  const quantityAvailable = Math.max(0, toNumber(simpleLot.availableToSell ?? simpleLot.qtyRemaining));
+  return {
+    type: 'SIMPLE',
+    lineType: 'SIMPLE',
+    productId: simpleLot.productId,
+    stockItemId: null,
+    simpleLotId: simpleLot.id,
+    barcode: simpleLot.barcode,
+    serialNumber: null,
+    quantityAvailable,
+    qtyRemaining: quantityAvailable,
+    physicalQtyRemaining: toNumber(simpleLot.qtyRemaining),
+    status: simpleLot.status,
+    matchReason,
+    barcodeAuthority: authority,
+    product: productSummary(simpleLot.product),
+    prices: pricesOf(simpleLot.product, branchId),
+  };
+};
 
 const exactReasonForStock = (item, normalized) => {
   if (String(item.barcode || '').toLowerCase() === normalized) return 'BARCODE_EXACT';
@@ -109,7 +113,7 @@ const assertExactSellable = (stockItems, simpleLots) => {
   ));
   const sellableSimple = simpleLots.filter((item) => (
     item.status === 'ACTIVE'
-    && toNumber(item.qtyRemaining) > 0
+    && toNumber(item.availableToSell ?? item.qtyRemaining) > 0
     && item.product?.active === true
     && item.product?.mode === 'SIMPLE'
     && item.product?.inventoryBehavior === 'TRACKED'
@@ -147,6 +151,52 @@ const authoritySummary = (authority) => authority ? {
   status: authority.status,
 } : null;
 
+const reservationAwareCandidates = async ({ branchId, stockItems, simpleLots, repository }) => {
+  const allCandidates = [...stockItems, ...simpleLots];
+  const productIds = [...new Set(allCandidates.map((item) => Number(item.productId)).filter(Number.isInteger))];
+  if (!productIds.length) return { stockItems: [], simpleLots: [] };
+
+  const rows = typeof repository.findProductAvailability === 'function'
+    ? await repository.findProductAvailability({ branchId, productIds })
+    : productIds.map((productId) => ({
+      productId,
+      availableToSell: allCandidates.filter((item) => Number(item.productId) === productId).length,
+    }));
+  const availableByProduct = new Map(rows.map((row) => [Number(row.productId), Math.max(0, toNumber(row.availableToSell))]));
+
+  const stockRemaining = new Map(availableByProduct);
+  const availableStockItems = stockItems.filter((item) => {
+    const productId = Number(item.productId);
+    const remaining = stockRemaining.get(productId) || 0;
+    if (remaining <= 0) return false;
+    stockRemaining.set(productId, remaining - 1);
+    return true;
+  });
+
+  const simpleRemaining = new Map(availableByProduct);
+  const availableSimpleLots = [];
+  for (const item of simpleLots) {
+    const productId = Number(item.productId);
+    const remaining = simpleRemaining.get(productId) || 0;
+    if (remaining <= 0) continue;
+    const lotAvailable = Math.min(toNumber(item.qtyRemaining), remaining);
+    if (lotAvailable <= 0) continue;
+    availableSimpleLots.push({ ...item, availableToSell: lotAvailable });
+    simpleRemaining.set(productId, remaining - lotAvailable);
+  }
+
+  return { stockItems: availableStockItems, simpleLots: availableSimpleLots };
+};
+
+const assertNotFullyReserved = ({ originalStock, originalSimple, availableStock, availableSimple }) => {
+  if ((originalStock.length || originalSimple.length) && !availableStock.length && !availableSimple.length) {
+    const first = originalStock[0] || originalSimple[0];
+    throw new SaleItemSearchError(409, 'SALE_ITEM_RESERVED', 'สินค้านี้ถูกกันไว้สำหรับใบจองและไม่เหลือจำนวนที่ขายให้รายการใหม่', {
+      productId: Number(first.productId),
+    });
+  }
+};
+
 const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRepository }) => {
   const normalizedQuery = String(query || '').trim();
   if (!Number.isInteger(branchId) || branchId <= 0 || !normalizedQuery) {
@@ -172,9 +222,24 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
     });
   }
 
+  const originalExactStock = [...authorityStock, ...exactStock];
+  const originalExactSimple = [...authoritySimple, ...exactSimple];
+  const exactAvailability = await reservationAwareCandidates({
+    branchId,
+    stockItems: originalExactStock,
+    simpleLots: originalExactSimple,
+    repository,
+  });
+  assertNotFullyReserved({
+    originalStock: originalExactStock,
+    originalSimple: originalExactSimple,
+    availableStock: exactAvailability.stockItems,
+    availableSimple: exactAvailability.simpleLots,
+  });
+
   const { sellableStock, sellableSimple } = assertExactSellable(
-    [...authorityStock, ...exactStock],
-    [...authoritySimple, ...exactSimple],
+    exactAvailability.stockItems,
+    exactAvailability.simpleLots,
   );
 
   const exactItems = uniqueByInventoryIdentity([
@@ -214,10 +279,16 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
     repository.findTextStockItems({ branchId, terms, take: MAX_RESULTS }),
     repository.findTextSimpleLots({ branchId, terms, take: MAX_RESULTS }),
   ]);
+  const textAvailability = await reservationAwareCandidates({
+    branchId,
+    stockItems: textStock,
+    simpleLots: textSimple,
+    repository,
+  });
 
   const items = uniqueByInventoryIdentity([
-    ...textStock.map((item) => mapStockItem(item, branchId, 'TEXT_MATCH')),
-    ...textSimple.map((item) => mapSimpleLot(item, branchId, 'TEXT_MATCH')),
+    ...textAvailability.stockItems.map((item) => mapStockItem(item, branchId, 'TEXT_MATCH')),
+    ...textAvailability.simpleLots.map((item) => mapSimpleLot(item, branchId, 'TEXT_MATCH')),
   ]).slice(0, MAX_RESULTS);
 
   return {
@@ -236,4 +307,5 @@ module.exports = {
   searchSaleItems,
   mapStockItem,
   mapSimpleLot,
+  reservationAwareCandidates,
 };
