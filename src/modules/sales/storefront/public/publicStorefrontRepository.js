@@ -66,13 +66,15 @@ const findPublishedStoreBySlug = async (slug, db = prisma) => {
       capability."maxDeliveryDistanceKm", capability."preparationSlaMinutes",
       capability."pickupInstruction", capability."deliveryInstruction",
       branch."name" AS "branchName", branch."address" AS "branchAddress", branch."phone" AS "branchPhone",
-      experience."themePreset", experience."themeTokens", experience."layoutPreset",
-      experience."sectionConfiguration", experience."version", experience."publishedAt"
+      experience."publishedThemePreset", experience."publishedThemeTokens",
+      experience."publishedLayoutPreset", experience."publishedSectionConfiguration",
+      experience."publishedContentConfiguration", experience."publishedVersion", experience."publishedAt"
     FROM "PartnerStoreCapability" capability
     JOIN "Branch" branch ON branch."id" = capability."branchId"
     JOIN "StoreExperienceProfile" experience ON experience."branchId" = capability."branchId"
     WHERE capability."storefrontEnabled" = TRUE
       AND experience."status" = 'PUBLISHED'
+      AND experience."publishedVersion" IS NOT NULL
       AND capability."storefrontSlug" = ${slug}
     LIMIT 1
   `);
@@ -96,11 +98,12 @@ const projectStore = (store, serviceAreas) => ({
   contactPhone: store.contactPhone || store.branchPhone || null,
   address: store.branchAddress || null,
   experience: {
-    themePreset: store.themePreset,
-    themeTokens: store.themeTokens || null,
-    layoutPreset: store.layoutPreset,
-    sectionConfiguration: store.sectionConfiguration || null,
-    version: toNumber(store.version),
+    themePreset: store.publishedThemePreset || 'platform-default',
+    themeTokens: store.publishedThemeTokens || null,
+    layoutPreset: store.publishedLayoutPreset || 'platform-default',
+    sectionConfiguration: store.publishedSectionConfiguration || null,
+    contentConfiguration: store.publishedContentConfiguration || null,
+    version: toNumber(store.publishedVersion),
     publishedAt: store.publishedAt || null,
   },
   fulfillment: {
