@@ -2,6 +2,8 @@
 
 const repository = require('./storeExperienceDraftRepository');
 
+const EDITABLE_STATUSES = ['DRAFT', 'READY'];
+
 const THEME_PRESETS = new Set(['platform-default', 'modern-light', 'classic-slate']);
 const LAYOUT_PRESETS = new Set(['platform-default', 'catalog-grid', 'catalog-list']);
 const SECTION_TYPES = new Set(['HERO', 'FEATURED_PRODUCTS', 'PRODUCT_GRID', 'CONTACT', 'FULFILLMENT']);
@@ -15,7 +17,7 @@ const fail = (statusCode, code, message) => {
 const normalizePreset = (value, allowed, field) => {
   if (value === undefined) return undefined;
   const normalized = String(value || '').trim().toLowerCase();
-  if (!allowed.has(normalized)) fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `${field} ไม่ถูกต้อง`);
+  if (!allowed.has(normalized)) fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `${field} à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡`);
   return normalized;
 };
 
@@ -23,11 +25,11 @@ const normalizeThemeTokens = (value) => {
   if (value === undefined) return undefined;
   if (value === null) return null;
   if (!value || Array.isArray(value) || typeof value !== 'object') {
-    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'themeTokens ต้องเป็น object');
+    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'themeTokens à¸•à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™ object');
   }
   const entries = Object.entries(value);
   if (entries.some(([key, color]) => !TOKEN_KEYS.has(key) || typeof color !== 'string' || !HEX_COLOR.test(color))) {
-    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'themeTokens มี token หรือค่าสีที่ไม่รองรับ');
+    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'themeTokens à¸¡à¸µ token à¸«à¸£à¸·à¸­à¸„à¹ˆà¸²à¸ªà¸µà¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸£à¸­à¸‡à¸£à¸±à¸š');
   }
   return Object.fromEntries(entries.map(([key, color]) => [key, color.toLowerCase()]));
 };
@@ -36,17 +38,17 @@ const normalizeSections = (value) => {
   if (value === undefined) return undefined;
   if (value === null) return null;
   if (!Array.isArray(value) || value.length > 12) {
-    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'sectionConfiguration ต้องมี sections ไม่เกิน 12 รายการ');
+    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'sectionConfiguration à¸•à¹‰à¸­à¸‡à¸¡à¸µ sections à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 12 à¸£à¸²à¸¢à¸à¸²à¸£');
   }
   const seen = new Set();
   return value.map((section, index) => {
     const id = String(section?.id || '').trim();
     const type = String(section?.type || '').trim().toUpperCase();
     if (!id || !/^[a-z0-9-]{1,80}$/i.test(id) || !SECTION_TYPES.has(type) || seen.has(id)) {
-      fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `sectionConfiguration[${index}] ไม่ถูกต้อง`);
+      fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `sectionConfiguration[${index}] à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡`);
     }
     if (section.enabled !== undefined && typeof section.enabled !== 'boolean') {
-      fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `sectionConfiguration[${index}].enabled ต้องเป็น boolean`);
+      fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', `sectionConfiguration[${index}].enabled à¸•à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™ boolean`);
     }
     seen.add(id);
     return { id, type, enabled: section.enabled !== false };
@@ -57,7 +59,7 @@ const normalizeContentConfiguration = (value) => {
   if (value === undefined) return undefined;
   if (value === null) return null;
   if (!value || Array.isArray(value) || typeof value !== 'object') {
-    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'contentConfiguration ต้องเป็น object');
+    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'contentConfiguration à¸•à¹‰à¸­à¸‡à¹€à¸›à¹‡à¸™ object');
   }
   return value;
 };
@@ -90,8 +92,8 @@ const getDraftForBranch = async (branchId) => {
 
 const saveDraftForBranch = async (branchId, payload) => {
   const existing = await repository.findByBranchId(branchId);
-  if (existing?.status === 'SUSPENDED') {
-    fail(409, 'STORE_EXPERIENCE_SUSPENDED', 'หน้าร้านถูกระงับและไม่สามารถแก้ไขได้');
+  if (existing?.status && !EDITABLE_STATUSES.includes(existing.status)) {
+    fail(409, 'STORE_EXPERIENCE_NOT_EDITABLE', 'à¸«à¸™à¹‰à¸²à¸£à¹‰à¸²à¸™à¸–à¸¹à¸à¸£à¸°à¸‡à¸±à¸šà¹à¸¥à¸°à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹à¸à¹‰à¹„à¸‚à¹„à¸”à¹‰');
   }
   const normalized = Object.fromEntries(Object.entries(normalizeDraft(payload)).filter(([, value]) => value !== undefined));
   const current = existing || defaults(branchId);
@@ -113,14 +115,14 @@ const publishForBranch = async (branchId) => {
     repository.findByBranchId(branchId),
     repository.findCapabilityByBranchId(branchId),
   ]);
-  if (!experience) fail(409, 'STORE_EXPERIENCE_DRAFT_REQUIRED', 'กรุณาบันทึกแบบร่างก่อนเผยแพร่');
-  if (experience.status === 'SUSPENDED') fail(409, 'STORE_EXPERIENCE_SUSPENDED', 'หน้าร้านถูกระงับและไม่สามารถเผยแพร่ได้');
-  if (!capability) fail(409, 'PARTNER_STORE_CAPABILITY_REQUIRED', 'กรุณาบันทึกข้อมูลหน้าร้านก่อนเผยแพร่');
-  if (!String(capability.storefrontSlug || '').trim()) fail(400, 'STOREFRONT_SLUG_REQUIRED', 'กรุณาระบุ URL ร้าน');
-  if (!String(capability.displayName || '').trim()) fail(400, 'STOREFRONT_DISPLAY_NAME_REQUIRED', 'กรุณาระบุชื่อที่แสดง');
+  if (!experience) fail(409, 'STORE_EXPERIENCE_DRAFT_REQUIRED', 'à¸à¸£à¸¸à¸“à¸²à¸šà¸±à¸™à¸—à¸¶à¸à¹à¸šà¸šà¸£à¹ˆà¸²à¸‡à¸à¹ˆà¸­à¸™à¹€à¸œà¸¢à¹à¸žà¸£à¹ˆ');
+  if (experience.status === 'SUSPENDED') fail(409, 'STORE_EXPERIENCE_NOT_EDITABLE', 'à¸«à¸™à¹‰à¸²à¸£à¹‰à¸²à¸™à¸–à¸¹à¸à¸£à¸°à¸‡à¸±à¸šà¹à¸¥à¸°à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸œà¸¢à¹à¸žà¸£à¹ˆà¹„à¸”à¹‰');
+  if (!capability) fail(409, 'PARTNER_STORE_CAPABILITY_REQUIRED', 'à¸à¸£à¸¸à¸“à¸²à¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¸™à¹‰à¸²à¸£à¹‰à¸²à¸™à¸à¹ˆà¸­à¸™à¹€à¸œà¸¢à¹à¸žà¸£à¹ˆ');
+  if (!String(capability.storefrontSlug || '').trim()) fail(400, 'STOREFRONT_SLUG_REQUIRED', 'à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸ URL à¸£à¹‰à¸²à¸™');
+  if (!String(capability.displayName || '').trim()) fail(400, 'STOREFRONT_DISPLAY_NAME_REQUIRED', 'à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸Šà¸·à¹ˆà¸­à¸—à¸µà¹ˆà¹à¸ªà¸”à¸‡');
   const sections = Array.isArray(experience.sectionConfiguration) ? experience.sectionConfiguration : [];
   if (!sections.some((section) => section?.enabled !== false)) {
-    fail(400, 'STORE_EXPERIENCE_SECTION_REQUIRED', 'ต้องเปิดใช้งานส่วนประกอบหน้าร้านอย่างน้อยหนึ่งส่วน');
+    fail(400, 'STORE_EXPERIENCE_SECTION_REQUIRED', 'à¸•à¹‰à¸­à¸‡à¹€à¸›à¸´à¸”à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸ªà¹ˆà¸§à¸™à¸›à¸£à¸°à¸à¸­à¸šà¸«à¸™à¹‰à¸²à¸£à¹‰à¸²à¸™à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢à¸«à¸™à¸¶à¹ˆà¸‡à¸ªà¹ˆà¸§à¸™');
   }
   return repository.publishForBranch(branchId, {
     publishedThemePreset: experience.themePreset,
@@ -134,7 +136,7 @@ const publishForBranch = async (branchId) => {
 const unpublishForBranch = async (branchId) => {
   const experience = await repository.findByBranchId(branchId);
   const capability = await repository.findCapabilityByBranchId(branchId);
-  if (!experience || !capability) fail(404, 'STORE_EXPERIENCE_NOT_FOUND', 'ไม่พบข้อมูลหน้าร้าน');
+  if (!experience || !capability) fail(404, 'STORE_EXPERIENCE_NOT_FOUND', 'à¹„à¸¡à¹ˆà¸žà¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸«à¸™à¹‰à¸²à¸£à¹‰à¸²à¸™');
   if (!capability.storefrontEnabled) return { experience, capability };
   return repository.unpublishForBranch(branchId);
 };
