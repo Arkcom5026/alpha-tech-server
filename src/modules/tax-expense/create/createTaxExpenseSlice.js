@@ -69,9 +69,9 @@ class CreateTaxExpenseService {
   constructor(client = prisma) { this.prisma = client; }
 
   async execute({ branchId, employeeId, input }) {
-    const supplierId = asPositiveInt(input?.supplierId);
-    if (!supplierId) {
-      const error = new Error('ต้องระบุผู้รับเงินจาก Supplier ที่ได้รับสิทธิ์ค่าใช้จ่าย');
+    const expensePayeeId = asPositiveInt(input?.expensePayeeId);
+    if (!expensePayeeId) {
+      const error = new Error('ต้องระบุผู้รับเงินค่าใช้จ่าย');
       error.statusCode = 400;
       error.code = 'TAX_EXPENSE_PAYEE_REQUIRED';
       throw error;
@@ -85,17 +85,12 @@ class CreateTaxExpenseService {
     const items = normalizeItems(input?.items);
 
     return this.prisma.$transaction(async (tx) => {
-      const supplier = await tx.supplier.findFirst({
-        where: {
-          id: supplierId,
-          branchId,
-          active: true,
-          capabilities: { some: { capability: 'EXPENSE_PAYEE' } },
-        },
+      const expensePayee = await tx.expensePayee.findFirst({
+        where: { id: expensePayeeId, branchId, active: true },
         select: { id: true, name: true, taxId: true },
       });
-      if (!supplier) {
-        const error = new Error('ไม่พบ Supplier ผู้รับเงินที่ใช้งานได้สำหรับร้านนี้');
+      if (!expensePayee) {
+        const error = new Error('ไม่พบผู้รับเงินค่าใช้จ่ายที่ใช้งานได้สำหรับร้านนี้');
         error.statusCode = 404;
         error.code = 'TAX_EXPENSE_PAYEE_NOT_FOUND';
         throw error;
@@ -128,11 +123,12 @@ class CreateTaxExpenseService {
       return tx.taxExpense.create({
         data: {
           branchId,
-          supplierId: supplier.id,
+          expensePayeeId: expensePayee.id,
+          supplierId: null,
           expenseNumber,
-          counterpartyType: 'SUPPLIER',
-          counterpartyName: supplier.name,
-          counterpartyTaxId: supplier.taxId,
+          counterpartyType: 'EXPENSE_PAYEE',
+          counterpartyName: expensePayee.name,
+          counterpartyTaxId: expensePayee.taxId,
           documentNumber,
           documentDate,
           expenseDate,
@@ -154,12 +150,12 @@ class CreateTaxExpenseService {
               previousStatus: 'DRAFT',
               resultingStatus: 'RECORDED',
               actorEmployeeId: employeeId,
-              metadata: { source: 'tax-expense-runtime' },
+              metadata: { source: 'tax-expense-runtime', payeeAuthority: 'ExpensePayee' },
             },
           },
         },
         include: {
-          supplier: { select: { id: true, name: true, taxId: true } },
+          expensePayee: { select: { id: true, name: true, taxId: true } },
           items: { include: { category: { select: { id: true, code: true, name: true } } }, orderBy: { lineNumber: 'asc' } },
         },
       });
