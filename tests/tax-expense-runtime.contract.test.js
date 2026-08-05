@@ -8,6 +8,10 @@ const routes = require('../src/modules/tax-expense/routes/taxExpenseRoutes');
 const {
   ListTaxExpensesRepository,
 } = require('../src/modules/tax-expense/query/list/listTaxExpensesSlice');
+const {
+  asOptionalDate,
+  asRequiredDate,
+} = require('../src/modules/tax-expense/shared/taxExpenseContext');
 
 const routeContracts = routes.stack
   .filter((layer) => layer.route)
@@ -32,7 +36,21 @@ assert.match(createSource, /capabilities:\s*\{\s*some:\s*\{\s*capability:\s*'EXP
 assert.match(createSource, /where:\s*\{\s*branchId,\s*active:\s*true,/);
 assert.match(createSource, /items:\s*\{\s*create:/);
 assert.match(createSource, /lifecycleEvents:\s*\{\s*create:/);
+assert.match(createSource, /TAX_EXPENSE_WITHHOLDING_EXCEEDS_TOTAL/);
+assert.match(createSource, /asOptionalDate\(input\?\.documentDate/);
+assert.match(createSource, /asOptionalDate\(input\?\.receivedAt/);
 assert.match(contextSource, /branchId is required from authenticated token/);
+
+assert.ok(asRequiredDate('2026-08-04', 'expenseDate') instanceof Date);
+assert.equal(asOptionalDate('', 'documentDate'), null);
+assert.throws(
+  () => asRequiredDate('not-a-date', 'expenseDate'),
+  (error) => error.code === 'TAX_EXPENSE_VALIDATION_ERROR' && error.statusCode === 400,
+);
+assert.throws(
+  () => asOptionalDate('not-a-date', 'receivedAt'),
+  (error) => error.code === 'TAX_EXPENSE_VALIDATION_ERROR' && error.statusCode === 400,
+);
 
 const calls = [];
 const repository = new ListTaxExpensesRepository({
