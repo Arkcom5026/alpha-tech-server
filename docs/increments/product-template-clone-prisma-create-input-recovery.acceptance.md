@@ -1,0 +1,1 @@
+Acceptance: focused contract, runtime clone creation, idempotent retry, and no duplicate ProductType/Product records.
