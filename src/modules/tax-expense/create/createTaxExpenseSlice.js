@@ -40,7 +40,6 @@ const normalizeItems = (items) => {
     const vatAmount = Number(asMoney(raw?.vatAmount ?? 0, `items[${index}].vatAmount`));
     const withholdingTaxAmount = Number(asMoney(raw?.withholdingTaxAmount ?? 0, `items[${index}].withholdingTaxAmount`));
     return {
-      branchId: null,
       categoryId: asPositiveInt(raw?.categoryId),
       lineNumber: index + 1,
       description: asRequiredText(raw?.description, `items[${index}].description`),
@@ -63,6 +62,18 @@ const normalizeItems = (items) => {
     }
     return item;
   });
+};
+
+const toNestedItemCreate = (item, branchId) => {
+  const { categoryId, ...data } = item;
+  return {
+    ...data,
+    category: {
+      connect: {
+        id_branchId: { id: categoryId, branchId },
+      },
+    },
+  };
 };
 
 class CreateTaxExpenseService {
@@ -143,7 +154,7 @@ class CreateTaxExpenseService {
           paymentDueAmount: paymentDueAmount.toFixed(2),
           note: asOptionalText(input?.note),
           createdByEmployeeId: employeeId,
-          items: { create: items.map((item) => ({ ...item, branchId })) },
+          items: { create: items.map((item) => toNestedItemCreate(item, branchId)) },
           lifecycleEvents: {
             create: {
               eventType: 'RECORDED',
@@ -182,3 +193,4 @@ class CreateTaxExpenseController {
 module.exports = new CreateTaxExpenseController();
 module.exports.CreateTaxExpenseService = CreateTaxExpenseService;
 module.exports.CreateTaxExpenseController = CreateTaxExpenseController;
+module.exports.toNestedItemCreate = toNestedItemCreate;
