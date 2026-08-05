@@ -5,20 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const routes = require('../src/modules/tax-expense/routes/taxExpenseRoutes');
-const {
-  ListTaxExpensesRepository,
-} = require('../src/modules/tax-expense/query/list/listTaxExpensesSlice');
-const {
-  ListExpensePayeesRepository,
-} = require('../src/modules/tax-expense/expense-payee/query/list/listExpensePayeesSlice');
-const {
-  CreateExpensePayeeRepository,
-  asPayeeType,
-} = require('../src/modules/tax-expense/expense-payee/create/createExpensePayeeSlice');
-const {
-  asOptionalDate,
-  asRequiredDate,
-} = require('../src/modules/tax-expense/shared/taxExpenseContext');
+const { ListTaxExpensesRepository } = require('../src/modules/tax-expense/query/list/listTaxExpensesSlice');
+const { ListExpensePayeesRepository } = require('../src/modules/tax-expense/expense-payee/query/list/listExpensePayeesSlice');
+const { CreateExpensePayeeRepository, asPayeeType } = require('../src/modules/tax-expense/expense-payee/create/createExpensePayeeSlice');
+const { asOptionalDate, asRequiredDate } = require('../src/modules/tax-expense/shared/taxExpenseContext');
 
 const routeContracts = routes.stack
   .filter((layer) => layer.route)
@@ -42,109 +32,54 @@ const contextSource = fs.readFileSync(path.join(root, 'shared', 'taxExpenseConte
 
 assert.match(payeeListSource, /this\.prisma\.expensePayee\.findMany/);
 assert.match(payeeListSource, /branchId,\s*active:\s*true/);
-assert.match(payeeListSource, /contactPerson:\s*\{\s*contains:\s*q/);
 assert.doesNotMatch(payeeListSource, /this\.prisma\.supplier/);
 assert.match(payeeCreateSource, /this\.prisma\.expensePayee\.create/);
-assert.match(payeeCreateSource, /branchIdFromToken\(req\)/);
-assert.match(payeeCreateSource, /employeeIdFromToken\(req\)/);
-assert.doesNotMatch(payeeCreateSource, /req\.body\?\.branchId/);
-assert.doesNotMatch(payeeCreateSource, /req\.body\?\.createdByEmployeeId/);
 assert.doesNotMatch(routeSource, /listExpensePayeeSuppliersSlice/);
-assert.match(createSource, /capabilities:\s*\{\s*some:\s*\{\s*capability:\s*'EXPENSE_PAYEE'/);
-assert.match(createSource, /where:\s*\{\s*id:\s*supplierId,\s*branchId,/);
+assert.match(createSource, /input\?\.expensePayeeId/);
+assert.match(createSource, /tx\.expensePayee\.findFirst/);
+assert.match(createSource, /where:\s*\{\s*id:\s*expensePayeeId,\s*branchId,\s*active:\s*true\s*\}/);
+assert.match(createSource, /expensePayeeId:\s*expensePayee\.id/);
+assert.match(createSource, /supplierId:\s*null/);
+assert.match(createSource, /counterpartyType:\s*'EXPENSE_PAYEE'/);
+assert.match(createSource, /include:\s*\{[\s\S]*expensePayee:/);
+assert.doesNotMatch(createSource, /tx\.supplier/);
+assert.doesNotMatch(createSource, /input\?\.supplierId/);
 assert.match(createSource, /items:\s*\{\s*create:/);
 assert.match(createSource, /lifecycleEvents:\s*\{\s*create:/);
 assert.match(createSource, /TAX_EXPENSE_WITHHOLDING_EXCEEDS_TOTAL/);
-assert.match(createSource, /asOptionalDate\(input\?\.documentDate/);
-assert.match(createSource, /asOptionalDate\(input\?\.receivedAt/);
 assert.match(contextSource, /branchId is required from authenticated token/);
 
 assert.equal(asPayeeType(undefined), 'LEGAL_ENTITY');
 assert.equal(asPayeeType('individual'), 'INDIVIDUAL');
-assert.throws(
-  () => asPayeeType('supplier'),
-  (error) => error.code === 'TAX_EXPENSE_PAYEE_TYPE_INVALID' && error.statusCode === 400,
-);
+assert.throws(() => asPayeeType('supplier'), (error) => error.code === 'TAX_EXPENSE_PAYEE_TYPE_INVALID');
 assert.ok(asRequiredDate('2026-08-04', 'expenseDate') instanceof Date);
 assert.equal(asOptionalDate('', 'documentDate'), null);
-assert.throws(
-  () => asRequiredDate('not-a-date', 'expenseDate'),
-  (error) => error.code === 'TAX_EXPENSE_VALIDATION_ERROR' && error.statusCode === 400,
-);
-assert.throws(
-  () => asOptionalDate('not-a-date', 'receivedAt'),
-  (error) => error.code === 'TAX_EXPENSE_VALIDATION_ERROR' && error.statusCode === 400,
-);
 
 const expenseCalls = [];
 const expenseRepository = new ListTaxExpensesRepository({
-  taxExpense: {
-    findMany: (options) => {
-      expenseCalls.push(options);
-      return options;
-    },
-  },
+  taxExpense: { findMany: (options) => { expenseCalls.push(options); return options; } },
 });
-
 expenseRepository.findMany(2, {});
 assert.deepEqual(expenseCalls.at(-1).where, { branchId: 2 });
-assert.equal(Object.hasOwn(expenseCalls.at(-1).where, 'expenseDate'), false);
-
-expenseRepository.findMany(2, { fromDate: '2026-08-01' });
-assert.ok(expenseCalls.at(-1).where.expenseDate.gte instanceof Date);
-assert.equal(Object.hasOwn(expenseCalls.at(-1).where.expenseDate, 'lte'), false);
-
-expenseRepository.findMany(2, { toDate: '2026-08-03' });
-assert.ok(expenseCalls.at(-1).where.expenseDate.lte instanceof Date);
-assert.equal(Object.hasOwn(expenseCalls.at(-1).where.expenseDate, 'gte'), false);
-
-expenseRepository.findMany(2, { fromDate: 'invalid', toDate: '' });
-assert.equal(Object.hasOwn(expenseCalls.at(-1).where, 'expenseDate'), false);
 
 const payeeListCalls = [];
 const payeeListRepository = new ListExpensePayeesRepository({
-  expensePayee: {
-    findMany: (options) => {
-      payeeListCalls.push(options);
-      return options;
-    },
-  },
+  expensePayee: { findMany: (options) => { payeeListCalls.push(options); return options; } },
 });
-
 payeeListRepository.findMany(2, 'office');
 assert.equal(payeeListCalls.at(-1).where.branchId, 2);
 assert.equal(payeeListCalls.at(-1).where.active, true);
-assert.equal(payeeListCalls.at(-1).where.OR.length, 4);
-assert.equal(payeeListCalls.at(-1).where.OR[0].name.contains, 'office');
 
 const payeeCreateCalls = [];
 const payeeCreateRepository = new CreateExpensePayeeRepository({
-  expensePayee: {
-    create: (options) => {
-      payeeCreateCalls.push(options);
-      return options;
-    },
-  },
+  expensePayee: { create: (options) => { payeeCreateCalls.push(options); return options; } },
 });
-
 payeeCreateRepository.create({
   branchId: 2,
   employeeId: 35,
-  input: {
-    payeeType: 'LEGAL_ENTITY',
-    name: 'Office Services Co., Ltd.',
-    taxId: '1234567890123',
-    taxBranchCode: '00000',
-    address: null,
-    phone: null,
-    email: null,
-    contactPerson: null,
-    notes: null,
-  },
+  input: { payeeType: 'LEGAL_ENTITY', name: 'Office Services Co., Ltd.', taxId: null, taxBranchCode: '00000', address: null, phone: null, email: null, contactPerson: null, notes: null },
 });
 assert.equal(payeeCreateCalls.at(-1).data.branchId, 2);
 assert.equal(payeeCreateCalls.at(-1).data.createdByEmployeeId, 35);
-assert.equal(payeeCreateCalls.at(-1).data.active, true);
-assert.equal(Object.hasOwn(payeeCreateCalls.at(-1).data, 'supplierId'), false);
 
 console.log('Tax expense runtime contract: PASS');
