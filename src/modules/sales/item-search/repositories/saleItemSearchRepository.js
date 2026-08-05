@@ -1,6 +1,4 @@
-const prismaModule = require('../../../../../lib/prisma');
-
-const prisma = prismaModule?.prisma || prismaModule;
+const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const productInclude = (branchId) => ({
   branchPrice: {
@@ -107,10 +105,26 @@ const findTextSimpleLots = async ({ branchId, terms, take = 40 }) => prisma.simp
   take,
 });
 
+const findProductAvailability = async ({ branchId, productIds }) => {
+  const normalizedIds = [...new Set((productIds || [])
+    .map(Number)
+    .filter((value) => Number.isInteger(value) && value > 0))];
+  if (!normalizedIds.length) return [];
+
+  return prisma.$queryRaw(Prisma.sql`
+    SELECT "productId", "quantity", "reserved",
+           GREATEST("quantity" - "reserved", 0)::INTEGER AS "availableToSell"
+    FROM "StockBalance"
+    WHERE "branchId" = ${branchId}
+      AND "productId" IN (${Prisma.join(normalizedIds)})
+  `);
+};
+
 module.exports = {
   findBarcodeAuthorityExact,
   findExactStockItems,
   findExactSimpleLots,
   findTextStockItems,
   findTextSimpleLots,
+  findProductAvailability,
 };
