@@ -112,6 +112,7 @@ model EmployeeProfile {
   assessedTaxExpenses                   TaxExpenseAssessment[]      @relation("TaxExpenseAssessmentAssessedBy")
   performedTaxExpenseEvents             TaxExpenseLifecycleEvent[]  @relation("TaxExpenseLifecycleEventActor")
   uploadedTaxExpenseAttachments         TaxExpenseAttachment[]      @relation("TaxExpenseAttachmentUploadedBy")
+  createdExpensePayees                   ExpensePayee[]               @relation("ExpensePayeeCreatedBy")
   productTemplateCandidatesCreated      ProductTemplateCandidate[]  @relation("ProductTemplateCandidateCreatedBy")
   productTemplateCandidatesReviewed     ProductTemplateCandidate[]  @relation("ProductTemplateCandidateReviewedBy")
   productTemplateCandidateEvents        ProductTemplateCandidateEvent[] @relation("ProductTemplateCandidateEventActor")
@@ -190,6 +191,7 @@ model Branch {
   provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedBranch")
   missingCostResolutions               MissingCostResolution[]
   taxExpenseCategories                 TaxExpenseCategory[]
+  expensePayees                        ExpensePayee[]
   taxExpenses                          TaxExpense[]
   taxIssuerProfile                     TaxIssuerProfile?
   storeExperienceProfile               StoreExperienceProfile?
@@ -2030,7 +2032,7 @@ model WarrantyClaim {
 
 // ============================================================
 // REPAIR EXECUTION AGGREGATE FOUNDATION
-// Phase 3 â€” additive diagnosis, labor, quality control, delivery
+// Phase 3 ├óΓé¼ΓÇ¥ additive diagnosis, labor, quality control, delivery
 // ============================================================
 
 model RepairDiagnosis {
@@ -2128,7 +2130,7 @@ model RepairDelivery {
 
 // ============================================================
 // DEVICE INTAKE AGGREGATE FOUNDATION
-// Phase 2 â€” additive reception, evidence, consent, and audit data
+// Phase 2 ├óΓé¼ΓÇ¥ additive reception, evidence, consent, and audit data
 // ============================================================
 
 model DeviceIntake {
@@ -2372,7 +2374,7 @@ model DeviceOwnershipHistory {
 
 // ============================================================
 // DEVICE PASSPORT TIMELINE FOUNDATION
-// Phase 4 â€” additive event vocabulary, idempotency and traceability
+// Phase 4 ├óΓé¼ΓÇ¥ additive event vocabulary, idempotency and traceability
 // ============================================================
 
 /// Append-oriented operational ledger for the complete device passport timeline.
@@ -3064,7 +3066,7 @@ enum SalesTaxFilingStatus {
 
 // ============================================================
 // TAX AUTHORITY FOUNDATION
-// Step 3.1 â€” Enum Foundation
+// Step 3.1 ├óΓé¼ΓÇ¥ Enum Foundation
 // ============================================================
 
 enum TaxDocumentType {
@@ -3438,6 +3440,14 @@ enum TaxExpenseStatus {
 
 enum TaxExpenseCounterpartyType {
   SUPPLIER
+  EXPENSE_PAYEE
+  OTHER
+}
+
+enum ExpensePayeeType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+  GOVERNMENT
   OTHER
 }
 
@@ -3507,10 +3517,38 @@ model TaxExpenseCategory {
   @@index([branchId, active])
 }
 
+model ExpensePayee {
+  id                  Int              @id @default(autoincrement())
+  branchId            Int
+  payeeType           ExpensePayeeType @default(LEGAL_ENTITY)
+  name                String
+  taxId               String?          @db.VarChar(13)
+  taxBranchCode       String?          @default("00000") @db.VarChar(5)
+  address             String?
+  phone               String?
+  email               String?
+  contactPerson       String?
+  notes               String?
+  active              Boolean          @default(true)
+  createdByEmployeeId Int
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  branch              Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdByEmployee   EmployeeProfile  @relation("ExpensePayeeCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  taxExpenses         TaxExpense[]     @relation("TaxExpenseExpensePayee")
+
+  @@unique([id, branchId])
+  @@index([branchId, active])
+  @@index([branchId, name])
+  @@index([branchId, taxId])
+  @@index([createdByEmployeeId])
+}
+
 model TaxExpense {
   id                   Int                       @id @default(autoincrement())
   branchId             Int
   supplierId           Int?
+  expensePayeeId       Int?
   expenseNumber        String
   counterpartyType     TaxExpenseCounterpartyType
   counterpartyName     String
@@ -3533,6 +3571,7 @@ model TaxExpense {
   updatedAt            DateTime                  @updatedAt
   branch               Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
   supplier             Supplier?                 @relation("TaxExpenseSupplier", fields: [supplierId, branchId], references: [id, branchId], onDelete: Restrict)
+  expensePayee         ExpensePayee?              @relation("TaxExpenseExpensePayee", fields: [expensePayeeId, branchId], references: [id, branchId], onDelete: Restrict)
   createdByEmployee    EmployeeProfile           @relation("TaxExpenseCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
   items                TaxExpenseItem[]          @relation("TaxExpenseItemExpense")
   assessments          TaxExpenseAssessment[]
@@ -3543,6 +3582,7 @@ model TaxExpense {
   @@unique([id, branchId])
   @@index([branchId, status, expenseDate])
   @@index([branchId, supplierId])
+  @@index([branchId, expensePayeeId])
   @@index([branchId, documentNumber])
   @@index([createdByEmployeeId])
 }
