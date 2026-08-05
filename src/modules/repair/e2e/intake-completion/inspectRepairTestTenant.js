@@ -36,7 +36,6 @@ async function main() {
     },
     select: {
       id: true,
-      role: true,
       user: {
         select: {
           id: true,
