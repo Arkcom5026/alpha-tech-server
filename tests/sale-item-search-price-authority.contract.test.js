@@ -40,8 +40,8 @@ assert.throws(
     && error.details?.productId === 11,
 );
 
-assert.throws(
-  () => service.mapSimpleLot({
+assert.deepStrictEqual(
+  service.mapSimpleLot({
     id: 21,
     productId: 12,
     barcode: 'SIMPLE-2',
@@ -58,12 +58,12 @@ assert.throws(
         priceOnline: 145,
       }],
     },
-  }, 2),
-  (error) => error.code === 'PRICE_VALUE_NOT_EFFECTIVE',
+  }, 2).prices,
+  { retail: null, wholesale: 140, technician: 130, online: 145 },
 );
 
-assert.throws(
-  () => service.mapSimpleLot({
+assert.deepStrictEqual(
+  service.mapSimpleLot({
     id: 22,
     productId: 13,
     barcode: 'SIMPLE-3',
@@ -80,8 +80,8 @@ assert.throws(
         priceOnline: 145,
       }],
     },
-  }, 2),
-  (error) => error.code === 'PRICE_VALUE_MISSING',
+  }, 2).prices,
+  { retail: 150, wholesale: null, technician: 130, online: 145 },
 );
 
 console.log('sale-item-search-price-authority.contract.test.js: PASS');

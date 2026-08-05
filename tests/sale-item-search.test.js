@@ -45,6 +45,10 @@ const emptyRepository = (overrides = {}) => ({
   findExactSimpleLots: async () => [],
   findTextStockItems: async () => [],
   findTextSimpleLots: async () => [],
+  findProductAvailability: async ({ productIds }) => productIds.map((productId) => ({
+    productId,
+    availableToSell: Number.MAX_SAFE_INTEGER,
+  })),
   ...overrides,
 });
 
