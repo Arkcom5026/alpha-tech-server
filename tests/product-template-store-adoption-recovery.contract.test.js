@@ -20,6 +20,7 @@ assert.match(service, /templateProduct: \{ connect: \{ id: tplId \} \}/)
 assert.match(service, /productType: \{ connect: \{ id: branchType\.id \} \}/)
 assert.match(service, /branch: \{ connect: \{ id: brId \} \}/)
 assert.doesNotMatch(service, /templateProductId: tplId,\s*productTypeId:/)
+assert.doesNotMatch(service, /categoryId: branchType\.globalProductType/)
 assert.doesNotMatch(service, /PRODUCT_TYPE_NOT_FOUND_IN_BRANCH/)
 
 assert.match(controller, /TEMPLATE_PRODUCT_TYPE_NOT_FOUND/)
