@@ -30,6 +30,7 @@ const required = [
   'insertAllocatedReservationItem',
   'stockItemId',
   'simpleLotId',
+  '${lineType}::"ProductReservationLineType"',
 ];
 
 for (const token of required) {
@@ -39,6 +40,16 @@ for (const token of required) {
 assert(
   source.indexOf("command.commandType === 'ACCEPT'") < source.indexOf('UPDATE "ProductReservation"'),
   'Physical allocation must complete before reservation status changes to ACCEPTED',
+);
+
+assert(
+  !source.includes('SET "lineType" = ${lineType},'),
+  'Physical allocation UPDATE must never send ProductReservationLineType as uncast text',
+);
+
+assert(
+  !source.includes('${`${item.lineId}-A${allocationIndex}`}, ${lineType},'),
+  'Physical allocation INSERT must never send ProductReservationLineType as uncast text',
 );
 
 assert(
