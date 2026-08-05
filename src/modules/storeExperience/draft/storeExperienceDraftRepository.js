@@ -17,6 +17,7 @@ const upsertDraftForBranch = ({ branchId, create, update }, client = prisma) =>
 
 const publishForBranch = (branchId, snapshot, client = prisma) =>
   client.$transaction(async (tx) => {
+    const current = await tx.storeExperienceProfile.findUnique({ where: { branchId } });
     const experience = await tx.storeExperienceProfile.update({
       where: { branchId },
       data: {
@@ -26,7 +27,7 @@ const publishForBranch = (branchId, snapshot, client = prisma) =>
         publishedLayoutPreset: snapshot.publishedLayoutPreset,
         publishedSectionConfiguration: snapshot.publishedSectionConfiguration,
         publishedContentConfiguration: snapshot.publishedContentConfiguration,
-        publishedVersion: { increment: 1 },
+        publishedVersion: Number(current?.publishedVersion || 0) + 1,
         publishedAt: new Date(),
       },
     });
