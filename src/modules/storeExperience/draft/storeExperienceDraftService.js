@@ -53,11 +53,21 @@ const normalizeSections = (value) => {
   });
 };
 
+const normalizeContentConfiguration = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!value || Array.isArray(value) || typeof value !== 'object') {
+    fail(400, 'STORE_EXPERIENCE_VALIDATION_FAILED', 'contentConfiguration ต้องเป็น object');
+  }
+  return value;
+};
+
 const normalizeDraft = (payload = {}) => ({
   themePreset: normalizePreset(payload.themePreset, THEME_PRESETS, 'themePreset'),
   themeTokens: normalizeThemeTokens(payload.themeTokens),
   layoutPreset: normalizePreset(payload.layoutPreset, LAYOUT_PRESETS, 'layoutPreset'),
   sectionConfiguration: normalizeSections(payload.sectionConfiguration),
+  contentConfiguration: normalizeContentConfiguration(payload.contentConfiguration),
 });
 
 const defaults = (branchId) => ({
@@ -67,7 +77,9 @@ const defaults = (branchId) => ({
   themeTokens: null,
   layoutPreset: 'platform-default',
   sectionConfiguration: null,
+  contentConfiguration: null,
   version: 1,
+  publishedVersion: null,
   publishedAt: null,
 });
 
@@ -78,16 +90,20 @@ const getDraftForBranch = async (branchId) => {
 
 const saveDraftForBranch = async (branchId, payload) => {
   const existing = await repository.findByBranchId(branchId);
-  if (existing && !['DRAFT', 'READY'].includes(existing.status)) {
-    fail(409, 'STORE_EXPERIENCE_NOT_EDITABLE', 'กรุณายกเลิกเผยแพร่ก่อนแก้ไขแบบร่าง');
+  if (existing?.status === 'SUSPENDED') {
+    fail(409, 'STORE_EXPERIENCE_SUSPENDED', 'หน้าร้านถูกระงับและไม่สามารถแก้ไขได้');
   }
   const normalized = Object.fromEntries(Object.entries(normalizeDraft(payload)).filter(([, value]) => value !== undefined));
   const current = existing || defaults(branchId);
   const next = { ...current, ...normalized };
-  const update = { ...normalized, status: existing?.status || 'DRAFT', version: (existing?.version || 1) + 1, publishedAt: null };
+  const update = {
+    ...normalized,
+    status: existing?.status || 'DRAFT',
+    version: (existing?.version || 1) + 1,
+  };
   return repository.upsertDraftForBranch({
     branchId,
-    create: { ...next, version: 1, publishedAt: null },
+    create: { ...next, version: 1 },
     update,
   });
 };
@@ -106,15 +122,20 @@ const publishForBranch = async (branchId) => {
   if (!sections.some((section) => section?.enabled !== false)) {
     fail(400, 'STORE_EXPERIENCE_SECTION_REQUIRED', 'ต้องเปิดใช้งานส่วนประกอบหน้าร้านอย่างน้อยหนึ่งส่วน');
   }
-  if (experience.status === 'PUBLISHED') return { experience, capability };
-  return repository.publishForBranch(branchId);
+  return repository.publishForBranch(branchId, {
+    publishedThemePreset: experience.themePreset,
+    publishedThemeTokens: experience.themeTokens,
+    publishedLayoutPreset: experience.layoutPreset,
+    publishedSectionConfiguration: experience.sectionConfiguration,
+    publishedContentConfiguration: experience.contentConfiguration,
+  });
 };
 
 const unpublishForBranch = async (branchId) => {
   const experience = await repository.findByBranchId(branchId);
   const capability = await repository.findCapabilityByBranchId(branchId);
   if (!experience || !capability) fail(404, 'STORE_EXPERIENCE_NOT_FOUND', 'ไม่พบข้อมูลหน้าร้าน');
-  if (experience.status !== 'PUBLISHED') return { experience, capability };
+  if (!capability.storefrontEnabled) return { experience, capability };
   return repository.unpublishForBranch(branchId);
 };
 
