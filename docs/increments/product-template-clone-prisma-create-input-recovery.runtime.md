@@ -1,0 +1,1 @@
+Runtime retest target: POST /api/products/pos/create-from-template for branch 14 and template 256, expecting 201 then 200 on retry.
