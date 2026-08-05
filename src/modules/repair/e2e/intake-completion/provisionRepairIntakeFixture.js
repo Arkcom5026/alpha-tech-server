@@ -1,42 +1,30 @@
 'use strict';
 
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
-const { assertTestDatabaseAuthority } = require('../../../../../recovery/testDatabaseAuthority');
+const {
+  resolveRepairIntakeE2ERuntimeAuthority,
+} = require('./repairIntakeE2ERuntimeAuthority');
 
-const APPROVAL = 'ALPHATECH_REPAIR_INTAKE_E2E_FIXTURE';
-const envPath = path.join(process.cwd(), '.env.restore');
-if (!fs.existsSync(envPath)) throw new Error('Missing .env.restore.');
-dotenv.config({ path: envPath, override: true });
-
-const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
-const authorityEnv = { ...process.env };
-delete authorityEnv.DATABASE_URL;
-delete authorityEnv.DIRECT_URL;
-assertTestDatabaseAuthority({ targetUrl, env: authorityEnv, requiresWriteApproval: true });
-
-if (process.env.REPAIR_INTAKE_E2E_FIXTURE_APPROVAL !== APPROVAL) {
-  throw new Error(`Set REPAIR_INTAKE_E2E_FIXTURE_APPROVAL=${APPROVAL} before provisioning.`);
-}
+const authority = resolveRepairIntakeE2ERuntimeAuthority({ requiresWrite: true });
 
 const required = (name) => {
   const value = String(process.env[name] || '').trim();
-  if (!value) throw new Error(`Missing ${name} in process environment or .env.restore.`);
+  if (!value) throw new Error(`Missing ${name} in the selected E2E runtime environment.`);
   return value;
 };
 
 const operatorEmail = required('REPAIR_INTAKE_E2E_OPERATOR_EMAIL').toLowerCase();
-const operatorPassword = required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD');
+const operatorPassword = authority.mayMutateOperatorCredential
+  ? required('REPAIR_INTAKE_E2E_OPERATOR_PASSWORD')
+  : null;
 const customerId = Number(required('REPAIR_INTAKE_E2E_CUSTOMER_ID'));
 if (!Number.isInteger(customerId) || customerId <= 0) {
   throw new Error('REPAIR_INTAKE_E2E_CUSTOMER_ID must be a positive integer.');
 }
 
-process.env.DATABASE_URL = targetUrl;
-process.env.DIRECT_URL = targetUrl;
+process.env.DATABASE_URL = authority.targetUrl;
+process.env.DIRECT_URL = authority.targetUrl;
 const { prisma } = require('../../../../../lib/prisma');
 const {
   CreateExternalDeviceIntakeService,
@@ -54,20 +42,37 @@ async function main() {
     throw new Error('The configured operator is not an active approved employee with a branch.');
   }
 
-  const passwordHash = await bcrypt.hash(operatorPassword, 12);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      password: passwordHash,
-      enabled: true,
-    },
-  });
+  if (authority.mayMutateOperatorCredential) {
+    const passwordHash = await bcrypt.hash(operatorPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: passwordHash,
+        enabled: true,
+      },
+    });
+  } else if (!user.enabled) {
+    throw new Error('The Main-DB E2E operator must already be enabled; fixture cannot change credentials.');
+  }
 
   const branch = await prisma.branch.findUnique({
     where: { id: Number(employee.branchId) },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, name: true },
   });
   if (!branch?.slug) throw new Error('The operator branch must have a slug.');
+
+  if (
+    authority.expectedBranch
+    && (
+      branch.id !== authority.expectedBranch.branchId
+      || branch.slug !== authority.expectedBranch.branchSlug
+    )
+  ) {
+    throw new Error(
+      `Main-DB Repair E2E operator must belong to branchId=${authority.expectedBranch.branchId}, `
+        + `slug=${authority.expectedBranch.branchSlug}; received branchId=${branch.id}, slug=${branch.slug}.`
+    );
+  }
 
   const customer = await externalRepository.findCustomer(branch.id, customerId);
   if (!customer) {
@@ -89,7 +94,7 @@ async function main() {
         barcode: `E2E-REPAIR-DEVICE-${runToken}`,
       },
       customerProblem: `Repair intake completion Browser E2E ${runToken}`,
-      internalRemark: `Test DB only; retained fixture ${runToken}`,
+      internalRemark: `${authority.environment} retained fixture ${runToken}`,
       accessories: [],
       depositPaid: 0,
       estimatedCost: 0,
@@ -98,11 +103,13 @@ async function main() {
 
   console.log(JSON.stringify({
     result: 'PASS',
-    environment: 'TEST',
+    environment: authority.environment,
+    runtimeAuthority: authority.target,
     runToken,
     fixture: {
       branchId: branch.id,
       branchSlug: branch.slug,
+      branchName: branch.name,
       employeeId: employee.id,
       customerId: customer.id,
       operatorEmail,
@@ -120,7 +127,9 @@ async function main() {
       REPAIR_INTAKE_E2E_RUN_TOKEN: runToken,
     },
     retainedTestData: true,
-    safety: 'Creates a fresh Test-DB-only external device, intake, and RepairJob; production is forbidden.',
+    safety: authority.expectedBranch
+      ? 'Creates data only through the fixed Main-DB test tenant; operator credentials are never changed.'
+      : 'Creates a fresh dedicated-Test-DB external device, intake, and RepairJob.',
   }, null, 2));
 }
 

@@ -85,9 +85,8 @@ test('create repository owns customer, stock, technician, repair and passport wr
     title: 'เปิดใบงานซ่อม',
   });
 
-  assert.equal(calls.customer.where.id, 8);
-  assert.ok(Array.isArray(calls.customer.where.OR));
-  assert.equal(calls.customer.where.OR.length, 4);
+  assert.deepEqual(calls.customer.where, { id: 8, branchId: 3 });
+  assert.equal(Object.hasOwn(calls.customer.where, 'OR'), false);
   assert.deepEqual(calls.stock.where, { id: 12 });
   assert.ok(calls.stock.include.devices);
   assert.ok(calls.stock.include.repairJobs);

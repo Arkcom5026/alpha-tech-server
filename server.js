@@ -98,6 +98,7 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174', // dedicated local Browser E2E client
   'http://localhost:3000',
   'https://saduaksabuy.com',
   'https://www.saduaksabuy.com',
@@ -220,59 +221,23 @@ app.use('/api/input-tax-reports', inputTaxReportRoutes);
 app.use('/api/combined-billing', combinedBillingRoutes);
 app.use('/api/sales-reports', salesReportRoutes);
 app.use('/api/upload-slip', uploadSlipRoutes);
-app.use('/api/stock-audit', stockAuditRoutes);
+app.use('/api/stock-audits', stockAuditRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/address', addressRoutes);
 app.use('/api/locations', locationsRoutes);
-app.use('/api/receipts-simple', receiptSimpleRoutes);
+app.use('/api/receipt-simple', receiptSimpleRoutes);
 app.use('/api/quick-receipts', quickReceiptRoutes);
-app.use('/api/stocks', stockRoutes);
+app.use('/api/stock', stockRoutes);
 app.use('/api/finance', financeRoutes);
-app.use('/api/upload-product', uploadProductRoutes);
-app.use('/api/tax', taxIntakeRoutes);
+app.use('/api/tax-periods', taxPeriodRoutes);
+app.use('/api/tax-intake', taxIntakeRoutes);
 app.use('/api/tax-expenses', taxExpenseRoutes);
-app.use('/api/tax', taxPeriodRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
-app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionReadRoutes);
-app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionMutationRoutes);
-app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionRecoveryPreviewRoutes);
-app.use('/api/inventory-recovery/missing-cost-resolutions', missingCostResolutionRecoveryExecutionRoutes);
-app.use('/api/system/operational-verification', operationalVerificationRoutes);
-
-// ===================== Errors =====================
-app.use((req, res) => {
-  res.status(404).json({
-    ok: false,
-    error: 'NOT_FOUND',
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-  });
-});
-
-app.use((err, req, res, _next) => {
-  console.error('❌ Unhandled error:', err);
-
-  const candidateStatusCode = Number(err?.statusCode ?? err?.status);
-  const statusCode =
-    Number.isInteger(candidateStatusCode) &&
-    candidateStatusCode >= 400 &&
-    candidateStatusCode <= 599
-      ? candidateStatusCode
-      : 500;
-  const code = err?.code || 'INTERNAL_SERVER_ERROR';
-
-  res.status(statusCode).json({
-    ok: false,
-    error: code,
-    code,
-    message: err?.message || 'Internal server error',
-    details: err?.details || null,
-    requestId: req.id,
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+app.use('/api/missing-cost-resolutions', missingCostResolutionReadRoutes);
+app.use('/api/missing-cost-resolutions', missingCostResolutionMutationRoutes);
+app.use('/api/missing-cost-resolutions', missingCostResolutionRecoveryPreviewRoutes);
+app.use('/api/missing-cost-resolutions', missingCostResolutionRecoveryExecutionRoutes);
+app.use('/api/operational-verification', operationalVerificationRoutes);
+app.use('/api/products/upload', uploadProductRoutes);
 
 module.exports = app;

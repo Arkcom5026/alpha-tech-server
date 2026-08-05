@@ -1,27 +1,17 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-const { assertTestDatabaseAuthority } = require('../../../../../recovery/testDatabaseAuthority');
+const {
+  resolveRepairIntakeE2ERuntimeAuthority,
+} = require('./repairIntakeE2ERuntimeAuthority');
 
 const repairJobId = Number(process.argv[2] || process.env.REPAIR_INTAKE_E2E_JOB_ID);
 if (!Number.isInteger(repairJobId) || repairJobId <= 0) {
   throw new Error('Usage: node verifyRepairIntakeOutcome.js <repair-job-id>');
 }
 
-const envPath = path.join(process.cwd(), '.env.restore');
-if (!fs.existsSync(envPath)) throw new Error('Missing .env.restore.');
-dotenv.config({ path: envPath, override: true });
-
-const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
-const authorityEnv = { ...process.env };
-delete authorityEnv.DATABASE_URL;
-delete authorityEnv.DIRECT_URL;
-const authority = assertTestDatabaseAuthority({ targetUrl, env: authorityEnv });
-
-process.env.DATABASE_URL = targetUrl;
-process.env.DIRECT_URL = targetUrl;
+const authority = resolveRepairIntakeE2ERuntimeAuthority({ requiresWrite: false });
+process.env.DATABASE_URL = authority.targetUrl;
+process.env.DIRECT_URL = authority.targetUrl;
 const { prisma } = require('../../../../../lib/prisma');
 
 const fail = (message, details = {}) => {
@@ -29,6 +19,7 @@ const fail = (message, details = {}) => {
     result: 'FAIL',
     databaseModified: false,
     repairJobId,
+    environment: authority.environment,
     authority: authority.target,
     message,
     details,
@@ -74,6 +65,15 @@ async function main() {
   });
 
   if (!job) return fail('Fixture RepairJob was not found.');
+  if (
+    authority.expectedBranch
+    && job.branchId !== authority.expectedBranch.branchId
+  ) {
+    return fail('RepairJob is outside the fixed Main-DB test tenant.', {
+      expectedBranchId: authority.expectedBranch.branchId,
+      actualBranchId: job.branchId,
+    });
+  }
   if (job.status !== 'IN_PROGRESS') {
     return fail('RepairJob did not reach IN_PROGRESS.', { status: job.status });
   }
@@ -117,6 +117,7 @@ async function main() {
   console.log(JSON.stringify({
     result: 'PASS',
     databaseModified: false,
+    environment: authority.environment,
     authority: authority.target,
     repairJob: {
       id: job.id,

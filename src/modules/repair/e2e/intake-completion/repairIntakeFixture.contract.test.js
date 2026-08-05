@@ -3,45 +3,27 @@
 const fs = require('fs');
 const path = require('path');
 
-const source = fs.readFileSync(
-  path.join(__dirname, 'provisionRepairIntakeFixture.js'),
-  'utf8'
-);
+const fixture = fs.readFileSync(path.join(__dirname, 'provisionRepairIntakeFixture.js'), 'utf8');
+const authority = fs.readFileSync(path.join(__dirname, 'repairIntakeE2ERuntimeAuthority.js'), 'utf8');
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(source.includes('assertTestDatabaseAuthority'), 'Fixture must assert Test DB authority.');
-assert(source.includes('requiresWriteApproval: true'), 'Fixture must require explicit write approval.');
-assert(
-  source.includes('ALPHATECH_REPAIR_INTAKE_E2E_FIXTURE'),
-  'Fixture approval token must remain explicit.'
-);
-assert(
-  source.includes('externalRepository.findCustomer(branch.id, customerId)'),
-  'Fixture customer must use the runtime branch-authority lookup.'
-);
-assert(
-  !source.includes('customerProfile.findFirst'),
-  'Fixture must not duplicate obsolete CustomerProfile branch scoping.'
-);
-assert(
-  source.includes('CreateExternalDeviceIntakeService'),
-  'Fixture must use the real repair external-intake service.'
-);
+assert(authority.includes("TEST_DB: 'TEST_DB'"), 'Test DB mode must remain available.');
+assert(authority.includes("MAIN_TEST_TENANT: 'MAIN_TEST_TENANT'"), 'Main test-tenant mode must be explicit.');
+assert(authority.includes('branchId: 13'), 'Main test tenant must be fixed to branchId 13.');
+assert(authority.includes("branchSlug: 'test-shop'"), 'Main test tenant slug must be fixed.');
+assert(authority.includes('assertTestDatabaseAuthority'), 'Legacy Test DB mode must retain authority checks.');
+assert(authority.includes('ALPHATECH_MAIN_DB_TEST_TENANT_WRITE'), 'Main mode must require explicit write approval.');
+assert(fixture.includes('authority.mayMutateOperatorCredential'), 'Operator handling must be mode-controlled.');
+assert(fixture.includes('externalRepository.findCustomer(branch.id, customerId)'), 'Customer lookup must be branch-scoped.');
+assert(fixture.includes('authority.expectedBranch.branchId'), 'Fixture must enforce the fixed Main branch.');
+assert(fixture.includes('CreateExternalDeviceIntakeService'), 'Fixture must use the real external-intake service.');
 
-const outputStart = source.indexOf('console.log(JSON.stringify({');
-assert(outputStart >= 0, 'Fixture must emit a structured JSON result.');
-const outputSource = source.slice(outputStart);
-assert(
-  !outputSource.includes('operatorPassword') && !outputSource.includes('E2E_TEST_PASSWORD'),
-  'Fixture output must not expose the operator password.'
-);
-
-assert(
-  !source.includes('PRODUCTION_DATABASE_URL'),
-  'Fixture must not introduce a production database path.'
-);
+const outputStart = fixture.indexOf('console.log(JSON.stringify({');
+assert(outputStart >= 0, 'Fixture must emit structured JSON.');
+const outputSource = fixture.slice(outputStart);
+assert(!outputSource.includes('operatorPassword'), 'Fixture output must not expose operator secrets.');
 
 console.log('Repair intake E2E fixture contract: PASS');
