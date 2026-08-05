@@ -6,6 +6,9 @@ const {
   listMerchantReservations,
   getMerchantReservationDetail,
 } = require('./productReservationMerchantQueryRepository');
+const {
+  ensureMerchantReservationPhysicalAllocation,
+} = require('./productReservationPhysicalAllocationRepository');
 const { createProductReservationLifecycleService } = require('../lifecycle/productReservationLifecycleService');
 const lifecycleRepository = require('../lifecycle/productReservationLifecyclePrismaRepository');
 
@@ -65,6 +68,23 @@ router.get('/:reservationId', async (req, res, next) => {
     if (!data) {
       return res.status(404).json({ code: 'PRODUCT_RESERVATION_NOT_FOUND', message: 'Reservation not found' });
     }
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:reservationId/allocation', async (req, res, next) => {
+  try {
+    const reservationId = Number(req.params.reservationId);
+    if (!Number.isInteger(reservationId) || reservationId <= 0) {
+      return res.status(400).json({ code: 'PRODUCT_RESERVATION_ID_INVALID', message: 'Invalid reservation id' });
+    }
+    const data = await ensureMerchantReservationPhysicalAllocation({
+      reservationId,
+      branchId: req.user.branchId,
+      actorId: req.user.employeeId,
+    });
     return res.json({ ok: true, data });
   } catch (error) {
     return next(error);
