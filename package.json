@@ -6,7 +6,7 @@
   },
   "scripts": {
     "prestart": "npm run db:ensure-device-intake && npm run db:ensure-input-tax-links && npm run db:ensure-supplier-payables && npm run db:ensure-supplier-payment-allocations && npm run db:ensure-supplier-advances && npm run db:ensure-supplier-disputes && npm run db:ensure-pos-held-carts",
-    "start": "node server.js",
+    "start": "node src/bootstrap/server.js",
     "db:ensure-device-intake": "node scripts/ensure-device-intake-foundation.js",
     "db:ensure-input-tax-links": "node scripts/ensure-flexible-input-tax-receipt-links.js",
     "db:ensure-supplier-payables": "node scripts/ensure-supplier-payable-foundation.js",
@@ -14,7 +14,7 @@
     "db:ensure-supplier-advances": "node scripts/ensure-supplier-advance-credit-authority.js",
     "db:ensure-supplier-disputes": "node scripts/ensure-supplier-dispute-adjustment-authority.js",
     "db:ensure-pos-held-carts": "node scripts/ensure-pos-held-cart-foundation.js",
-    "dev": "nodemon server.js",
+    "dev": "nodemon src/bootstrap/server.js",
     "test": "npm run test:certification",
     "test:regression": "node tests/customer-receipt-auth-regression.test.js && npm run test:auth-refresh-token-repository",
     "test:branch-test-tenant": "node tests/branch-test-tenant-provisioning.contract.test.js",
