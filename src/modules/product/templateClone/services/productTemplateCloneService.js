@@ -21,17 +21,8 @@ const requireBranchId = (branchId) => {
   return id
 }
 
-const adoptBranchProductType = async ({
-  branchId,
-  templateBranchId,
-  globalProductTypeId,
-  db,
-}) => {
-  const existing = await findBranchProductTypeByGlobalProductTypeId({
-    branchId,
-    globalProductTypeId,
-    db,
-  })
+const adoptBranchProductType = async ({ branchId, templateBranchId, globalProductTypeId, db }) => {
+  const existing = await findBranchProductTypeByGlobalProductTypeId({ branchId, globalProductTypeId, db })
   if (existing) return existing
 
   const templateType = await db.productType.findFirst({
@@ -69,12 +60,7 @@ const adoptBranchProductType = async ({
     })
   } catch (error) {
     if (error?.code !== 'P2002') throw error
-
-    const concurrent = await findBranchProductTypeByGlobalProductTypeId({
-      branchId,
-      globalProductTypeId,
-      db,
-    })
+    const concurrent = await findBranchProductTypeByGlobalProductTypeId({ branchId, globalProductTypeId, db })
     if (concurrent) return concurrent
     throw error
   }
@@ -99,11 +85,7 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
       throw error
     }
 
-    const template = await findTemplateProductForClone({
-      templateProductId: tplId,
-      templateBranchId: templateBranch.id,
-      db: tx,
-    })
+    const template = await findTemplateProductForClone({ templateProductId: tplId, templateBranchId: templateBranch.id, db: tx })
     if (!template) {
       const error = new Error('TEMPLATE_PRODUCT_NOT_FOUND')
       error.statusCode = 404
@@ -111,11 +93,7 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
       throw error
     }
 
-    const existing = await findOperationalRuntimeProductByTemplateId({
-      branchId: brId,
-      templateProductId: tplId,
-      db: tx,
-    })
+    const existing = await findOperationalRuntimeProductByTemplateId({ branchId: brId, templateProductId: tplId, db: tx })
     if (existing) {
       const mapped = toOperationalRuntimeProduct(existing, brId)
       return {
@@ -156,11 +134,12 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
         noSN: !structured,
         trackSerialNumber: structured,
         active: true,
-        templateProductId: tplId,
-        productTypeId: branchType.id,
         categoryId: branchType.globalProductType?.categoryId ?? null,
-        brandId: template.brandId ?? null,
-        unitId: template.unitId ?? null,
+        templateProduct: { connect: { id: tplId } },
+        productType: { connect: { id: branchType.id } },
+        branch: { connect: { id: brId } },
+        ...(template.brandId ? { brand: { connect: { id: template.brandId } } } : {}),
+        ...(template.unitId ? { unit: { connect: { id: template.unitId } } } : {}),
       },
     })
 
@@ -179,7 +158,4 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
   }, { timeout: 15000 })
 }
 
-module.exports = {
-  adoptBranchProductType,
-  cloneOperationalProductFromTemplate,
-}
+module.exports = { adoptBranchProductType, cloneOperationalProductFromTemplate }
