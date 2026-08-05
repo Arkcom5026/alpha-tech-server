@@ -22,7 +22,7 @@ const createOperationalProductFromTemplate = async (req, res) => {
       code === 'TEMPLATE_PRODUCT_ID_MISSING' ||
       code === 'TEMPLATE_BRANCH_NOT_FOUND' ||
       code === 'TEMPLATE_PRODUCT_NOT_FOUND' ||
-      code === 'PRODUCT_TYPE_NOT_FOUND_IN_BRANCH'
+      code === 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
     ) {
       return res.status(error?.status || error?.statusCode || 400).json({
         success: false,
