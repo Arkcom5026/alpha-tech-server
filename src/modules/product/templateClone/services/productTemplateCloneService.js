@@ -134,7 +134,6 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
         noSN: !structured,
         trackSerialNumber: structured,
         active: true,
-        categoryId: branchType.globalProductType?.categoryId ?? null,
         templateProduct: { connect: { id: tplId } },
         productType: { connect: { id: branchType.id } },
         branch: { connect: { id: brId } },
