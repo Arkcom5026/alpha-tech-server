@@ -62,7 +62,7 @@ const activeAllocationStatuses = Prisma.sql`
 const updateAllocatedReservationItem = async ({ tx, item, quantity, lineType, stockItemId = null, simpleLotId = null }) => {
   await tx.$executeRaw(Prisma.sql`
     UPDATE "ProductReservationItem"
-    SET "lineType" = ${lineType},
+    SET "lineType" = ${lineType}::"ProductReservationLineType",
         "stockItemId" = ${stockItemId},
         "simpleLotId" = ${simpleLotId},
         "quantity" = ${quantity},
@@ -86,7 +86,8 @@ const insertAllocatedReservationItem = async ({
       "quantity", "basePrice", "discount", "price", "vatAmount", "remark", "isActive",
       "createdAt", "updatedAt"
     ) VALUES (
-      ${Number(item.reservationId)}, ${`${item.lineId}-A${allocationIndex}`}, ${lineType},
+      ${Number(item.reservationId)}, ${`${item.lineId}-A${allocationIndex}`},
+      ${lineType}::"ProductReservationLineType",
       ${Number(item.productId)}, ${stockItemId}, ${simpleLotId}, ${quantity},
       ${item.basePrice}, ${item.discount}, ${item.price}, ${item.vatAmount}, ${item.remark}, TRUE,
       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
