@@ -64,6 +64,7 @@ const resolveSaleCompletionE2ERuntimeAuthority = ({ requiresWrite = false } = {}
       targetUrl,
       target: authority.target,
       expectedBranch: null,
+      mayMutateOperatorCredential: true,
     });
   }
 
@@ -102,6 +103,7 @@ const resolveSaleCompletionE2ERuntimeAuthority = ({ requiresWrite = false } = {}
     targetUrl,
     target: 'normal DATABASE_URL with fixed Main-DB test tenant',
     expectedBranch: MAIN_TEST_TENANT,
+    mayMutateOperatorCredential: false,
   });
 };
 
