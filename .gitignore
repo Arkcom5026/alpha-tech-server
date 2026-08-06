@@ -15,3 +15,9 @@ recovery/state/recovery-state.json
 # Backup and operational runtime artifacts
 backups/
 logs/
+
+# Local recovery backups
+*.online-store-studio-backup
+*.online-store-studio-patched-backup
+*.online-store-studio-published-backup
+*.online-store-studio-guard-backup

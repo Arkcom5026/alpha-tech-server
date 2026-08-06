@@ -246,6 +246,13 @@ model StoreExperienceProfile {
   themeTokens          Json?
   layoutPreset         String                       @default("platform-default") @db.VarChar(80)
   sectionConfiguration Json?
+  contentConfiguration              Json?
+  publishedThemePreset              String?                       @db.VarChar(80)
+  publishedThemeTokens              Json?
+  publishedLayoutPreset             String?                       @db.VarChar(80)
+  publishedSectionConfiguration     Json?
+  publishedContentConfiguration     Json?
+  publishedVersion                  Int?
   version              Int                          @default(1)
   publishedAt          DateTime?
   createdAt            DateTime                     @default(now())
