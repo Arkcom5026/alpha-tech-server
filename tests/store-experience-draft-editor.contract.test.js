@@ -23,7 +23,9 @@ assert.match(service, /LAYOUT_PRESETS/);
 assert.match(service, /SECTION_TYPES/);
 assert.match(service, /TOKEN_KEYS/);
 assert.match(service, /STORE_EXPERIENCE_NOT_EDITABLE/);
-assert.match(service, /\['DRAFT', 'READY'\]/);
+assert.match(service, /\['DRAFT', 'READY', 'PUBLISHED'\]/);
+assert.match(service, /!EDITABLE_STATUSES\.includes\(existing\.status\)/);
+assert.match(service, /status: existing\?\.status \|\| 'DRAFT'/);
 assert.match(repository, /storeExperienceProfile\.upsert/);
 assert.match(repository, /create: \{ branchId, status: 'DRAFT'/);
 
