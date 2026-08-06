@@ -16,8 +16,8 @@ const packageJson = JSON.parse(readServer('package.json'));
 
 assert.match(authority, /assertTestDatabaseAuthority/);
 assert.match(authority, /requiresWriteApproval: requiresWrite/);
-assert.match(authority, /POS_SALE_E2E_FIXTURE_APPROVAL/);
-assert.match(authority, /ALPHATECH_POS_SALE_E2E_FIXTURE/);
+assert.match(authority, /SALE_COMPLETION_E2E_MAIN_DB_WRITE_APPROVAL/);
+assert.match(authority, /ALPHATECH_MAIN_DB_TEST_TENANT_WRITE/);
 assert.match(fixture, /resolveSaleCompletionE2ERuntimeAuthority\(\{ requiresWrite: true \}\)/);
 assert.match(fixture, /status: 'IN_STOCK'/);
 assert.match(fixture, /SYSTEM_POS_SALE_E2E/);
