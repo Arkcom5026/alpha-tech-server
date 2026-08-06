@@ -184,6 +184,14 @@ class QuickStockRepository {
     })
   }
 
+  async findProductForReceive({ db, productId, branchId } = {}) {
+    return this.findOperationalProductInBranch({
+      db,
+      productId,
+      branchId,
+    })
+  }
+
   async findClonedOperationalProduct({ db, productId, branchId } = {}) {
     return this.findOperationalProductInBranch({ db, productId, branchId })
   }
@@ -250,6 +258,29 @@ class QuickStockRepository {
       branchPriceId: created.id,
       branchPrice: created,
     }
+  }
+
+  async upsertBranchPrice({
+    db,
+    productId,
+    branchId,
+    employeeId,
+    payload = {},
+  } = {}) {
+    return this.upsertBranchPriceManual({
+      db,
+      productId,
+      branchId,
+      data: {
+        costPrice: toNumber(payload.costPrice),
+        priceRetail: toNumber(payload.priceRetail),
+        priceWholesale: toNumber(payload.priceWholesale),
+        priceTechnician: toNumber(payload.priceTechnician),
+        priceOnline: toNumber(payload.priceOnline),
+        updatedBy: toInt(employeeId),
+        isActive: true,
+      },
+    })
   }
 
   async createStockItems({ db, data = [] } = {}) {
