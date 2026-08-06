@@ -11,6 +11,7 @@ const readServer = (file) => fs.readFileSync(path.join(serverRoot, file), 'utf8'
 
 const executableVerifier = readPackage('verifySaleCompletionOutcome.js');
 const verifier = readPackage('verify/verifySaleCompletionOutcome.js');
+const wrapper = readServer('scripts/verify-pos-sale-e2e-outcome.js');
 const packageJson = JSON.parse(readServer('package.json'));
 
 assert.match(executableVerifier, /resolveSaleCompletionE2ERuntimeAuthority/);
@@ -23,13 +24,14 @@ assert.match(verifier, /branchId: normalizedBranchId/);
 assert.match(verifier, /simpleItems: true/);
 assert.match(verifier, /completionCommand: true/);
 assert.doesNotMatch(verifier, /\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)\s*\(/);
+assert.match(wrapper, /src\/modules\/sales\/e2e\/completion\/verifySaleCompletionOutcome/);
 assert.equal(
   packageJson.scripts['verify:pos-sale-e2e-outcome'],
-  'node src/modules/sales/e2e/completion/verifySaleCompletionOutcome.js'
+  'node scripts/verify-pos-sale-e2e-outcome.js'
 );
 assert.equal(
   packageJson.scripts['test:pos-sale-e2e-outcome'],
-  'node src/modules/sales/e2e/completion/saleCompletionOutcome.contract.test.js'
+  'node tests/pos-sale-e2e-outcome.contract.test.js'
 );
 
 console.log('Sale completion E2E outcome verifier contract: PASS');
