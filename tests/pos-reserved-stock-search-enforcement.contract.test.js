@@ -12,12 +12,21 @@ const service = read('src/modules/sales/item-search/services/saleItemSearchServi
 
 for (const token of [
   'findProductAvailability',
-  'GREATEST("quantity" - "reserved", 0)',
+  'GREATEST(',
+  'COALESCE(balance."reserved", 0)',
+  'COALESCE(balance."quantity", physical.quantity, 0)',
+  'LEFT JOIN "StockBalance" balance',
   '"branchId" = ${branchId}',
   '"productId" IN (${Prisma.join(normalizedIds)})',
 ]) {
   assert(repository.includes(token), `Missing reserved-stock repository authority: ${token}`);
 }
+
+assert.match(
+  repository,
+  /GREATEST\([\s\S]*COALESCE\(balance\."quantity", physical\.quantity, 0\)[\s\S]*-[\s\S]*COALESCE\(balance\."reserved", 0\)[\s\S]*,[\s\S]*0[\s\S]*\)::INTEGER AS "availableToSell"/,
+  'Sellable quantity must subtract reserved stock and clamp at zero',
+);
 
 for (const token of [
   'reservationAwareCandidates',
