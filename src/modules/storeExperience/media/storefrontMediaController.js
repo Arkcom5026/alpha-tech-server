@@ -56,6 +56,7 @@ const listStorefrontMedia = async (req, res) => {
     const data = await storefrontMediaService.list({
       branchId,
       purpose: req.query?.purpose,
+      search: req.query?.search,
       pageSize: req.query?.pageSize,
       nextCursor: req.query?.nextCursor,
     });
