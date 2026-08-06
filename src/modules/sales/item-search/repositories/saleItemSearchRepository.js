@@ -112,11 +112,46 @@ const findProductAvailability = async ({ branchId, productIds }) => {
   if (!normalizedIds.length) return [];
 
   return prisma.$queryRaw(Prisma.sql`
-    SELECT "productId", "quantity", "reserved",
-           GREATEST("quantity" - "reserved", 0)::INTEGER AS "availableToSell"
-    FROM "StockBalance"
-    WHERE "branchId" = ${branchId}
-      AND "productId" IN (${Prisma.join(normalizedIds)})
+    WITH requested_products AS (
+      SELECT UNNEST(ARRAY[${Prisma.join(normalizedIds)}]::INTEGER[]) AS "productId"
+    ),
+    physical_inventory AS (
+      SELECT inventory."productId", SUM(inventory.quantity)::INTEGER AS quantity
+      FROM (
+        SELECT "productId", COUNT(*)::INTEGER AS quantity
+        FROM "StockItem"
+        WHERE "branchId" = ${branchId}
+          AND status = 'IN_STOCK'
+          AND "productId" IN (${Prisma.join(normalizedIds)})
+        GROUP BY "productId"
+
+        UNION ALL
+
+        SELECT "productId", SUM("qtyRemaining")::INTEGER AS quantity
+        FROM "SimpleLot"
+        WHERE "branchId" = ${branchId}
+          AND status = 'ACTIVE'
+          AND "qtyRemaining" > 0
+          AND "productId" IN (${Prisma.join(normalizedIds)})
+        GROUP BY "productId"
+      ) inventory
+      GROUP BY inventory."productId"
+    )
+    SELECT requested."productId",
+           COALESCE(balance."quantity", physical.quantity, 0)::INTEGER AS quantity,
+           COALESCE(balance."reserved", 0)::INTEGER AS reserved,
+           GREATEST(
+             COALESCE(balance."quantity", physical.quantity, 0)
+             - COALESCE(balance."reserved", 0),
+             0
+           )::INTEGER AS "availableToSell",
+           (balance."productId" IS NULL) AS "balanceMissing"
+    FROM requested_products requested
+    LEFT JOIN "StockBalance" balance
+      ON balance."branchId" = ${branchId}
+     AND balance."productId" = requested."productId"
+    LEFT JOIN physical_inventory physical
+      ON physical."productId" = requested."productId"
   `);
 };
 
