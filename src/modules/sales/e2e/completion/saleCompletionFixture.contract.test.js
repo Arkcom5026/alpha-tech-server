@@ -11,6 +11,7 @@ const readServer = (file) => fs.readFileSync(path.join(serverRoot, file), 'utf8'
 
 const fixture = readPackage('provisionSaleCompletionFixture.js');
 const authority = readPackage('saleCompletionE2ERuntimeAuthority.js');
+const wrapper = readServer('scripts/provision-pos-sale-e2e-fixture.js');
 const packageJson = JSON.parse(readServer('package.json'));
 
 assert.match(authority, /assertTestDatabaseAuthority/);
@@ -25,9 +26,10 @@ assert.match(fixture, /role: 'ADMIN'/);
 assert.doesNotMatch(fixture, /role: 'SUPERADMIN'/);
 assert.match(fixture, /customer is created only through the real POS Browser flow/);
 assert.doesNotMatch(fixture, /customerProfile\.(create|upsert)/);
+assert.match(wrapper, /src\/modules\/sales\/e2e\/completion\/provisionSaleCompletionFixture/);
 assert.equal(
   packageJson.scripts['provision:pos-sale-e2e-fixture'],
-  'node src/modules/sales/e2e/completion/provisionSaleCompletionFixture.js'
+  'node scripts/run-test-database-runtime.js scripts/provision-pos-sale-e2e-fixture.js'
 );
 
 console.log('Sale completion E2E fixture authority contract: PASS');
