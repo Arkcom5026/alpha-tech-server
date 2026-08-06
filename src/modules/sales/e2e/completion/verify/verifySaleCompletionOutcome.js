@@ -1,9 +1,11 @@
+'use strict';
+
 /**
  * Sale Completion E2E Post-condition Verifier
  *
  * Read-only verification against the real Test DB. The caller must inject the
- * Prisma client used by the Test-DB runtime; this module never creates, updates,
- * or deletes business data.
+ * Prisma client used by the selected runtime; this module never creates,
+ * updates, or deletes business data.
  */
 
 function assertPositiveInteger(value, name) {
@@ -25,7 +27,7 @@ function collectProductIds(sale) {
   return [...new Set(ids)];
 }
 
-export async function verifySaleCompletionOutcome({ prisma, saleId, branchId }) {
+async function verifySaleCompletionOutcome({ prisma, saleId, branchId }) {
   if (!prisma?.sale || !prisma?.payment || !prisma?.stockMovement) {
     throw new TypeError('A Prisma client with sale, payment, and stockMovement delegates is required');
   }
@@ -104,3 +106,7 @@ export async function verifySaleCompletionOutcome({ prisma, saleId, branchId }) 
     checks,
   };
 }
+
+module.exports = Object.freeze({
+  verifySaleCompletionOutcome,
+});
