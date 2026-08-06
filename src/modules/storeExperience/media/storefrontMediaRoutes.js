@@ -23,6 +23,7 @@ const allowEmployeeContext = (req, res, next) => {
 };
 
 router.use(verifyToken, allowEmployeeContext);
+router.get('/', controller.listStorefrontMedia);
 router.post('/upload', (req, res) => {
   uploadStorefrontMedia.single('file')(req, res, (error) => {
     if (error) return controller.sendError(res, error);

@@ -14,21 +14,28 @@ const sendError = (res, error) => {
   }
   return res.status(error?.statusCode || 500).json({
     success: false,
-    code: error?.code || 'STOREFRONT_MEDIA_UPLOAD_FAILED',
-    message: error?.message || 'อัปโหลดรูปภาพหน้าร้านไม่สำเร็จ',
+    code: error?.code || 'STOREFRONT_MEDIA_REQUEST_FAILED',
+    message: error?.message || 'ดำเนินการกับรูปภาพหน้าร้านไม่สำเร็จ',
   });
+};
+
+const requireBranchId = (req, res) => {
+  const branchId = branchIdOf(req);
+  if (!Number.isInteger(branchId) || branchId <= 0) {
+    res.status(403).json({
+      success: false,
+      code: 'EMPLOYEE_BRANCH_CONTEXT_REQUIRED',
+      message: 'ไม่พบร้านของผู้ดำเนินการ',
+    });
+    return null;
+  }
+  return branchId;
 };
 
 const uploadStorefrontMedia = async (req, res) => {
   try {
-    const branchId = branchIdOf(req);
-    if (!Number.isInteger(branchId) || branchId <= 0) {
-      return res.status(403).json({
-        success: false,
-        code: 'EMPLOYEE_BRANCH_CONTEXT_REQUIRED',
-        message: 'ไม่พบร้านของผู้ดำเนินการ',
-      });
-    }
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return undefined;
 
     const data = await storefrontMediaService.upload({
       branchId,
@@ -41,8 +48,27 @@ const uploadStorefrontMedia = async (req, res) => {
   }
 };
 
+const listStorefrontMedia = async (req, res) => {
+  try {
+    const branchId = requireBranchId(req, res);
+    if (!branchId) return undefined;
+
+    const data = await storefrontMediaService.list({
+      branchId,
+      purpose: req.query?.purpose,
+      pageSize: req.query?.pageSize,
+      nextCursor: req.query?.nextCursor,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 module.exports = {
   branchIdOf,
+  requireBranchId,
   sendError,
   uploadStorefrontMedia,
+  listStorefrontMedia,
 };
