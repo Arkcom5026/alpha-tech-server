@@ -16,6 +16,9 @@ recovery/state/recovery-state.json
 backups/
 logs/
 
+# Local print/render smoke artifacts
+.tmp-print-artifacts/
+
 # Local recovery backups
 *.online-store-studio-backup
 *.online-store-studio-patched-backup
