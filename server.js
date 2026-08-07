@@ -92,6 +92,7 @@ const missingCostResolutionRecoveryPreviewRoutes = require('./src/modules/invent
 const missingCostResolutionRecoveryExecutionRoutes = require('./src/modules/inventory/recovery/missing-cost-resolution/runtime/routes/missingCostResolutionRecoveryExecutionRoutes');
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 const storeDeviceRoutes = require('./src/modules/storeDevice/routes/storeDeviceRoutes');
+const documentPurposeRoutes = require('./src/modules/document-purpose/http/documentPurposeRoutes');
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
@@ -241,6 +242,7 @@ app.use('/api/missing-cost-resolutions', missingCostResolutionRecoveryExecutionR
 app.use('/api/operational-verification', operationalVerificationRoutes);
 app.use('/api/products/upload', uploadProductRoutes);
 app.use('/api/store-devices', storeDeviceRoutes);
+app.use('/api/document-purposes', documentPurposeRoutes);
 
 // ===================== Errors =====================
 app.use((req, res) => {
