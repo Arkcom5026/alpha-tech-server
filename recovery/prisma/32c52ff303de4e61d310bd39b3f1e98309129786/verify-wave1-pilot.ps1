@@ -62,7 +62,7 @@ $targets = [ordered]@{
 }
 
 $allowed = @('prisma/schema.prisma') + @($targets.Keys)
-$changed = @(git status --porcelain | ForEach-Object { $_.Substring(3) })
+$changed = @(git status --porcelain --untracked-files=all | ForEach-Object { $_.Substring(3) })
 $unexpected = @($changed | Where-Object { $_ -notin $allowed })
 if ($unexpected) { throw "Unexpected working-tree paths:`n$($unexpected -join "`n")" }
 foreach ($path in $targets.Keys) { if (-not (Test-Path $path)) { throw "Missing target $path" } }
