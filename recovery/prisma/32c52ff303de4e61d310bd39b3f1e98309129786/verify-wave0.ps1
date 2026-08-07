@@ -19,8 +19,16 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 }
 
 function Invoke-LoggedNative([string]$LogPath, [scriptblock]$Command) {
-  $output = & $Command 2>&1
-  $exitCode = $LASTEXITCODE
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & $Command 2>&1
+    $exitCode = $LASTEXITCODE
+  }
+  finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+
   $text = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine)
   Write-Utf8NoBom -Path $LogPath -Content ($text + [Environment]::NewLine)
   if ($output) { $output | ForEach-Object { Write-Host $_ } }
