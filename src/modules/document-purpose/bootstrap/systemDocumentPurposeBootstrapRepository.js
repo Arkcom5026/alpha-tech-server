@@ -10,6 +10,13 @@ class SystemDocumentPurposeBootstrapRepository {
     this.prisma = client
   }
 
+  listBranches() {
+    return this.prisma.branch.findMany({
+      select: { id: true, name: true },
+      orderBy: { id: 'asc' },
+    })
+  }
+
   branchExists(branchId) {
     return this.prisma.branch.findUnique({
       where: { id: Number(branchId) },
