@@ -1,0 +1,30 @@
+model Province {
+  code      String     @id
+  nameTh    String
+  region    String
+  districts District[]
+}
+
+model District {
+  code         String        @id
+  nameTh       String
+  provinceCode String
+  createdAt    DateTime      @default(now()) @map("created_at")
+  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  subdistricts Subdistrict[]
+
+  @@index([provinceCode])
+}
+
+model Subdistrict {
+  code            String            @id
+  nameTh          String
+  districtCode    String
+  postcode        String?
+  branches        Branch[]
+  CustomerProfile CustomerProfile[]
+  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+
+  @@index([districtCode])
+  @@index([postcode])
+}

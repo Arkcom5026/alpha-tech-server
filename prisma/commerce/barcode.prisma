@@ -1,0 +1,48 @@
+enum BarcodeStatus {
+  READY
+  SN_RECEIVED
+  USED
+  VOID
+}
+
+enum BarcodeKind {
+  SN
+  LOT
+}
+
+model BarcodeCounter {
+  id         Int      @id @default(autoincrement())
+  branchId   Int
+  yearMonth  String
+  lastNumber Int
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, yearMonth])
+}
+
+model BarcodeReceiptItem {
+  id                     Int                      @id @default(autoincrement())
+  barcode                String                   @unique
+  branchId               Int
+  yearMonth              String
+  runningNumber          Int
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  purchaseOrderReceiptId Int
+  stockItemId            Int?
+  printed                Boolean                  @default(false)
+  receiptItemId          Int
+  status                 BarcodeStatus            @default(READY)
+  kind                   BarcodeKind              @default(SN)
+  simpleLotId            Int?
+  branch                 Branch                   @relation(fields: [branchId], references: [id])
+  purchaseOrderReceipt   PurchaseOrderReceipt     @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
+  receiptItem            PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+  simpleLot              SimpleLot?               @relation(fields: [simpleLotId], references: [id])
+  stockItem              StockItem?               @relation(fields: [stockItemId], references: [id])
+
+  @@unique([branchId, yearMonth, runningNumber])
+  @@index([purchaseOrderReceiptId, branchId])
+}
