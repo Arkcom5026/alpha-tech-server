@@ -7,7 +7,10 @@ function Get-Block([string]$Text,[string]$Kind,[string]$Name){$m=[regex]::Match(
 Set-Location ((git rev-parse --show-toplevel).Trim())
 if((git branch --show-current).Trim()-ne$ExpectedBranch){throw "Expected branch $ExpectedBranch"}
 if(git status --porcelain --untracked-files=all){throw 'Working tree must be clean.'}
-if(git diff --quiet $CertifiedSha -- prisma){ }else{throw "Current Prisma tree differs from certified SHA $CertifiedSha"}
+& git diff --quiet $CertifiedSha -- prisma
+$prismaDiffExit=$LASTEXITCODE
+if($prismaDiffExit -eq 1){throw "Current Prisma tree differs from certified SHA $CertifiedSha"}
+if($prismaDiffExit -ne 0){throw "Unable to compare Prisma tree with certified SHA $CertifiedSha. git diff exit code: $prismaDiffExit"}
 $targets=[ordered]@{
  'prisma/service/device-intake.prisma'=@(
   @('enum','DeviceIntakeStatus'),@('enum','DevicePriority'),@('enum','AccessoryType'),@('enum','DeviceConditionLevel'),@('enum','DeviceIntakeAuditEvent'),
