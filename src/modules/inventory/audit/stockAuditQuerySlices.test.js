@@ -51,7 +51,7 @@ test('stock audit route authority is owned and mounted by inventory audit module
   const moduleRoute = fs.readFileSync(path.resolve(__dirname, 'routes/stockAuditRoutes.js'), 'utf8');
 
   assert.match(server, /require\('\.\/src\/modules\/inventory\/audit\/routes\/stockAuditRoutes'\)/);
-  assert.match(server, /app\.use\('\/api\/stock-audit', stockAuditRoutes\)/);
+  assert.match(server, /app\.use\('\/api\/stock-audits', stockAuditRoutes\)/);
   assert.match(moduleRoute, /query\/active\/getActiveAuditController/);
   assert.match(moduleRoute, /query\/overview\/getAuditOverviewController/);
   assert.doesNotMatch(server, /controllers\/stockAuditController/);
