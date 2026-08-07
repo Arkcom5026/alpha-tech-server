@@ -18,12 +18,18 @@ assert.match(service, /document\.candidate\?\.sourceType !== 'SALE'/);
 assert.match(service, /sale\.paid !== true/);
 assert.match(service, /sale\.statusPayment !== 'PAID'/);
 assert.match(service, /const invoiceKind = document\.taxInvoiceKind/);
-assert.match(service, /invoiceKind === 'FULL' \? 'FULL_TAX_INVOICE' : 'SHORT_TAX_INVOICE'/);
-assert.match(service, /invoiceKind === 'FULL' \? 'ใบกำกับภาษี' : 'ใบกำกับภาษีอย่างย่อ'/);
+
+assert.match(service, /const purposeCode\s*=\s*invoiceKind === 'FULL'[\s\S]*?'FULL_TAX_INVOICE'[\s\S]*?:\s*'SHORT_TAX_INVOICE'/);
+assert.match(service, /ResolvePrintDocumentPurposeService/);
+assert.match(service, /branchId:\s*normalizedBranchId/);
+assert.match(service, /code:\s*purposeCode/);
+assert.match(service, /type:\s*purpose\.code/);
+assert.match(service, /title:\s*purpose\.displayName/);
 
 assert.match(contract, /FULL_TAX_INVOICE/);
 assert.match(contract, /SHORT_TAX_INVOICE/);
 
+assert.doesNotMatch(service, /title:\s*invoiceKind === 'FULL'/);
 assert.doesNotMatch(service, /CustomerReceipts/);
 assert.doesNotMatch(service, /customerReceipt/i);
 
