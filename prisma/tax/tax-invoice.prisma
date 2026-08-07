@@ -1,0 +1,113 @@
+enum TaxInvoiceKind {
+  SHORT
+  FULL
+}
+
+model InputTaxFilingBatch {
+  id          Int                  @id @default(autoincrement())
+  branchId    Int
+  month       Int
+  year        Int
+  status      InputTaxFilingStatus @default(DRAFT)
+  note        String?
+  createdById Int
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  branch      Branch               @relation(fields: [branchId], references: [id])
+  createdBy   EmployeeProfile      @relation(fields: [createdById], references: [id])
+  items       InputTaxFilingItem[]
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+model SalesTaxFilingBatch {
+  id          Int                  @id @default(autoincrement())
+  branchId    Int
+  month       Int
+  year        Int
+  status      SalesTaxFilingStatus @default(DRAFT)
+  note        String?
+  createdById Int
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  branch      Branch               @relation(fields: [branchId], references: [id])
+  createdBy   EmployeeProfile      @relation(fields: [createdById], references: [id])
+  items       SalesTaxFilingItem[]
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+model SalesTaxFilingItem {
+  id        Int                 @id @default(autoincrement())
+  batchId   Int
+  saleId    Int
+  createdAt DateTime            @default(now())
+  batch     SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sale      Sale                @relation(fields: [saleId], references: [id])
+
+  @@unique([batchId, saleId])
+  @@index([saleId])
+}
+
+model InputTaxFilingItem {
+  id                     Int                      @id @default(autoincrement())
+  batchId                Int
+  purchaseOrderReceiptId Int?
+  taxDocumentId          Int?
+  status                 InputTaxFilingItemStatus @default(SELECTED)
+  claimedSubtotalAmount  Decimal?                 @db.Decimal(12, 2)
+  claimedVatAmount       Decimal?                 @db.Decimal(12, 2)
+  claimedTotalAmount     Decimal?                 @db.Decimal(12, 2)
+  eligibilitySnapshot    Json?
+  documentSnapshot       Json?
+  selectedAt             DateTime?
+  filedAt                DateTime?
+  removedAt              DateTime?
+  removedReason          String?
+  version                Int                      @default(1)
+  createdAt              DateTime                 @default(now())
+  batch                  InputTaxFilingBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  receipt                PurchaseOrderReceipt?    @relation(fields: [purchaseOrderReceiptId], references: [id])
+  taxDocument            TaxDocument?             @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, purchaseOrderReceiptId])
+  @@index([purchaseOrderReceiptId])
+  @@index([taxDocumentId, status])
+  @@index([batchId, status])
+  @@index([selectedAt])
+  @@index([filedAt])
+}
+
+enum InputTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
+enum InputTaxDocumentMode {
+  UNCLASSIFIED
+  NOT_RECEIVED
+  RECEIVED
+  NON_VAT_DOCUMENT
+  NO_INPUT_TAX_CLAIM
+}
+
+enum TaxDocumentReceiptSource {
+  WITH_GOODS
+  LATER
+}
+
+enum InputTaxFilingItemStatus {
+  SELECTED
+  FILED
+  REMOVED
+  VOIDED
+}
+
+enum SalesTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
