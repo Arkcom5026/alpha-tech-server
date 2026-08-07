@@ -12,6 +12,7 @@ const env = {
 }
 
 const sumatraPath = 'C:\\Users\\Test\\AppData\\Local\\SumatraPDF\\SumatraPDF.exe'
+const configuredSumatraPath = 'D:\\alpha-tech\\tools\\SumatraPDF\\SumatraPDF.exe'
 const adobePath = 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe'
 
 const ready = createInspectWindowsPdfTransportReadinessService({
@@ -25,9 +26,32 @@ assert.deepStrictEqual(ready.reasons, [])
 assert.strictEqual(ready.selectedTransport.code, 'SUMATRA_PDF')
 assert.strictEqual(ready.selectedTransport.strategy, 'EXPLICIT_PRINTER_CLI')
 assert.strictEqual(ready.selectedTransport.executablePath, sumatraPath)
+assert.strictEqual(ready.selectedTransport.source, 'STANDARD_LOCATION')
 assert.strictEqual(ready.physicalSideEffects, false)
 assert.strictEqual(ready.policy.executionEnabled, false)
 assert.strictEqual(ready.policy.requiresExplicitPrinterTarget, true)
+assert.strictEqual(ready.policy.explicitPathEnvironmentVariable, 'SUMATRA_PDF_PATH')
+
+const configured = createInspectWindowsPdfTransportReadinessService({
+  env: { ...env, SUMATRA_PDF_PATH: configuredSumatraPath },
+  platform: 'win32',
+  existsSync: (candidate) => candidate === configuredSumatraPath,
+}).execute()
+
+assert.strictEqual(configured.ready, true)
+assert.strictEqual(configured.selectedTransport.code, 'SUMATRA_PDF')
+assert.strictEqual(configured.selectedTransport.executablePath, configuredSumatraPath)
+assert.strictEqual(configured.selectedTransport.source, 'EXPLICIT_CONFIG')
+assert.strictEqual(configured.candidates[0].locations[0].configured, true)
+
+const configuredMissing = createInspectWindowsPdfTransportReadinessService({
+  env: { ...env, SUMATRA_PDF_PATH: configuredSumatraPath },
+  platform: 'win32',
+  existsSync: () => false,
+}).execute()
+
+assert.strictEqual(configuredMissing.ready, false)
+assert.deepStrictEqual(configuredMissing.reasons, ['WINDOWS_PDF_TRANSPORT_NOT_DISCOVERED'])
 
 const adobeOnly = createInspectWindowsPdfTransportReadinessService({
   env,
