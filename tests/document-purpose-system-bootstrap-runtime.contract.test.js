@@ -118,6 +118,26 @@ const expectedExisting = (purpose, id) => ({
   assert.equal(replayRepository.versions.length, 0)
   assert.equal(replayRepository.events.length, 0)
 
+  const reorderedMetadataExisting = SYSTEM_DOCUMENT_PURPOSES.map((purpose, index) => {
+    const row = expectedExisting(purpose, index + 20)
+    const metadata = purpose.metadata ?? {}
+    row.metadata = {
+      systemCatalogVersion: metadata.systemCatalogVersion,
+      printEligible: metadata.printEligible,
+      purposeFamily: metadata.purposeFamily,
+    }
+    return row
+  })
+  const reorderedRepository = createRepository({ existing: reorderedMetadataExisting })
+  const reorderedReplay = await new SystemDocumentPurposeBootstrapService(reorderedRepository)
+    .execute({ branchId: 1 })
+
+  assert.equal(reorderedReplay.changed, false)
+  assert.equal(reorderedReplay.created.length, 0)
+  assert.equal(reorderedRepository.definitions.length, 0)
+  assert.equal(reorderedRepository.versions.length, 0)
+  assert.equal(reorderedRepository.events.length, 0)
+
   const customConflict = expectedExisting(SYSTEM_DOCUMENT_PURPOSES[0], 7)
   customConflict.isSystem = false
   await assert.rejects(
