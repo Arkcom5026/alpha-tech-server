@@ -8,6 +8,8 @@ const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
 const service = read('src/modules/sales/documents/print/projectSaleDeliveryNoteService.js');
+const resolver = read('src/modules/document-purpose/resolve/resolvePrintDocumentPurposeService.js');
+const catalog = read('src/modules/document-purpose/bootstrap/systemDocumentPurposeCatalog.js');
 const controller = read('src/modules/sales/documents/controllers/saleDeliveryNoteController.js');
 const routes = read('src/modules/sales/routes/saleRoutes.js');
 
@@ -15,10 +17,23 @@ assert.match(service, /where: \{ id: normalizedSaleId, branchId: normalizedBranc
 assert.match(service, /sale\.status !== 'COMPLETED'/);
 assert.match(service, /sale\.isCredit === true \|\| sale\.paid !== true \|\| sale\.statusPayment !== 'PAID'/);
 assert.match(service, /DELIVERY_NOTE_NOT_REQUIRED/);
-assert.match(service, /DELIVERY_NOTE/);
-assert.match(service, /ใบส่งสินค้า/);
+assert.match(service, /ResolvePrintDocumentPurposeService/);
+assert.match(service, /code: 'DELIVERY_NOTE'/);
+assert.match(service, /type: purpose\.code/);
+assert.match(service, /title: purpose\.displayName/);
+assert.doesNotMatch(service, /title:\s*['"]ใบส่งสินค้า['"]/);
 assert.match(service, /simpleItems/);
 assert.match(service, /documentDescription/);
+
+assert.match(resolver, /findByCode/);
+assert.match(resolver, /purpose\.isSystem !== true/);
+assert.match(resolver, /purpose\.lifecycleState !== 'ACTIVE'/);
+assert.match(resolver, /purpose\.metadata\?\.printEligible !== true/);
+
+assert.match(catalog, /code: 'DELIVERY_NOTE'/);
+assert.match(catalog, /displayName: 'ใบส่งสินค้า'/);
+assert.match(catalog, /printEligible: true/);
+
 assert.match(controller, /req\.user\?\.branchId/);
 assert.match(controller, /projectSaleDeliveryNote/);
 assert.match(routes, /getSaleDeliveryNote/);
