@@ -59,22 +59,35 @@ const detail = async ({ branchId, heldCartId }, tx = prisma, lock = false) => {
     WHERE "heldCartId" = ${Number(heldCartId)}
     ORDER BY "sortOrder", "id"
   `);
+  const adjustments = await tx.$queryRaw(Prisma.sql`
+    SELECT "lineId", "priceAdjustment", "adjustmentReason", "finalPrice"
+    FROM "SalePriceAdjustmentEvidence"
+    WHERE "sourceType" = 'HELD_CART' AND "heldCartId" = ${Number(heldCartId)}
+  `);
+  const adjustmentByLine = new Map(adjustments.map((row) => [String(row.lineId), row]));
   return mapCart({
     ...rows[0],
-    lines: lines.map((line) => ({
-      ...line,
-      id: Number(line.id),
-      productId: Number(line.productId),
-      stockItemId: line.stockItemId == null ? null : Number(line.stockItemId),
-      simpleLotId: line.simpleLotId == null ? null : Number(line.simpleLotId),
-      quantity: money(line.quantity, 'quantity'),
-      unitPrice: money(line.unitPrice, 'unitPrice'),
-      discount: money(line.discount, 'discount'),
-    })),
+    lines: lines.map((line) => {
+      const adjustment = adjustmentByLine.get(String(line.lineKey));
+      return {
+        ...line,
+        id: Number(line.id),
+        productId: Number(line.productId),
+        stockItemId: line.stockItemId == null ? null : Number(line.stockItemId),
+        simpleLotId: line.simpleLotId == null ? null : Number(line.simpleLotId),
+        quantity: money(line.quantity, 'quantity'),
+        unitPrice: money(line.unitPrice, 'unitPrice'),
+        discount: money(line.discount, 'discount'),
+        priceAdjustment: Number(adjustment?.priceAdjustment || -Number(line.discount || 0)),
+        adjustmentReason: adjustment?.adjustmentReason || null,
+        finalPrice: adjustment ? Number(adjustment.finalPrice) : Math.max(0, Number(line.unitPrice) * Number(line.quantity) - Number(line.discount || 0)),
+      };
+    }),
   });
 };
 
-const replaceLines = async (tx, heldCartId, items) => {
+const replaceLines = async (tx, { heldCartId, branchId, employeeId, items }) => {
+  await tx.$executeRaw(Prisma.sql`DELETE FROM "SalePriceAdjustmentEvidence" WHERE "sourceType" = 'HELD_CART' AND "heldCartId" = ${Number(heldCartId)}`);
   await tx.$executeRaw(Prisma.sql`DELETE FROM "PosHeldCartLine" WHERE "heldCartId" = ${Number(heldCartId)}`);
   for (const item of items) {
     await tx.$executeRaw(Prisma.sql`
@@ -86,6 +99,16 @@ const replaceLines = async (tx, heldCartId, items) => {
         ${item.productId}, ${item.stockItemId}, ${item.simpleLotId}, ${item.barcode},
         ${item.productName}, ${item.modelName}, ${item.quantity}, ${item.unitPrice},
         ${item.discount}, ${item.remark}, ${item.sortOrder}
+      )
+    `);
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "SalePriceAdjustmentEvidence" (
+        "sourceType", "heldCartId", "branchId", "lineId", "lineType", "basePrice",
+        "priceAdjustment", "finalPrice", "adjustmentReason", "createdByEmployeeId"
+      ) VALUES (
+        'HELD_CART', ${Number(heldCartId)}, ${Number(branchId)}, ${item.lineKey}, ${item.lineType},
+        ${Number(item.unitPrice) * Number(item.quantity)}, ${item.priceAdjustment}, ${item.finalPrice},
+        ${item.adjustmentReason}, ${Number(employeeId)}
       )
     `);
   }
@@ -110,7 +133,7 @@ const create = async ({ branchId, employeeId, snapshot }, tx) => {
       ${Number(employeeId)}, ${Number(employeeId)}
     ) RETURNING "id"
   `);
-  await replaceLines(tx, rows[0].id, snapshot.items);
+  await replaceLines(tx, { heldCartId: rows[0].id, branchId, employeeId, items: snapshot.items });
   return detail({ branchId, heldCartId: rows[0].id }, tx);
 };
 
@@ -132,7 +155,7 @@ const update = async ({ branchId, employeeId, heldCartId, expectedVersion, snaps
       "version" = "version" + 1, "updatedAt" = CURRENT_TIMESTAMP
     WHERE "id" = ${Number(heldCartId)}
   `);
-  await replaceLines(tx, heldCartId, snapshot.items);
+  await replaceLines(tx, { heldCartId, branchId, employeeId, items: snapshot.items });
   return detail({ branchId, heldCartId }, tx);
 };
 

@@ -13,6 +13,11 @@ const money = (value, field, allowZero = true) => {
   if (!Number.isFinite(parsed) || parsed < 0 || (!allowZero && parsed === 0)) fail(`${field} is invalid`, 'HELD_CART_INPUT_INVALID');
   return Math.round(parsed * 100) / 100;
 };
+const signedMoney = (value, field) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) fail(`${field} is invalid`, 'HELD_CART_INPUT_INVALID');
+  return Math.round(parsed * 100) / 100;
+};
 const text = (value, max = 500) => String(value || '').trim().slice(0, max) || null;
 
 const parseLine = (line, index) => {
@@ -25,13 +30,28 @@ const parseLine = (line, index) => {
     ? positiveInt(line.simpleLotId, `items[${index}].simpleLotId`)
     : null;
   const lineKey = text(line.lineId || line.lineKey, 120) || `${lineType}-${stockItemId || simpleLotId || productId}-${index}`;
+  const unitPrice = money(line.unitPrice ?? line.price, `items[${index}].unitPrice`);
+  const basePrice = Math.round(unitPrice * quantity * 100) / 100;
+  const legacyDiscount = money(line.discount || 0, `items[${index}].discount`);
+  const billShare = money(line.billShare || 0, `items[${index}].billShare`);
+  const itemAdjustment = line.priceAdjustment == null
+    ? Math.round(-(legacyDiscount - billShare) * 100) / 100
+    : signedMoney(line.priceAdjustment, `items[${index}].priceAdjustment`);
+  const priceAdjustment = Math.round((itemAdjustment - billShare) * 100) / 100;
+  const finalPrice = Math.round((basePrice + priceAdjustment) * 100) / 100;
+  if (finalPrice < 0) fail('Price adjustment makes held cart line negative', 'HELD_CART_TOTAL_INVALID');
+  const discount = priceAdjustment < 0 ? Math.round(-priceAdjustment * 100) / 100 : 0;
+
   return {
     lineKey, lineType, productId, stockItemId, simpleLotId, quantity,
     barcode: text(line.barcode, 180),
     productName: text(line.productName, 300) || `Product ${productId}`,
     modelName: text(line.model || line.modelName, 200),
-    unitPrice: money(line.unitPrice ?? line.price, `items[${index}].unitPrice`),
-    discount: money(line.discount || 0, `items[${index}].discount`),
+    unitPrice,
+    discount,
+    priceAdjustment,
+    adjustmentReason: text(line.adjustmentReason, 500),
+    finalPrice,
     remark: text(line.remark, 500),
     sortOrder: index,
   };
@@ -43,7 +63,9 @@ const parseSnapshot = (body = {}) => {
   if (new Set(items.map((item) => item.lineKey)).size !== items.length) fail('Held cart line keys must be unique', 'HELD_CART_DUPLICATE_LINE');
   const totalBeforeDiscount = money(items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), 'totalBeforeDiscount');
   const totalDiscount = money(items.reduce((sum, item) => sum + item.discount, 0), 'totalDiscount');
-  if (totalDiscount > totalBeforeDiscount + 0.01) fail('Discount exceeds cart total', 'HELD_CART_TOTAL_INVALID');
+  const totalPriceAdjustment = signedMoney(items.reduce((sum, item) => sum + item.priceAdjustment, 0), 'totalPriceAdjustment');
+  const totalAmount = signedMoney(totalBeforeDiscount + totalPriceAdjustment, 'totalAmount');
+  if (totalAmount < 0) fail('Held cart total cannot be negative', 'HELD_CART_TOTAL_INVALID');
   return {
     customerId: body.customerId == null ? null : positiveInt(body.customerId, 'customerId'),
     customerName: text(body.customerName, 200),
@@ -53,8 +75,9 @@ const parseSnapshot = (body = {}) => {
     items,
     totalBeforeDiscount,
     totalDiscount,
-    totalAmount: money(totalBeforeDiscount - totalDiscount, 'totalAmount'),
+    totalPriceAdjustment,
+    totalAmount,
   };
 };
 
-module.exports = Object.freeze({ fail, money, parseSnapshot, positiveInt, text });
+module.exports = Object.freeze({ fail, money, parseSnapshot, positiveInt, signedMoney, text });
