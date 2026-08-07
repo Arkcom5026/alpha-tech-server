@@ -3,6 +3,7 @@
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { readPrismaSchemaSource } = require('./read-prisma-schema-source');
 
 const root = path.resolve(__dirname, '..');
 
@@ -248,7 +249,7 @@ assertNotContains(saleReturn, 'req.user?.employeeId || req.user?.profileId', 'sa
 const supplierPaymentRoutes = read('src/modules/procurement/supplier-payment/routes/supplierPaymentRoutes.js');
 assertContains(supplierPaymentRoutes, 'requireSupplierPaymentActor', 'supplier payment actor route guard');
 
-const schema = read('prisma/schema.prisma');
+const schema = readPrismaSchemaSource(root);
 const employeeProfileBlock = schema.match(/model\s+EmployeeProfile\s*\{[\s\S]*?\n\}/)?.[0] || '';
 assertContains(employeeProfileBlock, 'onDelete: Restrict', 'EmployeeProfile.user onDelete Restrict');
 assertContains(employeeProfileBlock, 'active', 'EmployeeProfile active lifecycle field');

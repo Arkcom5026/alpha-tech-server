@@ -3,6 +3,7 @@
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { readPrismaSchemaSource } = require('./read-prisma-schema-source');
 
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -60,7 +61,7 @@ assertContains(quickReceiptMigration, 'CREATE TABLE "QuickReceiptSessionItem"', 
 assertContains(quickReceiptMigration, 'CREATE TABLE "QuickReceiptFinalizeCommand"', 'Quick receipt finalization authority');
 assertContains(quickReceiptMigration, 'QuickReceiptSession_active_delivery_unique', 'Quick receipt active delivery uniqueness');
 
-const schema = read('prisma/schema.prisma');
+const schema = readPrismaSchemaSource(root);
 assertContains(schema, 'model PurchaseOrderReceipt {', 'purchase receipt tax source model');
 
 const server = read('server.js');

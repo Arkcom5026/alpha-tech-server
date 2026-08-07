@@ -3,9 +3,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readPrismaSchemaSource } = require('../scripts/read-prisma-schema-source');
 
 const root = path.resolve(__dirname, '..');
-const schema = fs.readFileSync(path.join(root, 'prisma', 'schema.prisma'), 'utf8');
+const schema = readPrismaSchemaSource(root);
 const migration = fs.readFileSync(
   path.join(root, 'prisma', 'migrations', '20260804070000_store_experience_root_foundation', 'migration.sql'),
   'utf8',

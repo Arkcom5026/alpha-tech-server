@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
 import { fileURLToPath } from 'node:url';
+import schemaReader from '../scripts/read-prisma-schema-source.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-const schema = read('prisma/schema.prisma');
+const schema = schemaReader.readPrismaSchemaSource(root);
 const service = read('src/modules/storeExperience/draft/storeExperienceDraftService.js');
 const repository = read('src/modules/storeExperience/draft/storeExperienceDraftRepository.js');
 const publicRepository = read('src/modules/sales/storefront/public/publicStorefrontRepository.js');

@@ -3,6 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { readPrismaSchemaSource } = require('../scripts/read-prisma-schema-source');
 
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -11,7 +12,7 @@ const issueService = read('src/modules/tax/documents/issue/issueOutputTaxDocumen
 const repository = read('src/modules/tax/documents/repository/taxDocumentRepository.js');
 const controller = read('src/modules/tax/http/taxIntakeController.js');
 const routes = read('src/modules/tax/http/taxIntakeRoutes.js');
-const schema = read('prisma/schema.prisma');
+const schema = readPrismaSchemaSource(root);
 
 assert.match(issueService, /forUpdate: true/);
 assert.match(issueService, /FOR UPDATE/);
