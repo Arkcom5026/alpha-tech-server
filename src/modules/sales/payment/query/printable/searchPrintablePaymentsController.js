@@ -10,6 +10,13 @@ const toLocalRange = (dateStr, tz = '+07:00') => {
   return { start, end };
 };
 
+const isDocumentPurposeError = (error) =>
+  typeof error?.code === 'string' &&
+  error.code.startsWith('DOCUMENT_PURPOSE_') &&
+  Number.isInteger(error?.statusCode) &&
+  error.statusCode >= 400 &&
+  error.statusCode < 600;
+
 const searchPrintablePayments = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
@@ -110,6 +117,15 @@ const searchPrintablePayments = async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('❌ [searchPrintablePayments] error:', error);
+
+    if (isDocumentPurposeError(error)) {
+      return res.status(error.statusCode).json({
+        code: error.code,
+        message: error.message,
+        ...(error.detail !== undefined ? { detail: error.detail } : {}),
+      });
+    }
+
     return res.status(500).json({ message: 'ไม่สามารถโหลดข้อมูลใบเสร็จได้' });
   }
 };
