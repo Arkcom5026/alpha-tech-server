@@ -1,0 +1,19 @@
+model SalePriceAdjustmentEvidence {
+  id                  Int      @id @default(autoincrement())
+  saleId              Int
+  branchId            Int
+  lineId              String   @db.VarChar(160)
+  lineType            String   @db.VarChar(24)
+  basePrice           Decimal  @db.Decimal(12, 2)
+  priceAdjustment     Decimal  @default(0) @db.Decimal(12, 2)
+  finalPrice          Decimal  @db.Decimal(12, 2)
+  adjustmentReason    String?
+  createdByEmployeeId Int
+  metadata            Json?
+  createdAt           DateTime @default(now())
+
+  @@unique([saleId, lineId])
+  @@index([branchId, createdAt])
+  @@index([saleId])
+  @@index([createdByEmployeeId])
+}
