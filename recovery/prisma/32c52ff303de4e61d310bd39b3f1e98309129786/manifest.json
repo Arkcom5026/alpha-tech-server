@@ -1,0 +1,21 @@
+{
+  "mission": "Prisma Multi-file Domain Organization",
+  "stage": "Wave 0 - Immutable Recovery Baseline",
+  "repository": "Arkcom5026/alpha-tech-server",
+  "sourceBranch": "main",
+  "sourceHead": "32c52ff303de4e61d310bd39b3f1e98309129786",
+  "sourceTree": "4c9c882db18a13c280fe248f594ea184991e68a3",
+  "sourcePath": "prisma/schema.prisma",
+  "sourceBlob": "6ae33c717d8e7876331a0cb3fcacaa03c0aa6d30",
+  "recoveryPath": "recovery/prisma/32c52ff303de4e61d310bd39b3f1e98309129786/schema.prisma",
+  "recoveryBlob": "6ae33c717d8e7876331a0cb3fcacaa03c0aa6d30",
+  "byteIdentityAuthority": "sourceBlob == recoveryBlob",
+  "modelCount": 128,
+  "enumCount": 107,
+  "databaseTarget": "NONE",
+  "migration": "PROHIBITED",
+  "semanticSchemaChange": "PROHIBITED",
+  "originalMutationStatus": "NOT_TOUCHED",
+  "candidateReplacementAuthority": "NOT_GRANTED",
+  "createdAt": "2026-08-07T10:00:00+07:00"
+}

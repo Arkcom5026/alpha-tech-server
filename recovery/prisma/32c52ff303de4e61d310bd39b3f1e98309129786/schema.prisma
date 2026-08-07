@@ -1,0 +1,3948 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                  Int                  @id @default(autoincrement())
+  email               String?              @unique
+  password            String
+  role                Role
+  enabled             Boolean              @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  loginId             String?              @unique
+  loginType           LoginType            @default(PHONE)
+  cart                Cart[]
+  customerProfiles    CustomerProfile[]
+  employeeProfile     EmployeeProfile?
+  orderOnline         OrderOnline[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedOwner")
+}
+
+model EmployeeProfile {
+  id                                Int                         @id @default(autoincrement())
+  name                              String?
+  phone                             String?
+  userId                            Int                         @unique
+  branchId                          Int?
+  positionId                        Int?
+  createdAt                         DateTime                    @default(now())
+  updatedAt                         DateTime                    @updatedAt
+  approved                          Boolean                     @default(false)
+  active                            Boolean                     @default(true)
+  passwordHashV2                    String?
+  v2Role                            EmployeeRole                @default(CASHIER)
+  combinedBillingDocument           CombinedBillingDocument[]
+  combinedSaleDocument              CombinedSaleDocument[]
+  customerDeposit                   CustomerDeposit[]
+  createdCustomerReceiptAllocations CustomerReceiptAllocation[] @relation("CustomerReceiptAllocationCreatedBy")
+  cancelledCustomerReceipts         CustomerReceipt[]           @relation("CustomerReceiptCancelledBy")
+  createdCustomerReceipts           CustomerReceipt[]           @relation("CustomerReceiptCreatedBy")
+  branch                            Branch?                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  position                          Position?                   @relation(fields: [positionId], references: [id])
+  user                              User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  inputTaxFilingBatches             InputTaxFilingBatch[]
+  taxDocumentLifecycleEvents        TaxDocumentLifecycleEvent[]
+  createdProductReservations        ProductReservation[]         @relation("ProductReservationCreatedBy")
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[] @relation("ProductReservationLifecycleCommandActor")
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[] @relation("ProductReservationLifecycleEventActor")
+  confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
+  payment                           Payment[]
+  purchaseOrderCreated              PurchaseOrder[]
+  PurchaseOrderReceipt              PurchaseOrderReceipt[]
+  refundTransaction                 RefundTransaction[]
+  repairJobs                        RepairJob[]
+  sale                              Sale[]
+  saleReturns                       SaleReturn[]
+  performedStockMovements           StockMovement[]
+  createdWarrantyClaims             WarrantyClaim[]             @relation("WarrantyClaimCreatedBy")
+  resolvedWarrantyClaims            WarrantyClaim[]             @relation("WarrantyClaimResolvedBy")
+  performedWarrantyClaimEvents      WarrantyClaimEvent[]
+  deviceOwnershipHistory            DeviceOwnershipHistory[]    @relation("DeviceOwnershipCreatedBy")
+  devicePassportEvents              DevicePassportEvent[]       @relation("DevicePassportActor")
+  checkedDeviceIntakeItems          DeviceIntakeChecklist[]     @relation("DeviceIntakeChecklistCheckedBy")
+  uploadedDeviceIntakeDocuments     DeviceIntakeDocument[]      @relation("DeviceIntakeDocumentUploadedBy")
+  uploadedDeviceIntakePhotos        DeviceIntakePhoto[]         @relation("DeviceIntakePhotoUploadedBy")
+  performedDeviceIntakeAudits       DeviceIntakeAudit[]         @relation("DeviceIntakeAuditPerformedBy")
+  receivedDeviceIntakes             DeviceIntake[]              @relation("DeviceIntakeReceivedBy")
+  diagnosedRepairJobs               RepairDiagnosis[]           @relation("RepairDiagnosisDiagnosedBy")
+  performedRepairLaborItems         RepairLaborItem[]           @relation("RepairLaborPerformedBy")
+  checkedRepairQualityChecks        RepairQualityCheck[]        @relation("RepairQualityCheckedBy")
+  deliveredRepairJobs               RepairDelivery[]            @relation("RepairDeliveryDeliveredBy")
+  createdRepairTrackingAccesses     RepairTrackingAccess[]      @relation("RepairTrackingAccessCreatedBy")
+  requestedRepairEstimateApprovals  RepairEstimateApproval[]    @relation("RepairEstimateApprovalRequestedBy")
+  refundedReturns                   SaleReturn[]                @relation("RefundedBy")
+  salesTaxFilingBatches             SalesTaxFilingBatch[]
+  assignedServices                  ServiceOrder[]
+  stockAuditScanLog                 StockAuditScanLog[]
+  stockAuditSession                 StockAuditSession[]
+  stockItem                         StockItem[]
+  supplierPayment                   SupplierPayment[]             @relation("SupplierPaymentCreatedBy")
+  createdSupplierPayables           SupplierPayable[]            @relation("SupplierPayableCreatedBy")
+  voidedSupplierPayments            SupplierPayment[]             @relation("SupplierPaymentVoidedBy")
+  reversedSupplierPaymentAllocations SupplierPaymentAllocation[] @relation("SupplierPaymentAllocationReversedBy")
+  createdSupplierAdvances            SupplierAdvance[]            @relation("SupplierAdvanceCreatedBy")
+  activatedSupplierAdvances          SupplierAdvance[]            @relation("SupplierAdvanceActivatedBy")
+  voidedSupplierAdvances             SupplierAdvance[]            @relation("SupplierAdvanceVoidedBy")
+  reversedSupplierAdvanceAllocations SupplierAdvanceAllocation[]  @relation("SupplierAdvanceAllocationReversedBy")
+  openedSupplierPayableDisputes      SupplierPayableDispute[]      @relation("SupplierPayableDisputeOpenedBy")
+  resolvedSupplierPayableDisputes    SupplierPayableDispute[]      @relation("SupplierPayableDisputeResolvedBy")
+  createdSupplierPayableAdjustments  SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentCreatedBy")
+  voidedSupplierPayableAdjustments   SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentVoidedBy")
+  createdPosHeldCarts                PosHeldCart[]                  @relation("PosHeldCartCreatedBy")
+  updatedPosHeldCarts                PosHeldCart[]                  @relation("PosHeldCartUpdatedBy")
+  cancelledPosHeldCarts              PosHeldCart[]                  @relation("PosHeldCartCancelledBy")
+  v2StockAudits                     V2StockAudit[]
+  createdMissingCostResolutions      MissingCostResolution[]        @relation("MissingCostResolutionCreatedBy")
+  approvedMissingCostResolutions     MissingCostResolution[]        @relation("MissingCostResolutionApprovedBy")
+  proposedMissingCostResolutionVersions MissingCostResolutionVersion[] @relation("MissingCostResolutionVersionProposer")
+  approvedMissingCostResolutionVersions MissingCostResolutionVersion[] @relation("MissingCostResolutionVersionApprover")
+  performedMissingCostResolutionEvents MissingCostResolutionEvent[] @relation("MissingCostResolutionEventActor")
+  createdTaxExpenses                    TaxExpense[]                @relation("TaxExpenseCreatedBy")
+  assessedTaxExpenses                   TaxExpenseAssessment[]      @relation("TaxExpenseAssessmentAssessedBy")
+  performedTaxExpenseEvents             TaxExpenseLifecycleEvent[]  @relation("TaxExpenseLifecycleEventActor")
+  uploadedTaxExpenseAttachments         TaxExpenseAttachment[]      @relation("TaxExpenseAttachmentUploadedBy")
+  createdExpensePayees                   ExpensePayee[]               @relation("ExpensePayeeCreatedBy")
+  productTemplateCandidatesCreated      ProductTemplateCandidate[]  @relation("ProductTemplateCandidateCreatedBy")
+  productTemplateCandidatesReviewed     ProductTemplateCandidate[]  @relation("ProductTemplateCandidateReviewedBy")
+  productTemplateCandidateEvents        ProductTemplateCandidateEvent[] @relation("ProductTemplateCandidateEventActor")
+}
+
+model Branch {
+  id                              Int                              @id @default(autoincrement())
+  name                            String
+  address                         String
+  createdAt                       DateTime                         @default(now())
+  updatedAt                       DateTime                         @updatedAt
+  RBACEnabled                     Boolean                          @default(true)
+  phone                           String?
+  subdistrictCode                 String?
+  businessType                    BusinessType                     @default(GENERAL)
+  features                        Json?
+  branchCode                      String?                          @db.VarChar(5)
+  isHeadOffice                    Boolean                          @default(false)
+  taxId                           String?                          @db.VarChar(13)
+  slug                            String?                          @unique
+  categoryId                      Int                              @default(1)
+
+  banks                           Bank[]
+  barcodeCounter                  BarcodeCounter[]
+  barcodeReceiptItem              BarcodeReceiptItem[]
+  category                        Category                         @relation(fields: [categoryId], references: [id])
+  subdistrict                     Subdistrict?                     @relation(fields: [subdistrictCode], references: [code])
+  branchPrices                    BranchPrice[]
+  combinedBillingDocument         CombinedBillingDocument[]
+  combinedSaleDocument            CombinedSaleDocument[]
+  customerProfiles                CustomerProfile[]
+  customerDeposit                 CustomerDeposit[]
+  customerReceipts                CustomerReceipt[]
+  employees                       EmployeeProfile[]
+  inputTaxFilingBatches           InputTaxFilingBatch[]
+  orderOnline                     OrderOnline[]
+  payment                         Payment[]
+  paymentCodeCounter              PaymentCodeCounter[]
+  productTypes                    ProductType[]
+  products                        Product[]
+  brands                          Brand[]
+  positions                       Position[]
+  pos                             PurchaseOrder[]
+  purchaseOrderReceipt            PurchaseOrderReceipt[]
+  refundTransaction               RefundTransaction[]
+  repairJobs                      RepairJob[]
+  sale                            Sale[]
+  salesCompletionCommands         SalesCompletionCommand[]
+  saleReturn                      SaleReturn[]
+  saleReturnCompletionCommands    SaleReturnCompletionCommand[]
+  warrantyClaims                  WarrantyClaim[]
+  warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
+  devices                         Device[]
+  devicePassportEvents            DevicePassportEvent[]
+  deviceIntakes                   DeviceIntake[]
+  salesTaxFilingBatches           SalesTaxFilingBatch[]
+  services                        ServiceOrder[]
+  simpleLots                      SimpleLot[]
+  stockAuditSession               StockAuditSession[]
+  stockBalances                   StockBalance[]
+  stock                           StockItem[]
+  stockMovement                   StockMovement[]
+  productReservations             ProductReservation[]
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[]
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[]
+  suppliers                       Supplier[]
+  supplierPayment                 SupplierPayment[]
+  supplierPayables                SupplierPayable[]
+  supplierPayableDisputes         SupplierPayableDispute[]
+  supplierPayableAdjustments      SupplierPayableAdjustment[]
+  posHeldCarts                    PosHeldCart[]
+  supplierAdvances                SupplierAdvance[]
+  taxCandidates                   TaxCandidate[]
+  taxDocuments                    TaxDocument[]
+  v2StockAudits                   V2StockAudit[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedBranch")
+  missingCostResolutions               MissingCostResolution[]
+  taxExpenseCategories                 TaxExpenseCategory[]
+  expensePayees                        ExpensePayee[]
+  taxExpenses                          TaxExpense[]
+  taxIssuerProfile                     TaxIssuerProfile?
+  storeExperienceProfile               StoreExperienceProfile?
+  sourceProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceBranch")
+  targetProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetBranch")
+  storeDeviceGateways                  StoreDeviceGateway[]
+  storeDeviceGatewaySessions           StoreDeviceGatewaySession[]
+  storeDeviceJobs                      StoreDeviceJob[]
+  storeDeviceJobLeases                 StoreDeviceJobLease[]
+  storeDeviceJobResults                StoreDeviceJobResult[]
+
+  @@index([subdistrictCode])
+}
+
+enum TaxIssuerProfileStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+}
+
+model TaxIssuerProfile {
+  id                         Int                    @id @default(autoincrement())
+  branchId                   Int                    @unique
+  legalName                  String?
+  taxId                      String?                @db.VarChar(13)
+  registeredAddress          String?
+  branchCode                 String                 @default("00000") @db.VarChar(5)
+  isHeadOffice               Boolean                @default(false)
+  shortTaxInvoicePrefix      String?
+  fullTaxInvoicePrefix       String?
+  nextShortTaxInvoiceNumber  Int                    @default(1)
+  nextFullTaxInvoiceNumber   Int                    @default(1)
+  creditNotePrefix           String?
+  nextCreditNoteNumber       Int                    @default(1)
+  status                     TaxIssuerProfileStatus @default(DRAFT)
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  branch                     Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  issuedTaxDocuments         TaxDocument[]          @relation("TaxDocumentIssuerProfile")
+
+  @@index([status])
+}
+
+
+enum StoreExperienceProfileStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  SUSPENDED
+}
+
+model StoreExperienceProfile {
+  id                   Int                          @id @default(autoincrement())
+  branchId             Int                          @unique
+  status               StoreExperienceProfileStatus @default(DRAFT)
+  themePreset          String                       @default("platform-default") @db.VarChar(80)
+  themeTokens          Json?
+  layoutPreset         String                       @default("platform-default") @db.VarChar(80)
+  sectionConfiguration Json?
+  contentConfiguration              Json?
+  publishedThemePreset              String?                       @db.VarChar(80)
+  publishedThemeTokens              Json?
+  publishedLayoutPreset             String?                       @db.VarChar(80)
+  publishedSectionConfiguration     Json?
+  publishedContentConfiguration     Json?
+  publishedVersion                  Int?
+  version              Int                          @default(1)
+  publishedAt          DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  branch               Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([publishedAt])
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  active    Boolean  @default(true)
+  isSystem  Boolean  @default(false)
+
+  branches           Branch[]
+  globalProductTypes GlobalProductType[]
+}
+
+model GlobalProductType {
+  id           Int           @id @default(autoincrement())
+  name         String
+  slug         String        @unique
+  active       Boolean       @default(true)
+  categoryId   Int
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  category     Category      @relation(fields: [categoryId], references: [id])
+  productTypes ProductType[]
+
+  @@index([categoryId])
+  @@index([active])
+}
+
+model ProductTypeBrand {
+  id            Int         @id @default(autoincrement())
+  productTypeId Int
+  brandId       Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  brand         Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([productTypeId, brandId])
+  @@index([productTypeId])
+  @@index([brandId])
+}
+
+model ProductType {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  active              Boolean  @default(true)
+  guideExamples       String[] @default([])
+  normalizedName      String?
+  pathCached          String?
+  branchId            Int?
+  globalProductTypeId Int
+
+  Product           Product[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  globalProductType GlobalProductType  @relation(fields: [globalProductTypeId], references: [id])
+  productTypeBrands ProductTypeBrand[]
+
+  @@unique([branchId, globalProductTypeId, normalizedName])
+  @@index([branchId])
+  @@index([globalProductTypeId])
+}
+
+model Brand {
+  id                Int                @id @default(autoincrement())
+  name              String
+  normalizedName    String             @unique
+  branchId          Int?
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  products          Product[]
+  productTypeBrands ProductTypeBrand[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+
+  @@index([active])
+  @@index([name])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, normalizedName])
+}
+
+model Product {
+  id                       Int                        @id @default(autoincrement())
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  noSN                     Boolean                    @default(false)
+  active                   Boolean                    @default(true)
+  name                     String
+  mode                     ProductMode                @default(STRUCTURED)
+  inventoryBehavior        ProductInventoryBehavior   @default(TRACKED)
+  saleBarcode              String?
+  trackSerialNumber        Boolean                    @default(false)
+  productTypeId            Int?
+  brandId                  Int?
+  codeType                 String?
+  productConfig            Json?
+  unitId                   Int?
+  warrantyDays             Int?
+  templateProductId        Int?
+  branchId                 Int?
+  branchPrice              BranchPrice[]
+  cartItems                CartItem[]
+  orderOnlineItem          OrderOnlineItem[]
+  brand                    Brand?                     @relation(fields: [brandId], references: [id])
+  productType              ProductType?               @relation(fields: [productTypeId], references: [id])
+  branch                   Branch?                    @relation(fields: [branchId], references: [id])
+  templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onUpdate: NoAction)
+  clonedProducts           Product[]                  @relation("ProductTemplateClone")
+  unit                     Unit?                      @relation(fields: [unitId], references: [id])
+  productImages            ProductImage[]
+  orderItems               ProductOnOrder[]
+  purchaseOrderItems       PurchaseOrderItem[]
+  PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
+  repairPartItems          RepairPartItem[]
+  saleItemSimple           SaleItemSimple[]
+  serviceItems             ServiceItem[]
+  simpleLots               SimpleLot[]
+  stockAuditSnapshotItem   StockAuditSnapshotItem[]
+  posHeldCartLines         PosHeldCartLine[]
+  stockBalances            StockBalance[]
+  stockItems               StockItem[]
+  stockMovement            StockMovement[]
+  productReservationItems  ProductReservationItem[]
+  v2StockAuditItems        V2StockAuditItem[]
+  missingCostResolutions   MissingCostResolution[]
+  sourceProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceProduct")
+  targetProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetProduct")
+
+  @@index([mode, active])
+  @@index([mode, inventoryBehavior, active])
+  @@index([saleBarcode])
+  @@index([productTypeId])
+  @@index([brandId])
+  @@index([templateProductId])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, productTypeId])
+  @@index([branchId, templateProductId])
+}
+
+model BranchPrice {
+  id              Int       @id @default(autoincrement())
+  productId       Int
+  branchId        Int
+  effectiveDate   DateTime?
+  expiredDate     DateTime?
+  note            String?
+  updatedBy       Int?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  costPrice       Decimal   @db.Decimal(12, 2)
+  priceOnline     Int?
+  priceRetail     Int?
+  priceTechnician Int?
+  priceWholesale  Int?
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+
+  @@unique([productId, branchId])
+}
+
+model StockBalance {
+  id               Int      @id @default(autoincrement())
+  productId        Int
+  branchId         Int
+  quantity         Decimal  @default(0) @db.Decimal(12, 2)
+  reserved         Decimal  @default(0) @db.Decimal(12, 2)
+  avgCost          Decimal? @db.Decimal(12, 2)
+  lastReceivedCost Decimal? @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  branch           Branch   @relation(fields: [branchId], references: [id])
+  product          Product  @relation(fields: [productId], references: [id])
+  missingCostResolutions MissingCostResolution[]
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+}
+
+model StockMovement {
+  id                    Int               @id @default(autoincrement())
+  productId             Int
+  branchId              Int
+  qty                   Decimal           @db.Decimal(12, 2)
+  type                  StockMovementType
+  refType               String?
+  refId                 Int?
+  note                  String?
+  createdAt             DateTime          @default(now())
+  simpleLotId           Int?
+  stockItemId           Int?
+  previousStockStatus   StockStatus?
+  resultingStockStatus  StockStatus?
+  performedByEmployeeId Int?
+  occurredAt            DateTime          @default(now())
+  branch                Branch            @relation(fields: [branchId], references: [id])
+  product               Product           @relation(fields: [productId], references: [id])
+  simpleLots            SimpleLot?        @relation(fields: [simpleLotId], references: [id])
+  stockItem             StockItem?        @relation(fields: [stockItemId], references: [id])
+  performedBy           EmployeeProfile?  @relation(fields: [performedByEmployeeId], references: [id])
+
+  @@index([branchId, createdAt])
+  @@index([productId, createdAt])
+  @@index([branchId, type, createdAt])
+  @@index([productId, branchId, createdAt])
+  @@index([stockItemId, occurredAt])
+  @@index([simpleLotId, occurredAt])
+  @@index([branchId, type, occurredAt])
+  @@index([productId, branchId, occurredAt])
+}
+
+model ProductImage {
+  id         Int      @id @default(autoincrement())
+  public_id  String   @unique
+  url        String
+  secure_url String
+  active     Boolean  @default(true)
+  productId  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  caption    String?
+  isCover    Boolean?
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Unit {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+}
+
+model StockItem {
+  id                         Int                       @id @default(autoincrement())
+  barcode                    String                    @unique
+  serialNumber               String?
+  receivedAt                 DateTime                  @default(now())
+  warrantyDays               Int?
+  expiredAt                  DateTime?
+  soldAt                     DateTime?
+  remark                     String?
+  productId                  Int
+  branchId                   Int
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  status                     StockStatus               @default(IN_STOCK)
+  purchaseOrderReceiptItemId Int?
+  batchNumber                String?
+  checkedBy                  String?
+  locationCode               String?
+  qrCodeData                 String?
+  source                     String?
+  tag                        String?
+  scannedAt                  DateTime                  @default(now())
+  scannedByEmployeeId        Int?
+  color                      String?
+  costPrice                  Decimal?                  @db.Decimal(12, 2)
+  barcodeReceiptItem         BarcodeReceiptItem[]
+  repairJobs                 RepairJob[]
+  saleItems                  SaleItem[]
+  stockMovements             StockMovement[]
+  productReservationItems    ProductReservationItem[]
+  stockAuditScanLog          StockAuditScanLog[]
+  stockAuditSnapshotItem     StockAuditSnapshotItem[]
+  branch                     Branch                    @relation(fields: [branchId], references: [id])
+  product                    Product                   @relation(fields: [productId], references: [id])
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
+  scannedBy                  EmployeeProfile?          @relation(fields: [scannedByEmployeeId], references: [id])
+  warrantyClaims             WarrantyClaim[]
+  replacementWarrantyClaims  WarrantyClaim[]           @relation("WarrantyClaimReplacementStockItem")
+  devices                    Device[]
+  posHeldCartLines           PosHeldCartLine[]
+
+  @@unique([serialNumber, productId])
+  @@index([branchId, status, productId])
+  @@index([productId, status])
+}
+
+model V2StockAudit {
+  id        Int                @id @default(autoincrement())
+  branchId  Int
+  auditorId Int
+  status    String             @default("PENDING")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  auditor   EmployeeProfile    @relation(fields: [auditorId], references: [id])
+  branch    Branch             @relation(fields: [branchId], references: [id])
+  items     V2StockAuditItem[]
+
+  @@index([branchId])
+}
+
+model V2StockAuditItem {
+  id           Int          @id @default(autoincrement())
+  stockAuditId Int
+  productId    Int
+  expectedQty  Int
+  actualQty    Int
+  difference   Int
+  product      Product      @relation(fields: [productId], references: [id])
+  stockAudit   V2StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
+}
+
+enum SupplierCapability {
+  PROCUREMENT
+  EXPENSE_PAYEE
+}
+
+model Supplier {
+  id                   Int                    @id @default(autoincrement())
+  name                 String
+  address              String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  contactPerson        String?
+  country              String?                @default("Thailand")
+  creditLimit          Decimal?               @default(0) @db.Decimal(12, 2)
+  email                String?
+  notes                String?
+  paymentTerms         Int?                   @default(0)
+  phone                String?
+  postalCode           String?
+  province             String?
+  taxId                String?
+  accountNumber        String?
+  accountType          String?
+  bankId               Int?
+  branchId             Int
+  active               Boolean                @default(true)
+  creditBalance        Decimal?               @default(0) @db.Decimal(12, 2)
+  taxBranchCode        String?                @default("00000")
+  isSystem             Boolean                @default(false)
+  pos                  PurchaseOrder[]
+  PurchaseOrderReceipt PurchaseOrderReceipt[]
+  bank                 Bank?                  @relation(fields: [bankId], references: [id])
+  branch               Branch                 @relation(fields: [branchId], references: [id])
+  supplierPayment      SupplierPayment[]
+  supplierPayables     SupplierPayable[]
+  supplierPayableDisputes SupplierPayableDispute[]
+  supplierPayableAdjustments SupplierPayableAdjustment[]
+  supplierAdvances     SupplierAdvance[]
+  warrantyClaims       WarrantyClaim[]
+  taxExpenses          TaxExpense[] @relation("TaxExpenseSupplier")
+  capabilities         SupplierCapabilityAssignment[]
+
+  @@unique([branchId, name])
+  @@unique([id, branchId])
+}
+
+model SupplierCapabilityAssignment {
+  id         Int                @id @default(autoincrement())
+  supplierId Int
+  capability SupplierCapability
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  supplier   Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@unique([supplierId, capability])
+  @@index([capability, supplierId])
+}
+
+model Bank {
+  id        Int        @id @default(autoincrement())
+  name      String
+  branchId  Int?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  active    Boolean    @default(true)
+  branch    Branch?    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier  Supplier[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([branchId, active])
+}
+
+model PurchaseOrder {
+  id         Int                    @id @default(autoincrement())
+  code       String                 @unique
+  date       DateTime               @default(now())
+  note       String?
+  status     PurchaseOrderStatus    @default(PENDING)
+  supplierId Int
+  branchId   Int
+  employeeId Int
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  branch     Branch                 @relation(fields: [branchId], references: [id])
+  employee   EmployeeProfile        @relation(fields: [employeeId], references: [id])
+  supplier   Supplier               @relation(fields: [supplierId], references: [id])
+  items      PurchaseOrderItem[]
+  receipts   PurchaseOrderReceipt[]
+}
+
+model PurchaseOrderItem {
+  id               Int                        @id @default(autoincrement())
+  productId        Int
+  quantity         Int
+  purchaseOrderId  Int
+  receivedQuantity Int                        @default(0)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  costPrice        Decimal                    @db.Decimal(12, 2)
+  product          Product                    @relation(fields: [productId], references: [id])
+  purchaseOrder    PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  receipts         PurchaseOrderReceiptItem[]
+}
+
+model PurchaseOrderReceipt {
+  id                       Int                        @id @default(autoincrement())
+  receivedAt               DateTime                   @default(now())
+  note                     String?
+  purchaseOrderId          Int?
+  branchId                 Int
+  receivedById             Int
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  code                     String                     @unique
+  printed                  Boolean                    @default(false)
+  paidAmount               Decimal?                   @db.Decimal(12, 2)
+  totalAmount              Decimal?                   @db.Decimal(12, 2)
+  statusPayment            PaymentStatus              @default(UNPAID)
+  statusReceipt            ReceiptStatus              @default(PENDING)
+  supplierTaxInvoiceDate   DateTime?
+  supplierTaxInvoiceNumber String?
+  deliveryNoteNumber       String?
+  deliveryNoteDate         DateTime?
+  taxDocumentMode          InputTaxDocumentMode       @default(UNCLASSIFIED)
+  taxDocumentReceivedAt    DateTime?
+  taxDocumentReceiptSource TaxDocumentReceiptSource?
+  vatRate                  Decimal?                   @default(7) @db.Decimal(5, 2)
+  source                   ReceiptSource              @default(PO)
+  supplierId               Int?
+  barcodeReceiptItem       BarcodeReceiptItem[]
+  inputTaxFilingItems      InputTaxFilingItem[]
+  branch                   Branch                     @relation(fields: [branchId], references: [id])
+  purchaseOrder            PurchaseOrder?             @relation(fields: [purchaseOrderId], references: [id])
+  receivedBy               EmployeeProfile            @relation(fields: [receivedById], references: [id])
+  supplier                 Supplier?                  @relation(fields: [supplierId], references: [id])
+  items                    PurchaseOrderReceiptItem[]
+  supplierPaymentReceipts  SupplierPaymentReceipt[]
+  supplierPayableReceiptLinks SupplierPayableReceiptLink[]
+
+  @@index([branchId, receivedAt])
+  @@index([branchId, taxDocumentMode, receivedAt])
+  @@index([purchaseOrderId])
+  @@index([source, receivedAt])
+}
+
+model InputTaxFilingBatch {
+  id          Int                  @id @default(autoincrement())
+  branchId    Int
+  month       Int
+  year        Int
+  status      InputTaxFilingStatus @default(DRAFT)
+  note        String?
+  createdById Int
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  branch      Branch               @relation(fields: [branchId], references: [id])
+  createdBy   EmployeeProfile      @relation(fields: [createdById], references: [id])
+  items       InputTaxFilingItem[]
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+model SalesTaxFilingBatch {
+  id          Int                  @id @default(autoincrement())
+  branchId    Int
+  month       Int
+  year        Int
+  status      SalesTaxFilingStatus @default(DRAFT)
+  note        String?
+  createdById Int
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  branch      Branch               @relation(fields: [branchId], references: [id])
+  createdBy   EmployeeProfile      @relation(fields: [createdById], references: [id])
+  items       SalesTaxFilingItem[]
+
+  @@index([branchId, year, month])
+  @@index([status])
+}
+
+model SalesTaxFilingItem {
+  id        Int                 @id @default(autoincrement())
+  batchId   Int
+  saleId    Int
+  createdAt DateTime            @default(now())
+  batch     SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sale      Sale                @relation(fields: [saleId], references: [id])
+
+  @@unique([batchId, saleId])
+  @@index([saleId])
+}
+
+model InputTaxFilingItem {
+  id                     Int                      @id @default(autoincrement())
+  batchId                Int
+  purchaseOrderReceiptId Int?
+  taxDocumentId          Int?
+  status                 InputTaxFilingItemStatus @default(SELECTED)
+  claimedSubtotalAmount  Decimal?                 @db.Decimal(12, 2)
+  claimedVatAmount       Decimal?                 @db.Decimal(12, 2)
+  claimedTotalAmount     Decimal?                 @db.Decimal(12, 2)
+  eligibilitySnapshot    Json?
+  documentSnapshot       Json?
+  selectedAt             DateTime?
+  filedAt                DateTime?
+  removedAt              DateTime?
+  removedReason          String?
+  version                Int                      @default(1)
+  createdAt              DateTime                 @default(now())
+  batch                  InputTaxFilingBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  receipt                PurchaseOrderReceipt?    @relation(fields: [purchaseOrderReceiptId], references: [id])
+  taxDocument            TaxDocument?             @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, purchaseOrderReceiptId])
+  @@index([purchaseOrderReceiptId])
+  @@index([taxDocumentId, status])
+  @@index([batchId, status])
+  @@index([selectedAt])
+  @@index([filedAt])
+}
+
+model PurchaseOrderReceiptItem {
+  id                  Int                  @id @default(autoincrement())
+  receiptId           Int
+  purchaseOrderItemId Int?
+  quantity            Decimal              @db.Decimal(12, 2)
+  costPrice           Decimal              @db.Decimal(12, 2)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  productId           Int?
+  barcodeReceiptItem  BarcodeReceiptItem[]
+  product             Product?             @relation(fields: [productId], references: [id])
+  purchaseOrderItem   PurchaseOrderItem?   @relation(fields: [purchaseOrderItemId], references: [id])
+  receipt             PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  simpleLots          SimpleLot[]
+  stockItems          StockItem[]
+
+  @@index([receiptId])
+  @@index([productId])
+}
+
+model Order {
+  id              Int              @id @default(autoincrement())
+  cartTotal       Decimal          @db.Decimal(12, 2)
+  stripePaymentId String
+  status          String
+  amount          Int
+  currency        String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  customerId      Int?
+  orderStatus     OrderStatus      @default(PENDING)
+  customer        CustomerProfile? @relation(fields: [customerId], references: [id])
+  products        ProductOnOrder[]
+}
+
+model ProductOnOrder {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  orderId   Int
+  count     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Cart {
+  id                Int              @id @default(autoincrement())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  customerProfileId Int?
+  userId            Int
+  customerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartItems         CartItem[]
+}
+
+model CartItem {
+  id              Int      @id @default(autoincrement())
+  cartId          Int
+  productId       Int
+  quantity        Int      @default(1)
+  priceAtThatTime Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model ServiceOrder {
+  id          Int              @id @default(autoincrement())
+  customerId  Int?
+  branchId    Int?
+  employeeId  Int?
+  receiveDate DateTime         @default(now())
+  status      ServiceStatus    @default(RECEIVED)
+  description String?
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       ServiceItem[]
+  branch      Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer    CustomerProfile? @relation(fields: [customerId], references: [id])
+  employee    EmployeeProfile? @relation(fields: [employeeId], references: [id])
+}
+
+model ServiceItem {
+  id           Int          @id @default(autoincrement())
+  serviceId    Int
+  productId    Int?
+  serialNumber String?
+  problem      String?
+  solution     String?
+  cost         Decimal?     @db.Decimal(12, 2)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  product      Product?     @relation(fields: [productId], references: [id])
+  service      ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+model BarcodeCounter {
+  id         Int      @id @default(autoincrement())
+  branchId   Int
+  yearMonth  String
+  lastNumber Int
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, yearMonth])
+}
+
+model BarcodeReceiptItem {
+  id                     Int                      @id @default(autoincrement())
+  barcode                String                   @unique
+  branchId               Int
+  yearMonth              String
+  runningNumber          Int
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  purchaseOrderReceiptId Int
+  stockItemId            Int?
+  printed                Boolean                  @default(false)
+  receiptItemId          Int
+  status                 BarcodeStatus            @default(READY)
+  kind                   BarcodeKind              @default(SN)
+  simpleLotId            Int?
+  branch                 Branch                   @relation(fields: [branchId], references: [id])
+  purchaseOrderReceipt   PurchaseOrderReceipt     @relation(fields: [purchaseOrderReceiptId], references: [id], onDelete: Cascade)
+  receiptItem            PurchaseOrderReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+  simpleLot              SimpleLot?               @relation(fields: [simpleLotId], references: [id])
+  stockItem              StockItem?               @relation(fields: [stockItemId], references: [id])
+
+  @@unique([branchId, yearMonth, runningNumber])
+  @@index([purchaseOrderReceiptId, branchId])
+}
+
+model Sale {
+  id                         Int                         @id @default(autoincrement())
+  code                       String                      @unique
+  soldAt                     DateTime                    @default(now())
+  customerId                 Int?
+  employeeId                 Int
+  branchId                   Int
+  totalBeforeDiscount        Decimal                     @db.Decimal(12, 2)
+  totalDiscount              Decimal                     @db.Decimal(12, 2)
+  vat                        Decimal                     @db.Decimal(12, 2)
+  vatRate                    Decimal                     @default(7) @db.Decimal(5, 2)
+  totalAmount                Decimal                     @db.Decimal(12, 2)
+  note                       String?
+  refCode                    String?
+  isTaxInvoice               Boolean                     @default(false)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  combinedDocumentId         Int?
+  dueDate                    DateTime?
+  finalizedAt                DateTime?
+  isCredit                   Boolean                     @default(false)
+  officialDocumentNumber     String?
+  saleType                   SaleType                    @default(NORMAL)
+  status                     SaleStatus                  @default(DRAFT)
+  paid                       Boolean                     @default(false)
+  paidAt                     DateTime?
+  combinedBillingId          Int?
+  sourceHeldCartId           Int?                        @unique
+  paidAmount                 Decimal                     @default(0) @db.Decimal(12, 2)
+  statusPayment              PaymentStatus               @default(UNPAID)
+  customerReceiptAllocations CustomerReceiptAllocation[]
+  depositUsages              DepositUsage[]
+  payments                   Payment[]
+  branch                     Branch                      @relation(fields: [branchId], references: [id])
+  combinedBilling            CombinedBillingDocument?    @relation("CombinedBillingSales", fields: [combinedBillingId], references: [id])
+  combinedDocument           CombinedSaleDocument?       @relation("SalesCombined", fields: [combinedDocumentId], references: [id])
+  customer                   CustomerProfile?            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  employee                   EmployeeProfile             @relation(fields: [employeeId], references: [id])
+  items                      SaleItem[]
+  simpleItems                SaleItemSimple[]
+  returns                    SaleReturn[]
+  salesTaxFilingItems        SalesTaxFilingItem[]
+  completionCommand          SalesCompletionCommand?
+  sourceHeldCart             PosHeldCart?                @relation("SaleSourceHeldCart", fields: [sourceHeldCartId], references: [id], onDelete: Restrict)
+
+  @@index([combinedBillingId])
+  @@index([branchId, soldAt])
+  @@index([branchId, statusPayment, soldAt])
+  @@index([branchId, statusPayment, dueDate])
+  @@index([isCredit, dueDate])
+  @@index([combinedDocumentId])
+}
+
+model SalesCompletionCommand {
+  id          Int      @id @default(autoincrement())
+  branchId    Int
+  commandKey  String
+  requestHash String
+  saleId      Int      @unique
+  createdAt   DateTime @default(now())
+  completedAt DateTime @default(now())
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([branchId, createdAt])
+}
+
+model PosHeldCart {
+  id                  Int               @id @default(autoincrement())
+  code                String            @unique
+  branchId            Int
+  customerId          Int?
+  customerName        String?
+  customerPhone       String?
+  note                String?
+  priceType           String            @default("retail")
+  status              PosHeldCartStatus @default(OPEN)
+  totalBeforeDiscount Decimal           @default(0) @db.Decimal(12, 2)
+  totalDiscount       Decimal           @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal           @default(0) @db.Decimal(12, 2)
+  createdById         Int
+  updatedById         Int
+  cancelledById       Int?
+  cancelledAt         DateTime?
+  cancelReason        String?
+  convertedAt         DateTime?
+  lastActivityAt      DateTime          @default(now())
+  version             Int               @default(1)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  branch              Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy           EmployeeProfile   @relation("PosHeldCartCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           EmployeeProfile   @relation("PosHeldCartUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  cancelledBy         EmployeeProfile?  @relation("PosHeldCartCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+  convertedSale       Sale?             @relation("SaleSourceHeldCart")
+  lines               PosHeldCartLine[]
+
+  @@index([branchId, status, lastActivityAt])
+  @@index([branchId, customerPhone, status])
+  @@index([branchId, customerId, status])
+}
+
+model PosHeldCartLine {
+  id           Int                 @id @default(autoincrement())
+  heldCartId   Int
+  lineKey      String
+  lineType     PosHeldCartLineType
+  productId    Int
+  stockItemId  Int?
+  simpleLotId  Int?
+  barcode      String?
+  productName  String
+  modelName    String?
+  quantity     Decimal             @db.Decimal(12, 2)
+  unitPrice    Decimal             @db.Decimal(12, 2)
+  discount     Decimal             @default(0) @db.Decimal(12, 2)
+  remark       String?
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  heldCart     PosHeldCart         @relation(fields: [heldCartId], references: [id], onDelete: Cascade)
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockItem    StockItem?          @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  simpleLot    SimpleLot?          @relation(fields: [simpleLotId], references: [id], onDelete: Restrict)
+
+  @@unique([heldCartId, lineKey])
+  @@index([productId])
+  @@index([stockItemId])
+  @@index([simpleLotId])
+}
+
+model SaleItem {
+  id                  Int              @id @default(autoincrement())
+  saleId              Int
+  stockItemId         Int
+  basePrice           Decimal          @db.Decimal(12, 2)
+  vatAmount           Decimal          @db.Decimal(12, 2)
+  price               Decimal          @db.Decimal(12, 2)
+  discount            Decimal          @db.Decimal(12, 2)
+  refundedAmount      Decimal          @default(0) @db.Decimal(12, 2)
+  returnedQuantity    Decimal          @default(0) @db.Decimal(12, 2)
+  lastReturnedAt      DateTime?
+  remark              String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  documentDescription String?
+  documentPrefix      String?
+  documentSuffix      String?
+  sale                Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  stockItem           StockItem        @relation(fields: [stockItemId], references: [id])
+  returnItems         SaleReturnItem[]
+
+  @@index([stockItemId])
+}
+
+model SaleItemSimple {
+  id                   Int                    @id @default(autoincrement())
+  saleId               Int
+  productId            Int
+  quantity             Decimal                @db.Decimal(12, 2)
+  basePrice            Decimal                @db.Decimal(12, 2)
+  discount             Decimal                @db.Decimal(12, 2)
+  price                Decimal                @db.Decimal(12, 2)
+  vatAmount            Decimal                @db.Decimal(12, 2)
+  remark               String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  simpleLotId          Int?
+  unitCost             Decimal?               @db.Decimal(12, 2)
+  documentDescription  String?
+  documentPrefix       String?
+  documentSuffix       String?
+  returnedQuantity     Decimal                @default(0) @db.Decimal(12, 2)
+  refundedAmount       Decimal                @default(0) @db.Decimal(12, 2)
+  lastReturnedAt       DateTime?
+  product              Product                @relation(fields: [productId], references: [id])
+  sale                 Sale                   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  simpleLots           SimpleLot?             @relation(fields: [simpleLotId], references: [id])
+  SaleReturnItemSimple SaleReturnItemSimple[]
+
+  @@index([saleId])
+  @@index([productId])
+  @@index([simpleLotId])
+}
+
+model Payment {
+  saleId               Int
+  receivedAt           DateTime         @default(now())
+  note                 String?
+  combinedDocumentCode String?
+  employeeProfileId    Int?
+  branchId             Int
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  code                 String           @unique
+  cancelNote           String?
+  cancelledAt          DateTime?
+  isCancelled          Boolean          @default(false)
+  id                   Int              @id @default(autoincrement())
+  depositUsages        DepositUsage[]
+  branch               Branch           @relation(fields: [branchId], references: [id])
+  employeeProfile      EmployeeProfile? @relation(fields: [employeeProfileId], references: [id])
+  sale                 Sale             @relation(fields: [saleId], references: [id])
+  items                PaymentItem[]
+
+  @@index([saleId])
+  @@index([branchId, receivedAt])
+}
+
+model PaymentItem {
+  id                 Int                 @id @default(autoincrement())
+  paymentId          Int
+  amount             Decimal             @db.Decimal(12, 2)
+  note               String?
+  slipImage          String?
+  cardRef            String?
+  govImage           String?
+  createdAt          DateTime            @default(now())
+  paymentMethod      PaymentMethod
+  payment            Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  refundTransactions RefundTransaction[]
+}
+
+model CombinedSaleDocument {
+  id             Int             @id @default(autoincrement())
+  code           String          @unique
+  issueDate      DateTime        @default(now())
+  note           String?
+  createdBy      Int
+  branchId       Int
+  totalAmount    Decimal         @db.Decimal(12, 2)
+  finalAmount    Decimal         @db.Decimal(12, 2)
+  adjustmentNote String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  branch         Branch          @relation(fields: [branchId], references: [id])
+  createdByUser  EmployeeProfile @relation(fields: [createdBy], references: [id])
+  sales          Sale[]          @relation("SalesCombined")
+}
+
+model SaleReturn {
+  id                    Int                          @id @default(autoincrement())
+  code                  String                       @unique
+  saleId                Int
+  returnedAt            DateTime                     @default(now())
+  employeeId            Int
+  refundedByEmployeeId  Int?
+  branchId              Int
+  totalRefund           Decimal                      @db.Decimal(12, 2)
+  note                  String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  returnType            ReturnType                   @default(REFUND)
+  reason                String?
+  deductedAmount        Decimal                      @default(0) @db.Decimal(12, 2)
+  isFullyRefunded       Boolean                      @default(false)
+  refundedAmount        Decimal                      @default(0) @db.Decimal(12, 2)
+  refundMethod          RefundMethod
+  status                SaleReturnStatus             @default(PENDING)
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  stockRestoredAt       DateTime?
+  completedAt           DateTime?
+  refundTransaction     RefundTransaction[]
+  branch                Branch                       @relation(fields: [branchId], references: [id])
+  employee              EmployeeProfile              @relation(fields: [employeeId], references: [id])
+  refundedBy            EmployeeProfile?             @relation("RefundedBy", fields: [refundedByEmployeeId], references: [id])
+  sale                  Sale                         @relation(fields: [saleId], references: [id])
+  items                 SaleReturnItem[]
+  saleReturnItemSimples SaleReturnItemSimple[]
+  completionCommand     SaleReturnCompletionCommand?
+  creditNoteTaxDocument TaxDocument?               @relation("TaxDocumentCreditNoteSaleReturn")
+
+  @@index([saleId, returnedAt])
+  @@index([branchId, returnedAt])
+  @@index([branchId, status, returnedAt])
+}
+
+model SaleReturnItem {
+  id             Int             @id @default(autoincrement())
+  saleReturnId   Int
+  saleItemId     Int
+  refundAmount   Decimal         @db.Decimal(12, 2)
+  reason         String?
+  reasonCode     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  saleItem       SaleItem        @relation(fields: [saleItemId], references: [id])
+  saleReturn     SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  warrantyClaims WarrantyClaim[]
+
+  @@unique([saleReturnId, saleItemId])
+  @@index([saleReturnId])
+  @@index([saleItemId])
+}
+
+model RefundTransaction {
+  id                   Int             @id @default(autoincrement())
+  saleReturnId         Int
+  amount               Decimal         @db.Decimal(12, 2)
+  note                 String?
+  refundedAt           DateTime        @default(now())
+  refundedByEmployeeId Int
+  branchId             Int
+  deducted             Decimal         @default(0) @db.Decimal(12, 2)
+  method               RefundMethod
+  sourcePaymentItemId  Int?
+  referenceNo          String?
+  branch               Branch          @relation(fields: [branchId], references: [id])
+  refundedBy           EmployeeProfile @relation(fields: [refundedByEmployeeId], references: [id])
+  saleReturn           SaleReturn      @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  sourcePaymentItem    PaymentItem?    @relation(fields: [sourcePaymentItemId], references: [id], onDelete: Restrict)
+
+  @@index([saleReturnId])
+  @@index([sourcePaymentItemId])
+  @@index([branchId, refundedAt])
+}
+
+model SaleReturnCompletionCommand {
+  id           Int        @id @default(autoincrement())
+  branchId     Int
+  commandKey   String
+  requestHash  String
+  saleReturnId Int        @unique
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime   @default(now())
+  branch       Branch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([branchId, createdAt])
+}
+
+model SupplierPayment {
+  id                      Int                      @id @default(autoincrement())
+  supplierId              Int
+  method                  PaymentMethod
+  note                    String?
+  paymentRef              String?
+  paymentProofUrl         String?
+  sourceType              String?
+  sourcePOId              Int?
+  paidAt                  DateTime                 @default(now())
+  employeeId              Int
+  branchId                Int
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  paymentType             PaymentType              @default(RECEIPT_BASED)
+  creditAmount            Decimal?                 @db.Decimal(12, 2)
+  debitAmount             Decimal?                 @db.Decimal(12, 2)
+  code                    String?                  @unique
+  amount                  Decimal?                 @db.Decimal(12, 2)
+  statusPayment           PaymentStatus            @default(UNPAID)
+  lifecycleStatus         SupplierPaymentLifecycleStatus @default(DRAFT)
+  confirmedAt             DateTime?
+  voidedAt                DateTime?
+  voidedById              Int?
+  voidReason              String?
+  version                 Int                      @default(1)
+  branch                  Branch                   @relation(fields: [branchId], references: [id])
+  employee                EmployeeProfile          @relation("SupplierPaymentCreatedBy", fields: [employeeId], references: [id])
+  voidedBy                EmployeeProfile?         @relation("SupplierPaymentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+  supplier                Supplier                 @relation(fields: [supplierId], references: [id])
+  supplierPaymentReceipts SupplierPaymentReceipt[]
+  payableAllocations      SupplierPaymentAllocation[]
+  supplierAdvance         SupplierAdvance?
+
+  @@index([branchId, paidAt])
+  @@index([supplierId])
+}
+
+model SupplierPaymentReceipt {
+  id         Int                  @id @default(autoincrement())
+  paymentId  Int
+  receiptId  Int
+  amountPaid Decimal              @db.Decimal(12, 2)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  payment    SupplierPayment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  receipt    PurchaseOrderReceipt @relation(fields: [receiptId], references: [id])
+
+  @@unique([paymentId, receiptId])
+}
+
+model SupplierPayable {
+  id            Int                   @id @default(autoincrement())
+  branchId      Int
+  supplierId    Int
+  code          String                @unique
+  status        SupplierPayableStatus @default(OPEN)
+  documentNumber String?
+  documentDate  DateTime?
+  dueDate       DateTime?
+  currency      String                @default("THB")
+  subtotalAmount Decimal?             @db.Decimal(12, 2)
+  taxAmount     Decimal?              @db.Decimal(12, 2)
+  totalAmount   Decimal               @db.Decimal(12, 2)
+  paidAmount    Decimal               @default(0) @db.Decimal(12, 2)
+  note          String?
+  openedAt      DateTime              @default(now())
+  createdById   Int
+  version       Int                   @default(1)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  branch        Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier      Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  createdBy     EmployeeProfile       @relation("SupplierPayableCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  receiptLinks  SupplierPayableReceiptLink[]
+  paymentAllocations SupplierPaymentAllocation[]
+  advanceAllocations SupplierAdvanceAllocation[]
+  disputes           SupplierPayableDispute[]
+  adjustments        SupplierPayableAdjustment[]
+
+  @@index([branchId, status, dueDate])
+  @@index([branchId, supplierId, status])
+}
+
+model SupplierPayableDispute {
+  id             Int                           @id @default(autoincrement())
+  branchId       Int
+  supplierId     Int
+  payableId      Int
+  status         SupplierPayableDisputeStatus  @default(OPEN)
+  disputedAmount Decimal                       @db.Decimal(12, 2)
+  reason         String
+  openedById     Int
+  openedAt       DateTime                      @default(now())
+  resolvedById   Int?
+  resolvedAt     DateTime?
+  resolutionNote String?
+  version        Int                           @default(1)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  branch         Branch                        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier       Supplier                      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable               @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  openedBy       EmployeeProfile               @relation("SupplierPayableDisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  resolvedBy     EmployeeProfile?              @relation("SupplierPayableDisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  adjustments    SupplierPayableAdjustment[]
+
+  @@index([branchId, status, openedAt])
+  @@index([payableId, status])
+}
+
+model SupplierPayableAdjustment {
+  id             Int                              @id @default(autoincrement())
+  branchId       Int
+  supplierId     Int
+  payableId      Int
+  disputeId      Int?
+  code           String                           @unique
+  type           SupplierPayableAdjustmentType
+  direction      SupplierPayableAdjustmentDirection
+  status         SupplierPayableAdjustmentStatus  @default(CONFIRMED)
+  amount         Decimal                          @db.Decimal(12, 2)
+  documentNumber String?
+  documentDate   DateTime?
+  note           String?
+  createdById    Int
+  confirmedAt    DateTime                         @default(now())
+  voidedById     Int?
+  voidedAt       DateTime?
+  voidReason     String?
+  version        Int                              @default(1)
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  branch         Branch                           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier       Supplier                         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable                  @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  dispute        SupplierPayableDispute?           @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  createdBy      EmployeeProfile                  @relation("SupplierPayableAdjustmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy       EmployeeProfile?                 @relation("SupplierPayableAdjustmentVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+
+  @@index([branchId, supplierId, status])
+  @@index([payableId, status])
+  @@index([disputeId])
+}
+
+model SupplierPayableReceiptLink {
+  id              Int                  @id @default(autoincrement())
+  payableId       Int
+  receiptId       Int
+  allocatedAmount Decimal              @db.Decimal(12, 2)
+  createdAt       DateTime             @default(now())
+  payable         SupplierPayable      @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  receipt         PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+
+  @@unique([payableId, receiptId])
+  @@index([receiptId])
+}
+
+model SupplierPaymentAllocation {
+  id            Int                            @id @default(autoincrement())
+  paymentId     Int
+  payableId     Int
+  amount        Decimal                        @db.Decimal(12, 2)
+  state         SupplierPaymentAllocationState @default(ACTIVE)
+  allocatedAt   DateTime                       @default(now())
+  reversedAt    DateTime?
+  reversedById  Int?
+  reversalReason String?
+  createdAt     DateTime                       @default(now())
+  payment       SupplierPayment                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  payable       SupplierPayable                @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  reversedBy    EmployeeProfile?               @relation("SupplierPaymentAllocationReversedBy", fields: [reversedById], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, state])
+  @@index([payableId, state])
+}
+
+model SupplierAdvance {
+  id               Int                   @id @default(autoincrement())
+  branchId         Int
+  supplierId       Int
+  paymentId        Int                   @unique
+  code             String                @unique
+  status           SupplierAdvanceStatus @default(ACTIVE)
+  originalAmount   Decimal               @db.Decimal(12, 2)
+  availableAmount  Decimal               @db.Decimal(12, 2)
+  legacyImported   Boolean               @default(false)
+  createdById      Int
+  activatedAt      DateTime?
+  activatedById    Int?
+  voidedAt         DateTime?
+  voidedById       Int?
+  voidReason       String?
+  version          Int                   @default(1)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  branch           Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier         Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payment          SupplierPayment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  createdBy        EmployeeProfile       @relation("SupplierAdvanceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  activatedBy      EmployeeProfile?      @relation("SupplierAdvanceActivatedBy", fields: [activatedById], references: [id], onDelete: Restrict)
+  voidedBy         EmployeeProfile?      @relation("SupplierAdvanceVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+  allocations      SupplierAdvanceAllocation[]
+
+  @@index([branchId, supplierId, status])
+  @@index([branchId, status, createdAt])
+}
+
+model SupplierAdvanceAllocation {
+  id             Int                            @id @default(autoincrement())
+  advanceId      Int
+  payableId      Int
+  amount         Decimal                        @db.Decimal(12, 2)
+  state          SupplierPaymentAllocationState @default(ACTIVE)
+  appliedAt      DateTime                       @default(now())
+  reversedAt     DateTime?
+  reversedById   Int?
+  reversalReason String?
+  createdAt      DateTime                       @default(now())
+  advance        SupplierAdvance                @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable                @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  reversedBy     EmployeeProfile?               @relation("SupplierAdvanceAllocationReversedBy", fields: [reversedById], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, state])
+  @@index([payableId, state])
+}
+
+model OrderOnline {
+  id                    Int               @id @default(autoincrement())
+  customerId            Int?
+  branchId              Int
+  note                  String?
+  status                OrderOnlineStatus @default(PENDING)
+  confirmedByEmployeeId Int?
+  shippedAt             DateTime?
+  cancelReason          String?
+  createdAt             DateTime          @default(now())
+  userId                Int?
+  deliveryDate          DateTime?
+  paymentMethod         PaymentMethod?
+  source                OrderSource?
+  trackingCode          String?
+  statusPayment         PaymentStatus     @default(UNPAID)
+  code                  String            @unique
+  paymentSlipStatus     PaymentSlipStatus @default(NONE)
+  paymentSlipUrl        String?
+  paymentNote           String?
+  paymentDate           DateTime?
+  branch                Branch            @relation(fields: [branchId], references: [id])
+  confirmedByEmployee   EmployeeProfile?  @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id])
+  customer              CustomerProfile?  @relation(fields: [customerId], references: [id])
+  user                  User?             @relation(fields: [userId], references: [id])
+  items                 OrderOnlineItem[]
+}
+
+model OrderOnlineItem {
+  id              Int         @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  quantity        Int
+  note            String?
+  priceAtPurchase Decimal?    @db.Decimal(12, 2)
+  order           OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product     @relation(fields: [productId], references: [id])
+}
+
+model CombinedBillingDocument {
+  id             Int                   @id @default(autoincrement())
+  code           String                @unique
+  issueDate      DateTime              @default(now())
+  note           String?
+  createdBy      Int
+  customerId     Int
+  branchId       Int
+  totalBeforeVat Decimal?              @db.Decimal(12, 2)
+  vatAmount      Decimal?              @db.Decimal(12, 2)
+  totalAmount    Decimal?              @db.Decimal(12, 2)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  status         CombinedBillingStatus @default(DRAFT)
+  branch         Branch                @relation(fields: [branchId], references: [id])
+  employee       EmployeeProfile       @relation(fields: [createdBy], references: [id])
+  customer       CustomerProfile       @relation(fields: [customerId], references: [id])
+  sales          Sale[]                @relation("CombinedBillingSales")
+}
+
+model StockAuditSession {
+  id            Int                      @id @default(autoincrement())
+  branchId      Int
+  employeeId    Int
+  expectedCount Int                      @default(0)
+  scannedCount  Int                      @default(0)
+  startedAt     DateTime                 @default(now())
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  note          String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  mode          StockAuditMode           @default(READY)
+  status        StockAuditStatus         @default(DRAFT)
+  scanLogs      StockAuditScanLog[]
+  branch        Branch                   @relation(fields: [branchId], references: [id])
+  employee      EmployeeProfile          @relation(fields: [employeeId], references: [id])
+  snapshotItems StockAuditSnapshotItem[]
+
+  @@index([branchId, status])
+  @@index([startedAt])
+}
+
+model StockAuditSnapshotItem {
+  id             Int               @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  productId      Int
+  barcode        String
+  expectedStatus StockStatus       @default(IN_STOCK)
+  isScanned      Boolean           @default(false)
+  scannedAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  auditSession   StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  product        Product           @relation(fields: [productId], references: [id])
+  stockItem      StockItem         @relation(fields: [stockItemId], references: [id])
+
+  @@unique([auditSessionId, stockItemId])
+  @@index([auditSessionId, isScanned])
+  @@index([barcode])
+}
+
+model StockAuditScanLog {
+  id             Int               @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  barcode        String
+  scannedAt      DateTime          @default(now())
+  byEmployeeId   Int
+  auditSession   StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  employee       EmployeeProfile   @relation(fields: [byEmployeeId], references: [id])
+  stockItem      StockItem         @relation(fields: [stockItemId], references: [id])
+
+  @@index([auditSessionId, scannedAt])
+  @@index([barcode])
+}
+
+model PaymentCodeCounter {
+  id       Int    @id @default(autoincrement())
+  branchId Int
+  yyyymmdd String
+  lastNo   Int    @default(0)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, yyyymmdd])
+}
+
+model SimpleLot {
+  id                 Int                       @id @default(autoincrement())
+  branchId           Int
+  productId          Int
+  receiptItemId      Int?
+  barcode            String                    @unique
+  qtyInitial         Decimal                   @db.Decimal(12, 2)
+  qtyRemaining       Decimal                   @db.Decimal(12, 2)
+  unitCost           Decimal                   @db.Decimal(12, 2)
+  receivedAt         DateTime                  @default(now())
+  printCount         Int                       @default(0)
+  lastPrintedAt      DateTime?
+  status             SimpleLotStatus           @default(ACTIVE)
+  BarcodeReceiptItem BarcodeReceiptItem[]
+  saleItemsSimple    SaleItemSimple[]
+  branch             Branch                    @relation(fields: [branchId], references: [id])
+  product            Product                   @relation(fields: [productId], references: [id])
+  receiptItem        PurchaseOrderReceiptItem? @relation(fields: [receiptItemId], references: [id])
+  stockMovements     StockMovement[]
+  productReservationItems ProductReservationItem[]
+  posHeldCartLines   PosHeldCartLine[]
+
+  @@index([branchId, productId, receivedAt])
+  @@index([branchId, status])
+}
+
+model SaleReturnItemSimple {
+  id               Int            @id @default(autoincrement())
+  saleReturnId     Int
+  saleItemSimpleId Int
+  refundAmount     Decimal        @db.Decimal(12, 2)
+  quantity         Decimal?       @db.Decimal(12, 2)
+  reason           String?
+  reasonCode       String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  saleItemSimple   SaleItemSimple @relation(fields: [saleItemSimpleId], references: [id])
+  saleReturn       SaleReturn     @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+
+  @@unique([saleReturnId, saleItemSimpleId])
+  @@index([saleReturnId])
+  @@index([saleItemSimpleId])
+}
+
+model CustomerReceipt {
+  id                           Int                         @id @default(autoincrement())
+  code                         String                      @unique
+  branchId                     Int
+  customerId                   Int
+  receivedAt                   DateTime                    @default(now())
+  totalAmount                  Decimal                     @db.Decimal(12, 2)
+  allocatedAmount              Decimal                     @default(0) @db.Decimal(12, 2)
+  remainingAmount              Decimal                     @db.Decimal(12, 2)
+  paymentMethod                PaymentMethod
+  referenceNo                  String?
+  note                         String?
+  status                       CustomerReceiptStatus       @default(ACTIVE)
+  createdByEmployeeProfileId   Int?
+  cancelledByEmployeeProfileId Int?
+  cancelledAt                  DateTime?
+  cancelReason                 String?
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
+  allocations                  CustomerReceiptAllocation[]
+  branch                       Branch                      @relation(fields: [branchId], references: [id])
+  cancelledByEmployeeProfile   EmployeeProfile?            @relation("CustomerReceiptCancelledBy", fields: [cancelledByEmployeeProfileId], references: [id])
+  createdByEmployeeProfile     EmployeeProfile?            @relation("CustomerReceiptCreatedBy", fields: [createdByEmployeeProfileId], references: [id])
+  customer                     CustomerProfile             @relation(fields: [customerId], references: [id])
+
+  @@index([branchId, receivedAt])
+  @@index([customerId, receivedAt])
+  @@index([status])
+  @@map("CustomerReceipts")
+}
+
+model CustomerReceiptAllocation {
+  id                         Int              @id @default(autoincrement())
+  receiptId                  Int
+  saleId                     Int
+  amount                     Decimal          @db.Decimal(12, 2)
+  note                       String?
+  allocatedAt                DateTime         @default(now())
+  createdByEmployeeProfileId Int?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+  createdByEmployeeProfile   EmployeeProfile? @relation("CustomerReceiptAllocationCreatedBy", fields: [createdByEmployeeProfileId], references: [id])
+  receipt                    CustomerReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  sale                       Sale             @relation(fields: [saleId], references: [id])
+
+  @@index([receiptId, allocatedAt])
+  @@index([saleId, allocatedAt])
+  @@index([createdByEmployeeProfileId])
+  @@map("CustomerReceiptAllocations")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id                Int            @id @default(autoincrement())
+  userId            Int
+  tokenHash         String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  replacedByTokenId Int?
+  userAgent         String?
+  ipAddress         String?
+  replacedByToken   RefreshToken?  @relation("RefreshTokenRotation", fields: [replacedByTokenId], references: [id])
+  previousTokens    RefreshToken[] @relation("RefreshTokenRotation")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model CustomerProfile {
+  id                        Int                       @id @default(autoincrement())
+  name                      String?
+  picture                   String?
+  userId                    Int
+  branchId                  Int?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
+  creditLimit               Decimal?                  @default(0) @db.Decimal(12, 2)
+  paymentTerms              Int?
+  type                      CustomerType              @default(INDIVIDUAL)
+  companyName               String?
+  subdistrictCode           String?
+  taxId                     String?
+  addressDetail             String?
+  depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
+  outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
+  cart                      Cart[]
+  combinedBillingDocuments  CombinedBillingDocument[]
+  customerDeposits          CustomerDeposit[]
+  subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
+  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerReceipts          CustomerReceipt[]
+  orders                    Order[]
+  orderOnlines              OrderOnline[]
+  repairJobs                RepairJob[]
+  ownedDevices              Device[]                  @relation("DeviceCurrentOwner")
+  deviceOwnershipHistory    DeviceOwnershipHistory[]
+  deviceIntakes             DeviceIntake[]
+  actedDevicePassportEvents DevicePassportEvent[]     @relation("DevicePassportCustomerActor")
+  sales                     Sale[]
+  services                  ServiceOrder[]
+  v2CustomerDeposits        V2CustomerDeposit[]
+  posHeldCarts              PosHeldCart[]
+  productReservations       ProductReservation[]
+
+  @@unique([branchId, userId])
+  @@index([userId])
+  @@index([subdistrictCode])
+  @@index([branchId])
+}
+
+model CustomerDeposit {
+  id             Int              @id @default(autoincrement())
+  cashAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  transferAmount Decimal          @default(0) @db.Decimal(12, 2)
+  note           String?
+  totalAmount    Decimal          @db.Decimal(12, 2)
+  customerId     Int?
+  branchId       Int?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  cardAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  usedAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  usedSaleId     Int?
+  createdBy      Int?
+  status         DepositStatus    @default(ACTIVE)
+  branch         Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdByEmp   EmployeeProfile? @relation(fields: [createdBy], references: [id])
+  customer       CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  depositUsage   DepositUsage[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([branchId, createdAt])
+}
+
+model DepositUsage {
+  id                Int             @id @default(autoincrement())
+  customerDepositId Int
+  saleId            Int?
+  amountUsed        Decimal         @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+  paymentId         Int?
+  customerDeposit   CustomerDeposit @relation(fields: [customerDepositId], references: [id], onDelete: Cascade)
+  payment           Payment?        @relation(fields: [paymentId], references: [id])
+  sale              Sale?           @relation(fields: [saleId], references: [id])
+
+  @@index([paymentId])
+  @@index([customerDepositId])
+}
+
+model V2CustomerDeposit {
+  id              Int             @id @default(autoincrement())
+  customerId      Int
+  amount          Float
+  transactionType String
+  referenceNumber String?
+  createdAt       DateTime        @default(now())
+  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model Province {
+  code      String     @id
+  nameTh    String
+  region    String
+  districts District[]
+}
+
+model District {
+  code         String        @id
+  nameTh       String
+  provinceCode String
+  createdAt    DateTime      @default(now()) @map("created_at")
+  province     Province      @relation(fields: [provinceCode], references: [code], onDelete: Cascade)
+  subdistricts Subdistrict[]
+
+  @@index([provinceCode])
+}
+
+model Subdistrict {
+  code            String            @id
+  nameTh          String
+  districtCode    String
+  postcode        String?
+  branches        Branch[]
+  CustomerProfile CustomerProfile[]
+  district        District          @relation(fields: [districtCode], references: [code], onDelete: Cascade)
+
+  @@index([districtCode])
+  @@index([postcode])
+}
+
+model Position {
+  id          Int               @id @default(autoincrement())
+  name        String
+  branchId    Int?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  description String?
+  isActive    Boolean           @default(true)
+  branch      Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  employees   EmployeeProfile[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([branchId, isActive])
+}
+
+model RepairJob {
+  id               Int              @id @default(autoincrement())
+  jobNo            String           @unique
+  branchId         Int
+  customerId       Int
+  stockItemId      Int?
+  deviceId         Int?
+  deviceModel      String
+  reportedSymptoms String
+  technicianNotes  String?
+  status           ServiceStatus    @default(RECEIVED)
+  estimatedCost    Decimal          @default(0.0) @db.Decimal(12, 2)
+  depositPaid      Decimal          @default(0.0) @db.Decimal(12, 2)
+  technicianId     Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  branch           Branch           @relation(fields: [branchId], references: [id])
+  customer         CustomerProfile  @relation(fields: [customerId], references: [id])
+  stockItem        StockItem?       @relation(fields: [stockItemId], references: [id])
+  device           Device?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  technician       EmployeeProfile? @relation(fields: [technicianId], references: [id])
+  partsUsed        RepairPartItem[]
+
+  warrantyClaims WarrantyClaim[]
+  deviceIntake   DeviceIntake?
+  diagnosis      RepairDiagnosis?
+  laborItems     RepairLaborItem[]
+  qualityCheck   RepairQualityCheck?
+  delivery       RepairDelivery?
+  trackingAccesses RepairTrackingAccess[]
+  estimateApprovals RepairEstimateApproval[]
+
+  @@index([branchId])
+  @@index([stockItemId])
+  @@index([deviceId])
+}
+
+model RepairTrackingAccess {
+  id                    Int              @id @default(autoincrement())
+  repairJobId           Int
+  tokenHash             String           @unique @db.VarChar(64)
+  expiresAt             DateTime?
+  revokedAt             DateTime?
+  lastAccessedAt        DateTime?
+  createdByEmployeeId   Int?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  repairJob             RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  createdBy             EmployeeProfile? @relation("RepairTrackingAccessCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, createdAt])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model RepairEstimateApproval {
+  id                    Int                          @id @default(autoincrement())
+  repairJobId           Int
+  estimateAmount        Decimal                      @db.Decimal(12, 2)
+  depositAmount         Decimal                      @default(0.0) @db.Decimal(12, 2)
+  balanceAmount         Decimal                      @db.Decimal(12, 2)
+  status                RepairEstimateApprovalStatus @default(PENDING)
+  requestNote           String?
+  customerNote          String?
+  confirmedByName       String?
+  requestedByEmployeeId Int?
+  requestedAt           DateTime                     @default(now())
+  expiresAt             DateTime?
+  decidedAt             DateTime?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  requestedBy EmployeeProfile? @relation("RepairEstimateApprovalRequestedBy", fields: [requestedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, requestedAt])
+  @@index([repairJobId, status])
+  @@index([status, expiresAt])
+}
+
+model RepairPartItem {
+  id          Int       @id @default(autoincrement())
+  repairJobId Int
+  productId   Int
+  qtyUsed     Int       @default(1)
+  unitPrice   Decimal   @db.Decimal(12, 2)
+  product     Product   @relation(fields: [productId], references: [id])
+  repairJob   RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+}
+
+model WarrantyClaim {
+  id                     Int                             @id @default(autoincrement())
+  branchId               Int
+  stockItemId            Int?
+  supplierId             Int?
+  saleReturnItemId       Int?
+  previousClaimId        Int?
+  repairJobId            Int?
+  deviceId               Int?
+  repairLinkState        WarrantyClaimRepairLinkState    @default(UNLINKED_LEGACY)
+  claimNo                String
+  status                 WarrantyClaimStatus             @default(DRAFT)
+  reason                 String
+  serviceProvider        String?
+  externalClaimRef       String?
+  trackingNumber         String?
+  resolution             WarrantyClaimResolution?
+  resolutionNote         String?
+  replacementStockItemId Int?
+  creditAmount           Decimal?                        @db.Decimal(12, 2)
+  openedAt               DateTime                        @default(now())
+  submittedAt            DateTime?
+  providerReceivedAt     DateTime?
+  resolvedAt             DateTime?
+  cancelledAt            DateTime?
+  createdByEmployeeId    Int?
+  resolvedByEmployeeId   Int?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+  branch                 Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  stockItem              StockItem?                      @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  supplier               Supplier?                       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  saleReturnItem         SaleReturnItem?                 @relation(fields: [saleReturnItemId], references: [id], onDelete: Restrict)
+  repairJob              RepairJob?                      @relation(fields: [repairJobId], references: [id], onDelete: Restrict)
+  device                 Device?                         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  previousClaim          WarrantyClaim?                  @relation("WarrantyClaimHistory", fields: [previousClaimId], references: [id], onDelete: Restrict)
+  subsequentClaims       WarrantyClaim[]                 @relation("WarrantyClaimHistory")
+  replacementStockItem   StockItem?                      @relation("WarrantyClaimReplacementStockItem", fields: [replacementStockItemId], references: [id], onDelete: Restrict)
+  createdBy              EmployeeProfile?                @relation("WarrantyClaimCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  resolvedBy             EmployeeProfile?                @relation("WarrantyClaimResolvedBy", fields: [resolvedByEmployeeId], references: [id], onDelete: Restrict)
+  events                 WarrantyClaimEvent[]
+  completionCommand      WarrantyClaimCompletionCommand?
+
+  @@unique([branchId, claimNo])
+  @@index([stockItemId, openedAt])
+  @@index([supplierId, openedAt])
+  @@index([saleReturnItemId])
+  @@index([repairJobId, openedAt])
+  @@index([deviceId])
+  @@index([repairLinkState, openedAt])
+  @@index([previousClaimId])
+  @@index([replacementStockItemId])
+  @@index([createdByEmployeeId])
+  @@index([resolvedByEmployeeId])
+  @@index([branchId, status, openedAt])
+}
+
+// ============================================================
+// REPAIR EXECUTION AGGREGATE FOUNDATION
+// Phase 3 ├óΓé¼ΓÇ¥ additive diagnosis, labor, quality control, delivery
+// ============================================================
+
+model RepairDiagnosis {
+  id                    Int                   @id @default(autoincrement())
+  repairJobId           Int                   @unique
+  status                RepairDiagnosisStatus @default(PENDING)
+  diagnosedByEmployeeId Int?
+  symptomSummary        String?
+  problemFound          String?
+  rootCause             String?
+  recommendedAction     String?
+  diagnosticData        Json?
+  estimatedLaborCost    Decimal               @default(0.0) @db.Decimal(12, 2)
+  estimatedPartsCost    Decimal               @default(0.0) @db.Decimal(12, 2)
+  diagnosedAt           DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  diagnosedBy EmployeeProfile? @relation("RepairDiagnosisDiagnosedBy", fields: [diagnosedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, diagnosedAt])
+  @@index([diagnosedByEmployeeId, diagnosedAt])
+}
+
+model RepairLaborItem {
+  id                    Int       @id @default(autoincrement())
+  repairJobId           Int
+  description           String
+  quantity              Decimal   @default(1.0) @db.Decimal(10, 2)
+  unitPrice             Decimal   @default(0.0) @db.Decimal(12, 2)
+  performedByEmployeeId Int?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  note                  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  performedBy EmployeeProfile? @relation("RepairLaborPerformedBy", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([repairJobId, createdAt])
+  @@index([performedByEmployeeId, completedAt])
+}
+
+model RepairQualityCheck {
+  id                  Int            @id @default(autoincrement())
+  repairJobId         Int            @unique
+  status              RepairQcStatus @default(PENDING)
+  checkedByEmployeeId Int?
+  checklist           Json?
+  note                String?
+  checkedAt           DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  repairJob RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  checkedBy EmployeeProfile? @relation("RepairQualityCheckedBy", fields: [checkedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, checkedAt])
+  @@index([checkedByEmployeeId, checkedAt])
+}
+
+model RepairDelivery {
+  id                    Int                  @id @default(autoincrement())
+  repairJobId           Int                  @unique
+  status                RepairDeliveryStatus @default(PENDING)
+  method                RepairDeliveryMethod @default(PICKUP_AT_BRANCH)
+  deliveredByEmployeeId Int?
+  recipientName         String?
+  recipientPhone        String?
+  customerConfirmedBy   String?
+  customerConfirmedAt   DateTime?
+  customerNote          String?
+  paymentConfirmed      Boolean               @default(false)
+  deviceReturned        Boolean               @default(false)
+  accessoriesReturned   Boolean               @default(false)
+  handoverSnapshot      Json?
+  proofUrl              String?
+  note                  String?
+  deliveredAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  repairJob   RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  deliveredBy EmployeeProfile? @relation("RepairDeliveryDeliveredBy", fields: [deliveredByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([status, deliveredAt])
+  @@index([deliveredByEmployeeId, deliveredAt])
+}
+
+/// Aggregate root representing the durable identity of a physical customer device.
+/// Sale, repair, warranty, and future operational modules reference this identity
+/// instead of creating competing device histories of their own.
+
+// ============================================================
+// DEVICE INTAKE AGGREGATE FOUNDATION
+// Phase 2 ├óΓé¼ΓÇ¥ additive reception, evidence, consent, and audit data
+// ============================================================
+
+model DeviceIntake {
+  id                   Int                @id @default(autoincrement())
+  deviceId             Int
+  branchId             Int
+  customerId           Int
+  repairJobId          Int?               @unique
+  receivedByEmployeeId Int
+  referenceNo          String
+  customerProblem      String
+  internalRemark       String?
+  status               DeviceIntakeStatus @default(RECEIVED)
+  priority             DevicePriority     @default(NORMAL)
+  receivedAt           DateTime           @default(now())
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  device      Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  branch      Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer    CustomerProfile         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  receivedBy  EmployeeProfile         @relation("DeviceIntakeReceivedBy", fields: [receivedByEmployeeId], references: [id], onDelete: Restrict)
+  repairJob   RepairJob?              @relation(fields: [repairJobId], references: [id], onDelete: SetNull)
+  snapshot    DeviceIntakeSnapshot?
+  condition   DeviceIntakeCondition?
+  accessories DeviceIntakeAccessory[]
+  consent     DeviceIntakeConsent?
+  audits      DeviceIntakeAudit[]
+  photos      DeviceIntakePhoto[]
+  documents   DeviceIntakeDocument[]
+  checklist   DeviceIntakeChecklist[]
+
+  @@unique([branchId, referenceNo])
+  @@index([deviceId, receivedAt])
+  @@index([branchId, status, receivedAt])
+  @@index([customerId, receivedAt])
+  @@index([receivedByEmployeeId, receivedAt])
+  @@index([priority, status])
+}
+
+model DeviceIntakeSnapshot {
+  id                 Int      @id @default(autoincrement())
+  deviceIntakeId     Int      @unique
+  brand              String?
+  model              String?
+  serialNumber       String?
+  imei               String?
+  barcode            String?
+  color              String?
+  capacity           String?
+  accessoriesSummary String?
+  createdAt          DateTime @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeCondition {
+  id                Int                   @id @default(autoincrement())
+  deviceIntakeId    Int                   @unique
+  screenCondition   DeviceConditionLevel? @default(UNKNOWN)
+  bodyCondition     DeviceConditionLevel? @default(UNKNOWN)
+  liquidDamage      Boolean?
+  powerOn           Boolean?
+  displayWorking    Boolean?
+  touchWorking      Boolean?
+  cameraWorking     Boolean?
+  speakerWorking    Boolean?
+  microphoneWorking Boolean?
+  chargingWorking   Boolean?
+  buttonsWorking    Boolean?
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAccessory {
+  id             Int           @id @default(autoincrement())
+  deviceIntakeId Int
+  accessoryType  AccessoryType
+  quantity       Int           @default(1)
+  remark         String?
+  createdAt      DateTime      @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+
+  @@index([deviceIntakeId])
+  @@index([accessoryType])
+}
+
+model DeviceIntakeConsent {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int       @unique
+  allowDataErase       Boolean   @default(false)
+  allowFactoryReset    Boolean   @default(false)
+  allowDisassembly     Boolean   @default(false)
+  allowOutsourceRepair Boolean   @default(false)
+  customerSignature    String?
+  signedAt             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAudit {
+  id                    Int                    @id @default(autoincrement())
+  deviceIntakeId        Int
+  eventType             DeviceIntakeAuditEvent
+  performedByEmployeeId Int?
+  note                  String?
+  metadata              Json?
+  occurredAt            DateTime               @default(now())
+  createdAt             DateTime               @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  performedBy  EmployeeProfile? @relation("DeviceIntakeAuditPerformedBy", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, occurredAt])
+  @@index([performedByEmployeeId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model DeviceIntakePhoto {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int
+  url                  String
+  storageKey           String?
+  category             String?
+  caption              String?
+  uploadedByEmployeeId Int?
+  takenAt              DateTime?
+  createdAt            DateTime  @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakePhotoUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, createdAt])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeDocument {
+  id                   Int      @id @default(autoincrement())
+  deviceIntakeId       Int
+  documentType         String
+  fileName             String?
+  url                  String
+  storageKey           String?
+  uploadedByEmployeeId Int?
+  createdAt            DateTime @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakeDocumentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, documentType])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeChecklist {
+  id                  Int       @id @default(autoincrement())
+  deviceIntakeId      Int
+  code                String
+  label               String
+  isChecked           Boolean   @default(false)
+  result              String?
+  note                String?
+  checkedByEmployeeId Int?
+  checkedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  checkedBy    EmployeeProfile? @relation("DeviceIntakeChecklistCheckedBy", fields: [checkedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceIntakeId, code])
+  @@index([deviceIntakeId, isChecked])
+  @@index([checkedByEmployeeId])
+}
+
+model Device {
+  id                     Int                      @id @default(autoincrement())
+  branchId               Int
+  /// Read-optimized projection of the currently active OWNER history entry.
+  /// Ownership mutations must update this field and DeviceOwnershipHistory atomically.
+  currentOwnerCustomerId Int?
+  stockItemId            Int?
+  /// Runtime-generated immutable identity key. It is not a customer-facing serial,
+  /// barcode, IMEI, or a concatenated business key.
+  fingerprint            String                   @unique
+  category               DeviceCategory?
+  brand                  String?
+  model                  String?
+  serialNumber           String?
+  imei                   String?
+  barcode                String?
+  status                 DeviceStatus             @default(ACTIVE)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  branch                 Branch                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  currentOwner           CustomerProfile?         @relation("DeviceCurrentOwner", fields: [currentOwnerCustomerId], references: [id], onDelete: SetNull)
+  stockItem              StockItem?               @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  repairJobs             RepairJob[]
+  warrantyClaims         WarrantyClaim[]
+  ownershipHistory       DeviceOwnershipHistory[]
+  passportEvents         DevicePassportEvent[]
+
+  deviceIntakes DeviceIntake[]
+
+  @@unique([branchId, barcode])
+  @@index([branchId])
+  @@index([currentOwnerCustomerId])
+  @@index([stockItemId])
+  @@index([category])
+  @@index([status])
+}
+
+/// Append-oriented ownership ledger and authority for device ownership history.
+/// An active ownership entry has endedAt = null. Application policy must prevent
+/// overlapping active OWNER periods for the same device.
+model DeviceOwnershipHistory {
+  id                  Int                 @id @default(autoincrement())
+  deviceId            Int
+  customerId          Int
+  ownershipType       DeviceOwnershipType
+  sourceType          DeviceSourceType?
+  sourceId            String?
+  createdByEmployeeId Int?
+  startedAt           DateTime
+  endedAt             DateTime?
+  createdAt           DateTime            @default(now())
+  device              Device              @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy           EmployeeProfile?    @relation("DeviceOwnershipCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId, startedAt])
+  @@index([deviceId, endedAt])
+  @@index([customerId, startedAt])
+  @@index([sourceType, sourceId])
+}
+
+// ============================================================
+// DEVICE PASSPORT TIMELINE FOUNDATION
+// Phase 4 ├óΓé¼ΓÇ¥ additive event vocabulary, idempotency and traceability
+// ============================================================
+
+/// Append-oriented operational ledger for the complete device passport timeline.
+/// Domain modules publish events here; they must not overwrite historical events.
+model DevicePassportEvent {
+  id              Int                     @id @default(autoincrement())
+  deviceId        Int
+  branchId        Int
+  eventType       DevicePassportEventType
+  sourceType      DeviceSourceType?
+  sourceId        String?
+  /// Optional publisher-supplied idempotency key. A publisher must reuse the
+  /// same key when retrying the same domain event for the same device.
+  eventKey        String?
+  /// Groups events produced by one operational request or workflow.
+  correlationId   String?
+  /// Identifies the preceding command/event when causal traceability is known.
+  causationId     String?
+  schemaVersion   Int                     @default(1)
+  title           String
+  description     String?
+  actorType       DeviceActorType
+  actorEmployeeId Int?
+  actorCustomerId Int?
+  customerVisible Boolean                 @default(false)
+  metadata        Json?
+  occurredAt      DateTime
+  createdAt       DateTime                @default(now())
+  device          Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  branch          Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actorEmployee   EmployeeProfile?        @relation("DevicePassportActor", fields: [actorEmployeeId], references: [id], onDelete: SetNull)
+  actorCustomer   CustomerProfile?        @relation("DevicePassportCustomerActor", fields: [actorCustomerId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, eventKey])
+  @@index([deviceId, occurredAt])
+  @@index([deviceId, eventType, occurredAt])
+  @@index([branchId, eventType, occurredAt])
+  @@index([sourceType, sourceId])
+  @@index([correlationId, occurredAt])
+  @@index([actorEmployeeId])
+  @@index([actorCustomerId])
+}
+
+model WarrantyClaimEvent {
+  id                    Int                 @id @default(autoincrement())
+  warrantyClaimId       Int
+  status                WarrantyClaimStatus
+  note                  String?
+  occurredAt            DateTime            @default(now())
+  performedByEmployeeId Int?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+  warrantyClaim         WarrantyClaim       @relation(fields: [warrantyClaimId], references: [id], onDelete: Restrict)
+  performedBy           EmployeeProfile?    @relation(fields: [performedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([warrantyClaimId, occurredAt])
+  @@index([performedByEmployeeId, occurredAt])
+}
+
+model WarrantyClaimCompletionCommand {
+  id              Int           @id @default(autoincrement())
+  branchId        Int
+  commandKey      String
+  requestHash     String
+  warrantyClaimId Int           @unique
+  createdAt       DateTime      @default(now())
+  completedAt     DateTime      @default(now())
+  branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warrantyClaim   WarrantyClaim @relation(fields: [warrantyClaimId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([branchId, createdAt])
+}
+
+model TaxCandidate {
+  id                 Int                @id @default(autoincrement())
+  branchId           Int
+  sourceType         String
+  sourceId           String
+  sourceDocumentNo   String?
+  registrationKey    String             @unique
+  status             TaxCandidateStatus @default(REGISTERED)
+  occurredAt         DateTime
+  snapshot           Json               @default("{}")
+  mappedDocumentType String?
+  rejectionCode      String?
+  rejectionReason    String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @default(now())
+  branch             Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  document           TaxDocument?
+
+  @@unique([branchId, sourceType, sourceId])
+  @@index([branchId, status, occurredAt])
+  @@index([sourceType, sourceId])
+}
+
+enum TaxInvoiceKind {
+  SHORT
+  FULL
+}
+
+model TaxDocument {
+  id                  Int                         @id @default(autoincrement())
+  branchId            Int
+  candidateId         Int?                        @unique
+  documentType        String
+  documentNumber      String
+  counterpartyTaxId   String?
+  identityKey         String                      @unique
+  status              String                      @default("DRAFT")
+  issuedAt            DateTime?
+  occurredAt          DateTime
+  currency            String                      @default("THB")
+  subtotalAmount      Decimal                     @default(0) @db.Decimal(14, 2)
+  taxAmount           Decimal                     @default(0) @db.Decimal(14, 2)
+  totalAmount         Decimal                     @default(0) @db.Decimal(14, 2)
+  snapshot            Json                        @default("{}")
+  taxInvoiceKind      TaxInvoiceKind?
+  issuerProfileId     Int?
+  issuedDocumentNumber String?
+  issuedSequence      Int?
+  issuerSnapshot      Json?
+  recipientSnapshot   Json?
+  originalTaxDocumentId Int?                       @unique
+  saleReturnId         Int?                         @unique
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @default(now())
+  branch              Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  candidate           TaxCandidate?               @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  issuerProfile       TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
+  lifecycleEvents     TaxDocumentLifecycleEvent[]
+  inputTaxFilingItems InputTaxFilingItem[]
+  originalTaxDocument TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
+  creditNote          TaxDocument?                 @relation("TaxDocumentCreditNote")
+  saleReturn          SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)
+
+  @@index([branchId, status, occurredAt])
+  @@index([branchId, documentType, documentNumber])
+  @@index([issuerProfileId], map: "TaxDocument_issuerProfileId_idx")
+  @@unique([issuerProfileId, taxInvoiceKind, issuedSequence], map: "TaxDocument_issuer_kind_sequence_key")
+  @@unique([issuerProfileId, taxInvoiceKind, issuedDocumentNumber], map: "TaxDocument_issuer_kind_number_key")
+}
+
+model TaxDocumentLifecycleEvent {
+  id              Int              @id @default(autoincrement())
+  taxDocumentId   Int
+  fromStatus      String?
+  toStatus        String
+  reason          String?
+  actorEmployeeId Int?
+  occurredAt      DateTime         @default(now())
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  taxDocument     TaxDocument      @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
+  actorEmployee   EmployeeProfile? @relation(fields: [actorEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([taxDocumentId, occurredAt])
+  @@index([actorEmployeeId, occurredAt])
+}
+
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+  ADMIN
+  SUPERADMIN
+}
+
+enum EmployeeRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum DeviceCategory {
+  DESKTOP_COMPUTER
+  NOTEBOOK
+  PRINTER
+  MONITOR
+  UPS
+  NETWORK_DEVICE
+  MOBILE_DEVICE
+  TABLET
+  STORAGE_DEVICE
+  ACCESSORY
+  OTHER
+}
+
+enum DeviceSourceType {
+  SALE
+  SALE_RETURN
+  STOCK_ITEM
+  PURCHASE_RECEIPT
+  DEVICE_OWNERSHIP
+  DEVICE_INTAKE
+  REPAIR_JOB
+  REPAIR_DIAGNOSIS
+  REPAIR_PART
+  REPAIR_LABOR
+  REPAIR_QUALITY_CHECK
+  REPAIR_DELIVERY
+  WARRANTY_CLAIM
+  WARRANTY_CLAIM_EVENT
+  MANUAL
+  IMPORT
+  SYSTEM
+  OTHER
+}
+
+enum DeviceIntakeStatus {
+  DRAFT
+  RECEIVED
+  INSPECTION_COMPLETED
+  LINKED_TO_REPAIR
+  CANCELLED
+}
+
+enum DevicePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AccessoryType {
+  CHARGER
+  POWER_ADAPTER
+  CABLE
+  BATTERY
+  BAG_CASE
+  SIM_CARD
+  MEMORY_CARD
+  OTHER
+}
+
+enum DeviceConditionLevel {
+  UNKNOWN
+  GOOD
+  FAIR
+  DAMAGED
+  SEVERELY_DAMAGED
+}
+
+enum DeviceIntakeAuditEvent {
+  CREATED
+  UPDATED
+  SNAPSHOT_RECORDED
+  CONDITION_RECORDED
+  ACCESSORY_ADDED
+  ACCESSORY_REMOVED
+  CONSENT_SIGNED
+  PHOTO_ADDED
+  DOCUMENT_ADDED
+  CHECKLIST_UPDATED
+  LINKED_TO_REPAIR
+  STATUS_CHANGED
+  CANCELLED
+}
+
+enum RepairEstimateApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+}
+
+enum DeviceStatus {
+  ACTIVE
+  IN_REPAIR
+  IN_WARRANTY_CLAIM
+  RETIRED
+  LOST
+}
+
+enum DeviceOwnershipType {
+  OWNER
+  CUSTODIAN
+  BORROWER
+}
+
+enum DeviceActorType {
+  EMPLOYEE
+  CUSTOMER
+  SYSTEM
+}
+
+enum DevicePassportEventType {
+  REGISTERED
+  OWNERSHIP_CHANGED
+  PURCHASED
+  SOLD
+  RETURNED
+  INTAKE_CREATED
+  INTAKE_RECEIVED
+  INTAKE_INSPECTION_COMPLETED
+  INTAKE_CANCELLED
+  REPAIR_CREATED
+  REPAIR_ASSIGNED
+  REPAIR_STATUS_CHANGED
+  DIAGNOSIS_STARTED
+  DIAGNOSIS_COMPLETED
+  DIAGNOSIS_REVISED
+  PART_ADDED
+  PART_REMOVED
+  LABOR_ADDED
+  LABOR_COMPLETED
+  QC_STARTED
+  QC_PASSED
+  QC_FAILED
+  DELIVERY_PREPARED
+  DELIVERED
+  WARRANTY_CLAIM_OPENED
+  WARRANTY_CLAIM_SUBMITTED
+  WARRANTY_CLAIM_PROVIDER_RECEIVED
+  WARRANTY_CLAIM_RESOLVED
+  WARRANTY_CLAIM_CANCELLED
+  WARRANTY_REPLACED
+  WARRANTY_CREDITED
+  DEVICE_STATUS_CHANGED
+  NOTE_ADDED
+  /// Compatibility event values retained during runtime migration.
+  INTAKE
+  REPAIR_UPDATED
+  WARRANTY_CLAIM_UPDATED
+  STATUS_CHANGED
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  PARTIALLY_RECEIVED
+  RECEIVED
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum StockStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+  CLAIMED
+  USED
+  MISSING_PENDING_REVIEW
+}
+
+enum ServiceStatus {
+  RECEIVED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum ReceiptStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  WAITING_APPROVAL
+}
+
+enum SupplierPayableStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+enum SupplierPaymentLifecycleStatus {
+  DRAFT
+  CONFIRMED
+  VOIDED
+}
+
+enum SupplierPaymentAllocationState {
+  ACTIVE
+  REVERSED
+}
+
+enum SupplierAdvanceStatus {
+  REVIEW_REQUIRED
+  ACTIVE
+  EXHAUSTED
+  VOIDED
+}
+
+enum SupplierPayableDisputeStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
+}
+
+enum SupplierPayableAdjustmentDirection {
+  CREDIT
+  DEBIT
+}
+
+enum SupplierPayableAdjustmentStatus {
+  CONFIRMED
+  VOIDED
+}
+
+enum SupplierPayableAdjustmentType {
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PRICE_CORRECTION
+  SHORTAGE
+  DAMAGE
+  DISCOUNT
+  OTHER
+}
+
+enum PaymentSlipStatus {
+  NONE
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum LoginType {
+  PHONE
+  EMAIL
+  SOCIAL
+  ADMIN
+}
+
+enum RefundMethod {
+  CASH
+  TRANSFER
+  CARD
+  STORE_CREDIT
+  OTHER
+}
+
+enum SaleType {
+  NORMAL
+  GOVERNMENT
+  WHOLESALE
+}
+
+enum SaleStatus {
+  DRAFT
+  DELIVERED
+  FINALIZED
+  COMPLETED
+  CANCELLED
+}
+
+enum PosHeldCartStatus {
+  OPEN
+  CONVERTED
+  CANCELLED
+}
+
+enum PosHeldCartLineType {
+  STOCK_ITEM
+  SIMPLE
+}
+
+enum ReturnType {
+  REFUND
+  CLAIM
+  EXCHANGE
+  CREDIT_NOTE
+  INTERNAL_USE
+  STOCK_ERROR
+}
+
+enum PaymentType {
+  ADVANCE
+  RECEIPT_BASED
+  CREDIT_NOTE
+}
+
+enum OrderOnlineStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderSource {
+  POS
+  ONLINE
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATION
+  GOVERNMENT
+}
+
+enum BarcodeStatus {
+  READY
+  SN_RECEIVED
+  USED
+  VOID
+}
+
+enum BusinessType {
+  GENERAL
+  IT
+  ELECTRONICS
+  CONSTRUCTION
+  GROCERY
+}
+
+enum ProductMode {
+  SIMPLE
+  STRUCTURED
+}
+
+enum ProductInventoryBehavior {
+  TRACKED
+  NON_STOCK
+}
+
+enum StockMovementType {
+  RECEIVE
+  SALE
+  ADJUST
+  TRANSFER
+  RESERVE
+  UNRESERVE
+  RETURN
+  LOSS
+  CLAIM_OUT
+  CLAIM_RETURN
+  CLAIM_REPLACEMENT
+  CLAIM_WRITE_OFF
+}
+
+enum WarrantyClaimRepairLinkState {
+  UNLINKED_LEGACY
+  LINKED_VERIFIED
+  MANUAL_REVIEW_REQUIRED
+}
+
+enum WarrantyClaimStatus {
+  DRAFT
+  SUBMITTED
+  IN_TRANSIT
+  RECEIVED_BY_PROVIDER
+  INSPECTING
+  APPROVED
+  REJECTED
+  REPAIRING
+  REPLACEMENT_PENDING
+  CREDIT_PENDING
+  RESOLVED
+  CANCELLED
+}
+
+enum WarrantyClaimResolution {
+  REPAIRED
+  REPLACED
+  CREDITED
+  REFUNDED
+  RETURNED_UNCHANGED
+  REJECTED
+  WRITTEN_OFF
+}
+
+enum ReceiptSource {
+  PO
+  QUICK
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  QR
+  E_WALLET
+  CHEQUE
+  OTHER
+  DEPOSIT
+}
+
+enum DepositStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+enum SaleReturnStatus {
+  PENDING
+  APPROVED
+  STOCK_RESTORED
+  COMPLETED
+  REJECTED
+  REFUNDED
+}
+
+enum CombinedBillingStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+enum BarcodeKind {
+  SN
+  LOT
+}
+
+enum StockAuditMode {
+  READY
+  FULL
+}
+
+enum StockAuditStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SimpleLotStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum CustomerReceiptStatus {
+  ACTIVE
+  FULLY_ALLOCATED
+  CANCELLED
+}
+
+enum InputTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
+enum InputTaxDocumentMode {
+  UNCLASSIFIED
+  NOT_RECEIVED
+  RECEIVED
+  NON_VAT_DOCUMENT
+  NO_INPUT_TAX_CLAIM
+}
+
+enum TaxDocumentReceiptSource {
+  WITH_GOODS
+  LATER
+}
+
+enum TaxCandidateStatus {
+  REGISTERED
+  MAPPED
+  REJECTED
+  CONVERTED
+}
+
+enum InputTaxFilingItemStatus {
+  SELECTED
+  FILED
+  REMOVED
+  VOIDED
+}
+
+enum SalesTaxFilingStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
+// ============================================================
+// TAX AUTHORITY FOUNDATION
+// Step 3.1 ├óΓé¼ΓÇ¥ Enum Foundation
+// ============================================================
+
+enum TaxDocumentType {
+  TAX_INVOICE
+  ABBREVIATED_TAX_INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  REPLACEMENT
+  VOID
+}
+
+enum TaxLifecycleStatus {
+  DRAFT
+  VALIDATED
+  ISSUED
+  REPORTED
+  LOCKED
+  CANCELLED
+  REPLACED
+  ARCHIVED
+}
+
+enum TaxSourceType {
+  SALE
+  SALE_RETURN
+  PURCHASE_RECEIPT
+  REPAIR
+  WARRANTY_CLAIM
+  MANUAL
+}
+
+enum TaxEventType {
+  CREATED
+  VALIDATED
+  ISSUED
+  REPORTED
+  LOCKED
+  CANCELLED
+  REPLACED
+  ARCHIVED
+}
+
+enum TaxLedgerType {
+  OUTPUT_VAT
+  INPUT_VAT
+  OUTPUT_VAT_ADJUSTMENT
+  INPUT_VAT_ADJUSTMENT
+}
+
+enum TaxPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+  SUBMITTED
+  REOPENED
+}
+
+enum RepairDiagnosisStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REVISED
+  CANCELLED
+}
+
+enum RepairQcStatus {
+  PENDING
+  IN_PROGRESS
+  PASSED
+  FAILED
+  WAIVED
+}
+
+enum RepairDeliveryStatus {
+  PENDING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum RepairDeliveryMethod {
+  PICKUP_AT_BRANCH
+  COURIER
+  DELIVERY_BY_STORE
+  OTHER
+}
+
+enum ProductReservationActorType {
+  EMPLOYEE
+  COMMERCE_IDENTITY
+}
+
+enum ProductReservationStatus {
+  ACTIVE
+  ACCEPTED
+  FULFILLMENT_READY
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ProductReservationLineType {
+  STOCK_ITEM
+  SIMPLE
+}
+
+enum ProductReservationLifecycleCommandType {
+  ACCEPT
+  MARK_FULFILLMENT_READY
+  CANCEL
+  EXPIRE
+}
+
+enum OnlineOrderSource {
+  ONLINE
+  STOREFRONT
+}
+
+enum OnlineFulfillmentMethod {
+  PICKUP
+}
+
+model ProductReservation {
+  id                  Int                         @id @default(autoincrement())
+  code                String                      @unique
+  branchId            Int
+  customerId          Int?
+  createdByEmployeeId Int?
+  actorType           ProductReservationActorType @default(EMPLOYEE)
+  commerceIdentityId  Int?                        @unique
+  anonymousSessionId  Int?                        @unique
+  idempotencyKey      String?
+  status              ProductReservationStatus    @default(ACTIVE)
+  orderSource         OnlineOrderSource           @default(ONLINE)
+  sourceReference     String?
+  fulfillmentMethod   OnlineFulfillmentMethod     @default(PICKUP)
+  totalBeforeDiscount Decimal                      @default(0) @db.Decimal(12, 2)
+  totalDiscount       Decimal                      @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal                      @db.Decimal(12, 2)
+  depositAmount       Decimal                      @default(0) @db.Decimal(12, 2)
+  note                String?
+  expiresAt           DateTime?
+  stockReleasedAt     DateTime?
+  version             Int                         @default(1)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  branch              Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdByEmployee   EmployeeProfile?             @relation("ProductReservationCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  commerceIdentity    CommerceCommitmentIdentity?  @relation(fields: [commerceIdentityId], references: [id], onDelete: Restrict)
+  anonymousSession    AnonymousShoppingSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: Restrict)
+  items               ProductReservationItem[]
+  lifecycleCommands   ProductReservationLifecycleCommand[]
+  lifecycleEvents     ProductReservationLifecycleEvent[]
+
+  @@index([branchId, status, createdAt])
+  @@index([status, expiresAt])
+}
+
+model ProductReservationLifecycleCommand {
+  id            Int                                   @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandKey    String
+  commandType   ProductReservationLifecycleCommandType
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  stockReleased Boolean                               @default(false)
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime                              @default(now())
+  reservation   ProductReservation                    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch                                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?                      @relation("ProductReservationLifecycleCommandActor", fields: [actorId], references: [id], onDelete: SetNull)
+  event         ProductReservationLifecycleEvent?
+
+  @@unique([reservationId, commandKey])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationLifecycleEvent {
+  id            Int                @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandId     Int                @unique
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime           @default(now())
+  reservation   ProductReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  command       ProductReservationLifecycleCommand @relation(fields: [commandId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?   @relation("ProductReservationLifecycleEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationItem {
+  id            Int                        @id @default(autoincrement())
+  reservationId Int
+  lineId        String
+  lineType      ProductReservationLineType
+  productId     Int
+  stockItemId   Int?
+  simpleLotId   Int?
+  quantity      Decimal                    @db.Decimal(12, 2)
+  basePrice     Decimal                    @db.Decimal(12, 2)
+  discount      Decimal                    @default(0) @db.Decimal(12, 2)
+  price         Decimal                    @db.Decimal(12, 2)
+  vatAmount     Decimal                    @default(0) @db.Decimal(12, 2)
+  remark        String?
+  isActive      Boolean                    @default(true)
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  reservation   ProductReservation         @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product       Product                    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockItem     StockItem?                 @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  simpleLot     SimpleLot?                 @relation(fields: [simpleLotId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, lineId])
+  @@index([reservationId, isActive])
+  @@index([productId])
+  @@index([simpleLotId])
+}
+
+
+enum MissingCostResolutionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  RETURNED_FOR_CORRECTION
+  CANCELLED
+  SUPERSEDED
+}
+
+enum MissingCostEvidenceSourceType {
+  LEGACY_INVOICE
+  SUPPLIER_DOCUMENT
+  PURCHASE_RECORD
+  HISTORICAL_COST_REFERENCE
+  MANUAL_BUSINESS_DECISION
+}
+
+enum MissingCostEvidenceConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum MissingCostResolutionEventType {
+  CREATED
+  EVIDENCE_VERSION_CREATED
+  UPDATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  RETURNED_FOR_CORRECTION
+  CANCELLED
+  SUPERSEDED
+  RECOVERY_PREVIEW_REQUESTED
+}
+
+model MissingCostResolution {
+  id                    Int                         @id @default(autoincrement())
+  branchId              Int
+  stockBalanceId        Int
+  productId             Int
+  sourceAuditId         String
+  sourceSnapshotHash    String
+  candidateId           String
+  candidateIdentityHash String
+  candidateEntryId      String
+  status                MissingCostResolutionStatus @default(DRAFT)
+  currentVersion        Int                         @default(1)
+  createdByEmployeeId   Int
+  approvedByEmployeeId  Int?
+  approvedAt            DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  branch                Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  stockBalance          StockBalance                @relation(fields: [stockBalanceId], references: [id], onDelete: Restrict)
+  product               Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdByEmployee     EmployeeProfile             @relation("MissingCostResolutionCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  approvedByEmployee    EmployeeProfile?            @relation("MissingCostResolutionApprovedBy", fields: [approvedByEmployeeId], references: [id], onDelete: Restrict)
+  versions              MissingCostResolutionVersion[]
+  events                MissingCostResolutionEvent[]
+
+  @@unique([branchId, candidateIdentityHash])
+  @@unique([branchId, candidateId])
+  @@index([branchId, status])
+  @@index([branchId, productId])
+  @@index([branchId, stockBalanceId])
+  @@index([branchId, createdAt])
+  @@index([sourceSnapshotHash])
+}
+
+model MissingCostResolutionVersion {
+  id                    Int                             @id @default(autoincrement())
+  resolutionId          Int
+  version               Int
+  sourceType            MissingCostEvidenceSourceType
+  sourceReference       String
+  evidenceSummary       String
+  proposedUnitCost      Decimal                         @db.Decimal(12, 2)
+  effectiveDate         DateTime
+  confidence            MissingCostEvidenceConfidence
+  rationale             String
+  proposerEmployeeId    Int
+  evidenceHash          String
+  candidateSnapshotHash String
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  approvedByEmployeeId  Int?
+  approvalSnapshot      Json?
+  createdAt             DateTime                        @default(now())
+  resolution            MissingCostResolution           @relation(fields: [resolutionId], references: [id], onDelete: Restrict)
+  proposerEmployee      EmployeeProfile                 @relation("MissingCostResolutionVersionProposer", fields: [proposerEmployeeId], references: [id], onDelete: Restrict)
+  approvedByEmployee    EmployeeProfile?                @relation("MissingCostResolutionVersionApprover", fields: [approvedByEmployeeId], references: [id], onDelete: Restrict)
+  events                MissingCostResolutionEvent[]
+
+  @@unique([resolutionId, version])
+  @@unique([resolutionId, evidenceHash])
+  @@index([resolutionId, createdAt])
+  @@index([proposerEmployeeId])
+  @@index([approvedByEmployeeId])
+  @@index([evidenceHash])
+}
+
+model MissingCostResolutionEvent {
+  id                    Int                            @id @default(autoincrement())
+  resolutionId          Int
+  versionId             Int?
+  eventType             MissingCostResolutionEventType
+  previousStatus        MissingCostResolutionStatus?
+  resultingStatus       MissingCostResolutionStatus?
+  actorEmployeeId       Int
+  reasonCode            String
+  note                  String?
+  evidenceHash          String?
+  candidateSnapshotHash String?
+  eventHash             String
+  occurredAt            DateTime                       @default(now())
+  createdAt             DateTime                       @default(now())
+  resolution            MissingCostResolution          @relation(fields: [resolutionId], references: [id], onDelete: Restrict)
+  version               MissingCostResolutionVersion?  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  actorEmployee         EmployeeProfile                @relation("MissingCostResolutionEventActor", fields: [actorEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([resolutionId, eventHash])
+  @@index([resolutionId, occurredAt])
+  @@index([versionId])
+  @@index([actorEmployeeId])
+  @@index([eventType, occurredAt])
+}
+
+
+enum TaxExpenseStatus {
+  DRAFT
+  RECORDED
+  UNDER_REVIEW
+  FINALIZED
+  VOIDED
+}
+
+enum TaxExpenseCounterpartyType {
+  SUPPLIER
+  EXPENSE_PAYEE
+  OTHER
+}
+
+enum ExpensePayeeType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+  GOVERNMENT
+  OTHER
+}
+
+enum TaxExpenseVatTreatment {
+  PENDING_REVIEW
+  CREDITABLE
+  NON_CREDITABLE
+  OUT_OF_SCOPE
+}
+
+enum TaxExpenseCitTreatment {
+  PENDING_REVIEW
+  DEDUCTIBLE
+  NON_DEDUCTIBLE
+  PARTIALLY_DEDUCTIBLE
+}
+
+enum TaxExpenseWhtTreatment {
+  NOT_APPLICABLE
+  PENDING_REVIEW
+  WITHHOLDING_REQUIRED
+  WITHHELD
+}
+
+enum TaxExpenseEvidenceStatus {
+  MISSING
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum TaxExpenseAssessmentStatus {
+  DRAFT
+  FINALIZED
+  SUPERSEDED
+}
+
+enum TaxExpenseAttachmentType {
+  TAX_INVOICE
+  RECEIPT
+  WITHHOLDING_CERTIFICATE
+  SUPPORTING_DOCUMENT
+  OTHER
+}
+
+enum TaxExpenseLifecycleEventType {
+  CREATED
+  RECORDED
+  REVIEW_REQUESTED
+  ASSESSMENT_FINALIZED
+  VOIDED
+}
+
+model TaxExpenseCategory {
+  id        Int      @id @default(autoincrement())
+  branchId  Int
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  items     TaxExpenseItem[] @relation("TaxExpenseItemCategory")
+
+  @@unique([branchId, code])
+  @@unique([id, branchId])
+  @@index([branchId, active])
+}
+
+model ExpensePayee {
+  id                  Int              @id @default(autoincrement())
+  branchId            Int
+  payeeType           ExpensePayeeType @default(LEGAL_ENTITY)
+  name                String
+  taxId               String?          @db.VarChar(13)
+  taxBranchCode       String?          @default("00000") @db.VarChar(5)
+  address             String?
+  phone               String?
+  email               String?
+  contactPerson       String?
+  notes               String?
+  active              Boolean          @default(true)
+  createdByEmployeeId Int
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  branch              Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdByEmployee   EmployeeProfile  @relation("ExpensePayeeCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  taxExpenses         TaxExpense[]     @relation("TaxExpenseExpensePayee")
+
+  @@unique([id, branchId])
+  @@index([branchId, active])
+  @@index([branchId, name])
+  @@index([branchId, taxId])
+  @@index([createdByEmployeeId])
+}
+
+model TaxExpense {
+  id                   Int                       @id @default(autoincrement())
+  branchId             Int
+  supplierId           Int?
+  expensePayeeId       Int?
+  expenseNumber        String
+  counterpartyType     TaxExpenseCounterpartyType
+  counterpartyName     String
+  counterpartyTaxId    String?
+  documentNumber       String?
+  documentDate         DateTime?
+  expenseDate          DateTime
+  receivedAt           DateTime?
+  status               TaxExpenseStatus          @default(DRAFT)
+  evidenceStatus       TaxExpenseEvidenceStatus  @default(MISSING)
+  currency             String                    @default("THB") @db.VarChar(3)
+  subtotalAmount       Decimal                   @default(0) @db.Decimal(14, 2)
+  vatAmount            Decimal                   @default(0) @db.Decimal(14, 2)
+  totalAmount          Decimal                   @default(0) @db.Decimal(14, 2)
+  withholdingTaxAmount Decimal                   @default(0) @db.Decimal(14, 2)
+  paymentDueAmount     Decimal                   @default(0) @db.Decimal(14, 2)
+  note                 String?
+  createdByEmployeeId  Int
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  branch               Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier             Supplier?                 @relation("TaxExpenseSupplier", fields: [supplierId, branchId], references: [id, branchId], onDelete: Restrict)
+  expensePayee         ExpensePayee?              @relation("TaxExpenseExpensePayee", fields: [expensePayeeId, branchId], references: [id, branchId], onDelete: Restrict)
+  createdByEmployee    EmployeeProfile           @relation("TaxExpenseCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  items                TaxExpenseItem[]          @relation("TaxExpenseItemExpense")
+  assessments          TaxExpenseAssessment[]
+  lifecycleEvents      TaxExpenseLifecycleEvent[]
+  attachments          TaxExpenseAttachment[]
+
+  @@unique([branchId, expenseNumber])
+  @@unique([id, branchId])
+  @@index([branchId, status, expenseDate])
+  @@index([branchId, supplierId])
+  @@index([branchId, expensePayeeId])
+  @@index([branchId, documentNumber])
+  @@index([createdByEmployeeId])
+}
+
+model TaxExpenseItem {
+  id                  Int                   @id @default(autoincrement())
+  taxExpenseId        Int
+  categoryId          Int
+  branchId            Int
+  lineNumber          Int
+  description         String
+  quantity            Decimal               @default(1) @db.Decimal(14, 2)
+  unitAmount          Decimal               @db.Decimal(14, 2)
+  subtotalAmount      Decimal               @db.Decimal(14, 2)
+  vatTreatment        TaxExpenseVatTreatment @default(PENDING_REVIEW)
+  vatAmount           Decimal               @default(0) @db.Decimal(14, 2)
+  citTreatment        TaxExpenseCitTreatment @default(PENDING_REVIEW)
+  whtTreatment        TaxExpenseWhtTreatment @default(NOT_APPLICABLE)
+  withholdingTaxRate  Decimal?              @db.Decimal(5, 2)
+  withholdingTaxAmount Decimal               @default(0) @db.Decimal(14, 2)
+  createdAt           DateTime              @default(now())
+  taxExpense          TaxExpense            @relation("TaxExpenseItemExpense", fields: [taxExpenseId, branchId], references: [id, branchId], onDelete: Restrict)
+  category            TaxExpenseCategory    @relation("TaxExpenseItemCategory", fields: [categoryId, branchId], references: [id, branchId], onDelete: Restrict)
+
+  @@unique([taxExpenseId, lineNumber])
+  @@index([branchId])
+  @@index([categoryId])
+}
+
+model TaxExpenseAssessment {
+  id                  Int                       @id @default(autoincrement())
+  taxExpenseId        Int
+  version             Int
+  status              TaxExpenseAssessmentStatus @default(DRAFT)
+  vatTreatment        TaxExpenseVatTreatment
+  citTreatment        TaxExpenseCitTreatment
+  whtTreatment        TaxExpenseWhtTreatment
+  assessmentNote      String?
+  assessmentSnapshot  Json?
+  assessmentHash      String
+  assessedByEmployeeId Int?
+  assessedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  taxExpense          TaxExpense                @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  assessedByEmployee  EmployeeProfile?          @relation("TaxExpenseAssessmentAssessedBy", fields: [assessedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([taxExpenseId, version])
+  @@unique([taxExpenseId, assessmentHash])
+  @@index([assessedByEmployeeId])
+}
+
+model TaxExpenseLifecycleEvent {
+  id                  Int                         @id @default(autoincrement())
+  taxExpenseId        Int
+  eventType           TaxExpenseLifecycleEventType
+  previousStatus      TaxExpenseStatus?
+  resultingStatus     TaxExpenseStatus?
+  actorEmployeeId     Int?
+  reasonCode          String?
+  note                String?
+  metadata            Json?
+  occurredAt          DateTime                    @default(now())
+  createdAt           DateTime                    @default(now())
+  taxExpense          TaxExpense                  @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  actorEmployee       EmployeeProfile?            @relation("TaxExpenseLifecycleEventActor", fields: [actorEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([taxExpenseId, occurredAt])
+  @@index([actorEmployeeId])
+  @@index([eventType, occurredAt])
+}
+
+model TaxExpenseAttachment {
+  id                  Int                     @id @default(autoincrement())
+  taxExpenseId        Int
+  attachmentType      TaxExpenseAttachmentType
+  evidenceStatus      TaxExpenseEvidenceStatus @default(PENDING_REVIEW)
+  storageKey          String
+  originalFileName    String
+  contentType         String
+  byteSize            Int
+  sha256              String
+  uploadedByEmployeeId Int
+  createdAt           DateTime                @default(now())
+  taxExpense          TaxExpense              @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  uploadedByEmployee  EmployeeProfile         @relation("TaxExpenseAttachmentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([taxExpenseId, sha256])
+  @@index([uploadedByEmployeeId])
+}
+
+enum ProductTemplateCandidateStatus {
+  DRAFT
+  UNDER_REVIEW
+  REJECTED
+  PROMOTED
+  MERGED
+  CANCELLED
+}
+
+enum ProductTemplateCandidateEventType {
+  CREATED
+  REVIEW_STARTED
+  PROPOSED_DATA_UPDATED
+  REJECTED
+  PROMOTED
+  MERGED
+  CANCELLED
+}
+
+model ProductTemplateCandidate {
+  id                      Int                            @id @default(autoincrement())
+  sourceBranchId          Int
+  sourceProductId         Int
+  targetTemplateBranchId  Int
+  targetTemplateProductId Int?
+  status                  ProductTemplateCandidateStatus @default(DRAFT)
+  sourceSnapshot          Json
+  proposedTemplateData    Json?
+  duplicateAssessment     Json?
+  createdByEmployeeId     Int?
+  reviewedByEmployeeId    Int?
+  decisionNote            String?
+  reviewedAt              DateTime?
+  promotedAt              DateTime?
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+  sourceBranch            Branch                         @relation("ProductTemplateCandidateSourceBranch", fields: [sourceBranchId], references: [id])
+  sourceProduct           Product                        @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
+  targetTemplateBranch    Branch                         @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
+  targetTemplateProduct   Product?                       @relation("ProductTemplateCandidateTargetProduct", fields: [targetTemplateProductId], references: [id])
+  createdByEmployee       EmployeeProfile?              @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
+  reviewedByEmployee      EmployeeProfile?              @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
+  events                  ProductTemplateCandidateEvent[]
+
+  @@index([sourceBranchId, sourceProductId])
+  @@index([targetTemplateBranchId, status])
+  @@index([status, createdAt])
+  @@index([targetTemplateProductId])
+}
+
+
+enum StoreDeviceGatewayEnrollmentState {
+  PENDING_ENROLLMENT
+  ENROLLED
+  REVOKED
+}
+
+enum StoreDeviceGatewayRuntimeState {
+  OFFLINE
+  ONLINE
+  DEGRADED
+}
+
+enum StoreDeviceGatewaySessionState {
+  CONNECTED
+  AUTHENTICATED
+  DISCONNECTED
+  REVOKED
+  EXPIRED
+}
+
+enum StoreDeviceJobType {
+  PRINT_DOCUMENT
+  PRINT_LABEL
+  DEVICE_DIAGNOSTIC
+}
+
+enum StoreDeviceJobStatus {
+  PENDING
+  LEASED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum StoreDeviceJobLeaseStatus {
+  OFFERED
+  ACKNOWLEDGED
+  COMPLETED
+  FAILED
+  EXPIRED
+  REVOKED
+}
+
+enum StoreDeviceJobResultStatus {
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model StoreDeviceGateway {
+  id                   Int                                @id @default(autoincrement())
+  branchId             Int
+  gatewayId            String
+  enrollmentState      StoreDeviceGatewayEnrollmentState @default(PENDING_ENROLLMENT)
+  runtimeState         StoreDeviceGatewayRuntimeState    @default(OFFLINE)
+  credentialVersion    Int
+  capabilitiesSnapshot Json?
+  platformSnapshot     Json?
+  lastHeartbeatAt      DateTime?
+  lastAuthenticatedAt  DateTime?
+  revokedAt            DateTime?
+  createdAt            DateTime                           @default(now())
+  updatedAt            DateTime                           @updatedAt
+
+  branch     Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  sessions   StoreDeviceGatewaySession[] @relation("StoreDeviceGatewaySessions")
+  jobLeases  StoreDeviceJobLease[]       @relation("StoreDeviceGatewayLeases")
+  jobResults StoreDeviceJobResult[]      @relation("StoreDeviceGatewayResults")
+
+  @@unique([id, branchId])
+  @@unique([branchId, gatewayId])
+  @@index([branchId, enrollmentState])
+  @@index([branchId, runtimeState])
+}
+
+model StoreDeviceGatewaySession {
+  id                Int                            @id @default(autoincrement())
+  branchId          Int
+  gatewayId         Int
+  sessionId         String
+  credentialVersion Int
+  challengeId       String?
+  state             StoreDeviceGatewaySessionState @default(CONNECTED)
+  reconnectCursor   String?
+  connectedAt       DateTime                       @default(now())
+  authenticatedAt   DateTime?
+  disconnectedAt    DateTime?
+  revokedAt         DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  branch     Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  gateway    StoreDeviceGateway        @relation("StoreDeviceGatewaySessions", fields: [branchId, gatewayId], references: [branchId, id], onDelete: Restrict)
+  jobLeases  StoreDeviceJobLease[]     @relation("StoreDeviceGatewaySessionLeases")
+  jobResults StoreDeviceJobResult[]    @relation("StoreDeviceGatewaySessionResults")
+
+  @@unique([id, branchId])
+  @@unique([branchId, sessionId])
+  @@unique([id, branchId, gatewayId])
+  @@index([branchId, gatewayId, state])
+  @@index([branchId, expiresAt])
+}
+
+model StoreDeviceJob {
+  id              Int                  @id @default(autoincrement())
+  branchId        Int
+  jobId           String
+  idempotencyKey  String
+  jobType         StoreDeviceJobType
+  source          String
+  status          StoreDeviceJobStatus @default(PENDING)
+  targetDeviceId  String?
+  targetProfileId String?
+  requestSnapshot Json
+  correlationId   String?
+  causationId     String?
+  requestedAt     DateTime             @default(now())
+  completedAt     DateTime?
+  failedAt        DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  branch  Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  leases  StoreDeviceJobLease[]
+  results StoreDeviceJobResult[]
+
+  @@unique([id, branchId])
+  @@unique([branchId, jobId])
+  @@unique([branchId, idempotencyKey])
+  @@index([branchId, status, requestedAt])
+  @@index([branchId, correlationId])
+}
+
+model StoreDeviceJobLease {
+  id             Int                       @id @default(autoincrement())
+  branchId       Int
+  jobId          Int
+  gatewayId      Int
+  sessionId      Int
+  leaseId        String
+  status         StoreDeviceJobLeaseStatus @default(OFFERED)
+  attemptNumber  Int
+  expiresAt      DateTime
+  acknowledgedAt DateTime?
+  completedAt    DateTime?
+  failedAt       DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  branch  Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  job     StoreDeviceJob            @relation(fields: [branchId, jobId], references: [branchId, id], onDelete: Restrict)
+  gateway StoreDeviceGateway        @relation("StoreDeviceGatewayLeases", fields: [branchId, gatewayId], references: [branchId, id], onDelete: Restrict)
+  session StoreDeviceGatewaySession @relation("StoreDeviceGatewaySessionLeases", fields: [branchId, gatewayId, sessionId], references: [branchId, gatewayId, id], onDelete: Restrict)
+  result  StoreDeviceJobResult?
+
+  @@unique([id, branchId])
+  @@unique([branchId, leaseId])
+  @@unique([jobId, attemptNumber])
+  @@index([branchId, gatewayId, status])
+  @@index([branchId, sessionId, status])
+  @@index([branchId, expiresAt])
+}
+
+model StoreDeviceJobResult {
+  id                Int                        @id @default(autoincrement())
+  branchId          Int
+  jobId             Int
+  leaseId           Int                        @unique
+  gatewayId         Int
+  sessionId         Int
+  resultId          String
+  status            StoreDeviceJobResultStatus
+  adapterEvidence   Json?
+  transportEvidence Json?
+  resultSnapshot    Json
+  errorMetadata     Json?
+  executedAt        DateTime
+  recordedAt        DateTime                   @default(now())
+
+  branch  Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  job     StoreDeviceJob            @relation(fields: [branchId, jobId], references: [branchId, id], onDelete: Restrict)
+  lease   StoreDeviceJobLease       @relation(fields: [branchId, leaseId], references: [branchId, id], onDelete: Restrict)
+  gateway StoreDeviceGateway        @relation("StoreDeviceGatewayResults", fields: [branchId, gatewayId], references: [branchId, id], onDelete: Restrict)
+  session StoreDeviceGatewaySession @relation("StoreDeviceGatewaySessionResults", fields: [branchId, gatewayId, sessionId], references: [branchId, gatewayId, id], onDelete: Restrict)
+
+  @@unique([branchId, resultId])
+  @@unique([branchId, leaseId])
+  @@index([branchId, jobId, recordedAt])
+  @@index([branchId, gatewayId, recordedAt])
+}
+
+model ProductTemplateCandidateEvent {
+  id              Int                               @id @default(autoincrement())
+  candidateId     Int
+  eventType       ProductTemplateCandidateEventType
+  previousStatus  ProductTemplateCandidateStatus?
+  resultingStatus ProductTemplateCandidateStatus
+  actorEmployeeId Int?
+  note            String?
+  metadata        Json?
+  createdAt       DateTime                          @default(now())
+  candidate       ProductTemplateCandidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  actorEmployee   EmployeeProfile?                  @relation("ProductTemplateCandidateEventActor", fields: [actorEmployeeId], references: [id])
+
+  @@index([candidateId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorEmployeeId])
+}
