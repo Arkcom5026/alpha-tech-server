@@ -12,7 +12,29 @@ class SystemDocumentPurposeBootstrapRepository {
 
   listBranches() {
     return this.prisma.branch.findMany({
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        branchCode: true,
+        slug: true,
+        categoryId: true,
+        features: true,
+      },
+      orderBy: { id: 'asc' },
+    })
+  }
+
+  findBranchesByIds(branchIds) {
+    return this.prisma.branch.findMany({
+      where: { id: { in: branchIds.map(Number) } },
+      select: {
+        id: true,
+        name: true,
+        branchCode: true,
+        slug: true,
+        categoryId: true,
+        features: true,
+      },
       orderBy: { id: 'asc' },
     })
   }
