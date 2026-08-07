@@ -33,6 +33,26 @@ const normalizeCopies = (value) => {
   return copies
 }
 
+const assertIdempotentJobCompatibility = ({ job, saleId, copies, documentPurpose }) => {
+  const snapshot = job?.requestSnapshot
+  if (!snapshot) return
+
+  const compatible =
+    snapshot.schemaVersion === 1
+    && snapshot.documentPurpose?.code === documentPurpose.code
+    && Number(snapshot.source?.id) === saleId
+    && snapshot.source?.type === 'SALE'
+    && Number(snapshot.print?.copies) === copies
+
+  if (!compatible) {
+    throw fail(
+      'STORE_DEVICE_PRINT_IDEMPOTENCY_CONFLICT',
+      'idempotencyKey is already bound to a different print request',
+      409,
+    )
+  }
+}
+
 const createDeliveryNotePrintJobService = ({
   projector = projectSaleDeliveryNote,
   jobService = durableJobService,
@@ -64,6 +84,24 @@ const createDeliveryNotePrintJobService = ({
       )
     }
 
+    const documentPurpose = {
+      code: projection.document.type,
+      displayName: projection.document.title,
+    }
+
+    const requestSnapshot = {
+      schemaVersion: 1,
+      documentPurpose,
+      source: {
+        type: 'SALE',
+        id: normalizedSaleId,
+      },
+      print: {
+        copies,
+      },
+      projection,
+    }
+
     const job = await jobService.createJob({
       user,
       payload: {
@@ -74,35 +112,24 @@ const createDeliveryNotePrintJobService = ({
         targetProfileId: payload.targetProfileId || null,
         correlationId: payload.correlationId || null,
         causationId: payload.causationId || null,
-        requestSnapshot: {
-          schemaVersion: 1,
-          documentPurpose: {
-            code: projection.document.type,
-            displayName: projection.document.title,
-          },
-          source: {
-            type: 'SALE',
-            id: normalizedSaleId,
-          },
-          print: {
-            copies,
-          },
-          projection,
-        },
+        requestSnapshot,
       },
     })
 
+    assertIdempotentJobCompatibility({
+      job,
+      saleId: normalizedSaleId,
+      copies,
+      documentPurpose,
+    })
+
+    const durableSnapshot = job?.requestSnapshot || requestSnapshot
+
     return {
       job,
-      documentPurpose: {
-        code: projection.document.type,
-        displayName: projection.document.title,
-      },
-      source: {
-        type: 'SALE',
-        id: normalizedSaleId,
-      },
-      copies,
+      documentPurpose: durableSnapshot.documentPurpose,
+      source: durableSnapshot.source,
+      copies: Number(durableSnapshot.print?.copies || copies),
     }
   },
 })
