@@ -40,7 +40,7 @@ assert.ok(routes.includes('router.use(verifyToken, requireAdministrator)'));
 assert.ok(routes.includes("['ADMIN', 'SUPERADMIN']"));
 assert.ok(routes.includes("router.get('/', async"));
 assert.ok(routes.includes("data.status === 'FAILED' ? 503 : 200"));
-assert.ok(server.includes("app.use('/api/system/operational-verification', operationalVerificationRoutes)"));
+assert.ok(server.includes("app.use('/api/operational-verification', operationalVerificationRoutes)"));
 
 for (const forbidden of ['password', 'token', 'DATABASE_URL', 'DIRECT_URL', 'JWT_SECRET']) {
   assert.ok(!service.includes(forbidden), `Verification response must not expose sensitive authority: ${forbidden}`);

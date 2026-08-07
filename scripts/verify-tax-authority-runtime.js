@@ -66,8 +66,8 @@ assertContains(schema, 'model PurchaseOrderReceipt {', 'purchase receipt tax sou
 
 const server = read('server.js');
 assertContains(server, "require('./src/modules/tax/http/taxIntakeRoutes')", 'tax intake route import');
-assertContains(server, "app.use('/api/tax', taxIntakeRoutes)", 'tax intake route mount');
-assertContains(server, "app.use('/api/tax', taxPeriodRoutes)", 'tax period route mount');
+assertContains(server, "app.use('/api/tax-intake', taxIntakeRoutes)", 'tax intake route mount');
+assertContains(server, "app.use('/api/tax-periods', taxPeriodRoutes)", 'tax period route mount');
 
 const taxIndex = read('src/modules/tax/index.js');
 assertContains(taxIndex, 'registerTaxCandidateService', 'tax candidate registration authority');
