@@ -1,0 +1,178 @@
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+  ADMIN
+  SUPERADMIN
+}
+
+enum EmployeeRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum LoginType {
+  PHONE
+  EMAIL
+  SOCIAL
+  ADMIN
+}
+
+model User {
+  id                  Int                  @id @default(autoincrement())
+  email               String?              @unique
+  password            String
+  role                Role
+  enabled             Boolean              @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  loginId             String?              @unique
+  loginType           LoginType            @default(PHONE)
+  cart                Cart[]
+  customerProfiles    CustomerProfile[]
+  employeeProfile     EmployeeProfile?
+  orderOnline         OrderOnline[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedOwner")
+}
+
+model EmployeeProfile {
+  id                                Int                         @id @default(autoincrement())
+  name                              String?
+  phone                             String?
+  userId                            Int                         @unique
+  branchId                          Int?
+  positionId                        Int?
+  createdAt                         DateTime                    @default(now())
+  updatedAt                         DateTime                    @updatedAt
+  approved                          Boolean                     @default(false)
+  active                            Boolean                     @default(true)
+  passwordHashV2                    String?
+  v2Role                            EmployeeRole                @default(CASHIER)
+  combinedBillingDocument           CombinedBillingDocument[]
+  combinedSaleDocument              CombinedSaleDocument[]
+  customerDeposit                   CustomerDeposit[]
+  createdCustomerReceiptAllocations CustomerReceiptAllocation[] @relation("CustomerReceiptAllocationCreatedBy")
+  cancelledCustomerReceipts         CustomerReceipt[]           @relation("CustomerReceiptCancelledBy")
+  createdCustomerReceipts           CustomerReceipt[]           @relation("CustomerReceiptCreatedBy")
+  branch                            Branch?                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  position                          Position?                   @relation(fields: [positionId], references: [id])
+  user                              User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  inputTaxFilingBatches             InputTaxFilingBatch[]
+  taxDocumentLifecycleEvents        TaxDocumentLifecycleEvent[]
+  createdProductReservations        ProductReservation[]         @relation("ProductReservationCreatedBy")
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[] @relation("ProductReservationLifecycleCommandActor")
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[] @relation("ProductReservationLifecycleEventActor")
+  confirmedOrders                   OrderOnline[]               @relation("EmployeeConfirmedOrders")
+  payment                           Payment[]
+  purchaseOrderCreated              PurchaseOrder[]
+  PurchaseOrderReceipt              PurchaseOrderReceipt[]
+  refundTransaction                 RefundTransaction[]
+  repairJobs                        RepairJob[]
+  sale                              Sale[]
+  saleReturns                       SaleReturn[]
+  performedStockMovements           StockMovement[]
+  createdWarrantyClaims             WarrantyClaim[]             @relation("WarrantyClaimCreatedBy")
+  resolvedWarrantyClaims            WarrantyClaim[]             @relation("WarrantyClaimResolvedBy")
+  performedWarrantyClaimEvents      WarrantyClaimEvent[]
+  deviceOwnershipHistory            DeviceOwnershipHistory[]    @relation("DeviceOwnershipCreatedBy")
+  devicePassportEvents              DevicePassportEvent[]       @relation("DevicePassportActor")
+  checkedDeviceIntakeItems          DeviceIntakeChecklist[]     @relation("DeviceIntakeChecklistCheckedBy")
+  uploadedDeviceIntakeDocuments     DeviceIntakeDocument[]      @relation("DeviceIntakeDocumentUploadedBy")
+  uploadedDeviceIntakePhotos        DeviceIntakePhoto[]         @relation("DeviceIntakePhotoUploadedBy")
+  performedDeviceIntakeAudits       DeviceIntakeAudit[]         @relation("DeviceIntakeAuditPerformedBy")
+  receivedDeviceIntakes             DeviceIntake[]              @relation("DeviceIntakeReceivedBy")
+  diagnosedRepairJobs               RepairDiagnosis[]           @relation("RepairDiagnosisDiagnosedBy")
+  performedRepairLaborItems         RepairLaborItem[]           @relation("RepairLaborPerformedBy")
+  checkedRepairQualityChecks        RepairQualityCheck[]        @relation("RepairQualityCheckedBy")
+  deliveredRepairJobs               RepairDelivery[]            @relation("RepairDeliveryDeliveredBy")
+  createdRepairTrackingAccesses     RepairTrackingAccess[]      @relation("RepairTrackingAccessCreatedBy")
+  requestedRepairEstimateApprovals  RepairEstimateApproval[]    @relation("RepairEstimateApprovalRequestedBy")
+  refundedReturns                   SaleReturn[]                @relation("RefundedBy")
+  salesTaxFilingBatches             SalesTaxFilingBatch[]
+  assignedServices                  ServiceOrder[]
+  stockAuditScanLog                 StockAuditScanLog[]
+  stockAuditSession                 StockAuditSession[]
+  stockItem                         StockItem[]
+  supplierPayment                   SupplierPayment[]             @relation("SupplierPaymentCreatedBy")
+  createdSupplierPayables           SupplierPayable[]            @relation("SupplierPayableCreatedBy")
+  voidedSupplierPayments            SupplierPayment[]             @relation("SupplierPaymentVoidedBy")
+  reversedSupplierPaymentAllocations SupplierPaymentAllocation[] @relation("SupplierPaymentAllocationReversedBy")
+  createdSupplierAdvances            SupplierAdvance[]            @relation("SupplierAdvanceCreatedBy")
+  activatedSupplierAdvances          SupplierAdvance[]            @relation("SupplierAdvanceActivatedBy")
+  voidedSupplierAdvances             SupplierAdvance[]            @relation("SupplierAdvanceVoidedBy")
+  reversedSupplierAdvanceAllocations SupplierAdvanceAllocation[]  @relation("SupplierAdvanceAllocationReversedBy")
+  openedSupplierPayableDisputes      SupplierPayableDispute[]      @relation("SupplierPayableDisputeOpenedBy")
+  resolvedSupplierPayableDisputes    SupplierPayableDispute[]      @relation("SupplierPayableDisputeResolvedBy")
+  createdSupplierPayableAdjustments  SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentCreatedBy")
+  voidedSupplierPayableAdjustments   SupplierPayableAdjustment[]   @relation("SupplierPayableAdjustmentVoidedBy")
+  createdPosHeldCarts                PosHeldCart[]                  @relation("PosHeldCartCreatedBy")
+  updatedPosHeldCarts                PosHeldCart[]                  @relation("PosHeldCartUpdatedBy")
+  cancelledPosHeldCarts              PosHeldCart[]                  @relation("PosHeldCartCancelledBy")
+  v2StockAudits                     V2StockAudit[]
+  createdMissingCostResolutions      MissingCostResolution[]        @relation("MissingCostResolutionCreatedBy")
+  approvedMissingCostResolutions     MissingCostResolution[]        @relation("MissingCostResolutionApprovedBy")
+  proposedMissingCostResolutionVersions MissingCostResolutionVersion[] @relation("MissingCostResolutionVersionProposer")
+  approvedMissingCostResolutionVersions MissingCostResolutionVersion[] @relation("MissingCostResolutionVersionApprover")
+  performedMissingCostResolutionEvents MissingCostResolutionEvent[] @relation("MissingCostResolutionEventActor")
+  createdTaxExpenses                    TaxExpense[]                @relation("TaxExpenseCreatedBy")
+  assessedTaxExpenses                   TaxExpenseAssessment[]      @relation("TaxExpenseAssessmentAssessedBy")
+  performedTaxExpenseEvents             TaxExpenseLifecycleEvent[]  @relation("TaxExpenseLifecycleEventActor")
+  uploadedTaxExpenseAttachments         TaxExpenseAttachment[]      @relation("TaxExpenseAttachmentUploadedBy")
+  createdExpensePayees                   ExpensePayee[]               @relation("ExpensePayeeCreatedBy")
+  productTemplateCandidatesCreated      ProductTemplateCandidate[]  @relation("ProductTemplateCandidateCreatedBy")
+  productTemplateCandidatesReviewed     ProductTemplateCandidate[]  @relation("ProductTemplateCandidateReviewedBy")
+  productTemplateCandidateEvents        ProductTemplateCandidateEvent[] @relation("ProductTemplateCandidateEventActor")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id                Int            @id @default(autoincrement())
+  userId            Int
+  tokenHash         String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  replacedByTokenId Int?
+  userAgent         String?
+  ipAddress         String?
+  replacedByToken   RefreshToken?  @relation("RefreshTokenRotation", fields: [replacedByTokenId], references: [id])
+  previousTokens    RefreshToken[] @relation("RefreshTokenRotation")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model Position {
+  id          Int               @id @default(autoincrement())
+  name        String
+  branchId    Int?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  description String?
+  isActive    Boolean           @default(true)
+  branch      Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  employees   EmployeeProfile[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([branchId, isActive])
+}

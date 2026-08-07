@@ -1,0 +1,97 @@
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ServiceStatus {
+  RECEIVED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id              Int              @id @default(autoincrement())
+  cartTotal       Decimal          @db.Decimal(12, 2)
+  stripePaymentId String
+  status          String
+  amount          Int
+  currency        String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  customerId      Int?
+  orderStatus     OrderStatus      @default(PENDING)
+  customer        CustomerProfile? @relation(fields: [customerId], references: [id])
+  products        ProductOnOrder[]
+}
+
+model ProductOnOrder {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  orderId   Int
+  count     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Cart {
+  id                Int              @id @default(autoincrement())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  customerProfileId Int?
+  userId            Int
+  customerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartItems         CartItem[]
+}
+
+model CartItem {
+  id              Int      @id @default(autoincrement())
+  cartId          Int
+  productId       Int
+  quantity        Int      @default(1)
+  priceAtThatTime Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model ServiceOrder {
+  id          Int              @id @default(autoincrement())
+  customerId  Int?
+  branchId    Int?
+  employeeId  Int?
+  receiveDate DateTime         @default(now())
+  status      ServiceStatus    @default(RECEIVED)
+  description String?
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       ServiceItem[]
+  branch      Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer    CustomerProfile? @relation(fields: [customerId], references: [id])
+  employee    EmployeeProfile? @relation(fields: [employeeId], references: [id])
+}
+
+model ServiceItem {
+  id           Int          @id @default(autoincrement())
+  serviceId    Int
+  productId    Int?
+  serialNumber String?
+  problem      String?
+  solution     String?
+  cost         Decimal?     @db.Decimal(12, 2)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  product      Product?     @relation(fields: [productId], references: [id])
+  service      ServiceOrder @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,87 @@
+model Branch {
+  id                              Int                              @id @default(autoincrement())
+  name                            String
+  address                         String
+  createdAt                       DateTime                         @default(now())
+  updatedAt                       DateTime                         @updatedAt
+  RBACEnabled                     Boolean                          @default(true)
+  phone                           String?
+  subdistrictCode                 String?
+  businessType                    BusinessType                     @default(GENERAL)
+  features                        Json?
+  branchCode                      String?                          @db.VarChar(5)
+  isHeadOffice                    Boolean                          @default(false)
+  taxId                           String?                          @db.VarChar(13)
+  slug                            String?                          @unique
+  categoryId                      Int                              @default(1)
+
+  banks                           Bank[]
+  barcodeCounter                  BarcodeCounter[]
+  barcodeReceiptItem              BarcodeReceiptItem[]
+  category                        Category                         @relation(fields: [categoryId], references: [id])
+  subdistrict                     Subdistrict?                     @relation(fields: [subdistrictCode], references: [code])
+  branchPrices                    BranchPrice[]
+  combinedBillingDocument         CombinedBillingDocument[]
+  combinedSaleDocument            CombinedSaleDocument[]
+  customerProfiles                CustomerProfile[]
+  customerDeposit                 CustomerDeposit[]
+  customerReceipts                CustomerReceipt[]
+  employees                       EmployeeProfile[]
+  inputTaxFilingBatches           InputTaxFilingBatch[]
+  orderOnline                     OrderOnline[]
+  payment                         Payment[]
+  paymentCodeCounter              PaymentCodeCounter[]
+  productTypes                    ProductType[]
+  products                        Product[]
+  brands                          Brand[]
+  positions                       Position[]
+  pos                             PurchaseOrder[]
+  purchaseOrderReceipt            PurchaseOrderReceipt[]
+  refundTransaction               RefundTransaction[]
+  repairJobs                      RepairJob[]
+  sale                            Sale[]
+  salesCompletionCommands         SalesCompletionCommand[]
+  saleReturn                      SaleReturn[]
+  saleReturnCompletionCommands    SaleReturnCompletionCommand[]
+  warrantyClaims                  WarrantyClaim[]
+  warrantyClaimCompletionCommands WarrantyClaimCompletionCommand[]
+  devices                         Device[]
+  devicePassportEvents            DevicePassportEvent[]
+  deviceIntakes                   DeviceIntake[]
+  salesTaxFilingBatches           SalesTaxFilingBatch[]
+  services                        ServiceOrder[]
+  simpleLots                      SimpleLot[]
+  stockAuditSession               StockAuditSession[]
+  stockBalances                   StockBalance[]
+  stock                           StockItem[]
+  stockMovement                   StockMovement[]
+  productReservations             ProductReservation[]
+  productReservationLifecycleCommands ProductReservationLifecycleCommand[]
+  productReservationLifecycleEvents ProductReservationLifecycleEvent[]
+  suppliers                       Supplier[]
+  supplierPayment                 SupplierPayment[]
+  supplierPayables                SupplierPayable[]
+  supplierPayableDisputes         SupplierPayableDispute[]
+  supplierPayableAdjustments      SupplierPayableAdjustment[]
+  posHeldCarts                    PosHeldCart[]
+  supplierAdvances                SupplierAdvance[]
+  taxCandidates                   TaxCandidate[]
+  taxDocuments                    TaxDocument[]
+  v2StockAudits                   V2StockAudit[]
+  provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedBranch")
+  missingCostResolutions               MissingCostResolution[]
+  taxExpenseCategories                 TaxExpenseCategory[]
+  expensePayees                        ExpensePayee[]
+  taxExpenses                          TaxExpense[]
+  taxIssuerProfile                     TaxIssuerProfile?
+  storeExperienceProfile               StoreExperienceProfile?
+  sourceProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceBranch")
+  targetProductTemplateCandidates      ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetBranch")
+  storeDeviceGateways                  StoreDeviceGateway[]
+  storeDeviceGatewaySessions           StoreDeviceGatewaySession[]
+  storeDeviceJobs                      StoreDeviceJob[]
+  storeDeviceJobLeases                 StoreDeviceJobLease[]
+  storeDeviceJobResults                StoreDeviceJobResult[]
+
+  @@index([subdistrictCode])
+}
