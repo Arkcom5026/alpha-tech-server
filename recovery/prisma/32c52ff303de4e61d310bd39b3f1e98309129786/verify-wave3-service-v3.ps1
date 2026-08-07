@@ -5,7 +5,19 @@ $CertifiedSha='3a707e514f3fe8a73b44dc6ff314748445d8257b'
 $ExpectedTotalModels=135;$ExpectedTotalEnums=114;$ExpectedMainModels=83;$ExpectedMainEnums=63
 function Write-Utf8NoBom([string]$Path,[string]$Content){[IO.File]::WriteAllText($Path,$Content,(New-Object Text.UTF8Encoding($false)))}
 function Normalize([string]$Text){(($Text-replace"`r`n","`n"-replace"`r","`n").Trim())+"`n"}
-function Get-DeclBlock([string]$Text,[string]$Kind,[string]$Name){$all=[regex]::Matches($Text,'(?m)^(generator|datasource|model|enum)\s+([A-Za-z_]\w*)\s*\{');$hit=$null;$idx=-1;for($i=0;$i-lt$all.Count;$i++){if($all[$i].Groups[1].Value-eq$Kind-and$all[$i].Groups[2].Value-eq$Name){$hit=$all[$i];$idx=$i;break}};if($null-eq$hit){throw "Missing $Kind $Name"};$end=if($idx+1-lt$all.Count){$all[$idx+1].Index}else{$Text.Length};$Text.Substring($hit.Index,$end-$hit.Index).TrimEnd()}
+function Get-DeclBlock([string]$Text,[string]$Kind,[string]$Name){
+  $all=[regex]::Matches($Text,'(?m)^(generator|datasource|model|enum)\s+([A-Za-z_]\w*)\s*\{')
+  $hit=$null;$idx=-1
+  for($i=0;$i-lt$all.Count;$i++){
+    if($all[$i].Groups[1].Value-eq$Kind-and$all[$i].Groups[2].Value-eq$Name){$hit=$all[$i];$idx=$i;break}
+  }
+  if($null-eq$hit){throw "Missing $Kind $Name"}
+  $segmentEnd=if($idx+1-lt$all.Count){$all[$idx+1].Index}else{$Text.Length}
+  $segment=$Text.Substring($hit.Index,$segmentEnd-$hit.Index)
+  $close=$segment.LastIndexOf('}')
+  if($close-lt0){throw "Missing closing brace for $Kind $Name"}
+  $segment.Substring(0,$close+1)
+}
 function Invoke-Logged([string]$Log,[scriptblock]$Command){$saved=$ErrorActionPreference;$ErrorActionPreference='Continue';try{$o=&$Command 2>&1;$c=$LASTEXITCODE}finally{$ErrorActionPreference=$saved};$t=(($o|ForEach-Object{$_.ToString()})-join[Environment]::NewLine);Write-Utf8NoBom $Log ($t+[Environment]::NewLine);$o|ForEach-Object{Write-Host $_};if($c-ne0){throw "Native command failed with exit code $c. See $Log"}}
 Set-Location ((git rev-parse --show-toplevel).Trim())
 if((git branch --show-current).Trim()-ne$ExpectedBranch){throw "Expected branch $ExpectedBranch"}
