@@ -10,8 +10,13 @@ const {
 
 const executionEnvelope = Object.freeze({
   schemaVersion: 1,
-  job: Object.freeze({ id: 101 }),
-  lease: Object.freeze({ id: 202 }),
+  job: Object.freeze({
+    jobId: 'sdj_print_pdf_101',
+    jobType: 'PRINT_DOCUMENT',
+  }),
+  lease: Object.freeze({
+    leaseId: 'sdl_print_pdf_202',
+  }),
   documentPurpose: Object.freeze({
     code: 'DELIVERY_NOTE',
     displayName: 'ใบส่งสินค้า',
