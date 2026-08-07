@@ -2,6 +2,7 @@
 
 const {
   LIFECYCLE_STATES,
+  canonicalJson,
   hashDocumentPurposeEvent,
   hashDocumentPurposeSnapshot,
   normalizeDocumentPurposeCode,
@@ -59,7 +60,7 @@ const isEquivalentSystemDefinition = (existing, expected) =>
   (existing.categoryCode ?? null) === expected.categoryCode &&
   existing.lifecycleState === expected.lifecycleState &&
   existing.sortOrder === expected.sortOrder &&
-  JSON.stringify(existing.metadata ?? null) === JSON.stringify(expected.metadata ?? null)
+  canonicalJson(existing.metadata ?? null) === canonicalJson(expected.metadata ?? null)
 
 class SystemDocumentPurposeBootstrapService {
   constructor(repository = new SystemDocumentPurposeBootstrapRepository()) {
