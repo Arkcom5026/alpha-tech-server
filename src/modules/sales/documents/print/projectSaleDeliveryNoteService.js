@@ -1,6 +1,9 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
+const {
+  ResolvePrintDocumentPurposeService,
+} = require('../../../document-purpose/resolve/resolvePrintDocumentPurposeService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -104,6 +107,11 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     );
   }
 
+  const purpose = await new ResolvePrintDocumentPurposeService().execute({
+    branchId: normalizedBranchId,
+    code: 'DELIVERY_NOTE',
+  });
+
   const lines = [
     ...sale.items.map((item) => mapLine({
       ...item,
@@ -121,8 +129,8 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
 
   return Object.freeze({
     document: {
-      type: 'DELIVERY_NOTE',
-      title: 'ใบส่งสินค้า',
+      type: purpose.code,
+      title: purpose.displayName,
       saleId: sale.id,
       saleCode: sale.code,
       issuedAt: sale.soldAt,
