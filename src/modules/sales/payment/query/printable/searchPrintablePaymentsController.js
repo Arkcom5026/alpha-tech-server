@@ -1,4 +1,7 @@
 const { prisma, Prisma } = require('../../../../../lib/prisma');
+const {
+  ResolvePrintDocumentPurposeService,
+} = require('../../../../document-purpose/resolve/resolvePrintDocumentPurposeService');
 
 const toLocalRange = (dateStr, tz = '+07:00') => {
   if (!dateStr) return {};
@@ -11,6 +14,11 @@ const searchPrintablePayments = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
+
+    const purpose = await new ResolvePrintDocumentPurposeService().execute({
+      branchId,
+      code: 'SALE_RECEIPT',
+    });
 
     const { keyword = '', fromDate, toDate, limit: limitRaw } = req.query;
     const limitParsed = parseInt(limitRaw, 10);
@@ -80,12 +88,23 @@ const searchPrintablePayments = async (req, res) => {
       },
     });
 
+    const documentPurpose = Object.freeze({
+      id: purpose.id,
+      code: purpose.code,
+      displayName: purpose.displayName,
+      currentVersion: purpose.currentVersion,
+    });
+
     const result = payments.map((payment) => {
       const total = payment.items.reduce(
         (sum, item) => sum.add(item.amount || 0),
         new Prisma.Decimal(0),
       );
-      return { ...payment, amount: Number(total.toFixed(2)) };
+      return {
+        ...payment,
+        amount: Number(total.toFixed(2)),
+        documentPurpose,
+      };
     });
 
     return res.json(result);
