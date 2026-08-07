@@ -4,6 +4,11 @@ const {
   isImmediateSalePaymentMethod,
   normalizeSalePaymentMethod,
 } = require('../policies/salePaymentPolicy');
+const {
+  normalizePriceAdjustment,
+  signedMoney,
+  summarizePriceAdjustments,
+} = require('../policies/salePriceAdjustmentPolicy');
 
 const money = (value, field, { allowZero = true } = {}) => {
   const number = Number(value);
@@ -49,13 +54,23 @@ const normalizeLineType = (item = {}) => {
 
 const normalizeSaleLine = (item, index) => {
   const lineType = normalizeLineType(item);
+  const pricing = normalizePriceAdjustment({
+    basePrice: item.basePrice,
+    priceAdjustment: item.priceAdjustment,
+    discount: item.discount,
+    price: item.price,
+    adjustmentReason: item.adjustmentReason,
+    fieldPrefix: `items[${index}]`,
+  });
   const common = {
     lineId: String(item.lineId || `${lineType}-${index + 1}`),
     lineType,
-    basePrice: money(item.basePrice, `items[${index}].basePrice`),
+    basePrice: pricing.basePrice,
+    priceAdjustment: pricing.priceAdjustment,
+    adjustmentReason: pricing.adjustmentReason,
     vatAmount: money(item.vatAmount, `items[${index}].vatAmount`),
-    price: money(item.price, `items[${index}].price`),
-    discount: money(item.discount || 0, `items[${index}].discount`),
+    price: pricing.finalPrice,
+    discount: pricing.discountAmount,
     remark: item.remark || null,
     documentPrefix: item.documentPrefix ?? null,
     documentDescription: item.documentDescription ?? null,
@@ -108,21 +123,33 @@ const parseCompleteSaleCommand = (body = {}) => {
     throw new SalesError(400, 'DUPLICATE_SALE_LINE', 'Every sale line requires a unique lineId');
   }
 
+  const pricingSummary = summarizePriceAdjustments(normalizedItems);
   const totalBeforeDiscount = money(sale.totalBeforeDiscount, 'totalBeforeDiscount');
+  const totalPriceAdjustment = sale.totalPriceAdjustment == null
+    ? pricingSummary.totalPriceAdjustment
+    : signedMoney(sale.totalPriceAdjustment, 'totalPriceAdjustment');
   const totalDiscount = money(sale.totalDiscount || 0, 'totalDiscount');
   const totalAmount = money(sale.totalAmount, 'totalAmount');
   const vatRate = money(sale.vatRate == null ? 7 : sale.vatRate, 'vatRate');
   const vat = money(sale.vat, 'vat');
-  const sumBase = money(normalizedItems.reduce((sum, item) => sum + item.basePrice, 0), 'sumBase');
-  const sumDiscount = money(normalizedItems.reduce((sum, item) => sum + item.discount, 0), 'sumDiscount');
   const sumPrice = money(normalizedItems.reduce((sum, item) => sum + item.price, 0), 'sumPrice');
   const expectedVat = money(totalAmount * vatRate / (100 + vatRate), 'expectedVat');
   const mismatch = (a, b) => Math.abs(a - b) > 0.01;
-  if (mismatch(totalBeforeDiscount, sumBase) || mismatch(totalDiscount, sumDiscount) ||
-      mismatch(totalAmount, sumPrice) || mismatch(totalAmount, totalBeforeDiscount - totalDiscount) ||
+  if (mismatch(totalBeforeDiscount, pricingSummary.totalBeforeAdjustment) ||
+      mismatch(totalPriceAdjustment, pricingSummary.totalPriceAdjustment) ||
+      mismatch(totalDiscount, pricingSummary.totalDiscount) ||
+      mismatch(totalAmount, pricingSummary.totalAmount) ||
+      mismatch(totalAmount, sumPrice) ||
       mismatch(vat, expectedVat)) {
-    throw new SalesError(400, 'SALE_TOTAL_MISMATCH', 'Sale totals or VAT do not match item evidence', {
-      totalBeforeDiscount, totalDiscount, totalAmount, vat, expectedVat, sumBase, sumDiscount, sumPrice,
+    throw new SalesError(400, 'SALE_TOTAL_MISMATCH', 'Sale totals, price adjustments, or VAT do not match item evidence', {
+      totalBeforeDiscount,
+      totalPriceAdjustment,
+      totalDiscount,
+      totalAmount,
+      vat,
+      expectedVat,
+      pricingSummary,
+      sumPrice,
     });
   }
 
@@ -173,6 +200,7 @@ const parseCompleteSaleCommand = (body = {}) => {
       customerFirstAssociationToken,
       sourceHeldCartId,
       totalBeforeDiscount,
+      totalPriceAdjustment,
       totalDiscount,
       totalAmount,
       vat,
