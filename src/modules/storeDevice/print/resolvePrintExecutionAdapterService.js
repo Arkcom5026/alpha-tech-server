@@ -7,6 +7,9 @@ const {
 const {
   dryRunPrintExecutionAdapter,
 } = require('./adapters/dryRunPrintExecutionAdapter')
+const {
+  createSaleReceiptSumatraPrintExecutionAdapter,
+} = require('./adapters/windows/saleReceiptSumatraPrintExecutionAdapter')
 
 const fail = (code, message, statusCode = 400) =>
   Object.assign(new Error(message), { code, statusCode })
@@ -14,38 +17,45 @@ const fail = (code, message, statusCode = 400) =>
 const normalizeAdapterCode = (value) => String(value || 'DRY_RUN').trim().toUpperCase()
 
 const createResolvePrintExecutionAdapterService = ({
-  adapters = { DRY_RUN: dryRunPrintExecutionAdapter },
-} = {}) => ({
-  execute({ executionEnvelope, adapterCode = 'DRY_RUN' }) {
-    const envelope = assertExecutionEnvelope(executionEnvelope)
-    const normalizedCode = normalizeAdapterCode(adapterCode)
-    const adapter = adapters[normalizedCode]
+  adapters,
+} = {}) => {
+  const registeredAdapters = adapters || {
+    DRY_RUN: dryRunPrintExecutionAdapter,
+    SALE_RECEIPT_SUMATRA: createSaleReceiptSumatraPrintExecutionAdapter(),
+  }
 
-    if (!adapter) {
-      throw fail(
-        'STORE_DEVICE_PRINT_ADAPTER_NOT_FOUND',
-        `Print execution adapter is not registered: ${normalizedCode}`,
-        404,
-      )
-    }
+  return {
+    execute({ executionEnvelope, adapterCode = 'DRY_RUN' }) {
+      const envelope = assertExecutionEnvelope(executionEnvelope)
+      const normalizedCode = normalizeAdapterCode(adapterCode)
+      const adapter = registeredAdapters[normalizedCode]
 
-    assertPrintExecutionAdapter(adapter)
+      if (!adapter) {
+        throw fail(
+          'STORE_DEVICE_PRINT_ADAPTER_NOT_FOUND',
+          `Print execution adapter is not registered: ${normalizedCode}`,
+          404,
+        )
+      }
 
-    if (!adapter.supports(envelope)) {
-      throw fail(
-        'STORE_DEVICE_PRINT_ADAPTER_UNSUPPORTED',
-        `Print execution adapter does not support this execution envelope: ${normalizedCode}`,
-        409,
-      )
-    }
+      assertPrintExecutionAdapter(adapter)
 
-    return Object.freeze({
-      adapterCode: normalizedCode,
-      adapter,
-      capabilities: adapter.capabilities(),
-    })
-  },
-})
+      if (!adapter.supports(envelope)) {
+        throw fail(
+          'STORE_DEVICE_PRINT_ADAPTER_UNSUPPORTED',
+          `Print execution adapter does not support this execution envelope: ${normalizedCode}`,
+          409,
+        )
+      }
+
+      return Object.freeze({
+        adapterCode: normalizedCode,
+        adapter,
+        capabilities: adapter.capabilities(),
+      })
+    },
+  }
+}
 
 module.exports = {
   createResolvePrintExecutionAdapterService,
