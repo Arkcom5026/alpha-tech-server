@@ -81,21 +81,28 @@ const projectSaleReceiptSearch = async ({ branchId }) => {
     fail('SALE_RECEIPT printable search failed', { branchId, statusCode, payload });
   }
 
-  if (payload.length > 0) {
-    const purpose = payload[0]?.documentPurpose;
-    if (purpose?.code !== 'SALE_RECEIPT' || !purpose?.displayName) {
-      fail('SALE_RECEIPT projection does not expose the registry purpose', {
-        branchId,
-        purpose,
-      });
-    }
+  if (payload.length === 0) {
+    return {
+      status: 'SKIP_NO_PRINTABLE_DATA',
+      rowCount: 0,
+      samplePaymentId: null,
+      documentPurpose: null,
+    };
+  }
+
+  const purpose = payload[0]?.documentPurpose;
+  if (purpose?.code !== 'SALE_RECEIPT' || !purpose?.displayName) {
+    fail('SALE_RECEIPT projection does not expose the registry purpose', {
+      branchId,
+      purpose,
+    });
   }
 
   return {
     status: 'PASS',
     rowCount: payload.length,
     samplePaymentId: payload[0]?.id || null,
-    documentPurpose: payload[0]?.documentPurpose || null,
+    documentPurpose: purpose,
   };
 };
 
