@@ -32,11 +32,12 @@ const parseLine = (line, index) => {
   const lineKey = text(line.lineId || line.lineKey, 120) || `${lineType}-${stockItemId || simpleLotId || productId}-${index}`;
   const unitPrice = money(line.unitPrice ?? line.price, `items[${index}].unitPrice`);
   const basePrice = Math.round(unitPrice * quantity * 100) / 100;
-  const explicitAdjustment = line.priceAdjustment;
   const legacyDiscount = money(line.discount || 0, `items[${index}].discount`);
-  const priceAdjustment = explicitAdjustment == null
-    ? Math.round(-legacyDiscount * 100) / 100
-    : signedMoney(explicitAdjustment, `items[${index}].priceAdjustment`);
+  const billShare = money(line.billShare || 0, `items[${index}].billShare`);
+  const itemAdjustment = line.priceAdjustment == null
+    ? Math.round(-(legacyDiscount - billShare) * 100) / 100
+    : signedMoney(line.priceAdjustment, `items[${index}].priceAdjustment`);
+  const priceAdjustment = Math.round((itemAdjustment - billShare) * 100) / 100;
   const finalPrice = Math.round((basePrice + priceAdjustment) * 100) / 100;
   if (finalPrice < 0) fail('Price adjustment makes held cart line negative', 'HELD_CART_TOTAL_INVALID');
   const discount = priceAdjustment < 0 ? Math.round(-priceAdjustment * 100) / 100 : 0;
