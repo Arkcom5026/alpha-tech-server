@@ -5,53 +5,14 @@ const durableJobService = require('../services/storeDeviceDurableJobService')
 const {
   projectSaleDeliveryNote,
 } = require('../../sales/documents/print/projectSaleDeliveryNoteService')
-
-const fail = (code, message, statusCode = 400) =>
-  Object.assign(new Error(message), { code, statusCode })
-
-const positiveInt = (value, code, field) => {
-  const parsed = Number(value)
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw fail(code, `${field} must be a positive integer`)
-  }
-  return parsed
-}
-
-const nonEmpty = (value, code, field) => {
-  if (typeof value !== 'string' || !value.trim()) {
-    throw fail(code, `${field} is required`)
-  }
-  return value.trim()
-}
-
-const normalizeCopies = (value) => {
-  if (value === undefined || value === null || value === '') return 1
-  const copies = Number(value)
-  if (!Number.isInteger(copies) || copies < 1 || copies > 20) {
-    throw fail('STORE_DEVICE_PRINT_COPIES_INVALID', 'copies must be an integer between 1 and 20')
-  }
-  return copies
-}
-
-const assertIdempotentJobCompatibility = ({ job, saleId, copies, documentPurpose }) => {
-  const snapshot = job?.requestSnapshot
-  if (!snapshot) return
-
-  const compatible =
-    snapshot.schemaVersion === 1
-    && snapshot.documentPurpose?.code === documentPurpose.code
-    && Number(snapshot.source?.id) === saleId
-    && snapshot.source?.type === 'SALE'
-    && Number(snapshot.print?.copies) === copies
-
-  if (!compatible) {
-    throw fail(
-      'STORE_DEVICE_PRINT_IDEMPOTENCY_CONFLICT',
-      'idempotencyKey is already bound to a different print request',
-      409,
-    )
-  }
-}
+const {
+  fail,
+  positiveInt,
+  nonEmpty,
+  normalizeCopies,
+  createPrintRequestSnapshot,
+  assertIdempotentPrintJobCompatibility,
+} = require('./printDocumentJobContract')
 
 const createDeliveryNotePrintJobService = ({
   projector = projectSaleDeliveryNote,
@@ -59,7 +20,11 @@ const createDeliveryNotePrintJobService = ({
 } = {}) => ({
   async execute({ user, saleId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
-    const normalizedSaleId = positiveInt(saleId, 'STORE_DEVICE_PRINT_SALE_ID_INVALID', 'saleId')
+    const normalizedSaleId = positiveInt(
+      saleId,
+      'STORE_DEVICE_PRINT_SALE_ID_INVALID',
+      'saleId',
+    )
     const idempotencyKey = nonEmpty(
       payload.idempotencyKey,
       'STORE_DEVICE_PRINT_IDEMPOTENCY_REQUIRED',
@@ -89,18 +54,13 @@ const createDeliveryNotePrintJobService = ({
       displayName: projection.document.title,
     }
 
-    const requestSnapshot = {
-      schemaVersion: 1,
+    const requestSnapshot = createPrintRequestSnapshot({
       documentPurpose,
-      source: {
-        type: 'SALE',
-        id: normalizedSaleId,
-      },
-      print: {
-        copies,
-      },
+      sourceType: 'SALE',
+      sourceId: normalizedSaleId,
+      copies,
       projection,
-    }
+    })
 
     const job = await jobService.createJob({
       user,
@@ -116,9 +76,10 @@ const createDeliveryNotePrintJobService = ({
       },
     })
 
-    assertIdempotentJobCompatibility({
+    assertIdempotentPrintJobCompatibility({
       job,
-      saleId: normalizedSaleId,
+      sourceType: 'SALE',
+      sourceId: normalizedSaleId,
       copies,
       documentPurpose,
     })
