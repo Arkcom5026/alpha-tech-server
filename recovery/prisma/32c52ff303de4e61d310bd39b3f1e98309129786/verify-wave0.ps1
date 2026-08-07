@@ -96,9 +96,17 @@ foreach ($file in $schemaFiles) {
 }
 
 try {
+  # All commands run against the temporary Prisma directory. The generator output
+  # therefore resolves under the temporary root and cannot collide with a running
+  # server process that has locked the repository's query engine DLL.
   Invoke-NativeLogged (Join-Path $evidence 'prisma-format.txt') { & npx.cmd prisma format --schema $tempPrisma }
-  Invoke-NativeLogged (Join-Path $evidence 'prisma-validate.txt') { & npx.cmd prisma validate --schema prisma }
-  Invoke-NativeLogged (Join-Path $evidence 'prisma-generate.txt') { & npx.cmd prisma generate --schema prisma }
+  Invoke-NativeLogged (Join-Path $evidence 'prisma-validate.txt') { & npx.cmd prisma validate --schema $tempPrisma }
+  Invoke-NativeLogged (Join-Path $evidence 'prisma-generate.txt') { & npx.cmd prisma generate --schema $tempPrisma }
+
+  $tempGeneratedClient = Join-Path $tempRoot 'node_modules/.prisma/client'
+  if (-not (Test-Path $tempGeneratedClient)) {
+    throw "Temporary Prisma Client output was not created at $tempGeneratedClient"
+  }
 
   git diff --exit-code -- prisma
   if ($LASTEXITCODE -ne 0) { throw 'Prisma directory changed during verification.' }
@@ -112,12 +120,14 @@ try {
     mainSchemaModelCount=$mainModels; mainSchemaEnumCount=$mainEnums
     totalModelCount=$totalModels; totalEnumCount=$totalEnums
     prismaCliVersion=$prismaVersion; prismaClientVersion=$clientVersion; prismaSchemaPath=$schemaPath
-    originalPrismaDirectoryMutated=$false; migrationExecution='PROHIBITED'; databaseTarget='NONE'
+    verificationSchemaPath=$tempPrisma; generatedClientPath=$tempGeneratedClient
+    originalPrismaDirectoryMutated=$false; repositoryNodeModulesMutated=$false
+    migrationExecution='PROHIBITED'; databaseTarget='NONE'
   }
   Write-Utf8NoBom (Join-Path $evidence 'wave0-result.json') (($result | ConvertTo-Json -Depth 10) + [Environment]::NewLine)
   Write-Host "Wave 0 verification PASS. Evidence: $evidence"
   Write-Host "Schema files: $($schemaFiles.Count); total models: $totalModels; total enums: $totalEnums"
-  Write-Host 'Original Prisma directory and migrations remain unchanged.'
+  Write-Host 'Original Prisma directory, repository node_modules, and migrations remain unchanged.'
 }
 finally {
   if (Test-Path $tempRoot) { Remove-Item -Recurse -Force $tempRoot }
