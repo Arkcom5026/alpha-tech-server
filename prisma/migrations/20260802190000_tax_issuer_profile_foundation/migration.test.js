@@ -5,10 +5,11 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..', '..');
+const { readPrismaSchemaSource } = require(path.join(root, 'scripts/read-prisma-schema-source'));
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
 const migration = read('prisma/migrations/20260802190000_tax_issuer_profile_foundation/migration.sql');
-const schema = read('prisma/schema.prisma');
+const schema = readPrismaSchemaSource(root);
 
 assert.match(migration, /CREATE TYPE "TaxIssuerProfileStatus"/);
 assert.match(migration, /CREATE TABLE "TaxIssuerProfile"/);
