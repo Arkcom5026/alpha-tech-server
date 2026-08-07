@@ -1,0 +1,227 @@
+enum DeviceIntakeStatus {
+  DRAFT
+  RECEIVED
+  INSPECTION_COMPLETED
+  LINKED_TO_REPAIR
+  CANCELLED
+}
+
+enum DevicePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AccessoryType {
+  CHARGER
+  POWER_ADAPTER
+  CABLE
+  BATTERY
+  BAG_CASE
+  SIM_CARD
+  MEMORY_CARD
+  OTHER
+}
+
+enum DeviceConditionLevel {
+  UNKNOWN
+  GOOD
+  FAIR
+  DAMAGED
+  SEVERELY_DAMAGED
+}
+
+enum DeviceIntakeAuditEvent {
+  CREATED
+  UPDATED
+  SNAPSHOT_RECORDED
+  CONDITION_RECORDED
+  ACCESSORY_ADDED
+  ACCESSORY_REMOVED
+  CONSENT_SIGNED
+  PHOTO_ADDED
+  DOCUMENT_ADDED
+  CHECKLIST_UPDATED
+  LINKED_TO_REPAIR
+  STATUS_CHANGED
+  CANCELLED
+}
+
+model DeviceIntake {
+  id                   Int                @id @default(autoincrement())
+  deviceId             Int
+  branchId             Int
+  customerId           Int
+  repairJobId          Int?               @unique
+  receivedByEmployeeId Int
+  referenceNo          String
+  customerProblem      String
+  internalRemark       String?
+  status               DeviceIntakeStatus @default(RECEIVED)
+  priority             DevicePriority     @default(NORMAL)
+  receivedAt           DateTime           @default(now())
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  device      Device                  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  branch      Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer    CustomerProfile         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  receivedBy  EmployeeProfile         @relation("DeviceIntakeReceivedBy", fields: [receivedByEmployeeId], references: [id], onDelete: Restrict)
+  repairJob   RepairJob?              @relation(fields: [repairJobId], references: [id], onDelete: SetNull)
+  snapshot    DeviceIntakeSnapshot?
+  condition   DeviceIntakeCondition?
+  accessories DeviceIntakeAccessory[]
+  consent     DeviceIntakeConsent?
+  audits      DeviceIntakeAudit[]
+  photos      DeviceIntakePhoto[]
+  documents   DeviceIntakeDocument[]
+  checklist   DeviceIntakeChecklist[]
+
+  @@unique([branchId, referenceNo])
+  @@index([deviceId, receivedAt])
+  @@index([branchId, status, receivedAt])
+  @@index([customerId, receivedAt])
+  @@index([receivedByEmployeeId, receivedAt])
+  @@index([priority, status])
+}
+
+model DeviceIntakeSnapshot {
+  id                 Int      @id @default(autoincrement())
+  deviceIntakeId     Int      @unique
+  brand              String?
+  model              String?
+  serialNumber       String?
+  imei               String?
+  barcode            String?
+  color              String?
+  capacity           String?
+  accessoriesSummary String?
+  createdAt          DateTime @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeCondition {
+  id                Int                   @id @default(autoincrement())
+  deviceIntakeId    Int                   @unique
+  screenCondition   DeviceConditionLevel? @default(UNKNOWN)
+  bodyCondition     DeviceConditionLevel? @default(UNKNOWN)
+  liquidDamage      Boolean?
+  powerOn           Boolean?
+  displayWorking    Boolean?
+  touchWorking      Boolean?
+  cameraWorking     Boolean?
+  speakerWorking    Boolean?
+  microphoneWorking Boolean?
+  chargingWorking   Boolean?
+  buttonsWorking    Boolean?
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAccessory {
+  id             Int           @id @default(autoincrement())
+  deviceIntakeId Int
+  accessoryType  AccessoryType
+  quantity       Int           @default(1)
+  remark         String?
+  createdAt      DateTime      @default(now())
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+
+  @@index([deviceIntakeId])
+  @@index([accessoryType])
+}
+
+model DeviceIntakeConsent {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int       @unique
+  allowDataErase       Boolean   @default(false)
+  allowFactoryReset    Boolean   @default(false)
+  allowDisassembly     Boolean   @default(false)
+  allowOutsourceRepair Boolean   @default(false)
+  customerSignature    String?
+  signedAt             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  deviceIntake DeviceIntake @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+}
+
+model DeviceIntakeAudit {
+  id                    Int                    @id @default(autoincrement())
+  deviceIntakeId        Int
+  eventType             DeviceIntakeAuditEvent
+  performedByEmployeeId Int?
+  note                  String?
+  metadata              Json?
+  occurredAt            DateTime               @default(now())
+  createdAt             DateTime               @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  performedBy  EmployeeProfile? @relation("DeviceIntakeAuditPerformedBy", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, occurredAt])
+  @@index([performedByEmployeeId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model DeviceIntakePhoto {
+  id                   Int       @id @default(autoincrement())
+  deviceIntakeId       Int
+  url                  String
+  storageKey           String?
+  category             String?
+  caption              String?
+  uploadedByEmployeeId Int?
+  takenAt              DateTime?
+  createdAt            DateTime  @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakePhotoUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, createdAt])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeDocument {
+  id                   Int      @id @default(autoincrement())
+  deviceIntakeId       Int
+  documentType         String
+  fileName             String?
+  url                  String
+  storageKey           String?
+  uploadedByEmployeeId Int?
+  createdAt            DateTime @default(now())
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   EmployeeProfile? @relation("DeviceIntakeDocumentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([deviceIntakeId, documentType])
+  @@index([uploadedByEmployeeId])
+}
+
+model DeviceIntakeChecklist {
+  id                  Int       @id @default(autoincrement())
+  deviceIntakeId      Int
+  code                String
+  label               String
+  isChecked           Boolean   @default(false)
+  result              String?
+  note                String?
+  checkedByEmployeeId Int?
+  checkedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  deviceIntake DeviceIntake     @relation(fields: [deviceIntakeId], references: [id], onDelete: Cascade)
+  checkedBy    EmployeeProfile? @relation("DeviceIntakeChecklistCheckedBy", fields: [checkedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceIntakeId, code])
+  @@index([deviceIntakeId, isChecked])
+  @@index([checkedByEmployeeId])
+}
