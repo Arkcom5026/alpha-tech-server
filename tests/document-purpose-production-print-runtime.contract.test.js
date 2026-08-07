@@ -29,8 +29,10 @@ for (const code of [
 assert.match(source, /projectSaleDeliveryNote/);
 assert.match(source, /searchPrintablePayments/);
 assert.match(source, /projectOutputTaxPrintableDocument/);
+assert.match(source, /SKIP_NO_PRINTABLE_DATA/);
 assert.match(source, /SKIP_NO_ELIGIBLE_DATA/);
 assert.match(source, /SKIP_NO_ISSUED_DATA/);
+assert.match(source, /payload\.length === 0/);
 
 for (const forbidden of [
   '.create(',
