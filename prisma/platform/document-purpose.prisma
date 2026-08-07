@@ -1,0 +1,89 @@
+model DocumentPurposeDefinition {
+  id                  Int      @id @default(autoincrement())
+  branchId            Int
+  code                String   @db.VarChar(100)
+  normalizedCode      String   @db.VarChar(100)
+  displayName         String   @db.VarChar(160)
+  description         String?
+  categoryCode        String?  @db.VarChar(100)
+  isSystem            Boolean  @default(false)
+  lifecycleState      String   @default("ACTIVE") @db.VarChar(24)
+  sortOrder           Int      @default(0)
+  metadata            Json?
+  currentVersion      Int      @default(1)
+  createdByEmployeeId Int?
+  updatedByEmployeeId Int?
+  archivedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  branch            Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdByEmployee EmployeeProfile? @relation("DocumentPurposeDefinitionCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  updatedByEmployee EmployeeProfile? @relation("DocumentPurposeDefinitionUpdatedBy", fields: [updatedByEmployeeId], references: [id], onDelete: Restrict)
+  versions          DocumentPurposeVersion[]
+  events            DocumentPurposeEvent[]
+
+  @@unique([branchId, normalizedCode])
+  @@index([branchId, lifecycleState, sortOrder])
+  @@index([branchId, categoryCode, lifecycleState])
+  @@index([branchId, archivedAt])
+  @@index([createdByEmployeeId])
+  @@index([updatedByEmployeeId])
+}
+
+model DocumentPurposeVersion {
+  id                  Int      @id @default(autoincrement())
+  definitionId        Int
+  version             Int
+  code                String   @db.VarChar(100)
+  normalizedCode      String   @db.VarChar(100)
+  displayName         String   @db.VarChar(160)
+  description         String?
+  categoryCode        String?  @db.VarChar(100)
+  isSystem            Boolean
+  lifecycleState      String   @db.VarChar(24)
+  sortOrder           Int
+  metadata            Json?
+  changeReason        String?
+  snapshotHash        String   @db.VarChar(64)
+  createdByEmployeeId Int?
+  createdAt           DateTime @default(now())
+
+  definition        DocumentPurposeDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  createdByEmployee EmployeeProfile?          @relation("DocumentPurposeVersionCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  events            DocumentPurposeEvent[]
+
+  @@unique([definitionId, version])
+  @@unique([definitionId, snapshotHash])
+  @@index([definitionId, createdAt])
+  @@index([createdByEmployeeId])
+  @@index([snapshotHash])
+}
+
+model DocumentPurposeEvent {
+  id              Int      @id @default(autoincrement())
+  definitionId    Int
+  versionId       Int?
+  eventType       String   @db.VarChar(50)
+  previousState   String?  @db.VarChar(24)
+  resultingState  String?  @db.VarChar(24)
+  actorEmployeeId Int?
+  reasonCode      String?  @db.VarChar(100)
+  note            String?
+  metadata        Json?
+  idempotencyKey  String?  @db.VarChar(160)
+  eventHash       String   @db.VarChar(64)
+  occurredAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  definition    DocumentPurposeDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  version       DocumentPurposeVersion?    @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  actorEmployee EmployeeProfile?           @relation("DocumentPurposeEventActor", fields: [actorEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([definitionId, eventHash])
+  @@unique([definitionId, idempotencyKey])
+  @@index([definitionId, occurredAt])
+  @@index([versionId])
+  @@index([actorEmployeeId])
+  @@index([eventType, occurredAt])
+}

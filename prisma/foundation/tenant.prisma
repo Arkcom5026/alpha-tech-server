@@ -26,6 +26,7 @@ model Branch {
   customerProfiles                CustomerProfile[]
   customerDeposit                 CustomerDeposit[]
   customerReceipts                CustomerReceipt[]
+  documentPurposeDefinitions      DocumentPurposeDefinition[]
   employees                       EmployeeProfile[]
   inputTaxFilingBatches           InputTaxFilingBatch[]
   orderOnline                     OrderOnline[]

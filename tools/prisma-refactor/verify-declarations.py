@@ -65,6 +65,8 @@ def git_baseline(root: Path, revision: str) -> dict[tuple[str, str], list[tuple[
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", default="HEAD")
+    parser.add_argument("--allow-added-model", action="append", default=[])
+    parser.add_argument("--allow-changed-model", action="append", default=[])
     args = parser.parse_args()
     root = Path.cwd()
     current = working_tree(root)
@@ -77,6 +79,12 @@ def main() -> int:
         if len(current[key]) == 1 and len(baseline[key]) == 1
         and current[key][0][0] != baseline[key][0][0]
     )
+    expected_added = {("model", name) for name in args.allow_added_model}
+    expected_changed = {("model", name) for name in args.allow_changed_model}
+    unexpected_added = sorted(set(added) - expected_added)
+    missing_expected_added = sorted(expected_added - set(added))
+    unexpected_changed = sorted(set(changed) - expected_changed)
+    missing_expected_changed = sorted(expected_changed - set(changed))
     models = sum(key[0] == "model" for key in current)
     enums = sum(key[0] == "enum" for key in current)
     duplicate_models = sum(key[0] == "model" for key in duplicates)
@@ -88,10 +96,19 @@ def main() -> int:
     print(f"MISSING DECLARATIONS: {len(missing)}")
     print(f"ADDED DECLARATIONS: {len(added)}")
     print(f"CHANGED DECLARATIONS: {len(changed)}")
-    for label, values in (("duplicate", sorted(duplicates)), ("missing", missing), ("added", added), ("changed", changed)):
+    print(f"EXPECTED ADDED MODELS: {len(expected_added)}")
+    print(f"EXPECTED CHANGED MODELS: {len(expected_changed)}")
+    errors = (
+        ("duplicate", sorted(duplicates)), ("missing", missing),
+        ("unexpected added", unexpected_added),
+        ("missing expected added", missing_expected_added),
+        ("unexpected changed", unexpected_changed),
+        ("missing expected changed", missing_expected_changed),
+    )
+    for label, values in errors:
         for kind, name in values:
             print(f"ERROR {label}: {kind} {name}")
-    return 1 if duplicates or missing or added or changed else 0
+    return 1 if any(values for _, values in errors) else 0
 
 
 if __name__ == "__main__":
