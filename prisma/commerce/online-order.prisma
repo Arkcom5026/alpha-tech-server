@@ -1,0 +1,228 @@
+enum StoreExperienceProfileStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  SUSPENDED
+}
+
+enum OrderOnlineStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderSource {
+  POS
+  ONLINE
+}
+
+enum ProductReservationActorType {
+  EMPLOYEE
+  COMMERCE_IDENTITY
+}
+
+enum ProductReservationStatus {
+  ACTIVE
+  ACCEPTED
+  FULFILLMENT_READY
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ProductReservationLineType {
+  STOCK_ITEM
+  SIMPLE
+}
+
+enum ProductReservationLifecycleCommandType {
+  ACCEPT
+  MARK_FULFILLMENT_READY
+  CANCEL
+  EXPIRE
+}
+
+enum OnlineOrderSource {
+  ONLINE
+  STOREFRONT
+}
+
+enum OnlineFulfillmentMethod {
+  PICKUP
+}
+
+model StoreExperienceProfile {
+  id                   Int                          @id @default(autoincrement())
+  branchId             Int                          @unique
+  status               StoreExperienceProfileStatus @default(DRAFT)
+  themePreset          String                       @default("platform-default") @db.VarChar(80)
+  themeTokens          Json?
+  layoutPreset         String                       @default("platform-default") @db.VarChar(80)
+  sectionConfiguration Json?
+  contentConfiguration              Json?
+  publishedThemePreset              String?                       @db.VarChar(80)
+  publishedThemeTokens              Json?
+  publishedLayoutPreset             String?                       @db.VarChar(80)
+  publishedSectionConfiguration     Json?
+  publishedContentConfiguration     Json?
+  publishedVersion                  Int?
+  version              Int                          @default(1)
+  publishedAt          DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  branch               Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([publishedAt])
+}
+
+model OrderOnline {
+  id                    Int               @id @default(autoincrement())
+  customerId            Int?
+  branchId              Int
+  note                  String?
+  status                OrderOnlineStatus @default(PENDING)
+  confirmedByEmployeeId Int?
+  shippedAt             DateTime?
+  cancelReason          String?
+  createdAt             DateTime          @default(now())
+  userId                Int?
+  deliveryDate          DateTime?
+  paymentMethod         PaymentMethod?
+  source                OrderSource?
+  trackingCode          String?
+  statusPayment         PaymentStatus     @default(UNPAID)
+  code                  String            @unique
+  paymentSlipStatus     PaymentSlipStatus @default(NONE)
+  paymentSlipUrl        String?
+  paymentNote           String?
+  paymentDate           DateTime?
+  branch                Branch            @relation(fields: [branchId], references: [id])
+  confirmedByEmployee   EmployeeProfile?  @relation("EmployeeConfirmedOrders", fields: [confirmedByEmployeeId], references: [id])
+  customer              CustomerProfile?  @relation(fields: [customerId], references: [id])
+  user                  User?             @relation(fields: [userId], references: [id])
+  items                 OrderOnlineItem[]
+}
+
+model OrderOnlineItem {
+  id              Int         @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  quantity        Int
+  note            String?
+  priceAtPurchase Decimal?    @db.Decimal(12, 2)
+  order           OrderOnline @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product     @relation(fields: [productId], references: [id])
+}
+
+model ProductReservation {
+  id                  Int                         @id @default(autoincrement())
+  code                String                      @unique
+  branchId            Int
+  customerId          Int?
+  createdByEmployeeId Int?
+  actorType           ProductReservationActorType @default(EMPLOYEE)
+  commerceIdentityId  Int?                        @unique
+  anonymousSessionId  Int?                        @unique
+  idempotencyKey      String?
+  status              ProductReservationStatus    @default(ACTIVE)
+  orderSource         OnlineOrderSource           @default(ONLINE)
+  sourceReference     String?
+  fulfillmentMethod   OnlineFulfillmentMethod     @default(PICKUP)
+  totalBeforeDiscount Decimal                      @default(0) @db.Decimal(12, 2)
+  totalDiscount       Decimal                      @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal                      @db.Decimal(12, 2)
+  depositAmount       Decimal                      @default(0) @db.Decimal(12, 2)
+  note                String?
+  expiresAt           DateTime?
+  stockReleasedAt     DateTime?
+  version             Int                         @default(1)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  branch              Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer            CustomerProfile?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdByEmployee   EmployeeProfile?             @relation("ProductReservationCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  commerceIdentity    CommerceCommitmentIdentity?  @relation(fields: [commerceIdentityId], references: [id], onDelete: Restrict)
+  anonymousSession    AnonymousShoppingSession?    @relation(fields: [anonymousSessionId], references: [id], onDelete: Restrict)
+  items               ProductReservationItem[]
+  lifecycleCommands   ProductReservationLifecycleCommand[]
+  lifecycleEvents     ProductReservationLifecycleEvent[]
+
+  @@index([branchId, status, createdAt])
+  @@index([status, expiresAt])
+}
+
+model ProductReservationLifecycleCommand {
+  id            Int                                   @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandKey    String
+  commandType   ProductReservationLifecycleCommandType
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  stockReleased Boolean                               @default(false)
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime                              @default(now())
+  reservation   ProductReservation                    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch                                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?                      @relation("ProductReservationLifecycleCommandActor", fields: [actorId], references: [id], onDelete: SetNull)
+  event         ProductReservationLifecycleEvent?
+
+  @@unique([reservationId, commandKey])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationLifecycleEvent {
+  id            Int                @id @default(autoincrement())
+  reservationId Int
+  branchId      Int
+  commandId     Int                @unique
+  fromStatus    ProductReservationStatus
+  toStatus      ProductReservationStatus
+  actorId       Int?
+  reason        String?
+  occurredAt    DateTime
+  createdAt     DateTime           @default(now())
+  reservation   ProductReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  command       ProductReservationLifecycleCommand @relation(fields: [commandId], references: [id], onDelete: Restrict)
+  actor         EmployeeProfile?   @relation("ProductReservationLifecycleEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model ProductReservationItem {
+  id            Int                        @id @default(autoincrement())
+  reservationId Int
+  lineId        String
+  lineType      ProductReservationLineType
+  productId     Int
+  stockItemId   Int?
+  simpleLotId   Int?
+  quantity      Decimal                    @db.Decimal(12, 2)
+  basePrice     Decimal                    @db.Decimal(12, 2)
+  discount      Decimal                    @default(0) @db.Decimal(12, 2)
+  price         Decimal                    @db.Decimal(12, 2)
+  vatAmount     Decimal                    @default(0) @db.Decimal(12, 2)
+  remark        String?
+  isActive      Boolean                    @default(true)
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  reservation   ProductReservation         @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product       Product                    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockItem     StockItem?                 @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  simpleLot     SimpleLot?                 @relation(fields: [simpleLotId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, lineId])
+  @@index([reservationId, isActive])
+  @@index([productId])
+  @@index([simpleLotId])
+}

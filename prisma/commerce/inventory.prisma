@@ -1,0 +1,248 @@
+enum StockStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+  CLAIMED
+  USED
+  MISSING_PENDING_REVIEW
+}
+
+enum StockMovementType {
+  RECEIVE
+  SALE
+  ADJUST
+  TRANSFER
+  RESERVE
+  UNRESERVE
+  RETURN
+  LOSS
+  CLAIM_OUT
+  CLAIM_RETURN
+  CLAIM_REPLACEMENT
+  CLAIM_WRITE_OFF
+}
+
+enum StockAuditMode {
+  READY
+  FULL
+}
+
+enum StockAuditStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SimpleLotStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+model StockBalance {
+  id               Int      @id @default(autoincrement())
+  productId        Int
+  branchId         Int
+  quantity         Decimal  @default(0) @db.Decimal(12, 2)
+  reserved         Decimal  @default(0) @db.Decimal(12, 2)
+  avgCost          Decimal? @db.Decimal(12, 2)
+  lastReceivedCost Decimal? @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  branch           Branch   @relation(fields: [branchId], references: [id])
+  product          Product  @relation(fields: [productId], references: [id])
+  missingCostResolutions MissingCostResolution[]
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+}
+
+model StockMovement {
+  id                    Int               @id @default(autoincrement())
+  productId             Int
+  branchId              Int
+  qty                   Decimal           @db.Decimal(12, 2)
+  type                  StockMovementType
+  refType               String?
+  refId                 Int?
+  note                  String?
+  createdAt             DateTime          @default(now())
+  simpleLotId           Int?
+  stockItemId           Int?
+  previousStockStatus   StockStatus?
+  resultingStockStatus  StockStatus?
+  performedByEmployeeId Int?
+  occurredAt            DateTime          @default(now())
+  branch                Branch            @relation(fields: [branchId], references: [id])
+  product               Product           @relation(fields: [productId], references: [id])
+  simpleLots            SimpleLot?        @relation(fields: [simpleLotId], references: [id])
+  stockItem             StockItem?        @relation(fields: [stockItemId], references: [id])
+  performedBy           EmployeeProfile?  @relation(fields: [performedByEmployeeId], references: [id])
+
+  @@index([branchId, createdAt])
+  @@index([productId, createdAt])
+  @@index([branchId, type, createdAt])
+  @@index([productId, branchId, createdAt])
+  @@index([stockItemId, occurredAt])
+  @@index([simpleLotId, occurredAt])
+  @@index([branchId, type, occurredAt])
+  @@index([productId, branchId, occurredAt])
+}
+
+model StockItem {
+  id                         Int                       @id @default(autoincrement())
+  barcode                    String                    @unique
+  serialNumber               String?
+  receivedAt                 DateTime                  @default(now())
+  warrantyDays               Int?
+  expiredAt                  DateTime?
+  soldAt                     DateTime?
+  remark                     String?
+  productId                  Int
+  branchId                   Int
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  status                     StockStatus               @default(IN_STOCK)
+  purchaseOrderReceiptItemId Int?
+  batchNumber                String?
+  checkedBy                  String?
+  locationCode               String?
+  qrCodeData                 String?
+  source                     String?
+  tag                        String?
+  scannedAt                  DateTime                  @default(now())
+  scannedByEmployeeId        Int?
+  color                      String?
+  costPrice                  Decimal?                  @db.Decimal(12, 2)
+  barcodeReceiptItem         BarcodeReceiptItem[]
+  repairJobs                 RepairJob[]
+  saleItems                  SaleItem[]
+  stockMovements             StockMovement[]
+  productReservationItems    ProductReservationItem[]
+  stockAuditScanLog          StockAuditScanLog[]
+  stockAuditSnapshotItem     StockAuditSnapshotItem[]
+  branch                     Branch                    @relation(fields: [branchId], references: [id])
+  product                    Product                   @relation(fields: [productId], references: [id])
+  purchaseOrderReceiptItem   PurchaseOrderReceiptItem? @relation(fields: [purchaseOrderReceiptItemId], references: [id])
+  scannedBy                  EmployeeProfile?          @relation(fields: [scannedByEmployeeId], references: [id])
+  warrantyClaims             WarrantyClaim[]
+  replacementWarrantyClaims  WarrantyClaim[]           @relation("WarrantyClaimReplacementStockItem")
+  devices                    Device[]
+  posHeldCartLines           PosHeldCartLine[]
+
+  @@unique([serialNumber, productId])
+  @@index([branchId, status, productId])
+  @@index([productId, status])
+}
+
+model V2StockAudit {
+  id        Int                @id @default(autoincrement())
+  branchId  Int
+  auditorId Int
+  status    String             @default("PENDING")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  auditor   EmployeeProfile    @relation(fields: [auditorId], references: [id])
+  branch    Branch             @relation(fields: [branchId], references: [id])
+  items     V2StockAuditItem[]
+
+  @@index([branchId])
+}
+
+model V2StockAuditItem {
+  id           Int          @id @default(autoincrement())
+  stockAuditId Int
+  productId    Int
+  expectedQty  Int
+  actualQty    Int
+  difference   Int
+  product      Product      @relation(fields: [productId], references: [id])
+  stockAudit   V2StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
+}
+
+model StockAuditSession {
+  id            Int                      @id @default(autoincrement())
+  branchId      Int
+  employeeId    Int
+  expectedCount Int                      @default(0)
+  scannedCount  Int                      @default(0)
+  startedAt     DateTime                 @default(now())
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  note          String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  mode          StockAuditMode           @default(READY)
+  status        StockAuditStatus         @default(DRAFT)
+  scanLogs      StockAuditScanLog[]
+  branch        Branch                   @relation(fields: [branchId], references: [id])
+  employee      EmployeeProfile          @relation(fields: [employeeId], references: [id])
+  snapshotItems StockAuditSnapshotItem[]
+
+  @@index([branchId, status])
+  @@index([startedAt])
+}
+
+model StockAuditSnapshotItem {
+  id             Int               @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  productId      Int
+  barcode        String
+  expectedStatus StockStatus       @default(IN_STOCK)
+  isScanned      Boolean           @default(false)
+  scannedAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  auditSession   StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  product        Product           @relation(fields: [productId], references: [id])
+  stockItem      StockItem         @relation(fields: [stockItemId], references: [id])
+
+  @@unique([auditSessionId, stockItemId])
+  @@index([auditSessionId, isScanned])
+  @@index([barcode])
+}
+
+model StockAuditScanLog {
+  id             Int               @id @default(autoincrement())
+  auditSessionId Int
+  stockItemId    Int
+  barcode        String
+  scannedAt      DateTime          @default(now())
+  byEmployeeId   Int
+  auditSession   StockAuditSession @relation(fields: [auditSessionId], references: [id], onDelete: Cascade)
+  employee       EmployeeProfile   @relation(fields: [byEmployeeId], references: [id])
+  stockItem      StockItem         @relation(fields: [stockItemId], references: [id])
+
+  @@index([auditSessionId, scannedAt])
+  @@index([barcode])
+}
+
+model SimpleLot {
+  id                 Int                       @id @default(autoincrement())
+  branchId           Int
+  productId          Int
+  receiptItemId      Int?
+  barcode            String                    @unique
+  qtyInitial         Decimal                   @db.Decimal(12, 2)
+  qtyRemaining       Decimal                   @db.Decimal(12, 2)
+  unitCost           Decimal                   @db.Decimal(12, 2)
+  receivedAt         DateTime                  @default(now())
+  printCount         Int                       @default(0)
+  lastPrintedAt      DateTime?
+  status             SimpleLotStatus           @default(ACTIVE)
+  BarcodeReceiptItem BarcodeReceiptItem[]
+  saleItemsSimple    SaleItemSimple[]
+  branch             Branch                    @relation(fields: [branchId], references: [id])
+  product            Product                   @relation(fields: [productId], references: [id])
+  receiptItem        PurchaseOrderReceiptItem? @relation(fields: [receiptItemId], references: [id])
+  stockMovements     StockMovement[]
+  productReservationItems ProductReservationItem[]
+  posHeldCartLines   PosHeldCartLine[]
+
+  @@index([branchId, productId, receivedAt])
+  @@index([branchId, status])
+}

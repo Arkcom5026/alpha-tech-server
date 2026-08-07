@@ -1,0 +1,194 @@
+enum ProductMode {
+  SIMPLE
+  STRUCTURED
+}
+
+enum ProductInventoryBehavior {
+  TRACKED
+  NON_STOCK
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  active    Boolean  @default(true)
+  isSystem  Boolean  @default(false)
+
+  branches           Branch[]
+  globalProductTypes GlobalProductType[]
+}
+
+model GlobalProductType {
+  id           Int           @id @default(autoincrement())
+  name         String
+  slug         String        @unique
+  active       Boolean       @default(true)
+  categoryId   Int
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  category     Category      @relation(fields: [categoryId], references: [id])
+  productTypes ProductType[]
+
+  @@index([categoryId])
+  @@index([active])
+}
+
+model ProductTypeBrand {
+  id            Int         @id @default(autoincrement())
+  productTypeId Int
+  brandId       Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  brand         Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([productTypeId, brandId])
+  @@index([productTypeId])
+  @@index([brandId])
+}
+
+model ProductType {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  active              Boolean  @default(true)
+  guideExamples       String[] @default([])
+  normalizedName      String?
+  pathCached          String?
+  branchId            Int?
+  globalProductTypeId Int
+
+  Product           Product[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  globalProductType GlobalProductType  @relation(fields: [globalProductTypeId], references: [id])
+  productTypeBrands ProductTypeBrand[]
+
+  @@unique([branchId, globalProductTypeId, normalizedName])
+  @@index([branchId])
+  @@index([globalProductTypeId])
+}
+
+model Brand {
+  id                Int                @id @default(autoincrement())
+  name              String
+  normalizedName    String             @unique
+  branchId          Int?
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  products          Product[]
+  productTypeBrands ProductTypeBrand[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+
+  @@index([active])
+  @@index([name])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, normalizedName])
+}
+
+model Product {
+  id                       Int                        @id @default(autoincrement())
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  noSN                     Boolean                    @default(false)
+  active                   Boolean                    @default(true)
+  name                     String
+  mode                     ProductMode                @default(STRUCTURED)
+  inventoryBehavior        ProductInventoryBehavior   @default(TRACKED)
+  saleBarcode              String?
+  trackSerialNumber        Boolean                    @default(false)
+  productTypeId            Int?
+  brandId                  Int?
+  codeType                 String?
+  productConfig            Json?
+  unitId                   Int?
+  warrantyDays             Int?
+  templateProductId        Int?
+  branchId                 Int?
+  branchPrice              BranchPrice[]
+  cartItems                CartItem[]
+  orderOnlineItem          OrderOnlineItem[]
+  brand                    Brand?                     @relation(fields: [brandId], references: [id])
+  productType              ProductType?               @relation(fields: [productTypeId], references: [id])
+  branch                   Branch?                    @relation(fields: [branchId], references: [id])
+  templateProduct          Product?                   @relation("ProductTemplateClone", fields: [templateProductId], references: [id], onUpdate: NoAction)
+  clonedProducts           Product[]                  @relation("ProductTemplateClone")
+  unit                     Unit?                      @relation(fields: [unitId], references: [id])
+  productImages            ProductImage[]
+  orderItems               ProductOnOrder[]
+  purchaseOrderItems       PurchaseOrderItem[]
+  PurchaseOrderReceiptItem PurchaseOrderReceiptItem[]
+  repairPartItems          RepairPartItem[]
+  saleItemSimple           SaleItemSimple[]
+  serviceItems             ServiceItem[]
+  simpleLots               SimpleLot[]
+  stockAuditSnapshotItem   StockAuditSnapshotItem[]
+  posHeldCartLines         PosHeldCartLine[]
+  stockBalances            StockBalance[]
+  stockItems               StockItem[]
+  stockMovement            StockMovement[]
+  productReservationItems  ProductReservationItem[]
+  v2StockAuditItems        V2StockAuditItem[]
+  missingCostResolutions   MissingCostResolution[]
+  sourceProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateSourceProduct")
+  targetProductTemplateCandidates ProductTemplateCandidate[] @relation("ProductTemplateCandidateTargetProduct")
+
+  @@index([mode, active])
+  @@index([mode, inventoryBehavior, active])
+  @@index([saleBarcode])
+  @@index([productTypeId])
+  @@index([brandId])
+  @@index([templateProductId])
+  @@index([branchId])
+  @@index([branchId, active])
+  @@index([branchId, productTypeId])
+  @@index([branchId, templateProductId])
+}
+
+model BranchPrice {
+  id              Int       @id @default(autoincrement())
+  productId       Int
+  branchId        Int
+  effectiveDate   DateTime?
+  expiredDate     DateTime?
+  note            String?
+  updatedBy       Int?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  costPrice       Decimal   @db.Decimal(12, 2)
+  priceOnline     Int?
+  priceRetail     Int?
+  priceTechnician Int?
+  priceWholesale  Int?
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+
+  @@unique([productId, branchId])
+}
+
+model ProductImage {
+  id         Int      @id @default(autoincrement())
+  public_id  String   @unique
+  url        String
+  secure_url String
+  active     Boolean  @default(true)
+  productId  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  caption    String?
+  isCover    Boolean?
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Unit {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+}

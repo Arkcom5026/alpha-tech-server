@@ -1,0 +1,113 @@
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATION
+  GOVERNMENT
+}
+
+enum BusinessType {
+  GENERAL
+  IT
+  ELECTRONICS
+  CONSTRUCTION
+  GROCERY
+}
+
+enum DepositStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+model CustomerProfile {
+  id                        Int                       @id @default(autoincrement())
+  name                      String?
+  picture                   String?
+  userId                    Int
+  branchId                  Int?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
+  creditLimit               Decimal?                  @default(0) @db.Decimal(12, 2)
+  paymentTerms              Int?
+  type                      CustomerType              @default(INDIVIDUAL)
+  companyName               String?
+  subdistrictCode           String?
+  taxId                     String?
+  addressDetail             String?
+  depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
+  outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
+  cart                      Cart[]
+  combinedBillingDocuments  CombinedBillingDocument[]
+  customerDeposits          CustomerDeposit[]
+  subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
+  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerReceipts          CustomerReceipt[]
+  orders                    Order[]
+  orderOnlines              OrderOnline[]
+  repairJobs                RepairJob[]
+  ownedDevices              Device[]                  @relation("DeviceCurrentOwner")
+  deviceOwnershipHistory    DeviceOwnershipHistory[]
+  deviceIntakes             DeviceIntake[]
+  actedDevicePassportEvents DevicePassportEvent[]     @relation("DevicePassportCustomerActor")
+  sales                     Sale[]
+  services                  ServiceOrder[]
+  v2CustomerDeposits        V2CustomerDeposit[]
+  posHeldCarts              PosHeldCart[]
+  productReservations       ProductReservation[]
+
+  @@unique([branchId, userId])
+  @@index([userId])
+  @@index([subdistrictCode])
+  @@index([branchId])
+}
+
+model CustomerDeposit {
+  id             Int              @id @default(autoincrement())
+  cashAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  transferAmount Decimal          @default(0) @db.Decimal(12, 2)
+  note           String?
+  totalAmount    Decimal          @db.Decimal(12, 2)
+  customerId     Int?
+  branchId       Int?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  cardAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  usedAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  usedSaleId     Int?
+  createdBy      Int?
+  status         DepositStatus    @default(ACTIVE)
+  branch         Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdByEmp   EmployeeProfile? @relation(fields: [createdBy], references: [id])
+  customer       CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  depositUsage   DepositUsage[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([branchId, createdAt])
+}
+
+model DepositUsage {
+  id                Int             @id @default(autoincrement())
+  customerDepositId Int
+  saleId            Int?
+  amountUsed        Decimal         @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+  paymentId         Int?
+  customerDeposit   CustomerDeposit @relation(fields: [customerDepositId], references: [id], onDelete: Cascade)
+  payment           Payment?        @relation(fields: [paymentId], references: [id])
+  sale              Sale?           @relation(fields: [saleId], references: [id])
+
+  @@index([paymentId])
+  @@index([customerDepositId])
+}
+
+model V2CustomerDeposit {
+  id              Int             @id @default(autoincrement())
+  customerId      Int
+  amount          Float
+  transactionType String
+  referenceNumber String?
+  createdAt       DateTime        @default(now())
+  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
