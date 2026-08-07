@@ -1,0 +1,1 @@
+Temporary compatibility note. The Wave 0 verifier must support Windows PowerShell 5.1 and therefore must not use ConvertFrom-Json -Depth.
