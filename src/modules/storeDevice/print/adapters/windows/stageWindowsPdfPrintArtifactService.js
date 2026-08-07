@@ -84,23 +84,7 @@ const createStageWindowsPdfPrintArtifactService = ({
     }
 
     const finalFilePath = path.win32.join(root, `${checksum}.pdf`)
-    const tempFilePath = path.win32.join(root, `.${checksum}.${randomId()}.tmp`)
-
-    await fsPromises.mkdir(root, { recursive: true })
-    await fsPromises.writeFile(tempFilePath, pdfBytes, { flag: 'wx' })
-
-    try {
-      await fsPromises.rename(tempFilePath, finalFilePath)
-    } catch (error) {
-      try {
-        await fsPromises.unlink(tempFilePath)
-      } catch (_cleanupError) {
-        // Preserve the primary staging failure.
-      }
-      throw error
-    }
-
-    return Object.freeze({
+    const buildResult = ({ reusedExisting }) => Object.freeze({
       schemaVersion: 1,
       mode: 'WINDOWS_PDF_ARTIFACT_STAGED',
       physicalSideEffects: false,
@@ -115,6 +99,9 @@ const createStageWindowsPdfPrintArtifactService = ({
         byteLength: pdfBytes.length,
         pageCount: normalizedArtifact.pageCount,
       }),
+      persistence: Object.freeze({
+        reusedExisting,
+      }),
       safety: Object.freeze({
         payloadSignatureVerified: true,
         byteLengthVerified: true,
@@ -127,6 +114,40 @@ const createStageWindowsPdfPrintArtifactService = ({
         requiresDedicatedPhysicalExecutor: true,
       }),
     })
+
+    await fsPromises.mkdir(root, { recursive: true })
+
+    try {
+      const existingBytes = await fsPromises.readFile(finalFilePath)
+      const existingChecksum = sha256(existingBytes)
+      if (existingChecksum !== checksum) {
+        throw fail(
+          'STORE_DEVICE_WINDOWS_PDF_STAGING_EXISTING_ARTIFACT_MISMATCH',
+          'Existing staged PDF does not match the certified artifact checksum',
+          409,
+          { expectedChecksum: checksum, actualChecksum: existingChecksum },
+        )
+      }
+      return buildResult({ reusedExisting: true })
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+
+    const tempFilePath = path.win32.join(root, `.${checksum}.${randomId()}.tmp`)
+    await fsPromises.writeFile(tempFilePath, pdfBytes, { flag: 'wx' })
+
+    try {
+      await fsPromises.rename(tempFilePath, finalFilePath)
+    } catch (error) {
+      try {
+        await fsPromises.unlink(tempFilePath)
+      } catch (_cleanupError) {
+        // Preserve the primary staging failure.
+      }
+      throw error
+    }
+
+    return buildResult({ reusedExisting: false })
   },
 })
 
