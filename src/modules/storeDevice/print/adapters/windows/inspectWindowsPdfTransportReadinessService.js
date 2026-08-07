@@ -8,6 +8,7 @@ const CANDIDATES = Object.freeze([
     code: 'SUMATRA_PDF',
     strategy: 'EXPLICIT_PRINTER_CLI',
     locations: Object.freeze([
+      Object.freeze({ environmentVariable: 'SUMATRA_PDF_PATH', direct: true }),
       Object.freeze({ environmentVariable: 'LOCALAPPDATA', segments: ['SumatraPDF', 'SumatraPDF.exe'] }),
       Object.freeze({ environmentVariable: 'PROGRAMFILES', segments: ['SumatraPDF', 'SumatraPDF.exe'] }),
       Object.freeze({ environmentVariable: 'PROGRAMFILES(X86)', segments: ['SumatraPDF', 'SumatraPDF.exe'] }),
@@ -24,13 +25,19 @@ const CANDIDATES = Object.freeze([
   }),
 ])
 
-const resolveLocation = ({ environmentVariable, segments }, env, existsSync) => {
+const resolveLocation = ({ environmentVariable, segments = [], direct = false }, env, existsSync) => {
   const root = env?.[environmentVariable]
   if (!root) {
-    return Object.freeze({ environmentVariable, executablePath: null, exists: false })
+    return Object.freeze({ environmentVariable, executablePath: null, exists: false, configured: direct })
   }
-  const executablePath = path.join(root, ...segments)
-  return Object.freeze({ environmentVariable, executablePath, exists: existsSync(executablePath) })
+
+  const executablePath = direct ? path.resolve(root) : path.join(root, ...segments)
+  return Object.freeze({
+    environmentVariable,
+    executablePath,
+    exists: existsSync(executablePath),
+    configured: direct,
+  })
 }
 
 const createInspectWindowsPdfTransportReadinessService = ({
@@ -47,6 +54,7 @@ const createInspectWindowsPdfTransportReadinessService = ({
         strategy: candidate.strategy,
         available: Boolean(selected),
         executablePath: selected?.executablePath || null,
+        source: selected?.configured ? 'EXPLICIT_CONFIG' : selected ? 'STANDARD_LOCATION' : null,
         locations: Object.freeze(locations),
       })
     })
@@ -73,11 +81,13 @@ const createInspectWindowsPdfTransportReadinessService = ({
             code: preferred.code,
             strategy: preferred.strategy,
             executablePath: preferred.executablePath,
+            source: preferred.source,
           })
         : null,
       candidates: Object.freeze(candidates),
       policy: Object.freeze({
         preferredTransport: 'SUMATRA_PDF',
+        explicitPathEnvironmentVariable: 'SUMATRA_PDF_PATH',
         requiresExplicitPrinterTarget: true,
         shellPrintToIsNotCertified: true,
         executionEnabled: false,
