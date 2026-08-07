@@ -6,7 +6,6 @@ $BaseHead = '32c52ff303de4e61d310bd39b3f1e98309129786'
 $RecoveryRoot = "recovery/prisma/$BaseHead"
 $OriginalSchema = 'prisma/schema.prisma'
 $RecoverySchema = "$RecoveryRoot/schema.prisma"
-$EvidenceDir = "$RecoveryRoot/local-evidence"
 
 function Assert-Equal([string]$Name, $Actual, $Expected) {
   if ($Actual -ne $Expected) {
@@ -14,7 +13,24 @@ function Assert-Equal([string]$Name, $Actual, $Expected) {
   }
 }
 
-New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
+function Write-Utf8NoBom([string]$Path, [string]$Content) {
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($Path, $Content, $utf8)
+}
+
+function Invoke-LoggedNative([string]$LogPath, [scriptblock]$Command) {
+  $output = & $Command 2>&1
+  $exitCode = $LASTEXITCODE
+  $text = (($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine)
+  Write-Utf8NoBom -Path $LogPath -Content ($text + [Environment]::NewLine)
+  if ($output) { $output | ForEach-Object { Write-Host $_ } }
+  if ($exitCode -ne 0) {
+    throw "Native command failed with exit code $exitCode. See $LogPath"
+  }
+}
+
+$RepoRoot = (git rev-parse --show-toplevel).Trim()
+Set-Location $RepoRoot
 
 $branch = (git branch --show-current).Trim()
 Assert-Equal 'Branch' $branch $ExpectedBranch
@@ -39,7 +55,8 @@ $enumCount = ([regex]::Matches($schemaText, '(?m)^enum\s+[A-Za-z_]\w*\s*\{')).Co
 Assert-Equal 'Model count' $modelCount 128
 Assert-Equal 'Enum count' $enumCount 107
 
-$lock = Get-Content -Raw package-lock.json | ConvertFrom-Json -Depth 100
+# Windows PowerShell 5.1 does not support ConvertFrom-Json -Depth.
+$lock = Get-Content -Raw package-lock.json | ConvertFrom-Json
 $prismaVersion = $lock.packages.'node_modules/prisma'.version
 $clientVersion = $lock.packages.'node_modules/@prisma/client'.version
 Assert-Equal 'Prisma CLI lock version' $prismaVersion '6.16.2'
@@ -48,8 +65,17 @@ Assert-Equal '@prisma/client lock version' $clientVersion '6.16.2'
 $package = Get-Content -Raw package.json | ConvertFrom-Json
 Assert-Equal 'Prisma schema path' $package.prisma.schema 'prisma'
 
+$EvidenceBase = if ($env:ALPHA_TECH_RECOVERY_ROOT) {
+  $env:ALPHA_TECH_RECOVERY_ROOT
+} else {
+  Join-Path $env:SystemDrive 'alpha-tech-recovery'
+}
+$EvidenceDir = Join-Path $EvidenceBase "prisma-wave0-$BaseHead-$head"
+New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
+
 $migrationInventoryPath = Join-Path $EvidenceDir 'migration-tree.txt'
-git ls-tree -r HEAD -- prisma/migrations | Set-Content -Encoding utf8NoBOM $migrationInventoryPath
+$migrationInventory = (git ls-tree -r HEAD -- prisma/migrations) -join [Environment]::NewLine
+Write-Utf8NoBom -Path $migrationInventoryPath -Content ($migrationInventory + [Environment]::NewLine)
 $migrationTreeSha256 = (Get-FileHash -Algorithm SHA256 $migrationInventoryPath).Hash
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "alpha-tech-prisma-wave0-$PID"
@@ -58,13 +84,21 @@ $tempSchema = Join-Path $tempRoot 'schema.prisma'
 Copy-Item -LiteralPath $OriginalSchema -Destination $tempSchema
 
 try {
-  npx prisma format --schema $tempSchema | Tee-Object -FilePath (Join-Path $EvidenceDir 'prisma-format.txt')
+  Invoke-LoggedNative (Join-Path $EvidenceDir 'prisma-format.txt') { & npx.cmd prisma format --schema $tempSchema }
   $formattedSha256 = (Get-FileHash -Algorithm SHA256 $tempSchema).Hash
 
-  npx prisma validate --schema prisma | Tee-Object -FilePath (Join-Path $EvidenceDir 'prisma-validate.txt')
-  npx prisma generate --schema prisma | Tee-Object -FilePath (Join-Path $EvidenceDir 'prisma-generate.txt')
+  Invoke-LoggedNative (Join-Path $EvidenceDir 'prisma-validate.txt') { & npx.cmd prisma validate --schema prisma }
+  Invoke-LoggedNative (Join-Path $EvidenceDir 'prisma-generate.txt') { & npx.cmd prisma generate --schema prisma }
 
   git diff --exit-code -- prisma/schema.prisma prisma/migrations
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Original schema or migration directory changed during verification.'
+  }
+
+  $postStatus = git status --porcelain
+  if ($postStatus) {
+    throw "Working tree became dirty during Wave 0 verification.`n$postStatus"
+  }
 
   $result = [ordered]@{
     verifiedAtUtc = [DateTime]::UtcNow.ToString('o')
@@ -72,6 +106,7 @@ try {
     head = $head
     baseHead = $BaseHead
     workingTreeClean = $true
+    evidenceDirectory = $EvidenceDir
     originalSchemaBlob = $originalBlob
     recoverySchemaBlob = $recoveryBlob
     originalSchemaSha256 = $originalSha256
@@ -90,8 +125,10 @@ try {
     migrationExecution = 'PROHIBITED'
   }
 
-  $result | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $EvidenceDir 'wave0-result.json')
-  Write-Host 'Wave 0 verification PASS. Original schema and migrations remain unchanged.'
+  $resultJson = $result | ConvertTo-Json -Depth 10
+  Write-Utf8NoBom -Path (Join-Path $EvidenceDir 'wave0-result.json') -Content ($resultJson + [Environment]::NewLine)
+  Write-Host "Wave 0 verification PASS. Evidence: $EvidenceDir"
+  Write-Host 'Original schema and migrations remain unchanged.'
 }
 finally {
   if (Test-Path $tempRoot) {
