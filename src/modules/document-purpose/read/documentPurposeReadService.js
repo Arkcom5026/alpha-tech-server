@@ -28,7 +28,7 @@ class DocumentPurposeReadService {
     this.repository = repository
   }
 
-  list({ branchId, query = {} }) {
+  async list({ branchId, query = {} }) {
     const ownerBranchId = asPositiveInt(branchId, 'branchId')
     const lifecycleState = query.lifecycleState
       ? assertLifecycleState(query.lifecycleState)
