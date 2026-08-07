@@ -131,6 +131,7 @@ const service = new DocumentPurposeLifecycleService(repository)
     ...repository,
     updateDefinitionIfVersion: async () => ({ count: 0 }),
   }
+  concurrentRepository.transaction = async (work) => work(concurrentRepository)
   const concurrentService = new DocumentPurposeLifecycleService(concurrentRepository)
   await assert.rejects(
     () => concurrentService.execute({
