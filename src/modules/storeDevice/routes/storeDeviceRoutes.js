@@ -7,6 +7,11 @@ const { createDeliveryNotePrintJob } = require('../print/createDeliveryNotePrint
 const { createOutputTaxInvoicePrintJob } = require('../print/createOutputTaxInvoicePrintJobController')
 const { createSaleReceiptPrintJob } = require('../print/createSaleReceiptPrintJobController')
 const { leasePrintDocumentJob } = require('../print/leasePrintDocumentJobController')
+const {
+  acknowledgePrintDocumentJob,
+  completePrintDocumentJob,
+  failPrintDocumentJob,
+} = require('../print/completePrintDocumentJobController')
 const router = express.Router()
 router.use(verifyToken)
 router.post('/gateways', controller.registerGateway)
@@ -26,6 +31,9 @@ router.post('/print/delivery-notes/:saleId/jobs', createDeliveryNotePrintJob)
 router.post('/print/output-tax-invoices/:taxDocumentId/jobs', createOutputTaxInvoicePrintJob)
 router.post('/print/sale-receipts/:paymentId/jobs', createSaleReceiptPrintJob)
 router.post('/print/jobs/:jobId/leases', leasePrintDocumentJob)
+router.post('/print/leases/:leaseId/acknowledge', acknowledgePrintDocumentJob)
+router.post('/print/leases/:leaseId/complete', completePrintDocumentJob)
+router.post('/print/leases/:leaseId/fail', failPrintDocumentJob)
 router.post('/jobs', controller.createJob)
 router.get('/jobs', controller.listJobs)
 router.get('/jobs/:jobId', controller.getJob)
