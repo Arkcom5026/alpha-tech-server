@@ -29,6 +29,28 @@ function Invoke-LoggedNative([string]$LogPath, [scriptblock]$Command) {
   }
 }
 
+function Get-LockPackageVersion([string]$LockText, [string]$PackagePath) {
+  $escapedPath = [regex]::Escape($PackagePath)
+  $pattern = '"' + $escapedPath + '"\s*:\s*\{(?s:.*?)"version"\s*:\s*"([^"]+)"'
+  $match = [regex]::Match($LockText, $pattern)
+  if (-not $match.Success) {
+    throw "Could not locate version for '$PackagePath' in package-lock.json."
+  }
+  return $match.Groups[1].Value
+}
+
+function Get-PrismaSchemaPath([string]$PackageText) {
+  $prismaBlock = [regex]::Match($PackageText, '"prisma"\s*:\s*\{(?s:.*?)\}')
+  if (-not $prismaBlock.Success) {
+    throw 'Could not locate prisma configuration in package.json.'
+  }
+  $schemaMatch = [regex]::Match($prismaBlock.Value, '"schema"\s*:\s*"([^"]+)"')
+  if (-not $schemaMatch.Success) {
+    throw 'Could not locate prisma.schema in package.json.'
+  }
+  return $schemaMatch.Groups[1].Value
+}
+
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
 Set-Location $RepoRoot
 
@@ -55,15 +77,16 @@ $enumCount = ([regex]::Matches($schemaText, '(?m)^enum\s+[A-Za-z_]\w*\s*\{')).Co
 Assert-Equal 'Model count' $modelCount 128
 Assert-Equal 'Enum count' $enumCount 107
 
-# Windows PowerShell 5.1 does not support ConvertFrom-Json -Depth.
-$lock = Get-Content -Raw package-lock.json | ConvertFrom-Json
-$prismaVersion = $lock.packages.'node_modules/prisma'.version
-$clientVersion = $lock.packages.'node_modules/@prisma/client'.version
+# Avoid ConvertFrom-Json entirely for Windows PowerShell 5.1 compatibility.
+$lockText = Get-Content -Raw package-lock.json
+$prismaVersion = Get-LockPackageVersion -LockText $lockText -PackagePath 'node_modules/prisma'
+$clientVersion = Get-LockPackageVersion -LockText $lockText -PackagePath 'node_modules/@prisma/client'
 Assert-Equal 'Prisma CLI lock version' $prismaVersion '6.16.2'
 Assert-Equal '@prisma/client lock version' $clientVersion '6.16.2'
 
-$package = Get-Content -Raw package.json | ConvertFrom-Json
-Assert-Equal 'Prisma schema path' $package.prisma.schema 'prisma'
+$packageText = Get-Content -Raw package.json
+$prismaSchemaPath = Get-PrismaSchemaPath -PackageText $packageText
+Assert-Equal 'Prisma schema path' $prismaSchemaPath 'prisma'
 
 $EvidenceBase = if ($env:ALPHA_TECH_RECOVERY_ROOT) {
   $env:ALPHA_TECH_RECOVERY_ROOT
@@ -117,7 +140,7 @@ try {
     enumCount = $enumCount
     prismaCliVersion = $prismaVersion
     prismaClientVersion = $clientVersion
-    prismaSchemaPath = $package.prisma.schema
+    prismaSchemaPath = $prismaSchemaPath
     migrationTreeSha256 = $migrationTreeSha256
     originalSchemaMutated = $false
     migrationDirectoryMutated = $false
