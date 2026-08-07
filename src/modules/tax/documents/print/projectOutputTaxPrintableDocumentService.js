@@ -2,6 +2,9 @@
 
 const { prisma } = require('../../../../../lib/prisma');
 const { projectOutputTaxCreditNotePrintableDocument } = require('../creditNote/print/projectOutputTaxCreditNotePrintableDocumentService');
+const {
+  ResolvePrintDocumentPurposeService,
+} = require('../../../document-purpose/resolve/resolvePrintDocumentPurposeService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -155,11 +158,19 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
     fail('TAX_OUTPUT_PRINT_RECIPIENT_MISSING', 'Full tax invoice has no recipient snapshot', 409);
   }
 
+  const purposeCode = invoiceKind === 'FULL'
+    ? 'FULL_TAX_INVOICE'
+    : 'SHORT_TAX_INVOICE';
+  const purpose = await new ResolvePrintDocumentPurposeService().execute({
+    branchId: normalizedBranchId,
+    code: purposeCode,
+  });
+
   return Object.freeze({
     document: {
       id: document.id,
-      type: invoiceKind === 'FULL' ? 'FULL_TAX_INVOICE' : 'SHORT_TAX_INVOICE',
-      title: invoiceKind === 'FULL' ? 'ใบกำกับภาษี' : 'ใบกำกับภาษีอย่างย่อ',
+      type: purpose.code,
+      title: purpose.displayName,
       number: document.issuedDocumentNumber,
       sequence: Number(document.issuedSequence),
       issuedAt: document.issuedAt,
