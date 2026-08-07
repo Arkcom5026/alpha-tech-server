@@ -53,3 +53,57 @@ FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE 
 ALTER TABLE "SalePriceAdjustmentEvidence"
 ADD CONSTRAINT "SalePriceAdjustmentEvidence_createdByEmployeeId_fkey"
 FOREIGN KEY ("createdByEmployeeId") REFERENCES "EmployeeProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+CREATE OR REPLACE FUNCTION "capture_sale_item_price_adjustment"()
+RETURNS TRIGGER AS $$
+DECLARE
+  sale_branch_id INTEGER;
+  sale_employee_id INTEGER;
+BEGIN
+  SELECT "branchId", "employeeId"
+  INTO sale_branch_id, sale_employee_id
+  FROM "Sale"
+  WHERE "id" = NEW."saleId";
+
+  INSERT INTO "SalePriceAdjustmentEvidence" (
+    "sourceType", "saleId", "branchId", "lineId", "lineType", "basePrice",
+    "priceAdjustment", "finalPrice", "adjustmentReason", "createdByEmployeeId"
+  ) VALUES (
+    'SALE', NEW."saleId", sale_branch_id, 'SALE_ITEM-' || NEW."id"::text, 'STOCK_ITEM',
+    NEW."basePrice", NEW."price" - NEW."basePrice", NEW."price",
+    NULLIF(BTRIM(COALESCE(NEW."remark", '')), ''), sale_employee_id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION "capture_sale_item_simple_price_adjustment"()
+RETURNS TRIGGER AS $$
+DECLARE
+  sale_branch_id INTEGER;
+  sale_employee_id INTEGER;
+BEGIN
+  SELECT "branchId", "employeeId"
+  INTO sale_branch_id, sale_employee_id
+  FROM "Sale"
+  WHERE "id" = NEW."saleId";
+
+  INSERT INTO "SalePriceAdjustmentEvidence" (
+    "sourceType", "saleId", "branchId", "lineId", "lineType", "basePrice",
+    "priceAdjustment", "finalPrice", "adjustmentReason", "createdByEmployeeId"
+  ) VALUES (
+    'SALE', NEW."saleId", sale_branch_id, 'SALE_ITEM_SIMPLE-' || NEW."id"::text, 'SIMPLE',
+    NEW."basePrice", NEW."price" - NEW."basePrice", NEW."price",
+    NULLIF(BTRIM(COALESCE(NEW."remark", '')), ''), sale_employee_id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "SaleItem_capture_price_adjustment"
+AFTER INSERT ON "SaleItem"
+FOR EACH ROW EXECUTE FUNCTION "capture_sale_item_price_adjustment"();
+
+CREATE TRIGGER "SaleItemSimple_capture_price_adjustment"
+AFTER INSERT ON "SaleItemSimple"
+FOR EACH ROW EXECUTE FUNCTION "capture_sale_item_simple_price_adjustment"();
