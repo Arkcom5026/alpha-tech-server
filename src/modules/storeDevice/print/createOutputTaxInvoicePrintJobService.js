@@ -1,7 +1,9 @@
 'use strict'
 
 const { requireBranchAuthority } = require('../policies/storeDeviceAuthorityPolicy')
-const durableJobService = require('../services/storeDeviceDurableJobService')
+const {
+  createDocumentPrintJobCreator,
+} = require('./createDocumentPrintJobCreator')
 const {
   projectOutputTaxPrintableDocument,
 } = require('../../tax/documents/print/projectOutputTaxPrintableDocumentService')
@@ -21,7 +23,7 @@ const ALLOWED_PURPOSE_CODES = new Set([
 
 const createOutputTaxInvoicePrintJobService = ({
   projector = projectOutputTaxPrintableDocument,
-  jobService = durableJobService,
+  documentPrintJobCreator = createDocumentPrintJobCreator(),
 } = {}) => ({
   async execute({ user, taxDocumentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -67,7 +69,7 @@ const createOutputTaxInvoicePrintJobService = ({
       projection,
     })
 
-    const job = await jobService.createJob({
+    const job = await documentPrintJobCreator.create({
       user,
       payload: {
         idempotencyKey,
@@ -76,7 +78,7 @@ const createOutputTaxInvoicePrintJobService = ({
         targetDeviceId: payload.targetDeviceId || null,
         targetProfileId: payload.targetProfileId || null,
         correlationId: payload.correlationId || null,
-        causationId: payload.causationId || null,
+        causationId: payload.correlationId || null,
         requestSnapshot,
       },
     })
