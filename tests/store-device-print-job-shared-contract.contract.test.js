@@ -60,6 +60,8 @@ for (const file of [
   assert.match(source, /require\('\.\/printDocumentJobContract'\)/)
   assert.match(source, /createPrintRequestSnapshot/)
   assert.match(source, /assertIdempotentPrintJobCompatibility/)
+  assert.doesNotMatch(source, /targetDeviceId\s*:/)
+  assert.doesNotMatch(source, /targetProfileId\s*:/)
 }
 
 console.log('store-device-print-job-shared-contract.contract.test.js: PASS')
