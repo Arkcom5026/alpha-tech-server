@@ -20,5 +20,6 @@ module.exports = {
   detail: respond((req) => service.detail({ user: req.user, deviceId: req.params.deviceId })),
   rename: respond((req) => service.rename({ user: req.user, deviceId: req.params.deviceId, payload: req.body })),
   assignWorkstation: respond((req) => service.assignWorkstation({ user: req.user, deviceId: req.params.deviceId, payload: req.body })),
+  assignPrinterProfile: respond((req) => service.assignPrinterProfile({ user: req.user, deviceId: req.params.deviceId, payload: req.body })),
   revoke: respond((req) => service.revoke({ user: req.user, deviceId: req.params.deviceId })),
 }

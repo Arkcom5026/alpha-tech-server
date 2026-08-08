@@ -62,6 +62,20 @@ const createStoreDeviceRegistryService = (repository = defaultRepository) => {
     return repository.assignWorkstation(branchId, current.deviceId, text(payload.workstationId, 'workstationId'))
   }
 
+  const assignPrinterProfile = async ({ user, deviceId, payload = {} }) => {
+    const branchId = requireBranchAuthority(user)
+    const current = await requireDevice(branchId, deviceId)
+    if (current.kind !== 'PRINTER') throw fail('STORE_DEVICE_PRINTER_REQUIRED', 'Only printers can receive a printer profile', 409)
+    if (current.revokedAt) throw fail('STORE_DEVICE_REVOKED', 'Revoked device cannot be assigned', 409)
+    const profileCode = text(payload.printerProfileCode, 'printerProfileCode').normalize('NFKC').toUpperCase().replace(/[\s-]+/g, '_')
+    const profile = await repository.prisma.printDeviceProfile.findUnique({
+      where: { branchId_normalizedCode: { branchId, normalizedCode: profileCode } },
+    })
+    if (!profile) throw fail('PRINT_PROFILE_NOT_FOUND', 'Printer profile not found for branch', 404)
+    if (!profile.isActive) throw fail('PRINT_PROFILE_INACTIVE', 'Printer profile is inactive', 409)
+    return repository.assignPrinterProfile(branchId, current.deviceId, profile.normalizedCode)
+  }
+
   const revoke = async ({ user, deviceId }) => {
     const branchId = requireBranchAuthority(user)
     const current = await requireDevice(branchId, deviceId)
@@ -69,7 +83,7 @@ const createStoreDeviceRegistryService = (repository = defaultRepository) => {
     return repository.revoke(branchId, current.deviceId)
   }
 
-  return Object.freeze({ register, list, detail, rename, assignWorkstation, revoke })
+  return Object.freeze({ register, list, detail, rename, assignWorkstation, assignPrinterProfile, revoke })
 }
 
 const defaultService = createStoreDeviceRegistryService()

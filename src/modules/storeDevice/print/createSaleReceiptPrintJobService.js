@@ -13,10 +13,12 @@ const {
   createPrintRequestSnapshot,
   assertIdempotentPrintJobCompatibility,
 } = require('./printDocumentJobContract')
+const { resolvePrintJobRouting } = require('./resolvePrintJobRouting')
 
 const createSaleReceiptPrintJobService = ({
   projector = projectSaleReceiptPrintablePayment,
   jobService = durableJobService,
+  routeResolver = null,
 } = {}) => ({
   async execute({ user, paymentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -30,8 +32,6 @@ const createSaleReceiptPrintJobService = ({
       'STORE_DEVICE_PRINT_IDEMPOTENCY_REQUIRED',
       'idempotencyKey',
     )
-    const copies = normalizeCopies(payload.copies)
-
     const projection = await projector({
       branchId,
       paymentId: normalizedPaymentId,
@@ -54,12 +54,23 @@ const createSaleReceiptPrintJobService = ({
       displayName: projection.document.title,
     }
 
+    const routing = await resolvePrintJobRouting({
+      routeResolver,
+      branchId,
+      documentPurposeCode: documentPurpose.code,
+      requestedCopies: payload.copies,
+      legacyTargetDeviceId: payload.targetDeviceId,
+      legacyTargetProfileId: payload.targetProfileId,
+    })
+    const copies = routing.copies
+
     const requestSnapshot = createPrintRequestSnapshot({
       documentPurpose,
       sourceType: 'PAYMENT',
       sourceId: normalizedPaymentId,
       copies,
       projection,
+      routeSnapshot: routing.routeSnapshot,
     })
 
     const job = await jobService.createJob({
@@ -68,8 +79,8 @@ const createSaleReceiptPrintJobService = ({
         idempotencyKey,
         jobType: 'PRINT_DOCUMENT',
         source: 'SALE_RECEIPT',
-        targetDeviceId: payload.targetDeviceId || null,
-        targetProfileId: payload.targetProfileId || null,
+        targetDeviceId: routing.targetDeviceId,
+        targetProfileId: routing.targetProfileId,
         correlationId: payload.correlationId || null,
         causationId: payload.causationId || null,
         requestSnapshot,

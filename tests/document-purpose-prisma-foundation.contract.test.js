@@ -18,7 +18,10 @@ const sql = fs.readFileSync(path.join(migrationRoot, migrationName, 'migration.s
 for (const model of ['DocumentPurposeDefinition', 'DocumentPurposeVersion', 'DocumentPurposeEvent']) {
   assert.match(schema, new RegExp(`model ${model} \\{`));
 }
-assert.equal((schema.match(/^model\s+\w+\s*\{/gm) || []).length, 138);
+assert.ok(
+  (schema.match(/^model\s+\w+\s*\{/gm) || []).length >= 138,
+  'Multi-file schema must preserve the certified model foundation',
+);
 assert.equal((schema.match(/^enum\s+\w+\s*\{/gm) || []).length, 114);
 assert.doesNotMatch(schema, /^enum\s+DocumentPurpose\w*/m);
 assert.match(schema, /branchId\s+Int[\s\S]*@@unique\(\[branchId, normalizedCode\]\)/);

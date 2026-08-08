@@ -9,7 +9,15 @@ module.exports = {
   disconnectSession: respond((req) => service.disconnectSession({ user: req.user, gatewayId: req.params.gatewayId, sessionId: req.params.sessionId })),
   rotateGateway: respond((req) => service.rotateGateway({ user: req.user, gatewayId: req.params.gatewayId, payload: req.body })),
   revokeGateway: respond((req) => service.revokeGateway({ user: req.user, gatewayId: req.params.gatewayId })),
-  createJob: respond((req) => service.createJob({ user: req.user, payload: req.body }), 201),
+  createJob: respond((req) => {
+    if (req.body?.jobType === 'PRINT_DOCUMENT') {
+      throw Object.assign(
+        new Error('Document print jobs must use a document-specific configured print route'),
+        { code: 'STORE_DEVICE_PRINT_ROUTE_REQUIRED', statusCode: 409 },
+      )
+    }
+    return service.createJob({ user: req.user, payload: req.body })
+  }, 201),
   getJob: respond((req) => service.getJob({ user: req.user, jobId: req.params.jobId })),
   listJobs: respond((req) => service.listJobs({ user: req.user })),
   leaseJob: respond((req) => service.leaseJob({ user: req.user, jobId: req.params.jobId, payload: req.body }), 201),
