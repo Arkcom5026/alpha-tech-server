@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 const routes = read('src/modules/storeExperience/draft/storeExperienceDraftRoutes.js');
 const controller = read('src/modules/storeExperience/draft/storeExperienceDraftController.js');
 const service = read('src/modules/storeExperience/draft/storeExperienceDraftService.js');

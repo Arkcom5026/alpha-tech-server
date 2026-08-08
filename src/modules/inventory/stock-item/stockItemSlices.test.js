@@ -68,7 +68,7 @@ test('search requires both query and branch authority', async () => {
 })
 
 test('stock item routes are owned and mounted by inventory slices', () => {
-  const server = fs.readFileSync(path.resolve(__dirname, '../../../../server.js'), 'utf8')
+  const server = require('../../../../scripts/read-server-composition-source').readServerCompositionSource()
   const routePath = path.join(__dirname, 'routes/stockItemRoutes.js')
   const source = fs.readFileSync(routePath, 'utf8')
 

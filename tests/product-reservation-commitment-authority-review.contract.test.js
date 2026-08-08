@@ -17,7 +17,7 @@ const repository = read('src/modules/sales/storefront/commitment/productReservat
 const service = read('src/modules/sales/storefront/commitment/productReservationCommitmentService.js');
 const controller = read('src/modules/sales/storefront/commitment/productReservationCommitmentController.js');
 const routes = read('src/modules/sales/storefront/commitment/productReservationCommitmentRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 assertIncludes(migration, 'ProductReservation_public_idempotency_unique', 'Public idempotency uniqueness is required');
 assertIncludes(migration, 'ProductReservation_commerce_identity_unique', 'One reservation per commerce identity is required');

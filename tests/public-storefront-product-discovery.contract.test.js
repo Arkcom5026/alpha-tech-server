@@ -7,7 +7,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 const routes = read('src/modules/sales/storefront/public/publicStorefrontRoutes.js');
 const controller = read('src/modules/sales/storefront/public/publicStorefrontController.js');
 const service = read('src/modules/sales/storefront/public/publicStorefrontService.js');

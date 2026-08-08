@@ -64,7 +64,7 @@ assertContains(quickReceiptMigration, 'QuickReceiptSession_active_delivery_uniqu
 const schema = readPrismaSchemaSource(root);
 assertContains(schema, 'model PurchaseOrderReceipt {', 'purchase receipt tax source model');
 
-const server = read('server.js');
+const server = require('./read-server-composition-source').readServerCompositionSource(root);
 assertContains(server, "require('./src/modules/tax/http/taxIntakeRoutes')", 'tax intake route import');
 assertContains(server, "app.use('/api/tax-intake', taxIntakeRoutes)", 'tax intake route mount');
 assertContains(server, "app.use('/api/tax-periods', taxPeriodRoutes)", 'tax period route mount');

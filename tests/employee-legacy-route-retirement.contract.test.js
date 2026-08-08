@@ -13,7 +13,7 @@ const legacyRoutePath = path.join(
   'routes/purchaseOrderReceiptSimpleRoutes.js'
 );
 
-const serverSource = fs.readFileSync(serverPath, 'utf8');
+const serverSource = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 assert(
   serverSource.includes("require('./src/modules/employee/routes/employeeRoutes')"),

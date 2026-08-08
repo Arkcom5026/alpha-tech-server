@@ -18,7 +18,7 @@ const provider = read('src/modules/sales/storefront/identity/commerceOtpProvider
 const service = read('src/modules/sales/storefront/identity/commerceIdentityService.js');
 const repository = read('src/modules/sales/storefront/identity/commerceIdentityRepository.js');
 const routes = read('src/modules/sales/storefront/identity/commerceIdentityRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 include(migration, 'CommerceIdentityChallenge');
 include(migration, 'CommerceCommitmentIdentity');

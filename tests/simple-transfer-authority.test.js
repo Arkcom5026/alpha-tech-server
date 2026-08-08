@@ -45,7 +45,7 @@ assert.throws(
 const root = path.join(__dirname, '..')
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 const routes = read('src/modules/inventory/simple-stock/routes/simpleStockRoutes.js')
-const server = read('server.js')
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root)
 const service = read('src/modules/inventory/simple-stock/transfer/simpleStockTransferService.js')
 const repository = read('src/modules/inventory/simple-stock/transfer/simpleStockTransferRepository.js')
 const controller = read('src/modules/inventory/simple-stock/transfer/simpleStockTransferController.js')

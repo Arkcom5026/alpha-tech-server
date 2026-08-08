@@ -9,7 +9,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const repository = read('src/modules/sales/storefront/public/publicStorefrontRepository.js');
 const service = read('src/modules/sales/storefront/public/publicStorefrontService.js');
 const routes = read('src/modules/sales/storefront/public/publicStorefrontRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 const assertIncludes = (source, value, label) => {
   if (!source.includes(value)) throw new Error(`${label} missing: ${value}`);

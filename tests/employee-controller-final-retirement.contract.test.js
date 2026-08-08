@@ -12,7 +12,7 @@ assert(!fs.existsSync(legacyControllerPath), 'legacy employee controller must be
 assert(fs.existsSync(serverPath), 'server runtime authority must remain');
 assert(fs.existsSync(moduleRoutePath), 'employee module route must remain');
 
-const serverSource = fs.readFileSync(serverPath, 'utf8');
+const serverSource = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 const moduleRouteSource = fs.readFileSync(moduleRoutePath, 'utf8');
 const verificationSource = fs.readFileSync(verificationPath, 'utf8');
 
@@ -33,7 +33,7 @@ assert(
   'module route must not reference legacy controller'
 );
 assert(
-  verificationSource.includes("assertMissing('controllers/employeeController.js'"),
+  verificationSource.includes("['controllers/employeeController.js', 'legacy employee controller retired']"),
   'employee lifecycle verification must enforce controller retirement'
 );
 

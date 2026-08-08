@@ -11,7 +11,7 @@ const routes = read('src/modules/sales/reservations/merchant/productReservationM
 const queries = read('src/modules/sales/reservations/merchant/productReservationMerchantQueryRepository.js');
 const expiry = read('src/modules/sales/reservations/expiry/productReservationExpiryRunner.js');
 const expiryRoutes = read('src/modules/sales/reservations/expiry/productReservationExpiryRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 for (const token of [
   'router.use(verifyToken, ensureMerchantContext)',

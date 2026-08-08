@@ -164,7 +164,7 @@ assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId pro
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
 assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
 
-const server = read('server.js');
+const server = require('./read-server-composition-source').readServerCompositionSource(root);
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
 const sessionAuthRoutes = read('src/modules/auth/routes/sessionAuthRoutes.js');
 const branchPriceRoute = read('src/modules/product/pricing/routes/branchPriceRoutes.js');

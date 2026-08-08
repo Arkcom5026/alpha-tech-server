@@ -9,7 +9,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const migration = read('prisma/migrations/20260729013000_anonymous_shopping_session_foundation/migration.sql');
 const schema = read('prisma/anonymous-shopping-session.prisma');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 const routes = read('src/modules/sales/storefront/session/anonymousShoppingSessionRoutes.js');
 const controller = read('src/modules/sales/storefront/session/anonymousShoppingSessionController.js');
 const service = read('src/modules/sales/storefront/session/anonymousShoppingSessionService.js');

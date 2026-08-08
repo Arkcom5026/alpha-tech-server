@@ -46,7 +46,7 @@ for (const relativePath of syntaxFiles) {
   }
 }
 
-const server = read('server.js');
+const server = require('./read-server-composition-source').readServerCompositionSource(root);
 assertContains(server, "require('./src/modules/repair/routes/repairRoutes')", 'repair route import');
 assertContains(server, "app.use('/api/repairs', repairRoutes)", 'canonical repair route mount');
 assertContains(server, "app.use('/api/repair', repairRoutes)", 'repair backward-compatible route mount');

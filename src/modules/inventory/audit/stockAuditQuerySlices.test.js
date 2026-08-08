@@ -47,7 +47,7 @@ test('overview query remains branch-safe and computes missing count', async () =
 });
 
 test('stock audit route authority is owned and mounted by inventory audit module', () => {
-  const server = fs.readFileSync(path.resolve(__dirname, '../../../../server.js'), 'utf8');
+  const server = require('../../../../scripts/read-server-composition-source').readServerCompositionSource();
   const moduleRoute = fs.readFileSync(path.resolve(__dirname, 'routes/stockAuditRoutes.js'), 'utf8');
 
   assert.match(server, /require\('\.\/src\/modules\/inventory\/audit\/routes\/stockAuditRoutes'\)/);

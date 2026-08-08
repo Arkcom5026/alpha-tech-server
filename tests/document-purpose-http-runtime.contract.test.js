@@ -107,7 +107,7 @@ const req = (overrides = {}) => ({
   assert.match(routes, /router\.patch\('\/:definitionId'/)
   assert.match(routes, /router\.post\('\/:definitionId\/lifecycle'/)
 
-  const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8')
+  const server = require('../scripts/read-server-composition-source').readServerCompositionSource(path.join(__dirname, '..'))
   assert.match(server, /documentPurposeRoutes/)
   assert.match(server, /app\.use\('\/api\/document-purposes', documentPurposeRoutes\)/)
 

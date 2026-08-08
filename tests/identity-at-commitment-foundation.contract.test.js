@@ -18,7 +18,7 @@ const repository = read('src/modules/sales/storefront/identity/commerceIdentityR
 const service = read('src/modules/sales/storefront/identity/commerceIdentityService.js');
 const controller = read('src/modules/sales/storefront/identity/commerceIdentityController.js');
 const routes = read('src/modules/sales/storefront/identity/commerceIdentityRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 assertIncludes(migration, 'CommerceIdentityChallenge', 'Identity challenge table is required');
 assertIncludes(migration, 'CommerceCommitmentIdentity', 'Commitment identity proof table is required');

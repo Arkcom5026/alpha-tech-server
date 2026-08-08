@@ -20,7 +20,7 @@ const repository = read('src/modules/sales/storefront/session/anonymousShoppingS
 const service = read('src/modules/sales/storefront/session/anonymousShoppingSessionService.js');
 const controller = read('src/modules/sales/storefront/session/anonymousShoppingSessionController.js');
 const routes = read('src/modules/sales/storefront/session/anonymousShoppingSessionRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 assertIncludes(migration, 'AnonymousShoppingSessionStatus', 'Session lifecycle enum is required');
 assertIncludes(migration, 'publicTokenHash', 'Only a token hash may be persisted');

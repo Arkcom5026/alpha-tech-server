@@ -17,7 +17,7 @@ const repository = read('src/modules/sales/storefront/commitment/productReservat
 const service = read('src/modules/sales/storefront/commitment/productReservationCommitmentService.js');
 const controller = read('src/modules/sales/storefront/commitment/productReservationCommitmentController.js');
 const routes = read('src/modules/sales/storefront/commitment/productReservationCommitmentRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 assertIncludes(migration, 'ProductReservationActorType', 'Reservation actor authority is required');
 assertIncludes(migration, 'CREATE TABLE "ProductReservation"', 'Reservation table must be created by canonical migration');

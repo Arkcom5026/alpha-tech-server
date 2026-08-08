@@ -9,7 +9,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const service = read('src/modules/system/operational-verification/operationalVerificationService.js');
 const routes = read('src/modules/system/operational-verification/operationalVerificationRoutes.js');
-const server = read('server.js');
+const server = require('../scripts/read-server-composition-source').readServerCompositionSource(root);
 
 for (const token of [
   "SELECT 1 AS ready",
