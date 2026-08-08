@@ -97,6 +97,20 @@ const assignWorkstation = async (branchId, deviceId, workstationId) => {
   return mapDevice(result[0])
 }
 
+const assignPrinterProfile = async (branchId, deviceId, printerProfileCode) => {
+  const result = await rows(
+    `UPDATE "StoreDeviceRegistryDevice"
+     SET "metadata" = COALESCE("metadata", '{}'::jsonb) || jsonb_build_object('printerProfileCode', $3::text),
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "branchId" = $1 AND "deviceId" = $2 AND "kind" = 'PRINTER' AND "revokedAt" IS NULL
+     RETURNING *`,
+    branchId,
+    deviceId,
+    printerProfileCode,
+  )
+  return mapDevice(result[0])
+}
+
 const revoke = async (branchId, deviceId, revokedAt = new Date()) => {
   const result = await rows(
     `UPDATE "StoreDeviceRegistryDevice"
@@ -111,4 +125,4 @@ const revoke = async (branchId, deviceId, revokedAt = new Date()) => {
   return mapDevice(result[0])
 }
 
-module.exports = { prisma, find, list, register, rename, assignWorkstation, revoke, execute }
+module.exports = { prisma, find, list, register, rename, assignWorkstation, assignPrinterProfile, revoke, execute }
