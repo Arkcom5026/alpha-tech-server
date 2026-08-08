@@ -20,4 +20,43 @@ describe('Legacy Document Print Adapter Boundary', () => {
 
     assert.equal(result.printTargetSnapshot.target.deviceId, 5);
   });
+
+  it('fails closed when print route is unavailable', async () => {
+    await assert.rejects(
+      () => createLegacyDocumentPrintJob(
+        {
+          documentPurposeCode: 'FULL_TAX_INVOICE',
+        },
+        {
+          resolveRoute: async () => ({
+            routeStatus: 'UNAVAILABLE',
+          }),
+          createPrintJob: async () => {
+            throw new Error('must not create print job');
+          },
+        },
+      ),
+      /PRINT_ROUTE_UNAVAILABLE/,
+    );
+  });
+
+  it('does not allow caller printer override without resolved authority', async () => {
+    await assert.rejects(
+      () => createLegacyDocumentPrintJob(
+        {
+          documentPurposeCode: 'FULL_TAX_INVOICE',
+          deviceId: 999,
+        },
+        {
+          resolveRoute: async () => ({
+            routeStatus: 'UNAVAILABLE',
+          }),
+          createPrintJob: async () => ({
+            created: true,
+          }),
+        },
+      ),
+      /PRINT_ROUTE_UNAVAILABLE/,
+    );
+  });
 });
