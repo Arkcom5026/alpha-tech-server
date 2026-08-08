@@ -10,9 +10,9 @@ const {
   positiveInt,
   nonEmpty,
   normalizeCopies,
-  createPrintRequestSnapshot,
   assertIdempotentPrintJobCompatibility,
 } = require('./printDocumentJobContract')
+const { createLegacyDocumentPrintJobAdapter } = require('./createLegacyDocumentPrintJobAdapter')
 
 const ALLOWED_PURPOSE_CODES = new Set([
   'SHORT_TAX_INVOICE',
@@ -22,6 +22,7 @@ const ALLOWED_PURPOSE_CODES = new Set([
 const createOutputTaxInvoicePrintJobService = ({
   projector = projectOutputTaxPrintableDocument,
   jobService = durableJobService,
+  createDocumentPrintJobService,
 } = {}) => ({
   async execute({ user, taxDocumentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -54,48 +55,53 @@ const createOutputTaxInvoicePrintJobService = ({
       )
     }
 
-    const documentPurpose = {
-      code: projection.document.type,
-      displayName: projection.document.title,
-    }
-
-    const requestSnapshot = createPrintRequestSnapshot({
-      documentPurpose,
+    const document = {
+      purpose: {
+        code: projection.document.type,
+        displayName: projection.document.title,
+      },
       sourceType: 'TAX_DOCUMENT',
       sourceId: normalizedTaxDocumentId,
       copies,
       projection,
-    })
+    }
 
-    const job = await jobService.createJob({
-      user,
-      payload: {
-        idempotencyKey,
-        jobType: 'PRINT_DOCUMENT',
-        source: 'OUTPUT_TAX_INVOICE',
-        targetDeviceId: payload.targetDeviceId || null,
-        targetProfileId: payload.targetProfileId || null,
-        correlationId: payload.correlationId || null,
-        causationId: payload.causationId || null,
-        requestSnapshot,
-      },
-    })
+    const job = createDocumentPrintJobService
+      ? await createLegacyDocumentPrintJobAdapter({
+        createDocumentPrintJobService,
+      }).execute({
+        user,
+        document,
+        payload: {
+          idempotencyKey,
+          source: 'OUTPUT_TAX_INVOICE',
+        },
+      })
+      : await jobService.createJob({
+        user,
+        payload: {
+          idempotencyKey,
+          jobType: 'PRINT_DOCUMENT',
+          source: 'OUTPUT_TAX_INVOICE',
+          requestSnapshot: document,
+        },
+      })
 
     assertIdempotentPrintJobCompatibility({
       job,
       sourceType: 'TAX_DOCUMENT',
       sourceId: normalizedTaxDocumentId,
       copies,
-      documentPurpose,
+      documentPurpose: document.purpose,
     })
 
-    const durableSnapshot = job?.requestSnapshot || requestSnapshot
+    const durableSnapshot = job?.requestSnapshot || document
 
     return {
       job,
-      documentPurpose: durableSnapshot.documentPurpose,
+      documentPurpose: durableSnapshot.documentPurpose || durableSnapshot.purpose,
       source: durableSnapshot.source,
-      copies: Number(durableSnapshot.print?.copies || copies),
+      copies: Number(durableSnapshot.print?.copies || durableSnapshot.copies || copies),
     }
   },
 })
