@@ -1,5 +1,14 @@
 const { Prisma } = require('../../../../../lib/prisma');
 const repository = require('./customerDepositRuntimeRepository');
+const {
+  createCustomerMoneyApplication,
+} = require('../../../customer-money/application/createCustomerMoneyApplicationService');
+const {
+  createCustomerMoneyLedger,
+} = require('../../../customer-money/ledger/createCustomerMoneyLedgerService');
+const {
+  updateCustomerMoneyBalance,
+} = require('../../../customer-money/balance/updateCustomerMoneyBalanceService');
 
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
 
@@ -383,10 +392,18 @@ const deleteCustomerDeposit = async ({ id, branchId }) => {
 
 const useCustomerDeposit = async ({ body = {}, user = {} }) => {
   const depositId = Number.parseInt(body.depositId, 10);
-  const amount = body.amount;
+  const saleId = Number.parseInt(body.saleId, 10);
+  const amount = body.amount ?? body.amountUsed;
   const branchId = Number(user.branchId);
+  const employeeId = Number(user.employeeId);
 
-  if (Number.isNaN(depositId) || !branchId || !isMoneyLike(amount)) {
+  if (
+    Number.isNaN(depositId)
+    || Number.isNaN(saleId)
+    || !branchId
+    || !employeeId
+    || !isMoneyLike(amount)
+  ) {
     return { status: 400, body: { message: 'ข้อมูลไม่ถูกต้อง' } };
   }
   const amountDecimal = D(amount);
@@ -403,6 +420,11 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
     if (!deposit) {
       return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
     }
+    if (!deposit.customerId) {
+      return {
+        error: { status: 400, body: { message: 'customer deposit must belong to a customer' } },
+      };
+    }
     const remaining = getDepositRemainingDecimal(deposit);
     if (amountDecimal.greaterThan(remaining)) {
       return {
@@ -415,6 +437,46 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
         usedAmount: D(deposit.usedAmount || 0).plus(amountDecimal),
       },
       client: tx,
+    });
+    const application = await createCustomerMoneyApplication({
+      client: tx,
+      data: {
+        branchId,
+        customerId: deposit.customerId,
+        sourceType: 'CUSTOMER_DEPOSIT',
+        sourceId: deposit.id,
+        targetType: 'SALE',
+        targetId: saleId,
+        amount: amountDecimal,
+        status: 'APPLIED',
+        createdById: employeeId,
+      },
+    });
+    await createCustomerMoneyLedger({
+      client: tx,
+      data: {
+        branchId,
+        customerId: deposit.customerId,
+        applicationId: application.id,
+        eventType: 'MONEY_APPLIED',
+        amount: amountDecimal,
+        direction: 'DEBIT',
+        referenceType: 'SALE',
+        referenceId: saleId,
+        createdById: employeeId,
+      },
+    });
+    const activeDeposits = await repository.findActiveDepositBalancesByCustomer({
+      customerId: deposit.customerId,
+      branchId,
+      client: tx,
+    });
+    const availableAmount = sumDeposits(activeDeposits);
+    await updateCustomerMoneyBalance({
+      client: tx,
+      branchId,
+      customerId: deposit.customerId,
+      availableAmount,
     });
     return { deposit: updated };
   });

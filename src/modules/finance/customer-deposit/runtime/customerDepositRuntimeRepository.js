@@ -14,7 +14,7 @@ const findActiveDepositsByBranch = (branchId) => prisma.customerDeposit.findMany
   include: { customer: { include: { user: true } } },
 });
 
-const findActiveDepositByIdAndBranch = ({ id, branchId }) => prisma.customerDeposit.findFirst({
+const findActiveDepositByIdAndBranch = ({ id, branchId, client = prisma }) => client.customerDeposit.findFirst({
   where: { id, branchId, status: 'ACTIVE' },
   include: { customer: { include: { user: true } } },
 });
@@ -75,13 +75,20 @@ const findCustomerById = ({ customerId, branchId }) => prisma.customerProfile.fi
   },
 });
 
-const updateDepositById = ({ id, data }) => prisma.customerDeposit.update({
+const updateDepositById = ({ id, data, client = prisma }) => client.customerDeposit.update({
   where: { id },
   data,
   include: { customer: { include: { user: true } } },
 });
 
 const deleteDepositById = (id) => prisma.customerDeposit.delete({ where: { id } });
+
+const findActiveDepositBalancesByCustomer = ({ customerId, branchId, client = prisma }) => (
+  client.customerDeposit.findMany({
+    where: { customerId, branchId, status: 'ACTIVE' },
+    select: { totalAmount: true, usedAmount: true },
+  })
+);
 
 const runTransaction = (callback, options) => prisma.$transaction(callback, options);
 
@@ -93,6 +100,7 @@ module.exports = {
   findCustomersByName,
   findCustomerById,
   updateDepositById,
+  findActiveDepositBalancesByCustomer,
   deleteDepositById,
   runTransaction,
 };
