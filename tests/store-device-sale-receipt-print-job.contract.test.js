@@ -103,7 +103,7 @@ const service = createSaleReceiptPrintJobService({ projector, jobService })
   })
 
   await assert.rejects(
-    () => service.execute({
+    () => conflictService.execute({
       user: { branchId: 2 },
       paymentId: 638,
       payload: { idempotencyKey: 'reused-key' },
