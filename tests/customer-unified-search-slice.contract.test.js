@@ -43,10 +43,12 @@ assert.match(repositorySource, /taxId/);
 assert.match(repositorySource, /loginId/);
 assert.match(repositorySource, /email/);
 assert.doesNotMatch(repositorySource, /stockItem|serialNumber|imei|serviceTag/i);
-assert.match(policySource, /sales:\s*\{\s*some:\s*\{\s*branchId/);
-assert.match(policySource, /repairJobs:\s*\{\s*some:\s*\{\s*branchId/);
-assert.match(policySource, /deviceIntakes:\s*\{\s*some:\s*\{\s*branchId/);
-assert.match(policySource, /ownedDevices:\s*\{\s*some:\s*\{\s*branchId/);
+assert.match(policySource, /return \{ branchId \}/);
+assert.match(policySource, /return \{ id: \{ equals: -1 \} \}/);
+assert.doesNotMatch(policySource, /sales:\s*\{\s*some/);
+assert.doesNotMatch(policySource, /repairJobs:\s*\{\s*some/);
+assert.doesNotMatch(policySource, /deviceIntakes:\s*\{\s*some/);
+assert.doesNotMatch(policySource, /ownedDevices:\s*\{\s*some/);
 assert.match(repairPolicySource, /customer\/policies\/customerBranchAccessPolicy/);
 
 require(controllerPath);
