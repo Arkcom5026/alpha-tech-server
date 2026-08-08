@@ -19,9 +19,10 @@ const createOrReadJob = ({ branchId, jobId, idempotencyKey, jobType, source, tar
 
 const createLeaseAtomically = ({ branchId, job, gateway, session, leaseId, expiresAt }) =>
   prisma.$transaction(async (tx) => {
+    const now = new Date()
     const current = await tx.storeDeviceJob.findFirst({ where: { id: job.id, branchId } })
     if (!current || ['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(current.status)) return null
-    const existing = await tx.storeDeviceJobLease.findFirst({ where: { jobId: job.id, status: { in: ['OFFERED', 'ACKNOWLEDGED'] } } })
+    const existing = await tx.storeDeviceJobLease.findFirst({ where: { jobId: job.id, status: { in: ['OFFERED', 'ACKNOWLEDGED'] }, expiresAt: { gt: now } } })
     if (existing) return existing
     const attempt = await tx.storeDeviceJobLease.count({ where: { jobId: job.id } }) + 1
     const lease = await tx.storeDeviceJobLease.create({ data: { branchId, jobId: job.id, gatewayId: gateway.id, sessionId: session.id, leaseId, attemptNumber: attempt, expiresAt } })
@@ -29,7 +30,7 @@ const createLeaseAtomically = ({ branchId, job, gateway, session, leaseId, expir
     return lease
   })
 
-const updateLease = (branchId, leaseId, gatewayId, sessionId, data) => prisma.storeDeviceJobLease.updateMany({ where: { branchId, leaseId, gatewayId, sessionId, status: { in: ['OFFERED', 'ACKNOWLEDGED'] } }, data })
+const updateLease = (branchId, leaseId, gatewayId, sessionId, data) => prisma.storeDeviceJobLease.updateMany({ where: { branchId, leaseId, gatewayId, sessionId, status: { in: ['OFFERED', 'ACKNOWLEDGED'] }, expiresAt: { gt: new Date() } }, data })
 const updateSession = (branchId, gatewayId, sessionId, data) => prisma.storeDeviceGatewaySession.updateMany({ where: { branchId, gatewayId, sessionId, state: { notIn: ['REVOKED', 'EXPIRED'] } }, data })
 const updateGateway = (branchId, gatewayId, data) => prisma.storeDeviceGateway.updateMany({ where: { branchId, gatewayId, enrollmentState: { not: 'REVOKED' } }, data })
 const revokeGateway = (branchId, gatewayId) => prisma.$transaction(async (tx) => {
