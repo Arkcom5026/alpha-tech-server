@@ -6,7 +6,7 @@ const { receiveCustomerMoneyController } = require('./receiveCustomerMoneyContro
 const createReceiveCustomerMoneyRoute = ({ receiveCustomerMoneyService }) => {
   const router = express.Router();
 
-  router.post('/customer-money/receive', (req, res, next) => {
+  router.post('/receive', (req, res, next) => {
     req.receiveCustomerMoneyService = receiveCustomerMoneyService;
     return receiveCustomerMoneyController(req, res, next);
   });
