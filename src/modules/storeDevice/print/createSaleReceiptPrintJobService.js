@@ -10,13 +10,14 @@ const {
   positiveInt,
   nonEmpty,
   normalizeCopies,
-  createPrintRequestSnapshot,
   assertIdempotentPrintJobCompatibility,
 } = require('./printDocumentJobContract')
+const { createLegacyDocumentPrintJobAdapter } = require('./createLegacyDocumentPrintJobAdapter')
 
 const createSaleReceiptPrintJobService = ({
   projector = projectSaleReceiptPrintablePayment,
   jobService = durableJobService,
+  createDocumentPrintJobService,
 } = {}) => ({
   async execute({ user, paymentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -49,48 +50,51 @@ const createSaleReceiptPrintJobService = ({
       )
     }
 
-    const documentPurpose = {
-      code: projection.document.type,
-      displayName: projection.document.title,
-    }
-
-    const requestSnapshot = createPrintRequestSnapshot({
-      documentPurpose,
+    const document = {
+      purpose: {
+        code: projection.document.type,
+        displayName: projection.document.title,
+      },
       sourceType: 'PAYMENT',
       sourceId: normalizedPaymentId,
       copies,
       projection,
-    })
+    }
 
-    const job = await jobService.createJob({
-      user,
-      payload: {
-        idempotencyKey,
-        jobType: 'PRINT_DOCUMENT',
-        source: 'SALE_RECEIPT',
-        targetDeviceId: payload.targetDeviceId || null,
-        targetProfileId: payload.targetProfileId || null,
-        correlationId: payload.correlationId || null,
-        causationId: payload.causationId || null,
-        requestSnapshot,
-      },
-    })
+    const job = createDocumentPrintJobService
+      ? await createLegacyDocumentPrintJobAdapter({
+        createDocumentPrintJobService,
+      }).execute({
+        user,
+        document,
+        payload: {
+          idempotencyKey,
+          source: 'SALE_RECEIPT',
+        },
+      })
+      : await jobService.createJob({
+        user,
+        payload: {
+          idempotencyKey,
+          jobType: 'PRINT_DOCUMENT',
+          source: 'SALE_RECEIPT',
+          requestSnapshot: document,
+        },
+      })
 
     assertIdempotentPrintJobCompatibility({
       job,
       sourceType: 'PAYMENT',
       sourceId: normalizedPaymentId,
       copies,
-      documentPurpose,
+      documentPurpose: document.purpose,
     })
-
-    const durableSnapshot = job?.requestSnapshot || requestSnapshot
 
     return {
       job,
-      documentPurpose: durableSnapshot.documentPurpose,
-      source: durableSnapshot.source,
-      copies: Number(durableSnapshot.print?.copies || copies),
+      documentPurpose: document.purpose,
+      source: 'SALE_RECEIPT',
+      copies,
     }
   },
 })
