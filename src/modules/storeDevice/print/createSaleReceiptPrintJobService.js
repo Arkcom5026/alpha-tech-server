@@ -1,10 +1,12 @@
 'use strict'
 
 const { requireBranchAuthority } = require('../policies/storeDeviceAuthorityPolicy')
-const durableJobService = require('../services/storeDeviceDurableJobService')
 const {
   projectSaleReceiptPrintablePayment,
 } = require('../../sales/payment/query/printable/projectSaleReceiptPrintablePaymentService')
+const {
+  createDocumentPrintJobCreator,
+} = require('./createDocumentPrintJobCreator')
 const {
   fail,
   positiveInt,
@@ -16,7 +18,7 @@ const {
 
 const createSaleReceiptPrintJobService = ({
   projector = projectSaleReceiptPrintablePayment,
-  jobService = durableJobService,
+  documentPrintJobCreator = createDocumentPrintJobCreator(),
 } = {}) => ({
   async execute({ user, paymentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -62,7 +64,7 @@ const createSaleReceiptPrintJobService = ({
       projection,
     })
 
-    const job = await jobService.createJob({
+    const job = await documentPrintJobCreator.create({
       user,
       payload: {
         idempotencyKey,
