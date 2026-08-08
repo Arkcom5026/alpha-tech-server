@@ -22,6 +22,7 @@ repository.findLease = async (branchId, leaseId) => ({
   id: 7,
   leaseId,
   branchId,
+  expiresAt: new Date(Date.now() + 60_000),
   job: {
     jobId: 'sdj_print_1',
     jobType: 'PRINT_DOCUMENT',
@@ -118,6 +119,7 @@ const service = createPrintDocumentExecutionService({ jobService })
   )
 
   repository.findLease = async () => ({
+    expiresAt: new Date(Date.now() + 60_000),
     job: { jobType: 'DEVICE_DIAGNOSTIC', requestSnapshot: snapshot },
   })
   await assert.rejects(
@@ -129,6 +131,36 @@ const service = createPrintDocumentExecutionService({ jobService })
     (error) => error.code === 'STORE_DEVICE_PRINT_EXECUTION_CONTRACT_INVALID',
   )
 
+  repository.findLease = async () => ({
+    expiresAt: new Date(Date.now() - 1_000),
+    job: {
+      jobId: 'sdj_expired',
+      jobType: 'PRINT_DOCUMENT',
+      requestSnapshot: snapshot,
+    },
+  })
+  await assert.rejects(
+    () => service.acknowledge({
+      user: { branchId: 2 },
+      leaseId: 'sdl_expired',
+      payload: { gatewayId: 'gw-1', sessionId: 'session-1' },
+    }),
+    (error) => error.code === 'STORE_DEVICE_LEASE_EXPIRED' && error.statusCode === 409,
+  )
+  await assert.rejects(
+    () => service.complete({
+      user: { branchId: 2 },
+      leaseId: 'sdl_expired',
+      status: 'SUCCEEDED',
+      payload: {
+        gatewayId: 'gw-1',
+        sessionId: 'session-1',
+        resultId: 'print-result-expired',
+      },
+    }),
+    (error) => error.code === 'STORE_DEVICE_LEASE_EXPIRED' && error.statusCode === 409,
+  )
+
   const routeSource = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'modules', 'storeDevice', 'routes', 'storeDeviceRoutes.js'),
     'utf8',
@@ -137,6 +169,13 @@ const service = createPrintDocumentExecutionService({ jobService })
   assert.match(routeSource, /router\.post\('\/print\/leases\/:leaseId\/acknowledge', acknowledgePrintDocumentJob\)/)
   assert.match(routeSource, /router\.post\('\/print\/leases\/:leaseId\/complete', completePrintDocumentJob\)/)
   assert.match(routeSource, /router\.post\('\/print\/leases\/:leaseId\/fail', failPrintDocumentJob\)/)
+
+  const repositorySource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'modules', 'storeDevice', 'repositories', 'storeDeviceRepository.js'),
+    'utf8',
+  )
+  assert.match(repositorySource, /expiresAt:\s*\{\s*gt:\s*now\s*\}/)
+  assert.match(repositorySource, /expiresAt:\s*\{\s*gt:\s*new Date\(\)\s*\}/)
 
   console.log('store-device-print-job-execution-lifecycle.contract.test.js: PASS')
 })().catch((error) => {
