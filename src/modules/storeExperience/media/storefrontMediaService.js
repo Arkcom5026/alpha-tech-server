@@ -3,12 +3,20 @@
 const crypto = require('crypto');
 const streamifier = require('streamifier');
 const { cloudinary } = require('../../../../utils/cloudinary');
+const mediaRepository = require('./storefrontMediaRepository');
 
 const PURPOSES = Object.freeze({
   STORE_LOGO: 'logo',
   STORE_COVER: 'cover',
   STORE_HERO: 'hero',
   STORE_PROMOTION: 'promotion',
+});
+
+const PURPOSE_CONTENT_FIELDS = Object.freeze({
+  STORE_LOGO: 'logoUrl',
+  STORE_COVER: 'coverImageUrl',
+  STORE_HERO: 'heroImageUrl',
+  STORE_PROMOTION: 'promotionImageUrl',
 });
 
 const DEFAULT_LIBRARY_PAGE_SIZE = 24;
@@ -23,6 +31,7 @@ const makeError = (code, message, statusCode = 400, cause = null) => {
 };
 
 const normalizePurpose = (value) => String(value || '').trim().toUpperCase();
+const normalizeSearch = (value) => String(value || '').trim().toLowerCase().slice(0, 120);
 const normalizePageSize = (value) => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_LIBRARY_PAGE_SIZE;
@@ -52,8 +61,40 @@ const normalizeLibraryAsset = (resource, branchId) => ({
   createdAt: resource?.created_at ?? null,
 });
 
+const usageStateOf = ({ draft, published }) => {
+  if (draft && published) return 'DRAFT_AND_PUBLISHED';
+  if (draft) return 'DRAFT';
+  if (published) return 'PUBLISHED';
+  return 'UNUSED';
+};
+
+const classifyUsage = (asset, experience) => {
+  const field = PURPOSE_CONTENT_FIELDS[asset?.purpose];
+  const draftUrl = field ? experience?.contentConfiguration?.[field] : null;
+  const publishedUrl = field ? experience?.publishedContentConfiguration?.[field] : null;
+  const draft = Boolean(asset?.secureUrl && draftUrl === asset.secureUrl);
+  const published = Boolean(asset?.secureUrl && publishedUrl === asset.secureUrl);
+
+  return {
+    ...asset,
+    usage: {
+      draft,
+      published,
+      state: usageStateOf({ draft, published }),
+    },
+    deletable: false,
+  };
+};
+
+const matchesSearch = (asset, search) => {
+  if (!search) return true;
+  return [asset?.publicId, asset?.secureUrl, asset?.format, asset?.purpose]
+    .some((value) => String(value || '').toLowerCase().includes(search));
+};
+
 const createStorefrontMediaService = ({
   cloudinaryClient = cloudinary,
+  repository = mediaRepository,
   idFactory = () => crypto.randomUUID(),
 } = {}) => {
   const requireBranch = (branchId) => {
@@ -125,9 +166,10 @@ const createStorefrontMediaService = ({
     };
   };
 
-  const list = async ({ branchId, purpose, pageSize, nextCursor } = {}) => {
+  const list = async ({ branchId, purpose, search, pageSize, nextCursor } = {}) => {
     const normalizedBranchId = requireBranch(branchId);
     const normalizedPurpose = purpose ? normalizePurpose(purpose) : null;
+    const normalizedSearch = normalizeSearch(search);
     const purposeFolder = normalizedPurpose ? PURPOSES[normalizedPurpose] : null;
 
     if (normalizedPurpose && !purposeFolder) {
@@ -159,15 +201,30 @@ const createStorefrontMediaService = ({
       );
     }
 
+    let experience;
+    try {
+      experience = await repository.findExperienceUsageByBranchId(normalizedBranchId);
+    } catch (error) {
+      throw makeError(
+        'STOREFRONT_MEDIA_USAGE_LOOKUP_FAILED',
+        'ไม่สามารถตรวจสอบการใช้งานรูปภาพได้',
+        500,
+        error
+      );
+    }
+
     const assets = Array.isArray(response?.resources)
       ? response.resources
         .map((resource) => normalizeLibraryAsset(resource, normalizedBranchId))
         .filter((asset) => asset.secureUrl && asset.publicId && asset.purpose)
+        .filter((asset) => matchesSearch(asset, normalizedSearch))
+        .map((asset) => classifyUsage(asset, experience))
       : [];
 
     return {
       branchId: normalizedBranchId,
       purpose: normalizedPurpose,
+      search: normalizedSearch || null,
       assets,
       nextCursor: response?.next_cursor || null,
     };
@@ -178,12 +235,17 @@ const createStorefrontMediaService = ({
 
 module.exports = {
   PURPOSES,
+  PURPOSE_CONTENT_FIELDS,
   DEFAULT_LIBRARY_PAGE_SIZE,
   MAX_LIBRARY_PAGE_SIZE,
   normalizePurpose,
+  normalizeSearch,
   normalizePageSize,
   purposeFromPublicId,
   normalizeLibraryAsset,
+  usageStateOf,
+  classifyUsage,
+  matchesSearch,
   createStorefrontMediaService,
   storefrontMediaService: createStorefrontMediaService(),
 };
