@@ -4,9 +4,9 @@ const {
   createSaleReceiptPrintJobService,
 } = require('./createSaleReceiptPrintJobService')
 
-const service = createSaleReceiptPrintJobService()
-
-const createSaleReceiptPrintJob = async (req, res) => {
+const createSaleReceiptPrintJobController = ({
+  service = createSaleReceiptPrintJobService(),
+} = {}) => async (req, res) => {
   try {
     const data = await service.execute({
       user: req.user,
@@ -23,6 +23,9 @@ const createSaleReceiptPrintJob = async (req, res) => {
   }
 }
 
+const createSaleReceiptPrintJob = createSaleReceiptPrintJobController()
+
 module.exports = {
   createSaleReceiptPrintJob,
+  createSaleReceiptPrintJobController,
 }
