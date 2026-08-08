@@ -16,6 +16,9 @@ const assertPrintLease = async ({ user, leaseId }) => {
   const branchId = requireBranchAuthority(user)
   const lease = await repository.findLease(branchId, leaseId)
   if (!lease) throw fail('STORE_DEVICE_LEASE_NOT_FOUND', 'Lease not found', 404)
+  if (!(lease.expiresAt instanceof Date) || lease.expiresAt <= new Date()) {
+    throw fail('STORE_DEVICE_LEASE_EXPIRED', 'Print lease is expired', 409)
+  }
 
   const snapshot = lease.job?.requestSnapshot
   if (
