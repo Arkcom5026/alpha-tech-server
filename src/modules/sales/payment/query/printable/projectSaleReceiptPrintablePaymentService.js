@@ -84,7 +84,6 @@ const projectSaleReceiptPrintablePayment = async ({ branchId, paymentId }) => {
               id: true,
               name: true,
               companyName: true,
-              phone: true,
               taxId: true,
             },
           },
@@ -186,7 +185,6 @@ const projectSaleReceiptPrintablePayment = async ({ branchId, paymentId }) => {
       ? {
           id: payment.sale.customer.id,
           name: payment.sale.customer.companyName || payment.sale.customer.name || null,
-          phone: payment.sale.customer.phone || null,
           taxId: payment.sale.customer.taxId || null,
         }
       : null,

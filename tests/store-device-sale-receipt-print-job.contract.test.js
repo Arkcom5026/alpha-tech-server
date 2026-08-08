@@ -156,6 +156,18 @@ const service = createSaleReceiptPrintJobService({ projector, jobService })
   assert.match(projectorSource, /branchId: normalizedBranchId/)
   assert.match(projectorSource, /isCancelled: false/)
   assert.match(projectorSource, /simpleItems:/)
+  assert.doesNotMatch(projectorSource, /phone:\s*true/)
+  assert.doesNotMatch(projectorSource, /payment\.sale\.customer\.phone/)
+
+  const customerSchemaSource = fs.readFileSync(
+    path.join(__dirname, '..', 'prisma', 'customer', 'customer.prisma'),
+    'utf8',
+  )
+  const customerProfileBlock = customerSchemaSource.match(
+    /model CustomerProfile \{[\s\S]*?\n\}/,
+  )?.[0] || ''
+  assert.ok(customerProfileBlock)
+  assert.doesNotMatch(customerProfileBlock, /^\s*phone\s+/m)
 
   console.log('store-device-sale-receipt-print-job.contract.test.js: PASS')
 })().catch((error) => {
