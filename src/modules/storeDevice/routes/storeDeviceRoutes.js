@@ -3,15 +3,37 @@ const express = require('express')
 const verifyToken = require('../../../../middlewares/verifyToken')
 const controller = require('../controllers/storeDeviceDurableJobController')
 const registryController = require('../controllers/storeDeviceRegistryController')
-const { createDeliveryNotePrintJob } = require('../print/createDeliveryNotePrintJobController')
-const { createOutputTaxInvoicePrintJob } = require('../print/createOutputTaxInvoicePrintJobController')
-const { createSaleReceiptPrintJob } = require('../print/createSaleReceiptPrintJobController')
+const { createPrintComposition } = require('../print/createPrintComposition')
+const {
+  createDeliveryNotePrintJobController,
+} = require('../print/createDeliveryNotePrintJobController')
+const {
+  createOutputTaxInvoicePrintJobController,
+} = require('../print/createOutputTaxInvoicePrintJobController')
+const {
+  createSaleReceiptPrintJobController,
+} = require('../print/createSaleReceiptPrintJobController')
 const { leasePrintDocumentJob } = require('../print/leasePrintDocumentJobController')
 const {
   acknowledgePrintDocumentJob,
   completePrintDocumentJob,
   failPrintDocumentJob,
 } = require('../print/completePrintDocumentJobController')
+
+const printComposition = createPrintComposition()
+
+const createDeliveryNotePrintJob = createDeliveryNotePrintJobController({
+  service: printComposition.deliveryNotePrintJobService,
+})
+
+const createOutputTaxInvoicePrintJob = createOutputTaxInvoicePrintJobController({
+  service: printComposition.outputTaxInvoicePrintJobService,
+})
+
+const createSaleReceiptPrintJob = createSaleReceiptPrintJobController({
+  service: printComposition.saleReceiptPrintJobService,
+})
+
 const router = express.Router()
 router.use(verifyToken)
 router.post('/gateways', controller.registerGateway)
