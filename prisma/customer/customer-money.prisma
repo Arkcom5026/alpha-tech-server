@@ -1,0 +1,58 @@
+model CustomerMoneyApplication {
+  id          Int      @id @default(autoincrement())
+  branchId    Int
+  customerId  Int
+  sourceType  String   @db.VarChar(50)
+  sourceId    Int
+  targetType  String   @db.VarChar(50)
+  targetId    Int
+  amount      Decimal  @db.Decimal(12, 2)
+  status      String   @default("APPLIED") @db.VarChar(30)
+  appliedAt   DateTime @default(now())
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer      CustomerProfile       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  ledgerEntries CustomerMoneyLedger[]
+
+  @@index([customerId])
+  @@index([sourceType, sourceId])
+  @@index([targetType, targetId])
+  @@index([branchId])
+}
+
+model CustomerMoneyLedger {
+  id            Int      @id @default(autoincrement())
+  branchId      Int
+  customerId    Int
+  applicationId Int?
+  eventType     String   @db.VarChar(50)
+  amount        Decimal  @db.Decimal(12, 2)
+  direction     String   @db.VarChar(20)
+  referenceType String?  @db.VarChar(50)
+  referenceId   Int?
+  createdById   Int
+  createdAt     DateTime @default(now())
+
+  customer    CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  application CustomerMoneyApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@index([customerId])
+  @@index([applicationId])
+  @@index([referenceType, referenceId])
+  @@index([branchId])
+}
+
+model CustomerMoneyBalance {
+  id              Int      @id @default(autoincrement())
+  branchId        Int
+  customerId      Int
+  availableAmount Decimal  @db.Decimal(12, 2)
+  updatedAt       DateTime @updatedAt
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, customerId])
+  @@index([customerId])
+}

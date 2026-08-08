@@ -19,37 +19,40 @@ enum DepositStatus {
 }
 
 model CustomerProfile {
-  id                        Int                       @id @default(autoincrement())
+  id                        Int                        @id @default(autoincrement())
   name                      String?
   picture                   String?
   userId                    Int
   branchId                  Int?
-  createdAt                 DateTime                  @default(now())
-  updatedAt                 DateTime                  @updatedAt
-  creditBalance             Decimal?                  @default(0) @db.Decimal(12, 2)
-  creditLimit               Decimal?                  @default(0) @db.Decimal(12, 2)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  creditBalance             Decimal?                   @default(0) @db.Decimal(12, 2)
+  creditLimit               Decimal?                   @default(0) @db.Decimal(12, 2)
   paymentTerms              Int?
-  type                      CustomerType              @default(INDIVIDUAL)
+  type                      CustomerType               @default(INDIVIDUAL)
   companyName               String?
   subdistrictCode           String?
   taxId                     String?
   addressDetail             String?
-  depositBalance_v2         Decimal                   @default(0.0) @db.Decimal(12, 2)
-  outstandingDebt_v2        Decimal                   @default(0.0) @db.Decimal(12, 2)
+  depositBalance_v2         Decimal                    @default(0.0) @db.Decimal(12, 2)
+  outstandingDebt_v2        Decimal                    @default(0.0) @db.Decimal(12, 2)
   cart                      Cart[]
   combinedBillingDocuments  CombinedBillingDocument[]
   customerDeposits          CustomerDeposit[]
-  subdistrict               Subdistrict?              @relation(fields: [subdistrictCode], references: [code])
-  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  branch                    Branch?                   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerMoneyApplications CustomerMoneyApplication[]
+  customerMoneyLedgers      CustomerMoneyLedger[]
+  customerMoneyBalances     CustomerMoneyBalance[]
+  subdistrict               Subdistrict?               @relation(fields: [subdistrictCode], references: [code])
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch                    Branch?                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
   customerReceipts          CustomerReceipt[]
   orders                    Order[]
   orderOnlines              OrderOnline[]
   repairJobs                RepairJob[]
-  ownedDevices              Device[]                  @relation("DeviceCurrentOwner")
+  ownedDevices              Device[]                   @relation("DeviceCurrentOwner")
   deviceOwnershipHistory    DeviceOwnershipHistory[]
   deviceIntakes             DeviceIntake[]
-  actedDevicePassportEvents DevicePassportEvent[]     @relation("DevicePassportCustomerActor")
+  actedDevicePassportEvents DevicePassportEvent[]      @relation("DevicePassportCustomerActor")
   sales                     Sale[]
   services                  ServiceOrder[]
   v2CustomerDeposits        V2CustomerDeposit[]
