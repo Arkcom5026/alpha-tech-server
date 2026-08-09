@@ -1,11 +1,18 @@
 'use strict';
 
-const { receiveCustomerMoneyController } = require('./receiveCustomerMoneyController');
-const { receiveCustomerMoneyService } = require('./receiveCustomerMoneyService');
+const {
+  receiveCustomerMoney,
+  listCustomerMoneyReceives,
+  getCustomerMoneyReceive,
+} = require('./receiveCustomerMoneyService');
 const { createReceiveCustomerMoneyRoute } = require('./receiveCustomerMoneyRoute');
+const { createRuntime, mountCustomerMoneyReceiveModule } = require('./registerCustomerMoneyReceive');
 
 module.exports = {
-  receiveCustomerMoneyController,
-  receiveCustomerMoneyService,
+  receiveCustomerMoney,
+  listCustomerMoneyReceives,
+  getCustomerMoneyReceive,
   createReceiveCustomerMoneyRoute,
+  createRuntime,
+  mountCustomerMoneyReceiveModule,
 };
