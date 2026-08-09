@@ -39,7 +39,35 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
     error.statusCode = 404;
     throw error;
   }
-  return serialize(row);
+
+  const result = serialize(row);
+  const saleIds = [...new Set((result.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
+  const sales = saleIds.length ? await prisma.sale.findMany({
+    where: { id: { in: saleIds }, branchId },
+    select: {
+      id: true,
+      code: true,
+      officialDocumentNumber: true,
+      totalAmount: true,
+      paidAmount: true,
+      statusPayment: true,
+      isCredit: true,
+      status: true,
+    },
+  }) : [];
+
+  result.salePaymentStates = sales.map((sale) => ({
+    saleId: sale.id,
+    saleCode: sale.code,
+    documentNo: sale.officialDocumentNumber || sale.code,
+    totalAmount: toNumber(sale.totalAmount),
+    paidAmount: toNumber(sale.paidAmount),
+    outstandingAmount: Math.max(0, Number((toNumber(sale.totalAmount) - toNumber(sale.paidAmount)).toFixed(2))),
+    statusPayment: sale.statusPayment,
+    taxDocumentReady: sale.isCredit === true && sale.status !== 'CANCELLED' && sale.statusPayment === 'PAID',
+  }));
+
+  return result;
 };
 
 module.exports = { serialize, listDeliveryCreditSettlements, getDeliveryCreditSettlement };
