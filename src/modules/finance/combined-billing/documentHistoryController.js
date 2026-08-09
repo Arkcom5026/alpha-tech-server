@@ -18,4 +18,24 @@ const detail = async (req, res, next) => { try {
   if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
   res.json((await enrich([document], branchId))[0]);
 } catch (error) { next(error); } };
-module.exports = { list, detail, enrich };
+const printable = async (req, res, next) => { try {
+  const branchId = positive(req.user?.branchId); const id = positive(req.params?.id);
+  if (!branchId || !id) throw Object.assign(new Error('Document identity is invalid'), { statusCode: 400, code: 'CONSOLIDATED_DELIVERY_ID_INVALID' });
+  const document = await prisma.combinedBillingDocument.findFirst({
+    where: { id, branchId, documentLines: { some: {} } },
+    include: { customer: true, employee: true, documentLines: { orderBy: { id: 'asc' } } },
+  });
+  if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
+  res.json({
+    document: { id: document.id, title: 'ใบส่งของรวม', number: document.code, issuedAt: document.issueDate, note: document.note, totalAmount: document.totalAmount },
+    customer: document.customer,
+    createdBy: document.employee,
+    lines: document.documentLines.map((line) => ({
+      id: line.id, sourceDocumentNo: line.sourceDocumentNo, sourceSaleCode: line.sourceSaleCode,
+      description: line.description, quantity: line.quantity, sourceUnitPrice: line.sourceUnitPrice,
+      documentUnitPrice: line.documentUnitPrice, priceAdjustment: line.priceAdjustment,
+      adjustmentReason: line.adjustmentReason, lineAmount: line.documentAmount,
+    })),
+  });
+} catch (error) { next(error); } };
+module.exports = { list, detail, printable, enrich };

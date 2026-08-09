@@ -18,6 +18,7 @@ router.use(verifyToken);
 router.get('/document-workspace', documentWorkspace.list);
 router.post('/document-workspace/confirm', documentWorkspace.confirm);
 router.get('/consolidated-deliveries', documentHistory.list);
+router.get('/consolidated-deliveries/:id/printable', documentHistory.printable);
 router.get('/consolidated-deliveries/:id', documentHistory.detail);
 
 router.get('/combinable-sales', getCombinableSales);

@@ -42,3 +42,11 @@ test('consolidated delivery is registered into the existing output tax authority
   assert.match(contract, /'CONSOLIDATED_DELIVERY'/);
   assert.match(issue, /candidate\?\.sourceType === 'CONSOLIDATED_DELIVERY'/);
 });
+
+test('consolidated delivery has its own printable snapshot without issuing tax', () => {
+  const history = read('src/modules/finance/combined-billing/documentHistoryController.js');
+  const routes = read('src/modules/finance/combined-billing/routes/combinedBillingRoutes.js');
+  assert.match(history, /title: 'ใบส่งของรวม'/);
+  assert.match(history, /documentUnitPrice/);
+  assert.match(routes, /consolidated-deliveries\/:id\/printable/);
+});
