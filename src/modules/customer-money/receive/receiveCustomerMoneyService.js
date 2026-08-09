@@ -146,9 +146,24 @@ const getCustomerMoneyReceive = async ({ prisma, getRepository, user, id }) => {
   const receiptId = Number(id);
   if (!Number.isInteger(branchId) || branchId <= 0) throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
   if (!Number.isInteger(receiptId) || receiptId <= 0) throw buildError('รหัสเอกสารไม่ถูกต้อง', 400, 'INVALID_DOCUMENT_ID');
+
   const receipt = await getRepository({ client: prisma, id: receiptId, branchId });
   if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
-  return serializeReceipt(receipt);
+
+  const balance = await prisma.customerMoneyBalance.findUnique({
+    where: {
+      branchId_customerId: {
+        branchId,
+        customerId: receipt.customerId,
+      },
+    },
+    select: { availableAmount: true },
+  });
+
+  return {
+    ...serializeReceipt(receipt),
+    availableBalance: Number(balance?.availableAmount ?? 0),
+  };
 };
 
 module.exports = { receiveCustomerMoney, listCustomerMoneyReceives, getCustomerMoneyReceive };
