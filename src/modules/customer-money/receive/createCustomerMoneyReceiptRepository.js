@@ -19,6 +19,18 @@ const receiptSelect = {
   cancelReason: true,
   createdAt: true,
   updatedAt: true,
+  branch: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      phone: true,
+      taxId: true,
+      branchCode: true,
+      isHeadOffice: true,
+      slug: true,
+    },
+  },
   customer: {
     select: {
       id: true,
@@ -26,6 +38,28 @@ const receiptSelect = {
       companyName: true,
       taxId: true,
       type: true,
+      addressDetail: true,
+      user: {
+        select: {
+          email: true,
+          loginId: true,
+          loginType: true,
+        },
+      },
+    },
+  },
+  createdByEmployeeProfile: {
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+    },
+  },
+  cancelledByEmployeeProfile: {
+    select: {
+      id: true,
+      name: true,
+      phone: true,
     },
   },
 };

@@ -15,6 +15,7 @@ const serializeReceipt = (receipt) => ({
   id: receipt.id,
   documentNo: receipt.code,
   branchId: receipt.branchId,
+  branch: receipt.branch || null,
   customerId: receipt.customerId,
   receivedAt: receipt.receivedAt,
   amount: Number(receipt.totalAmount),
@@ -24,8 +25,12 @@ const serializeReceipt = (receipt) => ({
   description: receipt.note || '',
   status: receipt.status,
   customer: receipt.customer || null,
-  receivedBy: receipt.createdByEmployeeProfileId ? { id: receipt.createdByEmployeeProfileId } : null,
-  cancelledBy: receipt.cancelledByEmployeeProfileId ? { id: receipt.cancelledByEmployeeProfileId } : null,
+  receivedBy: receipt.createdByEmployeeProfile || (
+    receipt.createdByEmployeeProfileId ? { id: receipt.createdByEmployeeProfileId } : null
+  ),
+  cancelledBy: receipt.cancelledByEmployeeProfile || (
+    receipt.cancelledByEmployeeProfileId ? { id: receipt.cancelledByEmployeeProfileId } : null
+  ),
   cancelledAt: receipt.cancelledAt || null,
   cancelReason: receipt.cancelReason || null,
   createdAt: receipt.createdAt,
