@@ -2,6 +2,7 @@
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 const { assertOutputTaxCreditNoteEligibility } = require('../saleReturnCreditNoteEligibilityPolicy');
+const outputVatRecordService = require('../../../outputVat/outputVatRecordService');
 
 const fail = (code, message, statusCode = 409) => {
   const error = new Error(message);
@@ -93,7 +94,15 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
     const existing = await tx.taxDocument.findFirst({
       where: { originalTaxDocumentId: normalizedDocumentId, branchId: normalizedBranchId },
     });
-    if (existing) return Object.freeze({ replayed: true, document: existing });
+    if (existing) {
+      const outputVat = await outputVatRecordService.recordIssuedDocument({
+        tx,
+        branchId: normalizedBranchId,
+        document: existing,
+        ledgerType: 'OUTPUT_VAT_ADJUSTMENT',
+      });
+      return Object.freeze({ replayed: true, document: existing, outputVatRecord: outputVat.record });
+    }
 
     const candidate = original.candidateId
       ? await tx.taxCandidate.findUnique({ where: { id: Number(original.candidateId) } })
@@ -178,7 +187,14 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
       },
     });
 
-    return Object.freeze({ replayed: false, document });
+    const outputVat = await outputVatRecordService.recordIssuedDocument({
+      tx,
+      branchId: normalizedBranchId,
+      document,
+      ledgerType: 'OUTPUT_VAT_ADJUSTMENT',
+    });
+
+    return Object.freeze({ replayed: false, document, outputVatRecord: outputVat.record });
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     timeout: 30000,
