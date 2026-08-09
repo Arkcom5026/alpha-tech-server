@@ -25,6 +25,8 @@ const mapSimpleLine = (item) => ({
   barcode: null,
 });
 
+const lineKey = (saleId, lineType, saleItemId) => `${saleId}:${lineType}:${saleItemId}`;
+
 const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   const customer = await prisma.customerProfile.findFirst({
     where: { id: command.customerId, branchId: command.branchId },
@@ -89,6 +91,20 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     take: command.take,
   });
 
+  const saleIds = sales.map((sale) => sale.id);
+  const priorLines = saleIds.length ? await prisma.customerMoneySettlementLine.findMany({
+    where: {
+      saleId: { in: saleIds },
+      settlement: { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
+    },
+    select: { saleId: true, saleItemType: true, saleItemId: true, appliedAmount: true },
+  }) : [];
+  const appliedByLine = priorLines.reduce((map, line) => {
+    const key = lineKey(line.saleId, line.saleItemType, line.saleItemId);
+    map.set(key, (map.get(key) || 0) + money(line.appliedAmount));
+    return map;
+  }, new Map());
+
   const balance = await prisma.customerMoneyBalance.findUnique({
     where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
     select: { id: true, availableAmount: true, updatedAt: true },
@@ -101,20 +117,32 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
       availableAmount: money(balance?.availableAmount),
       updatedAt: balance?.updatedAt || null,
     },
-    sales: sales.map((sale) => ({
-      id: sale.id,
-      code: sale.code,
-      documentNo: sale.officialDocumentNumber || sale.code,
-      soldAt: sale.soldAt,
-      dueDate: sale.dueDate,
-      totalAmount: money(sale.totalAmount),
-      paidAmount: money(sale.paidAmount),
-      outstandingAmount: outstanding(sale),
-      statusPayment: sale.statusPayment,
-      note: sale.note || null,
-      lines: [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)],
-    })).filter((sale) => sale.outstandingAmount > 0),
+    sales: sales.map((sale) => {
+      const lines = [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)]
+        .map((line) => {
+          const appliedAmount = appliedByLine.get(lineKey(sale.id, line.lineType, line.saleItemId)) || 0;
+          return {
+            ...line,
+            appliedAmount: Number(appliedAmount.toFixed(2)),
+            remainingAmount: Math.max(0, Number((line.lineAmount - appliedAmount).toFixed(2))),
+          };
+        })
+        .filter((line) => line.remainingAmount > 0);
+      return {
+        id: sale.id,
+        code: sale.code,
+        documentNo: sale.officialDocumentNumber || sale.code,
+        soldAt: sale.soldAt,
+        dueDate: sale.dueDate,
+        totalAmount: money(sale.totalAmount),
+        paidAmount: money(sale.paidAmount),
+        outstandingAmount: outstanding(sale),
+        statusPayment: sale.statusPayment,
+        note: sale.note || null,
+        lines,
+      };
+    }).filter((sale) => sale.outstandingAmount > 0 && sale.lines.length > 0),
   };
 };
 
-module.exports = { listEligibleDeliveryCredits, outstanding };
+module.exports = { listEligibleDeliveryCredits, outstanding, lineKey };
