@@ -1,9 +1,6 @@
-const { Prisma } = require('../../../../../../lib/prisma');
-const { findInputTaxReceipts } = require('./inputTaxReportRuntimeRepository');
+const { findInputVatRecords } = require('./inputTaxReportRuntimeRepository');
 
-const D = (value) => (value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value || 0));
 const toNumber = (value) => (value && typeof value.toNumber === 'function' ? value.toNumber() : Number(value || 0));
-
 const makeError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 
 const parseYmdLocal = (value, endOfDay = false) => {
@@ -51,34 +48,38 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
   if (!branchId) throw makeError(403, 'ไม่สามารถระบุสาขาของผู้ใช้ได้');
 
   const period = resolvePeriod(query);
-  const receipts = await findInputTaxReceipts({
+  const records = await findInputVatRecords({
     branchId,
     startDate: period.startDate,
     endDate: period.endDate,
   });
 
-  const data = receipts.map((receipt) => {
-    const totalAmountDec = (receipt.items || []).reduce(
-      (sum, item) => sum.plus(D(item.costPrice).times(item.quantity || 0)),
-      new Prisma.Decimal(0)
-    );
-    const vatRate = Number(receipt.vatRate || 7);
-    const vatAmountDec = totalAmountDec.times(vatRate).div(100);
-    const grandTotalDec = totalAmountDec.plus(vatAmountDec);
+  const data = records.map((record) => {
+    const sign = record.ledgerType === 'INPUT_VAT_ADJUSTMENT' ? -1 : 1;
+    const subtotal = toNumber(record.subtotalAmount) * sign;
+    const vatAmount = toNumber(record.taxAmount) * sign;
+    const grandTotal = toNumber(record.totalAmount) * sign;
+    const snapshot = record.documentSnapshot || {};
+    const vatRate = subtotal ? Math.round((Math.abs(vatAmount / subtotal) * 100) * 100) / 100 : 0;
 
     return {
-      id: receipt.id,
-      date: receipt.supplierTaxInvoiceDate,
-      poNumber: receipt.purchaseOrder?.code || 'N/A',
-      supplierTaxInvoiceDate: receipt.supplierTaxInvoiceDate,
-      supplierTaxInvoiceNumber: receipt.supplierTaxInvoiceNumber,
-      supplierName: receipt.purchaseOrder?.supplier?.name || 'N/A',
-      supplierTaxId: receipt.purchaseOrder?.supplier?.taxId || 'N/A',
-      branchName: receipt.branch?.name || 'N/A',
-      totalAmount: toNumber(totalAmountDec),
-      vatAmount: toNumber(vatAmountDec),
-      grandTotal: toNumber(grandTotalDec),
+      id: record.id,
+      taxDocumentId: Number(record.taxDocumentId),
+      authority: 'INPUT_VAT_RECORD',
+      ledgerType: record.ledgerType,
+      date: record.documentDate,
+      poNumber: snapshot.purchaseOrderCode || snapshot.poNumber || 'N/A',
+      supplierTaxInvoiceDate: record.documentDate,
+      supplierTaxInvoiceNumber: record.documentNumber,
+      supplierName: record.supplierName || 'N/A',
+      supplierTaxId: record.supplierTaxId || 'N/A',
+      branchName: record.branch?.name || 'N/A',
+      totalAmount: subtotal,
+      vatAmount,
+      grandTotal,
       vatRate,
+      originalTaxDocumentId: record.originalTaxDocumentId || null,
+      originalDocumentNumber: record.originalDocumentNumber || null,
     };
   });
 
@@ -93,6 +94,7 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
 
   return {
     message: 'Successfully fetched input tax report.',
+    authority: 'INPUT_VAT_RECORD',
     data,
     summary,
     period: {
