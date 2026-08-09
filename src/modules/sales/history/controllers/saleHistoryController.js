@@ -227,6 +227,30 @@ const searchPrintableSales = async (req, res) => {
 
     const saleIds = sales.map((s) => s.id);
 
+    const issuedTaxCandidates = saleIds.length
+      ? await prisma.taxCandidate.findMany({
+          where: {
+            branchId,
+            sourceType: 'SALE',
+            sourceId: { in: saleIds.map(String) },
+            document: {
+              is: {
+                documentType: 'OUTPUT_TAX_INVOICE',
+                status: 'REGISTERED',
+                issuedDocumentNumber: { not: null },
+              },
+            },
+          },
+          select: {
+            sourceId: true,
+            document: { select: { id: true, taxInvoiceKind: true, issuedDocumentNumber: true } },
+          },
+        })
+      : [];
+    const issuedTaxBySaleId = new Map(
+      issuedTaxCandidates.map((candidate) => [String(candidate.sourceId), candidate.document]),
+    );
+
     const payments = saleIds.length
       ? await prisma.payment.findMany({
           where: { saleId: { in: saleIds }, isCancelled: false },
@@ -261,6 +285,7 @@ const searchPrintableSales = async (req, res) => {
       const balanceAmount = Math.max(0, round2(totalAmount - paidAmount));
       const paidEnough = totalAmount > 0 ? paidAmount >= totalAmount : false;
       const lastPaidAt = (storedPaidAmount != null ? null : agg.lastPaidAt) || null;
+      const issuedTaxDocument = issuedTaxBySaleId.get(String(s.id)) || null;
 
       return {
         id: s.id,
@@ -282,6 +307,9 @@ const searchPrintableSales = async (req, res) => {
         employeeName: s.employee?.name || '-',
         status: s.status,
         isCredit: !!s.isCredit,
+        taxDocumentId: issuedTaxDocument?.id || null,
+        taxInvoiceKind: issuedTaxDocument?.taxInvoiceKind || null,
+        issuedTaxDocumentNumber: issuedTaxDocument?.issuedDocumentNumber || null,
       };
     });
 

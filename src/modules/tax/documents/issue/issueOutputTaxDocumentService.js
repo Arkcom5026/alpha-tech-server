@@ -121,7 +121,7 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
     fail('TAX_DOCUMENT_ID_REQUIRED', 'taxDocumentId must be a positive integer');
   }
   const kind = normalizeKind(taxInvoiceKind);
-  const recipientSnapshot = kind === 'FULL' ? normalizeRecipient(recipient) : null;
+  let recipientSnapshot = null;
 
   return prisma.$transaction(async (tx) => {
     const document = await documentRepository.findDetailById({
@@ -138,6 +138,19 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
     }
     if (document.status !== 'DRAFT' || document.documentType !== 'OUTPUT_TAX_INVOICE') {
       fail('TAX_DOCUMENT_ISSUANCE_FORBIDDEN', 'Only a draft output tax document may be issued', 409);
+    }
+
+    if (kind === 'FULL') {
+      recipientSnapshot = normalizeRecipient(recipient || document.snapshot?.recipient);
+    } else {
+      const sourceRecipient = document.snapshot?.recipient || {};
+      recipientSnapshot = {
+        legalName: String(sourceRecipient.legalName || document.snapshot?.counterpartyName || '').trim() || null,
+        taxId: String(sourceRecipient.taxId || document.counterpartyTaxId || '').replace(/[^0-9]/g, '') || null,
+        registeredAddress: String(sourceRecipient.registeredAddress || '').trim() || null,
+        branchCode: String(sourceRecipient.branchCode || '00000'),
+        isHeadOffice: Boolean(sourceRecipient.isHeadOffice),
+      };
     }
 
     await assertEligibleSaleSource({ document, branchId: normalizedBranchId }, tx);

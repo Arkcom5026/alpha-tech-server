@@ -112,43 +112,9 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
   const sale = await prisma.sale.findFirst({
     where: { id: saleId, branchId: normalizedBranchId },
     select: {
-      id: true,
-      code: true,
-      soldAt: true,
-      status: true,
-      paid: true,
-      statusPayment: true,
-      customer: {
-        select: { name: true, companyName: true, taxId: true },
-      },
-      items: {
-        select: {
-          id: true,
-          basePrice: true,
-          discount: true,
-          price: true,
-          vatAmount: true,
-          documentDescription: true,
-          stockItem: {
-            select: {
-              barcode: true,
-              product: { select: { name: true } },
-            },
-          },
-        },
-      },
-      simpleItems: {
-        select: {
-          id: true,
-          quantity: true,
-          basePrice: true,
-          discount: true,
-          price: true,
-          vatAmount: true,
-          documentDescription: true,
-          product: { select: { name: true } },
-        },
-      },
+      id: true, code: true, soldAt: true, paid: true, statusPayment: true,
+      items: { select: { id: true, basePrice: true, discount: true, price: true, vatAmount: true, documentDescription: true, stockItem: { select: { barcode: true, product: { select: { name: true } } } } } },
+      simpleItems: { select: { id: true, quantity: true, basePrice: true, discount: true, price: true, vatAmount: true, documentDescription: true, product: { select: { name: true } } } },
     },
   });
 
@@ -157,23 +123,28 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
     fail('TAX_OUTPUT_PRINT_PAYMENT_REQUIRED', 'A fully paid sale is required to print an output tax invoice', 409);
   }
 
-  const lines = [
-    ...sale.items.map((item) => mapLine({
-      ...item,
-      quantity: 1,
-      description: item.documentDescription,
-      productName: item.stockItem.product.name,
-      barcode: item.stockItem.barcode,
-    })),
-    ...sale.simpleItems.map((item) => mapLine({
-      ...item,
-      description: item.documentDescription,
-      productName: item.product.name,
-    })),
-  ];
+  const snapshot = document.snapshot || {};
+  let lines = Array.isArray(snapshot.items) ? snapshot.items.map((item, index) => ({
+    id: item.sourceLineId || index + 1,
+    description: String(item.description || '').trim() || 'Sale item',
+    quantity: amount(item.quantity || 1),
+    unitAmount: amount(item.unitAmount),
+    discountAmount: amount(item.discountAmount),
+    lineAmount: amount(item.lineAmount),
+    vatAmount: amount(item.vatAmount),
+    barcode: item.barcode || null,
+  })) : [];
+  // Compatibility for documents issued before immutable sale-line snapshots were introduced.
+  if (!lines.length) {
+    lines = [
+      ...sale.items.map((item) => mapLine({ ...item, quantity: 1, description: item.documentDescription, productName: item.stockItem.product.name, barcode: item.stockItem.barcode })),
+      ...sale.simpleItems.map((item) => mapLine({ ...item, description: item.documentDescription, productName: item.product.name })),
+    ];
+  }
+  if (!lines.length) fail('TAX_OUTPUT_PRINT_SNAPSHOT_MISSING', 'Issued tax document has no printable line data', 409);
 
   const invoiceKind = document.taxInvoiceKind;
-  const recipient = invoiceKind === 'FULL' ? document.recipientSnapshot : null;
+  const recipient = document.recipientSnapshot || null;
   if (invoiceKind === 'FULL' && !recipient) {
     fail('TAX_OUTPUT_PRINT_RECIPIENT_MISSING', 'Full tax invoice has no recipient snapshot', 409);
   }
@@ -206,8 +177,8 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       code: sale.code,
       soldAt: sale.soldAt,
       branchId: normalizedBranchId,
-      customerName: sale.customer?.companyName || sale.customer?.name || null,
-      customerTaxId: sale.customer?.taxId || null,
+      customerName: recipient?.legalName || snapshot.counterpartyName || null,
+      customerTaxId: recipient?.taxId || snapshot.counterpartyTaxId || null,
     },
     lines,
   });

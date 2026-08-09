@@ -1,4 +1,5 @@
 const repository = require('./taxPeriodRepository');
+const { prisma, Prisma } = require('../../../lib/prisma');
 
 const TRANSITIONS = {
   OPEN: ['CLOSED'],
@@ -93,6 +94,48 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
   if (current.status === targetStatus) return { replayed: true, period: current };
   if (!(TRANSITIONS[current.status] || []).includes(targetStatus)) {
     fail('TAX_PERIOD_TRANSITION_FORBIDDEN', `Cannot transition ${current.status} to ${targetStatus}`, 409);
+  }
+  if (targetStatus === 'CLOSED') {
+    const draftCount = await prisma.taxDocument.count({
+      where: {
+        branchId: normalizedBranchId,
+        documentType: 'OUTPUT_TAX_INVOICE',
+        status: 'DRAFT',
+        occurredAt: { gte: current.startDate, lte: current.endDate },
+      },
+    });
+    if (draftCount > 0) fail('TAX_PERIOD_OUTPUT_DRAFTS_REMAIN', `Cannot close period while ${draftCount} output tax document(s) remain in draft`, 409);
+  }
+  if (targetStatus === 'LOCKED') {
+    const rows = await prisma.$queryRaw(Prisma.sql`
+      SELECT COUNT(*)::int AS count
+      FROM "TaxDocument" document
+      WHERE document."branchId" = ${normalizedBranchId}
+        AND document."documentType" IN ('OUTPUT_TAX_INVOICE', 'OUTPUT_TAX_CREDIT_NOTE')
+        AND document."status" IN ('REGISTERED', 'UNDER_REVIEW', 'APPROVED')
+        AND document."issuedAt" >= ${current.startDate} AND document."issuedAt" <= ${current.endDate}
+        AND NOT EXISTS (
+          SELECT 1 FROM "SalesTaxFilingItem" item
+          JOIN "SalesTaxFilingBatch" batch ON batch."id" = item."batchId"
+          WHERE item."taxDocumentId" = document."id"
+            AND batch."branchId" = ${normalizedBranchId}
+            AND batch."year" = ${new Date(current.startDate).getUTCFullYear()}
+            AND batch."month" = ${new Date(current.startDate).getUTCMonth() + 1}
+            AND item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"
+        )
+    `);
+    if (Number(rows[0]?.count || 0) > 0) fail('TAX_PERIOD_OUTPUT_FILING_INCOMPLETE', 'Prepare the sales tax filing and include every issued document before locking the period', 409);
+  }
+  if (targetStatus === 'SUBMITTED') {
+    const batches = await prisma.salesTaxFilingBatch.count({
+      where: {
+        branchId: normalizedBranchId,
+        year: new Date(current.startDate).getUTCFullYear(),
+        month: new Date(current.startDate).getUTCMonth() + 1,
+        status: 'SUBMITTED',
+      },
+    });
+    if (!batches) fail('TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED', 'Submit the sales tax filing before submitting the tax period', 409);
   }
   const period = await repository.transition({
     branchId: normalizedBranchId,
