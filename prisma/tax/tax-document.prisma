@@ -84,6 +84,8 @@ model TaxDocument {
   salesTaxFilingItems SalesTaxFilingItem[]
   outputVatRecord     OutputVatRecord?
   adjustedOutputVatRecords OutputVatRecord[]       @relation("OutputVatOriginalTaxDocument")
+  inputVatRecord      InputVatRecord?
+  adjustedInputVatRecords InputVatRecord[]         @relation("InputVatOriginalTaxDocument")
   originalTaxDocument TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
   creditNote          TaxDocument?                 @relation("TaxDocumentCreditNote")
   saleReturn          SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)
@@ -111,6 +113,7 @@ model TaxPeriod {
   updatedAt        DateTime        @default(now())
   branch           Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
   outputVatRecords OutputVatRecord[]
+  inputVatRecords  InputVatRecord[]
 
   @@unique([branchId, periodCode])
   @@unique([id, branchId], map: "TaxPeriod_id_branchId_key")
@@ -152,6 +155,42 @@ model OutputVatRecord {
   originalTaxDocument    TaxDocument?     @relation("OutputVatOriginalTaxDocument", fields: [originalTaxDocumentId, branchId], references: [id, branchId], onDelete: Restrict)
 
   @@unique([taxDocumentId, branchId], map: "OutputVatRecord_taxDocumentId_branchId_key")
+  @@index([branchId, documentDate])
+  @@index([branchId, ledgerType, documentDate])
+  @@index([taxPeriodId, documentDate])
+  @@index([originalTaxDocumentId])
+}
+
+model InputVatRecord {
+  id                     String          @id @default(cuid())
+  branchId               Int
+  taxDocumentId          Int             @unique
+  taxPeriodId            String?
+  ledgerType             TaxLedgerType
+  replayKey              String          @unique
+  authorityVersion       Int             @default(1)
+  documentType           String
+  documentNumber         String
+  documentDate           DateTime
+  currency               String          @default("THB")
+  subtotalAmount         Decimal         @db.Decimal(14, 2)
+  taxAmount              Decimal         @db.Decimal(14, 2)
+  totalAmount            Decimal         @db.Decimal(14, 2)
+  supplierName           String?
+  supplierTaxId          String?
+  supplierBranchCode     String?         @db.VarChar(5)
+  documentSnapshot       Json
+  originalTaxDocumentId  Int?
+  originalDocumentNumber String?
+  projectedAt            DateTime        @default(now())
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  branch                 Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  taxDocument            TaxDocument     @relation(fields: [taxDocumentId, branchId], references: [id, branchId], onDelete: Restrict)
+  taxPeriod              TaxPeriod?      @relation(fields: [taxPeriodId, branchId], references: [id, branchId], onDelete: Restrict)
+  originalTaxDocument    TaxDocument?     @relation("InputVatOriginalTaxDocument", fields: [originalTaxDocumentId, branchId], references: [id, branchId], onDelete: Restrict)
+
+  @@unique([taxDocumentId, branchId], map: "InputVatRecord_taxDocumentId_branchId_key")
   @@index([branchId, documentDate])
   @@index([branchId, ledgerType, documentDate])
   @@index([taxPeriodId, documentDate])
