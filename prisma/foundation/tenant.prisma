@@ -70,6 +70,8 @@ model Branch {
   supplierAdvances                SupplierAdvance[]
   taxCandidates                   TaxCandidate[]
   taxDocuments                    TaxDocument[]
+  taxPeriods                      TaxPeriod[]
+  outputVatRecords                OutputVatRecord[]
   v2StockAudits                   V2StockAudit[]
   provisionedPartnerStoreApplications PartnerStoreApplication[] @relation("PartnerStoreApplicationProvisionedBranch")
   missingCostResolutions               MissingCostResolution[]
