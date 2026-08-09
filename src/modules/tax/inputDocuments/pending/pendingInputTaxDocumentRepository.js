@@ -15,7 +15,15 @@ const mapRow = (row) => ({
   itemTypeCount: Number(row.itemTypeCount || 0),
   totalQuantity: Number(row.totalQuantity || 0),
   receiptAmount: Number(row.receiptAmount || 0),
+  sourceSubtotalAmount: Number(row.sourceSubtotalAmount || 0),
+  sourceVatAmount: Number(row.sourceVatAmount || 0),
+  sourceTotalAmount: Number(row.sourceTotalAmount || 0),
+  allocatedSubtotal: Number(row.allocatedSubtotal || 0),
+  allocatedVatAmount: Number(row.allocatedVatAmount || 0),
   allocatedTotalAmount: Number(row.allocatedTotalAmount || 0),
+  remainingSubtotalAmount: Number(row.remainingSubtotalAmount || 0),
+  remainingVatAmount: Number(row.remainingVatAmount || 0),
+  remainingTotalAmount: Number(row.remainingTotalAmount || 0),
   activeTaxDocumentCount: Number(row.activeTaxDocumentCount || 0),
   linkState: row.linkState,
   taxDocumentMode: row.taxDocumentMode,
@@ -40,6 +48,13 @@ const listPending = async ({
         r."deliveryNoteNumber" AS "deliveryNoteNumber", r."receivedAt" AS "receivedAt",
         COUNT(DISTINCT item."id")::int AS "itemTypeCount",
         COALESCE(SUM(item."quantity"), 0)::numeric AS "totalQuantity",
+        COALESCE(SUM(item."quantity" * item."costPrice"), 0)::numeric AS "sourceSubtotalAmount",
+        GREATEST(
+          COALESCE(r."totalAmount", SUM(item."quantity" * item."costPrice"), 0)
+            - COALESCE(SUM(item."quantity" * item."costPrice"), 0),
+          0
+        )::numeric AS "sourceVatAmount",
+        COALESCE(r."totalAmount", SUM(item."quantity" * item."costPrice"), 0)::numeric AS "sourceTotalAmount",
         COALESCE(r."totalAmount", SUM(item."quantity" * item."costPrice"), 0)::numeric AS "receiptAmount",
         r."taxDocumentMode"::text AS "taxDocumentMode",
         GREATEST(0, EXTRACT(DAY FROM CURRENT_TIMESTAMP - r."receivedAt"))::int AS "pendingDays"
@@ -60,9 +75,26 @@ const listPending = async ({
         quick."deliveryNoteNumber" AS "deliveryNoteNumber", quick."completedAt" AS "receivedAt",
         COUNT(DISTINCT item."id")::int AS "itemTypeCount",
         COALESCE(SUM(item."quantity"), 0)::numeric AS "totalQuantity",
+        COALESCE(quick."documentSubtotal", SUM(item."quantity" * item."costPrice"), 0)::numeric AS "sourceSubtotalAmount",
+        COALESCE(
+          quick."documentVatAmount",
+          GREATEST(
+            COALESCE(quick."documentTotalAmount", SUM(item."quantity" * item."costPrice"), 0)
+              - COALESCE(quick."documentSubtotal", SUM(item."quantity" * item."costPrice"), 0),
+            0
+          ),
+          0
+        )::numeric AS "sourceVatAmount",
         COALESCE(
           quick."documentTotalAmount",
-          SUM(item."quantity" * item."costPrice"),
+          COALESCE(quick."documentSubtotal", SUM(item."quantity" * item."costPrice"), 0)
+            + COALESCE(quick."documentVatAmount", 0),
+          0
+        )::numeric AS "sourceTotalAmount",
+        COALESCE(
+          quick."documentTotalAmount",
+          COALESCE(quick."documentSubtotal", SUM(item."quantity" * item."costPrice"), 0)
+            + COALESCE(quick."documentVatAmount", 0),
           0
         )::numeric AS "receiptAmount",
         quick."taxDocumentMode"::text AS "taxDocumentMode",
@@ -79,6 +111,8 @@ const listPending = async ({
       SELECT
         link."sourceType"::text AS "sourceType",
         link."sourceId",
+        COALESCE(SUM(link."allocatedSubtotal"), 0)::numeric AS "allocatedSubtotal",
+        COALESCE(SUM(link."allocatedVatAmount"), 0)::numeric AS "allocatedVatAmount",
         COALESCE(SUM(link."allocatedTotalAmount"), 0)::numeric AS "allocatedTotalAmount",
         COUNT(DISTINCT link."taxDocumentId")::int AS "activeTaxDocumentCount"
       FROM "InputTaxDocumentReceiptLink" link
@@ -89,7 +123,12 @@ const listPending = async ({
     receipt_links AS (
       SELECT
         receipt.*,
+        COALESCE(allocation."allocatedSubtotal", 0)::numeric AS "allocatedSubtotal",
+        COALESCE(allocation."allocatedVatAmount", 0)::numeric AS "allocatedVatAmount",
         COALESCE(allocation."allocatedTotalAmount", 0)::numeric AS "allocatedTotalAmount",
+        GREATEST(receipt."sourceSubtotalAmount" - COALESCE(allocation."allocatedSubtotal", 0), 0)::numeric AS "remainingSubtotalAmount",
+        GREATEST(receipt."sourceVatAmount" - COALESCE(allocation."allocatedVatAmount", 0), 0)::numeric AS "remainingVatAmount",
+        GREATEST(receipt."sourceTotalAmount" - COALESCE(allocation."allocatedTotalAmount", 0), 0)::numeric AS "remainingTotalAmount",
         COALESCE(allocation."activeTaxDocumentCount", 0)::int AS "activeTaxDocumentCount",
         CASE
           WHEN COALESCE(allocation."allocatedTotalAmount", 0) <= 0 THEN 'UNLINKED'
