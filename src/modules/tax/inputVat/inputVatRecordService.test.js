@@ -61,18 +61,20 @@ test('Input VAT authority is replay-safe and branch isolated', async () => {
   );
 });
 
-test('input tax report reads InputVatRecord authority instead of recalculating PurchaseOrderReceipt', () => {
+test('input tax report uses InputVatRecord as primary authority with explicit legacy compatibility', () => {
   const repository = fs.readFileSync(
-    path.join(__dirname, '../../../reporting/tax/input/runtime/inputTaxReportRuntimeRepository.js'),
+    path.join(__dirname, '../../reporting/tax/input/runtime/inputTaxReportRuntimeRepository.js'),
     'utf8',
   );
   const service = fs.readFileSync(
-    path.join(__dirname, '../../../reporting/tax/input/runtime/inputTaxReportRuntimeService.js'),
+    path.join(__dirname, '../../reporting/tax/input/runtime/inputTaxReportRuntimeService.js'),
     'utf8',
   );
 
   assert.match(repository, /prisma\.inputVatRecord\.findMany/);
-  assert.doesNotMatch(repository, /purchaseOrderReceipt/);
+  assert.match(repository, /findLegacyInputTaxReceipts/);
   assert.match(service, /authority: 'INPUT_VAT_RECORD'/);
+  assert.match(service, /LEGACY_PURCHASE_RECEIPT_COMPAT/);
+  assert.match(service, /authoritativeKeys/);
   assert.match(service, /INPUT_VAT_ADJUSTMENT/);
 });
