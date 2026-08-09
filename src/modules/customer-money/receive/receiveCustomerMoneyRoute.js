@@ -5,6 +5,7 @@ const {
   receiveCustomerMoneyController,
   listCustomerMoneyReceiveController,
   getCustomerMoneyReceiveController,
+  cancelCustomerMoneyReceiveController,
 } = require('./receiveCustomerMoneyController');
 
 const createReceiveCustomerMoneyRoute = ({ verifyToken, runtime }) => {
@@ -19,6 +20,7 @@ const createReceiveCustomerMoneyRoute = ({ verifyToken, runtime }) => {
   router.get('/', listCustomerMoneyReceiveController);
   router.get('/:id', getCustomerMoneyReceiveController);
   router.post('/', receiveCustomerMoneyController);
+  router.post('/:id/cancel', cancelCustomerMoneyReceiveController);
 
   return router;
 };
