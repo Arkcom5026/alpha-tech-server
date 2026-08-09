@@ -1,14 +1,7 @@
 'use strict';
 
-const { createReceiveCustomerMoneyRoute } = require('./receiveCustomerMoneyRoute');
-const { receiveCustomerMoneyService } = require('./receiveCustomerMoneyService');
+const { createRuntime } = require('./registerCustomerMoneyReceive');
 
-const createCustomerMoneyReceiveRuntime = () => {
-  return {
-    routes: createReceiveCustomerMoneyRoute({
-      receiveCustomerMoneyService,
-    }),
-  };
-};
+const createCustomerMoneyReceiveRuntime = () => createRuntime();
 
 module.exports = { createCustomerMoneyReceiveRuntime };
