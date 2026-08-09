@@ -25,6 +25,9 @@ const serializeReceipt = (receipt) => ({
   status: receipt.status,
   customer: receipt.customer || null,
   receivedBy: receipt.createdByEmployeeProfileId ? { id: receipt.createdByEmployeeProfileId } : null,
+  cancelledBy: receipt.cancelledByEmployeeProfileId ? { id: receipt.cancelledByEmployeeProfileId } : null,
+  cancelledAt: receipt.cancelledAt || null,
+  cancelReason: receipt.cancelReason || null,
   createdAt: receipt.createdAt,
   updatedAt: receipt.updatedAt,
 });
@@ -52,6 +55,41 @@ const sumAvailableMoneyReceipts = (receipts = []) => receipts.reduce(
   new Prisma.Decimal(0),
 );
 
+const calculateAvailableCustomerMoney = async (tx, { branchId, customerId }) => {
+  const [activeDeposits, activeMoneyReceipts] = await Promise.all([
+    tx.customerDeposit.findMany({
+      where: { customerId, branchId, status: 'ACTIVE' },
+      select: { totalAmount: true, usedAmount: true },
+    }),
+    tx.customerReceipt.findMany({
+      where: {
+        customerId,
+        branchId,
+        status: 'ACTIVE',
+        code: { startsWith: 'CMR-' },
+      },
+      select: { remainingAmount: true },
+    }),
+  ]);
+
+  return sumAvailableDeposits(activeDeposits)
+    .plus(sumAvailableMoneyReceipts(activeMoneyReceipts));
+};
+
+const ensureEmployeeInBranch = async (tx, { employeeId, branchId }) => {
+  const employee = await tx.employeeProfile.findFirst({
+    where: {
+      id: employeeId,
+      branchId,
+      active: true,
+      approved: true,
+    },
+    select: { id: true },
+  });
+  if (!employee) throw buildError('ไม่พบพนักงานผู้รับเงินในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
+  return employee;
+};
+
 const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, updateBalance, input, user }) => {
   if (!prisma?.$transaction) throw new TypeError('Prisma transaction client is required');
   const command = validateReceiveCustomerMoneyInput(input, user);
@@ -64,16 +102,10 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
     });
     if (!customer) throw buildError('ไม่พบลูกค้าในสาขานี้', 404, 'CUSTOMER_NOT_FOUND');
 
-    const employee = await tx.employeeProfile.findFirst({
-      where: {
-        id: command.createdById,
-        branchId: command.branchId,
-        active: true,
-        approved: true,
-      },
-      select: { id: true },
+    await ensureEmployeeInBranch(tx, {
+      employeeId: command.createdById,
+      branchId: command.branchId,
     });
-    if (!employee) throw buildError('ไม่พบพนักงานผู้รับเงินในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
 
     const documentNo = await createDocumentCode(tx, command.branchId, command.receivedAt);
     const receipt = await receiptRepository({
@@ -97,28 +129,10 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
       },
     });
 
-    const [activeDeposits, activeMoneyReceipts] = await Promise.all([
-      tx.customerDeposit.findMany({
-        where: {
-          customerId: command.customerId,
-          branchId: command.branchId,
-          status: 'ACTIVE',
-        },
-        select: { totalAmount: true, usedAmount: true },
-      }),
-      tx.customerReceipt.findMany({
-        where: {
-          customerId: command.customerId,
-          branchId: command.branchId,
-          status: 'ACTIVE',
-          code: { startsWith: 'CMR-' },
-        },
-        select: { remainingAmount: true },
-      }),
-    ]);
-
-    const nextAvailable = sumAvailableDeposits(activeDeposits)
-      .plus(sumAvailableMoneyReceipts(activeMoneyReceipts));
+    const nextAvailable = await calculateAvailableCustomerMoney(tx, {
+      branchId: command.branchId,
+      customerId: command.customerId,
+    });
     const balance = await updateBalance({
       client: tx, branchId: command.branchId, customerId: command.customerId, availableAmount: nextAvailable,
     });
@@ -166,4 +180,91 @@ const getCustomerMoneyReceive = async ({ prisma, getRepository, user, id }) => {
   };
 };
 
-module.exports = { receiveCustomerMoney, listCustomerMoneyReceives, getCustomerMoneyReceive };
+const cancelCustomerMoneyReceive = async ({
+  prisma,
+  getRepository,
+  createLedger,
+  updateBalance,
+  user,
+  id,
+  cancelReason,
+}) => {
+  const branchId = Number(user?.branchId);
+  const employeeId = Number(user?.employeeId);
+  const receiptId = Number(id);
+  const reason = String(cancelReason || '').trim();
+
+  if (!Number.isInteger(branchId) || branchId <= 0) throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
+  if (!Number.isInteger(employeeId) || employeeId <= 0) throw buildError('ไม่พบพนักงานผู้ยกเลิก', 400, 'EMPLOYEE_CONTEXT_REQUIRED');
+  if (!Number.isInteger(receiptId) || receiptId <= 0) throw buildError('รหัสเอกสารไม่ถูกต้อง', 400, 'INVALID_DOCUMENT_ID');
+  if (!reason) throw buildError('กรุณาระบุเหตุผลการยกเลิก', 400, 'CANCEL_REASON_REQUIRED');
+
+  return prisma.$transaction(async (tx) => {
+    await ensureEmployeeInBranch(tx, { employeeId, branchId });
+
+    const receipt = await getRepository({ client: tx, id: receiptId, branchId });
+    if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
+    if (receipt.status === 'CANCELLED') throw buildError('เอกสารรับเงินนี้ถูกยกเลิกแล้ว', 409, 'DOCUMENT_ALREADY_CANCELLED');
+
+    const totalAmount = new Prisma.Decimal(receipt.totalAmount ?? 0);
+    const allocatedAmount = new Prisma.Decimal(receipt.allocatedAmount ?? 0);
+    const remainingAmount = new Prisma.Decimal(receipt.remainingAmount ?? 0);
+    if (!allocatedAmount.equals(0) || !remainingAmount.equals(totalAmount)) {
+      throw buildError(
+        'ไม่สามารถยกเลิกเอกสารรับเงินที่ถูกนำไปใช้แล้ว',
+        409,
+        'CUSTOMER_MONEY_RECEIVE_ALREADY_USED',
+      );
+    }
+
+    await tx.customerReceipt.update({
+      where: { id: receiptId },
+      data: {
+        status: 'CANCELLED',
+        remainingAmount: new Prisma.Decimal(0),
+        cancelledAt: new Date(),
+        cancelledByEmployeeProfileId: employeeId,
+        cancelReason: reason,
+      },
+    });
+
+    await createLedger({
+      client: tx,
+      data: {
+        branchId,
+        customerId: receipt.customerId,
+        applicationId: null,
+        eventType: 'MONEY_RECEIVE_CANCELLED',
+        amount: totalAmount,
+        direction: 'DEBIT',
+        referenceType: 'CUSTOMER_MONEY_RECEIPT',
+        referenceId: receiptId,
+        createdById: employeeId,
+      },
+    });
+
+    const nextAvailable = await calculateAvailableCustomerMoney(tx, {
+      branchId,
+      customerId: receipt.customerId,
+    });
+    const balance = await updateBalance({
+      client: tx,
+      branchId,
+      customerId: receipt.customerId,
+      availableAmount: nextAvailable,
+    });
+
+    const cancelledReceipt = await getRepository({ client: tx, id: receiptId, branchId });
+    return {
+      receipt: serializeReceipt(cancelledReceipt),
+      balance: { customerId: balance.customerId, availableAmount: Number(balance.availableAmount) },
+    };
+  });
+};
+
+module.exports = {
+  receiveCustomerMoney,
+  listCustomerMoneyReceives,
+  getCustomerMoneyReceive,
+  cancelCustomerMoneyReceive,
+};
