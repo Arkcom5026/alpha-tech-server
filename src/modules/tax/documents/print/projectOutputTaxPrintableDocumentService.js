@@ -64,6 +64,7 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       taxAmount: true,
       totalAmount: true,
       currency: true,
+      snapshot: true,
       candidate: {
         select: { sourceType: true, sourceId: true },
       },
@@ -84,8 +85,27 @@ const projectOutputTaxPrintableDocument = async ({ branchId, taxDocumentId }) =>
       409,
     );
   }
+  if (document.candidate?.sourceType === 'CONSOLIDATED_DELIVERY') {
+    const snapshot = document.snapshot || {};
+    const lines = Array.isArray(snapshot.items) ? snapshot.items.map((item) => ({
+      id: Number(item.id), description: item.description, quantity: amount(item.quantity),
+      unitAmount: amount(item.documentUnitPrice), discountAmount: 0,
+      lineAmount: amount(item.documentAmount), vatAmount: 0, barcode: null,
+      sourceDocumentNo: item.sourceDocumentNo,
+    })) : [];
+    const invoiceKind = document.taxInvoiceKind;
+    const purpose = await new ResolvePrintDocumentPurposeService().execute({ branchId: normalizedBranchId, code: invoiceKind === 'FULL' ? 'FULL_TAX_INVOICE' : 'SHORT_TAX_INVOICE' });
+    return Object.freeze({
+      document: { id: document.id, type: purpose.code, title: purpose.displayName, number: document.issuedDocumentNumber, sequence: Number(document.issuedSequence), issuedAt: document.issuedAt, currency: document.currency, subtotalAmount: amount(document.subtotalAmount), taxAmount: amount(document.taxAmount), totalAmount: amount(document.totalAmount) },
+      issuer: document.issuerSnapshot,
+      recipient: invoiceKind === 'FULL' ? document.recipientSnapshot : null,
+      sale: { id: null, code: snapshot.sourceDocumentNo || null, soldAt: document.issuedAt, branchId: normalizedBranchId, customerName: snapshot.customer?.companyName || snapshot.customer?.name || null, customerTaxId: snapshot.customer?.taxId || null },
+      sourceReferences: snapshot.sourceReferences || [],
+      lines,
+    });
+  }
   if (document.candidate?.sourceType !== 'SALE') {
-    fail('TAX_OUTPUT_PRINT_SOURCE_UNSUPPORTED', 'Output tax document must be sourced from a sale', 409);
+    fail('TAX_OUTPUT_PRINT_SOURCE_UNSUPPORTED', 'Output tax document source is unsupported', 409);
   }
 
   const saleId = positiveInt(document.candidate.sourceId, 'TAX_SOURCE_SALE_NOT_FOUND', 'saleId');

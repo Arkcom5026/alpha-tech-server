@@ -92,8 +92,16 @@ const allocateSequence = async ({ profile, taxInvoiceKind }, tx) => {
 
 const assertEligibleSaleSource = async ({ document, branchId }, tx) => {
   const candidate = document.candidate;
+  if (candidate?.sourceType === 'CONSOLIDATED_DELIVERY') {
+    const source = await tx.combinedBillingDocument.findFirst({
+      where: { id: Number(candidate.sourceId), branchId: Number(branchId), status: 'ISSUED' },
+      select: { id: true, documentLines: { where: { status: 'DOCUMENTED' }, select: { id: true } } },
+    });
+    if (!source || !source.documentLines.length) fail('TAX_SOURCE_CONSOLIDATED_DELIVERY_NOT_FOUND', 'Consolidated delivery source is not ready', 404);
+    return;
+  }
   if (!candidate || candidate.sourceType !== 'SALE') {
-    fail('TAX_OUTPUT_ISSUANCE_SOURCE_UNSUPPORTED', 'Only a paid sale candidate can issue an output tax invoice', 409);
+    fail('TAX_OUTPUT_ISSUANCE_SOURCE_UNSUPPORTED', 'Only a paid sale or consolidated delivery candidate can issue an output tax invoice', 409);
   }
   const sale = await tx.sale.findFirst({
     where: { id: Number(candidate.sourceId), branchId: Number(branchId) },
