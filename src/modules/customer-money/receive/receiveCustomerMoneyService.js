@@ -149,13 +149,36 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
   });
 };
 
+const PAYMENT_METHODS = new Set(['CASH', 'TRANSFER', 'CARD', 'QR', 'E_WALLET', 'CHEQUE', 'OTHER', 'DEPOSIT']);
+const RECEIPT_STATUSES = new Set(['ACTIVE', 'CANCELLED']);
+
+const parseHistoryDate = (value, endOfDay = false) => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const date = new Date(`${raw}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const listCustomerMoneyReceives = async ({ prisma, listRepository, user, query = {} }) => {
   const branchId = Number(user?.branchId);
   if (!Number.isInteger(branchId) || branchId <= 0) throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
+
   const customerId = Number(query.customerId);
+  const statusCandidate = String(query.status || '').trim().toUpperCase();
+  const paymentMethodCandidate = String(query.paymentMethod || '').trim().toUpperCase();
+  const takeCandidate = Number(query.take);
+  const take = Number.isInteger(takeCandidate) ? Math.min(Math.max(takeCandidate, 1), 500) : 100;
+
   const receipts = await listRepository({
-    client: prisma, branchId,
+    client: prisma,
+    branchId,
     customerId: Number.isInteger(customerId) && customerId > 0 ? customerId : null,
+    search: String(query.search || query.q || '').trim().slice(0, 120),
+    status: RECEIPT_STATUSES.has(statusCandidate) ? statusCandidate : null,
+    paymentMethod: PAYMENT_METHODS.has(paymentMethodCandidate) ? paymentMethodCandidate : null,
+    dateFrom: parseHistoryDate(query.dateFrom),
+    dateTo: parseHistoryDate(query.dateTo, true),
+    take,
   });
   return receipts.map(serializeReceipt);
 };
