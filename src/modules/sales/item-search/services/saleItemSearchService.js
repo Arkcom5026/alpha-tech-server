@@ -123,6 +123,13 @@ const assertExactSellable = (stockItems, simpleLots) => {
 
   const first = stockItems[0] || simpleLots[0];
   if (first) {
+    if (stockItems[0]?.status === 'SOLD') {
+      throw new SaleItemSearchError(409, 'SALE_ITEM_ALREADY_SOLD', 'สินค้ารายการนี้ถูกขายไปแล้ว ไม่สามารถเพิ่มเข้ารายการขายได้', {
+        type: 'STOCK',
+        status: stockItems[0].status,
+        stockItemId: stockItems[0].id,
+      });
+    }
     throw new SaleItemSearchError(409, 'SALE_ITEM_NOT_SELLABLE', `พบสินค้าแต่ยังไม่พร้อมขาย (สถานะ: ${first.status})`, {
       type: stockItems[0] ? 'STOCK' : 'SIMPLE',
       status: first.status,
@@ -224,10 +231,11 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
 
   const originalExactStock = [...authorityStock, ...exactStock];
   const originalExactSimple = [...authoritySimple, ...exactSimple];
+  const exactSellable = assertExactSellable(originalExactStock, originalExactSimple);
   const exactAvailability = await reservationAwareCandidates({
     branchId,
-    stockItems: originalExactStock,
-    simpleLots: originalExactSimple,
+    stockItems: exactSellable.sellableStock,
+    simpleLots: exactSellable.sellableSimple,
     repository,
   });
   assertNotFullyReserved({
@@ -237,10 +245,7 @@ const searchSaleItems = async ({ branchId, query, repository = saleItemSearchRep
     availableSimple: exactAvailability.simpleLots,
   });
 
-  const { sellableStock, sellableSimple } = assertExactSellable(
-    exactAvailability.stockItems,
-    exactAvailability.simpleLots,
-  );
+  const { stockItems: sellableStock, simpleLots: sellableSimple } = exactAvailability;
 
   const exactItems = uniqueByInventoryIdentity([
     ...sellableStock.map((item) => mapStockItem(

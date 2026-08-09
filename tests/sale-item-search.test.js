@@ -241,7 +241,25 @@ test('no search result is a normal empty response', async () => {
   assert.deepEqual(result.items, []);
 });
 
-test('exact identifier found but unavailable returns a conflict', async () => {
+test('sold StockItem barcode returns an explicit already-sold conflict', async () => {
+  const repository = emptyRepository({
+    findExactStockItems: async () => [{
+      id: 421,
+      productId: 99,
+      barcode: 'STOCK-421',
+      serialNumber: 'SN-421',
+      status: 'SOLD',
+      product: structuredProduct,
+    }],
+  });
+
+  await assert.rejects(
+    () => searchSaleItems({ branchId: 1, query: 'STOCK-421', repository }),
+    { code: 'SALE_ITEM_ALREADY_SOLD', status: 409, details: { type: 'STOCK', status: 'SOLD', stockItemId: 421 } },
+  );
+});
+
+test('sold StockItem serial number returns an explicit already-sold conflict', async () => {
   const repository = emptyRepository({
     findExactStockItems: async () => [{
       id: 421,
@@ -255,7 +273,7 @@ test('exact identifier found but unavailable returns a conflict', async () => {
 
   await assert.rejects(
     () => searchSaleItems({ branchId: 1, query: 'SN-421', repository }),
-    { code: 'SALE_ITEM_NOT_SELLABLE', status: 409 },
+    { code: 'SALE_ITEM_ALREADY_SOLD', status: 409, details: { type: 'STOCK', status: 'SOLD', stockItemId: 421 } },
   );
 });
 
