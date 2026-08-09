@@ -69,13 +69,46 @@ const createCustomerMoneyReceipt = ({ client, data }) => {
   return client.customerReceipt.create({ data, select: receiptSelect });
 };
 
-const listCustomerMoneyReceipts = ({ client, branchId, customerId = null, take = 100 }) => {
+const listCustomerMoneyReceipts = ({
+  client,
+  branchId,
+  customerId = null,
+  search = '',
+  status = null,
+  paymentMethod = null,
+  dateFrom = null,
+  dateTo = null,
+  take = 100,
+}) => {
   if (!client?.customerReceipt) throw new TypeError('Customer receipt client is required');
+
+  const keyword = String(search || '').trim();
+  const receivedAt = {};
+  if (dateFrom) receivedAt.gte = dateFrom;
+  if (dateTo) receivedAt.lte = dateTo;
+
   return client.customerReceipt.findMany({
     where: {
       branchId,
       ...(customerId ? { customerId } : {}),
+      ...(status ? { status } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+      ...(Object.keys(receivedAt).length ? { receivedAt } : {}),
       code: { startsWith: 'CMR-' },
+      ...(keyword ? {
+        AND: [{
+          OR: [
+            { code: { contains: keyword, mode: 'insensitive' } },
+            { referenceNo: { contains: keyword, mode: 'insensitive' } },
+            { note: { contains: keyword, mode: 'insensitive' } },
+            { customer: { name: { contains: keyword, mode: 'insensitive' } } },
+            { customer: { companyName: { contains: keyword, mode: 'insensitive' } } },
+            { customer: { taxId: { contains: keyword, mode: 'insensitive' } } },
+            { customer: { user: { email: { contains: keyword, mode: 'insensitive' } } } },
+            { customer: { user: { loginId: { contains: keyword, mode: 'insensitive' } } } },
+          ],
+        }],
+      } : {}),
     },
     select: receiptSelect,
     orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
