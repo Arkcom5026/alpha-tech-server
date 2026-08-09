@@ -1,43 +1,166 @@
 'use strict';
 
+const { Prisma } = require('../../../lib/prisma');
+const { validateReceiveCustomerMoneyInput } = require('./receiveCustomerMoneyContract');
+const { validateReceiveCustomerMoneyPolicy } = require('./receiveCustomerMoneyPolicy');
+
+const buildError = (message, statusCode, code) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+};
+
+const serializeReceipt = (receipt) => ({
+  id: receipt.id,
+  documentNo: receipt.code,
+  branchId: receipt.branchId,
+  customerId: receipt.customerId,
+  receivedAt: receipt.receivedAt,
+  amount: Number(receipt.totalAmount),
+  remainingAmount: Number(receipt.remainingAmount),
+  paymentMethod: receipt.paymentMethod,
+  paymentReference: receipt.referenceNo || null,
+  description: receipt.note || '',
+  status: receipt.status,
+  customer: receipt.customer || null,
+  receivedBy: receipt.createdByEmployeeProfileId
+    ? { id: receipt.createdByEmployeeProfileId }
+    : null,
+  createdAt: receipt.createdAt,
+  updatedAt: receipt.updatedAt,
+});
+
+const createDocumentCode = async (tx, branchId, receivedAt) => {
+  const date = receivedAt || new Date();
+  const yy = String(date.getFullYear()).slice(-2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const prefix = `CMR-${yy}${mm}${dd}-`;
+  const count = await tx.customerReceipt.count({
+    where: { branchId, code: { startsWith: prefix } },
+  });
+  return `${prefix}${String(count + 1).padStart(4, '0')}`;
+};
+
 const receiveCustomerMoney = async ({
   prisma,
   receiptRepository,
   createLedger,
   updateBalance,
-  receiptData,
-  ledgerData,
-  balanceData,
+  input,
+  user,
 }) => {
-  if (!prisma?.$transaction) {
-    throw new TypeError('Prisma transaction client is required');
-  }
+  if (!prisma?.$transaction) throw new TypeError('Prisma transaction client is required');
+
+  const command = validateReceiveCustomerMoneyInput(input, user);
+  validateReceiveCustomerMoneyPolicy({ amount: command.amount });
+  const amount = new Prisma.Decimal(String(command.amount));
 
   return prisma.$transaction(async (tx) => {
+    const customer = await tx.customerProfile.findFirst({
+      where: { id: command.customerId, branchId: command.branchId },
+      select: { id: true },
+    });
+    if (!customer) throw buildError('ไม่พบลูกค้าในสาขานี้', 404, 'CUSTOMER_NOT_FOUND');
+
+    const employee = await tx.employeeProfile.findFirst({
+      where: { id: command.createdById, branchId: command.branchId },
+      select: { id: true },
+    });
+    if (!employee) throw buildError('ไม่พบพนักงานผู้รับเงินในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
+
+    const documentNo = await createDocumentCode(tx, command.branchId, command.receivedAt);
     const receipt = await receiptRepository({
       client: tx,
-      data: receiptData,
+      data: {
+        code: documentNo,
+        branchId: command.branchId,
+        customerId: command.customerId,
+        receivedAt: command.receivedAt,
+        totalAmount: amount,
+        allocatedAmount: new Prisma.Decimal(0),
+        remainingAmount: amount,
+        paymentMethod: command.paymentMethod,
+        referenceNo: command.paymentReference,
+        note: command.description,
+        status: 'ACTIVE',
+        createdByEmployeeProfileId: command.createdById,
+      },
     });
 
     await createLedger({
       client: tx,
       data: {
-        ...ledgerData,
-        referenceId: receipt.id,
+        branchId: command.branchId,
+        customerId: command.customerId,
+        applicationId: null,
+        eventType: 'MONEY_RECEIVED',
+        amount,
+        direction: 'CREDIT',
         referenceType: 'CUSTOMER_MONEY_RECEIPT',
+        referenceId: receipt.id,
+        createdById: command.createdById,
       },
     });
 
+    const currentBalance = await tx.customerMoneyBalance.findUnique({
+      where: {
+        branchId_customerId: {
+          branchId: command.branchId,
+          customerId: command.customerId,
+        },
+      },
+      select: { availableAmount: true },
+    });
+    const nextAvailable = (currentBalance?.availableAmount || new Prisma.Decimal(0)).plus(amount);
     const balance = await updateBalance({
       client: tx,
-      data: balanceData,
+      branchId: command.branchId,
+      customerId: command.customerId,
+      availableAmount: nextAvailable,
     });
 
     return {
-      receipt,
-      balance,
+      receipt: serializeReceipt(receipt),
+      balance: {
+        customerId: balance.customerId,
+        availableAmount: Number(balance.availableAmount),
+      },
     };
   });
 };
 
-module.exports = { receiveCustomerMoney };
+const listCustomerMoneyReceives = async ({ prisma, listRepository, user, query = {} }) => {
+  const branchId = Number(user?.branchId);
+  if (!Number.isInteger(branchId) || branchId <= 0) {
+    throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
+  }
+  const customerId = Number(query.customerId);
+  const receipts = await listRepository({
+    client: prisma,
+    branchId,
+    customerId: Number.isInteger(customerId) && customerId > 0 ? customerId : null,
+  });
+  return receipts.map(serializeReceipt);
+};
+
+const getCustomerMoneyReceive = async ({ prisma, getRepository, user, id }) => {
+  const branchId = Number(user?.branchId);
+  const receiptId = Number(id);
+  if (!Number.isInteger(branchId) || branchId <= 0) {
+    throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
+  }
+  if (!Number.isInteger(receiptId) || receiptId <= 0) {
+    throw buildError('รหัสเอกสารไม่ถูกต้อง', 400, 'INVALID_DOCUMENT_ID');
+  }
+  const receipt = await getRepository({ client: prisma, id: receiptId, branchId });
+  if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
+  return serializeReceipt(receipt);
+};
+
+module.exports = {
+  receiveCustomerMoney,
+  listCustomerMoneyReceives,
+  getCustomerMoneyReceive,
+};
