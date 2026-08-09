@@ -218,42 +218,46 @@ const getSalesTaxReport = async ({ branchId, startDate, endDate }) => {
   const parsedStart = startOfDay(startDate);
   const parsedEnd = endOfDay(endDate);
   if (Number.isNaN(parsedStart.getTime()) || Number.isNaN(parsedEnd.getTime())) return { invalidDate: true };
-  const documents = await repository.prisma.taxDocument.findMany({
+  const records = await repository.prisma.outputVatRecord.findMany({
     where: {
       branchId: Number(branchId),
-      documentType: { in: ['OUTPUT_TAX_INVOICE', 'OUTPUT_TAX_CREDIT_NOTE'] },
-      status: { in: ['REGISTERED', 'UNDER_REVIEW', 'APPROVED'] },
-      issuedAt: { gte: parsedStart, lte: parsedEnd },
-      issuedDocumentNumber: { not: null },
+      documentDate: { gte: parsedStart, lte: parsedEnd },
+      taxDocument: {
+        status: { in: ['REGISTERED', 'UNDER_REVIEW', 'APPROVED'] },
+        issuedDocumentNumber: { not: null },
+      },
     },
-    orderBy: [{ issuedAt: 'asc' }, { issuedSequence: 'asc' }, { id: 'asc' }],
+    include: { taxDocument: { select: { status: true } } },
+    orderBy: [{ documentDate: 'asc' }, { taxDocumentId: 'asc' }],
   });
-  const project = (document, type) => {
-    const snapshot = document.snapshot || {};
-    const recipient = document.recipientSnapshot || snapshot.recipient || {};
-    const sign = type === 'return' ? -1 : 1;
+  const project = (record, type) => {
+    const snapshot = record.documentSnapshot || {};
+    const recipient = record.recipientSnapshot || snapshot.recipient || {};
+    const sign = record.ledgerType === 'OUTPUT_VAT_ADJUSTMENT' ? -1 : 1;
     return {
-      taxDocumentId: document.id,
-      date: document.issuedAt,
-      taxInvoiceNumber: document.issuedDocumentNumber,
-      taxInvoiceKind: document.taxInvoiceKind || null,
-      customerName: recipient.legalName || snapshot.counterpartyName || '-',
-      taxId: recipient.taxId || document.counterpartyTaxId || '',
-      baseAmount: sign * toNum(document.subtotalAmount),
-      vatAmount: sign * toNum(document.taxAmount),
-      totalAmount: sign * toNum(document.totalAmount),
-      status: document.status,
-      originalTaxDocumentId: document.originalTaxDocumentId || null,
+      outputVatRecordId: record.id,
+      taxDocumentId: record.taxDocumentId,
+      taxPeriodId: record.taxPeriodId || null,
+      date: record.documentDate,
+      taxInvoiceNumber: record.issuedDocumentNumber,
+      taxInvoiceKind: record.taxInvoiceKind || null,
+      customerName: record.counterpartyName || recipient.legalName || snapshot.counterpartyName || '-',
+      taxId: record.counterpartyTaxId || recipient.taxId || '',
+      baseAmount: sign * toNum(record.subtotalAmount),
+      vatAmount: sign * toNum(record.taxAmount),
+      totalAmount: sign * toNum(record.totalAmount),
+      status: record.taxDocument.status,
+      originalTaxDocumentId: record.originalTaxDocumentId || null,
       type,
     };
   };
-  const sales = documents.filter((document) => document.documentType === 'OUTPUT_TAX_INVOICE').map((document) => project(document, 'sale'));
-  const returns = documents.filter((document) => document.documentType === 'OUTPUT_TAX_CREDIT_NOTE').map((document) => project(document, 'return'));
+  const sales = records.filter((record) => record.ledgerType === 'OUTPUT_VAT').map((record) => project(record, 'sale'));
+  const returns = records.filter((record) => record.ledgerType === 'OUTPUT_VAT_ADJUSTMENT').map((record) => project(record, 'return'));
   return {
     sales,
     returns,
     period: { start: parsedStart, end: parsedEnd },
-    authority: 'TAX_DOCUMENT',
+    authority: 'OUTPUT_VAT_RECORD',
   };
 };
 

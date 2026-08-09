@@ -109,15 +109,17 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
   if (targetStatus === 'LOCKED') {
     const rows = await prisma.$queryRaw(Prisma.sql`
       SELECT COUNT(*)::int AS count
-      FROM "TaxDocument" document
-      WHERE document."branchId" = ${normalizedBranchId}
-        AND document."documentType" IN ('OUTPUT_TAX_INVOICE', 'OUTPUT_TAX_CREDIT_NOTE')
+      FROM "OutputVatRecord" record
+      JOIN "TaxDocument" document ON document."id" = record."taxDocumentId" AND document."branchId" = record."branchId"
+      WHERE record."branchId" = ${normalizedBranchId}
+        AND record."ledgerType" IN ('OUTPUT_VAT'::"TaxLedgerType", 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType")
         AND document."status" IN ('REGISTERED', 'UNDER_REVIEW', 'APPROVED')
-        AND document."issuedAt" >= ${current.startDate} AND document."issuedAt" <= ${current.endDate}
+        AND record."documentDate" >= ${current.startDate} AND record."documentDate" <= ${current.endDate}
+        AND (record."taxPeriodId" IS NULL OR record."taxPeriodId" = ${String(taxPeriodId)})
         AND NOT EXISTS (
           SELECT 1 FROM "SalesTaxFilingItem" item
           JOIN "SalesTaxFilingBatch" batch ON batch."id" = item."batchId"
-          WHERE item."taxDocumentId" = document."id"
+          WHERE item."taxDocumentId" = record."taxDocumentId"
             AND batch."branchId" = ${normalizedBranchId}
             AND batch."year" = ${new Date(current.startDate).getUTCFullYear()}
             AND batch."month" = ${new Date(current.startDate).getUTCMonth() + 1}

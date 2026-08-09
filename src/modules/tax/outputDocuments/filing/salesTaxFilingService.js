@@ -16,16 +16,22 @@ const loadBatch = async ({ branchId, batchId }, tx = prisma) => {
   `);
   if (!batches[0]) return null;
   const items = await tx.$queryRaw(Prisma.sql`
-    SELECT item.*, document."issuedDocumentNumber", document."taxInvoiceKind", document."documentType",
-      document."issuedAt",
-      CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."subtotalAmount" ELSE document."subtotalAmount" END AS "subtotalAmount",
-      CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."taxAmount" ELSE document."taxAmount" END AS "taxAmount",
-      CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."totalAmount" ELSE document."totalAmount" END AS "totalAmount",
-      document."recipientSnapshot", document."originalTaxDocumentId"
+    SELECT item.*, record."id" AS "outputVatRecordId",
+      COALESCE(record."issuedDocumentNumber", document."issuedDocumentNumber") AS "issuedDocumentNumber",
+      COALESCE(record."taxInvoiceKind", document."taxInvoiceKind") AS "taxInvoiceKind",
+      COALESCE(record."documentType", document."documentType") AS "documentType",
+      COALESCE(record."documentDate", document."issuedAt") AS "issuedAt",
+      CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."subtotalAmount", document."subtotalAmount") ELSE COALESCE(record."subtotalAmount", document."subtotalAmount") END AS "subtotalAmount",
+      CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."taxAmount", document."taxAmount") ELSE COALESCE(record."taxAmount", document."taxAmount") END AS "taxAmount",
+      CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."totalAmount", document."totalAmount") ELSE COALESCE(record."totalAmount", document."totalAmount") END AS "totalAmount",
+      COALESCE(record."recipientSnapshot", document."recipientSnapshot") AS "recipientSnapshot",
+      COALESCE(record."originalTaxDocumentId", document."originalTaxDocumentId") AS "originalTaxDocumentId",
+      record."taxPeriodId"
     FROM "SalesTaxFilingItem" item
     LEFT JOIN "TaxDocument" document ON document."id" = item."taxDocumentId"
+    LEFT JOIN "OutputVatRecord" record ON record."taxDocumentId" = item."taxDocumentId"
     WHERE item."batchId" = CAST(${Number(batchId)} AS integer) AND item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"
-    ORDER BY document."issuedAt", document."issuedSequence", item."id"
+    ORDER BY record."documentDate", record."taxDocumentId", item."id"
   `);
   return { ...batches[0], items };
 };
@@ -37,12 +43,13 @@ const listSalesTaxFilings = async ({ branchId, year, month }) => {
   const batches = await prisma.$queryRaw(Prisma.sql`
     SELECT batch.*,
       COUNT(item."id") FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus")::int AS "itemCount",
-      COALESCE(SUM(CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."subtotalAmount" ELSE document."subtotalAmount" END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "subtotalAmount",
-      COALESCE(SUM(CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."taxAmount" ELSE document."taxAmount" END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "taxAmount",
-      COALESCE(SUM(CASE WHEN document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE' THEN -document."totalAmount" ELSE document."totalAmount" END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "totalAmount"
+      COALESCE(SUM(CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."subtotalAmount", document."subtotalAmount") ELSE COALESCE(record."subtotalAmount", document."subtotalAmount") END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "subtotalAmount",
+      COALESCE(SUM(CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."taxAmount", document."taxAmount") ELSE COALESCE(record."taxAmount", document."taxAmount") END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "taxAmount",
+      COALESCE(SUM(CASE WHEN record."ledgerType" = 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType" OR (record."id" IS NULL AND document."documentType" = 'OUTPUT_TAX_CREDIT_NOTE') THEN -COALESCE(record."totalAmount", document."totalAmount") ELSE COALESCE(record."totalAmount", document."totalAmount") END) FILTER (WHERE item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"), 0) AS "totalAmount"
     FROM "SalesTaxFilingBatch" batch
     LEFT JOIN "SalesTaxFilingItem" item ON item."batchId" = batch."id"
     LEFT JOIN "TaxDocument" document ON document."id" = item."taxDocumentId"
+    LEFT JOIN "OutputVatRecord" record ON record."taxDocumentId" = item."taxDocumentId" AND record."branchId" = batch."branchId"
     WHERE batch."branchId" = CAST(${branchId} AS integer)
       ${yearFilter ? Prisma.sql`AND batch."year" = CAST(${yearFilter} AS integer)` : Prisma.empty}
       ${monthFilter ? Prisma.sql`AND batch."month" = CAST(${monthFilter} AS integer)` : Prisma.empty}
@@ -72,20 +79,34 @@ const prepareSalesTaxFiling = async ({ branchId, year, month, actorEmployeeId })
       batch = rows[0];
     }
     await tx.$executeRaw(Prisma.sql`
+      UPDATE "OutputVatRecord" record
+      SET "taxPeriodId" = period."id", "updatedAt" = NOW()
+      FROM "TaxPeriod" period
+      WHERE record."branchId" = ${branchId}
+        AND record."taxPeriodId" IS NULL
+        AND record."documentDate" >= ${range.start} AND record."documentDate" < ${range.end}
+        AND period."branchId" = record."branchId"
+        AND period."status" IN ('OPEN'::"TaxPeriodStatus", 'REOPENED'::"TaxPeriodStatus")
+        AND record."documentDate" >= period."startDate" AND record."documentDate" <= period."endDate"
+    `);
+    await tx.$executeRaw(Prisma.sql`
       INSERT INTO "SalesTaxFilingItem" ("batchId", "taxDocumentId", "status", "documentSnapshot", "selectedAt", "createdAt")
-      SELECT ${Number(batch.id)}, document."id", 'SELECTED'::"SalesTaxFilingItemStatus",
+      SELECT ${Number(batch.id)}, record."taxDocumentId", 'SELECTED'::"SalesTaxFilingItemStatus",
         jsonb_build_object(
-          'issuedDocumentNumber', document."issuedDocumentNumber", 'documentType', document."documentType",
-          'issuedAt', document."issuedAt", 'subtotalAmount', document."subtotalAmount",
-          'taxAmount', document."taxAmount", 'totalAmount', document."totalAmount",
-          'recipientSnapshot', document."recipientSnapshot", 'originalTaxDocumentId', document."originalTaxDocumentId"
+          'outputVatRecordId', record."id", 'issuedDocumentNumber', record."issuedDocumentNumber",
+          'documentType', record."documentType", 'issuedAt', record."documentDate",
+          'ledgerType', record."ledgerType", 'subtotalAmount', record."subtotalAmount",
+          'taxAmount', record."taxAmount", 'totalAmount', record."totalAmount",
+          'recipientSnapshot', record."recipientSnapshot", 'originalTaxDocumentId', record."originalTaxDocumentId",
+          'taxPeriodId', record."taxPeriodId"
         ), NOW(), NOW()
-      FROM "TaxDocument" document
-      WHERE document."branchId" = ${branchId}
-        AND document."documentType" IN ('OUTPUT_TAX_INVOICE', 'OUTPUT_TAX_CREDIT_NOTE')
+      FROM "OutputVatRecord" record
+      JOIN "TaxDocument" document ON document."id" = record."taxDocumentId" AND document."branchId" = record."branchId"
+      WHERE record."branchId" = ${branchId}
+        AND record."ledgerType" IN ('OUTPUT_VAT'::"TaxLedgerType", 'OUTPUT_VAT_ADJUSTMENT'::"TaxLedgerType")
         AND document."status" IN ('REGISTERED', 'UNDER_REVIEW', 'APPROVED')
-        AND document."issuedAt" >= ${range.start} AND document."issuedAt" < ${range.end}
-        AND document."issuedDocumentNumber" IS NOT NULL
+        AND record."documentDate" >= ${range.start} AND record."documentDate" < ${range.end}
+        AND record."issuedDocumentNumber" IS NOT NULL
       ON CONFLICT ("batchId", "taxDocumentId") DO NOTHING
     `);
     return loadBatch({ branchId, batchId: batch.id }, tx);
