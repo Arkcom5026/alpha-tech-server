@@ -13,6 +13,7 @@ const {
   receiveCustomerMoney,
   listCustomerMoneyReceives,
   getCustomerMoneyReceive,
+  cancelCustomerMoneyReceive,
 } = require('./receiveCustomerMoneyService');
 const { createReceiveCustomerMoneyRoute } = require('./receiveCustomerMoneyRoute');
 
@@ -36,6 +37,15 @@ const createRuntime = () => ({
     getRepository: getCustomerMoneyReceipt,
     user,
     id,
+  }),
+  cancel: (id, cancelReason, user) => cancelCustomerMoneyReceive({
+    prisma,
+    getRepository: getCustomerMoneyReceipt,
+    createLedger: createCustomerMoneyLedger,
+    updateBalance: updateCustomerMoneyBalance,
+    user,
+    id,
+    cancelReason,
   }),
 });
 
