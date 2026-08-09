@@ -6,6 +6,9 @@ const documentRepository = require('../repository/taxDocumentRepository');
 const {
   assertInputTaxDocumentReconciled,
 } = require('../../inputDocuments/reconciliation/inputTaxDocumentReconciliationService');
+const {
+  recordApprovedDocument,
+} = require('../../inputVat/inputVatRecordService');
 
 const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, reason, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -62,6 +65,15 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
       });
     }
 
+    let inputVat = null;
+    if (updated.documentType === 'INPUT_TAX_INVOICE' && updated.status === 'APPROVED') {
+      inputVat = await recordApprovedDocument({
+        tx,
+        branchId: normalizedBranchId,
+        document: updated,
+      });
+    }
+
     await documentRepository.appendLifecycleEvent({
       taxDocumentId: normalizedDocumentId,
       fromStatus: decision.currentStatus,
@@ -71,7 +83,7 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
       metadata: { branchId: normalizedBranchId },
     }, tx);
 
-    return Object.freeze({ replayed: false, document: updated, reconciliation });
+    return Object.freeze({ replayed: false, document: updated, reconciliation, inputVat });
   });
 };
 
