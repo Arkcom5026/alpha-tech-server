@@ -11,12 +11,18 @@ const queryService = read('listEligibleDeliveryCreditsService.js');
 const createService = read('createDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
 
- test('eligible delivery credit query is branch and customer scoped', () => {
+test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
   assert.match(queryService, /customerId:\s*command\.customerId/);
   assert.match(queryService, /isCredit:\s*true/);
-  assert.match(queryService, /status:\s*'COMPLETED'/);
+  assert.match(queryService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
   assert.match(queryService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
+});
+
+test('write validation uses the same active credit sale eligibility', () => {
+  assert.match(createService, /isCredit:\s*true/);
+  assert.match(createService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
+  assert.match(createService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
 });
 
 test('eligible delivery credit query is read-only and exposes item references', () => {
