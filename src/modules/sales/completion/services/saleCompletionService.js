@@ -2,6 +2,7 @@ const dayjs = require('dayjs');
 const { Prisma } = require('../../../../../lib/prisma');
 const { SaleCompletionError: SalesError } = require('../contracts/saleCompletionError');
 const { postPaymentEvidence } = require('./salePaymentPostingService');
+const { nextPaymentCode } = require('../../payment/code/nextPaymentCode');
 const { stockConflict } = require('../policies/saleStockPolicy');
 const { assertSaleReplayHash } = require('../policies/saleIdempotencyPolicy');
 const {
@@ -361,7 +362,9 @@ const completeSale = async ({ command, branchId, employeeId }) => {
         ];
         if (movements.length) await tx.stockMovement.createMany({ data: movements });
 
-        const paymentCode = `PM-C-${sale.id}-${command.requestHash.slice(0, 12)}`;
+        const paymentCode = command.payment.paymentItems.length
+          ? await nextPaymentCode(tx, branchId)
+          : `PM-C-${sale.id}-${command.requestHash.slice(0, 12)}`;
         await postPaymentEvidence(tx, {
           sale: { ...sale, customerId: command.sale.customerId },
           branchId,

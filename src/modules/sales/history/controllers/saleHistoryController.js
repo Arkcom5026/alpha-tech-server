@@ -255,14 +255,14 @@ const searchPrintableSales = async (req, res) => {
       ? await prisma.payment.findMany({
           where: { saleId: { in: saleIds }, isCancelled: false },
           orderBy: { receivedAt: 'desc' },
-          select: { saleId: true, receivedAt: true, items: { select: { amount: true } } },
+          select: { id: true, code: true, saleId: true, receivedAt: true, items: { select: { amount: true } } },
         })
       : [];
 
     const paymentAgg = new Map();
     for (const p of payments) {
       const sid = p.saleId;
-      const prev = paymentAgg.get(sid) || { paidAmount: 0, lastPaidAt: null };
+      const prev = paymentAgg.get(sid) || { paidAmount: 0, lastPaidAt: null, receiptPaymentId: null, receiptNumber: null };
       const itemSum = (Array.isArray(p.items) ? p.items : []).reduce((ss, it) => {
         const amt = it?.amount != null ? toNum(it.amount) : 0;
         return ss + amt;
@@ -273,13 +273,18 @@ const searchPrintableSales = async (req, res) => {
         ? p.receivedAt || null
         : p.receivedAt && new Date(p.receivedAt) > new Date(prev.lastPaidAt) ? p.receivedAt : prev.lastPaidAt;
 
-      paymentAgg.set(sid, { paidAmount: nextPaid, lastPaidAt: nextLast });
+      paymentAgg.set(sid, {
+        paidAmount: nextPaid,
+        lastPaidAt: nextLast,
+        receiptPaymentId: prev.receiptPaymentId || p.id,
+        receiptNumber: prev.receiptNumber || p.code,
+      });
     }
 
     const rowsAll = sales.map((s) => {
       const totalAmount = resolveCanonicalTotalAmount(s);
       const storedPaidAmount = s?.paidAmount != null ? toNum(s.paidAmount) : null;
-      const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null };
+      const agg = paymentAgg.get(s.id) || { paidAmount: 0, lastPaidAt: null, receiptPaymentId: null, receiptNumber: null };
       const aggPaid = agg.paidAmount || 0;
       const paidAmount = storedPaidAmount == null ? aggPaid : Math.max(storedPaidAmount, aggPaid);
       const balanceAmount = Math.max(0, round2(totalAmount - paidAmount));
@@ -310,6 +315,8 @@ const searchPrintableSales = async (req, res) => {
         taxDocumentId: issuedTaxDocument?.id || null,
         taxInvoiceKind: issuedTaxDocument?.taxInvoiceKind || null,
         issuedTaxDocumentNumber: issuedTaxDocument?.issuedDocumentNumber || null,
+        receiptPaymentId: agg.receiptPaymentId || null,
+        receiptNumber: agg.receiptNumber || null,
       };
     });
 
