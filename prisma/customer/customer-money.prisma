@@ -13,13 +13,63 @@ model CustomerMoneyApplication {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  customer      CustomerProfile       @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  ledgerEntries CustomerMoneyLedger[]
+  customer        CustomerProfile               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  ledgerEntries   CustomerMoneyLedger[]
+  settlementLines CustomerMoneySettlementLine[]
 
   @@index([customerId])
   @@index([sourceType, sourceId])
   @@index([targetType, targetId])
   @@index([branchId])
+}
+
+model CustomerMoneySettlement {
+  id             Int       @id @default(autoincrement())
+  code           String    @unique @db.VarChar(50)
+  branchId       Int
+  customerId     Int
+  settlementType String    @default("DELIVERY_CREDIT") @db.VarChar(30)
+  totalAmount    Decimal   @db.Decimal(12, 2)
+  status         String    @default("ACTIVE") @db.VarChar(30)
+  settledAt      DateTime  @default(now())
+  note           String?
+  createdById    Int
+  cancelledAt    DateTime?
+  cancelledById  Int?
+  cancelReason   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  customer CustomerProfile               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lines    CustomerMoneySettlementLine[]
+
+  @@index([branchId])
+  @@index([customerId])
+  @@index([branchId, status, settledAt])
+}
+
+model CustomerMoneySettlementLine {
+  id            Int      @id @default(autoincrement())
+  settlementId  Int
+  applicationId Int
+  saleId        Int
+  saleCode      String   @db.VarChar(100)
+  saleItemType  String   @db.VarChar(20)
+  saleItemId    Int
+  description   String
+  quantity      Decimal  @db.Decimal(12, 2)
+  unitAmount    Decimal  @db.Decimal(12, 2)
+  lineAmount    Decimal  @db.Decimal(12, 2)
+  appliedAmount Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+
+  settlement  CustomerMoneySettlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  application CustomerMoneyApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@index([settlementId])
+  @@index([applicationId])
+  @@index([saleId])
+  @@index([saleItemType, saleItemId])
 }
 
 model CustomerMoneyLedger {

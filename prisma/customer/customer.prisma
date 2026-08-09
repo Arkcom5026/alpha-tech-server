@@ -42,6 +42,7 @@ model CustomerProfile {
   customerMoneyApplications CustomerMoneyApplication[]
   customerMoneyLedgers      CustomerMoneyLedger[]
   customerMoneyBalances     CustomerMoneyBalance[]
+  customerMoneySettlements  CustomerMoneySettlement[]
   subdistrict               Subdistrict?               @relation(fields: [subdistrictCode], references: [code])
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch                    Branch?                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
