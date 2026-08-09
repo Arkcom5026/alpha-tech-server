@@ -1,6 +1,7 @@
 'use strict';
 const { prisma } = require('../../../../lib/prisma');
 const positive = (value) => { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : null; };
+const customerInclude = { user: true, subdistrict: { include: { district: { include: { province: true } } } } };
 const enrich = async (documents, branchId) => {
   const ids = documents.map((document) => String(document.id));
   const candidates = ids.length ? await prisma.taxCandidate.findMany({ where: { branchId, sourceType: 'CONSOLIDATED_DELIVERY', sourceId: { in: ids } }, select: { sourceId: true, document: { select: { id: true, status: true, taxInvoiceKind: true, issuedDocumentNumber: true } } } }) : [];
@@ -9,12 +10,12 @@ const enrich = async (documents, branchId) => {
 };
 const list = async (req, res, next) => { try {
   const branchId = positive(req.user?.branchId); if (!branchId) throw Object.assign(new Error('Branch context is required'), { statusCode: 401, code: 'BRANCH_CONTEXT_REQUIRED' });
-  const documents = await prisma.combinedBillingDocument.findMany({ where: { branchId, documentLines: { some: {} } }, include: { customer: true, documentLines: { select: { id: true, sourceSaleId: true, sourceDocumentNo: true, sourceLineType: true, sourceLineId: true, description: true, documentAmount: true, status: true } } }, orderBy: [{ issueDate: 'desc' }, { id: 'desc' }], take: 100 });
+  const documents = await prisma.combinedBillingDocument.findMany({ where: { branchId, documentLines: { some: {} } }, include: { customer: { include: customerInclude }, documentLines: { select: { id: true, sourceSaleId: true, sourceDocumentNo: true, sourceLineType: true, sourceLineId: true, description: true, documentAmount: true, status: true } } }, orderBy: [{ issueDate: 'desc' }, { id: 'desc' }], take: 100 });
   res.json(await enrich(documents, branchId));
 } catch (error) { next(error); } };
 const detail = async (req, res, next) => { try {
   const branchId = positive(req.user?.branchId); const id = positive(req.params?.id); if (!branchId || !id) throw Object.assign(new Error('Document identity is invalid'), { statusCode: 400, code: 'CONSOLIDATED_DELIVERY_ID_INVALID' });
-  const document = await prisma.combinedBillingDocument.findFirst({ where: { id, branchId, documentLines: { some: {} } }, include: { customer: true, employee: true, documentLines: { orderBy: { id: 'asc' } } } });
+  const document = await prisma.combinedBillingDocument.findFirst({ where: { id, branchId, documentLines: { some: {} } }, include: { customer: { include: customerInclude }, employee: true, documentLines: { orderBy: { id: 'asc' } } } });
   if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
   res.json((await enrich([document], branchId))[0]);
 } catch (error) { next(error); } };
@@ -23,7 +24,7 @@ const printable = async (req, res, next) => { try {
   if (!branchId || !id) throw Object.assign(new Error('Document identity is invalid'), { statusCode: 400, code: 'CONSOLIDATED_DELIVERY_ID_INVALID' });
   const document = await prisma.combinedBillingDocument.findFirst({
     where: { id, branchId, documentLines: { some: {} } },
-    include: { customer: true, employee: true, branch: true, documentLines: { orderBy: { id: 'asc' } } },
+    include: { customer: { include: customerInclude }, employee: true, branch: true, documentLines: { orderBy: { id: 'asc' } } },
   });
   if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
   res.json({

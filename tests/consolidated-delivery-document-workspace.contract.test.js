@@ -49,4 +49,11 @@ test('consolidated delivery has its own printable snapshot without issuing tax',
   assert.match(history, /title: 'ใบส่งของรวม'/);
   assert.match(history, /documentUnitPrice/);
   assert.match(routes, /consolidated-deliveries\/:id\/printable/);
+  assert.match(history, /subdistrict: \{ include: \{ district: \{ include: \{ province: true \} \} \} \}/);
+});
+
+test('new consolidated tax snapshots preserve the structured customer address', () => {
+  const service = read('src/modules/finance/combined-billing/documentWorkspaceService.js');
+  assert.match(service, /customer: \{ include: customerInclude \}/);
+  assert.match(service, /province: true/);
 });

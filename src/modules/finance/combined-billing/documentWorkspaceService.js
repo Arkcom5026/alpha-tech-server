@@ -10,6 +10,7 @@ const taxDocumentRepository = require('../../tax/documents/repository/taxDocumen
 const money = (value) => Number(Number(value || 0).toFixed(2));
 const keyOf = (type, id) => `${type}:${id}`;
 const fail = (code, message, statusCode = 400) => { const error = new Error(message); error.code = code; error.statusCode = statusCode; throw error; };
+const customerInclude = { user: true, subdistrict: { include: { district: { include: { province: true } } } } };
 
 const registerConsolidatedTaxCandidate = async ({ tx, document, branchId, employeeId }) => {
   const snapshot = {
@@ -139,7 +140,7 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
           adjustedAt: priceAdjustment ? new Date() : null,
         })) },
       },
-      include: { documentLines: true, customer: true },
+      include: { documentLines: true, customer: { include: customerInclude } },
     });
     const refund = money(data.reduce((sum, row) => sum + Math.max(0, row.settledAmount - row.documentAmount), 0));
     if (refund > 0) {
