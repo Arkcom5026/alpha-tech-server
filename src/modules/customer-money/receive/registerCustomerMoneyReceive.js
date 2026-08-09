@@ -1,7 +1,7 @@
 'use strict';
 
-const { prisma } = require('../../../lib/prisma');
-const verifyToken = require('../../../middlewares/verifyToken');
+const { prisma } = require('../../../../lib/prisma');
+const verifyToken = require('../../../../middlewares/verifyToken');
 const { createCustomerMoneyLedger } = require('../ledger/createCustomerMoneyLedgerService');
 const { updateCustomerMoneyBalance } = require('../balance/updateCustomerMoneyBalanceService');
 const {
@@ -46,7 +46,4 @@ const mountCustomerMoneyReceiveModule = (app) => {
   return router;
 };
 
-module.exports = {
-  createRuntime,
-  mountCustomerMoneyReceiveModule,
-};
+module.exports = { createRuntime, mountCustomerMoneyReceiveModule };
