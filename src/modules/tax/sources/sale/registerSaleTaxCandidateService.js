@@ -33,7 +33,27 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       createdAt: true,
       updatedAt: true,
       customer: {
-        select: { name: true, companyName: true, taxId: true, type: true },
+        select: {
+          name: true,
+          companyName: true,
+          taxId: true,
+          type: true,
+          addressDetail: true,
+          subdistrict: { select: { nameTh: true, district: { select: { nameTh: true, province: { select: { nameTh: true } } } } } },
+        },
+      },
+      items: {
+        select: {
+          id: true, basePrice: true, discount: true, price: true, vatAmount: true,
+          documentDescription: true,
+          stockItem: { select: { barcode: true, product: { select: { name: true } } } },
+        },
+      },
+      simpleItems: {
+        select: {
+          id: true, quantity: true, basePrice: true, discount: true, price: true, vatAmount: true,
+          documentDescription: true, product: { select: { name: true } },
+        },
       },
     },
   });
@@ -53,6 +73,38 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
   const gross = Number(sale.totalAmount || 0);
   const taxAmount = Number(sale.vat || 0);
   const subtotalAmount = Math.max(0, gross - taxAmount);
+  const customerAddress = [
+    sale.customer?.addressDetail,
+    sale.customer?.subdistrict?.nameTh,
+    sale.customer?.subdistrict?.district?.nameTh,
+    sale.customer?.subdistrict?.district?.province?.nameTh,
+  ].filter(Boolean).join(' ');
+  const items = [
+    ...sale.items.map((item) => ({
+      id: `STOCK:${item.id}`,
+      sourceLineType: 'STOCK',
+      sourceLineId: item.id,
+      description: item.documentDescription || item.stockItem?.product?.name || 'Sale item',
+      barcode: item.stockItem?.barcode || null,
+      quantity: 1,
+      unitAmount: Number(item.basePrice || 0),
+      discountAmount: Number(item.discount || 0),
+      lineAmount: Number(item.price || 0),
+      vatAmount: Number(item.vatAmount || 0),
+    })),
+    ...sale.simpleItems.map((item) => ({
+      id: `SIMPLE:${item.id}`,
+      sourceLineType: 'SIMPLE',
+      sourceLineId: item.id,
+      description: item.documentDescription || item.product?.name || 'Sale item',
+      barcode: null,
+      quantity: Number(item.quantity || 0),
+      unitAmount: Number(item.basePrice || 0),
+      discountAmount: Number(item.discount || 0),
+      lineAmount: Number(item.price || 0),
+      vatAmount: Number(item.vatAmount || 0),
+    })),
+  ];
 
   return registerTaxCandidate({
     branchId: normalizedBranchId,
@@ -67,6 +119,13 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       customerId: sale.customerId,
       counterpartyName: sale.customer?.companyName || sale.customer?.name || null,
       counterpartyTaxId: sale.customer?.taxId || null,
+      recipient: {
+        legalName: sale.customer?.companyName || sale.customer?.name || null,
+        taxId: sale.customer?.taxId || null,
+        registeredAddress: customerAddress || null,
+        branchCode: '00000',
+        isHeadOffice: true,
+      },
       customerType: sale.customer?.type || null,
       isTaxInvoice: Boolean(sale.isTaxInvoice),
       saleStatus: sale.status,
@@ -78,6 +137,7 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       vatRate: Number(sale.vatRate || 0),
       currency: 'THB',
       issuedAt: sale.updatedAt || sale.createdAt,
+      items,
     },
   });
 };

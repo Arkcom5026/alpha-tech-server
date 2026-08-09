@@ -218,11 +218,42 @@ const getSalesTaxReport = async ({ branchId, startDate, endDate }) => {
   const parsedStart = startOfDay(startDate);
   const parsedEnd = endOfDay(endDate);
   if (Number.isNaN(parsedStart.getTime()) || Number.isNaN(parsedEnd.getTime())) return { invalidDate: true };
-  const { sales, returns } = await repository.findSalesTaxData(branchId, parsedStart, parsedEnd);
+  const documents = await repository.prisma.taxDocument.findMany({
+    where: {
+      branchId: Number(branchId),
+      documentType: { in: ['OUTPUT_TAX_INVOICE', 'OUTPUT_TAX_CREDIT_NOTE'] },
+      status: { in: ['REGISTERED', 'UNDER_REVIEW', 'APPROVED'] },
+      issuedAt: { gte: parsedStart, lte: parsedEnd },
+      issuedDocumentNumber: { not: null },
+    },
+    orderBy: [{ issuedAt: 'asc' }, { issuedSequence: 'asc' }, { id: 'asc' }],
+  });
+  const project = (document, type) => {
+    const snapshot = document.snapshot || {};
+    const recipient = document.recipientSnapshot || snapshot.recipient || {};
+    const sign = type === 'return' ? -1 : 1;
+    return {
+      taxDocumentId: document.id,
+      date: document.issuedAt,
+      taxInvoiceNumber: document.issuedDocumentNumber,
+      taxInvoiceKind: document.taxInvoiceKind || null,
+      customerName: recipient.legalName || snapshot.counterpartyName || '-',
+      taxId: recipient.taxId || document.counterpartyTaxId || '',
+      baseAmount: sign * toNum(document.subtotalAmount),
+      vatAmount: sign * toNum(document.taxAmount),
+      totalAmount: sign * toNum(document.totalAmount),
+      status: document.status,
+      originalTaxDocumentId: document.originalTaxDocumentId || null,
+      type,
+    };
+  };
+  const sales = documents.filter((document) => document.documentType === 'OUTPUT_TAX_INVOICE').map((document) => project(document, 'sale'));
+  const returns = documents.filter((document) => document.documentType === 'OUTPUT_TAX_CREDIT_NOTE').map((document) => project(document, 'return'));
   return {
-    sales: sales.map((sale) => ({ date: sale.soldAt, taxInvoiceNumber: sale.taxInvoiceNumber || sale.code, customerName: sale.customer?.name || '-', taxId: sale.customer?.taxId || '', baseAmount: toNum(D(sale.totalBeforeDiscount).plus(D(sale.totalDiscount))), vatAmount: toNum(D(sale.vat)), totalAmount: toNum(D(sale.totalAmount)), type: 'sale' })),
-    returns: returns.map((ret) => ({ date: ret.returnedAt, taxInvoiceNumber: ret.taxInvoiceNumber || ret.code, customerName: ret.sale?.customer?.name || '-', taxId: ret.sale?.customer?.taxId || '', baseAmount: toNum(D(ret.totalBeforeDiscount).plus(D(ret.totalDiscount))), vatAmount: toNum(D(ret.vat)), totalAmount: toNum(D(ret.totalAmount)), type: 'return' })),
+    sales,
+    returns,
     period: { start: parsedStart, end: parsedEnd },
+    authority: 'TAX_DOCUMENT',
   };
 };
 

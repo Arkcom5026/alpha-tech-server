@@ -35,20 +35,28 @@ model SalesTaxFilingBatch {
   createdBy   EmployeeProfile      @relation(fields: [createdById], references: [id])
   items       SalesTaxFilingItem[]
 
-  @@index([branchId, year, month])
+  @@unique([branchId, year, month])
   @@index([status])
 }
 
 model SalesTaxFilingItem {
-  id        Int                 @id @default(autoincrement())
-  batchId   Int
-  saleId    Int
-  createdAt DateTime            @default(now())
-  batch     SalesTaxFilingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sale      Sale                @relation(fields: [saleId], references: [id])
+  id               Int                      @id @default(autoincrement())
+  batchId          Int
+  saleId           Int?
+  taxDocumentId    Int?
+  status           SalesTaxFilingItemStatus @default(SELECTED)
+  documentSnapshot Json?
+  selectedAt       DateTime?
+  filedAt          DateTime?
+  createdAt        DateTime                 @default(now())
+  batch            SalesTaxFilingBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sale             Sale?                    @relation(fields: [saleId], references: [id])
+  taxDocument      TaxDocument?             @relation(fields: [taxDocumentId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, saleId])
+  @@unique([batchId, taxDocumentId])
   @@index([saleId])
+  @@index([taxDocumentId, status])
 }
 
 model InputTaxFilingItem {
@@ -110,4 +118,10 @@ enum SalesTaxFilingStatus {
   DRAFT
   SUBMITTED
   VOIDED
+}
+
+enum SalesTaxFilingItemStatus {
+  SELECTED
+  FILED
+  REMOVED
 }

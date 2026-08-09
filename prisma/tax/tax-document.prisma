@@ -81,6 +81,7 @@ model TaxDocument {
   issuerProfile       TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
   lifecycleEvents     TaxDocumentLifecycleEvent[]
   inputTaxFilingItems InputTaxFilingItem[]
+  salesTaxFilingItems SalesTaxFilingItem[]
   originalTaxDocument TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
   creditNote          TaxDocument?                 @relation("TaxDocumentCreditNote")
   saleReturn          SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)

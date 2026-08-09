@@ -29,6 +29,17 @@ const transitionTaxDocument = async ({ branchId, taxDocumentId, targetStatus, re
       throw Object.assign(new Error('Tax document not found'), { code: 'TAX_DOCUMENT_NOT_FOUND', statusCode: 404 });
     }
 
+    if (
+      current.documentType === 'OUTPUT_TAX_INVOICE'
+      && current.status === 'DRAFT'
+      && normalizedTarget === 'REGISTERED'
+    ) {
+      throw Object.assign(
+        new Error('Output tax invoices must be issued through the controlled numbering service'),
+        { code: 'TAX_OUTPUT_ISSUE_ENDPOINT_REQUIRED', statusCode: 409 },
+      );
+    }
+
     const decision = assertTaxDocumentTransition({ currentStatus: current.status, targetStatus: normalizedTarget });
     if (decision.replayed) return Object.freeze({ replayed: true, document: current });
 
