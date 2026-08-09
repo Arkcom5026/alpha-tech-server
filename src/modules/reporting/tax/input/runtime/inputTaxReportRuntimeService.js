@@ -1,9 +1,11 @@
 const { Prisma } = require('../../../../../../lib/prisma');
-const { findInputTaxReceipts } = require('./inputTaxReportRuntimeRepository');
+const {
+  findInputVatRecords,
+  findLegacyInputTaxReceipts,
+} = require('./inputTaxReportRuntimeRepository');
 
 const D = (value) => (value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value || 0));
 const toNumber = (value) => (value && typeof value.toNumber === 'function' ? value.toNumber() : Number(value || 0));
-
 const makeError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 
 const parseYmdLocal = (value, endOfDay = false) => {
@@ -46,41 +48,88 @@ const resolvePeriod = (query = {}) => {
   return { month, year, startDate, endDate, startDateText, endDateText };
 };
 
+const normalizeText = (value) => String(value || '').trim().toUpperCase();
+const authorityKey = ({ supplierTaxId, supplierTaxInvoiceNumber }) =>
+  `${normalizeText(supplierTaxId)}|${normalizeText(supplierTaxInvoiceNumber)}`;
+
+const mapAuthorityRecord = (record) => {
+  const sign = record.ledgerType === 'INPUT_VAT_ADJUSTMENT' ? -1 : 1;
+  const subtotal = toNumber(record.subtotalAmount) * sign;
+  const vatAmount = toNumber(record.taxAmount) * sign;
+  const grandTotal = toNumber(record.totalAmount) * sign;
+  const snapshot = record.documentSnapshot || {};
+  const vatRate = subtotal ? Math.round((Math.abs(vatAmount / subtotal) * 100) * 100) / 100 : 0;
+
+  return {
+    id: record.id,
+    taxDocumentId: Number(record.taxDocumentId),
+    authority: 'INPUT_VAT_RECORD',
+    ledgerType: record.ledgerType,
+    date: record.documentDate,
+    poNumber: snapshot.purchaseOrderCode || snapshot.poNumber || 'N/A',
+    supplierTaxInvoiceDate: record.documentDate,
+    supplierTaxInvoiceNumber: record.documentNumber,
+    supplierName: record.supplierName || 'N/A',
+    supplierTaxId: record.supplierTaxId || 'N/A',
+    branchName: record.branch?.name || 'N/A',
+    totalAmount: subtotal,
+    vatAmount,
+    grandTotal,
+    vatRate,
+    originalTaxDocumentId: record.originalTaxDocumentId || null,
+    originalDocumentNumber: record.originalDocumentNumber || null,
+  };
+};
+
+const mapLegacyReceipt = (receipt) => {
+  const totalAmountDec = (receipt.items || []).reduce(
+    (sum, item) => sum.plus(D(item.costPrice).times(item.quantity || 0)),
+    new Prisma.Decimal(0),
+  );
+  const vatRate = Number(receipt.vatRate || 7);
+  const vatAmountDec = totalAmountDec.times(vatRate).div(100);
+  const grandTotalDec = totalAmountDec.plus(vatAmountDec);
+
+  return {
+    id: `legacy-receipt:${receipt.id}`,
+    legacyPurchaseOrderReceiptId: receipt.id,
+    taxDocumentId: null,
+    authority: 'LEGACY_PURCHASE_RECEIPT_COMPAT',
+    ledgerType: 'INPUT_VAT',
+    date: receipt.supplierTaxInvoiceDate,
+    poNumber: receipt.purchaseOrder?.code || 'N/A',
+    supplierTaxInvoiceDate: receipt.supplierTaxInvoiceDate,
+    supplierTaxInvoiceNumber: receipt.supplierTaxInvoiceNumber,
+    supplierName: receipt.purchaseOrder?.supplier?.name || 'N/A',
+    supplierTaxId: receipt.purchaseOrder?.supplier?.taxId || 'N/A',
+    branchName: receipt.branch?.name || 'N/A',
+    totalAmount: toNumber(totalAmountDec),
+    vatAmount: toNumber(vatAmountDec),
+    grandTotal: toNumber(grandTotalDec),
+    vatRate,
+    originalTaxDocumentId: null,
+    originalDocumentNumber: null,
+  };
+};
+
 const getInputTaxReport = async ({ user = {}, query = {} }) => {
   const branchId = Number(user.branchId);
   if (!branchId) throw makeError(403, 'ไม่สามารถระบุสาขาของผู้ใช้ได้');
 
   const period = resolvePeriod(query);
-  const receipts = await findInputTaxReceipts({
-    branchId,
-    startDate: period.startDate,
-    endDate: period.endDate,
-  });
+  const [records, legacyReceipts] = await Promise.all([
+    findInputVatRecords({ branchId, startDate: period.startDate, endDate: period.endDate }),
+    findLegacyInputTaxReceipts({ branchId, startDate: period.startDate, endDate: period.endDate }),
+  ]);
 
-  const data = receipts.map((receipt) => {
-    const totalAmountDec = (receipt.items || []).reduce(
-      (sum, item) => sum.plus(D(item.costPrice).times(item.quantity || 0)),
-      new Prisma.Decimal(0)
-    );
-    const vatRate = Number(receipt.vatRate || 7);
-    const vatAmountDec = totalAmountDec.times(vatRate).div(100);
-    const grandTotalDec = totalAmountDec.plus(vatAmountDec);
-
-    return {
-      id: receipt.id,
-      date: receipt.supplierTaxInvoiceDate,
-      poNumber: receipt.purchaseOrder?.code || 'N/A',
-      supplierTaxInvoiceDate: receipt.supplierTaxInvoiceDate,
-      supplierTaxInvoiceNumber: receipt.supplierTaxInvoiceNumber,
-      supplierName: receipt.purchaseOrder?.supplier?.name || 'N/A',
-      supplierTaxId: receipt.purchaseOrder?.supplier?.taxId || 'N/A',
-      branchName: receipt.branch?.name || 'N/A',
-      totalAmount: toNumber(totalAmountDec),
-      vatAmount: toNumber(vatAmountDec),
-      grandTotal: toNumber(grandTotalDec),
-      vatRate,
-    };
-  });
+  const authorityRows = records.map(mapAuthorityRecord);
+  const authoritativeKeys = new Set(authorityRows.map(authorityKey));
+  const legacyRows = legacyReceipts
+    .map(mapLegacyReceipt)
+    .filter((row) => !authoritativeKeys.has(authorityKey(row)));
+  const data = [...authorityRows, ...legacyRows]
+    .sort((a, b) => new Date(a.date) - new Date(b.date)
+      || String(a.supplierTaxInvoiceNumber).localeCompare(String(b.supplierTaxInvoiceNumber)));
 
   const summary = data.reduce(
     (acc, row) => ({
@@ -88,11 +137,13 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
       vatAmount: acc.vatAmount + row.vatAmount,
       grandTotal: acc.grandTotal + row.grandTotal,
     }),
-    { totalAmount: 0, vatAmount: 0, grandTotal: 0 }
+    { totalAmount: 0, vatAmount: 0, grandTotal: 0 },
   );
 
   return {
     message: 'Successfully fetched input tax report.',
+    authority: 'INPUT_VAT_RECORD',
+    legacyCompatibilityRowCount: legacyRows.length,
     data,
     summary,
     period: {

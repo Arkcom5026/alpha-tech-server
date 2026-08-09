@@ -1,6 +1,22 @@
 const { prisma } = require('../../../../../../lib/prisma');
 
-const findInputTaxReceipts = ({ branchId, startDate, endDate }) =>
+const findInputVatRecords = ({ branchId, startDate, endDate }) =>
+  prisma.inputVatRecord.findMany({
+    where: {
+      branchId,
+      documentDate: { gte: startDate, lte: endDate },
+      ledgerType: { in: ['INPUT_VAT', 'INPUT_VAT_ADJUSTMENT'] },
+    },
+    include: {
+      branch: { select: { id: true, name: true } },
+      taxDocument: { select: { id: true, status: true } },
+    },
+    orderBy: [{ documentDate: 'asc' }, { documentNumber: 'asc' }],
+  });
+
+// Compatibility only for historical rows that predate InputVatRecord.
+// New approved documents are superseded by InputVatRecord in the service projection.
+const findLegacyInputTaxReceipts = ({ branchId, startDate, endDate }) =>
   prisma.purchaseOrderReceipt.findMany({
     where: {
       branchId,
@@ -16,4 +32,4 @@ const findInputTaxReceipts = ({ branchId, startDate, endDate }) =>
     orderBy: { supplierTaxInvoiceDate: 'asc' },
   });
 
-module.exports = { findInputTaxReceipts };
+module.exports = { findInputVatRecords, findLegacyInputTaxReceipts };
