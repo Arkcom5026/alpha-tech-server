@@ -4,7 +4,6 @@ const { Prisma } = require('../../../../../lib/prisma');
 const { createCustomerMoneyApplication } = require('../../application/createCustomerMoneyApplicationService');
 const { createCustomerMoneyLedger } = require('../../ledger/createCustomerMoneyLedgerService');
 const { updateCustomerMoneyBalance } = require('../../balance/updateCustomerMoneyBalanceService');
-const { createSettlement } = require('./deliveryCreditSettlementRepository');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -115,6 +114,12 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   });
   const available = money(balance?.availableAmount);
   const requestedTotal = command.lines.reduce((sum, line) => sum.plus(money(line.amount)), money(0));
+  if (!balance || available.lessThanOrEqualTo(0)) {
+    const error = new Error('ลูกค้าไม่มี Customer Money ที่พร้อมใช้');
+    error.code = 'CUSTOMER_MONEY_NOT_AVAILABLE';
+    error.statusCode = 409;
+    throw error;
+  }
   if (requestedTotal.greaterThan(available)) {
     const error = new Error('ยอดตัดชำระมากกว่า Customer Money ที่พร้อมใช้');
     error.code = 'INSUFFICIENT_CUSTOMER_MONEY';
@@ -241,13 +246,14 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   for (const [saleId, applied] of perSale.entries()) {
     const sale = sales.get(saleId);
     const nextPaid = money(sale.paidAmount).plus(applied);
+    const fullyPaid = nextPaid.greaterThanOrEqualTo(money(sale.totalAmount));
     await tx.sale.update({
       where: { id: saleId },
       data: {
         paidAmount: nextPaid,
         statusPayment: derivePaymentStatus({ totalAmount: sale.totalAmount, paidAmount: nextPaid }),
-        paid: nextPaid.greaterThanOrEqualTo(money(sale.totalAmount)),
-        paidAt: nextPaid.greaterThanOrEqualTo(money(sale.totalAmount)) ? settledAt : null,
+        paid: fullyPaid,
+        paidAt: fullyPaid ? settledAt : null,
       },
     });
   }
@@ -260,20 +266,18 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     availableAmount: nextBalance,
   });
 
-  return createSettlement({ client: tx, data: undefined }).catch(async () => {
-    const fresh = await tx.customerMoneySettlement.findUnique({
-      where: { id: settlement.id },
-      include: {
-        customer: { select: { id: true, name: true, companyName: true, taxId: true } },
-        lines: { orderBy: [{ saleId: 'asc' }, { id: 'asc' }], include: { application: true } },
-      },
-    });
-    return {
-      ...fresh,
-      totalAmount: asNumber(fresh.totalAmount),
-      customerMoneyBalance: asNumber(nextBalance),
-    };
+  const fresh = await tx.customerMoneySettlement.findUnique({
+    where: { id: settlement.id },
+    include: {
+      customer: { select: { id: true, name: true, companyName: true, taxId: true } },
+      lines: { orderBy: [{ saleId: 'asc' }, { id: 'asc' }], include: { application: true } },
+    },
   });
+  return {
+    ...fresh,
+    totalAmount: asNumber(fresh.totalAmount),
+    customerMoneyBalance: asNumber(nextBalance),
+  };
 });
 
 module.exports = { createDeliveryCreditSettlement, derivePaymentStatus };
