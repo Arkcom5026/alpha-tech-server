@@ -59,6 +59,10 @@ test('deposit use adapts the existing FE payload into the Customer Money foundat
         { totalAmount: new Prisma.Decimal(50), usedAmount: new Prisma.Decimal(5) },
       ];
     },
+    findActiveMoneyReceiptBalancesByCustomer: async (input) => {
+      assert.equal(input.client, tx);
+      return [];
+    },
   } };
   require.cache[applicationPath] = { exports: {
     createCustomerMoneyApplication: async ({ client, data }) => {
