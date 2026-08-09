@@ -14,6 +14,9 @@ const receiptSelect = {
   note: true,
   status: true,
   createdByEmployeeProfileId: true,
+  cancelledByEmployeeProfileId: true,
+  cancelledAt: true,
+  cancelReason: true,
   createdAt: true,
   updatedAt: true,
   customer: {
@@ -55,6 +58,7 @@ const getCustomerMoneyReceipt = ({ client, id, branchId }) => {
 };
 
 module.exports = {
+  receiptSelect,
   createCustomerMoneyReceipt,
   listCustomerMoneyReceipts,
   getCustomerMoneyReceipt,
