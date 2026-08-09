@@ -94,6 +94,7 @@ const operationalVerificationRoutes = require('./src/modules/system/operational-
 const storeDeviceRoutes = require('./src/modules/storeDevice/routes/storeDeviceRoutes');
 const documentPurposeRoutes = require('./src/modules/document-purpose/http/documentPurposeRoutes');
 const { mountCustomerMoneyReceiveModule } = require('./src/modules/customer-money/receive/registerCustomerMoneyReceive');
+const { mountDeliveryCreditSettlementModule } = require('./src/modules/customer-money/settlement/delivery-credit/registerDeliveryCreditSettlement');
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
@@ -245,6 +246,7 @@ app.use('/api/products/upload', uploadProductRoutes);
 app.use('/api/store-devices', storeDeviceRoutes);
 app.use('/api/document-purposes', documentPurposeRoutes);
 mountCustomerMoneyReceiveModule(app);
+mountDeliveryCreditSettlementModule(app);
 
 // ===================== Errors =====================
 app.use((req, res) => {
