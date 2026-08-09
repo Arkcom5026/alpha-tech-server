@@ -44,7 +44,7 @@ const selectSale = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
     branchId,
     customerId,
     isCredit: true,
-    status: 'COMPLETED',
+    status: { not: 'CANCELLED' },
     statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
   },
   select: {
