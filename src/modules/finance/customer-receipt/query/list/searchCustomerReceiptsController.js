@@ -38,7 +38,10 @@ const searchCustomerReceipts = async (req, res) => {
     );
     const skip = (page - 1) * limit;
 
-    const where = { branchId };
+    const where = {
+      branchId,
+      NOT: { code: { startsWith: 'CMR-' } },
+    };
 
     if (status) where.status = status;
     if (Number.isInteger(customerId) && customerId > 0) where.customerId = customerId;
