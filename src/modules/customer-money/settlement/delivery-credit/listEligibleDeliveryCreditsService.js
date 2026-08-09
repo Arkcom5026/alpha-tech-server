@@ -45,7 +45,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
       branchId: command.branchId,
       customerId: command.customerId,
       isCredit: true,
-      status: 'COMPLETED',
+      status: { not: 'CANCELLED' },
       statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
       ...(keyword ? {
         OR: [
