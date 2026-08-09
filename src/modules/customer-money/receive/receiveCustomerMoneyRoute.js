@@ -1,15 +1,24 @@
 'use strict';
 
 const express = require('express');
-const { receiveCustomerMoneyController } = require('./receiveCustomerMoneyController');
+const {
+  receiveCustomerMoneyController,
+  listCustomerMoneyReceiveController,
+  getCustomerMoneyReceiveController,
+} = require('./receiveCustomerMoneyController');
 
-const createReceiveCustomerMoneyRoute = ({ receiveCustomerMoneyService }) => {
+const createReceiveCustomerMoneyRoute = ({ verifyToken, runtime }) => {
   const router = express.Router();
 
-  router.post('/receive', (req, res, next) => {
-    req.receiveCustomerMoneyService = receiveCustomerMoneyService;
-    return receiveCustomerMoneyController(req, res, next);
+  if (verifyToken) router.use(verifyToken);
+  router.use((req, _res, next) => {
+    req.customerMoneyReceive = runtime;
+    next();
   });
+
+  router.get('/', listCustomerMoneyReceiveController);
+  router.get('/:id', getCustomerMoneyReceiveController);
+  router.post('/', receiveCustomerMoneyController);
 
   return router;
 };
