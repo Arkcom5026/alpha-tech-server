@@ -70,6 +70,11 @@ const sumDeposits = (deposits = []) => deposits.reduce(
   new Prisma.Decimal(0)
 );
 
+const sumMoneyReceipts = (receipts = []) => receipts.reduce(
+  (sum, receipt) => sum.plus(new Prisma.Decimal(receipt?.remainingAmount ?? 0)),
+  new Prisma.Decimal(0)
+);
+
 const projectDeposit = (deposit) => {
   const base = NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit;
   return {
@@ -466,12 +471,19 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
         createdById: employeeId,
       },
     });
-    const activeDeposits = await repository.findActiveDepositBalancesByCustomer({
-      customerId: deposit.customerId,
-      branchId,
-      client: tx,
-    });
-    const availableAmount = sumDeposits(activeDeposits);
+    const [activeDeposits, activeMoneyReceipts] = await Promise.all([
+      repository.findActiveDepositBalancesByCustomer({
+        customerId: deposit.customerId,
+        branchId,
+        client: tx,
+      }),
+      repository.findActiveMoneyReceiptBalancesByCustomer({
+        customerId: deposit.customerId,
+        branchId,
+        client: tx,
+      }),
+    ]);
+    const availableAmount = sumDeposits(activeDeposits).plus(sumMoneyReceipts(activeMoneyReceipts));
     await updateCustomerMoneyBalance({
       client: tx,
       branchId,

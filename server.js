@@ -93,6 +93,7 @@ const missingCostResolutionRecoveryExecutionRoutes = require('./src/modules/inve
 const operationalVerificationRoutes = require('./src/modules/system/operational-verification/operationalVerificationRoutes');
 const storeDeviceRoutes = require('./src/modules/storeDevice/routes/storeDeviceRoutes');
 const documentPurposeRoutes = require('./src/modules/document-purpose/http/documentPurposeRoutes');
+const { mountCustomerMoneyReceiveModule } = require('./src/modules/customer-money/receive/registerCustomerMoneyReceive');
 
 // ===================== Middleware =====================
 app.use(express.json({ limit: '2mb' }));
@@ -243,6 +244,7 @@ app.use('/api/operational-verification', operationalVerificationRoutes);
 app.use('/api/products/upload', uploadProductRoutes);
 app.use('/api/store-devices', storeDeviceRoutes);
 app.use('/api/document-purposes', documentPurposeRoutes);
+mountCustomerMoneyReceiveModule(app);
 
 // ===================== Errors =====================
 app.use((req, res) => {

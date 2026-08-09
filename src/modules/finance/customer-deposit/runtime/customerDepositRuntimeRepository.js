@@ -90,6 +90,18 @@ const findActiveDepositBalancesByCustomer = ({ customerId, branchId, client = pr
   })
 );
 
+const findActiveMoneyReceiptBalancesByCustomer = ({ customerId, branchId, client = prisma }) => (
+  client.customerReceipt.findMany({
+    where: {
+      customerId,
+      branchId,
+      status: 'ACTIVE',
+      code: { startsWith: 'CMR-' },
+    },
+    select: { remainingAmount: true },
+  })
+);
+
 const runTransaction = (callback, options) => prisma.$transaction(callback, options);
 
 module.exports = {
@@ -101,6 +113,7 @@ module.exports = {
   findCustomerById,
   updateDepositById,
   findActiveDepositBalancesByCustomer,
+  findActiveMoneyReceiptBalancesByCustomer,
   deleteDepositById,
   runTransaction,
 };
