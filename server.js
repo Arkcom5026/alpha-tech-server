@@ -235,6 +235,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/tax-periods', taxPeriodRoutes);
 app.use('/api/tax-intake', taxIntakeRoutes);
+app.use('/api/tax', taxIntakeRoutes);
 app.use('/api/tax-expenses', taxExpenseRoutes);
 app.use('/api/simple-stock', simpleStockRoutes);
 app.use('/api/missing-cost-resolutions', missingCostResolutionReadRoutes);

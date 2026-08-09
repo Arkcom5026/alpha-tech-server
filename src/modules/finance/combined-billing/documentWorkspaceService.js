@@ -96,6 +96,20 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
       for (const item of sale.simpleItems) source.set(keyOf('SIMPLE', item.id), lineProjection(sale, 'SIMPLE', item, 0));
     }
     if (source.size !== requested.length) fail('DOCUMENT_WORKSPACE_SOURCE_INVALID', 'A source line is missing or outside this customer/branch', 409);
+    const alreadyDocumented = await tx.consolidatedDeliveryLine.findFirst({
+      where: {
+        branchId,
+        OR: requested.map((line) => ({ sourceLineType: line.lineType, sourceLineId: line.lineId })),
+      },
+      select: { combinedBillingId: true, sourceDocumentNo: true },
+    });
+    if (alreadyDocumented) {
+      fail(
+        'DOCUMENT_WORKSPACE_LINE_ALREADY_DOCUMENTED',
+        `รายการจาก ${alreadyDocumented.sourceDocumentNo} ถูกนำไปสร้างใบส่งของรวมแล้ว`,
+        409,
+      );
+    }
     const settlementRows = await tx.customerMoneySettlementLine.findMany({ where: { OR: requested.map((line) => ({ saleItemType: line.lineType, saleItemId: line.lineId })), settlement: { status: 'ACTIVE', branchId, customerId } }, select: { saleItemType: true, saleItemId: true, appliedAmount: true } });
     const settled = new Map(); for (const row of settlementRows) settled.set(keyOf(row.saleItemType, row.saleItemId), money((settled.get(keyOf(row.saleItemType, row.saleItemId)) || 0) + Number(row.appliedAmount)));
     const data = requested.map((request) => {

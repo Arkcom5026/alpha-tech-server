@@ -18,9 +18,18 @@ test('document workspace persists immutable source and negotiated document price
 test('confirmation protects paid authority, releases negotiated surplus and never mutates inventory', () => {
   const service = read('src/modules/finance/combined-billing/documentWorkspaceService.js');
   assert.match(service, /DOCUMENT_WORKSPACE_ADDITIONAL_PAYMENT_REQUIRED/);
+  assert.match(service, /DOCUMENT_WORKSPACE_LINE_ALREADY_DOCUMENTED/);
   assert.match(service, /DOCUMENT_PRICE_ADJUSTMENT_RELEASE/);
   assert.match(service, /customerMoneyBalance\.upsert/);
   assert.doesNotMatch(service, /stockMovement|inventory|stockItem\.update|sale\.update/);
+});
+
+test('duplicate source-line submission is a business conflict before Prisma writes', () => {
+  const service = read('src/modules/finance/combined-billing/documentWorkspaceService.js');
+  const controller = read('src/modules/finance/combined-billing/documentWorkspaceController.js');
+  assert.match(service, /consolidatedDeliveryLine\.findFirst/);
+  assert.match(controller, /error\?\.code === 'P2002'/);
+  assert.match(controller, /status\(409\)/);
 });
 
 test('consolidated delivery is registered into the existing output tax authority', () => {
