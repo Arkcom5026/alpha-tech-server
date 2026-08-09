@@ -246,14 +246,11 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   for (const [saleId, applied] of perSale.entries()) {
     const sale = sales.get(saleId);
     const nextPaid = money(sale.paidAmount).plus(applied);
-    const fullyPaid = nextPaid.greaterThanOrEqualTo(money(sale.totalAmount));
     await tx.sale.update({
       where: { id: saleId },
       data: {
         paidAmount: nextPaid,
         statusPayment: derivePaymentStatus({ totalAmount: sale.totalAmount, paidAmount: nextPaid }),
-        paid: fullyPaid,
-        paidAt: fullyPaid ? settledAt : null,
       },
     });
   }
