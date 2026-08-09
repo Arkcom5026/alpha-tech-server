@@ -14,4 +14,22 @@ const findInputVatRecords = ({ branchId, startDate, endDate }) =>
     orderBy: [{ documentDate: 'asc' }, { documentNumber: 'asc' }],
   });
 
-module.exports = { findInputVatRecords };
+// Compatibility only for historical rows that predate InputVatRecord.
+// New approved documents are superseded by InputVatRecord in the service projection.
+const findLegacyInputTaxReceipts = ({ branchId, startDate, endDate }) =>
+  prisma.purchaseOrderReceipt.findMany({
+    where: {
+      branchId,
+      supplierTaxInvoiceDate: { gte: startDate, lte: endDate },
+      supplierTaxInvoiceNumber: { not: null },
+      purchaseOrder: { supplier: { isSystem: false } },
+    },
+    include: {
+      branch: true,
+      purchaseOrder: { include: { supplier: true } },
+      items: { select: { quantity: true, costPrice: true } },
+    },
+    orderBy: { supplierTaxInvoiceDate: 'asc' },
+  });
+
+module.exports = { findInputVatRecords, findLegacyInputTaxReceipts };
