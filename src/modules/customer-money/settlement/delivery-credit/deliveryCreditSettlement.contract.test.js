@@ -8,9 +8,10 @@ const test = require('node:test');
 const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const contract = read('deliveryCreditSettlementContract.js');
 const queryService = read('listEligibleDeliveryCreditsService.js');
+const createService = read('createDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
 
-test('eligible delivery credit query is branch and customer scoped', () => {
+ test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
   assert.match(queryService, /customerId:\s*command\.customerId/);
   assert.match(queryService, /isCredit:\s*true/);
@@ -35,7 +36,22 @@ test('settlement command supports multi-sale item-level partial application', ()
   assert.match(contract, /amount/);
 });
 
-test('settlement endpoint is isolated from legacy customer receipt allocation', () => {
-  assert.match(route, /eligible-sales/);
+test('settlement write is atomic across customer money and sale payment projection', () => {
+  assert.match(createService, /prisma\.\$transaction/);
+  assert.match(createService, /customerMoneySettlement\.create/);
+  assert.match(createService, /createCustomerMoneyApplication/);
+  assert.match(createService, /eventType:\s*'MONEY_APPLIED'/);
+  assert.match(createService, /direction:\s*'DEBIT'/);
+  assert.match(createService, /updateCustomerMoneyBalance/);
+  assert.match(createService, /tx\.sale\.update/);
+  assert.match(createService, /paidAmount:\s*nextPaid/);
+  assert.match(createService, /statusPayment:\s*derivePaymentStatus/);
+});
+
+test('settlement write preserves stock and legacy receipt boundaries', () => {
+  assert.doesNotMatch(createService, /stockItem\.update|stockMovement|inventory|customerReceiptAllocation\.create/);
+  assert.match(createService, /targetType:\s*'DELIVERY_CREDIT'/);
+  assert.match(createService, /sourceType:\s*'CUSTOMER_MONEY_BALANCE'/);
+  assert.match(route, /router\.post\('\/'/);
   assert.doesNotMatch(route, /customer-receipt|allocation/i);
 });
