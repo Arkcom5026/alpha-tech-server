@@ -39,6 +39,19 @@ const createDocumentCode = async (tx, branchId, receivedAt) => {
   return `${prefix}${String(count + 1).padStart(4, '0')}`;
 };
 
+const sumAvailableDeposits = (deposits = []) => deposits.reduce(
+  (sum, deposit) => sum.plus(
+    new Prisma.Decimal(deposit?.totalAmount ?? 0)
+      .minus(new Prisma.Decimal(deposit?.usedAmount ?? 0)),
+  ),
+  new Prisma.Decimal(0),
+);
+
+const sumAvailableMoneyReceipts = (receipts = []) => receipts.reduce(
+  (sum, receipt) => sum.plus(new Prisma.Decimal(receipt?.remainingAmount ?? 0)),
+  new Prisma.Decimal(0),
+);
+
 const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, updateBalance, input, user }) => {
   if (!prisma?.$transaction) throw new TypeError('Prisma transaction client is required');
   const command = validateReceiveCustomerMoneyInput(input, user);
@@ -52,7 +65,13 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
     if (!customer) throw buildError('ไม่พบลูกค้าในสาขานี้', 404, 'CUSTOMER_NOT_FOUND');
 
     const employee = await tx.employeeProfile.findFirst({
-      where: { id: command.createdById, branchId: command.branchId }, select: { id: true },
+      where: {
+        id: command.createdById,
+        branchId: command.branchId,
+        active: true,
+        approved: true,
+      },
+      select: { id: true },
     });
     if (!employee) throw buildError('ไม่พบพนักงานผู้รับเงินในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
 
@@ -78,11 +97,28 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
       },
     });
 
-    const currentBalance = await tx.customerMoneyBalance.findUnique({
-      where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
-      select: { availableAmount: true },
-    });
-    const nextAvailable = (currentBalance?.availableAmount || new Prisma.Decimal(0)).plus(amount);
+    const [activeDeposits, activeMoneyReceipts] = await Promise.all([
+      tx.customerDeposit.findMany({
+        where: {
+          customerId: command.customerId,
+          branchId: command.branchId,
+          status: 'ACTIVE',
+        },
+        select: { totalAmount: true, usedAmount: true },
+      }),
+      tx.customerReceipt.findMany({
+        where: {
+          customerId: command.customerId,
+          branchId: command.branchId,
+          status: 'ACTIVE',
+          code: { startsWith: 'CMR-' },
+        },
+        select: { remainingAmount: true },
+      }),
+    ]);
+
+    const nextAvailable = sumAvailableDeposits(activeDeposits)
+      .plus(sumAvailableMoneyReceipts(activeMoneyReceipts));
     const balance = await updateBalance({
       client: tx, branchId: command.branchId, customerId: command.customerId, availableAmount: nextAvailable,
     });
