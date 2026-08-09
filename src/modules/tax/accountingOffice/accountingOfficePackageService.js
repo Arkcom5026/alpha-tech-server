@@ -43,6 +43,7 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     SELECT
       record."id" AS "outputVatRecordId",
       record."taxDocumentId",
+      record."taxPeriodId",
       record."ledgerType",
       record."documentType",
       record."taxInvoiceKind",
