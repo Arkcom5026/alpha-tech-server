@@ -9,6 +9,7 @@ const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const contract = read('deliveryCreditSettlementContract.js');
 const queryService = read('listEligibleDeliveryCreditsService.js');
 const createService = read('createDeliveryCreditSettlementService.js');
+const detailQueryService = read('queryDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
 
 test('eligible delivery credit query is branch and customer scoped', () => {
@@ -52,6 +53,13 @@ test('settlement write is atomic across customer money and sale payment projecti
   assert.match(createService, /tx\.sale\.update/);
   assert.match(createService, /paidAmount:\s*nextPaid/);
   assert.match(createService, /statusPayment:\s*derivePaymentStatus/);
+});
+
+test('fully paid referenced sales become tax-document ready without creating a new tax engine', () => {
+  assert.match(detailQueryService, /salePaymentStates/);
+  assert.match(detailQueryService, /statusPayment:\s*sale\.statusPayment/);
+  assert.match(detailQueryService, /taxDocumentReady:[\s\S]*sale\.statusPayment === 'PAID'/);
+  assert.doesNotMatch(detailQueryService, /taxDocument\.create|taxInvoice\.create/);
 });
 
 test('settlement write preserves stock and legacy receipt boundaries', () => {
