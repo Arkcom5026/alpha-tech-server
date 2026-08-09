@@ -36,6 +36,7 @@ const createPrintRequestSnapshot = ({
   sourceId,
   copies,
   projection,
+  routeSnapshot = null,
 }) => ({
   schemaVersion: 1,
   documentPurpose,
@@ -46,6 +47,7 @@ const createPrintRequestSnapshot = ({
   print: {
     copies,
   },
+  route: routeSnapshot,
   projection,
 })
 

@@ -3,8 +3,11 @@
 const {
   createSaleReceiptPrintJobService,
 } = require('./createSaleReceiptPrintJobService')
+const { createResolveConfiguredPrintRouteService } = require('../../print-routing/resolveConfiguredPrintRouteService')
 
-const service = createSaleReceiptPrintJobService()
+const service = createSaleReceiptPrintJobService({
+  routeResolver: createResolveConfiguredPrintRouteService(),
+})
 
 const createSaleReceiptPrintJob = async (req, res) => {
   try {

@@ -3,8 +3,11 @@
 const {
   createDeliveryNotePrintJobService,
 } = require('./createDeliveryNotePrintJobService')
+const { createResolveConfiguredPrintRouteService } = require('../../print-routing/resolveConfiguredPrintRouteService')
 
-const service = createDeliveryNotePrintJobService()
+const service = createDeliveryNotePrintJobService({
+  routeResolver: createResolveConfiguredPrintRouteService(),
+})
 
 const createDeliveryNotePrintJob = async (req, res) => {
   try {

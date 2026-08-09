@@ -22,13 +22,59 @@ model DocumentPurposeDefinition {
   updatedByEmployee EmployeeProfile? @relation("DocumentPurposeDefinitionUpdatedBy", fields: [updatedByEmployeeId], references: [id], onDelete: Restrict)
   versions          DocumentPurposeVersion[]
   events            DocumentPurposeEvent[]
+  printRoutes       DocumentPurposePrintRoute[]
 
   @@unique([branchId, normalizedCode])
+  @@unique([branchId, id])
   @@index([branchId, lifecycleState, sortOrder])
   @@index([branchId, categoryCode, lifecycleState])
   @@index([branchId, archivedAt])
   @@index([createdByEmployeeId])
   @@index([updatedByEmployeeId])
+}
+
+model PrintDeviceProfile {
+  id             Int      @id @default(autoincrement())
+  branchId       Int
+  code           String   @db.VarChar(100)
+  normalizedCode String   @db.VarChar(100)
+  displayName    String   @db.VarChar(160)
+  manufacturer   String?  @db.VarChar(120)
+  modelName      String?  @db.VarChar(160)
+  capabilities   Json
+  paperProfile   Json?
+  adapterKind    String?  @db.VarChar(80)
+  transportKind  String?  @db.VarChar(80)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  branch Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  routes DocumentPurposePrintRoute[]
+
+  @@unique([branchId, normalizedCode])
+  @@unique([branchId, id])
+  @@index([branchId, isActive, displayName])
+}
+
+model DocumentPurposePrintRoute {
+  id                 Int      @id @default(autoincrement())
+  branchId           Int
+  definitionId       Int
+  printerProfileId   Int
+  requiredCapability String   @default("PRINT") @db.VarChar(40)
+  copies             Int      @default(1)
+  priority           Int      @default(100)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  branch         Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  definition     DocumentPurposeDefinition @relation(fields: [branchId, definitionId], references: [branchId, id], onDelete: Restrict)
+  printerProfile PrintDeviceProfile        @relation(fields: [branchId, printerProfileId], references: [branchId, id], onDelete: Restrict)
+
+  @@unique([branchId, definitionId])
+  @@index([branchId, printerProfileId, isActive])
 }
 
 model DocumentPurposeVersion {

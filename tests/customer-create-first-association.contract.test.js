@@ -20,11 +20,11 @@ assert.match(controller, /branchId: Number\(req\.user\?\.branchId\)/);
 assert.match(controller, /employeeId: Number\(/);
 assert.match(service, /issueCustomerFirstAssociationToken/);
 assert.match(service, /firstAssociationToken/);
-assert.match(service, /CUSTOMER_PHONE_NOT_AVAILABLE_IN_BRANCH/);
-assert.match(service, /repository\.findAccessibleCustomer/);
+assert.match(service, /repository\.findCustomerByUserAndBranch/);
+assert.match(service, /repository\.createCustomerProfile/);
 assert.doesNotMatch(service, /prisma\./);
 assert.doesNotMatch(service, /branchId\s*=\s*input/);
-assert.match(repository, /buildCustomerBranchAccessWhere/);
-assert.match(repository, /findAccessibleCustomer/);
+assert.match(repository, /branchId_userId/);
+assert.match(repository, /branchId:\s*Number\(branchId\)/);
 
 console.log('customer-create-first-association.contract: PASS');

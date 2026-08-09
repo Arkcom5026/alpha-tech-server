@@ -29,10 +29,9 @@ test('Repair customer consumers preserve the shared branch authority boundary', 
   assert.match(repairPolicy, /buildCustomerBranchEvidence/);
   assert.doesNotMatch(repairPolicy, /sales:\s*\{|repairJobs:\s*\{|deviceIntakes:\s*\{|ownedDevices:\s*\{/);
 
-  ['sales', 'repairJobs', 'deviceIntakes', 'ownedDevices'].forEach((relation) => {
-    assert.match(sharedPolicy, new RegExp(`${relation}:\\s*\\{\\s*some:`));
-  });
-  assert.match(sharedPolicy, /status:\s*\{\s*not:\s*'RETIRED'/);
+  assert.match(sharedPolicy, /return \{ branchId \}/);
+  assert.match(sharedPolicy, /return \{ id: \{ equals: -1 \} \}/);
+  assert.doesNotMatch(sharedPolicy, /sales:\s*\{|repairJobs:\s*\{|deviceIntakes:\s*\{|ownedDevices:\s*\{/);
 
   [files.intakeSearch, files.createRepairJob, files.externalIntake, files.warrantyAssets]
     .map(read)

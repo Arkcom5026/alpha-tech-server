@@ -13,6 +13,7 @@ const {
   createPrintRequestSnapshot,
   assertIdempotentPrintJobCompatibility,
 } = require('./printDocumentJobContract')
+const { resolvePrintJobRouting } = require('./resolvePrintJobRouting')
 
 const ALLOWED_PURPOSE_CODES = new Set([
   'SHORT_TAX_INVOICE',
@@ -22,6 +23,7 @@ const ALLOWED_PURPOSE_CODES = new Set([
 const createOutputTaxInvoicePrintJobService = ({
   projector = projectOutputTaxPrintableDocument,
   jobService = durableJobService,
+  routeResolver = null,
 } = {}) => ({
   async execute({ user, taxDocumentId, payload = {} }) {
     const branchId = requireBranchAuthority(user)
@@ -35,8 +37,6 @@ const createOutputTaxInvoicePrintJobService = ({
       'STORE_DEVICE_PRINT_IDEMPOTENCY_REQUIRED',
       'idempotencyKey',
     )
-    const copies = normalizeCopies(payload.copies)
-
     const projection = await projector({
       branchId,
       taxDocumentId: normalizedTaxDocumentId,
@@ -59,12 +59,23 @@ const createOutputTaxInvoicePrintJobService = ({
       displayName: projection.document.title,
     }
 
+    const routing = await resolvePrintJobRouting({
+      routeResolver,
+      branchId,
+      documentPurposeCode: documentPurpose.code,
+      requestedCopies: payload.copies,
+      legacyTargetDeviceId: payload.targetDeviceId,
+      legacyTargetProfileId: payload.targetProfileId,
+    })
+    const copies = routing.copies
+
     const requestSnapshot = createPrintRequestSnapshot({
       documentPurpose,
       sourceType: 'TAX_DOCUMENT',
       sourceId: normalizedTaxDocumentId,
       copies,
       projection,
+      routeSnapshot: routing.routeSnapshot,
     })
 
     const job = await jobService.createJob({
@@ -73,8 +84,8 @@ const createOutputTaxInvoicePrintJobService = ({
         idempotencyKey,
         jobType: 'PRINT_DOCUMENT',
         source: 'OUTPUT_TAX_INVOICE',
-        targetDeviceId: payload.targetDeviceId || null,
-        targetProfileId: payload.targetProfileId || null,
+        targetDeviceId: routing.targetDeviceId,
+        targetProfileId: routing.targetProfileId,
         correlationId: payload.correlationId || null,
         causationId: payload.causationId || null,
         requestSnapshot,
