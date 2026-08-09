@@ -447,6 +447,38 @@ model CombinedBillingDocument {
   employee       EmployeeProfile       @relation(fields: [createdBy], references: [id])
   customer       CustomerProfile       @relation(fields: [customerId], references: [id])
   sales          Sale[]                @relation("CombinedBillingSales")
+  documentLines  ConsolidatedDeliveryLine[]
+}
+
+model ConsolidatedDeliveryLine {
+  id                    Int                     @id @default(autoincrement())
+  combinedBillingId     Int
+  branchId              Int
+  customerId            Int
+  sourceSaleId          Int
+  sourceSaleCode        String                  @db.VarChar(100)
+  sourceDocumentNo      String                  @db.VarChar(100)
+  sourceLineType        String                  @db.VarChar(20)
+  sourceLineId          Int
+  description           String
+  quantity              Decimal                 @db.Decimal(12, 2)
+  sourceUnitPrice       Decimal                 @db.Decimal(12, 2)
+  documentUnitPrice     Decimal                 @db.Decimal(12, 2)
+  priceAdjustment       Decimal                 @db.Decimal(12, 2)
+  adjustmentReason      String?
+  settledAmount         Decimal                 @db.Decimal(12, 2)
+  documentAmount        Decimal                 @db.Decimal(12, 2)
+  status                String                  @default("DOCUMENTED") @db.VarChar(30)
+  sourceSnapshot        Json
+  adjustedById          Int?
+  adjustedAt            DateTime?
+  createdAt             DateTime                @default(now())
+  combinedBilling       CombinedBillingDocument @relation(fields: [combinedBillingId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, sourceLineType, sourceLineId])
+  @@index([combinedBillingId])
+  @@index([sourceSaleId])
+  @@index([branchId, customerId, status])
 }
 
 model PaymentCodeCounter {

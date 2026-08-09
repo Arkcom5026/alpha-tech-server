@@ -24,8 +24,9 @@ test('repository preserves branch scope, pending sale rules, keyword search and 
 
   assert.deepEqual(receivedQuery.where, {
     branchId: 7,
-    status: 'DELIVERED',
-    combinedBillingId: null,
+    isCredit: true,
+    status: { not: 'CANCELLED' },
+    statusPayment: { in: ['PARTIALLY_PAID', 'PAID'] },
     customerId: { not: null },
     customer: {
       OR: [

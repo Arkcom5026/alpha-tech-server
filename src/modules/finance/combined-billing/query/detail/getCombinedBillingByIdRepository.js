@@ -12,6 +12,7 @@ class GetCombinedBillingByIdRepository {
         customer: true,
         employee: true,
         sales: true,
+        documentLines: { orderBy: { id: 'asc' } },
       },
     });
   }

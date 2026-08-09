@@ -22,6 +22,7 @@ test('repository scopes combined billing detail by document id and branch', asyn
     customer: true,
     employee: true,
     sales: true,
+    documentLines: { orderBy: { id: 'asc' } },
   });
   assert.equal(result.id, 7);
 });

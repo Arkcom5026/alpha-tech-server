@@ -11,7 +11,11 @@ const {
 } = require('../create/createCombinedBillingDocumentController');
 
 const router = express.Router();
+const documentWorkspace = require('../documentWorkspaceController');
 router.use(verifyToken);
+
+router.get('/document-workspace', documentWorkspace.list);
+router.post('/document-workspace/confirm', documentWorkspace.confirm);
 
 router.get('/combinable-sales', getCombinableSales);
 router.post('/create', createCombinedBillingDocument);
