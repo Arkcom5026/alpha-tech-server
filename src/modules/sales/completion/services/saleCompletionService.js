@@ -47,7 +47,7 @@ const canonicalResult = (sale, payments, replayed, commandKey) => ({
   completionStatus: sale.statusPayment === 'PAID' ? 'COMPLETED_PAID' : 'COMPLETED_CREDIT',
   documentDefaults: {
     option: sale.isCredit ? 'DELIVERY_NOTE' : 'RECEIPT',
-    deliveryNoteMode: sale.isCredit ? 'PRINT' : null,
+    deliveryNoteMode: sale.officialDocumentNumber ? 'PRINT' : null,
   },
   idempotency: { commandId: commandKey, replayed },
 });
@@ -276,7 +276,7 @@ const completeSale = async ({ command, branchId, employeeId }) => {
             paid: false,
             paidAmount: D(0),
             statusPayment: 'UNPAID',
-            officialDocumentNumber: command.sale.isCredit && command.sale.deliveryNoteMode === 'PRINT' ? `DN-${code}` : null,
+            officialDocumentNumber: command.sale.deliveryNoteMode === 'PRINT' ? `DN-${code}` : null,
             sourceHeldCartId: sourceHeldCart ? Number(sourceHeldCart.id) : null,
             items: evidence.stockLines.length ? {
               create: evidence.stockLines.map((item) => ({

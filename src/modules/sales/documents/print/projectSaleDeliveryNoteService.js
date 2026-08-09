@@ -39,6 +39,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     select: {
       id: true,
       code: true,
+      officialDocumentNumber: true,
       soldAt: true,
       status: true,
       statusPayment: true,
@@ -98,11 +99,11 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     fail('DELIVERY_NOTE_SALE_NOT_COMPLETED', 'Only a completed sale may have a delivery note', 409);
   }
 
-  const eligible = sale.isCredit === true || sale.paid !== true || sale.statusPayment !== 'PAID';
+  const eligible = Boolean(sale.officialDocumentNumber);
   if (!eligible) {
     fail(
       'DELIVERY_NOTE_NOT_REQUIRED',
-      'A delivery note is only available for a credit or outstanding sale',
+      'This sale was not issued with a delivery note',
       409,
     );
   }
@@ -133,6 +134,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       title: purpose.displayName,
       saleId: sale.id,
       saleCode: sale.code,
+      documentNumber: sale.officialDocumentNumber,
       issuedAt: sale.soldAt,
       totalBeforeDiscount: amount(sale.totalBeforeDiscount),
       totalDiscount: amount(sale.totalDiscount),

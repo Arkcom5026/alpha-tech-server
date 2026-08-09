@@ -255,7 +255,7 @@ const createSale = async (req, res) => {
               saleType: saleTypeFromClient || customerSaleType,
               isTaxInvoice: isTaxInvoiceEffective,
               officialDocumentNumber:
-                isCreditSale && String(deliveryNoteMode || 'PRINT') === 'PRINT' ? `DN-${code}` : null,
+                (isCreditSale || String(deliveryNoteMode || '').toUpperCase() === 'PRINT') ? `DN-${code}` : null,
               items: {
                 create: items.map((item) => ({
                   stockItemId: item.stockItemId,

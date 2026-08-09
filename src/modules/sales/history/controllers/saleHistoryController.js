@@ -180,10 +180,13 @@ const searchPrintableSales = async (req, res) => {
     const branchId = Number(req.user?.branchId);
     if (!branchId) return res.status(401).json({ message: 'unauthorized' });
 
-    const { keyword = '', fromDate, toDate, limit: limitRaw, onlyUnpaid, onlyPaid } = req.query;
+    const { keyword = '', fromDate, toDate, limit: limitRaw, onlyUnpaid, onlyPaid, onlyWithDeliveryNote } = req.query;
     const onlyUnpaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyUnpaid ?? '').toLowerCase());
     const onlyPaidBool = ['1', 'true', 'yes', 'y'].includes(String(onlyPaid ?? '').toLowerCase());
     const bothFlags = onlyPaidBool && onlyUnpaidBool;
+    const onlyWithDeliveryNoteBool = ['1', 'true', 'yes', 'y'].includes(
+      String(onlyWithDeliveryNote ?? '').toLowerCase(),
+    );
 
     const limitParsed = parseInt(limitRaw, 10);
     const take = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 100, 1), 500);
@@ -194,6 +197,7 @@ const searchPrintableSales = async (req, res) => {
     const where = {
       branchId,
       status: { not: 'CANCELLED' },
+      ...(onlyWithDeliveryNoteBool ? { officialDocumentNumber: { not: null } } : {}),
       ...(keyword
         ? {
             OR: [
@@ -261,6 +265,7 @@ const searchPrintableSales = async (req, res) => {
       return {
         id: s.id,
         code: s.code,
+        officialDocumentNumber: s.officialDocumentNumber || null,
         createdAt: s.createdAt,
         soldAt: s.soldAt || null,
         totalAmount: round2(totalAmount),

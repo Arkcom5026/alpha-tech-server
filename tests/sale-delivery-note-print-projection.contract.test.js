@@ -15,8 +15,9 @@ const routes = read('src/modules/sales/routes/saleRoutes.js');
 
 assert.match(service, /where: \{ id: normalizedSaleId, branchId: normalizedBranchId \}/);
 assert.match(service, /sale\.status !== 'COMPLETED'/);
-assert.match(service, /sale\.isCredit === true \|\| sale\.paid !== true \|\| sale\.statusPayment !== 'PAID'/);
+assert.match(service, /Boolean\(sale\.officialDocumentNumber\)/);
 assert.match(service, /DELIVERY_NOTE_NOT_REQUIRED/);
+assert.match(service, /documentNumber: sale\.officialDocumentNumber/);
 assert.match(service, /ResolvePrintDocumentPurposeService/);
 assert.match(service, /code: 'DELIVERY_NOTE'/);
 assert.match(service, /type: purpose\.code/);
