@@ -23,12 +23,13 @@ const printable = async (req, res, next) => { try {
   if (!branchId || !id) throw Object.assign(new Error('Document identity is invalid'), { statusCode: 400, code: 'CONSOLIDATED_DELIVERY_ID_INVALID' });
   const document = await prisma.combinedBillingDocument.findFirst({
     where: { id, branchId, documentLines: { some: {} } },
-    include: { customer: true, employee: true, documentLines: { orderBy: { id: 'asc' } } },
+    include: { customer: true, employee: true, branch: true, documentLines: { orderBy: { id: 'asc' } } },
   });
   if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
   res.json({
     document: { id: document.id, title: 'ใบส่งของรวม', number: document.code, issuedAt: document.issueDate, note: document.note, totalAmount: document.totalAmount },
     customer: document.customer,
+    branch: document.branch,
     createdBy: document.employee,
     lines: document.documentLines.map((line) => ({
       id: line.id, sourceDocumentNo: line.sourceDocumentNo, sourceSaleCode: line.sourceSaleCode,
