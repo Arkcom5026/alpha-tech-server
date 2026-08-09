@@ -1,7 +1,12 @@
 'use strict';
 
 const express = require('express');
-const { listEligibleDeliveryCreditsController } = require('./deliveryCreditSettlementController');
+const {
+  listEligibleDeliveryCreditsController,
+  createDeliveryCreditSettlementController,
+  listDeliveryCreditSettlementsController,
+  getDeliveryCreditSettlementController,
+} = require('./deliveryCreditSettlementController');
 
 const createDeliveryCreditSettlementRoute = ({ verifyToken, runtime }) => {
   const router = express.Router();
@@ -11,6 +16,9 @@ const createDeliveryCreditSettlementRoute = ({ verifyToken, runtime }) => {
     next();
   });
   router.get('/eligible-sales', listEligibleDeliveryCreditsController);
+  router.get('/', listDeliveryCreditSettlementsController);
+  router.get('/:id', getDeliveryCreditSettlementController);
+  router.post('/', createDeliveryCreditSettlementController);
   return router;
 };
 
