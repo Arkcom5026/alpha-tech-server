@@ -27,8 +27,22 @@ const getCustomerMoneyReceiveController = async (req, res, next) => {
   }
 };
 
+const cancelCustomerMoneyReceiveController = async (req, res, next) => {
+  try {
+    const result = await req.customerMoneyReceive.cancel(
+      req.params.id,
+      req.body?.cancelReason,
+      req.user,
+    );
+    return res.status(200).json({ ok: true, data: result.receipt, balance: result.balance });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   receiveCustomerMoneyController,
   listCustomerMoneyReceiveController,
   getCustomerMoneyReceiveController,
+  cancelCustomerMoneyReceiveController,
 };
