@@ -3,7 +3,10 @@
 require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 
-const MIGRATION_NAME = '20260810123000_withholding_tax_workflow';
+const MIGRATION_NAMES = [
+  '20260810123000_withholding_tax_workflow',
+  '20260810124500_withholding_tax_treatment_audit',
+];
 const TABLE_NAMES = [
   'WithholdingTaxTreatmentEvent',
   'WithholdingTaxCertificate',
@@ -28,15 +31,24 @@ const normalizeRegclass = (value) => {
 };
 
 const run = async () => {
-  const migrations = await prisma.$queryRawUnsafe(`
-    SELECT migration_name, finished_at, rolled_back_at
-    FROM "_prisma_migrations"
-    WHERE migration_name = '${MIGRATION_NAME}'
-  `);
-  if (migrations.length !== 1) fail('Expected exactly one WHT workflow migration record', { migrationCount: migrations.length });
-  const migration = migrations[0];
-  if (!migration.finished_at || migration.rolled_back_at) {
-    fail('WHT workflow migration is not in a successful terminal state', {
+  const migrationEvidence = [];
+  for (const migrationName of MIGRATION_NAMES) {
+    const migrations = await prisma.$queryRawUnsafe(`
+      SELECT migration_name, finished_at, rolled_back_at
+      FROM "_prisma_migrations"
+      WHERE migration_name = '${migrationName}'
+    `);
+    if (migrations.length !== 1) fail('Expected exactly one WHT migration record', { migrationName, migrationCount: migrations.length });
+    const migration = migrations[0];
+    if (!migration.finished_at || migration.rolled_back_at) {
+      fail('WHT migration is not in a successful terminal state', {
+        migrationName,
+        finishedAt: migration.finished_at,
+        rolledBackAt: migration.rolled_back_at,
+      });
+    }
+    migrationEvidence.push({
+      name: migration.migration_name,
       finishedAt: migration.finished_at,
       rolledBackAt: migration.rolled_back_at,
     });
@@ -51,17 +63,13 @@ const run = async () => {
     tables[tableName] = normalized;
     const countRows = await prisma.$queryRawUnsafe(`SELECT COUNT(*)::int AS count FROM "${tableName}"`);
     const rowCount = Number(countRows[0]?.count ?? -1);
-    if (rowCount !== 0) fail('WHT workflow migration must not backfill authority rows', { tableName, rowCount });
+    if (rowCount !== 0) fail('WHT workflow migrations must not backfill authority rows', { tableName, rowCount });
     rowCounts[tableName] = rowCount;
   }
 
   console.log(JSON.stringify({
     ok: true,
-    migration: {
-      name: migration.migration_name,
-      finishedAt: migration.finished_at,
-      rolledBackAt: migration.rolled_back_at,
-    },
+    migrations: migrationEvidence,
     tables,
     rowCounts,
   }, null, 2));
