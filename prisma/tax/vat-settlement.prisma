@@ -18,6 +18,8 @@ model VatCarryForwardAuthority {
   amount            Decimal                   @db.Decimal(14, 2)
   status            VatCarryForwardStatus     @default(DRAFT)
   note              String?
+  sourceSnapshot    Json?
+  version           Int                       @default(1)
   confirmedById     Int?
   confirmedAt       DateTime?
   createdAt         DateTime                  @default(now())
