@@ -27,6 +27,19 @@ class RepairHandoverRepository {
     });
   }
 
+  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    if (!deviceId) return null;
+    return this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(deviceId),
+        branchId: Number(branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
   async findDelivery(repairJobId) {
     const rows = await this.prisma.$queryRawUnsafe(
       `SELECT ${columns} FROM "RepairDelivery" WHERE "repairJobId" = $1 LIMIT 1`,
@@ -66,26 +79,45 @@ class RepairHandoverRepository {
         Number(repairJobId), Number(employeeId), input.note, JSON.stringify(snapshot)
       );
       if (!rows[0]) return null;
+
+      await tx.repairJob.update({
+        where: { id: Number(repairJobId) },
+        data: { status: 'COMPLETED' },
+      });
       await tx.device.updateMany({
         where: { repairJobs: { some: { id: Number(repairJobId) } } },
         data: { status: 'ACTIVE' },
       });
       const job = await tx.repairJob.findUnique({
         where: { id: Number(repairJobId) },
-        select: { deviceId: true, deviceIntake: { select: { id: true } } },
+        select: { id: true, jobNo: true, branchId: true, deviceId: true, deviceIntake: { select: { id: true } } },
       });
       if (job?.deviceId) {
         await tx.devicePassportEvent.create({
           data: {
-            deviceId: job.deviceId, eventType: 'DELIVERED',
-            sourceType: 'REPAIR_DELIVERY', sourceId: String(rows[0].id),
-            eventKey: `repair-job:${repairJobId}:delivered`,
+            deviceId: job.deviceId,
+            eventType: 'DELIVERED',
+            sourceType: 'REPAIR_JOB',
+            sourceId: String(repairJobId),
+            eventKey: `repair-workflow:${repairJobId}:handover-delivered`,
             correlationId: `repair-job:${repairJobId}`,
-            title: 'ส่งมอบอุปกรณ์คืนแล้ว',
+            causationId: `repair-handover:${rows[0].id}`,
+            title: `งานซ่อม ${job.jobNo}: ส่งมอบแล้ว`,
             description: `ผู้รับ: ${rows[0].customerConfirmedBy}`,
-            actorType: 'EMPLOYEE', actorEmployeeId: Number(employeeId),
-            branchId: snapshot.branchId, customerVisible: true,
-            metadata: snapshot, occurredAt: new Date(),
+            actorType: 'EMPLOYEE',
+            actorEmployeeId: Number(employeeId),
+            branchId: snapshot.branchId,
+            customerVisible: true,
+            metadata: {
+              repairJobId: Number(repairJobId),
+              action: 'DELIVER',
+              workflowPreviousStatus: 'READY_FOR_DELIVERY',
+              workflowTargetStatus: 'DELIVERED',
+              legacyServiceStatus: 'COMPLETED',
+              terminal: false,
+              handover: snapshot,
+            },
+            occurredAt: new Date(),
           },
         });
       }

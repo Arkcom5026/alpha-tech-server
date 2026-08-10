@@ -6,7 +6,18 @@ const {
   CLAIM_ACTIVE_STATUSES,
 } = require('../contracts/repairContract');
 
-function assertRepairCanOpenClaim(job) {
+const CLAIM_OPENABLE_WORKFLOW_STATUSES = Object.freeze([
+  'DIAGNOSING',
+  'WAITING_APPROVAL',
+  'APPROVED',
+  'REJECTED',
+  'REPAIRING',
+  'WAITING_PARTS',
+  'WAITING_QC',
+  'QC_FAILED',
+]);
+
+function assertRepairCanOpenClaim(job, workflowStatus = null) {
   if (!job) {
     throw new RepairError(
       RepairFailureCode.REPAIR_JOB_NOT_FOUND,
@@ -31,6 +42,18 @@ function assertRepairCanOpenClaim(job) {
       RepairFailureCode.WARRANTY_STOCK_ITEM_REQUIRED,
       'งานซ่อมนี้ยังไม่ได้ผูกกับ StockItem หรือ Device จึงยังเปิดเคลมไม่ได้',
       409
+    );
+  }
+
+  if (!CLAIM_OPENABLE_WORKFLOW_STATUSES.includes(workflowStatus)) {
+    throw new RepairError(
+      RepairFailureCode.CONFLICT,
+      'ยังไม่สามารถเปิดเคลมในขั้นตอนปัจจุบัน กรุณาตรวจวินิจฉัยงานก่อน หรือกลับมาดำเนินงานซ่อมให้ถึงขั้นที่รองรับการส่งเคลม',
+      409,
+      {
+        workflowStatus: workflowStatus || 'RECEIVED',
+        allowedWorkflowStatuses: CLAIM_OPENABLE_WORKFLOW_STATUSES,
+      }
     );
   }
 }
@@ -83,6 +106,7 @@ function assertResolutionRequirements(update) {
 }
 
 module.exports = {
+  CLAIM_OPENABLE_WORKFLOW_STATUSES,
   assertRepairCanOpenClaim,
   assertNoActiveClaimForJob,
   assertResolutionRequirements,

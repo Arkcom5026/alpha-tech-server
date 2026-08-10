@@ -137,6 +137,7 @@ test('claim status service applies transition timestamps and event metadata', as
     31,
     {
       status: 'submitted',
+      expectedStatus: 'draft',
       note: 'ส่งผู้ให้บริการ',
       trackingNumber: 'TRACK-1',
     }
@@ -152,6 +153,40 @@ test('claim status service applies transition timestamps and event metadata', as
   });
   assert.equal(updateCall.event.performedByEmployeeId, 8);
   assert.equal(result.status, 'SUBMITTED');
+});
+
+test('claim status service rejects stale guided action before write', async () => {
+  let wrote = false;
+  const service = new UpdateWarrantyClaimStatusService({
+    transaction(work) {
+      return work({
+        findById() {
+          return claimFixture({ status: 'IN_TRANSIT' });
+        },
+        updateWithEvent() {
+          wrote = true;
+        },
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => service.execute(
+      { branchId: 4, employeeId: 8 },
+      31,
+      { status: 'RECEIVED_BY_PROVIDER', expectedStatus: 'SUBMITTED' }
+    ),
+    (error) => {
+      assert.equal(error.code, RepairFailureCode.CONFLICT);
+      assert.equal(error.statusCode, 409);
+      assert.deepEqual(error.details, {
+        expectedStatus: 'SUBMITTED',
+        actualStatus: 'IN_TRANSIT',
+      });
+      return true;
+    }
+  );
+  assert.equal(wrote, false);
 });
 
 test('claim status service preserves replacement scope and resolution contracts', async () => {

@@ -2,6 +2,10 @@ function getDefaultPrismaClient() {
   return require('../../../../database/prisma/client');
 }
 
+const {
+  publishDevicePassportEvent,
+} = require('../../../device/passport/publish/devicePassportEventPublisher');
+
 const warrantyClaimDetailInclude = {
   branch: true,
   stockItem: {
@@ -73,6 +77,57 @@ class UpdateWarrantyClaimStatusRepository {
     return this.prisma.stockItem.findUnique({
       where: { id: Number(replacementStockItemId) },
     });
+  }
+
+  consumeReplacementStockItem({ branchId, stockItemId, claimId, employeeId }) {
+    return this.prisma.stockItem.updateMany({
+      where: {
+        id: Number(stockItemId),
+        branchId: Number(branchId),
+        status: 'IN_STOCK',
+      },
+      data: {
+        status: 'SOLD',
+        soldAt: new Date(),
+      },
+    }).then(async (changed) => {
+      if (changed.count !== 1) return changed;
+      const stockItem = await this.prisma.stockItem.findUnique({
+        where: { id: Number(stockItemId) },
+        select: { productId: true },
+      });
+      await this.prisma.stockMovement.create({
+        data: {
+          productId: stockItem.productId,
+          branchId: Number(branchId),
+          qty: -1,
+          type: 'CLAIM_REPLACEMENT',
+          refType: 'WARRANTY_CLAIM',
+          refId: Number(claimId),
+          stockItemId: Number(stockItemId),
+          previousStockStatus: 'IN_STOCK',
+          resultingStockStatus: 'SOLD',
+          performedByEmployeeId: employeeId ? Number(employeeId) : null,
+          note: `Warranty claim replacement #${claimId}`,
+        },
+      });
+      return changed;
+    });
+  }
+
+  updateDeviceStatus(deviceId, status) {
+    return this.prisma.device.update({
+      where: { id: Number(deviceId) },
+      data: { status },
+    });
+  }
+
+  publishPassportEvent(event) {
+    return publishDevicePassportEvent(this.prisma, event);
+  }
+
+  createCompletionCommand(data) {
+    return this.prisma.warrantyClaimCompletionCommand.create({ data });
   }
 
   updateWithEvent(warrantyClaimId, data, event) {

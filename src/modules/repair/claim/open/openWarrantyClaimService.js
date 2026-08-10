@@ -20,6 +20,10 @@ function isPrismaUniqueConflict(error) {
   return error && error.code === 'P2002';
 }
 
+function workflowStatusFromEvent(event) {
+  return event?.metadata?.workflowTargetStatus || 'RECEIVED';
+}
+
 class OpenWarrantyClaimService {
   constructor(repository = openWarrantyClaimRepository) {
     this.repository = repository;
@@ -44,7 +48,16 @@ class OpenWarrantyClaimService {
           actor.branchId,
           normalizedRepairJobId
         );
-        assertRepairCanOpenClaim(job);
+        if (!job) {
+          assertRepairCanOpenClaim(job, 'RECEIVED');
+        }
+
+        const workflowEvent = job.deviceId
+          ? await repo.findLatestWorkflowEvent(actor.branchId, job.id, job.deviceId)
+          : null;
+        const workflowStatus = workflowStatusFromEvent(workflowEvent);
+
+        assertRepairCanOpenClaim(job, workflowStatus);
         assertNoActiveClaimForJob(job);
 
         const sourceSupplierId = inferSourceSupplierId(job.stockItem);
@@ -103,6 +116,7 @@ class OpenWarrantyClaimService {
             metadata: {
               source: 'REPAIR_JOB',
               repairJobId: job.id,
+              workflowStatusAtHandoff: workflowStatus,
               repairLinkState: 'LINKED_VERIFIED',
             },
           }
@@ -134,3 +148,5 @@ class OpenWarrantyClaimService {
 
 module.exports = new OpenWarrantyClaimService();
 module.exports.OpenWarrantyClaimService = OpenWarrantyClaimService;
+module.exports.isPrismaUniqueConflict = isPrismaUniqueConflict;
+module.exports.workflowStatusFromEvent = workflowStatusFromEvent;

@@ -13,14 +13,20 @@ function notFound() {
   return error;
 }
 
+async function workflowStatusFor(job) {
+  const event = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
+  return event?.metadata?.workflowTargetStatus || 'RECEIVED';
+}
+
 async function confirmPublic(token, payload) {
   const access = await trackingRepository.findValidByTokenHash(hashToken(token || ''));
   if (!access) throw notFound();
   const job = await repository.findJob(access.repairJobId);
   if (!job) throw notFound();
-  const input = validateCustomerConfirmation(job, payload);
   const existing = await repository.findDelivery(job.id);
   if (existing?.status === 'DELIVERED') return mapHandover(existing);
+  const workflowStatus = await workflowStatusFor(job);
+  const input = validateCustomerConfirmation(workflowStatus, payload);
   const delivery = await repository.confirmCustomer(job.id, input);
   await trackingRepository.touch(access.id);
   return mapHandover(delivery);
@@ -29,26 +35,41 @@ async function confirmPublic(token, payload) {
 async function getStaff(actor, repairJobId) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
-  return mapHandover(await repository.findDelivery(job.id));
+  const handover = mapHandover(await repository.findDelivery(job.id));
+  return {
+    ...handover,
+    workflowStatus: await workflowStatusFor(job),
+  };
 }
 
 async function finalize(actor, repairJobId, payload) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
   const delivery = await repository.findDelivery(job.id);
-  if (delivery?.status === 'DELIVERED') return mapHandover(delivery);
-  const input = validateFinalization(job, delivery, payload);
+  if (delivery?.status === 'DELIVERED') {
+    return { ...mapHandover(delivery), workflowStatus: 'DELIVERED' };
+  }
+  const workflowStatus = await workflowStatusFor(job);
+  const input = validateFinalization(workflowStatus, delivery, payload);
   const snapshot = {
-    contractVersion: 'repair-handover.v1',
+    contractVersion: 'repair-handover.v2',
     jobNo: job.jobNo, branchId: job.branchId, customerId: job.customerId,
     deviceId: job.deviceId, customerConfirmedBy: delivery.customerConfirmedBy,
     customerConfirmedAt: delivery.customerConfirmedAt,
     estimatedCost: Number(job.estimatedCost || 0),
     depositPaid: Number(job.depositPaid || 0),
     accessories: job.deviceIntake?.accessories || [],
+    workflowPreviousStatus: workflowStatus,
+    workflowTargetStatus: 'DELIVERED',
     checks: { paymentConfirmed: true, deviceReturned: true, accessoriesReturned: true },
   };
-  return mapHandover(await repository.finalize(job.id, actor.employeeId, input, snapshot));
+  const finalized = await repository.finalize(job.id, actor.employeeId, input, snapshot);
+  if (!finalized) {
+    const error = new Error('ไม่สามารถยืนยันการส่งมอบได้ กรุณาโหลดข้อมูลใหม่');
+    error.statusCode = 409; error.status = 409; error.code = 'REPAIR_HANDOVER_STATE_CHANGED'; error.isOperational = true;
+    throw error;
+  }
+  return { ...mapHandover(finalized), workflowStatus: 'DELIVERED' };
 }
 
-module.exports = { confirmPublic, getStaff, finalize };
+module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor };

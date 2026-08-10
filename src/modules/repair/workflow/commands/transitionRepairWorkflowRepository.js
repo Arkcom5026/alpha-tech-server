@@ -18,15 +18,7 @@ const repairWorkflowInclude = {
       },
     },
   },
-  device: {
-    include: {
-      passportEvents: {
-        where: { sourceType: 'REPAIR_JOB' },
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-        take: 1,
-      },
-    },
-  },
+  device: true,
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
@@ -58,17 +50,37 @@ class TransitionRepairWorkflowRepository {
     );
   }
 
-  findRepairJob(repairJobId) {
-    return this.prisma.repairJob.findUnique({
-      where: { id: Number(repairJobId) },
+  async findRepairJob(repairJobId) {
+    const id = Number(repairJobId);
+    const job = await this.prisma.repairJob.findUnique({
+      where: { id },
       include: repairWorkflowInclude,
     });
+    if (!job?.deviceId || !job.device) return job;
+
+    const latestWorkflowEvent = await this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(job.deviceId),
+        branchId: Number(job.branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(id),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return {
+      ...job,
+      device: {
+        ...job.device,
+        passportEvents: latestWorkflowEvent ? [latestWorkflowEvent] : [],
+      },
+    };
   }
 
-  updateLegacyStatus(repairJobId, status) {
+  updateLegacyStatus(repairJobId, status, extraData = {}) {
     return this.prisma.repairJob.update({
       where: { id: Number(repairJobId) },
-      data: { status },
+      data: { status, ...extraData },
       include: repairWorkflowInclude,
     });
   }

@@ -260,6 +260,7 @@ function mapWarrantyClaim(claim) {
     resolution: claim.resolution,
     resolutionNote: claim.resolutionNote,
     replacementStockItemId: claim.replacementStockItemId,
+    replacementStockItem: mapStockIdentity(claim.replacementStockItem),
     creditAmount: numberOrNull(claim.creditAmount),
     openedAt: claim.openedAt,
     submittedAt: claim.submittedAt,

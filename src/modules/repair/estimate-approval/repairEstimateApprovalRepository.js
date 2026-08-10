@@ -1,4 +1,7 @@
 const prisma = require('../../../database/prisma/client');
+const {
+  publishDevicePassportEvent,
+} = require('../../device/passport/publish/devicePassportEventPublisher');
 
 class RepairEstimateApprovalRepository {
   constructor(client = prisma) {
@@ -17,9 +20,38 @@ class RepairEstimateApprovalRepository {
       select: {
         id: true,
         jobNo: true,
+        branchId: true,
+        deviceId: true,
+        status: true,
         estimatedCost: true,
         depositPaid: true,
       },
+    });
+  }
+
+  findRepairJobWorkflowContext(repairJobId) {
+    return this.prisma.repairJob.findUnique({
+      where: { id: Number(repairJobId) },
+      select: {
+        id: true,
+        jobNo: true,
+        branchId: true,
+        deviceId: true,
+        status: true,
+      },
+    });
+  }
+
+  findLatestWorkflowEvent({ repairJobId, branchId, deviceId }) {
+    if (!deviceId) return Promise.resolve(null);
+    return this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(deviceId),
+        branchId: Number(branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
     });
   }
 
@@ -100,6 +132,18 @@ class RepairEstimateApprovalRepository {
         "requestedAt", "expiresAt", "decidedAt", "createdAt", "updatedAt"
     `;
     return rows[0] || null;
+  }
+
+  updateRepairStatus(repairJobId, status) {
+    return this.prisma.repairJob.update({
+      where: { id: Number(repairJobId) },
+      data: { status },
+      select: { id: true, status: true },
+    });
+  }
+
+  publishWorkflowEvent(event) {
+    return publishDevicePassportEvent(this.prisma, event);
   }
 }
 

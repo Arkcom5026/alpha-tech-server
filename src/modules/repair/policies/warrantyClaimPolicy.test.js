@@ -1,18 +1,26 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  CLAIM_OPENABLE_WORKFLOW_STATUSES,
   assertRepairCanOpenClaim,
   assertNoActiveClaimForJob,
   assertResolutionRequirements,
 } = require('./warrantyClaimPolicy');
 
+const linkedJob = (overrides = {}) => ({
+  status: 'IN_PROGRESS',
+  stockItemId: 1,
+  stockItem: { id: 1 },
+  ...overrides,
+});
+
 test('requires an existing non-terminal repair job linked to stock or device identity', () => {
-  assert.throws(() => assertRepairCanOpenClaim(null), {
+  assert.throws(() => assertRepairCanOpenClaim(null, 'DIAGNOSING'), {
     code: 'REPAIR_JOB_NOT_FOUND',
     status: 'fail',
   });
   assert.throws(
-    () => assertRepairCanOpenClaim({ status: 'COMPLETED', stockItemId: 1, stockItem: {} }),
+    () => assertRepairCanOpenClaim({ status: 'COMPLETED', stockItemId: 1, stockItem: {} }, 'REPAIRING'),
     { code: 'REPAIR_JOB_TERMINAL', status: 'fail' }
   );
   assert.throws(
@@ -22,12 +30,10 @@ test('requires an existing non-terminal repair job linked to stock or device ide
       stockItem: null,
       deviceId: null,
       device: null,
-    }),
+    }, 'DIAGNOSING'),
     { code: 'WARRANTY_STOCK_ITEM_REQUIRED', status: 'fail' }
   );
-  assert.doesNotThrow(() =>
-    assertRepairCanOpenClaim({ status: 'IN_PROGRESS', stockItemId: 1, stockItem: { id: 1 } })
-  );
+  assert.doesNotThrow(() => assertRepairCanOpenClaim(linkedJob(), 'DIAGNOSING'));
   assert.doesNotThrow(() =>
     assertRepairCanOpenClaim({
       status: 'IN_PROGRESS',
@@ -35,8 +41,26 @@ test('requires an existing non-terminal repair job linked to stock or device ide
       stockItem: null,
       deviceId: 2,
       device: { id: 2 },
-    })
+    }, 'REPAIRING')
   );
+});
+
+test('claim opening is optional only after diagnosis starts and before delivery', () => {
+  for (const status of CLAIM_OPENABLE_WORKFLOW_STATUSES) {
+    assert.doesNotThrow(() => assertRepairCanOpenClaim(linkedJob(), status));
+  }
+
+  for (const status of ['RECEIVED', 'WAITING_DIAGNOSIS', 'READY_FOR_DELIVERY', 'DELIVERED', 'CLOSED', 'CANCELLED']) {
+    assert.throws(
+      () => assertRepairCanOpenClaim(linkedJob(), status),
+      (error) => {
+        assert.equal(error.code, 'REPAIR_CONFLICT');
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.details.workflowStatus, status);
+        return true;
+      }
+    );
+  }
 });
 
 test('blocks an active claim for the same repair job', () => {
