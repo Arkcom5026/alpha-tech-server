@@ -24,6 +24,23 @@ enum WithholdingTaxFilingStatus {
   VOIDED
 }
 
+model WithholdingTaxTreatmentEvent {
+  id                  String                 @id @default(cuid())
+  branchId            Int
+  taxExpenseId        Int
+  taxExpenseItemId    Int
+  previousTreatment   TaxExpenseWhtTreatment
+  resultingTreatment  TaxExpenseWhtTreatment
+  actorEmployeeId     Int
+  note                String?
+  occurredAt          DateTime               @default(now())
+  createdAt           DateTime               @default(now())
+
+  @@index([branchId, taxExpenseId, occurredAt])
+  @@index([taxExpenseItemId, occurredAt])
+  @@index([actorEmployeeId])
+}
+
 model WithholdingTaxCertificate {
   id                    String                       @id @default(cuid())
   branchId              Int
