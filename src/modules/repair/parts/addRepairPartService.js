@@ -29,6 +29,51 @@ function activeWarrantyClaim(job) {
   ) || null;
 }
 
+function assertPartInventoryMode(product, payload, actor) {
+  if (product.inventoryBehavior === 'NON_STOCK') {
+    throw new RepairError(
+      RepairFailureCode.CONFLICT,
+      'อะไหล่สำหรับงานซ่อมต้องเป็นสินค้าที่รับเข้าและมีสต๊อกพร้อมใช้งานก่อนเสมอ',
+      409,
+      { productId: product.id, inventoryBehavior: product.inventoryBehavior }
+    );
+  }
+
+  if (product.branchId && Number(product.branchId) !== Number(actor.branchId)) {
+    throw new RepairError(
+      RepairFailureCode.PART_PRODUCT_NOT_FOUND,
+      'ไม่พบสินค้าอะไหล่ที่ใช้งานได้ในสาขานี้',
+      404
+    );
+  }
+
+  if (product.trackSerialNumber) {
+    if (!payload.stockItemId) {
+      throw new RepairError(
+        RepairFailureCode.INVALID_INPUT,
+        'สินค้านี้ติดตาม Serial/StockItem กรุณาเลือกชิ้นที่อยู่ในสถานะพร้อมขายก่อนเบิกใช้',
+        400,
+        { field: 'stockItemId', productId: product.id }
+      );
+    }
+    if (payload.qtyUsed !== 1) {
+      throw new RepairError(
+        RepairFailureCode.INVALID_INPUT,
+        'อะไหล่แบบ Serial ต้องเบิกครั้งละ 1 StockItem',
+        400,
+        { field: 'qtyUsed', productId: product.id }
+      );
+    }
+  } else if (payload.stockItemId) {
+    throw new RepairError(
+      RepairFailureCode.INVALID_INPUT,
+      'สินค้านี้ไม่ได้ติดตาม Serial กรุณาเบิกด้วยจำนวนสินค้าแทน',
+      400,
+      { field: 'stockItemId', productId: product.id }
+    );
+  }
+}
+
 class AddRepairPartService {
   constructor(repo = repository) {
     this.repository = repo;
@@ -91,11 +136,30 @@ class AddRepairPartService {
           404
         );
       }
+      assertPartInventoryMode(product, payload, actor);
 
-      const stockBalance = await repo.findStockBalance(
-        actor.branchId,
-        payload.productId
-      );
+      let stockItem = null;
+      if (product.trackSerialNumber) {
+        stockItem = await repo.findStockItem(actor.branchId, product.id, payload.stockItemId);
+        if (!stockItem) {
+          throw new RepairError(
+            RepairFailureCode.PART_PRODUCT_NOT_FOUND,
+            'ไม่พบ StockItem ของอะไหล่นี้ในสาขา',
+            404,
+            { stockItemId: payload.stockItemId, productId: product.id }
+          );
+        }
+        if (stockItem.status !== 'IN_STOCK') {
+          throw new RepairError(
+            RepairFailureCode.CONFLICT,
+            'StockItem นี้ไม่ได้อยู่ในสถานะพร้อมขาย/พร้อมใช้งาน กรุณาเลือกชิ้นอื่น',
+            409,
+            { stockItemId: stockItem.id, status: stockItem.status, requiredStatus: 'IN_STOCK' }
+          );
+        }
+      }
+
+      const stockBalance = await repo.findStockBalance(actor.branchId, payload.productId);
       const available = stockBalance ? Number(stockBalance.quantity) : 0;
       if (!stockBalance || available < payload.qtyUsed) {
         throw new RepairError(
@@ -106,10 +170,7 @@ class AddRepairPartService {
         );
       }
 
-      const branchPrice = await repo.findBranchPrice(
-        actor.branchId,
-        payload.productId
-      );
+      const branchPrice = await repo.findBranchPrice(actor.branchId, payload.productId);
       const unitPrice = Number(
         branchPrice?.priceTechnician ??
           branchPrice?.priceRetail ??
@@ -118,6 +179,28 @@ class AddRepairPartService {
           0
       );
 
+      if (stockItem) {
+        const consumed = await repo.consumeStockItem(actor.branchId, product.id, stockItem.id);
+        if (consumed.count !== 1) {
+          throw new RepairError(
+            RepairFailureCode.CONFLICT,
+            'StockItem ถูกเปลี่ยนสถานะไปแล้ว กรุณาโหลดรายการพร้อมขายใหม่',
+            409,
+            { stockItemId: stockItem.id }
+          );
+        }
+      }
+
+      const decremented = await repo.decrementStockBalance(actor.branchId, payload.productId, payload.qtyUsed);
+      if (decremented.count !== 1) {
+        throw new RepairError(
+          RepairFailureCode.PART_STOCK_INSUFFICIENT,
+          'สต๊อกถูกเปลี่ยนระหว่างการเบิก กรุณาตรวจสอบจำนวนใหม่',
+          409,
+          { requested: payload.qtyUsed }
+        );
+      }
+
       const part = await repo.createRepairPart({
         repairJobId: job.id,
         productId: payload.productId,
@@ -125,20 +208,19 @@ class AddRepairPartService {
         unitPrice,
       });
 
-      await repo.decrementStockBalance(
-        actor.branchId,
-        payload.productId,
-        payload.qtyUsed
-      );
-
       await repo.createStockMovement({
         productId: payload.productId,
         branchId: actor.branchId,
         qty: -payload.qtyUsed,
         type: 'ADJUST',
+        stockItemId: stockItem?.id || null,
+        previousStockStatus: stockItem ? 'IN_STOCK' : null,
+        resultingStockStatus: stockItem ? 'USED' : null,
         refType: 'REPAIR_JOB_PART_USAGE',
         refId: job.id,
-        note: `เบิกอะไหล่สำหรับใบงานซ่อม ${job.jobNo}`,
+        note: stockItem
+          ? `เบิกอะไหล่ Serial ${stockItem.serialNumber || stockItem.barcode || stockItem.id} สำหรับใบงานซ่อม ${job.jobNo}`
+          : `เบิกอะไหล่สำหรับใบงานซ่อม ${job.jobNo}`,
         performedByEmployeeId: actor.employeeId,
       });
 
@@ -149,6 +231,16 @@ class AddRepairPartService {
         productName: part.product?.name || null,
         qtyUsed: part.qtyUsed,
         unitPrice: Number(part.unitPrice),
+        serialized: Boolean(stockItem),
+        stockItem: stockItem
+          ? {
+              id: stockItem.id,
+              barcode: stockItem.barcode,
+              serialNumber: stockItem.serialNumber,
+              previousStatus: 'IN_STOCK',
+              status: 'USED',
+            }
+          : null,
       };
     });
   }
@@ -158,3 +250,4 @@ module.exports = new AddRepairPartService();
 module.exports.AddRepairPartService = AddRepairPartService;
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
 module.exports.activeWarrantyClaim = activeWarrantyClaim;
+module.exports.assertPartInventoryMode = assertPartInventoryMode;
