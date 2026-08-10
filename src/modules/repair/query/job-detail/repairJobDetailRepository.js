@@ -60,7 +60,7 @@ class RepairJobDetailRepository {
       sourceId: String(id),
     };
 
-    const [repairWorkflowEvent, repairDiagnosisEvent] = await Promise.all([
+    const [repairWorkflowEvent, repairDiagnosisEvent, repairWorkflowHistory] = await Promise.all([
       prisma.devicePassportEvent.findFirst({
         where: eventScope,
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
@@ -72,9 +72,22 @@ class RepairJobDetailRepository {
         },
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       }),
+      prisma.devicePassportEvent.findMany({
+        where: eventScope,
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: 50,
+        select: {
+          id: true,
+          eventType: true,
+          title: true,
+          description: true,
+          occurredAt: true,
+          metadata: true,
+        },
+      }),
     ]);
 
-    return { ...job, repairWorkflowEvent, repairDiagnosisEvent };
+    return { ...job, repairWorkflowEvent, repairDiagnosisEvent, repairWorkflowHistory };
   }
 }
 
