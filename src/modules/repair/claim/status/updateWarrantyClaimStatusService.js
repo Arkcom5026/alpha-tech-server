@@ -60,6 +60,18 @@ class UpdateWarrantyClaimStatusService {
         );
       }
 
+      if (payload.expectedStatus && payload.expectedStatus !== claim.status) {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'สถานะเคลมถูกเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนดำเนินการต่อ',
+          409,
+          {
+            expectedStatus: payload.expectedStatus,
+            actualStatus: claim.status,
+          }
+        );
+      }
+
       assertClaimTransition(claim.status, payload.status);
 
       if (payload.replacementStockItemId) {
