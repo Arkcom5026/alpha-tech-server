@@ -36,7 +36,8 @@ assert.doesNotMatch(lifecycleRepository, /UPDATE "TaxDocumentLifecycleEvent"/);
 assert.match(reportController, /safeLogContext/);
 assert.match(reportController, /INPUT_TAX_REPORT_INTERNAL_ERROR/);
 assert.doesNotMatch(reportController, /error:\s*error\.message/);
-assert.doesNotMatch(reportController, /console\.error\([^\n]*,\s*error\)/);
+assert.doesNotMatch(reportController, /console\.error\([^;\n]*,\s*error\s*\);/);
+assert.match(reportController, /console\.error\('\[input-tax-report\] FAILED', safeLogContext\(req, error\)\)/);
 assert.doesNotMatch(reportController, /req\.body/);
 
 console.log('input tax step 9d operational assurance contract: PASS');
