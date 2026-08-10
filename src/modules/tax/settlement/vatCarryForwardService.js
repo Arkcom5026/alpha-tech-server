@@ -123,100 +123,105 @@ const confirmVatCarryForwardAuthority = async ({
   amount,
   note,
   actorEmployeeId,
-}) => prisma.$transaction(async (tx) => {
-  const normalizedBranchId = positiveBranchId(branchId);
-  const normalizedPeriodId = periodId(taxPeriodId);
-  const normalizedSourceType = sourceType(requestedSourceType);
-  const normalizedAmount = money(amount);
-  const normalizedActorId = positiveActorId(actorEmployeeId);
-  const normalizedNote = String(note || '').trim() || null;
+}, runtime = {}) => {
+  const database = runtime.database || prisma;
+  const priorSettlementLoader = runtime.loadPriorPeriodSettlement || loadPriorPeriodSettlement;
 
-  const { target, previousPeriod } = await loadPeriodContext({
-    branchId: normalizedBranchId,
-    taxPeriodId: normalizedPeriodId,
-  }, tx, true);
+  return database.$transaction(async (tx) => {
+    const normalizedBranchId = positiveBranchId(branchId);
+    const normalizedPeriodId = periodId(taxPeriodId);
+    const normalizedSourceType = sourceType(requestedSourceType);
+    const normalizedAmount = money(amount);
+    const normalizedActorId = positiveActorId(actorEmployeeId);
+    const normalizedNote = String(note || '').trim() || null;
 
-  if (String(target.status) === 'SUBMITTED') {
-    fail('VAT_CARRY_FORWARD_PERIOD_IMMUTABLE', 'Carry-forward authority cannot change after the tax period is submitted', 409, {
-      taxPeriodId: target.id,
-      taxPeriodStatus: target.status,
-    });
-  }
+    const { target, previousPeriod } = await loadPeriodContext({
+      branchId: normalizedBranchId,
+      taxPeriodId: normalizedPeriodId,
+    }, tx, true);
 
-  let sourceTaxPeriodId = null;
-  let sourceSettlement = null;
-  if (normalizedSourceType === 'PRIOR_PERIOD') {
-    if (!previousPeriod) fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_REQUIRED', 'A prior tax period is required for PRIOR_PERIOD authority', 409);
-    if (!['LOCKED', 'SUBMITTED'].includes(String(previousPeriod.status))) {
-      fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_NOT_FINALIZED', 'Prior tax period must be locked or submitted before its VAT credit is carried forward', 409, {
+    if (String(target.status) === 'SUBMITTED') {
+      fail('VAT_CARRY_FORWARD_PERIOD_IMMUTABLE', 'Carry-forward authority cannot change after the tax period is submitted', 409, {
+        taxPeriodId: target.id,
+        taxPeriodStatus: target.status,
+      });
+    }
+
+    let sourceTaxPeriodId = null;
+    let sourceSettlement = null;
+    if (normalizedSourceType === 'PRIOR_PERIOD') {
+      if (!previousPeriod) fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_REQUIRED', 'A prior tax period is required for PRIOR_PERIOD authority', 409);
+      if (!['LOCKED', 'SUBMITTED'].includes(String(previousPeriod.status))) {
+        fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_NOT_FINALIZED', 'Prior tax period must be locked or submitted before its VAT credit is carried forward', 409, {
+          previousPeriodId: previousPeriod.id,
+          previousPeriodStatus: previousPeriod.status,
+        });
+      }
+      sourceSettlement = await priorSettlementLoader({ branchId: normalizedBranchId, previousPeriod }, tx);
+      if (!sourceSettlement?.readyForPp30Preparation || sourceSettlement.pp30VatCredit == null) {
+        fail('VAT_CARRY_FORWARD_SOURCE_SETTLEMENT_NOT_READY', 'Prior period PP30 settlement must be ready before confirming carried VAT credit', 409, {
+          previousPeriodId: previousPeriod.id,
+          exceptionCodes: sourceSettlement?.exceptionCodes || [],
+        });
+      }
+      const availableCredit = Number(sourceSettlement.pp30VatCredit || 0);
+      if (Number(normalizedAmount) > availableCredit + 0.004) {
+        fail('VAT_CARRY_FORWARD_AMOUNT_EXCEEDS_SOURCE_CREDIT', 'Carry-forward amount cannot exceed prior-period VAT credit', 409, {
+          requestedAmount: normalizedAmount,
+          availableCredit: availableCredit.toFixed(2),
+        });
+      }
+      sourceTaxPeriodId = previousPeriod.id;
+    } else if (previousPeriod) {
+      fail('VAT_CARRY_FORWARD_HISTORICAL_OPENING_NOT_ALLOWED', 'Historical opening authority is only allowed when no prior tax period exists', 409, {
         previousPeriodId: previousPeriod.id,
-        previousPeriodStatus: previousPeriod.status,
       });
     }
-    sourceSettlement = await loadPriorPeriodSettlement({ branchId: normalizedBranchId, previousPeriod }, tx);
-    if (!sourceSettlement?.readyForPp30Preparation || sourceSettlement.pp30VatCredit == null) {
-      fail('VAT_CARRY_FORWARD_SOURCE_SETTLEMENT_NOT_READY', 'Prior period PP30 settlement must be ready before confirming carried VAT credit', 409, {
-        previousPeriodId: previousPeriod.id,
-        exceptionCodes: sourceSettlement?.exceptionCodes || [],
-      });
-    }
-    const availableCredit = Number(sourceSettlement.pp30VatCredit || 0);
-    if (Number(normalizedAmount) > availableCredit + 0.004) {
-      fail('VAT_CARRY_FORWARD_AMOUNT_EXCEEDS_SOURCE_CREDIT', 'Carry-forward amount cannot exceed prior-period VAT credit', 409, {
-        requestedAmount: normalizedAmount,
-        availableCredit: availableCredit.toFixed(2),
-      });
-    }
-    sourceTaxPeriodId = previousPeriod.id;
-  } else if (previousPeriod) {
-    fail('VAT_CARRY_FORWARD_HISTORICAL_OPENING_NOT_ALLOWED', 'Historical opening authority is only allowed when no prior tax period exists', 409, {
-      previousPeriodId: previousPeriod.id,
+
+    const sourceSnapshot = {
+      sourceType: normalizedSourceType,
+      sourceTaxPeriodId,
+      sourcePeriodCode: previousPeriod?.periodCode || null,
+      sourcePeriodStatus: previousPeriod?.status || null,
+      sourceAvailableCredit: sourceSettlement?.pp30VatCredit ?? null,
+      sourcePayable: sourceSettlement?.pp30VatPayable ?? null,
+      confirmedAmount: normalizedAmount,
+      confirmedById: normalizedActorId,
+    };
+
+    const rows = await tx.$queryRaw(Prisma.sql`
+      INSERT INTO "VatCarryForwardAuthority" (
+        "id", "branchId", "taxPeriodId", "sourceTaxPeriodId", "sourceType", "amount",
+        "status", "note", "sourceSnapshot", "version", "confirmedById", "confirmedAt", "createdAt", "updatedAt"
+      ) VALUES (
+        CONCAT('vcf_', md5(random()::text || clock_timestamp()::text)),
+        ${normalizedBranchId}, ${normalizedPeriodId}, ${sourceTaxPeriodId},
+        ${normalizedSourceType}::"VatCarryForwardSourceType", ${normalizedAmount},
+        'CONFIRMED'::"VatCarryForwardStatus", ${normalizedNote}, ${JSON.stringify(sourceSnapshot)}::jsonb,
+        1, ${normalizedActorId}, NOW(), NOW(), NOW()
+      )
+      ON CONFLICT ("branchId", "taxPeriodId") DO UPDATE SET
+        "sourceTaxPeriodId" = EXCLUDED."sourceTaxPeriodId",
+        "sourceType" = EXCLUDED."sourceType",
+        "amount" = EXCLUDED."amount",
+        "status" = 'CONFIRMED'::"VatCarryForwardStatus",
+        "note" = EXCLUDED."note",
+        "sourceSnapshot" = EXCLUDED."sourceSnapshot",
+        "version" = "VatCarryForwardAuthority"."version" + 1,
+        "confirmedById" = EXCLUDED."confirmedById",
+        "confirmedAt" = NOW(),
+        "updatedAt" = NOW()
+      RETURNING *
+    `);
+
+    const authority = rows[0];
+    return Object.freeze({
+      ...authority,
+      amount: Number(authority.amount || 0),
+      version: Number(authority.version || 1),
     });
-  }
-
-  const sourceSnapshot = {
-    sourceType: normalizedSourceType,
-    sourceTaxPeriodId,
-    sourcePeriodCode: previousPeriod?.periodCode || null,
-    sourcePeriodStatus: previousPeriod?.status || null,
-    sourceAvailableCredit: sourceSettlement?.pp30VatCredit ?? null,
-    sourcePayable: sourceSettlement?.pp30VatPayable ?? null,
-    confirmedAmount: normalizedAmount,
-    confirmedById: normalizedActorId,
-  };
-
-  const rows = await tx.$queryRaw(Prisma.sql`
-    INSERT INTO "VatCarryForwardAuthority" (
-      "id", "branchId", "taxPeriodId", "sourceTaxPeriodId", "sourceType", "amount",
-      "status", "note", "sourceSnapshot", "version", "confirmedById", "confirmedAt", "createdAt", "updatedAt"
-    ) VALUES (
-      CONCAT('vcf_', md5(random()::text || clock_timestamp()::text)),
-      ${normalizedBranchId}, ${normalizedPeriodId}, ${sourceTaxPeriodId},
-      ${normalizedSourceType}::"VatCarryForwardSourceType", ${normalizedAmount},
-      'CONFIRMED'::"VatCarryForwardStatus", ${normalizedNote}, ${JSON.stringify(sourceSnapshot)}::jsonb,
-      1, ${normalizedActorId}, NOW(), NOW(), NOW()
-    )
-    ON CONFLICT ("branchId", "taxPeriodId") DO UPDATE SET
-      "sourceTaxPeriodId" = EXCLUDED."sourceTaxPeriodId",
-      "sourceType" = EXCLUDED."sourceType",
-      "amount" = EXCLUDED."amount",
-      "status" = 'CONFIRMED'::"VatCarryForwardStatus",
-      "note" = EXCLUDED."note",
-      "sourceSnapshot" = EXCLUDED."sourceSnapshot",
-      "version" = "VatCarryForwardAuthority"."version" + 1,
-      "confirmedById" = EXCLUDED."confirmedById",
-      "confirmedAt" = NOW(),
-      "updatedAt" = NOW()
-    RETURNING *
-  `);
-
-  const authority = rows[0];
-  return Object.freeze({
-    ...authority,
-    amount: Number(authority.amount || 0),
-    version: Number(authority.version || 1),
   });
-});
+};
 
 module.exports = Object.freeze({
   loadVatCarryForwardAuthority,
