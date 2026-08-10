@@ -50,11 +50,15 @@ const byId = new Map(contract.endpoints.map((item) => [item.id, item]));
 ].forEach((id) => assert.ok(byId.has(id), `missing frontend contract endpoint: ${id}`));
 
 assert.equal(byId.get('filing-remove').concurrency.versionField, 'version|expectedVersion');
+assert.ok(byId.get('filing-select').errors.includes('INPUT_TAX_FILING_VAT_AUTHORITY_REQUIRED'));
+assert.ok(byId.get('filing-select').errors.includes('INPUT_TAX_FILING_VAT_AUTHORITY_CONFLICT'));
 assert.equal(byId.get('input-vat-report').bounds.maxRows, 2000);
 assert.equal(byId.get('input-tax-overview').bounds.maxExplicitRangeDays, 366);
 assert.equal(byId.get('tax-period-transition').replay, 'MUTATION_REPLAY_SAFE');
 assert.ok(byId.get('tax-period-transition').errors.includes('TAX_PERIOD_INPUT_FILING_INCOMPLETE'));
 assert.ok(byId.get('tax-period-transition').errors.includes('TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED'));
+assert.equal(contract.InputTaxFrontendErrorCode.FILING_VAT_AUTHORITY_REQUIRED, 'INPUT_TAX_FILING_VAT_AUTHORITY_REQUIRED');
+assert.equal(contract.InputTaxFrontendErrorCode.FILING_VAT_AUTHORITY_CONFLICT, 'INPUT_TAX_FILING_VAT_AUTHORITY_CONFLICT');
 assert.equal(contract.InputTaxFrontendErrorCode.TAX_PERIOD_INPUT_FILING_INCOMPLETE, 'TAX_PERIOD_INPUT_FILING_INCOMPLETE');
 assert.equal(contract.InputTaxFrontendErrorCode.TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED, 'TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED');
 assert.ok(contract.unavailableSurfaces.some((item) => item.id === 'investigation-workspace'));
