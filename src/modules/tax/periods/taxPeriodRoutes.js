@@ -4,6 +4,7 @@ const controller = require('./taxPeriodController');
 const accountingOfficeController = require('../accountingOffice/accountingOfficePackageController');
 const vatSettlementController = require('../settlement/vatSettlementController');
 const vatCarryForwardController = require('../settlement/vatCarryForwardController');
+const withholdingTaxController = require('../withholdingTax/withholdingTaxController');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -15,6 +16,11 @@ router.get('/accounting-office/packages/:taxPeriodId', accountingOfficeControlle
 router.get('/vat-settlement/:taxPeriodId', vatSettlementController.getPreparation);
 router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
 router.post('/vat-carry-forward/:taxPeriodId/confirm', vatCarryForwardController.confirmAuthority);
+router.get('/withholding-tax/:taxPeriodId', withholdingTaxController.getWorkspace);
+router.post('/withholding-tax/items/:taxExpenseItemId/treatment', withholdingTaxController.transitionTreatment);
+router.post('/withholding-tax/:taxPeriodId/certificates/issue', withholdingTaxController.issueCertificate);
+router.post('/withholding-tax/:taxPeriodId/filings/:formType/prepare', withholdingTaxController.prepareFiling);
+router.post('/withholding-tax/:taxPeriodId/filings/:formType/submit', withholdingTaxController.submitFiling);
 router.post('/periods/ensure', controller.ensureMonthlyPeriod);
 router.post('/periods/:taxPeriodId/close', controller.closePeriod);
 router.post('/periods/:taxPeriodId/lock', controller.lockPeriod);
