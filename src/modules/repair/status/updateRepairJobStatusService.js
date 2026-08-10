@@ -56,12 +56,13 @@ class UpdateRepairJobStatusService {
       if (INTAKE_REQUIRED_STATUSES.has(payload.status) && !isIntakeComplete(job)) {
         throw new RepairError(
           RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE,
-          'กรุณาบันทึกความยินยอมและรูปสภาพเครื่องตอนรับเข้าก่อนดำเนินงานต่อ',
+          'กรุณาบันทึกความยินยอมของลูกค้าก่อนดำเนินงานต่อ รูปสภาพเครื่องเป็นหลักฐานเสริมและไม่บังคับ',
           409,
           {
             repairJobId: job.id,
             nextStatus: payload.status,
-            requiredEvidence: ['CONSENT', 'INTAKE_CONDITION_PHOTO'],
+            requiredEvidence: ['CONSENT'],
+            optionalEvidence: ['INTAKE_CONDITION_PHOTO'],
           }
         );
       }
