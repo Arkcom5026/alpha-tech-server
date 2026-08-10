@@ -63,6 +63,22 @@ function mapHistory(event) {
   };
 }
 
+function mapSerializedPartMovement(movement) {
+  return {
+    movementId: movement.id,
+    productId: movement.productId,
+    productName: movement.stockItem?.product?.name || null,
+    qtyUsed: Math.abs(Number(movement.qty || 0)),
+    stockItemId: movement.stockItemId,
+    barcode: movement.stockItem?.barcode || null,
+    serialNumber: movement.stockItem?.serialNumber || null,
+    previousStatus: movement.previousStockStatus || null,
+    status: movement.resultingStockStatus || movement.stockItem?.status || null,
+    occurredAt: movement.occurredAt,
+    performedByEmployeeId: movement.performedByEmployeeId || null,
+  };
+}
+
 function deriveClaimContext(job, workflowEvent) {
   const claims = job.warrantyClaims || [];
   const activeClaim = claims.find((claim) => CLAIM_ACTIVE_STATUSES.includes(claim.status)) || null;
@@ -118,6 +134,7 @@ class RepairJobDetailService {
     const diagnosis = job.repairDiagnosisEvent?.metadata?.diagnosis || null;
     const history = (job.repairWorkflowHistory || []).map(mapHistory);
     const claimContext = deriveClaimContext(job, workflowEvent);
+    const serializedPartsUsed = (job.serializedPartMovements || []).map(mapSerializedPartMovement);
 
     const nextAction = claimContext?.active
       ? `ใบงานพักการดำเนินการระหว่างเคลม ${claimContext.claimNo} (${claimContext.status}) ให้ดำเนินงานในรายการเคลมจนจบก่อนกลับมาที่ใบงานซ่อม`
@@ -127,6 +144,7 @@ class RepairJobDetailService {
 
     return {
       ...mapRepairJob(job),
+      serializedPartsUsed,
       workflow: {
         status: workflowStatus,
         nextAction,
@@ -155,3 +173,4 @@ module.exports.NEXT_ACTION_BY_STATUS = NEXT_ACTION_BY_STATUS;
 module.exports.CLAIM_HANDBACK_BY_RESOLUTION = CLAIM_HANDBACK_BY_RESOLUTION;
 module.exports.deriveClaimContext = deriveClaimContext;
 module.exports.mapHistory = mapHistory;
+module.exports.mapSerializedPartMovement = mapSerializedPartMovement;
