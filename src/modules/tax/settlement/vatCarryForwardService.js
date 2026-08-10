@@ -136,8 +136,8 @@ const confirmVatCarryForwardAuthority = async ({
     taxPeriodId: normalizedPeriodId,
   }, tx, true);
 
-  if (['LOCKED', 'SUBMITTED'].includes(String(target.status))) {
-    fail('VAT_CARRY_FORWARD_PERIOD_IMMUTABLE', 'Carry-forward authority cannot change after the tax period is locked', 409, {
+  if (String(target.status) === 'SUBMITTED') {
+    fail('VAT_CARRY_FORWARD_PERIOD_IMMUTABLE', 'Carry-forward authority cannot change after the tax period is submitted', 409, {
       taxPeriodId: target.id,
       taxPeriodStatus: target.status,
     });
