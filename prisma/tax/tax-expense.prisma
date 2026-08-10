@@ -176,7 +176,6 @@ model TaxExpenseItem {
   category            TaxExpenseCategory    @relation("TaxExpenseItemCategory", fields: [categoryId, branchId], references: [id, branchId], onDelete: Restrict)
 
   @@unique([taxExpenseId, lineNumber])
-  @@unique([id, branchId])
   @@index([branchId])
   @@index([categoryId])
 }
