@@ -14,7 +14,28 @@ class GetRepairPartStockOptionsRepository {
   findRepairJob(branchId, repairJobId) {
     return this.prisma.repairJob.findFirst({
       where: { id: Number(repairJobId), branchId: Number(branchId) },
-      select: { id: true, branchId: true, jobNo: true },
+      select: {
+        id: true,
+        branchId: true,
+        jobNo: true,
+        deviceId: true,
+        warrantyClaims: {
+          select: { id: true, claimNo: true, status: true },
+          orderBy: { openedAt: 'desc' },
+        },
+      },
+    });
+  }
+
+  findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
+    return this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(deviceId),
+        branchId: Number(branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
     });
   }
 
