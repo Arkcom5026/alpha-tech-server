@@ -271,13 +271,20 @@ const removeTaxDocumentFromFiling = async ({
   return mapRow(row, false);
 });
 
-const markInputTaxBatchFiled = async ({ batchId, filedAt = new Date() }) => prisma.$transaction(async (tx) => {
+const markInputTaxBatchFiled = async ({ branchId, batchId, filedAt = new Date() }) => prisma.$transaction(async (tx) => {
+  const normalizedBranchId = positiveInt(branchId, 'branchId');
   const normalizedBatchId = positiveInt(batchId, 'batchId');
   const authority = await repository.lockBatchPeriodAuthority({ batchId: normalizedBatchId }, tx);
   if (!authority) {
     throw Object.assign(new Error('Input tax filing batch was not found'), {
       code: 'INPUT_TAX_FILING_BATCH_NOT_FOUND',
       statusCode: 404,
+    });
+  }
+  if (Number(authority.branchId) !== normalizedBranchId) {
+    throw Object.assign(new Error('Filing batch does not belong to the requested branch'), {
+      code: 'INPUT_TAX_FILING_BATCH_BRANCH_MISMATCH',
+      statusCode: 403,
     });
   }
   if (authority.batchStatus === 'SUBMITTED') {
