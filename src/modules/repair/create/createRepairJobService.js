@@ -97,6 +97,7 @@ class CreateRepairJobService {
               stockItemId: created.stockItemId,
               status: created.status,
               deviceModel: created.deviceModel,
+              preAgreedService: payload.preAgreedService || null,
             },
             occurredAt: created.createdAt,
           });
