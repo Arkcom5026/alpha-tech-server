@@ -4,6 +4,9 @@ const {
   evaluateIntakeCompletion,
 } = require('../../intake-evidence/intakeEvidencePolicy');
 const {
+  assertRepairNotHeldByActiveClaim,
+} = require('../../policies/claimRepairHoldPolicy');
+const {
   REPAIR_WORKFLOW_STATUS,
   REPAIR_WORKFLOW_ACTION,
   getAvailableRepairWorkflowActions,
@@ -179,6 +182,8 @@ class TransitionRepairWorkflowService {
       if (!repairJob.deviceId || !repairJob.device) {
         throw new RepairWorkflowCommandError('REPAIR_DEVICE_REQUIRED', 'Repair workflow commands require a linked device passport', { repairJobId });
       }
+
+      assertRepairNotHeldByActiveClaim(repairJob, RepairWorkflowCommandError);
 
       const workflowStatus = currentWorkflowStatus(repairJob);
       if (expectedWorkflowStatus && expectedWorkflowStatus !== workflowStatus) {
