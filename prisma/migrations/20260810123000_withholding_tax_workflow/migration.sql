@@ -6,6 +6,20 @@ CREATE TYPE "WithholdingTaxRecordStatus" AS ENUM ('DRAFT', 'READY', 'CERTIFIED',
 CREATE TYPE "WithholdingTaxCertificateStatus" AS ENUM ('DRAFT', 'ISSUED', 'VOIDED');
 CREATE TYPE "WithholdingTaxFilingStatus" AS ENUM ('DRAFT', 'PREPARED', 'SUBMITTED', 'VOIDED');
 
+CREATE TABLE "WithholdingTaxTreatmentEvent" (
+  "id" TEXT NOT NULL,
+  "branchId" INTEGER NOT NULL,
+  "taxExpenseId" INTEGER NOT NULL,
+  "taxExpenseItemId" INTEGER NOT NULL,
+  "previousTreatment" "TaxExpenseWhtTreatment" NOT NULL,
+  "resultingTreatment" "TaxExpenseWhtTreatment" NOT NULL,
+  "actorEmployeeId" INTEGER NOT NULL,
+  "note" TEXT,
+  "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "WithholdingTaxTreatmentEvent_pkey" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "WithholdingTaxCertificate" (
   "id" TEXT NOT NULL,
   "branchId" INTEGER NOT NULL,
@@ -89,6 +103,10 @@ CREATE TABLE "WithholdingTaxFilingItem" (
   CONSTRAINT "WithholdingTaxFilingItem_pkey" PRIMARY KEY ("id")
 );
 
+CREATE INDEX "WithholdingTaxTreatmentEvent_branchId_taxExpenseId_occurredAt_idx" ON "WithholdingTaxTreatmentEvent"("branchId", "taxExpenseId", "occurredAt");
+CREATE INDEX "WithholdingTaxTreatmentEvent_taxExpenseItemId_occurredAt_idx" ON "WithholdingTaxTreatmentEvent"("taxExpenseItemId", "occurredAt");
+CREATE INDEX "WithholdingTaxTreatmentEvent_actorEmployeeId_idx" ON "WithholdingTaxTreatmentEvent"("actorEmployeeId");
+
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_taxExpenseId_key" ON "WithholdingTaxCertificate"("taxExpenseId");
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_id_branchId_key" ON "WithholdingTaxCertificate"("id", "branchId");
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_branchId_certificateNumber_key" ON "WithholdingTaxCertificate"("branchId", "certificateNumber");
@@ -111,6 +129,21 @@ CREATE UNIQUE INDEX "WithholdingTaxFilingItem_batchId_withholdingTaxRecordId_key
 CREATE INDEX "WithholdingTaxFilingItem_branchId_batchId_idx" ON "WithholdingTaxFilingItem"("branchId", "batchId");
 CREATE INDEX "WithholdingTaxFilingItem_taxExpenseId_idx" ON "WithholdingTaxFilingItem"("taxExpenseId");
 CREATE INDEX "WithholdingTaxFilingItem_certificateId_idx" ON "WithholdingTaxFilingItem"("certificateId");
+
+ALTER TABLE "WithholdingTaxTreatmentEvent"
+  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseId_branchId_fkey"
+  FOREIGN KEY ("taxExpenseId", "branchId") REFERENCES "TaxExpense"("id", "branchId")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "WithholdingTaxTreatmentEvent"
+  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseItemId_fkey"
+  FOREIGN KEY ("taxExpenseItemId") REFERENCES "TaxExpenseItem"("id")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "WithholdingTaxTreatmentEvent"
+  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_actorEmployeeId_fkey"
+  FOREIGN KEY ("actorEmployeeId") REFERENCES "EmployeeProfile"("id")
+  ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxCertificate"
   ADD CONSTRAINT "WithholdingTaxCertificate_taxExpenseId_branchId_fkey"
