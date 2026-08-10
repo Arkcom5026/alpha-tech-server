@@ -130,6 +130,9 @@ function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = 
       device,
       reportedSymptoms: job.reportedSymptoms,
       status: currentStatus,
+      pickupDefaults: {
+        receiverName: job.customer?.name || job.customer?.companyName || '',
+      },
       estimate: {
         amount: Number(job.estimatedCost || 0),
         depositPaid: Number(job.depositPaid || 0),
