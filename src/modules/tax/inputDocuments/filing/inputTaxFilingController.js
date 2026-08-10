@@ -94,14 +94,8 @@ const removeDocument = handle(async (req) => {
 
 const markBatchFiled = handle(async (req) => {
   const authority = resolveAuthority(req, req.body, InputTaxCapability.FILE);
-  const batchAuthority = await filingService.assertBatchPeriodMutable({ batchId: req.params.batchId });
-  if (Number(batchAuthority.branchId) !== authority.branchId) {
-    throw Object.assign(new Error('Filing batch does not belong to the requested branch'), {
-      code: 'INPUT_TAX_FILING_BATCH_BRANCH_MISMATCH',
-      statusCode: 403,
-    });
-  }
   return filingService.markInputTaxBatchFiled({
+    branchId: authority.branchId,
     batchId: req.params.batchId,
     filedAt: req.body?.filedAt ? new Date(req.body.filedAt) : new Date(),
   });
