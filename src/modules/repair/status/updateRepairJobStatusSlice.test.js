@@ -94,24 +94,43 @@ test('status service rejects active work when intake evidence is missing', async
   assert.equal(updated, false);
 });
 
-test('status service rejects intake without consent or condition photo', async () => {
-  for (const deviceIntake of [
-    { consent: null, photos: [{ category: 'INTAKE_CONDITION' }] },
-    { consent: { id: 1 }, photos: [{ category: 'OTHER' }] },
-  ]) {
-    const service = new UpdateRepairJobStatusService({
-      transaction(work) {
-        return work({
-          findJob: () => Promise.resolve(jobFixture('RECEIVED', { deviceIntake })),
-        });
-      },
-    });
+test('status service requires consent but allows missing condition photo', async () => {
+  const missingConsent = new UpdateRepairJobStatusService({
+    transaction(work) {
+      return work({
+        findJob: () => Promise.resolve(jobFixture('RECEIVED', {
+          deviceIntake: { consent: null, photos: [{ category: 'INTAKE_CONDITION' }] },
+        })),
+      });
+    },
+  });
 
-    await assert.rejects(
-      () => service.execute({ branchId: 4 }, 31, { status: 'IN_PROGRESS' }),
-      (error) => error.code === RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE
-    );
-  }
+  await assert.rejects(
+    () => missingConsent.execute({ branchId: 4 }, 31, { status: 'IN_PROGRESS' }),
+    (error) => error.code === RepairFailureCode.INTAKE_EVIDENCE_INCOMPLETE
+  );
+
+  let updated = false;
+  const consentOnly = new UpdateRepairJobStatusService({
+    transaction(work) {
+      return work({
+        findJob: () => Promise.resolve(jobFixture('RECEIVED', {
+          deviceIntake: { consent: { id: 1 }, photos: [] },
+        })),
+        updateJob: () => {
+          updated = true;
+          return Promise.resolve(jobFixture('IN_PROGRESS', {
+            deviceIntake: { consent: { id: 1 }, photos: [] },
+          }));
+        },
+        createTimelineEvent: () => Promise.resolve({ id: 1 }),
+      });
+    },
+  });
+
+  const result = await consentOnly.execute({ branchId: 4, employeeId: 12 }, 31, { status: 'IN_PROGRESS' });
+  assert.equal(updated, true);
+  assert.equal(result.status, 'IN_PROGRESS');
 });
 
 test('status service applies transition and records timeline event atomically', async () => {
