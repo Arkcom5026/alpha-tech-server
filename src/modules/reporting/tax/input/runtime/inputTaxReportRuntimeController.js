@@ -1,5 +1,15 @@
 const inputTaxReportRuntimeService = require('./inputTaxReportRuntimeService');
 
+const safeLogContext = (req, error) => ({
+  reqId: req?.id || req?.headers?.['x-request-id'] || null,
+  method: req?.method || null,
+  path: req?.originalUrl || req?.url || null,
+  branchId: req?.user?.branchId || null,
+  actorEmployeeId: req?.user?.employeeId || null,
+  code: error?.code || 'INPUT_TAX_REPORT_INTERNAL_ERROR',
+  errorName: error?.name || null,
+});
+
 const getInputTaxReport = async (req, res) => {
   try {
     res.set({
@@ -18,14 +28,13 @@ const getInputTaxReport = async (req, res) => {
     return res.status(200).json(payload);
   } catch (error) {
     const statusCode = Number(error?.statusCode || 500);
-    if (statusCode >= 500) console.error('Error fetching input tax report:', error);
+    if (statusCode >= 500) console.error('[input-tax-report] FAILED', safeLogContext(req, error));
     return res.status(statusCode).json({
       message: statusCode >= 500 ? 'An error occurred while fetching the input tax report.' : error.message,
-      ...(error?.code ? { code: error.code } : {}),
-      ...(error?.details ? { details: error.details } : {}),
-      ...(statusCode >= 500 ? { error: error.message || String(error) } : {}),
+      code: error?.code || (statusCode >= 500 ? 'INPUT_TAX_REPORT_INTERNAL_ERROR' : undefined),
+      ...(statusCode < 500 && error?.details ? { details: error.details } : {}),
     });
   }
 };
 
-module.exports = { getInputTaxReport };
+module.exports = { getInputTaxReport, safeLogContext };
