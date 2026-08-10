@@ -78,6 +78,18 @@ test('WHT submission is manual evidence authority and not direct government fili
   assert.doesNotMatch(source, /rd\.go\.th|e-Filing|efiling/i);
 });
 
+test('WHT readiness is normalized from blocking exception authority at response boundaries', () => {
+  const readiness = read('src/modules/tax/withholdingTax/withholdingTaxReadiness.js');
+  const controller = read('src/modules/tax/withholdingTax/withholdingTaxController.js');
+  const accountingController = read('src/modules/tax/accountingOffice/accountingOfficePackageController.js');
+  assert.match(readiness, /WHT_PND3_FILING_/);
+  assert.match(readiness, /WHT_PND53_FILING_/);
+  assert.match(readiness, /submittedFilingCount/);
+  assert.match(readiness, /readyForAccountant: certificatesReady && filingsReady/);
+  assert.match(controller, /normalizeWithholdingTaxWorkspace/);
+  assert.match(accountingController, /normalizeWithholdingTaxWorkspace/);
+});
+
 test('accountant package consumes WHT certificate and filing authority instead of legacy attachment blockers', () => {
   const controller = read('src/modules/tax/accountingOffice/accountingOfficePackageController.js');
   assert.match(controller, /withholdingTaxService\.loadWithholdingTaxWorkspace/);
@@ -102,9 +114,10 @@ test('WHT migration verifier checks all authority tables and zero backfill', () 
   assert.match(verifier, /must not backfill authority rows/);
 });
 
-test('tax router exposes WHT workspace certificate and filing endpoints', () => {
+test('tax router exposes WHT workspace treatment certificate and filing endpoints', () => {
   const routes = read('src/modules/tax/periods/taxPeriodRoutes.js');
   assert.match(routes, /withholding-tax\/\:taxPeriodId/);
+  assert.match(routes, /items\/\:taxExpenseItemId\/treatment/);
   assert.match(routes, /certificates\/issue/);
   assert.match(routes, /filings\/\:formType\/prepare/);
   assert.match(routes, /filings\/\:formType\/submit/);
