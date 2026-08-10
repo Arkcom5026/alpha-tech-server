@@ -16,6 +16,8 @@ const periodService = read('src/modules/tax/periods/taxPeriodService.js');
 
 assert.match(filingRepository, /FOR UPDATE OF batch/);
 assert.match(filingRepository, /lockTaxDocumentForFiling/);
+assert.match(filingRepository, /lockInputVatAuthorityForFiling/);
+assert.match(filingRepository, /FROM "InputVatRecord"/);
 assert.match(filingRepository, /findBatchDocumentItemForUpdate/);
 assert.match(filingRepository, /status" = 'SUBMITTED'/);
 assert.match(filingService, /prisma\.\$transaction/);
@@ -25,6 +27,11 @@ assert.match(filingService, /replayed: true/);
 assert.match(filingService, /authority\.batchStatus === 'SUBMITTED'/);
 assert.match(filingService, /PERIOD_FILING_SUBMIT_BLOCKED_STATUSES = new Set\(\['CLOSED', 'SUBMITTED'\]\)/);
 assert.match(filingService, /assertLockedBatchSubmittable\(authority\)/);
+assert.match(filingService, /INPUT_TAX_FILING_VAT_AUTHORITY_REQUIRED/);
+assert.match(filingService, /INPUT_TAX_FILING_VAT_AUTHORITY_CONFLICT/);
+assert.match(filingService, /eligibleVat > Number\(authorityVat\)/);
+assert.match(filingService, /inputVatRecordId: vatAuthority\.id/);
+assert.match(filingService, /claimedSubtotalAmount = authorityAmounts\.authoritySubtotal/);
 assert.match(filingController, /expectedVersion: req\.body\?\.version \?\? req\.body\?\.expectedVersion/);
 assert.match(filingController, /branchId: authority\.branchId/);
 
