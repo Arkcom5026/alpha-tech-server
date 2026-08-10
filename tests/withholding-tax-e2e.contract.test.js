@@ -78,6 +78,30 @@ test('WHT submission is manual evidence authority and not direct government fili
   assert.doesNotMatch(source, /rd\.go\.th|e-Filing|efiling/i);
 });
 
+test('accountant package consumes WHT certificate and filing authority instead of legacy attachment blockers', () => {
+  const controller = read('src/modules/tax/accountingOffice/accountingOfficePackageController.js');
+  assert.match(controller, /withholdingTaxService\.loadWithholdingTaxWorkspace/);
+  assert.match(controller, /WITHHOLDING_TAX_RECORD_CERTIFICATE_AND_FILING/);
+  assert.match(controller, /withholdingFilingsSubmitted/);
+  assert.match(controller, /withholdingSummary/);
+  assert.match(controller, /withholdingFilings/);
+  assert.match(controller, /LEGACY_WHT_EXCEPTION_CODES/);
+  assert.match(controller, /WITHHOLDING_CERTIFICATE_MISSING/);
+  assert.match(controller, /WITHHOLDING_NOT_COMPLETED/);
+});
+
+test('WHT migration verifier checks all authority tables and zero backfill', () => {
+  const verifier = read('scripts/verify-withholding-tax-migration.js');
+  assert.match(verifier, /20260810123000_withholding_tax_workflow/);
+  assert.match(verifier, /WithholdingTaxCertificate/);
+  assert.match(verifier, /WithholdingTaxRecord/);
+  assert.match(verifier, /WithholdingTaxFilingBatch/);
+  assert.match(verifier, /WithholdingTaxFilingItem/);
+  assert.match(verifier, /to_regclass/);
+  assert.match(verifier, /rowCount !== 0/);
+  assert.match(verifier, /must not backfill authority rows/);
+});
+
 test('tax router exposes WHT workspace certificate and filing endpoints', () => {
   const routes = read('src/modules/tax/periods/taxPeriodRoutes.js');
   assert.match(routes, /withholding-tax\/\:taxPeriodId/);
