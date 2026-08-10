@@ -88,6 +88,35 @@ const getPeriodSummary = async ({ branchId, referenceDate }) => {
   };
 };
 
+const countIncompleteInputTaxFilingRecords = async ({ branchId, taxPeriodId, startDate, endDate }) => {
+  const year = new Date(startDate).getUTCFullYear();
+  const month = new Date(startDate).getUTCMonth() + 1;
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    SELECT COUNT(*)::int AS count
+    FROM "InputVatRecord" record
+    WHERE record."branchId" = ${Number(branchId)}
+      AND record."ledgerType" IN ('INPUT_VAT'::"TaxLedgerType", 'INPUT_VAT_ADJUSTMENT'::"TaxLedgerType")
+      AND record."documentDate" >= ${startDate}
+      AND record."documentDate" <= ${endDate}
+      AND (record."taxPeriodId" IS NULL OR record."taxPeriodId" = ${String(taxPeriodId)})
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "InputTaxFilingItem" item
+        JOIN "InputTaxFilingBatch" batch ON batch."id" = item."batchId"
+        WHERE item."taxDocumentId" = record."taxDocumentId"
+          AND batch."branchId" = ${Number(branchId)}
+          AND batch."year" = ${year}
+          AND batch."month" = ${month}
+          AND batch."status" <> 'VOIDED'::"InputTaxFilingStatus"
+          AND item."status" IN (
+            'SELECTED'::"InputTaxFilingItemStatus",
+            'FILED'::"InputTaxFilingItemStatus"
+          )
+      )
+  `);
+  return Number(rows[0]?.count || 0);
+};
+
 const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredAt }) => {
   const normalizedBranchId = normalizeBranchId(branchId);
   const current = await getPeriodDetail({ branchId: normalizedBranchId, taxPeriodId });
@@ -126,18 +155,47 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
             AND item."status" <> 'REMOVED'::"SalesTaxFilingItemStatus"
         )
     `);
-    if (Number(rows[0]?.count || 0) > 0) fail('TAX_PERIOD_OUTPUT_FILING_INCOMPLETE', 'Prepare the sales tax filing and include every issued document before locking the period', 409);
+    if (Number(rows[0]?.count || 0) > 0) {
+      fail('TAX_PERIOD_OUTPUT_FILING_INCOMPLETE', 'Prepare the sales tax filing and include every issued document before locking the period', 409);
+    }
+
+    const incompleteInputCount = await countIncompleteInputTaxFilingRecords({
+      branchId: normalizedBranchId,
+      taxPeriodId,
+      startDate: current.startDate,
+      endDate: current.endDate,
+    });
+    if (incompleteInputCount > 0) {
+      fail(
+        'TAX_PERIOD_INPUT_FILING_INCOMPLETE',
+        `Prepare the input tax filing and include all ${incompleteInputCount} claimable input VAT record(s) before locking the period`,
+        409,
+      );
+    }
   }
   if (targetStatus === 'SUBMITTED') {
-    const batches = await prisma.salesTaxFilingBatch.count({
-      where: {
-        branchId: normalizedBranchId,
-        year: new Date(current.startDate).getUTCFullYear(),
-        month: new Date(current.startDate).getUTCMonth() + 1,
-        status: 'SUBMITTED',
-      },
-    });
-    if (!batches) fail('TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED', 'Submit the sales tax filing before submitting the tax period', 409);
+    const year = new Date(current.startDate).getUTCFullYear();
+    const month = new Date(current.startDate).getUTCMonth() + 1;
+    const [outputBatches, inputBatches] = await Promise.all([
+      prisma.salesTaxFilingBatch.count({
+        where: {
+          branchId: normalizedBranchId,
+          year,
+          month,
+          status: 'SUBMITTED',
+        },
+      }),
+      prisma.inputTaxFilingBatch.count({
+        where: {
+          branchId: normalizedBranchId,
+          year,
+          month,
+          status: 'SUBMITTED',
+        },
+      }),
+    ]);
+    if (!outputBatches) fail('TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED', 'Submit the sales tax filing before submitting the tax period', 409);
+    if (!inputBatches) fail('TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED', 'Submit the input tax filing before submitting the tax period', 409);
   }
   const period = await repository.transition({
     branchId: normalizedBranchId,
@@ -155,6 +213,7 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
 };
 
 module.exports = {
+  countIncompleteInputTaxFilingRecords,
   ensureMonthlyPeriod,
   getPeriodDetail,
   getPeriodSummary,
