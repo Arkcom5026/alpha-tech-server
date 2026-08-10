@@ -59,7 +59,47 @@ class AddRepairPartRepository {
   }
 
   findProduct(productId) {
-    return this.prisma.product.findUnique({ where: { id: Number(productId) } });
+    return this.prisma.product.findUnique({
+      where: { id: Number(productId) },
+      select: {
+        id: true,
+        name: true,
+        active: true,
+        branchId: true,
+        trackSerialNumber: true,
+        inventoryBehavior: true,
+      },
+    });
+  }
+
+  findStockItem(branchId, productId, stockItemId) {
+    return this.prisma.stockItem.findFirst({
+      where: {
+        id: Number(stockItemId),
+        branchId: Number(branchId),
+        productId: Number(productId),
+      },
+      select: {
+        id: true,
+        branchId: true,
+        productId: true,
+        barcode: true,
+        serialNumber: true,
+        status: true,
+      },
+    });
+  }
+
+  consumeStockItem(branchId, productId, stockItemId) {
+    return this.prisma.stockItem.updateMany({
+      where: {
+        id: Number(stockItemId),
+        branchId: Number(branchId),
+        productId: Number(productId),
+        status: 'IN_STOCK',
+      },
+      data: { status: 'USED' },
+    });
   }
 
   findStockBalance(branchId, productId) {
@@ -92,12 +132,11 @@ class AddRepairPartRepository {
   }
 
   decrementStockBalance(branchId, productId, qtyUsed) {
-    return this.prisma.stockBalance.update({
+    return this.prisma.stockBalance.updateMany({
       where: {
-        productId_branchId: {
-          productId: Number(productId),
-          branchId: Number(branchId),
-        },
+        productId: Number(productId),
+        branchId: Number(branchId),
+        quantity: { gte: qtyUsed },
       },
       data: { quantity: { decrement: qtyUsed } },
     });
