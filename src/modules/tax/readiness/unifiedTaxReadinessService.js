@@ -24,6 +24,9 @@ const SETTLEMENT_DUPLICATES = new Set([
 const routeFor = (exception, taxPeriodId) => {
   const code = String(exception?.code || '');
   const source = String(exception?.source || '');
+  if (source === 'TAX_EXPENSE' && Number.isInteger(Number(exception?.taxExpenseId)) && Number(exception.taxExpenseId) > 0) {
+    return `tax-expenses?assessmentExpenseId=${Number(exception.taxExpenseId)}`;
+  }
   if (code.startsWith('VAT_SETTLEMENT_') || ['PRIOR_PERIOD_VAT_CREDIT', 'HISTORICAL_OPENING_VAT_CREDIT'].includes(source)) {
     return `tax-periods/${taxPeriodId}/vat-settlement`;
   }
@@ -44,6 +47,7 @@ const normalizeException = (entry, taxPeriodId, origin) => Object.freeze({
   count: Number(entry?.count || 1),
   message: entry?.message || null,
   amount: entry?.amount == null ? null : Number(entry.amount),
+  sourceRefs: Object.freeze(Array.isArray(entry?.sourceRefs) ? entry.sourceRefs.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0) : []),
   origin,
   target: Object.freeze({
     kind: 'FINANCE_ROUTE',
@@ -61,23 +65,31 @@ const dedupeExceptions = (entries) => {
   });
 };
 
-const loadPendingVatCitExpenseCount = async ({ branchId, period }, tx = prisma) => {
+const loadPendingVatCitExpenses = async ({ branchId, period }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
-    SELECT COUNT(DISTINCT expense."id")::int AS "count"
-    FROM "TaxExpense" expense
-    JOIN "TaxExpenseItem" item
-      ON item."taxExpenseId" = expense."id"
-     AND item."branchId" = expense."branchId"
-    WHERE expense."branchId" = ${Number(branchId)}
-      AND expense."expenseDate" >= ${period.startDate}
-      AND expense."expenseDate" <= ${period.endDate}
-      AND expense."status" <> 'VOIDED'::"TaxExpenseStatus"
-      AND (
-        item."vatTreatment" = 'PENDING_REVIEW'::"TaxExpenseVatTreatment"
-        OR item."citTreatment" = 'PENDING_REVIEW'::"TaxExpenseCitTreatment"
-      )
+    SELECT pending."id", COUNT(*) OVER()::int AS "totalCount"
+    FROM (
+      SELECT DISTINCT expense."id"
+      FROM "TaxExpense" expense
+      JOIN "TaxExpenseItem" item
+        ON item."taxExpenseId" = expense."id"
+       AND item."branchId" = expense."branchId"
+      WHERE expense."branchId" = ${Number(branchId)}
+        AND expense."expenseDate" >= ${period.startDate}
+        AND expense."expenseDate" <= ${period.endDate}
+        AND expense."status" <> 'VOIDED'::"TaxExpenseStatus"
+        AND (
+          item."vatTreatment" = 'PENDING_REVIEW'::"TaxExpenseVatTreatment"
+          OR item."citTreatment" = 'PENDING_REVIEW'::"TaxExpenseCitTreatment"
+        )
+    ) pending
+    ORDER BY pending."id" ASC
+    LIMIT 20
   `);
-  return Number(rows[0]?.count || 0);
+  return Object.freeze({
+    count: Number(rows[0]?.totalCount || 0),
+    expenseIds: Object.freeze(rows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)),
+  });
 };
 
 const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
@@ -88,17 +100,19 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     vatSettlementService.loadVatSettlementPreparation(args),
   ]);
   const withholding = normalizeWithholdingTaxWorkspace(withholdingRaw);
-  const pendingVatCitExpenseCount = await loadPendingVatCitExpenseCount({ branchId, period: closingPackage.period });
+  const pendingVatCit = await loadPendingVatCitExpenses({ branchId, period: closingPackage.period });
 
   const closingExceptions = (closingPackage.exceptions || [])
     .filter((entry) => !LEGACY_WHT_CODES.has(entry.code) && !LEGACY_EXPENSE_CODES.has(entry.code))
     .map((entry) => normalizeException(entry, taxPeriodId, 'MONTHLY_TAX_CLOSING_PACKAGE'));
-  const expenseExceptions = pendingVatCitExpenseCount > 0
+  const expenseExceptions = pendingVatCit.count > 0
     ? [normalizeException({
         code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING',
         source: 'TAX_EXPENSE',
         severity: 'BLOCKER',
-        count: pendingVatCitExpenseCount,
+        count: pendingVatCit.count,
+        taxExpenseId: pendingVatCit.expenseIds[0] || null,
+        sourceRefs: pendingVatCit.expenseIds,
         message: 'Tax expenses remain pending VAT/CIT assessment',
       }, taxPeriodId, 'TAX_EXPENSE_ASSESSMENT')]
     : [];
@@ -114,7 +128,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     ...settlementExceptions,
   ]));
 
-  const expensesReady = pendingVatCitExpenseCount === 0
+  const expensesReady = pendingVatCit.count === 0
     && closingPackage.readiness?.expenseEvidenceComplete === true;
   const documentsReady = closingPackage.readiness?.outputVatComplete === true
     && closingPackage.readiness?.inputVatComplete === true
@@ -154,7 +168,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
 
 module.exports = Object.freeze({
   loadUnifiedTaxReadiness,
-  loadPendingVatCitExpenseCount,
+  loadPendingVatCitExpenses,
   normalizeException,
   routeFor,
 });
