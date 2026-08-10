@@ -21,6 +21,8 @@ const getInputTaxReport = async (req, res) => {
     if (statusCode >= 500) console.error('Error fetching input tax report:', error);
     return res.status(statusCode).json({
       message: statusCode >= 500 ? 'An error occurred while fetching the input tax report.' : error.message,
+      ...(error?.code ? { code: error.code } : {}),
+      ...(error?.details ? { details: error.details } : {}),
       ...(statusCode >= 500 ? { error: error.message || String(error) } : {}),
     });
   }
