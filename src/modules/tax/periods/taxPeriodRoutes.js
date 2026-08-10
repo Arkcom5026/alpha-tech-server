@@ -17,6 +17,7 @@ router.get('/vat-settlement/:taxPeriodId', vatSettlementController.getPreparatio
 router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
 router.post('/vat-carry-forward/:taxPeriodId/confirm', vatCarryForwardController.confirmAuthority);
 router.get('/withholding-tax/:taxPeriodId', withholdingTaxController.getWorkspace);
+router.post('/withholding-tax/items/:taxExpenseItemId/treatment', withholdingTaxController.transitionTreatment);
 router.post('/withholding-tax/:taxPeriodId/certificates/issue', withholdingTaxController.issueCertificate);
 router.post('/withholding-tax/:taxPeriodId/filings/:formType/prepare', withholdingTaxController.prepareFiling);
 router.post('/withholding-tax/:taxPeriodId/filings/:formType/submit', withholdingTaxController.submitFiling);
