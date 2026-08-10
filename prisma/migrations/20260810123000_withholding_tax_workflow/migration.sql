@@ -89,8 +89,6 @@ CREATE TABLE "WithholdingTaxFilingItem" (
   CONSTRAINT "WithholdingTaxFilingItem_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "TaxExpenseItem_id_branchId_key" ON "TaxExpenseItem"("id", "branchId");
-
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_taxExpenseId_key" ON "WithholdingTaxCertificate"("taxExpenseId");
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_id_branchId_key" ON "WithholdingTaxCertificate"("id", "branchId");
 CREATE UNIQUE INDEX "WithholdingTaxCertificate_branchId_certificateNumber_key" ON "WithholdingTaxCertificate"("branchId", "certificateNumber");
@@ -130,8 +128,8 @@ ALTER TABLE "WithholdingTaxRecord"
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxRecord"
-  ADD CONSTRAINT "WithholdingTaxRecord_taxExpenseItemId_branchId_fkey"
-  FOREIGN KEY ("taxExpenseItemId", "branchId") REFERENCES "TaxExpenseItem"("id", "branchId")
+  ADD CONSTRAINT "WithholdingTaxRecord_taxExpenseItemId_fkey"
+  FOREIGN KEY ("taxExpenseItemId") REFERENCES "TaxExpenseItem"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxRecord"
