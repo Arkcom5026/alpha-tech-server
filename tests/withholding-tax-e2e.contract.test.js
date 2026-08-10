@@ -7,10 +7,11 @@ const path = require('node:path');
 
 const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 
-test('WHT Prisma foundation separates certificate record and filing authorities', () => {
+test('WHT Prisma foundation separates treatment certificate record and filing authorities', () => {
   const schema = read('prisma/tax/withholding-tax.prisma');
   const migration = read('prisma/migrations/20260810123000_withholding_tax_workflow/migration.sql');
 
+  assert.match(schema, /model WithholdingTaxTreatmentEvent/);
   assert.match(schema, /model WithholdingTaxCertificate/);
   assert.match(schema, /taxExpenseId\s+Int\s+@unique/);
   assert.match(schema, /model WithholdingTaxRecord/);
@@ -20,12 +21,22 @@ test('WHT Prisma foundation separates certificate record and filing authorities'
   assert.match(schema, /PND3/);
   assert.match(schema, /PND53/);
 
+  assert.match(migration, /CREATE TABLE "WithholdingTaxTreatmentEvent"/);
   assert.match(migration, /CREATE TABLE "WithholdingTaxCertificate"/);
   assert.match(migration, /CREATE TABLE "WithholdingTaxRecord"/);
   assert.match(migration, /CREATE TABLE "WithholdingTaxFilingBatch"/);
   assert.match(migration, /CREATE TABLE "WithholdingTaxFilingItem"/);
   assert.doesNotMatch(migration, /UPDATE "TaxExpense"/);
   assert.doesNotMatch(migration, /INSERT INTO "WithholdingTaxRecord"/);
+});
+
+test('WHT human confirmation persists append-only treatment event evidence', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxTreatmentService.js');
+  assert.match(source, /PENDING_REVIEW: Object\.freeze\(\['WITHHOLDING_REQUIRED'\]\)/);
+  assert.match(source, /WITHHOLDING_REQUIRED: Object\.freeze\(\['WITHHELD'\]\)/);
+  assert.match(source, /INSERT INTO "WithholdingTaxTreatmentEvent"/);
+  assert.match(source, /WHT_TREATMENT_CONCURRENT_MODIFICATION/);
+  assert.match(source, /WHT_TREATMENT_CERTIFICATE_LOCKED/);
 });
 
 test('WHT form authority defaults individual to PND3 and legal entity to PND53', () => {
@@ -105,6 +116,7 @@ test('accountant package consumes WHT certificate and filing authority instead o
 test('WHT migration verifier checks all authority tables and zero backfill', () => {
   const verifier = read('scripts/verify-withholding-tax-migration.js');
   assert.match(verifier, /20260810123000_withholding_tax_workflow/);
+  assert.match(verifier, /WithholdingTaxTreatmentEvent/);
   assert.match(verifier, /WithholdingTaxCertificate/);
   assert.match(verifier, /WithholdingTaxRecord/);
   assert.match(verifier, /WithholdingTaxFilingBatch/);
