@@ -5,6 +5,7 @@ const { PrismaClient } = require('@prisma/client');
 
 const MIGRATION_NAME = '20260810123000_withholding_tax_workflow';
 const TABLE_NAMES = [
+  'WithholdingTaxTreatmentEvent',
   'WithholdingTaxCertificate',
   'WithholdingTaxRecord',
   'WithholdingTaxFilingBatch',
