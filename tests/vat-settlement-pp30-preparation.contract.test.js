@@ -17,13 +17,24 @@ test('VAT settlement preparation uses output authority and claimed input VAT aut
   assert.match(source, /INPUT_VAT_ADJUSTMENT/);
 });
 
-test('VAT settlement computes payable and credit without persisting a new ledger', () => {
+test('VAT settlement computes current-period payable and credit without persisting a new ledger', () => {
   const source = read('src/modules/tax/settlement/vatSettlementService.js');
-  assert.match(source, /netVat = amount\(outputVatAuthority - creditableInputVat\)/);
-  assert.match(source, /vatPayable = amount\(Math\.max\(0, netVat\)\)/);
-  assert.match(source, /vatCredit = amount\(Math\.max\(0, -netVat\)\)/);
+  assert.match(source, /currentPeriodNetVat = amount\(outputVatAuthority - creditableInputVat\)/);
+  assert.match(source, /currentPeriodVatPayable = amount\(Math\.max\(0, currentPeriodNetVat\)\)/);
+  assert.match(source, /currentPeriodVatCredit = amount\(Math\.max\(0, -currentPeriodNetVat\)\)/);
   assert.doesNotMatch(source, /INSERT INTO "VatSettlement/);
   assert.doesNotMatch(source, /UPDATE "VatSettlement/);
+});
+
+test('PP30 readiness is blocked when prior-period carry-forward authority is unresolved', () => {
+  const source = read('src/modules/tax/settlement/vatSettlementService.js');
+  assert.match(source, /FROM "TaxPeriod"/);
+  assert.match(source, /PREVIOUS_PERIOD_CREDIT_DISPOSITION_NOT_MODELLED/);
+  assert.match(source, /carryForwardAuthorityReady/);
+  assert.match(source, /VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED/);
+  assert.match(source, /pp30NetVatAfterCarryForward/);
+  assert.match(source, /readyForCurrentPeriodSettlement/);
+  assert.match(source, /readyForPp30Preparation/);
 });
 
 test('VAT settlement exposes reconciliation and readiness blockers', () => {
@@ -34,7 +45,6 @@ test('VAT settlement exposes reconciliation and readiness blockers', () => {
   assert.match(source, /VAT_SETTLEMENT_OUTPUT_RECONCILIATION_MISMATCH/);
   assert.match(source, /VAT_SETTLEMENT_INPUT_CREDIT_NOT_READY/);
   assert.match(source, /VAT_SETTLEMENT_PERIOD_NOT_LOCKED/);
-  assert.match(source, /readyForPp30Preparation/);
 });
 
 test('tax router exposes VAT settlement preparation endpoint', () => {
