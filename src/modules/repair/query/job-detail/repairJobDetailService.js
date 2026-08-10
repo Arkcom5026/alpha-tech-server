@@ -42,7 +42,7 @@ class RepairJobDetailService {
     const workflowEvent = job.repairWorkflowEvent || null;
     const workflowStatus =
       workflowEvent?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
-    const diagnosis = workflowEvent?.metadata?.diagnosis || null;
+    const diagnosis = job.repairDiagnosisEvent?.metadata?.diagnosis || null;
 
     return {
       ...mapRepairJob(job),
