@@ -53,17 +53,28 @@ class RepairJobDetailRepository {
     });
     if (!job?.deviceId) return job;
 
-    const repairWorkflowEvent = await prisma.devicePassportEvent.findFirst({
-      where: {
-        deviceId: Number(job.deviceId),
-        branchId: branch,
-        sourceType: 'REPAIR_JOB',
-        sourceId: String(id),
-      },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-    });
+    const eventScope = {
+      deviceId: Number(job.deviceId),
+      branchId: branch,
+      sourceType: 'REPAIR_JOB',
+      sourceId: String(id),
+    };
 
-    return { ...job, repairWorkflowEvent };
+    const [repairWorkflowEvent, repairDiagnosisEvent] = await Promise.all([
+      prisma.devicePassportEvent.findFirst({
+        where: eventScope,
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      }),
+      prisma.devicePassportEvent.findFirst({
+        where: {
+          ...eventScope,
+          eventType: 'DIAGNOSIS_COMPLETED',
+        },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+
+    return { ...job, repairWorkflowEvent, repairDiagnosisEvent };
   }
 }
 
