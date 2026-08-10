@@ -35,6 +35,17 @@ const requireAuthority = (req) => {
 
 const employeeId = (req) => Number(req.user?.employeeId || req.user?.employeeProfileId || req.user?.id || 0);
 
+const requireMutablePeriod = async ({ branchId, taxPeriodId }) => {
+  const workspace = await service.loadWithholdingTaxWorkspace({ branchId, taxPeriodId });
+  if (String(workspace?.period?.status || '') === 'SUBMITTED') {
+    const error = new Error('WHT cannot change after the tax period is submitted');
+    error.code = 'WHT_PERIOD_IMMUTABLE';
+    error.statusCode = 409;
+    throw error;
+  }
+  return workspace;
+};
+
 const getWorkspace = async (req, res, next) => {
   try {
     const workspace = await service.loadWithholdingTaxWorkspace({ branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId });
@@ -67,8 +78,10 @@ const issueCertificate = async (req, res, next) => {
 
 const prepareFiling = async (req, res, next) => {
   try {
+    const branchId = requireAuthority(req);
+    await requireMutablePeriod({ branchId, taxPeriodId: req.params.taxPeriodId });
     const data = await service.prepareWithholdingFiling({
-      branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId,
+      branchId, taxPeriodId: req.params.taxPeriodId,
       formType: req.params.formType, actorEmployeeId: employeeId(req),
     });
     return res.json({ ok: true, data });
@@ -85,4 +98,4 @@ const submitFiling = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-module.exports = Object.freeze({ getWorkspace, transitionTreatment, issueCertificate, prepareFiling, submitFiling });
+module.exports = Object.freeze({ getWorkspace, transitionTreatment, issueCertificate, prepareFiling, submitFiling, requireMutablePeriod });
