@@ -8,11 +8,13 @@ const { routeFor, normalizeException } = require('../src/modules/tax/readiness/u
 
 const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 
-test('unified readiness composes six existing tax authority domains', () => {
+test('unified readiness composes eight tax closing authority domains', () => {
   const source = read('src/modules/tax/readiness/unifiedTaxReadinessService.js');
-  for (const domain of ['OUTPUT_VAT', 'INPUT_VAT', 'TAX_EXPENSE', 'WITHHOLDING_TAX', 'PP30', 'TAX_PERIOD']) {
+  for (const domain of ['OUTPUT_VAT', 'INPUT_VAT', 'TAX_EXPENSE', 'WITHHOLDING_TAX', 'DOCUMENTS', 'RECONCILIATION', 'PP30', 'TAX_PERIOD']) {
     assert.match(source, new RegExp(`key: '${domain}'`));
   }
+  assert.match(source, /documentsReady/);
+  assert.match(source, /reconciliationReady/);
   assert.match(source, /readyForAccountant/);
   assert.match(source, /readinessPercent/);
 });
