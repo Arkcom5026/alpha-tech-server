@@ -63,7 +63,11 @@ test('validateRepairStatusUpdate uppercases status and normalizes optional field
 });
 
 test('validateAddPart requires positive integer product and quantity', () => {
-  assert.deepEqual(validateAddPart({ productId: '4', qtyUsed: '2' }), { productId: 4, qtyUsed: 2 });
+  assert.deepEqual(validateAddPart({ productId: '4', qtyUsed: '2' }), {
+    productId: 4,
+    stockItemId: null,
+    qtyUsed: 2,
+  });
   assert.throws(() => validateAddPart({ productId: 4, qtyUsed: 0 }), { code: 'REPAIR_INVALID_INPUT' });
 });
 
