@@ -4,6 +4,7 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
+const { CLAIM_ACTIVE_STATUSES } = require('../contracts/repairContract');
 
 function positiveRepairJobId(value) {
   const parsed = Number(value);
@@ -20,6 +21,12 @@ function positiveRepairJobId(value) {
 
 function currentWorkflowStatus(event) {
   return event?.metadata?.workflowTargetStatus || 'RECEIVED';
+}
+
+function activeWarrantyClaim(job) {
+  return (job?.warrantyClaims || []).find((claim) =>
+    CLAIM_ACTIVE_STATUSES.includes(claim.status)
+  ) || null;
 }
 
 class AddRepairPartService {
@@ -46,6 +53,20 @@ class AddRepairPartService {
           RepairFailureCode.REPAIR_JOB_TERMINAL,
           'ไม่สามารถเบิกอะไหล่ให้ใบงานที่ปิดหรือยกเลิกแล้ว',
           409
+        );
+      }
+
+      const activeClaim = activeWarrantyClaim(job);
+      if (activeClaim) {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'ใบงานอยู่ระหว่างเคลม กรุณาดำเนินรายการเคลมให้จบก่อนเบิกอะไหล่เพิ่ม',
+          409,
+          {
+            warrantyClaimId: activeClaim.id,
+            claimNo: activeClaim.claimNo,
+            claimStatus: activeClaim.status,
+          }
         );
       }
 
@@ -136,3 +157,4 @@ class AddRepairPartService {
 module.exports = new AddRepairPartService();
 module.exports.AddRepairPartService = AddRepairPartService;
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
+module.exports.activeWarrantyClaim = activeWarrantyClaim;
