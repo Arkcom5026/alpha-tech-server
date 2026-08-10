@@ -11,6 +11,12 @@ enum WithholdingTaxRecordStatus {
   VOIDED
 }
 
+enum WithholdingTaxCertificateStatus {
+  DRAFT
+  ISSUED
+  VOIDED
+}
+
 enum WithholdingTaxFilingStatus {
   DRAFT
   PREPARED
@@ -18,11 +24,35 @@ enum WithholdingTaxFilingStatus {
   VOIDED
 }
 
+model WithholdingTaxCertificate {
+  id                    String                       @id @default(cuid())
+  branchId              Int
+  taxExpenseId          Int                          @unique
+  taxPeriodId           String?
+  formType              WithholdingTaxFormType
+  certificateNumber     String
+  status                WithholdingTaxCertificateStatus @default(DRAFT)
+  issuerSnapshot        Json
+  payeeSnapshot         Json
+  issuedAt              DateTime?
+  version               Int                          @default(1)
+  createdByEmployeeId   Int
+  issuedByEmployeeId    Int?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  @@unique([id, branchId])
+  @@unique([branchId, certificateNumber])
+  @@index([branchId, taxPeriodId, formType, status])
+}
+
 model WithholdingTaxRecord {
   id                    String                     @id @default(cuid())
   branchId              Int
-  taxExpenseId          Int                        @unique
+  taxExpenseId          Int
+  taxExpenseItemId      Int                        @unique
   taxPeriodId           String?
+  certificateId         String?
   formType              WithholdingTaxFormType
   payeeType             ExpensePayeeType
   payeeName             String
@@ -34,40 +64,36 @@ model WithholdingTaxRecord {
   withholdingTaxRate    Decimal                    @db.Decimal(5, 2)
   withholdingTaxAmount  Decimal                    @db.Decimal(14, 2)
   status                WithholdingTaxRecordStatus @default(DRAFT)
-  certificateNumber     String?
-  certificateIssuedAt   DateTime?
-  certificateSnapshot   Json?
-  certificateVersion    Int                        @default(0)
   createdByEmployeeId   Int
-  certifiedByEmployeeId Int?
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
 
   @@unique([id, branchId])
-  @@unique([branchId, certificateNumber])
+  @@index([branchId, taxExpenseId])
+  @@index([branchId, certificateId])
   @@index([branchId, taxPeriodId, formType, status])
   @@index([branchId, paidAt])
   @@index([payeeTaxId])
 }
 
 model WithholdingTaxFilingBatch {
-  id                   String                     @id @default(cuid())
-  branchId             Int
-  taxPeriodId          String
-  formType             WithholdingTaxFormType
-  year                 Int
-  month                Int
-  status               WithholdingTaxFilingStatus @default(DRAFT)
-  itemCount            Int                        @default(0)
-  taxableBaseAmount    Decimal                    @default(0) @db.Decimal(14, 2)
-  withholdingTaxAmount Decimal                    @default(0) @db.Decimal(14, 2)
-  preparedByEmployeeId Int?
-  preparedAt           DateTime?
+  id                    String                     @id @default(cuid())
+  branchId              Int
+  taxPeriodId           String
+  formType              WithholdingTaxFormType
+  year                  Int
+  month                 Int
+  status                WithholdingTaxFilingStatus @default(DRAFT)
+  itemCount             Int                        @default(0)
+  taxableBaseAmount     Decimal                    @default(0) @db.Decimal(14, 2)
+  withholdingTaxAmount  Decimal                    @default(0) @db.Decimal(14, 2)
+  preparedByEmployeeId  Int?
+  preparedAt            DateTime?
   submittedByEmployeeId Int?
-  submittedAt          DateTime?
-  submissionEvidence   Json?
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
+  submittedAt           DateTime?
+  submissionEvidence    Json?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 
   @@unique([branchId, taxPeriodId, formType])
   @@unique([id, branchId])
@@ -75,22 +101,24 @@ model WithholdingTaxFilingBatch {
 }
 
 model WithholdingTaxFilingItem {
-  id                   String   @id @default(cuid())
-  branchId             Int
-  batchId              String
-  withholdingTaxRecordId String @unique
-  taxExpenseId         Int
-  certificateNumber    String
-  payeeName            String
-  payeeTaxId           String?
-  paidAt               DateTime
-  taxableBaseAmount    Decimal  @db.Decimal(14, 2)
-  withholdingTaxRate   Decimal  @db.Decimal(5, 2)
-  withholdingTaxAmount Decimal  @db.Decimal(14, 2)
-  sourceSnapshot       Json
-  createdAt            DateTime @default(now())
+  id                     String   @id @default(cuid())
+  branchId               Int
+  batchId                String
+  withholdingTaxRecordId String   @unique
+  taxExpenseId           Int
+  certificateId          String
+  certificateNumber      String
+  payeeName              String
+  payeeTaxId             String?
+  paidAt                 DateTime
+  taxableBaseAmount      Decimal  @db.Decimal(14, 2)
+  withholdingTaxRate     Decimal  @db.Decimal(5, 2)
+  withholdingTaxAmount   Decimal  @db.Decimal(14, 2)
+  sourceSnapshot         Json
+  createdAt              DateTime @default(now())
 
   @@unique([batchId, withholdingTaxRecordId])
   @@index([branchId, batchId])
   @@index([taxExpenseId])
+  @@index([certificateId])
 }
