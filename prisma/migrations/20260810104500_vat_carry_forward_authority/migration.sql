@@ -13,6 +13,8 @@ CREATE TABLE "VatCarryForwardAuthority" (
   "amount" DECIMAL(14,2) NOT NULL,
   "status" "VatCarryForwardStatus" NOT NULL DEFAULT 'DRAFT',
   "note" TEXT,
+  "sourceSnapshot" JSONB,
+  "version" INTEGER NOT NULL DEFAULT 1,
   "confirmedById" INTEGER,
   "confirmedAt" TIMESTAMP(3),
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
