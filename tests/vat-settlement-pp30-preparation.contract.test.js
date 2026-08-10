@@ -84,9 +84,12 @@ test('carry-forward Prisma foundation is additive and tax-period scoped', () => 
   assert.doesNotMatch(migration, /INSERT INTO "VatCarryForwardAuthority"/);
 });
 
-test('VAT carry-forward migration verifier casts regclass to text and enforces zero backfill', () => {
+test('VAT carry-forward migration verifier normalizes quoted regclass text and enforces zero backfill', () => {
   const source = read('scripts/verify-vat-carry-forward-migration.js');
   assert.match(source, /to_regclass\('public\."\$\{TABLE_NAME\}"'\)::text AS "tableName"/);
+  assert.match(source, /normalizeRegclassName/);
+  assert.match(source, /replace\(\/\^"\(\.\*\)"\$\/, '\$1'\)/);
+  assert.match(source, /rawTableName/);
   assert.match(source, /finished_at/);
   assert.match(source, /rolled_back_at/);
   assert.match(source, /rowCount !== 0/);
