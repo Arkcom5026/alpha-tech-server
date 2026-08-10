@@ -30,10 +30,14 @@ test('VAT settlement applies only confirmed carry-forward authority to PP30 resu
   assert.doesNotMatch(source, /UPDATE "VatSettlement/);
 });
 
-test('PP30 readiness is blocked when prior-period carry-forward authority is unresolved', () => {
+test('PP30 readiness requires explicit prior-period or historical-opening authority', () => {
   const source = read('src/modules/tax/settlement/vatSettlementService.js');
+  assert.match(source, /expectedCarryForwardSourceType = previousPeriod \? 'PRIOR_PERIOD' : 'HISTORICAL_OPENING'/);
+  assert.match(source, /carryForwardSourceMatches/);
   assert.match(source, /carryForwardAuthorityReady/);
   assert.match(source, /VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED/);
+  assert.match(source, /VAT_SETTLEMENT_HISTORICAL_OPENING_AUTHORITY_REQUIRED/);
+  assert.match(source, /HISTORICAL_OPENING_AUTHORITY_REQUIRED/);
   assert.match(source, /readyForCurrentPeriodSettlement/);
   assert.match(source, /readyForPp30Preparation/);
 });
