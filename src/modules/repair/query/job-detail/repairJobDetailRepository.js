@@ -40,16 +40,33 @@ class RepairJobDetailRepository {
     return this.client;
   }
 
-  findById(branchId, repairJobId) {
-    return this.getPrisma().repairJob.findFirst({
+  async findById(branchId, repairJobId) {
+    const prisma = this.getPrisma();
+    const id = Number(repairJobId);
+    const branch = Number(branchId);
+    const job = await prisma.repairJob.findFirst({
       where: {
-        id: Number(repairJobId),
-        branchId: Number(branchId),
+        id,
+        branchId: branch,
       },
       include: repairJobDetailInclude,
     });
+    if (!job?.deviceId) return job;
+
+    const repairWorkflowEvent = await prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(job.deviceId),
+        branchId: branch,
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(id),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return { ...job, repairWorkflowEvent };
   }
 }
 
 module.exports = new RepairJobDetailRepository();
 module.exports.RepairJobDetailRepository = RepairJobDetailRepository;
+module.exports.repairJobDetailInclude = repairJobDetailInclude;
