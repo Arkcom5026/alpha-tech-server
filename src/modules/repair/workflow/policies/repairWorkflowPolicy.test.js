@@ -9,7 +9,7 @@ const {
   resolveRepairWorkflowTransition,
 } = require('./repairWorkflowPolicy');
 
-test('covers the canonical repair path from received to closed', () => {
+test('covers the canonical workflow-command path up to digital handover', () => {
   const path = [
     REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
     REPAIR_WORKFLOW_ACTION.START_DIAGNOSIS,
@@ -18,8 +18,6 @@ test('covers the canonical repair path from received to closed', () => {
     REPAIR_WORKFLOW_ACTION.START_REPAIR,
     REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR,
     REPAIR_WORKFLOW_ACTION.PASS_QC,
-    REPAIR_WORKFLOW_ACTION.DELIVER,
-    REPAIR_WORKFLOW_ACTION.CLOSE,
   ];
 
   let status = REPAIR_WORKFLOW_STATUS.RECEIVED;
@@ -27,7 +25,18 @@ test('covers the canonical repair path from received to closed', () => {
     status = resolveRepairWorkflowTransition(status, action).targetStatus;
   }
 
-  assert.equal(status, REPAIR_WORKFLOW_STATUS.CLOSED);
+  assert.equal(status, REPAIR_WORKFLOW_STATUS.READY_FOR_DELIVERY);
+  assert.deepEqual(getAvailableRepairWorkflowActions(status), []);
+  assert.throws(
+    () => resolveRepairWorkflowTransition(status, REPAIR_WORKFLOW_ACTION.DELIVER),
+    (error) => error.code === 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED'
+  );
+
+  const closed = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.DELIVERED,
+    REPAIR_WORKFLOW_ACTION.CLOSE
+  );
+  assert.equal(closed.targetStatus, REPAIR_WORKFLOW_STATUS.CLOSED);
 });
 
 test('supports waiting for parts and resuming repair', () => {
@@ -113,18 +122,29 @@ test('maps detailed workflow statuses to the current legacy ServiceStatus safely
   assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.CANCELLED), 'CANCELLED');
 });
 
-test('marks only terminal target statuses as terminal', () => {
+test('rejected quotation is recoverable while only closed/cancelled are terminal', () => {
   const rejected = resolveRepairWorkflowTransition(
     REPAIR_WORKFLOW_STATUS.WAITING_APPROVAL,
     REPAIR_WORKFLOW_ACTION.REJECT_QUOTATION
   );
   assert.equal(rejected.targetStatus, REPAIR_WORKFLOW_STATUS.REJECTED);
-  assert.equal(rejected.terminal, true);
+  assert.equal(rejected.terminal, false);
 
-  const approved = resolveRepairWorkflowTransition(
-    REPAIR_WORKFLOW_STATUS.WAITING_APPROVAL,
-    REPAIR_WORKFLOW_ACTION.APPROVE_QUOTATION
+  const reopened = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.REJECTED,
+    REPAIR_WORKFLOW_ACTION.REOPEN_AFTER_REJECTION
   );
-  assert.equal(approved.targetStatus, REPAIR_WORKFLOW_STATUS.APPROVED);
-  assert.equal(approved.terminal, false);
+  assert.equal(reopened.targetStatus, REPAIR_WORKFLOW_STATUS.DIAGNOSING);
+
+  const cancelled = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_ACTION.CANCEL
+  );
+  assert.equal(cancelled.terminal, true);
+
+  const closed = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.DELIVERED,
+    REPAIR_WORKFLOW_ACTION.CLOSE
+  );
+  assert.equal(closed.terminal, true);
 });
