@@ -1,0 +1,88 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+
+test('WHT Prisma foundation separates certificate record and filing authorities', () => {
+  const schema = read('prisma/tax/withholding-tax.prisma');
+  const migration = read('prisma/migrations/20260810123000_withholding_tax_workflow/migration.sql');
+
+  assert.match(schema, /model WithholdingTaxCertificate/);
+  assert.match(schema, /taxExpenseId\s+Int\s+@unique/);
+  assert.match(schema, /model WithholdingTaxRecord/);
+  assert.match(schema, /taxExpenseItemId\s+Int\s+@unique/);
+  assert.match(schema, /model WithholdingTaxFilingBatch/);
+  assert.match(schema, /model WithholdingTaxFilingItem/);
+  assert.match(schema, /PND3/);
+  assert.match(schema, /PND53/);
+
+  assert.match(migration, /CREATE TABLE "WithholdingTaxCertificate"/);
+  assert.match(migration, /CREATE TABLE "WithholdingTaxRecord"/);
+  assert.match(migration, /CREATE TABLE "WithholdingTaxFilingBatch"/);
+  assert.match(migration, /CREATE TABLE "WithholdingTaxFilingItem"/);
+  assert.doesNotMatch(migration, /UPDATE "TaxExpense"/);
+  assert.doesNotMatch(migration, /INSERT INTO "WithholdingTaxRecord"/);
+});
+
+test('WHT form authority defaults individual to PND3 and legal entity to PND53', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxService.js');
+  assert.match(source, /payeeType === 'INDIVIDUAL'.*'PND3'/);
+  assert.match(source, /payeeType === 'LEGAL_ENTITY'.*'PND53'/);
+  assert.match(source, /WHT_FORM_REVIEW_REQUIRED/);
+  assert.match(source, /WHT_FORM_TYPE_MISMATCH/);
+});
+
+test('certificate issuance requires WITHHELD item authority and active issuer profile', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxService.js');
+  assert.match(source, /issuer\."status" = 'ACTIVE'::"TaxIssuerProfileStatus"/);
+  assert.match(source, /WHT_ISSUER_PROFILE_REQUIRED/);
+  assert.match(source, /item\.whtTreatment !== 'WITHHELD'/);
+  assert.match(source, /WHT_ITEMS_NOT_WITHHELD/);
+  assert.match(source, /WithholdingTaxCertificate/);
+  assert.match(source, /ON CONFLICT \("taxExpenseId"\)/);
+  assert.match(source, /WithholdingTaxCertificate"\."version" \+ 1/);
+  assert.match(source, /ON CONFLICT \("taxExpenseItemId"\)/);
+  assert.match(source, /'CERTIFIED'::"WithholdingTaxRecordStatus"/);
+});
+
+test('submitted WHT filing makes certificate source immutable', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxService.js');
+  assert.match(source, /WHT_CERTIFICATE_ALREADY_FILED/);
+  assert.match(source, /batch\."status" = 'SUBMITTED'::"WithholdingTaxFilingStatus"/);
+  assert.match(source, /WHT_PERIOD_IMMUTABLE/);
+});
+
+test('WHT filing preparation snapshots certified records by PND form', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxService.js');
+  assert.match(source, /prepareWithholdingFiling/);
+  assert.match(source, /'PREPARED'::"WithholdingTaxFilingStatus"/);
+  assert.match(source, /'CERTIFIED'::"WithholdingTaxRecordStatus"/);
+  assert.match(source, /certificate\."status" = 'ISSUED'::"WithholdingTaxCertificateStatus"/);
+  assert.match(source, /sourceSnapshot/);
+  assert.match(source, /taxableBaseAmount/);
+  assert.match(source, /withholdingTaxAmount/);
+});
+
+test('WHT submission is manual evidence authority and not direct government filing', () => {
+  const source = read('src/modules/tax/withholdingTax/withholdingTaxService.js');
+  const controller = read('src/modules/tax/withholdingTax/withholdingTaxController.js');
+  assert.match(source, /WHT_SUBMISSION_EVIDENCE_REQUIRED/);
+  assert.match(source, /submissionEvidence/);
+  assert.match(source, /'SUBMITTED'::"WithholdingTaxFilingStatus"/);
+  assert.match(source, /'FILED'::"WithholdingTaxRecordStatus"/);
+  assert.match(controller, /evidence: req\.body\?\.evidence/);
+  assert.doesNotMatch(source, /rd\.go\.th|e-Filing|efiling/i);
+});
+
+test('tax router exposes WHT workspace certificate and filing endpoints', () => {
+  const routes = read('src/modules/tax/periods/taxPeriodRoutes.js');
+  assert.match(routes, /withholding-tax\/\:taxPeriodId/);
+  assert.match(routes, /certificates\/issue/);
+  assert.match(routes, /filings\/\:formType\/prepare/);
+  assert.match(routes, /filings\/\:formType\/submit/);
+  assert.match(routes, /withholdingTaxController/);
+});
