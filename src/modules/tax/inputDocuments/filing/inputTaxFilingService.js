@@ -45,6 +45,7 @@ const decimal = (value, fieldName) => {
 };
 
 const PERIOD_MUTATION_BLOCKED_STATUSES = new Set(['CLOSED', 'LOCKED', 'SUBMITTED']);
+const PERIOD_FILING_SUBMIT_BLOCKED_STATUSES = new Set(['CLOSED', 'SUBMITTED']);
 
 const assertBatchPeriodMutable = async ({ batchId }, tx) => {
   const authority = await repository.findBatchPeriodAuthority({ batchId }, tx);
@@ -91,6 +92,34 @@ const assertLockedBatchMutable = (authority) => {
   }
   if (PERIOD_MUTATION_BLOCKED_STATUSES.has(authority.taxPeriodStatus)) {
     throw Object.assign(new Error('Input tax filing mutation is blocked while its period is closed'), {
+      code: 'INPUT_TAX_PERIOD_MUTATION_BLOCKED',
+      statusCode: 409,
+      details: {
+        batchId: Number(authority.batchId),
+        taxPeriodId: authority.taxPeriodId,
+        taxPeriodStatus: authority.taxPeriodStatus,
+      },
+    });
+  }
+  return authority;
+};
+
+const assertLockedBatchSubmittable = (authority) => {
+  if (!authority) {
+    throw Object.assign(new Error('Input tax filing batch was not found'), {
+      code: 'INPUT_TAX_FILING_BATCH_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+  if (authority.batchStatus !== 'DRAFT') {
+    throw Object.assign(new Error('Input tax filing batch is no longer mutable'), {
+      code: 'INPUT_TAX_FILING_BATCH_NOT_MUTABLE',
+      statusCode: 409,
+      details: { batchId: Number(authority.batchId), batchStatus: authority.batchStatus },
+    });
+  }
+  if (PERIOD_FILING_SUBMIT_BLOCKED_STATUSES.has(authority.taxPeriodStatus)) {
+    throw Object.assign(new Error('Input tax filing cannot be submitted in the current tax period state'), {
       code: 'INPUT_TAX_PERIOD_MUTATION_BLOCKED',
       statusCode: 409,
       details: {
@@ -296,7 +325,7 @@ const markInputTaxBatchFiled = async ({ branchId, batchId, filedAt = new Date() 
       replayed: true,
     });
   }
-  assertLockedBatchMutable(authority);
+  assertLockedBatchSubmittable(authority);
 
   const result = await repository.submitBatch({ batchId: normalizedBatchId, filedAt }, tx);
   if (!result.batch) {
@@ -315,8 +344,10 @@ const markInputTaxBatchFiled = async ({ branchId, batchId, filedAt = new Date() 
 });
 
 module.exports = Object.freeze({
+  PERIOD_FILING_SUBMIT_BLOCKED_STATUSES,
   PERIOD_MUTATION_BLOCKED_STATUSES,
   assertBatchPeriodMutable,
+  assertLockedBatchSubmittable,
   markInputTaxBatchFiled,
   removeTaxDocumentFromFiling,
   selectTaxDocumentForFiling,
