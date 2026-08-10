@@ -58,6 +58,8 @@ class RepairTrackingAccessRepository {
       select: {
         id: true,
         jobNo: true,
+        branchId: true,
+        deviceId: true,
         deviceModel: true,
         reportedSymptoms: true,
         status: true,
@@ -143,6 +145,20 @@ class RepairTrackingAccessRepository {
           },
         },
       },
+    });
+  }
+
+  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    if (!deviceId) return null;
+    return this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(deviceId),
+        branchId: Number(branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      select: { metadata: true, occurredAt: true },
     });
   }
 
