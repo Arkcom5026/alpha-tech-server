@@ -23,6 +23,8 @@ assert.match(filingService, /INPUT_TAX_STALE_VERSION/);
 assert.match(filingService, /INPUT_TAX_REASON_REQUIRED/);
 assert.match(filingService, /replayed: true/);
 assert.match(filingService, /authority\.batchStatus === 'SUBMITTED'/);
+assert.match(filingService, /PERIOD_FILING_SUBMIT_BLOCKED_STATUSES = new Set\(\['CLOSED', 'SUBMITTED'\]\)/);
+assert.match(filingService, /assertLockedBatchSubmittable\(authority\)/);
 assert.match(filingController, /expectedVersion: req\.body\?\.version \?\? req\.body\?\.expectedVersion/);
 assert.match(filingController, /branchId: authority\.branchId/);
 
@@ -34,5 +36,11 @@ assert.match(periodRepository, /AND "status" = \$5::"TaxPeriodStatus"/);
 assert.match(periodService, /expectedStatus: current\.status/);
 assert.match(periodService, /TAX_PERIOD_STALE_VERSION/);
 assert.match(periodService, /latest\.status === targetStatus/);
+assert.match(periodService, /countIncompleteInputTaxFilingRecords/);
+assert.match(periodService, /TAX_PERIOD_INPUT_FILING_INCOMPLETE/);
+assert.match(periodService, /prisma\.inputTaxFilingBatch\.count/);
+assert.match(periodService, /TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED/);
+assert.match(periodService, /InputTaxFilingItemStatus/);
+assert.match(periodService, /InputTaxFilingStatus/);
 
 console.log('input tax step 9b concurrency/replay contract evidence: PASS');
