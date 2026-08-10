@@ -34,9 +34,9 @@ function repositoryFor(job) {
     transaction(work) {
       return work({
         findRepairJob: async () => job,
-        updateLegacyStatus: async (id, status) => {
-          calls.update = { id, status };
-          return { ...job, status };
+        updateLegacyStatus: async (id, status, extraData = {}) => {
+          calls.update = { id, status, extraData };
+          return { ...job, ...extraData, status };
         },
         publishPassportEvent: async (event) => {
           calls.event = event;
@@ -60,7 +60,7 @@ test('applies a transition and passport event in one transaction boundary', asyn
     }
   );
 
-  assert.deepEqual(repo.calls.update, { id: 41, status: 'RECEIVED' });
+  assert.deepEqual(repo.calls.update, { id: 41, status: 'RECEIVED', extraData: {} });
   assert.equal(repo.calls.event.eventType, 'REPAIR_STATUS_CHANGED');
   assert.equal(repo.calls.event.eventKey, 'repair-workflow:41:queue-diagnosis-1');
   assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'WAITING_DIAGNOSIS');
@@ -68,7 +68,7 @@ test('applies a transition and passport event in one transaction boundary', asyn
   assert.equal(result.passportEventId, 91);
 });
 
-test('uses the latest device passport workflow target as current authority', async () => {
+test('persists structured diagnosis before moving to customer approval', async () => {
   const job = repairJob({
     status: 'IN_PROGRESS',
     device: {
@@ -85,13 +85,53 @@ test('uses the latest device passport workflow target as current authority', asy
       action: 'COMPLETE_DIAGNOSIS',
       commandKey: 'diagnosis-complete-1',
       expectedWorkflowStatus: 'DIAGNOSING',
+      diagnosis: {
+        findings: 'เครื่องเปิดไม่ติดและไม่รับไฟ',
+        cause: 'ภาคจ่ายไฟเสีย',
+        recommendedAction: 'เปลี่ยนชุดภาคจ่ายไฟและทดสอบระบบ',
+        estimatedCost: 1800,
+        customerNote: 'รออนุมัติก่อนสั่งอะไหล่',
+      },
     }
   );
 
   assert.equal(result.previousStatus, 'DIAGNOSING');
   assert.equal(result.status, 'WAITING_APPROVAL');
   assert.equal(repo.calls.update.status, 'IN_PROGRESS');
+  assert.equal(repo.calls.update.extraData.estimatedCost, 1800);
+  assert.match(repo.calls.update.extraData.technicianNotes, /ภาคจ่ายไฟเสีย/);
   assert.equal(repo.calls.event.eventType, 'DIAGNOSIS_COMPLETED');
+  assert.equal(repo.calls.event.metadata.diagnosis.findings, 'เครื่องเปิดไม่ติดและไม่รับไฟ');
+  assert.equal(result.diagnosis.estimatedCost, 1800);
+});
+
+test('rejects incomplete diagnosis before any write', async () => {
+  const job = repairJob({
+    status: 'IN_PROGRESS',
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'DIAGNOSING' } }],
+    },
+  });
+  const repo = repositoryFor(job);
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 3, employeeId: 7 },
+      {
+        repairJobId: 41,
+        action: 'COMPLETE_DIAGNOSIS',
+        commandKey: 'diagnosis-invalid',
+        diagnosis: { findings: 'พบอาการแล้ว', recommendedAction: '' },
+      }
+    ),
+    (error) =>
+      error.code === 'INVALID_REPAIR_WORKFLOW_COMMAND' &&
+      error.details.field === 'diagnosis.recommendedAction'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
 });
 
 test('rejects stale commands before any write', async () => {
