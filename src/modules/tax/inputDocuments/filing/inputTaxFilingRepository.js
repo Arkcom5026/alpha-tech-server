@@ -34,6 +34,27 @@ const lockTaxDocumentForFiling = async ({ taxDocumentId }, tx = prisma) => {
   return rows[0] || null;
 };
 
+const lockInputVatAuthorityForFiling = async ({ taxDocumentId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT
+      "id",
+      "branchId",
+      "taxDocumentId",
+      "ledgerType",
+      "subtotalAmount",
+      "taxAmount",
+      "totalAmount",
+      "documentNumber",
+      "documentDate",
+      "currency"
+    FROM "InputVatRecord"
+    WHERE "taxDocumentId" = ${Number(taxDocumentId)}
+    LIMIT 1
+    FOR UPDATE
+  `);
+  return rows[0] || null;
+};
+
 const findBatchDocumentItemForUpdate = async ({ batchId, taxDocumentId }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     SELECT *
@@ -190,6 +211,7 @@ module.exports = Object.freeze({
   findBatchDocumentItemForUpdate,
   findBatchPeriodAuthority,
   lockBatchPeriodAuthority,
+  lockInputVatAuthorityForFiling,
   lockTaxDocumentForFiling,
   removeDocumentFromFiling,
   selectDocumentForFiling,
