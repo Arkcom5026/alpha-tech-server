@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma, Prisma } = require('../../../../lib/prisma');
+const { buildClosingExceptions } = require('./accountingOfficePackageExceptions');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -309,6 +310,20 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     && readiness.withholdingReady
     && readiness.periodLockedOrSubmitted;
 
+  const exceptions = buildClosingExceptions({
+    period,
+    outputUnboundCount,
+    outputFilingPrepared: readiness.filingPrepared,
+    outputFilingCoversAllDocuments: readiness.filingCoversAllDocuments,
+    inputUnboundCount,
+    inputFilingPrepared: readiness.inputFilingPrepared,
+    inputFilingCoversAllDocuments: readiness.inputFilingCoversAllDocuments,
+    pendingAssessmentCount: expenseSummary.pendingAssessmentCount,
+    missingEvidenceCount: expenseSummary.missingEvidenceCount,
+    withholdingPendingCount: expenseSummary.withholdingPendingCount,
+    missingWithholdingCertificateCount: expenseSummary.missingWithholdingCertificateCount,
+  });
+
   return Object.freeze({
     authority: 'MONTHLY_TAX_CLOSING_PACKAGE',
     authorities: Object.freeze({
@@ -326,6 +341,7 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     inputSummary,
     expenseSummary,
     readiness,
+    exceptions,
     documents,
     inputDocuments,
     expenses,
