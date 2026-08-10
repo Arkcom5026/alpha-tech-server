@@ -16,6 +16,7 @@ function repairJobFixture(overrides = {}) {
     id: 51,
     branchId: 3,
     stockItemId: 77,
+    deviceId: 88,
     status: 'IN_PROGRESS',
     stockItem: {
       purchaseOrderReceiptItem: {
@@ -25,9 +26,14 @@ function repairJobFixture(overrides = {}) {
         },
       },
     },
+    device: { id: 88 },
     warrantyClaims: [],
     ...overrides,
   };
+}
+
+function workflowEvent(status = 'REPAIRING') {
+  return { metadata: { workflowTargetStatus: status } };
 }
 
 function claimFixture(data = {}, event = {}) {
@@ -86,13 +92,20 @@ function claimFixture(data = {}, event = {}) {
   };
 }
 
-test('open claim repository keeps repair lookup branch-safe and creates initial event atomically', async () => {
+test('open claim repository keeps repair and workflow lookup branch-safe and creates initial event atomically', async () => {
   let findArgs;
+  let workflowArgs;
   let createArgs;
   const repository = new OpenWarrantyClaimRepository({
     repairJob: {
       findFirst(args) {
         findArgs = args;
+        return Promise.resolve(null);
+      },
+    },
+    devicePassportEvent: {
+      findFirst(args) {
+        workflowArgs = args;
         return Promise.resolve(null);
       },
     },
@@ -105,6 +118,7 @@ test('open claim repository keeps repair lookup branch-safe and creates initial 
   });
 
   await repository.findRepairJob('3', '51');
+  await repository.findLatestWorkflowEvent('3', '51', '88');
   await repository.createWarrantyClaim(
     { branchId: 3, repairJobId: 51, claimNo: 'WC-3-TEST' },
     { status: 'DRAFT', note: 'เริ่มเคลม' }
@@ -113,6 +127,12 @@ test('open claim repository keeps repair lookup branch-safe and creates initial 
   assert.deepEqual(findArgs.where, { id: 51, branchId: 3 });
   assert.ok(findArgs.include.stockItem);
   assert.ok(findArgs.include.warrantyClaims);
+  assert.deepEqual(workflowArgs.where, {
+    branchId: 3,
+    deviceId: 88,
+    sourceType: 'REPAIR_JOB',
+    sourceId: '51',
+  });
   assert.equal(createArgs.data.events.create.status, 'DRAFT');
   assert.ok(createArgs.include.events);
 });
@@ -136,7 +156,7 @@ test('open claim service rejects invalid repair job id before transaction', asyn
   assert.equal(called, false);
 });
 
-test('open claim service infers supplier and writes linked draft plus initial event', async () => {
+test('open claim service infers supplier and writes linked draft plus workflow handoff evidence', async () => {
   let createdData;
   let createdEvent;
   const service = new OpenWarrantyClaimService({
@@ -146,6 +166,10 @@ test('open claim service infers supplier and writes linked draft plus initial ev
           assert.equal(branchId, 3);
           assert.equal(repairJobId, 51);
           return Promise.resolve(repairJobFixture());
+        },
+        findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
+          assert.deepEqual({ branchId, repairJobId, deviceId }, { branchId: 3, repairJobId: 51, deviceId: 88 });
+          return Promise.resolve(workflowEvent('REPAIRING'));
         },
         createWarrantyClaim(data, event) {
           createdData = data;
@@ -172,8 +196,29 @@ test('open claim service infers supplier and writes linked draft plus initial ev
   assert.equal(createdEvent.status, 'DRAFT');
   assert.equal(createdEvent.note, 'ตรวจรับจากลูกค้าแล้ว');
   assert.equal(createdEvent.metadata.source, 'REPAIR_JOB');
+  assert.equal(createdEvent.metadata.workflowStatusAtHandoff, 'REPAIRING');
   assert.equal(result.id, 61);
   assert.equal(result.status, 'DRAFT');
+});
+
+test('open claim service blocks claim handoff before diagnosis starts', async () => {
+  const service = new OpenWarrantyClaimService({
+    transaction(work) {
+      return work({
+        findRepairJob: () => Promise.resolve(repairJobFixture()),
+        findLatestWorkflowEvent: () => Promise.resolve(workflowEvent('WAITING_DIAGNOSIS')),
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => service.execute({ branchId: 3, employeeId: 9 }, 51, { reason: 'ส่งเคลม' }),
+    (error) => {
+      assert.equal(error.code, RepairFailureCode.CONFLICT);
+      assert.equal(error.details.workflowStatus, 'WAITING_DIAGNOSIS');
+      return true;
+    }
+  );
 });
 
 test('open claim service preserves supplier mismatch and repeated number conflict contracts', async () => {
@@ -181,6 +226,7 @@ test('open claim service preserves supplier mismatch and repeated number conflic
     transaction(work) {
       return work({
         findRepairJob: () => Promise.resolve(repairJobFixture()),
+        findLatestWorkflowEvent: () => Promise.resolve(workflowEvent('REPAIRING')),
         findSupplier: () => Promise.resolve({ id: 13, branchId: 3, active: true }),
       });
     },
