@@ -142,10 +142,15 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
   const period = await repository.transition({
     branchId: normalizedBranchId,
     taxPeriodId,
+    expectedStatus: current.status,
     targetStatus,
     occurredAt,
   });
-  if (!period) fail('TAX_PERIOD_NOT_FOUND', 'Tax period not found', 404);
+  if (!period) {
+    const latest = await getPeriodDetail({ branchId: normalizedBranchId, taxPeriodId });
+    if (latest.status === targetStatus) return { replayed: true, period: latest };
+    fail('TAX_PERIOD_STALE_VERSION', `Tax period changed from ${current.status} to ${latest.status} before this transition completed`, 409);
+  }
   return { replayed: false, period };
 };
 
