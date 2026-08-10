@@ -116,11 +116,18 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
 
   const expensesReady = pendingVatCitExpenseCount === 0
     && closingPackage.readiness?.expenseEvidenceComplete === true;
+  const documentsReady = closingPackage.readiness?.outputVatComplete === true
+    && closingPackage.readiness?.inputVatComplete === true
+    && closingPackage.readiness?.expenseEvidenceComplete === true;
+  const reconciliationReady = vatSettlement.readiness?.outputFilingReconciled === true
+    && vatSettlement.readiness?.inputCreditAuthorityReady === true;
   const domains = Object.freeze([
     Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: closingPackage.readiness?.outputVatReady === true, target: 'output-tax-filings' }),
     Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: closingPackage.readiness?.inputVatReady === true, target: 'input-tax-receipts' }),
     Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: expensesReady, target: 'tax-expenses' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', label: 'WHT', ready: withholding.readiness?.readyForAccountant === true, target: `tax-periods/${taxPeriodId}/withholding-tax` }),
+    Object.freeze({ key: 'DOCUMENTS', label: 'Documents', ready: documentsReady, target: `tax-periods/${taxPeriodId}/accounting-office` }),
+    Object.freeze({ key: 'RECONCILIATION', label: 'Reconciliation', ready: reconciliationReady, target: `tax-periods/${taxPeriodId}/vat-settlement` }),
     Object.freeze({ key: 'PP30', label: 'PP30', ready: vatSettlement.readiness?.readyForPp30Preparation === true, target: `tax-periods/${taxPeriodId}/vat-settlement` }),
     Object.freeze({ key: 'TAX_PERIOD', label: 'Tax Period', ready: closingPackage.readiness?.periodLockedOrSubmitted === true, target: 'tax-periods' }),
   ]);
