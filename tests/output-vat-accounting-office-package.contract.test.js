@@ -7,6 +7,14 @@ const path = require('node:path');
 
 const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 
+const inputVatQuery = (source) => {
+  const start = source.indexOf('const inputRows = await tx.$queryRaw');
+  const end = source.indexOf('const inputFilingBatches = await tx.$queryRaw');
+  assert.notEqual(start, -1, 'input VAT query start must exist');
+  assert.notEqual(end, -1, 'input VAT query end must exist');
+  return source.slice(start, end);
+};
+
 test('accounting office package projects output VAT authority', () => {
   const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
   assert.match(source, /FROM "OutputVatRecord" record/);
@@ -28,13 +36,14 @@ test('monthly closing package projects input VAT authority and filing coverage',
 
 test('input VAT projection aliases canonical supplier fields into package counterparty contract', () => {
   const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
-  assert.match(source, /record\."supplierName" AS "counterpartyName"/);
-  assert.match(source, /record\."supplierTaxId" AS "counterpartyTaxId"/);
-  assert.match(source, /record\."supplierBranchCode" AS "counterpartyBranchCode"/);
-  assert.match(source, /COALESCE\(document\."issuedDocumentNumber", record\."documentNumber"\) AS "issuedDocumentNumber"/);
-  assert.match(source, /document\."taxInvoiceKind" AS "taxInvoiceKind"/);
-  assert.doesNotMatch(source, /record\."taxInvoiceKind"/);
-  assert.doesNotMatch(source, /record\."counterpartyName"/);
+  const query = inputVatQuery(source);
+  assert.match(query, /record\."supplierName" AS "counterpartyName"/);
+  assert.match(query, /record\."supplierTaxId" AS "counterpartyTaxId"/);
+  assert.match(query, /record\."supplierBranchCode" AS "counterpartyBranchCode"/);
+  assert.match(query, /COALESCE\(document\."issuedDocumentNumber", record\."documentNumber"\) AS "issuedDocumentNumber"/);
+  assert.match(query, /document\."taxInvoiceKind" AS "taxInvoiceKind"/);
+  assert.doesNotMatch(query, /record\."taxInvoiceKind"/);
+  assert.doesNotMatch(query, /record\."counterpartyName"/);
 });
 
 test('monthly closing package projects tax expense assessment and evidence readiness', () => {
