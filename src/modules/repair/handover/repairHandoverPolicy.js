@@ -7,10 +7,18 @@ function createError(statusCode, code, message) {
   return error;
 }
 
-function validateCustomerConfirmation(job, payload = {}) {
-  if (job.status !== 'COMPLETED') {
-    throw createError(409, 'REPAIR_NOT_READY_FOR_PICKUP', 'งานยังไม่พร้อมส่งมอบ');
+function requireReadyForDelivery(workflowStatus, code, message) {
+  if (workflowStatus !== 'READY_FOR_DELIVERY') {
+    throw createError(409, code, message);
   }
+}
+
+function validateCustomerConfirmation(workflowStatus, payload = {}) {
+  requireReadyForDelivery(
+    workflowStatus,
+    'REPAIR_NOT_READY_FOR_PICKUP',
+    'งานยังไม่ผ่าน QC หรือยังไม่พร้อมส่งมอบ'
+  );
   const receiverName = String(payload.receiverName || '').trim();
   if (receiverName.length < 2 || receiverName.length > 160) {
     throw createError(400, 'INVALID_PICKUP_RECEIVER', 'กรุณาระบุชื่อผู้รับเครื่อง');
@@ -22,10 +30,12 @@ function validateCustomerConfirmation(job, payload = {}) {
   };
 }
 
-function validateFinalization(job, delivery, payload = {}) {
-  if (job.status !== 'COMPLETED') {
-    throw createError(409, 'REPAIR_NOT_READY_FOR_HANDOVER', 'งานยังไม่พร้อมส่งมอบ');
-  }
+function validateFinalization(workflowStatus, delivery, payload = {}) {
+  requireReadyForDelivery(
+    workflowStatus,
+    'REPAIR_NOT_READY_FOR_HANDOVER',
+    'งานยังไม่ผ่าน QC หรือยังไม่พร้อมส่งมอบ'
+  );
   if (!delivery?.customerConfirmedAt) {
     throw createError(409, 'CUSTOMER_PICKUP_NOT_CONFIRMED', 'ลูกค้ายังไม่ได้ยืนยันรับเครื่อง');
   }
