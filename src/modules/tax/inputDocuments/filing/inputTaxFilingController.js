@@ -87,7 +87,8 @@ const removeDocument = handle(async (req) => {
   return filingService.removeTaxDocumentFromFiling({
     batchId: req.params.batchId,
     taxDocumentId: req.params.taxDocumentId,
-    removedReason: req.body?.reason || null,
+    removedReason: req.body?.reason,
+    expectedVersion: req.body?.version ?? req.body?.expectedVersion,
   });
 });
 
