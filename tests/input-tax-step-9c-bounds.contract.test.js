@@ -21,8 +21,9 @@ assert.match(reportService, /QUERY_TAKE = MAX_REPORT_ROWS \+ 1/);
 assert.match(reportRepository, /take,/);
 assert.match(reportRepository, /documentNumber: 'asc'/);
 assert.match(reportRepository, /id: 'asc'/);
-assert.match(reportController, /error\.code/);
-assert.match(reportController, /error\.details/);
+assert.match(reportController, /error\?\.code/);
+assert.match(reportController, /error\?\.details/);
+assert.match(reportController, /statusCode < 500/);
 
 assert.match(overviewController, /MAX_OVERVIEW_RANGE_DAYS = 366/);
 assert.match(overviewController, /INPUT_TAX_OVERVIEW_RANGE_TOO_LARGE/);
