@@ -51,44 +51,44 @@ model TaxCandidate {
 }
 
 model TaxDocument {
-  id                       Int                         @id @default(autoincrement())
-  branchId                 Int
-  candidateId              Int?                        @unique
-  documentType             String
-  documentNumber           String
-  counterpartyTaxId        String?
-  identityKey              String                      @unique
-  status                   String                      @default("DRAFT")
-  issuedAt                 DateTime?
-  occurredAt               DateTime
-  currency                 String                      @default("THB")
-  subtotalAmount           Decimal                     @default(0) @db.Decimal(14, 2)
-  taxAmount                Decimal                     @default(0) @db.Decimal(14, 2)
-  totalAmount              Decimal                     @default(0) @db.Decimal(14, 2)
-  snapshot                 Json                        @default("{}")
-  taxInvoiceKind           TaxInvoiceKind?
-  issuerProfileId          Int?
-  issuedDocumentNumber     String?
-  issuedSequence           Int?
-  issuerSnapshot           Json?
-  recipientSnapshot        Json?
-  originalTaxDocumentId    Int?                        @unique
-  saleReturnId             Int?                        @unique
-  createdAt                DateTime                    @default(now())
-  updatedAt                DateTime                    @default(now())
-  branch                   Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  candidate                TaxCandidate?               @relation(fields: [candidateId], references: [id], onDelete: Restrict)
-  issuerProfile            TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
-  lifecycleEvents          TaxDocumentLifecycleEvent[]
-  inputTaxFilingItems      InputTaxFilingItem[]
-  salesTaxFilingItems      SalesTaxFilingItem[]
-  outputVatRecord          OutputVatRecord?
-  adjustedOutputVatRecords OutputVatRecord[]            @relation("OutputVatOriginalTaxDocument")
-  inputVatRecord           InputVatRecord?
-  adjustedInputVatRecords  InputVatRecord[]             @relation("InputVatOriginalTaxDocument")
-  originalTaxDocument      TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
-  creditNote               TaxDocument?                 @relation("TaxDocumentCreditNote")
-  saleReturn               SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)
+  id                  Int                         @id @default(autoincrement())
+  branchId            Int
+  candidateId         Int?                        @unique
+  documentType        String
+  documentNumber      String
+  counterpartyTaxId   String?
+  identityKey         String                      @unique
+  status              String                      @default("DRAFT")
+  issuedAt            DateTime?
+  occurredAt          DateTime
+  currency            String                      @default("THB")
+  subtotalAmount      Decimal                     @default(0) @db.Decimal(14, 2)
+  taxAmount           Decimal                     @default(0) @db.Decimal(14, 2)
+  totalAmount         Decimal                     @default(0) @db.Decimal(14, 2)
+  snapshot            Json                        @default("{}")
+  taxInvoiceKind      TaxInvoiceKind?
+  issuerProfileId     Int?
+  issuedDocumentNumber String?
+  issuedSequence      Int?
+  issuerSnapshot      Json?
+  recipientSnapshot   Json?
+  originalTaxDocumentId Int?                       @unique
+  saleReturnId         Int?                         @unique
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @default(now())
+  branch              Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  candidate           TaxCandidate?               @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  issuerProfile       TaxIssuerProfile?           @relation("TaxDocumentIssuerProfile", fields: [issuerProfileId], references: [id], onDelete: Restrict)
+  lifecycleEvents     TaxDocumentLifecycleEvent[]
+  inputTaxFilingItems InputTaxFilingItem[]
+  salesTaxFilingItems SalesTaxFilingItem[]
+  outputVatRecord     OutputVatRecord?
+  adjustedOutputVatRecords OutputVatRecord[]       @relation("OutputVatOriginalTaxDocument")
+  inputVatRecord      InputVatRecord?
+  adjustedInputVatRecords InputVatRecord[]         @relation("InputVatOriginalTaxDocument")
+  originalTaxDocument TaxDocument?                 @relation("TaxDocumentCreditNote", fields: [originalTaxDocumentId], references: [id], onDelete: Restrict)
+  creditNote          TaxDocument?                 @relation("TaxDocumentCreditNote")
+  saleReturn          SaleReturn?                  @relation("TaxDocumentCreditNoteSaleReturn", fields: [saleReturnId], references: [id], onDelete: Restrict)
 
   @@index([branchId, status, occurredAt])
   @@index([branchId, documentType, documentNumber])
@@ -99,23 +99,23 @@ model TaxDocument {
 }
 
 model TaxPeriod {
-  id                       String                       @id
-  branchId                 Int
-  periodCode               String
-  startDate                DateTime
-  endDate                  DateTime
-  status                   TaxPeriodStatus              @default(OPEN)
-  closedAt                 DateTime?
-  submittedAt              DateTime?
-  reopenedAt               DateTime?
-  lockedAt                 DateTime?
-  createdAt                DateTime                     @default(now())
-  updatedAt                DateTime                     @default(now())
-  branch                   Branch                       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  outputVatRecords         OutputVatRecord[]
-  inputVatRecords          InputVatRecord[]
-  vatCarryForwardAuthority VatCarryForwardAuthority?     @relation("VatCarryForwardTarget")
-  vatCarryForwardSources   VatCarryForwardAuthority[]    @relation("VatCarryForwardSource")
+  id               String          @id
+  branchId         Int
+  periodCode       String
+  startDate        DateTime
+  endDate          DateTime
+  status           TaxPeriodStatus @default(OPEN)
+  closedAt         DateTime?
+  submittedAt      DateTime?
+  reopenedAt       DateTime?
+  lockedAt         DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now())
+  branch           Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  outputVatRecords OutputVatRecord[]
+  inputVatRecords  InputVatRecord[]
+  vatCarryForwardAuthority VatCarryForwardAuthority? @relation("VatCarryForwardTarget")
+  vatCarryForwardSources   VatCarryForwardAuthority[] @relation("VatCarryForwardSource")
 
   @@unique([branchId, periodCode])
   @@unique([id, branchId], map: "TaxPeriod_id_branchId_key")
