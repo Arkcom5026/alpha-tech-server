@@ -34,6 +34,9 @@ const {
   openWarrantyClaim,
 } = require('../claim/open/openWarrantyClaimController');
 const {
+  getWarrantyClaimOptions,
+} = require('../claim/options/getWarrantyClaimOptionsController');
+const {
   listWarrantyClaims,
 } = require('../claim/query/list/listWarrantyClaimsController');
 const {
@@ -165,6 +168,11 @@ router.post(
   addRepairPart
 );
 
+router.get(
+  '/jobs/:id/warranty-claim-options',
+  allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM),
+  getWarrantyClaimOptions
+);
 router.post(
   '/jobs/:id/warranty-claims',
   allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM),
