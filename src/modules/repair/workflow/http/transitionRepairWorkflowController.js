@@ -23,6 +23,7 @@ function normalizeWorkflowCommand(req) {
     correlationId: req.body?.correlationId,
     causationId: req.body?.causationId,
     note: req.body?.note,
+    diagnosis: req.body?.diagnosis,
     customerVisible: req.body?.customerVisible,
     occurredAt: req.body?.occurredAt,
   };
@@ -39,6 +40,7 @@ function projectRepairWorkflowCommandResponse(result) {
     terminal: result.terminal,
     passportEventId: result.passportEventId,
     availableActions: result.availableActions,
+    diagnosis: result.diagnosis || null,
     repairJob: result.repairJob,
   };
 }
