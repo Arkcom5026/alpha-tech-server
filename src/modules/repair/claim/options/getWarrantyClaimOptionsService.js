@@ -20,7 +20,12 @@ class GetWarrantyClaimOptionsService {
     }
 
     const job = await this.repository.findRepairJob(actor.branchId, repairJobId);
-    assertRepairCanOpenClaim(job);
+    const workflowEvent = job?.deviceId
+      ? await this.repository.findLatestWorkflowEvent(actor.branchId, repairJobId, job.deviceId)
+      : null;
+    const workflowStatus = workflowEvent?.metadata?.workflowTargetStatus || null;
+
+    assertRepairCanOpenClaim(job, workflowStatus);
     assertNoActiveClaimForJob(job);
 
     const sourceSupplierId = inferSourceSupplierId(job.stockItem);

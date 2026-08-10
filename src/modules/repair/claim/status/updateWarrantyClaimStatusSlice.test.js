@@ -150,6 +150,8 @@ test('claim status service applies transition timestamps and event metadata', as
   assert.deepEqual(updateCall.event.metadata, {
     previousStatus: 'DRAFT',
     resolution: null,
+    replacementStockItemId: null,
+    outcome: null,
   });
   assert.equal(updateCall.event.performedByEmployeeId, 8);
   assert.equal(result.status, 'SUBMITTED');

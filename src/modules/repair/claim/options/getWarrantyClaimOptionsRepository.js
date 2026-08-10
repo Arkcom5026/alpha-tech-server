@@ -28,8 +28,21 @@ class GetWarrantyClaimOptionsRepository {
             },
           },
         },
+        device: true,
         warrantyClaims: true,
       },
+    });
+  }
+
+  findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
+    return this.getClient().devicePassportEvent.findFirst({
+      where: {
+        branchId: Number(branchId),
+        deviceId: Number(deviceId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
     });
   }
 

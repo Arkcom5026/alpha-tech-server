@@ -8,6 +8,7 @@ function eligibleJob(overrides = {}) {
     status: 'IN_PROGRESS',
     stockItemId: 18,
     deviceId: 55,
+    device: { id: 55 },
     warrantyClaims: [],
     stockItem: {
       purchaseOrderReceiptItem: {
@@ -21,6 +22,10 @@ function eligibleJob(overrides = {}) {
   };
 }
 
+function repairingWorkflow() {
+  return Promise.resolve({ metadata: { workflowTargetStatus: 'REPAIRING' } });
+}
+
 test('locks supplier choice to the source supplier when purchase history exists', async () => {
   let listed = false;
   const service = new GetWarrantyClaimOptionsService({
@@ -28,6 +33,10 @@ test('locks supplier choice to the source supplier when purchase history exists'
       assert.equal(branchId, 3);
       assert.equal(repairJobId, 41);
       return Promise.resolve(eligibleJob());
+    },
+    findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
+      assert.deepEqual({ branchId, repairJobId, deviceId }, { branchId: 3, repairJobId: 41, deviceId: 55 });
+      return repairingWorkflow();
     },
     listActiveSuppliers() {
       listed = true;
@@ -51,8 +60,10 @@ test('offers only active branch supplier options when there is no source supplie
         stockItem: null,
         stockItemId: null,
         deviceId: 55,
+        device: { id: 55 },
       }));
     },
+    findLatestWorkflowEvent: repairingWorkflow,
     listActiveSuppliers(branchId) {
       assert.equal(branchId, 3);
       return Promise.resolve([

@@ -46,12 +46,12 @@ test('rejected quotation can return to diagnosis without becoming terminal', () 
   assert.equal(transition.terminal, false);
 });
 
-test('cancel requires a reason before any write', async () => {
+test('cancel requires a reason before any write', () => {
   const repo = repositoryFor(jobAt('REPAIRING'));
   const service = new TransitionRepairWorkflowService(repo);
 
-  await assert.rejects(
-    service.execute(
+  assert.throws(
+    () => service.execute(
       { branchId: 3, employeeId: 7 },
       { repairJobId: 41, action: 'CANCEL', commandKey: 'cancel-1', expectedWorkflowStatus: 'REPAIRING' }
     ),
