@@ -89,6 +89,16 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
     LIMIT 1
   `);
 
+  const previousPeriods = await tx.$queryRaw(Prisma.sql`
+    SELECT "id", "periodCode", "status", "startDate", "endDate"
+    FROM "TaxPeriod"
+    WHERE "branchId" = ${normalizedBranchId}
+      AND "endDate" < ${period.startDate}
+    ORDER BY "endDate" DESC
+    LIMIT 1
+  `);
+  const previousPeriod = previousPeriods[0] || null;
+
   const outputFiling = outputFilingRows[0] || null;
   const inputFiling = inputFilingRows[0] || null;
   const outputVatAuthority = amount(closingPackage.summary?.taxAmount);
@@ -96,10 +106,19 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
   const creditableInputVat = amount(inputFiling?.creditableVatAmount);
   const rawInputVat = amount(closingPackage.inputSummary?.taxAmount);
   const nonCreditableOrUnselectedInputVat = amount(Math.max(0, rawInputVat - creditableInputVat));
-  const netVat = amount(outputVatAuthority - creditableInputVat);
-  const vatPayable = amount(Math.max(0, netVat));
-  const vatCredit = amount(Math.max(0, -netVat));
+  const currentPeriodNetVat = amount(outputVatAuthority - creditableInputVat);
+  const currentPeriodVatPayable = amount(Math.max(0, currentPeriodNetVat));
+  const currentPeriodVatCredit = amount(Math.max(0, -currentPeriodNetVat));
   const outputReconciliationDifference = amount(outputVatAuthority - outputVatFiling);
+
+  const carryForward = Object.freeze({
+    previousPeriodId: previousPeriod?.id || null,
+    previousPeriodCode: previousPeriod?.periodCode || null,
+    previousPeriodStatus: previousPeriod?.status || null,
+    authorityAvailable: !previousPeriod,
+    amount: previousPeriod ? null : 0,
+    reason: previousPeriod ? 'PREVIOUS_PERIOD_CREDIT_DISPOSITION_NOT_MODELLED' : 'NO_PREVIOUS_PERIOD',
+  });
 
   const readiness = Object.freeze({
     outputFilingPrepared: Boolean(outputFiling),
@@ -107,6 +126,7 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
     outputFilingReconciled: Boolean(outputFiling) && Math.abs(outputReconciliationDifference) < 0.005,
     inputCreditAuthorityReady: Boolean(inputFiling) && closingPackage.readiness.inputVatReady,
     periodLockedOrSubmitted: closingPackage.readiness.periodLockedOrSubmitted,
+    carryForwardAuthorityReady: carryForward.authorityAvailable,
   });
 
   const exceptions = [];
@@ -115,6 +135,13 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
   if (readiness.outputFilingPrepared && !readiness.outputFilingReconciled) exceptions.push({ code: 'VAT_SETTLEMENT_OUTPUT_RECONCILIATION_MISMATCH', source: 'OUTPUT_VAT', severity: 'BLOCKER', amount: outputReconciliationDifference });
   if (readiness.inputFilingPrepared && !readiness.inputCreditAuthorityReady) exceptions.push({ code: 'VAT_SETTLEMENT_INPUT_CREDIT_NOT_READY', source: 'INPUT_VAT', severity: 'BLOCKER' });
   if (!readiness.periodLockedOrSubmitted) exceptions.push({ code: 'VAT_SETTLEMENT_PERIOD_NOT_LOCKED', source: 'TAX_PERIOD', severity: 'BLOCKER' });
+  if (!readiness.carryForwardAuthorityReady) exceptions.push({
+    code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED',
+    source: 'PRIOR_PERIOD_VAT_CREDIT',
+    severity: 'BLOCKER',
+    previousPeriodId: carryForward.previousPeriodId,
+    previousPeriodCode: carryForward.previousPeriodCode,
+  });
 
   return Object.freeze({
     authority: 'VAT_SETTLEMENT_PREPARATION',
@@ -123,19 +150,27 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
     period,
     outputFiling: outputFiling ? { id: Number(outputFiling.batchId), status: outputFiling.batchStatus, itemCount: Number(outputFiling.itemCount || 0) } : null,
     inputFiling: inputFiling ? { id: Number(inputFiling.batchId), status: inputFiling.batchStatus, itemCount: Number(inputFiling.itemCount || 0) } : null,
+    carryForward,
     settlement: Object.freeze({
       outputVatAuthority,
       outputVatFiling,
       creditableInputVat,
       rawInputVat,
       nonCreditableOrUnselectedInputVat,
-      netVat,
-      vatPayable,
-      vatCredit,
+      currentPeriodNetVat,
+      currentPeriodVatPayable,
+      currentPeriodVatCredit,
       outputReconciliationDifference,
+      pp30NetVatAfterCarryForward: carryForward.amount == null
+        ? null
+        : amount(currentPeriodNetVat - carryForward.amount),
     }),
     readiness: Object.freeze({
       ...readiness,
+      readyForCurrentPeriodSettlement: readiness.outputFilingPrepared
+        && readiness.inputFilingPrepared
+        && readiness.outputFilingReconciled
+        && readiness.inputCreditAuthorityReady,
       readyForPp30Preparation: exceptions.length === 0,
     }),
     exceptions: Object.freeze(exceptions),
