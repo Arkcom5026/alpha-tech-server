@@ -68,6 +68,32 @@ test('applies a transition and passport event in one transaction boundary', asyn
   assert.equal(result.passportEventId, 91);
 });
 
+test('allows diagnosis queue with customer consent even when intake condition photo is absent', async () => {
+  const repo = repositoryFor(repairJob({
+    deviceIntake: {
+      consent: {
+        customerSignature: 'ลูกค้าทดสอบ',
+        signedAt: new Date('2026-07-27T00:00:00Z'),
+      },
+      photos: [],
+    },
+  }));
+  const service = new TransitionRepairWorkflowService(repo);
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'QUEUE_DIAGNOSIS',
+      commandKey: 'queue-without-photo',
+      expectedWorkflowStatus: 'RECEIVED',
+    }
+  );
+
+  assert.equal(result.status, 'WAITING_DIAGNOSIS');
+  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'WAITING_DIAGNOSIS');
+});
+
 test('persists structured diagnosis before moving to customer approval', async () => {
   const job = repairJob({
     status: 'IN_PROGRESS',
@@ -182,7 +208,7 @@ test('requires branch ownership and a linked device passport', async () => {
   );
 });
 
-test('blocks diagnosis queue when intake evidence is incomplete', async () => {
+test('blocks diagnosis queue when intake consent is incomplete', async () => {
   const repo = repositoryFor(repairJob({ deviceIntake: null }));
   const service = new TransitionRepairWorkflowService(repo);
 

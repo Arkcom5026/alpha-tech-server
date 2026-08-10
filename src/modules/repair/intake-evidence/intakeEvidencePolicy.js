@@ -39,12 +39,12 @@ function evaluateIntakeCompletion(intake) {
   const missingRequirements = [];
 
   if (!hasConsent) missingRequirements.push('CUSTOMER_CONSENT');
-  if (!hasConditionPhoto) missingRequirements.push('INTAKE_CONDITION_PHOTO');
 
   return {
     complete: missingRequirements.length === 0,
     hasConsent,
     hasConditionPhoto,
+    conditionPhotoRequired: false,
     missingRequirements,
   };
 }
