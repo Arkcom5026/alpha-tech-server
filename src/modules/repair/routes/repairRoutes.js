@@ -37,6 +37,9 @@ const {
   getWarrantyClaimOptions,
 } = require('../claim/options/getWarrantyClaimOptionsController');
 const {
+  getWarrantyReplacementOptions,
+} = require('../claim/replacement/getWarrantyReplacementOptionsController');
+const {
   listWarrantyClaims,
 } = require('../claim/query/list/listWarrantyClaimsController');
 const {
@@ -74,12 +77,8 @@ const {
 
 const router = express.Router();
 
-// Customer-safe endpoints must remain before staff authentication middleware.
 router.get('/public/tracking/:token', getPublicRepairTracking);
-router.post(
-  '/public/tracking/:token/estimate-decision',
-  decidePublicEstimateApproval
-);
+router.post('/public/tracking/:token/estimate-decision', decidePublicEstimateApproval);
 router.post('/public/tracking/:token/pickup-confirmation', confirmPublicPickup);
 
 router.use(verifyToken);
@@ -87,111 +86,29 @@ router.use(loadRepairEmployeeContext);
 
 router.get('/intake-search', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), searchIntake);
 router.get('/intake-context/:lookup', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), getIntakeContext);
-router.get(
-  '/customers/:customerId/warranty-assets',
-  allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE),
-  listCustomerWarrantyAssets
-);
-router.post(
-  '/intakes/external-device',
-  allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE),
-  createExternalDeviceIntake
-);
+router.get('/customers/:customerId/warranty-assets', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), listCustomerWarrantyAssets);
+router.post('/intakes/external-device', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), createExternalDeviceIntake);
 
 router.get('/jobs', allowRepairCapabilities(REPAIR_CAPABILITY.READ), listRepairJobs);
 router.get('/jobs/:id', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getRepairJobDetail);
 router.post('/jobs', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), createRepairJob);
-
-router.post(
-  '/jobs/:id/tracking-access',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
-  createTrackingAccess
-);
-router.post(
-  '/jobs/:id/tracking-access/rotate',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
-  rotateTrackingAccess
-);
-router.delete(
-  '/jobs/:id/tracking-access',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS),
-  revokeTrackingAccess
-);
-
-router.get(
-  '/jobs/:id/estimate-approval',
-  allowRepairCapabilities(REPAIR_CAPABILITY.ESTIMATE),
-  getLatestEstimateApproval
-);
-router.post(
-  '/jobs/:id/estimate-approval',
-  allowRepairCapabilities(REPAIR_CAPABILITY.ESTIMATE),
-  publishEstimateApproval
-);
-
-router.get(
-  '/jobs/:id/handover',
-  allowRepairCapabilities(REPAIR_CAPABILITY.READ),
-  getRepairHandover
-);
-router.post(
-  '/jobs/:id/handover/finalize',
-  allowRepairCapabilities(REPAIR_CAPABILITY.HANDOVER),
-  finalizeRepairHandover
-);
-
-router.get(
-  '/jobs/:id/intake-evidence',
-  allowRepairCapabilities(REPAIR_CAPABILITY.READ),
-  getIntakeEvidence
-);
-router.post(
-  '/jobs/:id/intake-evidence',
-  allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE),
-  intakeEvidenceUpload,
-  saveIntakeEvidence
-);
-
-router.post(
-  '/jobs/:id/workflow/commands',
-  allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW),
-  transitionRepairWorkflow
-);
-router.patch(
-  '/jobs/:id/status',
-  allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW),
-  updateRepairJobStatus
-);
-router.post(
-  '/jobs/:id/parts',
-  allowRepairCapabilities(REPAIR_CAPABILITY.PARTS),
-  addRepairPart
-);
-
-router.get(
-  '/jobs/:id/warranty-claim-options',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM),
-  getWarrantyClaimOptions
-);
-router.post(
-  '/jobs/:id/warranty-claims',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM),
-  openWarrantyClaim
-);
-router.get(
-  '/warranty-claims',
-  allowRepairCapabilities(REPAIR_CAPABILITY.READ),
-  listWarrantyClaims
-);
-router.get(
-  '/warranty-claims/:claimId',
-  allowRepairCapabilities(REPAIR_CAPABILITY.READ),
-  getWarrantyClaim
-);
-router.patch(
-  '/warranty-claims/:claimId/status',
-  allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM),
-  updateWarrantyClaimStatus
-);
+router.post('/jobs/:id/tracking-access', allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS), createTrackingAccess);
+router.post('/jobs/:id/tracking-access/rotate', allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS), rotateTrackingAccess);
+router.delete('/jobs/:id/tracking-access', allowRepairCapabilities(REPAIR_CAPABILITY.CUSTOMER_ACCESS), revokeTrackingAccess);
+router.get('/jobs/:id/estimate-approval', allowRepairCapabilities(REPAIR_CAPABILITY.ESTIMATE), getLatestEstimateApproval);
+router.post('/jobs/:id/estimate-approval', allowRepairCapabilities(REPAIR_CAPABILITY.ESTIMATE), publishEstimateApproval);
+router.get('/jobs/:id/handover', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getRepairHandover);
+router.post('/jobs/:id/handover/finalize', allowRepairCapabilities(REPAIR_CAPABILITY.HANDOVER), finalizeRepairHandover);
+router.get('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getIntakeEvidence);
+router.post('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), intakeEvidenceUpload, saveIntakeEvidence);
+router.post('/jobs/:id/workflow/commands', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), transitionRepairWorkflow);
+router.patch('/jobs/:id/status', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), updateRepairJobStatus);
+router.post('/jobs/:id/parts', allowRepairCapabilities(REPAIR_CAPABILITY.PARTS), addRepairPart);
+router.get('/jobs/:id/warranty-claim-options', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), getWarrantyClaimOptions);
+router.post('/jobs/:id/warranty-claims', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), openWarrantyClaim);
+router.get('/warranty-claims', allowRepairCapabilities(REPAIR_CAPABILITY.READ), listWarrantyClaims);
+router.get('/warranty-claims/:claimId/replacement-options', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), getWarrantyReplacementOptions);
+router.get('/warranty-claims/:claimId', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getWarrantyClaim);
+router.patch('/warranty-claims/:claimId/status', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), updateWarrantyClaimStatus);
 
 module.exports = router;
