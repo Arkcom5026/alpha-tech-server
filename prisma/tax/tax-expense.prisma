@@ -130,7 +130,7 @@ model TaxExpense {
   currency             String                    @default("THB") @db.VarChar(3)
   subtotalAmount       Decimal                   @default(0) @db.Decimal(14, 2)
   vatAmount            Decimal                   @default(0) @db.Decimal(14, 2)
-  totalAmount           Decimal                   @default(0) @db.Decimal(14, 2)
+  totalAmount          Decimal                   @default(0) @db.Decimal(14, 2)
   withholdingTaxAmount Decimal                   @default(0) @db.Decimal(14, 2)
   paymentDueAmount     Decimal                   @default(0) @db.Decimal(14, 2)
   note                 String?
@@ -156,24 +156,24 @@ model TaxExpense {
 }
 
 model TaxExpenseItem {
-  id                   Int                    @id @default(autoincrement())
-  taxExpenseId         Int
-  categoryId           Int
-  branchId             Int
-  lineNumber           Int
-  description          String
-  quantity             Decimal                @default(1) @db.Decimal(14, 2)
-  unitAmount           Decimal                @db.Decimal(14, 2)
-  subtotalAmount       Decimal                @db.Decimal(14, 2)
-  vatTreatment         TaxExpenseVatTreatment @default(PENDING_REVIEW)
-  vatAmount            Decimal                @default(0) @db.Decimal(14, 2)
-  citTreatment         TaxExpenseCitTreatment @default(PENDING_REVIEW)
-  whtTreatment         TaxExpenseWhtTreatment @default(NOT_APPLICABLE)
-  withholdingTaxRate   Decimal?               @db.Decimal(5, 2)
-  withholdingTaxAmount Decimal                @default(0) @db.Decimal(14, 2)
-  createdAt            DateTime               @default(now())
-  taxExpense           TaxExpense             @relation("TaxExpenseItemExpense", fields: [taxExpenseId, branchId], references: [id, branchId], onDelete: Restrict)
-  category             TaxExpenseCategory     @relation("TaxExpenseItemCategory", fields: [categoryId, branchId], references: [id, branchId], onDelete: Restrict)
+  id                  Int                   @id @default(autoincrement())
+  taxExpenseId        Int
+  categoryId          Int
+  branchId            Int
+  lineNumber          Int
+  description         String
+  quantity            Decimal               @default(1) @db.Decimal(14, 2)
+  unitAmount          Decimal               @db.Decimal(14, 2)
+  subtotalAmount      Decimal               @db.Decimal(14, 2)
+  vatTreatment        TaxExpenseVatTreatment @default(PENDING_REVIEW)
+  vatAmount           Decimal               @default(0) @db.Decimal(14, 2)
+  citTreatment        TaxExpenseCitTreatment @default(PENDING_REVIEW)
+  whtTreatment        TaxExpenseWhtTreatment @default(NOT_APPLICABLE)
+  withholdingTaxRate  Decimal?              @db.Decimal(5, 2)
+  withholdingTaxAmount Decimal               @default(0) @db.Decimal(14, 2)
+  createdAt           DateTime              @default(now())
+  taxExpense          TaxExpense            @relation("TaxExpenseItemExpense", fields: [taxExpenseId, branchId], references: [id, branchId], onDelete: Restrict)
+  category            TaxExpenseCategory    @relation("TaxExpenseItemCategory", fields: [categoryId, branchId], references: [id, branchId], onDelete: Restrict)
 
   @@unique([taxExpenseId, lineNumber])
   @@unique([id, branchId])
@@ -182,21 +182,21 @@ model TaxExpenseItem {
 }
 
 model TaxExpenseAssessment {
-  id                   Int                        @id @default(autoincrement())
-  taxExpenseId         Int
-  version              Int
-  status               TaxExpenseAssessmentStatus @default(DRAFT)
-  vatTreatment         TaxExpenseVatTreatment
-  citTreatment         TaxExpenseCitTreatment
-  whtTreatment         TaxExpenseWhtTreatment
-  assessmentNote       String?
-  assessmentSnapshot   Json?
-  assessmentHash       String
+  id                  Int                       @id @default(autoincrement())
+  taxExpenseId        Int
+  version             Int
+  status              TaxExpenseAssessmentStatus @default(DRAFT)
+  vatTreatment        TaxExpenseVatTreatment
+  citTreatment        TaxExpenseCitTreatment
+  whtTreatment        TaxExpenseWhtTreatment
+  assessmentNote      String?
+  assessmentSnapshot  Json?
+  assessmentHash      String
   assessedByEmployeeId Int?
-  assessedAt           DateTime?
-  createdAt            DateTime                   @default(now())
-  taxExpense           TaxExpense                 @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
-  assessedByEmployee   EmployeeProfile?           @relation("TaxExpenseAssessmentAssessedBy", fields: [assessedByEmployeeId], references: [id], onDelete: Restrict)
+  assessedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  taxExpense          TaxExpense                @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  assessedByEmployee  EmployeeProfile?          @relation("TaxExpenseAssessmentAssessedBy", fields: [assessedByEmployeeId], references: [id], onDelete: Restrict)
 
   @@unique([taxExpenseId, version])
   @@unique([taxExpenseId, assessmentHash])
@@ -204,19 +204,19 @@ model TaxExpenseAssessment {
 }
 
 model TaxExpenseLifecycleEvent {
-  id              Int                         @id @default(autoincrement())
-  taxExpenseId    Int
-  eventType       TaxExpenseLifecycleEventType
-  previousStatus  TaxExpenseStatus?
-  resultingStatus TaxExpenseStatus?
-  actorEmployeeId Int?
-  reasonCode      String?
-  note            String?
-  metadata        Json?
-  occurredAt      DateTime                    @default(now())
-  createdAt       DateTime                    @default(now())
-  taxExpense      TaxExpense                  @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
-  actorEmployee   EmployeeProfile?            @relation("TaxExpenseLifecycleEventActor", fields: [actorEmployeeId], references: [id], onDelete: Restrict)
+  id                  Int                         @id @default(autoincrement())
+  taxExpenseId        Int
+  eventType           TaxExpenseLifecycleEventType
+  previousStatus      TaxExpenseStatus?
+  resultingStatus     TaxExpenseStatus?
+  actorEmployeeId     Int?
+  reasonCode          String?
+  note                String?
+  metadata            Json?
+  occurredAt          DateTime                    @default(now())
+  createdAt           DateTime                    @default(now())
+  taxExpense          TaxExpense                  @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  actorEmployee       EmployeeProfile?            @relation("TaxExpenseLifecycleEventActor", fields: [actorEmployeeId], references: [id], onDelete: Restrict)
 
   @@index([taxExpenseId, occurredAt])
   @@index([actorEmployeeId])
@@ -224,19 +224,19 @@ model TaxExpenseLifecycleEvent {
 }
 
 model TaxExpenseAttachment {
-  id                   Int                      @id @default(autoincrement())
-  taxExpenseId         Int
-  attachmentType       TaxExpenseAttachmentType
-  evidenceStatus       TaxExpenseEvidenceStatus @default(PENDING_REVIEW)
-  storageKey           String
-  originalFileName     String
-  contentType          String
-  byteSize             Int
-  sha256               String
+  id                  Int                     @id @default(autoincrement())
+  taxExpenseId        Int
+  attachmentType      TaxExpenseAttachmentType
+  evidenceStatus      TaxExpenseEvidenceStatus @default(PENDING_REVIEW)
+  storageKey          String
+  originalFileName    String
+  contentType         String
+  byteSize            Int
+  sha256              String
   uploadedByEmployeeId Int
-  createdAt            DateTime                 @default(now())
-  taxExpense           TaxExpense               @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
-  uploadedByEmployee   EmployeeProfile          @relation("TaxExpenseAttachmentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: Restrict)
+  createdAt           DateTime                @default(now())
+  taxExpense          TaxExpense              @relation(fields: [taxExpenseId], references: [id], onDelete: Restrict)
+  uploadedByEmployee  EmployeeProfile         @relation("TaxExpenseAttachmentUploadedBy", fields: [uploadedByEmployeeId], references: [id], onDelete: Restrict)
 
   @@unique([taxExpenseId, sha256])
   @@index([uploadedByEmployeeId])
