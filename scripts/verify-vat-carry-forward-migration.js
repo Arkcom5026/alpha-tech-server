@@ -14,6 +14,14 @@ const fail = (message, details = undefined) => {
   throw error;
 };
 
+const normalizeRegclassName = (value) => {
+  if (value == null) return null;
+  return String(value)
+    .replace(/^public\./, '')
+    .replace(/^"(.*)"$/, '$1')
+    .replace(/""/g, '"');
+};
+
 const run = async () => {
   const migrations = await prisma.$queryRawUnsafe(`
     SELECT migration_name, finished_at, rolled_back_at
@@ -36,9 +44,10 @@ const run = async () => {
   const tableRows = await prisma.$queryRawUnsafe(`
     SELECT to_regclass('public."${TABLE_NAME}"')::text AS "tableName"
   `);
-  const tableName = tableRows[0]?.tableName || null;
+  const rawTableName = tableRows[0]?.tableName || null;
+  const tableName = normalizeRegclassName(rawTableName);
   if (tableName !== TABLE_NAME) {
-    fail('VAT carry-forward table was not found in public schema', { tableName });
+    fail('VAT carry-forward table was not found in public schema', { rawTableName, tableName });
   }
 
   const countRows = await prisma.$queryRawUnsafe(`
