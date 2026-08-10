@@ -74,21 +74,52 @@ class GetStockDashboardOverviewRepository {
   }
 
   async getSimpleSummary(branchId) {
-    const aggregate = await this.prisma.stockBalance.aggregate({
+    const rows = await this.prisma.stockBalance.findMany({
       where: {
         branchId,
         product: buildTrackedSimpleProductWhere(branchId),
       },
-      _sum: { quantity: true, reserved: true },
-      _count: { _all: true },
+      select: {
+        quantity: true,
+        reserved: true,
+        avgCost: true,
+        lastReceivedCost: true,
+      },
     });
-    const qtyOnHand = toNumber(aggregate?._sum?.quantity);
-    const qtyReserved = toNumber(aggregate?._sum?.reserved);
+
+    let qtyOnHand = 0;
+    let qtyReserved = 0;
+    let costValue = 0;
+    let missingCostProductCount = 0;
+    let missingCostQuantity = 0;
+
+    for (const row of rows) {
+      const quantity = toNumber(row.quantity);
+      const reserved = toNumber(row.reserved);
+      const avgCost = toNumber(row.avgCost, NaN);
+      const fallbackCost = toNumber(row.lastReceivedCost, NaN);
+      const unitCost = Number.isFinite(avgCost) && avgCost > 0 ? avgCost : fallbackCost;
+
+      qtyOnHand += quantity;
+      qtyReserved += reserved;
+
+      if (quantity <= 0) continue;
+      if (!Number.isFinite(unitCost) || unitCost <= 0) {
+        missingCostProductCount += 1;
+        missingCostQuantity += quantity;
+        continue;
+      }
+      costValue += quantity * unitCost;
+    }
+
     return {
-      productCount: Number(aggregate?._count?._all || 0),
+      productCount: rows.length,
       qtyOnHand,
       qtyReserved,
       netAvailable: qtyOnHand - qtyReserved,
+      costValue,
+      missingCostProductCount,
+      missingCostQuantity,
     };
   }
 
@@ -99,38 +130,15 @@ class GetStockDashboardOverviewRepository {
       qtyRemaining: { gt: 0 },
       product: buildTrackedSimpleProductWhere(branchId),
     };
-    const [aggregate, valuationRows] = await Promise.all([
-      this.prisma.simpleLot.aggregate({
-        where: lotWhere,
-        _count: { _all: true },
-        _sum: { qtyRemaining: true },
-      }),
-      this.prisma.simpleLot.findMany({
-        where: lotWhere,
-        select: { qtyRemaining: true, unitCost: true },
-      }),
-    ]);
-
-    let costValue = 0;
-    let missingCostLotCount = 0;
-    let missingCostQuantity = 0;
-    for (const row of valuationRows) {
-      const quantity = toNumber(row.qtyRemaining);
-      const unitCost = toNumber(row.unitCost, NaN);
-      if (!Number.isFinite(unitCost) || unitCost <= 0) {
-        missingCostLotCount += 1;
-        missingCostQuantity += quantity;
-        continue;
-      }
-      costValue += quantity * unitCost;
-    }
+    const aggregate = await this.prisma.simpleLot.aggregate({
+      where: lotWhere,
+      _count: { _all: true },
+      _sum: { qtyRemaining: true },
+    });
 
     return {
       activeLotCount: Number(aggregate?._count?._all || 0),
       qtyRemaining: toNumber(aggregate?._sum?.qtyRemaining),
-      costValue,
-      missingCostLotCount,
-      missingCostQuantity,
     };
   }
 }
@@ -167,10 +175,11 @@ class GetStockDashboardOverviewService {
     };
 
     const structuredCostValue = toNumber(structuredValuation.costValue);
-    const simpleCostValue = toNumber(lot.costValue);
+    const simpleCostValue = toNumber(simple.costValue);
     const totalCostValue = structuredCostValue + simpleCostValue;
     const missingCostItems = Number(structuredValuation.missingCostCount || 0);
-    const missingCostLots = Number(lot.missingCostLotCount || 0);
+    const missingCostProducts = Number(simple.missingCostProductCount || 0);
+    const simpleLotQuantityDifference = toNumber(simple.qtyOnHand) - toNumber(lot.qtyRemaining);
 
     return {
       inStock: structured.inStock,
@@ -184,13 +193,14 @@ class GetStockDashboardOverviewService {
         structuredCostValue,
         simpleCostValue,
         totalCostValue,
+        simpleSource: 'STOCK_BALANCE_WEIGHTED_AVERAGE',
       },
       dataQuality: {
         missingCostItems,
-        missingCostLots,
-        missingCostQuantity: toNumber(lot.missingCostQuantity),
-        hasIncompleteValuation: missingCostItems > 0 || missingCostLots > 0,
-        quantityReconciliationDifference: toNumber(simple.qtyOnHand) - toNumber(lot.qtyRemaining),
+        missingCostProducts,
+        missingCostQuantity: toNumber(simple.missingCostQuantity),
+        hasIncompleteValuation: missingCostItems > 0 || missingCostProducts > 0,
+        simpleLotQuantityDifference,
       },
       scope: {
         branchId,
