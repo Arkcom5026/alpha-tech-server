@@ -18,6 +18,10 @@ function positiveRepairJobId(value) {
   return parsed;
 }
 
+function currentWorkflowStatus(event) {
+  return event?.metadata?.workflowTargetStatus || 'RECEIVED';
+}
+
 class AddRepairPartService {
   constructor(repo = repository) {
     this.repository = repo;
@@ -42,6 +46,19 @@ class AddRepairPartService {
           RepairFailureCode.REPAIR_JOB_TERMINAL,
           'ไม่สามารถเบิกอะไหล่ให้ใบงานที่ปิดหรือยกเลิกแล้ว',
           409
+        );
+      }
+
+      const workflowEvent = job.deviceId
+        ? await repo.findLatestWorkflowEvent(actor.branchId, job.id, job.deviceId)
+        : null;
+      const workflowStatus = currentWorkflowStatus(workflowEvent);
+      if (workflowStatus !== 'REPAIRING') {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'เบิกอะไหล่ได้เฉพาะขณะงานอยู่ในขั้นกำลังซ่อม',
+          409,
+          { workflowStatus, requiredWorkflowStatus: 'REPAIRING' }
         );
       }
 
@@ -118,3 +135,4 @@ class AddRepairPartService {
 
 module.exports = new AddRepairPartService();
 module.exports.AddRepairPartService = AddRepairPartService;
+module.exports.currentWorkflowStatus = currentWorkflowStatus;
