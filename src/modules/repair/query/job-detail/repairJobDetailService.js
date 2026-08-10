@@ -6,6 +6,7 @@ const {
 } = require('../../contracts/repairError');
 const { CLAIM_ACTIVE_STATUSES } = require('../../contracts/repairContract');
 const {
+  REPAIR_WORKFLOW_ACTION,
   REPAIR_WORKFLOW_STATUS,
   getAvailableRepairWorkflowActions,
 } = require('../../workflow/policies/repairWorkflowPolicy');
@@ -24,12 +25,12 @@ function requirePositiveInteger(value, fieldName) {
 }
 
 const NEXT_ACTION_BY_STATUS = Object.freeze({
-  RECEIVED: 'ตรวจหลักฐานรับเครื่องให้ครบ แล้วส่งเข้าคิวตรวจวินิจฉัย',
-  WAITING_DIAGNOSIS: 'เริ่มตรวจวินิจฉัยเมื่อช่างพร้อม',
+  RECEIVED: 'ตรวจหลักฐานรับเครื่องให้ครบ แล้วส่งเข้าคิวตรวจสอบ',
+  WAITING_DIAGNOSIS: 'เริ่มตรวจสอบเมื่อช่างพร้อม',
   DIAGNOSING: 'บันทึกผลตรวจ สาเหตุ แนวทางแก้ และราคาประเมิน',
   WAITING_APPROVAL: 'ส่งราคาประเมินและรอการตัดสินใจจากลูกค้า',
   APPROVED: 'เริ่มงานซ่อมตามรายการที่ลูกค้าอนุมัติ',
-  REJECTED: 'ทบทวนแนวทาง/ราคา แล้วเปิดวินิจฉัยใหม่หากต้องการเสนอทางเลือกใหม่',
+  REJECTED: 'ทบทวนแนวทาง/ราคา แล้วเปิดตรวจสอบใหม่หากต้องการเสนอทางเลือกใหม่',
   REPAIRING: 'ดำเนินการซ่อม บันทึกอะไหล่ และสรุปงานเมื่อเสร็จ',
   WAITING_PARTS: 'ติดตามอะไหล่ และกลับมาซ่อมต่อเมื่อพร้อม',
   WAITING_QC: 'ตรวจ QC ให้ครบทุกหัวข้อก่อนส่งมอบ',
@@ -111,6 +112,21 @@ function deriveClaimContext(job, workflowEvent) {
   };
 }
 
+function derivePreAgreedService(job) {
+  const creationEvent = (job.repairWorkflowHistory || []).find(
+    (event) => event.eventType === 'REPAIR_CREATED'
+  );
+  return creationEvent?.metadata?.preAgreedService || null;
+}
+
+function availableActionsForContext(workflowStatus, preAgreedService) {
+  const actions = getAvailableRepairWorkflowActions(workflowStatus);
+  if (preAgreedService?.enabled) return actions;
+  return actions.filter(
+    (item) => item.action !== REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+  );
+}
+
 class RepairJobDetailService {
   constructor(repo = repository) {
     this.repository = repo;
@@ -134,13 +150,16 @@ class RepairJobDetailService {
     const diagnosis = job.repairDiagnosisEvent?.metadata?.diagnosis || null;
     const history = (job.repairWorkflowHistory || []).map(mapHistory);
     const claimContext = deriveClaimContext(job, workflowEvent);
+    const preAgreedService = derivePreAgreedService(job);
     const serializedPartsUsed = (job.serializedPartMovements || []).map(mapSerializedPartMovement);
 
     const nextAction = claimContext?.active
       ? `ใบงานพักการดำเนินการระหว่างเคลม ${claimContext.claimNo} (${claimContext.status}) ให้ดำเนินงานในรายการเคลมจนจบก่อนกลับมาที่ใบงานซ่อม`
       : claimContext?.handbackPending
         ? CLAIM_HANDBACK_BY_RESOLUTION[claimContext.resolution] || 'รายการเคลมจบแล้ว ตรวจผลเคลมและดำเนินใบงานซ่อมต่อ'
-        : NEXT_ACTION_BY_STATUS[workflowStatus] || 'ตรวจสอบสถานะงานก่อนดำเนินการต่อ';
+        : workflowStatus === REPAIR_WORKFLOW_STATUS.RECEIVED && preAgreedService?.enabled
+          ? 'ลูกค้าตกลงราคาและขอบเขตงานแล้ว ตรวจหลักฐานรับเครื่องให้ครบ จากนั้นเริ่มงานตามที่ตกลงได้ทันที หรือเลือกส่งเข้าตรวจสอบหากต้องการ'
+          : NEXT_ACTION_BY_STATUS[workflowStatus] || 'ตรวจสอบสถานะงานก่อนดำเนินการต่อ';
 
     return {
       ...mapRepairJob(job),
@@ -148,8 +167,11 @@ class RepairJobDetailService {
       workflow: {
         status: workflowStatus,
         nextAction,
-        availableActions: claimContext?.active ? [] : getAvailableRepairWorkflowActions(workflowStatus),
+        availableActions: claimContext?.active
+          ? []
+          : availableActionsForContext(workflowStatus, preAgreedService),
         claimContext,
+        preAgreedService,
         latestEvent: workflowEvent
           ? {
               id: workflowEvent.id,
@@ -172,5 +194,7 @@ module.exports.requirePositiveInteger = requirePositiveInteger;
 module.exports.NEXT_ACTION_BY_STATUS = NEXT_ACTION_BY_STATUS;
 module.exports.CLAIM_HANDBACK_BY_RESOLUTION = CLAIM_HANDBACK_BY_RESOLUTION;
 module.exports.deriveClaimContext = deriveClaimContext;
+module.exports.derivePreAgreedService = derivePreAgreedService;
+module.exports.availableActionsForContext = availableActionsForContext;
 module.exports.mapHistory = mapHistory;
 module.exports.mapSerializedPartMovement = mapSerializedPartMovement;
