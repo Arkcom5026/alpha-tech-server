@@ -49,6 +49,18 @@ test('carry-forward confirmation is branch scoped, versioned and immutable after
   assert.match(source, /'CONFIRMED'::"VatCarryForwardStatus"/);
 });
 
+test('prior-period carry-forward is derived from ready PP30 settlement and capped by source credit', () => {
+  const source = read('src/modules/tax/settlement/vatCarryForwardService.js');
+  assert.match(source, /loadPriorPeriodSettlement/);
+  assert.match(source, /vatSettlementService\.loadVatSettlementPreparation/);
+  assert.match(source, /readyForPp30Preparation/);
+  assert.match(source, /suggestedAmount/);
+  assert.match(source, /VAT_CARRY_FORWARD_SOURCE_SETTLEMENT_NOT_READY/);
+  assert.match(source, /VAT_CARRY_FORWARD_AMOUNT_EXCEEDS_SOURCE_CREDIT/);
+  assert.match(source, /availableCredit/);
+  assert.match(source, /sourceAvailableCredit/);
+});
+
 test('carry-forward Prisma foundation is additive and tax-period scoped', () => {
   const schema = read('prisma/tax/vat-settlement.prisma');
   const taxSchema = read('prisma/tax/tax-document.prisma');
