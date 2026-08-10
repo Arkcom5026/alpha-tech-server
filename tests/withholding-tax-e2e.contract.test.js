@@ -27,10 +27,10 @@ test('WHT Prisma foundation separates treatment certificate record and filing au
   assert.match(coreMigration, /CREATE TABLE "WithholdingTaxRecord"/);
   assert.match(coreMigration, /CREATE TABLE "WithholdingTaxFilingBatch"/);
   assert.match(coreMigration, /CREATE TABLE "WithholdingTaxFilingItem"/);
-  assert.match(coreMigration, /CREATE UNIQUE INDEX "TaxExpenseItem_id_branchId_key"/);
-  assert.match(coreMigration, /FOREIGN KEY \("taxExpenseItemId", "branchId"\) REFERENCES "TaxExpenseItem"\("id", "branchId"\)/);
+  assert.doesNotMatch(coreMigration, /CREATE UNIQUE INDEX "TaxExpenseItem_id_branchId_key"/);
+  assert.match(coreMigration, /FOREIGN KEY \("taxExpenseItemId"\) REFERENCES "TaxExpenseItem"\("id"\)/);
   assert.match(treatmentMigration, /CREATE TABLE "WithholdingTaxTreatmentEvent"/);
-  assert.match(treatmentMigration, /FOREIGN KEY \("taxExpenseItemId", "branchId"\) REFERENCES "TaxExpenseItem"\("id", "branchId"\)/);
+  assert.match(treatmentMigration, /FOREIGN KEY \("taxExpenseItemId"\) REFERENCES "TaxExpenseItem"\("id"\)/);
   assert.doesNotMatch(coreMigration, /UPDATE "TaxExpense"/);
   assert.doesNotMatch(treatmentMigration, /UPDATE "TaxExpenseItem"/);
   assert.doesNotMatch(coreMigration, /INSERT INTO "WithholdingTaxRecord"/);
