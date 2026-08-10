@@ -153,6 +153,7 @@ class CreateExternalDeviceIntakeService {
           status: repairJob.status,
           workflowTargetStatus: 'RECEIVED',
           externalDevice: true,
+          preAgreedService: payload.preAgreedService || null,
         },
         occurredAt,
       });
@@ -167,7 +168,11 @@ class CreateExternalDeviceIntakeService {
             action: 'QUEUE_DIAGNOSIS',
             targetStatus: 'WAITING_DIAGNOSIS',
           },
+          ...(payload.preAgreedService
+            ? [{ action: 'START_PRE_AGREED_SERVICE', targetStatus: 'APPROVED' }]
+            : []),
         ],
+        preAgreedService: payload.preAgreedService || null,
       };
     });
   }
