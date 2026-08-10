@@ -26,6 +26,17 @@ test('monthly closing package projects input VAT authority and filing coverage',
   assert.match(source, /inputVatReady/);
 });
 
+test('input VAT projection aliases canonical supplier fields into package counterparty contract', () => {
+  const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
+  assert.match(source, /record\."supplierName" AS "counterpartyName"/);
+  assert.match(source, /record\."supplierTaxId" AS "counterpartyTaxId"/);
+  assert.match(source, /record\."supplierBranchCode" AS "counterpartyBranchCode"/);
+  assert.match(source, /COALESCE\(document\."issuedDocumentNumber", record\."documentNumber"\) AS "issuedDocumentNumber"/);
+  assert.match(source, /document\."taxInvoiceKind" AS "taxInvoiceKind"/);
+  assert.doesNotMatch(source, /record\."taxInvoiceKind"/);
+  assert.doesNotMatch(source, /record\."counterpartyName"/);
+});
+
 test('monthly closing package projects tax expense assessment and evidence readiness', () => {
   const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
   assert.match(source, /FROM "TaxExpense" expense/);
