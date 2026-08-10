@@ -1,5 +1,6 @@
 const repository = require('./taxPeriodRepository');
 const { prisma, Prisma } = require('../../../lib/prisma');
+const vatSettlementService = require('../settlement/vatSettlementService');
 
 const TRANSITIONS = {
   OPEN: ['CLOSED'],
@@ -196,6 +197,21 @@ const transitionPeriod = async ({ branchId, taxPeriodId, targetStatus, occurredA
     ]);
     if (!outputBatches) fail('TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED', 'Submit the sales tax filing before submitting the tax period', 409);
     if (!inputBatches) fail('TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED', 'Submit the input tax filing before submitting the tax period', 409);
+
+    const settlement = await vatSettlementService.loadVatSettlementPreparation({
+      branchId: normalizedBranchId,
+      taxPeriodId,
+    });
+    if (!settlement.readiness?.readyForPp30Preparation) {
+      const error = new Error('VAT settlement must be ready before submitting the tax period');
+      error.code = 'TAX_PERIOD_VAT_SETTLEMENT_NOT_READY';
+      error.statusCode = 409;
+      error.details = {
+        taxPeriodId,
+        exceptionCodes: (settlement.exceptions || []).map((entry) => entry.code),
+      };
+      throw error;
+    }
   }
   const period = await repository.transition({
     branchId: normalizedBranchId,
