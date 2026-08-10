@@ -4,6 +4,10 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../../contracts/repairError');
+const {
+  REPAIR_WORKFLOW_STATUS,
+  getAvailableRepairWorkflowActions,
+} = require('../../workflow/policies/repairWorkflowPolicy');
 
 function requirePositiveInteger(value, fieldName) {
   const parsed = Number(value);
@@ -35,7 +39,28 @@ class RepairJobDetailService {
       );
     }
 
-    return mapRepairJob(job);
+    const workflowEvent = job.repairWorkflowEvent || null;
+    const workflowStatus =
+      workflowEvent?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
+    const diagnosis = workflowEvent?.metadata?.diagnosis || null;
+
+    return {
+      ...mapRepairJob(job),
+      workflow: {
+        status: workflowStatus,
+        availableActions: getAvailableRepairWorkflowActions(workflowStatus),
+        latestEvent: workflowEvent
+          ? {
+              id: workflowEvent.id,
+              eventType: workflowEvent.eventType,
+              title: workflowEvent.title,
+              description: workflowEvent.description,
+              occurredAt: workflowEvent.occurredAt,
+            }
+          : null,
+        diagnosis,
+      },
+    };
   }
 }
 
