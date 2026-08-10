@@ -58,18 +58,27 @@ class TransitionRepairWorkflowRepository {
     });
     if (!job?.deviceId || !job.device) return job;
 
-    const latestWorkflowEvent = await this.prisma.devicePassportEvent.findFirst({
-      where: {
-        deviceId: Number(job.deviceId),
-        branchId: Number(job.branchId),
-        sourceType: 'REPAIR_JOB',
-        sourceId: String(id),
-      },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-    });
+    const eventScope = {
+      deviceId: Number(job.deviceId),
+      branchId: Number(job.branchId),
+      sourceType: 'REPAIR_JOB',
+      sourceId: String(id),
+    };
+    const [latestWorkflowEvent, creationEvent] = await Promise.all([
+      this.prisma.devicePassportEvent.findFirst({
+        where: eventScope,
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      }),
+      this.prisma.devicePassportEvent.findFirst({
+        where: { ...eventScope, eventType: 'REPAIR_CREATED' },
+        orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+        select: { metadata: true },
+      }),
+    ]);
 
     return {
       ...job,
+      preAgreedService: creationEvent?.metadata?.preAgreedService || null,
       device: {
         ...job.device,
         passportEvents: latestWorkflowEvent ? [latestWorkflowEvent] : [],

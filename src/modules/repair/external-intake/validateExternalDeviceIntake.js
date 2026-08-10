@@ -61,6 +61,11 @@ function nonNegativeMoney(value, field) {
   return parsed;
 }
 
+function booleanValue(value, defaultValue = false) {
+  if (value === undefined || value === null) return defaultValue;
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
 function validateAccessories(value) {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.length > 12) {
@@ -80,6 +85,30 @@ function validateAccessories(value) {
   });
 }
 
+function validatePreAgreedService(rawValue, estimatedCost, customerNameFallback = '') {
+  const value = rawValue && typeof rawValue === 'object' ? rawValue : {};
+  if (!booleanValue(value.enabled, false)) return null;
+
+  return {
+    enabled: true,
+    agreedScope: requiredText(value.agreedScope, 'ขอบเขตงานที่ตกลง', 2000),
+    agreedAmount: nonNegativeMoney(
+      value.agreedAmount === undefined ? estimatedCost : value.agreedAmount,
+      'preAgreedService.agreedAmount'
+    ),
+    confirmedByName: requiredText(
+      value.confirmedByName || customerNameFallback,
+      'ชื่อผู้ยืนยันข้อตกลง',
+      255
+    ),
+    confirmationNote: optionalText(
+      value.confirmationNote,
+      'หมายเหตุข้อตกลง',
+      2000
+    ),
+  };
+}
+
 function validateExternalDeviceIntake(payload = {}) {
   const device = payload.device || {};
   const category = String(device.category || '').trim().toUpperCase();
@@ -90,6 +119,12 @@ function validateExternalDeviceIntake(payload = {}) {
   const serialNumber = optionalText(device.serialNumber, 'Serial Number', 255);
   const imei = optionalText(device.imei, 'IMEI', 255);
   const barcode = optionalText(device.barcode, 'Barcode/QR ร้าน', 255);
+  const estimatedCost = nonNegativeMoney(payload.estimatedCost, 'estimatedCost');
+  const preAgreedService = validatePreAgreedService(
+    payload.preAgreedService,
+    estimatedCost,
+    payload.customerName || ''
+  );
 
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
@@ -105,7 +140,8 @@ function validateExternalDeviceIntake(payload = {}) {
     internalRemark: optionalText(payload.internalRemark, 'หมายเหตุภายใน', 4000),
     accessories: validateAccessories(payload.accessories),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid'),
-    estimatedCost: nonNegativeMoney(payload.estimatedCost, 'estimatedCost'),
+    estimatedCost: preAgreedService?.agreedAmount ?? estimatedCost,
+    ...(preAgreedService ? { preAgreedService } : {}),
   };
 }
 
@@ -113,4 +149,5 @@ module.exports = {
   ACCESSORY_TYPES,
   DEVICE_CATEGORIES,
   validateExternalDeviceIntake,
+  validatePreAgreedService,
 };

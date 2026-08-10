@@ -20,9 +20,8 @@ function repairJob(data) {
   };
 }
 
-test('external intake creates device, ownership, intake, repair and passport events atomically', async () => {
-  const writes = [];
-  const service = new CreateExternalDeviceIntakeService({
+function repositoryFixture(writes = []) {
+  return {
     transaction(work) {
       return work({
         findCustomer: () => Promise.resolve({ id: 8 }),
@@ -49,7 +48,12 @@ test('external intake creates device, ownership, intake, repair and passport eve
         },
       });
     },
-  });
+  };
+}
+
+test('external intake creates device, ownership, intake, repair and passport events atomically', async () => {
+  const writes = [];
+  const service = new CreateExternalDeviceIntakeService(repositoryFixture(writes));
 
   const result = await service.execute(
     { branchId: 3, employeeId: 7, role: 'CASHIER' },
@@ -80,6 +84,45 @@ test('external intake creates device, ownership, intake, repair and passport eve
   assert.equal(writes[5][1].metadata.workflowTargetStatus, 'RECEIVED');
   assert.equal(result.repairJob.id, 41);
   assert.equal(result.workflowStatus, 'RECEIVED');
+});
+
+test('external intake preserves pre-agreed service evidence and exposes the fast-path action', async () => {
+  const writes = [];
+  const service = new CreateExternalDeviceIntakeService(repositoryFixture(writes));
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7, role: 'CASHIER' },
+    {
+      customerId: 8,
+      customerName: 'ลูกค้าทดสอบ',
+      device: {
+        category: 'NOTEBOOK',
+        brand: 'ASUS',
+        model: 'VivoBook',
+      },
+      customerProblem: 'ลง Windows และโปรแกรมพื้นฐาน',
+      estimatedCost: 900,
+      preAgreedService: {
+        enabled: true,
+        agreedScope: 'ลง Windows + Driver + โปรแกรมพื้นฐาน',
+        agreedAmount: 1200,
+        confirmedByName: 'ลูกค้าทดสอบ',
+        confirmationNote: 'ตกลงหน้าร้าน',
+      },
+    }
+  );
+
+  const repairWrite = writes.find(([type]) => type === 'repair')[1];
+  const createdEvent = writes.filter(([type]) => type === 'event')[1][1];
+
+  assert.equal(repairWrite.estimatedCost, 1200);
+  assert.equal(createdEvent.metadata.preAgreedService.agreedAmount, 1200);
+  assert.equal(createdEvent.metadata.preAgreedService.agreedScope, 'ลง Windows + Driver + โปรแกรมพื้นฐาน');
+  assert.deepEqual(
+    result.availableActions.map((item) => item.action),
+    ['QUEUE_DIAGNOSIS', 'START_PRE_AGREED_SERVICE']
+  );
+  assert.equal(result.preAgreedService.confirmedByName, 'ลูกค้าทดสอบ');
 });
 
 test('external intake rejects duplicate serial or IMEI before writing', async () => {

@@ -97,17 +97,38 @@ function validateSearchQuery(rawQuery) {
   return query;
 }
 
+function validatePreAgreedService(rawValue, estimatedCost) {
+  const value = rawValue && typeof rawValue === 'object' ? rawValue : {};
+  if (!booleanValue(value.enabled, false)) return null;
+
+  return {
+    enabled: true,
+    agreedScope: requiredText(value.agreedScope, 'ขอบเขตงานที่ตกลง', 2000),
+    agreedAmount: nonNegativeMoney(
+      value.agreedAmount === undefined ? estimatedCost : value.agreedAmount,
+      'preAgreedService.agreedAmount',
+      estimatedCost
+    ),
+    confirmedByName: requiredText(value.confirmedByName, 'ชื่อผู้ยืนยันข้อตกลง', 255),
+    confirmationNote: optionalText(value.confirmationNote, 2000),
+  };
+}
+
 function validateCreateRepairJob(payload = {}) {
+  const estimatedCost = nonNegativeMoney(payload.estimatedCost, 'estimatedCost', 0);
+  const preAgreedService = validatePreAgreedService(payload.preAgreedService, estimatedCost);
+
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
     stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
     deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
-    estimatedCost: nonNegativeMoney(payload.estimatedCost, 'estimatedCost', 0),
+    estimatedCost: preAgreedService?.agreedAmount ?? estimatedCost,
     technicianId: positiveInt(payload.technicianId, 'technicianId', { optional: true }),
     technicianNotes: optionalText(payload.technicianNotes, 4000),
     allowCustomerOverride: booleanValue(payload.allowCustomerOverride, false),
+    ...(preAgreedService ? { preAgreedService } : {}),
   };
 }
 
@@ -196,6 +217,7 @@ module.exports = {
   validateLookup,
   validateSearchQuery,
   validateCreateRepairJob,
+  validatePreAgreedService,
   validateRepairStatusUpdate,
   validateAddPart,
   validateOpenWarrantyClaim,
