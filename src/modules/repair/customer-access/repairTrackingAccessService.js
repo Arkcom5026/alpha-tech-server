@@ -35,11 +35,39 @@ function mapClaimStatus(claim) {
   };
 }
 
-function toPublicProjection(job, persistedTimelineEvents = []) {
+function mapWorkflowCustomerStatus(workflowStatus, legacyStatus) {
+  if (workflowStatus === 'READY_FOR_DELIVERY') {
+    return {
+      code: 'READY',
+      label: 'พร้อมรับเครื่อง',
+      description: 'งานซ่อมและการตรวจ QC เสร็จแล้ว กรุณายืนยันการรับเครื่องเพื่อดำเนินการส่งมอบ',
+      stage: 4,
+    };
+  }
+
+  if (['DELIVERED', 'CLOSED'].includes(workflowStatus)) {
+    return mapCustomerStatus('COMPLETED');
+  }
+  if (['CANCELLED', 'REJECTED'].includes(workflowStatus)) {
+    return mapCustomerStatus('CANCELLED');
+  }
+  if (workflowStatus === 'WAITING_PARTS') {
+    return mapCustomerStatus('WAITING_PARTS');
+  }
+  if (['RECEIVED', 'WAITING_DIAGNOSIS'].includes(workflowStatus)) {
+    return mapCustomerStatus('RECEIVED');
+  }
+  if (workflowStatus) {
+    return mapCustomerStatus('IN_PROGRESS');
+  }
+  return mapCustomerStatus(legacyStatus);
+}
+
+function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = null) {
   const product = job.stockItem?.product;
   const intakeSnapshot = job.deviceIntake?.snapshot;
   const registeredDevice = job.device;
-  const currentStatus = mapCustomerStatus(job.status);
+  const currentStatus = mapWorkflowCustomerStatus(workflowStatus, job.status);
   const device = {
     displayName:
       product?.name ||
@@ -184,17 +212,18 @@ async function getPublicTracking(token) {
     throw createHttpError(404, 'TRACKING_ACCESS_NOT_FOUND', 'ลิงก์ติดตามงานไม่ถูกต้องหรือหมดอายุ');
   }
 
-  const [job, timelineEvents, estimateApproval] = await Promise.all([
-    repository.getPublicRepairProjection(access.repairJobId),
-    repository.listCustomerVisibleTimelineEvents(access.repairJobId),
-    repository.getLatestEstimateApproval(access.repairJobId),
-  ]);
-
+  const job = await repository.getPublicRepairProjection(access.repairJobId);
   if (!job) {
     throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบข้อมูลงานซ่อม');
   }
 
-  const projection = toPublicProjection(job, timelineEvents);
+  const [timelineEvents, estimateApproval, workflowEvent] = await Promise.all([
+    repository.listCustomerVisibleTimelineEvents(access.repairJobId),
+    repository.getLatestEstimateApproval(access.repairJobId),
+    repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId),
+  ]);
+  const workflowStatus = workflowEvent?.metadata?.workflowTargetStatus || null;
+  const projection = toPublicProjection(job, timelineEvents, workflowStatus);
   projection.repair.estimateApproval = mapApproval(estimateApproval);
   await repository.touch(access.id);
   return projection;
@@ -207,5 +236,6 @@ module.exports = {
   getPublicTracking,
   hashToken,
   mapCustomerStatus,
+  mapWorkflowCustomerStatus,
   toPublicProjection,
 };
