@@ -7,12 +7,14 @@ const path = require('node:path');
 
 const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 
-test('assessment suggestion is rule-assisted and never auto-finalizes', () => {
+test('assessment suggestion is rule-assisted evidence-safe and never auto-finalizes', () => {
   const source = read('src/modules/tax-expense/assessment/taxExpenseAssessmentService.js');
   assert.match(source, /RULE_ASSISTED_HUMAN_CONFIRMATION/);
   assert.match(source, /autoFinalize: false/);
   assert.match(source, /NO_VAT_AMOUNT_RECORDED/);
-  assert.match(source, /VERIFIED_EVIDENCE_WITH_DOCUMENT/);
+  assert.match(source, /INPUT_VAT_ELIGIBILITY_AUTHORITY_REQUIRED/);
+  assert.match(source, /treatment: 'PENDING_REVIEW'/);
+  assert.doesNotMatch(source, /VERIFIED_EVIDENCE_WITH_DOCUMENT/);
   assert.match(source, /CIT_RULE_AUTHORITY_NOT_CONFIGURED/);
 });
 
