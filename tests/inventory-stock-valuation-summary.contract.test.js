@@ -5,6 +5,7 @@ const {
   GetStockDashboardOverviewRepository,
   GetStockDashboardOverviewService,
   GetStockDashboardOverviewController,
+  buildTrackedSimpleProductWhere,
 } = require('../src/modules/inventory/dashboard/query/overview/getStockDashboardOverviewSlice');
 
 const makePrisma = () => {
@@ -62,6 +63,13 @@ const makePrisma = () => {
   const service = new GetStockDashboardOverviewService(repository);
   const result = await service.execute(branchId, now);
 
+  assert.deepStrictEqual(buildTrackedSimpleProductWhere(branchId), {
+    mode: 'SIMPLE',
+    inventoryBehavior: 'TRACKED',
+    active: true,
+    productType: { branchId },
+  });
+
   assert.strictEqual(result.branchId, branchId);
   assert.strictEqual(result.scope.branchId, branchId);
   assert.strictEqual(result.scope.calculatedAt, now.toISOString());
@@ -71,6 +79,7 @@ const makePrisma = () => {
   assert.strictEqual(result.structured.costValue, 4500);
   assert.strictEqual(result.structured.missingCostCount, 1);
 
+  assert.strictEqual(result.simple.productCount, 2);
   assert.strictEqual(result.simple.qtyOnHand, 10);
   assert.strictEqual(result.simple.qtyReserved, 3);
   assert.strictEqual(result.simple.netAvailable, 7);
@@ -93,9 +102,22 @@ const makePrisma = () => {
     quantityReconciliationDifference: 1,
   });
 
+  const trackedSimpleWhere = buildTrackedSimpleProductWhere(branchId);
   for (const [name, args] of calls) {
     assert.strictEqual(args.where.branchId, branchId, `${name} must be scoped to authenticated branchId`);
+    if (name === 'stockBalance.aggregate' || name.startsWith('simpleLot.')) {
+      assert.deepStrictEqual(
+        args.where.product,
+        trackedSimpleWhere,
+        `${name} must only include active TRACKED SIMPLE products owned by the authenticated branch`
+      );
+    }
   }
+
+  const stockBalanceCall = calls.find(([name]) => name === 'stockBalance.aggregate');
+  assert.ok(stockBalanceCall, 'stockBalance.aggregate must be executed');
+  assert.deepStrictEqual(stockBalanceCall[1]._sum, { quantity: true, reserved: true });
+  assert.deepStrictEqual(stockBalanceCall[1]._count, { _all: true });
 
   const controller = new GetStockDashboardOverviewController({
     execute: async () => {
