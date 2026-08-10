@@ -28,6 +28,9 @@ const {
   addRepairPart,
 } = require('../parts/addRepairPartController');
 const {
+  getRepairPartStockOptions,
+} = require('../parts/options/getRepairPartStockOptionsController');
+const {
   openWarrantyClaim,
 } = require('../claim/open/openWarrantyClaimController');
 const {
@@ -103,6 +106,7 @@ router.post('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILI
 // The legacy PATCH /jobs/:id/status endpoint is intentionally not mounted because it can
 // bypass diagnosis, approval, QC, claim-hold and handover workflow gates.
 router.post('/jobs/:id/workflow/commands', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), transitionRepairWorkflow);
+router.get('/jobs/:id/part-stock-options', allowRepairCapabilities(REPAIR_CAPABILITY.PARTS), getRepairPartStockOptions);
 router.post('/jobs/:id/parts', allowRepairCapabilities(REPAIR_CAPABILITY.PARTS), addRepairPart);
 router.get('/jobs/:id/warranty-claim-options', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), getWarrantyClaimOptions);
 router.post('/jobs/:id/warranty-claims', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), openWarrantyClaim);
