@@ -1,6 +1,7 @@
 'use strict';
 
 const service = require('./withholdingTaxService');
+const treatmentService = require('./withholdingTaxTreatmentService');
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -35,58 +36,52 @@ const employeeId = (req) => Number(req.user?.employeeId || req.user?.employeePro
 
 const getWorkspace = async (req, res, next) => {
   try {
-    const data = await service.loadWithholdingTaxWorkspace({
+    const data = await service.loadWithholdingTaxWorkspace({ branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId });
+    return res.json({ ok: true, data });
+  } catch (error) { return next(error); }
+};
+
+const transitionTreatment = async (req, res, next) => {
+  try {
+    const data = await treatmentService.transitionWhtTreatment({
       branchId: requireAuthority(req),
-      taxPeriodId: req.params.taxPeriodId,
+      taxExpenseItemId: req.params.taxExpenseItemId,
+      resultingTreatment: req.body?.resultingTreatment,
+      note: req.body?.note,
+      actorEmployeeId: employeeId(req),
     });
     return res.json({ ok: true, data });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 };
 
 const issueCertificate = async (req, res, next) => {
   try {
     const data = await service.issueWithholdingCertificate({
-      branchId: requireAuthority(req),
-      taxPeriodId: req.params.taxPeriodId,
-      taxExpenseId: req.body?.taxExpenseId,
-      formType: req.body?.formType,
-      actorEmployeeId: employeeId(req),
+      branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId,
+      taxExpenseId: req.body?.taxExpenseId, formType: req.body?.formType, actorEmployeeId: employeeId(req),
     });
     return res.json({ ok: true, data });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 };
 
 const prepareFiling = async (req, res, next) => {
   try {
     const data = await service.prepareWithholdingFiling({
-      branchId: requireAuthority(req),
-      taxPeriodId: req.params.taxPeriodId,
-      formType: req.params.formType,
-      actorEmployeeId: employeeId(req),
+      branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId,
+      formType: req.params.formType, actorEmployeeId: employeeId(req),
     });
     return res.json({ ok: true, data });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 };
 
 const submitFiling = async (req, res, next) => {
   try {
     const data = await service.submitWithholdingFiling({
-      branchId: requireAuthority(req),
-      taxPeriodId: req.params.taxPeriodId,
-      formType: req.params.formType,
-      evidence: req.body?.evidence,
-      actorEmployeeId: employeeId(req),
+      branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId,
+      formType: req.params.formType, evidence: req.body?.evidence, actorEmployeeId: employeeId(req),
     });
     return res.json({ ok: true, data });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 };
 
-module.exports = Object.freeze({ getWorkspace, issueCertificate, prepareFiling, submitFiling });
+module.exports = Object.freeze({ getWorkspace, transitionTreatment, issueCertificate, prepareFiling, submitFiling });
