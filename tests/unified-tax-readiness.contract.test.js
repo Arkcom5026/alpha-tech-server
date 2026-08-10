@@ -30,26 +30,30 @@ test('unified readiness reuses closing WHT and settlement authorities without du
 
 test('expense readiness counts only VAT and CIT assessment while WHT remains separate', () => {
   const source = read('src/modules/tax/readiness/unifiedTaxReadinessService.js');
-  assert.match(source, /loadPendingVatCitExpenseCount/);
+  assert.match(source, /loadPendingVatCitExpenses/);
   assert.match(source, /item\."vatTreatment" = 'PENDING_REVIEW'/);
   assert.match(source, /item\."citTreatment" = 'PENDING_REVIEW'/);
-  assert.doesNotMatch(source.match(/loadPendingVatCitExpenseCount[\s\S]*?return Number\(rows\[0\]/)?.[0] || '', /whtTreatment/);
+  const queryBlock = source.match(/loadPendingVatCitExpenses[\s\S]*?return Object\.freeze/)?.[0] || '';
+  assert.doesNotMatch(queryBlock, /whtTreatment/);
   assert.match(source, /TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING/);
   assert.match(source, /LEGACY_EXPENSE_CODES/);
+  assert.match(source, /LIMIT 20/);
 });
 
-test('exception targets resolve to source workspaces', () => {
-  assert.equal(routeFor({ code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
+test('exception targets resolve to source workspaces and exact expense review when available', () => {
+  assert.equal(routeFor({ code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING', source: 'TAX_EXPENSE', taxExpenseId: 41 }, 'p1'), 'tax-expenses?assessmentExpenseId=41');
+  assert.equal(routeFor({ code: 'TAX_EXPENSE_EVIDENCE_INCOMPLETE', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
   assert.equal(routeFor({ code: 'WHT_CERTIFICATE_NOT_ISSUED', source: 'WHT_CERTIFICATE' }, 'p1'), 'tax-periods/p1/withholding-tax');
   assert.equal(routeFor({ code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED', source: 'PRIOR_PERIOD_VAT_CREDIT' }, 'p1'), 'tax-periods/p1/vat-settlement');
   assert.equal(routeFor({ code: 'INPUT_VAT_PERIOD_UNBOUND', source: 'INPUT_VAT' }, 'p1'), 'input-tax-receipts');
   assert.equal(routeFor({ code: 'OUTPUT_VAT_PERIOD_UNBOUND', source: 'OUTPUT_VAT' }, 'p1'), 'output-tax-filings');
 });
 
-test('blocking severity is normalized for one UI contract', () => {
-  const entry = normalizeException({ code: 'WHT_TEST', source: 'WHT_FILING', severity: 'BLOCKING', count: 2 }, 'p1', 'WITHHOLDING_TAX_WORKSPACE');
+test('blocking severity and source references are normalized for one UI contract', () => {
+  const entry = normalizeException({ code: 'WHT_TEST', source: 'WHT_FILING', severity: 'BLOCKING', count: 2, sourceRefs: [7, 8] }, 'p1', 'WITHHOLDING_TAX_WORKSPACE');
   assert.equal(entry.severity, 'BLOCKER');
   assert.equal(entry.count, 2);
+  assert.deepEqual(entry.sourceRefs, [7, 8]);
   assert.equal(entry.target.relativePath, 'tax-periods/p1/withholding-tax');
 });
 
