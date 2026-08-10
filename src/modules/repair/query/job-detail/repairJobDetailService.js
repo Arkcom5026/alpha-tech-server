@@ -4,6 +4,7 @@ const {
   RepairError,
   RepairFailureCode,
 } = require('../../contracts/repairError');
+const { CLAIM_ACTIVE_STATUSES } = require('../../contracts/repairContract');
 const {
   REPAIR_WORKFLOW_STATUS,
   getAvailableRepairWorkflowActions,
@@ -39,6 +40,16 @@ const NEXT_ACTION_BY_STATUS = Object.freeze({
   CANCELLED: 'ใบงานถูกยกเลิก ตรวจเหตุผลและประวัติได้จาก Timeline',
 });
 
+const CLAIM_HANDBACK_BY_RESOLUTION = Object.freeze({
+  REPAIRED: 'เคลมซ่อมกลับมาแล้ว ตรวจสภาพงานที่ได้รับจากศูนย์ แล้วดำเนินขั้นซ่อม/สรุปงานต่อเพื่อเข้าสู่ QC',
+  REPLACED: 'ได้รับสินค้าทดแทนแล้ว ตรวจ Serial/Barcode และทดสอบสินค้าทดแทนก่อนดำเนินงานต่อ',
+  RETURNED_UNCHANGED: 'ศูนย์ส่งสินค้ากลับโดยไม่แก้ไข ให้ทบทวนผลตรวจและกำหนดแนวทางซ่อมใหม่กับลูกค้า',
+  REJECTED: 'ศูนย์ปฏิเสธการเคลม ให้ทบทวนเหตุผลและกำหนดแนวทางซ่อมหรือทางเลือกใหม่กับลูกค้า',
+  CREDITED: 'ได้รับเครดิตจากผู้จำหน่ายแล้ว ให้ตรวจเงื่อนไขชดเชยและตกลงแนวทางสุดท้ายกับลูกค้าก่อนดำเนินใบงานต่อ',
+  REFUNDED: 'ได้รับการคืนเงินจากผู้จำหน่ายแล้ว ให้ตรวจยอดและตกลงแนวทางสุดท้ายกับลูกค้าก่อนดำเนินใบงานต่อ',
+  WRITTEN_OFF: 'ผลเคลมเป็นตัดจำหน่าย ให้ผู้รับผิดชอบตรวจหลักฐานและตกลงแนวทางชดเชย/ปิดงานกับลูกค้า',
+});
+
 function mapHistory(event) {
   return {
     id: event.id,
@@ -49,6 +60,38 @@ function mapHistory(event) {
     title: event.title,
     description: event.description || event.metadata?.note || null,
     occurredAt: event.occurredAt,
+  };
+}
+
+function deriveClaimContext(job, workflowEvent) {
+  const claims = job.warrantyClaims || [];
+  const activeClaim = claims.find((claim) => CLAIM_ACTIVE_STATUSES.includes(claim.status)) || null;
+  if (activeClaim) {
+    return {
+      active: true,
+      handbackPending: false,
+      claimId: activeClaim.id,
+      claimNo: activeClaim.claimNo,
+      status: activeClaim.status,
+      resolution: activeClaim.resolution || null,
+      resolvedAt: activeClaim.resolvedAt || null,
+    };
+  }
+
+  const resolvedClaim = claims.find((claim) => claim.status === 'RESOLVED' && claim.resolvedAt) || null;
+  if (!resolvedClaim) return null;
+
+  const workflowAt = workflowEvent?.occurredAt ? new Date(workflowEvent.occurredAt).getTime() : 0;
+  const resolvedAt = new Date(resolvedClaim.resolvedAt).getTime();
+  const handbackPending = Number.isFinite(resolvedAt) && resolvedAt > workflowAt;
+  return {
+    active: false,
+    handbackPending,
+    claimId: resolvedClaim.id,
+    claimNo: resolvedClaim.claimNo,
+    status: resolvedClaim.status,
+    resolution: resolvedClaim.resolution || null,
+    resolvedAt: resolvedClaim.resolvedAt,
   };
 }
 
@@ -74,13 +117,21 @@ class RepairJobDetailService {
       workflowEvent?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
     const diagnosis = job.repairDiagnosisEvent?.metadata?.diagnosis || null;
     const history = (job.repairWorkflowHistory || []).map(mapHistory);
+    const claimContext = deriveClaimContext(job, workflowEvent);
+
+    const nextAction = claimContext?.active
+      ? `ใบงานพักการดำเนินการระหว่างเคลม ${claimContext.claimNo} (${claimContext.status}) ให้ดำเนินงานในรายการเคลมจนจบก่อนกลับมาที่ใบงานซ่อม`
+      : claimContext?.handbackPending
+        ? CLAIM_HANDBACK_BY_RESOLUTION[claimContext.resolution] || 'รายการเคลมจบแล้ว ตรวจผลเคลมและดำเนินใบงานซ่อมต่อ'
+        : NEXT_ACTION_BY_STATUS[workflowStatus] || 'ตรวจสอบสถานะงานก่อนดำเนินการต่อ';
 
     return {
       ...mapRepairJob(job),
       workflow: {
         status: workflowStatus,
-        nextAction: NEXT_ACTION_BY_STATUS[workflowStatus] || 'ตรวจสอบสถานะงานก่อนดำเนินการต่อ',
-        availableActions: getAvailableRepairWorkflowActions(workflowStatus),
+        nextAction,
+        availableActions: claimContext?.active ? [] : getAvailableRepairWorkflowActions(workflowStatus),
+        claimContext,
         latestEvent: workflowEvent
           ? {
               id: workflowEvent.id,
@@ -101,4 +152,6 @@ module.exports = new RepairJobDetailService();
 module.exports.RepairJobDetailService = RepairJobDetailService;
 module.exports.requirePositiveInteger = requirePositiveInteger;
 module.exports.NEXT_ACTION_BY_STATUS = NEXT_ACTION_BY_STATUS;
+module.exports.CLAIM_HANDBACK_BY_RESOLUTION = CLAIM_HANDBACK_BY_RESOLUTION;
+module.exports.deriveClaimContext = deriveClaimContext;
 module.exports.mapHistory = mapHistory;
