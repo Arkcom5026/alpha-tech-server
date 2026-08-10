@@ -27,6 +27,7 @@ function publicJobFixture(overrides = {}) {
     depositPaid: 300,
     createdAt: new Date('2026-07-27T09:00:00Z'),
     updatedAt: new Date('2026-07-27T10:00:00Z'),
+    customer: { name: 'สมชาย ใจดี', companyName: null },
     branch: { name: 'Alpha Tech', phone: '0812345678', address: 'Bangkok' },
     stockItem: null,
     device: {
@@ -51,7 +52,7 @@ function publicJobFixture(overrides = {}) {
   };
 }
 
-test('public tracking projects an external registered device without exposing customer data', () => {
+test('public tracking projects an external registered device with only the pickup name default', () => {
   const projection = toPublicProjection(publicJobFixture());
 
   assert.equal(projection.repair.device.barcode, 'DEV-2-ABC');
@@ -59,7 +60,17 @@ test('public tracking projects an external registered device without exposing cu
   assert.equal(projection.repair.status.code, 'IN_PROGRESS');
   assert.equal(projection.repair.estimate.estimatedBalance, 1200);
   assert.equal(projection.repair.accessories[0].type, 'CHARGER');
+  assert.deepEqual(projection.repair.pickupDefaults, { receiverName: 'สมชาย ใจดี' });
   assert.equal(Object.hasOwn(projection, 'customer'), false);
+  assert.equal(Object.hasOwn(projection.repair, 'customer'), false);
+});
+
+test('pickup name default falls back to customer company name without exposing contact details', () => {
+  const projection = toPublicProjection(publicJobFixture({
+    customer: { name: null, companyName: 'บริษัท ทดสอบ จำกัด' },
+  }));
+
+  assert.deepEqual(projection.repair.pickupDefaults, { receiverName: 'บริษัท ทดสอบ จำกัด' });
 });
 
 test('completed repair maps to customer-ready status', () => {
