@@ -2,6 +2,7 @@
 
 const service = require('./accountingOfficePackageService');
 const withholdingTaxService = require('../withholdingTax/withholdingTaxService');
+const { normalizeWithholdingTaxWorkspace } = require('../withholdingTax/withholdingTaxReadiness');
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -40,19 +41,20 @@ const LEGACY_WHT_EXCEPTION_CODES = new Set([
 ]);
 
 const composeWithholdingAuthority = (closingPackage, withholdingWorkspace) => {
+  const normalizedWithholdingWorkspace = normalizeWithholdingTaxWorkspace(withholdingWorkspace);
   const legacyExceptions = Array.isArray(closingPackage.exceptions)
     ? closingPackage.exceptions.filter((entry) => !LEGACY_WHT_EXCEPTION_CODES.has(entry.code))
     : [];
-  const whtExceptions = (withholdingWorkspace.exceptions || []).map((entry) => Object.freeze({
+  const whtExceptions = (normalizedWithholdingWorkspace.exceptions || []).map((entry) => Object.freeze({
     ...entry,
     severity: entry.severity === 'BLOCKING' ? 'BLOCKER' : entry.severity,
   }));
   const readiness = {
     ...closingPackage.readiness,
-    withholdingComplete: withholdingWorkspace.readiness?.certificatesReady === true,
-    withholdingEvidenceComplete: withholdingWorkspace.readiness?.certificatesReady === true,
-    withholdingFilingsSubmitted: withholdingWorkspace.readiness?.filingsReady === true,
-    withholdingReady: withholdingWorkspace.readiness?.readyForAccountant === true,
+    withholdingComplete: normalizedWithholdingWorkspace.readiness?.certificatesReady === true,
+    withholdingEvidenceComplete: normalizedWithholdingWorkspace.readiness?.certificatesReady === true,
+    withholdingFilingsSubmitted: normalizedWithholdingWorkspace.readiness?.filingsReady === true,
+    withholdingReady: normalizedWithholdingWorkspace.readiness?.readyForAccountant === true,
   };
   readiness.readyForAccountingOffice = Boolean(
     readiness.outputVatReady
@@ -70,9 +72,9 @@ const composeWithholdingAuthority = (closingPackage, withholdingWorkspace) => {
     }),
     readiness: Object.freeze(readiness),
     exceptions: Object.freeze([...legacyExceptions, ...whtExceptions]),
-    withholdingSummary: withholdingWorkspace.summary,
-    withholdingFilings: withholdingWorkspace.filings,
-    withholdingRows: withholdingWorkspace.rows,
+    withholdingSummary: normalizedWithholdingWorkspace.summary,
+    withholdingFilings: normalizedWithholdingWorkspace.filings,
+    withholdingRows: normalizedWithholdingWorkspace.rows,
   });
 };
 
