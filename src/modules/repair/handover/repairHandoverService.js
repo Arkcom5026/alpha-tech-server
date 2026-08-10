@@ -23,10 +23,10 @@ async function confirmPublic(token, payload) {
   if (!access) throw notFound();
   const job = await repository.findJob(access.repairJobId);
   if (!job) throw notFound();
-  const workflowStatus = await workflowStatusFor(job);
-  const input = validateCustomerConfirmation(workflowStatus, payload);
   const existing = await repository.findDelivery(job.id);
   if (existing?.status === 'DELIVERED') return mapHandover(existing);
+  const workflowStatus = await workflowStatusFor(job);
+  const input = validateCustomerConfirmation(workflowStatus, payload);
   const delivery = await repository.confirmCustomer(job.id, input);
   await trackingRepository.touch(access.id);
   return mapHandover(delivery);
