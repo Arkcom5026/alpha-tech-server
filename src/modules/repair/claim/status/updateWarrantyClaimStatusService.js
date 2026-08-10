@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const repository = require('./updateWarrantyClaimStatusRepository');
 const { validateClaimStatusUpdate } = require('../../validators/repairValidator');
 const {
@@ -11,6 +12,7 @@ const {
   assertClaimTransition,
 } = require('../../policies/repairTransitionPolicy');
 const { mapWarrantyClaim } = require('../../mappers/repairMapper');
+const { resolveWarrantyClaimOutcome } = require('./warrantyClaimOutcomePolicy');
 
 function positiveClaimId(value) {
   const parsed = Number(value);
@@ -33,6 +35,15 @@ function claimTimestampData(nextStatus, now) {
     case 'CANCELLED': return { cancelledAt: now };
     default: return {};
   }
+}
+
+function resolutionRequestHash(claimId, payload) {
+  return crypto.createHash('sha256').update(JSON.stringify({
+    claimId: Number(claimId),
+    resolution: payload.resolution || null,
+    replacementStockItemId: payload.replacementStockItemId || null,
+    creditAmount: payload.creditAmount ?? null,
+  })).digest('hex');
 }
 
 class UpdateWarrantyClaimStatusService {
@@ -62,8 +73,9 @@ class UpdateWarrantyClaimStatusService {
 
       assertClaimTransition(claim.status, payload.status);
 
+      let replacement = null;
       if (payload.replacementStockItemId) {
-        const replacement = await repo.findReplacementStockItem(payload.replacementStockItemId);
+        replacement = await repo.findReplacementStockItem(payload.replacementStockItemId);
         if (!replacement || Number(replacement.branchId) !== Number(actor.branchId)) {
           throw new RepairError(RepairFailureCode.STOCK_ITEM_NOT_FOUND, 'ไม่พบสินค้าทดแทนในสาขานี้', 404);
         }
@@ -83,6 +95,52 @@ class UpdateWarrantyClaimStatusService {
             { replacementStockItemId: replacement.id }
           );
         }
+      }
+
+      const outcome = payload.status === 'RESOLVED'
+        ? resolveWarrantyClaimOutcome(payload.resolution)
+        : null;
+
+      if (outcome?.consumeReplacementStockItem) {
+        const changed = await repo.consumeReplacementStockItem({
+          branchId: actor.branchId,
+          stockItemId: replacement.id,
+          claimId: claim.id,
+          employeeId: actor.employeeId,
+        });
+        if (changed.count !== 1) {
+          throw new RepairError(
+            RepairFailureCode.CONFLICT,
+            'สินค้าทดแทนถูกใช้งานไปแล้ว กรุณาโหลดข้อมูลและเลือกสินค้าใหม่',
+            409,
+            { replacementStockItemId: replacement.id }
+          );
+        }
+      }
+
+      if (claim.deviceId && outcome?.deviceStatus) {
+        await repo.updateDeviceStatus(claim.deviceId, outcome.deviceStatus);
+        await repo.publishPassportEvent({
+          deviceId: claim.deviceId,
+          branchId: actor.branchId,
+          eventType: outcome.passportEventType,
+          sourceType: 'WARRANTY_CLAIM',
+          sourceId: String(claim.id),
+          eventKey: `warranty-claim:${claim.id}:resolved`,
+          correlationId: `warranty-claim:${claim.id}`,
+          title: 'ปิดผลการเคลม',
+          description: payload.resolutionNote || payload.note || `ผลการเคลม: ${payload.resolution}`,
+          actorType: actor.employeeId ? 'EMPLOYEE' : 'SYSTEM',
+          actorEmployeeId: actor.employeeId || null,
+          customerVisible: true,
+          metadata: {
+            claimNo: claim.claimNo,
+            resolution: payload.resolution,
+            deviceStatus: outcome.deviceStatus,
+            replacementStockItemId: payload.replacementStockItemId || null,
+            creditAmount: payload.creditAmount ?? null,
+          },
+        });
       }
 
       const now = new Date();
@@ -108,9 +166,24 @@ class UpdateWarrantyClaimStatusService {
             previousStatus: claim.status,
             resolution: payload.resolution,
             replacementStockItemId: payload.replacementStockItemId || null,
+            outcome: outcome ? {
+              deviceStatus: outcome.deviceStatus,
+              passportEventType: outcome.passportEventType,
+              replacementConsumed: outcome.consumeReplacementStockItem,
+            } : null,
           },
         }
       );
+
+      if (payload.status === 'RESOLVED') {
+        await repo.createCompletionCommand({
+          branchId: Number(actor.branchId),
+          commandKey: `warranty-claim:${claim.id}:resolved`,
+          requestHash: resolutionRequestHash(claim.id, payload),
+          warrantyClaimId: claim.id,
+          completedAt: now,
+        });
+      }
 
       return mapWarrantyClaim(updated);
     });
@@ -121,3 +194,4 @@ module.exports = new UpdateWarrantyClaimStatusService();
 module.exports.UpdateWarrantyClaimStatusService = UpdateWarrantyClaimStatusService;
 module.exports.positiveClaimId = positiveClaimId;
 module.exports.claimTimestampData = claimTimestampData;
+module.exports.resolutionRequestHash = resolutionRequestHash;
