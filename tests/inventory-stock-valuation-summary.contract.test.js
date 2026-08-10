@@ -30,25 +30,18 @@ const makePrisma = () => {
       },
     },
     stockBalance: {
-      aggregate: async (args) => {
-        calls.push(['stockBalance.aggregate', args]);
-        return {
-          _count: { _all: 2 },
-          _sum: { quantity: 10, reserved: 3 },
-        };
+      findMany: async (args) => {
+        calls.push(['stockBalance.findMany', args]);
+        return [
+          { quantity: 6, reserved: 1, avgCost: 100, lastReceivedCost: 120 },
+          { quantity: 4, reserved: 2, avgCost: null, lastReceivedCost: 80 },
+        ];
       },
     },
     simpleLot: {
       aggregate: async (args) => {
         calls.push(['simpleLot.aggregate', args]);
-        return { _count: { _all: 2 }, _sum: { qtyRemaining: 9 } };
-      },
-      findMany: async (args) => {
-        calls.push(['simpleLot.findMany', args]);
-        return [
-          { qtyRemaining: 5, unitCost: 100 },
-          { qtyRemaining: 4, unitCost: null },
-        ];
+        return { _count: { _all: 2 }, _sum: { qtyRemaining: 9999 } };
       },
     },
   };
@@ -83,29 +76,31 @@ const makePrisma = () => {
   assert.strictEqual(result.simple.qtyOnHand, 10);
   assert.strictEqual(result.simple.qtyReserved, 3);
   assert.strictEqual(result.simple.netAvailable, 7);
+  assert.strictEqual(result.simple.costValue, 920);
+  assert.strictEqual(result.simple.missingCostProductCount, 0);
+  assert.strictEqual(result.simple.missingCostQuantity, 0);
 
-  assert.strictEqual(result.lot.qtyRemaining, 9);
-  assert.strictEqual(result.lot.costValue, 500);
-  assert.strictEqual(result.lot.missingCostLotCount, 1);
-  assert.strictEqual(result.lot.missingCostQuantity, 4);
+  assert.strictEqual(result.lot.qtyRemaining, 9999);
+  assert.strictEqual(result.lot.activeLotCount, 2);
 
   assert.deepStrictEqual(result.valuation, {
     structuredCostValue: 4500,
-    simpleCostValue: 500,
-    totalCostValue: 5000,
+    simpleCostValue: 920,
+    totalCostValue: 5420,
+    simpleSource: 'STOCK_BALANCE_WEIGHTED_AVERAGE',
   });
   assert.deepStrictEqual(result.dataQuality, {
     missingCostItems: 1,
-    missingCostLots: 1,
-    missingCostQuantity: 4,
+    missingCostProducts: 0,
+    missingCostQuantity: 0,
     hasIncompleteValuation: true,
-    quantityReconciliationDifference: 1,
+    simpleLotQuantityDifference: -9989,
   });
 
   const trackedSimpleWhere = buildTrackedSimpleProductWhere(branchId);
   for (const [name, args] of calls) {
     assert.strictEqual(args.where.branchId, branchId, `${name} must be scoped to authenticated branchId`);
-    if (name === 'stockBalance.aggregate' || name.startsWith('simpleLot.')) {
+    if (name === 'stockBalance.findMany' || name.startsWith('simpleLot.')) {
       assert.deepStrictEqual(
         args.where.product,
         trackedSimpleWhere,
@@ -114,10 +109,14 @@ const makePrisma = () => {
     }
   }
 
-  const stockBalanceCall = calls.find(([name]) => name === 'stockBalance.aggregate');
-  assert.ok(stockBalanceCall, 'stockBalance.aggregate must be executed');
-  assert.deepStrictEqual(stockBalanceCall[1]._sum, { quantity: true, reserved: true });
-  assert.deepStrictEqual(stockBalanceCall[1]._count, { _all: true });
+  const balanceCall = calls.find(([name]) => name === 'stockBalance.findMany');
+  assert.ok(balanceCall, 'stockBalance.findMany must be executed');
+  assert.deepStrictEqual(balanceCall[1].select, {
+    quantity: true,
+    reserved: true,
+    avgCost: true,
+    lastReceivedCost: true,
+  });
 
   const controller = new GetStockDashboardOverviewController({
     execute: async () => {
