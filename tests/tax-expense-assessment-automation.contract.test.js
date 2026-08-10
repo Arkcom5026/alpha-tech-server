@@ -32,6 +32,14 @@ test('assessment confirmation updates VAT and CIT only while preserving WHT auth
   assert.doesNotMatch(source, /data: \{[^}]*whtTreatment: decision/);
 });
 
+test('assessment confirmation rejects duplicate items concurrent writes and submitted tax periods', () => {
+  const source = read('src/modules/tax-expense/assessment/taxExpenseAssessmentService.js');
+  assert.match(source, /TAX_EXPENSE_ASSESSMENT_DUPLICATE_ITEM/);
+  assert.match(source, /TAX_EXPENSE_ASSESSMENT_CONCURRENT_MODIFICATION/);
+  assert.match(source, /TAX_EXPENSE_ASSESSMENT_PERIOD_IMMUTABLE/);
+  assert.match(source, /status: 'SUBMITTED'/);
+});
+
 test('assessment routes expose suggestion and human confirmation endpoints', () => {
   const routes = read('src/modules/tax-expense/routes/taxExpenseRoutes.js');
   assert.match(routes, /assessment-suggestion/);
