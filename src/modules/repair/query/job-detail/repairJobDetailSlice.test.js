@@ -11,7 +11,7 @@ const {
   RepairFailureCode,
 } = require('../../contracts/repairError');
 
-function jobFixture() {
+function jobFixture(overrides = {}) {
   return {
     id: 21,
     jobNo: 'RP-21',
@@ -20,10 +20,12 @@ function jobFixture() {
     customer: { companyName: 'Alpha Customer' },
     stockItemId: null,
     stockItem: null,
+    deviceId: 31,
+    device: { id: 31 },
     deviceModel: 'Desktop',
     reportedSymptoms: 'No display',
     technicianNotes: null,
-    status: 'DIAGNOSING',
+    status: 'IN_PROGRESS',
     estimatedCost: '1200.50',
     depositPaid: '200',
     technician: null,
@@ -31,6 +33,7 @@ function jobFixture() {
     warrantyClaims: [],
     createdAt: new Date('2026-07-02T00:00:00Z'),
     updatedAt: new Date('2026-07-02T00:00:00Z'),
+    ...overrides,
   };
 }
 
@@ -54,6 +57,40 @@ test('job detail repository scopes id lookup by branch', async () => {
   assert.ok(received.include.warrantyClaims);
 });
 
+test('job detail repository keeps workflow and diagnosis event scopes on the same repair job', async () => {
+  const calls = [];
+  const repository = new RepairJobDetailRepository({
+    repairJob: {
+      findFirst() {
+        return Promise.resolve(jobFixture());
+      },
+    },
+    devicePassportEvent: {
+      findFirst(args) {
+        calls.push(args);
+        return Promise.resolve(null);
+      },
+    },
+  });
+
+  await repository.findById(6, 21);
+
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].where, {
+    deviceId: 31,
+    branchId: 6,
+    sourceType: 'REPAIR_JOB',
+    sourceId: '21',
+  });
+  assert.deepEqual(calls[1].where, {
+    deviceId: 31,
+    branchId: 6,
+    sourceType: 'REPAIR_JOB',
+    sourceId: '21',
+    eventType: 'DIAGNOSIS_COMPLETED',
+  });
+});
+
 test('job detail service validates id before repository access', async () => {
   let called = false;
   const service = new RepairJobDetailService({
@@ -75,12 +112,44 @@ test('job detail service validates id before repository access', async () => {
   assert.equal(called, false);
 });
 
+test('job detail keeps completed diagnosis visible after workflow advances', async () => {
+  const diagnosis = {
+    findings: 'ภาคจ่ายเสีย',
+    cause: 'ไฟกระชาก',
+    recommendedAction: 'เปลี่ยนภาคจ่าย',
+    estimatedCost: 1800,
+    customerNote: 'รออนุมัติราคา',
+  };
+  const service = new RepairJobDetailService({
+    findById() {
+      return Promise.resolve(
+        jobFixture({
+          repairWorkflowEvent: {
+            id: 90,
+            eventType: 'REPAIR_STATUS_CHANGED',
+            metadata: { workflowTargetStatus: 'APPROVED' },
+          },
+          repairDiagnosisEvent: {
+            id: 80,
+            eventType: 'DIAGNOSIS_COMPLETED',
+            metadata: { diagnosis },
+          },
+        })
+      );
+    },
+  });
+
+  const result = await service.execute({ branchId: 6 }, 21);
+  assert.equal(result.workflow.status, 'APPROVED');
+  assert.deepEqual(result.workflow.diagnosis, diagnosis);
+});
+
 test('job detail service maps result and preserves not-found contract', async () => {
   const successService = new RepairJobDetailService({
     findById(branchId, repairJobId) {
       assert.equal(branchId, 6);
       assert.equal(repairJobId, 21);
-      return Promise.resolve(jobFixture());
+      return Promise.resolve(jobFixture({ deviceId: null, device: null }));
     },
   });
 
@@ -88,6 +157,7 @@ test('job detail service maps result and preserves not-found contract', async ()
   assert.equal(result.id, 21);
   assert.equal(result.customerName, 'Alpha Customer');
   assert.equal(result.estimatedCost, 1200.5);
+  assert.equal(result.workflow.status, 'RECEIVED');
 
   const notFoundService = new RepairJobDetailService({
     findById() {
