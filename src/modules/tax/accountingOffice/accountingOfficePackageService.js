@@ -172,7 +172,20 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
         WHERE item."vatTreatment" = 'PENDING_REVIEW'::"TaxExpenseVatTreatment"
            OR item."citTreatment" = 'PENDING_REVIEW'::"TaxExpenseCitTreatment"
            OR item."whtTreatment" = 'PENDING_REVIEW'::"TaxExpenseWhtTreatment"
-      )::int AS "pendingAssessmentItemCount"
+      )::int AS "pendingAssessmentItemCount",
+      COUNT(item."id") FILTER (
+        WHERE item."whtTreatment" = 'WITHHOLDING_REQUIRED'::"TaxExpenseWhtTreatment"
+      )::int AS "withholdingRequiredItemCount",
+      COUNT(item."id") FILTER (
+        WHERE item."whtTreatment" = 'WITHHELD'::"TaxExpenseWhtTreatment"
+      )::int AS "withheldItemCount",
+      EXISTS (
+        SELECT 1
+        FROM "TaxExpenseAttachment" attachment
+        WHERE attachment."taxExpenseId" = expense."id"
+          AND attachment."attachmentType" = 'WITHHOLDING_CERTIFICATE'::"TaxExpenseAttachmentType"
+          AND attachment."evidenceStatus" = 'VERIFIED'::"TaxExpenseEvidenceStatus"
+      ) AS "hasVerifiedWithholdingCertificate"
     FROM "TaxExpense" expense
     LEFT JOIN "TaxExpenseItem" item
       ON item."taxExpenseId" = expense."id"
@@ -237,6 +250,9 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     paymentDueAmount: decimalNumber(row.paymentDueAmount),
     itemCount: Number(row.itemCount || 0),
     pendingAssessmentItemCount: Number(row.pendingAssessmentItemCount || 0),
+    withholdingRequiredItemCount: Number(row.withholdingRequiredItemCount || 0),
+    withheldItemCount: Number(row.withheldItemCount || 0),
+    hasVerifiedWithholdingCertificate: Boolean(row.hasVerifiedWithholdingCertificate),
   }));
   const expenseAmountTotals = sumAmounts(expenses, [
     'subtotalAmount',
@@ -249,6 +265,10 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     expenseCount: expenses.length,
     pendingAssessmentCount: expenses.filter((row) => row.pendingAssessmentItemCount > 0).length,
     missingEvidenceCount: expenses.filter((row) => row.evidenceStatus !== 'VERIFIED').length,
+    withholdingPendingCount: expenses.filter((row) => row.withholdingRequiredItemCount > 0).length,
+    missingWithholdingCertificateCount: expenses.filter((row) => (
+      row.withholdingTaxAmount > 0 && !row.hasVerifiedWithholdingCertificate
+    )).length,
     ...expenseAmountTotals,
   };
 
@@ -268,6 +288,8 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     inputFilingCoversAllDocuments: Boolean(latestInputFiling) && inputFilingItemCount === inputRows.length,
     expensesClassified: expenseSummary.pendingAssessmentCount === 0,
     expenseEvidenceComplete: expenseSummary.missingEvidenceCount === 0,
+    withholdingComplete: expenseSummary.withholdingPendingCount === 0,
+    withholdingEvidenceComplete: expenseSummary.missingWithholdingCertificateCount === 0,
     periodClosedOrLater: ['CLOSED', 'LOCKED', 'SUBMITTED'].includes(period.status),
     periodLockedOrSubmitted: ['LOCKED', 'SUBMITTED'].includes(period.status),
   };
@@ -278,9 +300,11 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
     && readiness.inputFilingPrepared
     && readiness.inputFilingCoversAllDocuments;
   readiness.expensesReady = readiness.expensesClassified && readiness.expenseEvidenceComplete;
+  readiness.withholdingReady = readiness.withholdingComplete && readiness.withholdingEvidenceComplete;
   readiness.readyForAccountingOffice = readiness.outputVatReady
     && readiness.inputVatReady
     && readiness.expensesReady
+    && readiness.withholdingReady
     && readiness.periodLockedOrSubmitted;
 
   return Object.freeze({
@@ -289,6 +313,7 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
       outputVat: 'OUTPUT_VAT_RECORD',
       inputVat: 'INPUT_VAT_RECORD',
       expenses: 'TAX_EXPENSE',
+      withholding: 'TAX_EXPENSE_WHT_TREATMENT_AND_EVIDENCE',
       period: 'TAX_PERIOD',
     }),
     branchId: normalizedBranchId,
