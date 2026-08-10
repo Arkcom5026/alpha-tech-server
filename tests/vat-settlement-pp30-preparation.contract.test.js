@@ -38,9 +38,11 @@ test('PP30 readiness is blocked when prior-period carry-forward authority is unr
   assert.match(source, /readyForPp30Preparation/);
 });
 
-test('carry-forward confirmation is branch scoped, versioned and immutable after period lock', () => {
+test('carry-forward confirmation is branch scoped, versioned and mutable while locked but immutable after submit', () => {
   const source = read('src/modules/tax/settlement/vatCarryForwardService.js');
   assert.match(source, /"branchId" = \$\{branchId\}/);
+  assert.match(source, /String\(target\.status\) === 'SUBMITTED'/);
+  assert.doesNotMatch(source, /\['LOCKED', 'SUBMITTED'\]\.includes\(String\(target\.status\)\)/);
   assert.match(source, /VAT_CARRY_FORWARD_PERIOD_IMMUTABLE/);
   assert.match(source, /VAT_CARRY_FORWARD_PREVIOUS_PERIOD_NOT_FINALIZED/);
   assert.match(source, /HISTORICAL_OPENING/);
@@ -86,6 +88,24 @@ test('VAT settlement exposes reconciliation and readiness blockers', () => {
   assert.match(source, /VAT_SETTLEMENT_OUTPUT_RECONCILIATION_MISMATCH/);
   assert.match(source, /VAT_SETTLEMENT_INPUT_CREDIT_NOT_READY/);
   assert.match(source, /VAT_SETTLEMENT_PERIOD_NOT_LOCKED/);
+});
+
+test('tax period submit requires PP30 settlement readiness after filing submission gates', () => {
+  const source = read('src/modules/tax/periods/taxPeriodService.js');
+  assert.match(source, /vatSettlementService\.loadVatSettlementPreparation/);
+  assert.match(source, /settlement\.readiness\?\.readyForPp30Preparation/);
+  assert.match(source, /TAX_PERIOD_VAT_SETTLEMENT_NOT_READY/);
+  assert.match(source, /exceptionCodes/);
+  assert.match(source, /TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED/);
+  assert.match(source, /TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED/);
+  assert.ok(
+    source.indexOf('TAX_PERIOD_OUTPUT_FILING_NOT_SUBMITTED') < source.indexOf('TAX_PERIOD_VAT_SETTLEMENT_NOT_READY'),
+    'output filing submit gate must precede settlement gate',
+  );
+  assert.ok(
+    source.indexOf('TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED') < source.indexOf('TAX_PERIOD_VAT_SETTLEMENT_NOT_READY'),
+    'input filing submit gate must precede settlement gate',
+  );
 });
 
 test('tax router exposes settlement and carry-forward authority endpoints', () => {
