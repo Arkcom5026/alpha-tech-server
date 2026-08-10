@@ -39,7 +39,15 @@ const transitionWhtTreatment = async ({
       item."id", item."taxExpenseId", item."branchId", item."whtTreatment"::text AS "whtTreatment",
       item."withholdingTaxRate", item."withholdingTaxAmount",
       expense."status"::text AS "expenseStatus",
-      certificate."status"::text AS "certificateStatus"
+      certificate."status"::text AS "certificateStatus",
+      EXISTS (
+        SELECT 1
+        FROM "TaxPeriod" period
+        WHERE period."branchId" = expense."branchId"
+          AND period."status" = 'SUBMITTED'::"TaxPeriodStatus"
+          AND expense."expenseDate" >= period."startDate"
+          AND expense."expenseDate" <= period."endDate"
+      ) AS "submittedPeriodLocked"
     FROM "TaxExpenseItem" item
     JOIN "TaxExpense" expense
       ON expense."id" = item."taxExpenseId"
@@ -55,6 +63,7 @@ const transitionWhtTreatment = async ({
   const item = rows[0];
   if (!item) fail('WHT_ITEM_NOT_FOUND', 'Tax expense item was not found', 404);
   if (item.expenseStatus === 'VOIDED') fail('WHT_EXPENSE_IMMUTABLE', 'Voided tax expense cannot change WHT treatment', 409);
+  if (item.submittedPeriodLocked) fail('WHT_PERIOD_IMMUTABLE', 'WHT treatment cannot change after the tax period is submitted', 409);
   if (item.certificateStatus === 'ISSUED') fail('WHT_TREATMENT_CERTIFICATE_LOCKED', 'WHT treatment cannot change after certificate issuance', 409);
 
   const previous = String(item.whtTreatment);
