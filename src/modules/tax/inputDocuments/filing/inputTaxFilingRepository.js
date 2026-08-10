@@ -2,6 +2,50 @@
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 
+const lockBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT
+      batch."id" AS "batchId",
+      batch."branchId",
+      batch."year",
+      batch."month",
+      batch."status" AS "batchStatus",
+      period."id" AS "taxPeriodId",
+      period."status" AS "taxPeriodStatus"
+    FROM "InputTaxFilingBatch" batch
+    LEFT JOIN "TaxPeriod" period
+      ON period."branchId" = batch."branchId"
+      AND period."periodCode" = CONCAT(batch."year", '-', LPAD(batch."month"::text, 2, '0'))
+    WHERE batch."id" = ${Number(batchId)}
+    LIMIT 1
+    FOR UPDATE OF batch
+  `);
+  return rows[0] || null;
+};
+
+const lockTaxDocumentForFiling = async ({ taxDocumentId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT "id", "branchId"
+    FROM "TaxDocument"
+    WHERE "id" = ${Number(taxDocumentId)}
+    LIMIT 1
+    FOR UPDATE
+  `);
+  return rows[0] || null;
+};
+
+const findBatchDocumentItemForUpdate = async ({ batchId, taxDocumentId }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT *
+    FROM "InputTaxFilingItem"
+    WHERE "batchId" = ${Number(batchId)}
+      AND "taxDocumentId" = ${Number(taxDocumentId)}
+    LIMIT 1
+    FOR UPDATE
+  `);
+  return rows[0] || null;
+};
+
 const selectDocumentForFiling = async ({
   batchId,
   taxDocumentId,
@@ -56,18 +100,39 @@ const selectDocumentForFiling = async ({
   return rows[0] || null;
 };
 
-const markBatchFiled = async ({ batchId, filedAt }, tx = prisma) => tx.$executeRaw(Prisma.sql`
-  UPDATE "InputTaxFilingItem"
-  SET
-    "status" = 'FILED'::"InputTaxFilingItemStatus",
-    "filedAt" = ${filedAt},
-    "version" = "version" + 1
-  WHERE "batchId" = ${Number(batchId)}
-    AND "taxDocumentId" IS NOT NULL
-    AND "status" = 'SELECTED'::"InputTaxFilingItemStatus"
-`);
+const submitBatch = async ({ batchId, filedAt }, tx = prisma) => {
+  const itemCount = await tx.$executeRaw(Prisma.sql`
+    UPDATE "InputTaxFilingItem"
+    SET
+      "status" = 'FILED'::"InputTaxFilingItemStatus",
+      "filedAt" = ${filedAt},
+      "version" = "version" + 1
+    WHERE "batchId" = ${Number(batchId)}
+      AND "taxDocumentId" IS NOT NULL
+      AND "status" = 'SELECTED'::"InputTaxFilingItemStatus"
+  `);
 
-const removeDocumentFromFiling = async ({ batchId, taxDocumentId, removedAt, removedReason }, tx = prisma) => {
+  const batches = await tx.$queryRaw(Prisma.sql`
+    UPDATE "InputTaxFilingBatch"
+    SET "status" = 'SUBMITTED'::"InputTaxFilingStatus", "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${Number(batchId)}
+      AND "status" = 'DRAFT'::"InputTaxFilingStatus"
+    RETURNING *
+  `);
+
+  return { itemCount: Number(itemCount), batch: batches[0] || null };
+};
+
+const removeDocumentFromFiling = async ({
+  batchId,
+  taxDocumentId,
+  removedAt,
+  removedReason,
+  expectedVersion,
+}, tx = prisma) => {
+  const versionFilter = expectedVersion == null
+    ? Prisma.empty
+    : Prisma.sql`AND "version" = ${Number(expectedVersion)}`;
   const rows = await tx.$queryRaw(Prisma.sql`
     UPDATE "InputTaxFilingItem"
     SET
@@ -78,6 +143,7 @@ const removeDocumentFromFiling = async ({ batchId, taxDocumentId, removedAt, rem
     WHERE "batchId" = ${Number(batchId)}
       AND "taxDocumentId" = ${Number(taxDocumentId)}
       AND "status" = 'SELECTED'::"InputTaxFilingItemStatus"
+      ${versionFilter}
     RETURNING *
   `);
   return rows[0] || null;
@@ -106,6 +172,7 @@ const findBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
       batch."branchId",
       batch."year",
       batch."month",
+      batch."status" AS "batchStatus",
       period."id" AS "taxPeriodId",
       period."status" AS "taxPeriodStatus"
     FROM "InputTaxFilingBatch" batch
@@ -119,9 +186,12 @@ const findBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
 };
 
 module.exports = Object.freeze({
-  findBatchPeriodAuthority,
   findActiveByDocument,
-  markBatchFiled,
+  findBatchDocumentItemForUpdate,
+  findBatchPeriodAuthority,
+  lockBatchPeriodAuthority,
+  lockTaxDocumentForFiling,
   removeDocumentFromFiling,
   selectDocumentForFiling,
+  submitBatch,
 });
