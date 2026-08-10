@@ -6,7 +6,15 @@ const {
 
 const D = (value) => (value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value || 0));
 const toNumber = (value) => (value && typeof value.toNumber === 'function' ? value.toNumber() : Number(value || 0));
-const makeError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
+const makeError = (statusCode, message, code, details) => Object.assign(new Error(message), {
+  statusCode,
+  ...(code ? { code } : {}),
+  ...(details ? { details } : {}),
+});
+
+const MAX_REPORT_RANGE_DAYS = 366;
+const MAX_REPORT_ROWS = 2000;
+const QUERY_TAKE = MAX_REPORT_ROWS + 1;
 
 const parseYmdLocal = (value, endOfDay = false) => {
   const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(String(value || '').trim());
@@ -31,21 +39,37 @@ const resolvePeriod = (query = {}) => {
   if (startDateText && endDateText) {
     startDate = parseYmdLocal(startDateText, false);
     endDate = parseYmdLocal(endDateText, true);
-    if (!startDate || !endDate) throw makeError(400, 'รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)');
+    if (!startDate || !endDate) {
+      throw makeError(400, 'รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)', 'INPUT_TAX_REPORT_PERIOD_INVALID');
+    }
     if (startDate.getTime() > endDate.getTime()) {
-      throw makeError(400, 'ช่วงวันที่ไม่ถูกต้อง (startDate ต้องไม่มากกว่า endDate)');
+      throw makeError(400, 'ช่วงวันที่ไม่ถูกต้อง (startDate ต้องไม่มากกว่า endDate)', 'INPUT_TAX_REPORT_PERIOD_INVALID');
     }
     month = startDate.getMonth() + 1;
     year = startDate.getFullYear();
   } else {
     if (!month || !year) {
-      throw makeError(400, 'กรุณาระบุช่วงวันที่ (startDate/endDate) หรือ เดือนและปีภาษี (month/year)');
+      throw makeError(
+        400,
+        'กรุณาระบุช่วงวันที่ (startDate/endDate) หรือ เดือนและปีภาษี (month/year)',
+        'INPUT_TAX_REPORT_PERIOD_REQUIRED',
+      );
     }
     startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
     endDate = new Date(year, month, 0, 23, 59, 59, 999);
   }
 
-  return { month, year, startDate, endDate, startDateText, endDateText };
+  const rangeDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+  if (rangeDays > MAX_REPORT_RANGE_DAYS) {
+    throw makeError(
+      413,
+      `ช่วงรายงานต้องไม่เกิน ${MAX_REPORT_RANGE_DAYS} วัน`,
+      'INPUT_TAX_REPORT_RANGE_TOO_LARGE',
+      { maxRangeDays: MAX_REPORT_RANGE_DAYS, rangeDays },
+    );
+  }
+
+  return { month, year, startDate, endDate, startDateText, endDateText, rangeDays };
 };
 
 const normalizeText = (value) => String(value || '').trim().toUpperCase();
@@ -114,13 +138,34 @@ const mapLegacyReceipt = (receipt) => {
 
 const getInputTaxReport = async ({ user = {}, query = {} }) => {
   const branchId = Number(user.branchId);
-  if (!branchId) throw makeError(403, 'ไม่สามารถระบุสาขาของผู้ใช้ได้');
+  if (!branchId) {
+    throw makeError(403, 'ไม่สามารถระบุสาขาของผู้ใช้ได้', 'INPUT_TAX_REPORT_BRANCH_REQUIRED');
+  }
 
   const period = resolvePeriod(query);
   const [records, legacyReceipts] = await Promise.all([
-    findInputVatRecords({ branchId, startDate: period.startDate, endDate: period.endDate }),
-    findLegacyInputTaxReceipts({ branchId, startDate: period.startDate, endDate: period.endDate }),
+    findInputVatRecords({
+      branchId,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      take: QUERY_TAKE,
+    }),
+    findLegacyInputTaxReceipts({
+      branchId,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      take: QUERY_TAKE,
+    }),
   ]);
+
+  if (records.length > MAX_REPORT_ROWS || legacyReceipts.length > MAX_REPORT_ROWS) {
+    throw makeError(
+      413,
+      'ข้อมูลรายงานภาษีซื้อมีขนาดใหญ่เกินขอบเขตที่อนุญาต กรุณาลดช่วงวันที่',
+      'INPUT_TAX_REPORT_RESULT_TOO_LARGE',
+      { maxRows: MAX_REPORT_ROWS },
+    );
+  }
 
   const authorityRows = records.map(mapAuthorityRecord);
   const authoritativeKeys = new Set(authorityRows.map(authorityKey));
@@ -129,7 +174,17 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
     .filter((row) => !authoritativeKeys.has(authorityKey(row)));
   const data = [...authorityRows, ...legacyRows]
     .sort((a, b) => new Date(a.date) - new Date(b.date)
-      || String(a.supplierTaxInvoiceNumber).localeCompare(String(b.supplierTaxInvoiceNumber)));
+      || String(a.supplierTaxInvoiceNumber).localeCompare(String(b.supplierTaxInvoiceNumber))
+      || String(a.id).localeCompare(String(b.id)));
+
+  if (data.length > MAX_REPORT_ROWS) {
+    throw makeError(
+      413,
+      'ข้อมูลรายงานภาษีซื้อมีขนาดใหญ่เกินขอบเขตที่อนุญาต กรุณาลดช่วงวันที่',
+      'INPUT_TAX_REPORT_RESULT_TOO_LARGE',
+      { maxRows: MAX_REPORT_ROWS, resultRows: data.length },
+    );
+  }
 
   const summary = data.reduce(
     (acc, row) => ({
@@ -146,6 +201,11 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
     legacyCompatibilityRowCount: legacyRows.length,
     data,
     summary,
+    bounds: {
+      maxRangeDays: MAX_REPORT_RANGE_DAYS,
+      maxRows: MAX_REPORT_ROWS,
+      resultRows: data.length,
+    },
     period: {
       month: period.month,
       year: period.year,
@@ -157,4 +217,9 @@ const getInputTaxReport = async ({ user = {}, query = {} }) => {
   };
 };
 
-module.exports = { getInputTaxReport };
+module.exports = {
+  MAX_REPORT_RANGE_DAYS,
+  MAX_REPORT_ROWS,
+  getInputTaxReport,
+  resolvePeriod,
+};
