@@ -124,6 +124,7 @@ function validateAddPart(payload = {}) {
   const qtyUsed = positiveInt(payload.qtyUsed, 'qtyUsed');
   return {
     productId: positiveInt(payload.productId, 'productId'),
+    stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
     qtyUsed,
   };
 }
