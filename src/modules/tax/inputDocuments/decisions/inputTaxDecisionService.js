@@ -27,10 +27,37 @@ const requiredText = (value, fieldName) => {
 
 const cloneSnapshot = (document) => ({ ...(document?.snapshot || {}) });
 
+const duplicateProjection = ({ document, branchId, taxDocumentId, replayed }) => Object.freeze({
+  taxDocumentId,
+  branchId,
+  decisionType: 'DUPLICATE',
+  decision: document.snapshot?.inputTaxDuplicateStatus || null,
+  reason: document.snapshot?.inputTaxDuplicateReason || null,
+  evidence: document.snapshot?.inputTaxDuplicateEvidence || null,
+  decidedAt: document.snapshot?.inputTaxDuplicateDecidedAt || null,
+  actorEmployeeId: document.snapshot?.inputTaxDuplicateDecidedByEmployeeId || null,
+  updatedAt: document.updatedAt || null,
+  replayed,
+});
+
+const replacementProjection = ({ document, branchId, taxDocumentId, replayed }) => Object.freeze({
+  taxDocumentId,
+  branchId,
+  decisionType: 'REPLACEMENT',
+  replacesTaxDocumentId: Number(document.snapshot?.replacesTaxDocumentId || 0) || null,
+  reason: document.snapshot?.inputTaxReplacementReason || null,
+  evidence: document.snapshot?.inputTaxReplacementEvidence || null,
+  decidedAt: document.snapshot?.inputTaxReplacementDecidedAt || null,
+  actorEmployeeId: document.snapshot?.inputTaxReplacementDecidedByEmployeeId || null,
+  updatedAt: document.updatedAt || null,
+  replayed,
+});
+
 const decideDuplicate = async ({ branchId, taxDocumentId, decision, reason, actorEmployeeId, evidence = null, decidedAt = new Date() }) => prisma.$transaction(async (tx) => {
   const normalizedBranchId = positiveInt(branchId, 'branchId');
   const normalizedDocumentId = positiveInt(taxDocumentId, 'taxDocumentId');
   const normalizedDecision = String(decision || '').trim().toUpperCase();
+  const normalizedReason = requiredText(reason, 'reason');
   if (!DUPLICATE_DECISIONS.has(normalizedDecision)) {
     throw Object.assign(new Error('Unsupported duplicate decision'), {
       code: 'INPUT_TAX_DUPLICATE_DECISION_INVALID', statusCode: 400, details: { allowed: [...DUPLICATE_DECISIONS] },
@@ -42,9 +69,16 @@ const decideDuplicate = async ({ branchId, taxDocumentId, decision, reason, acto
     throw Object.assign(new Error('Tax document not found'), { code: 'TAX_DOCUMENT_NOT_FOUND', statusCode: 404 });
   }
 
+  if (
+    document.snapshot?.inputTaxDuplicateStatus === normalizedDecision
+    && String(document.snapshot?.inputTaxDuplicateReason || '').trim() === normalizedReason
+  ) {
+    return duplicateProjection({ document, branchId: normalizedBranchId, taxDocumentId: normalizedDocumentId, replayed: true });
+  }
+
   const snapshot = cloneSnapshot(document);
   snapshot.inputTaxDuplicateStatus = normalizedDecision;
-  snapshot.inputTaxDuplicateReason = requiredText(reason, 'reason');
+  snapshot.inputTaxDuplicateReason = normalizedReason;
   snapshot.inputTaxDuplicateEvidence = evidence;
   snapshot.inputTaxDuplicateDecidedAt = decidedAt;
   snapshot.inputTaxDuplicateDecidedByEmployeeId = actorEmployeeId || null;
@@ -53,15 +87,16 @@ const decideDuplicate = async ({ branchId, taxDocumentId, decision, reason, acto
   await repository.appendDecisionEvent({
     taxDocumentId: normalizedDocumentId,
     eventType: normalizedDecision,
-    reason: snapshot.inputTaxDuplicateReason,
+    reason: normalizedReason,
     actorEmployeeId,
     metadata: { decisionType: 'DUPLICATE', decision: normalizedDecision, evidence, decidedAt },
   }, tx);
 
-  return Object.freeze({
-    taxDocumentId: normalizedDocumentId, branchId: normalizedBranchId, decisionType: 'DUPLICATE',
-    decision: normalizedDecision, reason: snapshot.inputTaxDuplicateReason, evidence, decidedAt,
-    actorEmployeeId: actorEmployeeId || null, updatedAt: updated?.updatedAt || null,
+  return duplicateProjection({
+    document: { ...updated, snapshot },
+    branchId: normalizedBranchId,
+    taxDocumentId: normalizedDocumentId,
+    replayed: false,
   });
 });
 
@@ -69,19 +104,30 @@ const linkReplacement = async ({ branchId, taxDocumentId, replacesTaxDocumentId,
   const normalizedBranchId = positiveInt(branchId, 'branchId');
   const normalizedDocumentId = positiveInt(taxDocumentId, 'taxDocumentId');
   const normalizedReplacedId = positiveInt(replacesTaxDocumentId, 'replacesTaxDocumentId');
+  const normalizedReason = requiredText(reason, 'reason');
   if (normalizedDocumentId === normalizedReplacedId) {
     throw Object.assign(new Error('A tax document cannot replace itself'), { code: 'INPUT_TAX_REPLACEMENT_SELF_REFERENCE', statusCode: 409 });
   }
 
-  const [document, replacedDocument] = await Promise.all([
-    repository.findForUpdate({ branchId: normalizedBranchId, taxDocumentId: normalizedDocumentId }, tx),
-    repository.findForUpdate({ branchId: normalizedBranchId, taxDocumentId: normalizedReplacedId }, tx),
-  ]);
+  const lockIds = [normalizedDocumentId, normalizedReplacedId].sort((a, b) => a - b);
+  const locked = new Map();
+  for (const id of lockIds) {
+    const row = await repository.findForUpdate({ branchId: normalizedBranchId, taxDocumentId: id }, tx);
+    if (row) locked.set(id, row);
+  }
+  const document = locked.get(normalizedDocumentId);
+  const replacedDocument = locked.get(normalizedReplacedId);
   if (!document || !replacedDocument) {
     throw Object.assign(new Error('Replacement documents must exist in the same branch'), { code: 'INPUT_TAX_REPLACEMENT_DOCUMENT_NOT_FOUND', statusCode: 404 });
   }
 
   const currentParentId = Number(document.snapshot?.replacesTaxDocumentId || 0) || null;
+  if (
+    currentParentId === normalizedReplacedId
+    && String(document.snapshot?.inputTaxReplacementReason || '').trim() === normalizedReason
+  ) {
+    return replacementProjection({ document, branchId: normalizedBranchId, taxDocumentId: normalizedDocumentId, replayed: true });
+  }
   if (currentParentId && currentParentId !== normalizedReplacedId) {
     throw Object.assign(new Error('Replacement document is already linked to another source'), {
       code: 'INPUT_TAX_REPLACEMENT_ALREADY_LINKED', statusCode: 409, details: { currentParentId },
@@ -97,13 +143,13 @@ const linkReplacement = async ({ branchId, taxDocumentId, replacesTaxDocumentId,
     cursor.add(Number(current.id));
     const parentId = Number(current.snapshot?.replacesTaxDocumentId || 0) || null;
     if (!parentId) break;
-    current = await repository.findForUpdate({ branchId: normalizedBranchId, taxDocumentId: parentId }, tx);
+    current = locked.get(parentId) || await repository.findForUpdate({ branchId: normalizedBranchId, taxDocumentId: parentId }, tx);
     if (!current) break;
   }
 
   const snapshot = cloneSnapshot(document);
   snapshot.replacesTaxDocumentId = normalizedReplacedId;
-  snapshot.inputTaxReplacementReason = requiredText(reason, 'reason');
+  snapshot.inputTaxReplacementReason = normalizedReason;
   snapshot.inputTaxReplacementEvidence = evidence;
   snapshot.inputTaxReplacementDecidedAt = decidedAt;
   snapshot.inputTaxReplacementDecidedByEmployeeId = actorEmployeeId || null;
@@ -112,15 +158,16 @@ const linkReplacement = async ({ branchId, taxDocumentId, replacesTaxDocumentId,
   await repository.appendDecisionEvent({
     taxDocumentId: normalizedDocumentId,
     eventType: 'ACTIVE_REPLACEMENT',
-    reason: snapshot.inputTaxReplacementReason,
+    reason: normalizedReason,
     actorEmployeeId,
     metadata: { decisionType: 'REPLACEMENT', replacesTaxDocumentId: normalizedReplacedId, evidence, decidedAt },
   }, tx);
 
-  return Object.freeze({
-    taxDocumentId: normalizedDocumentId, branchId: normalizedBranchId, decisionType: 'REPLACEMENT',
-    replacesTaxDocumentId: normalizedReplacedId, reason: snapshot.inputTaxReplacementReason, evidence,
-    decidedAt, actorEmployeeId: actorEmployeeId || null, updatedAt: updated?.updatedAt || null,
+  return replacementProjection({
+    document: { ...updated, snapshot },
+    branchId: normalizedBranchId,
+    taxDocumentId: normalizedDocumentId,
+    replayed: false,
   });
 });
 
