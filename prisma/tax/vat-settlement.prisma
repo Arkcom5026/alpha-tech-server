@@ -28,6 +28,7 @@ model VatCarryForwardAuthority {
   sourceTaxPeriod   TaxPeriod?                @relation("VatCarryForwardSource", fields: [sourceTaxPeriodId, branchId], references: [id, branchId], onDelete: Restrict)
 
   @@unique([branchId, taxPeriodId])
+  @@unique([taxPeriodId, branchId], map: "VatCarryForwardAuthority_taxPeriodId_branchId_key")
   @@index([branchId, status])
   @@index([sourceTaxPeriodId, branchId])
   @@index([confirmedById, confirmedAt])
