@@ -1,5 +1,6 @@
 'use strict';
 
+const { prisma, Prisma } = require('../../../../lib/prisma');
 const accountingOfficeService = require('../accountingOffice/accountingOfficePackageService');
 const withholdingTaxService = require('../withholdingTax/withholdingTaxService');
 const { normalizeWithholdingTaxWorkspace } = require('../withholdingTax/withholdingTaxReadiness');
@@ -8,6 +9,10 @@ const vatSettlementService = require('../settlement/vatSettlementService');
 const LEGACY_WHT_CODES = new Set([
   'WITHHOLDING_NOT_COMPLETED',
   'WITHHOLDING_CERTIFICATE_MISSING',
+]);
+
+const LEGACY_EXPENSE_CODES = new Set([
+  'TAX_EXPENSE_ASSESSMENT_PENDING',
 ]);
 
 const SETTLEMENT_DUPLICATES = new Set([
@@ -56,6 +61,25 @@ const dedupeExceptions = (entries) => {
   });
 };
 
+const loadPendingVatCitExpenseCount = async ({ branchId, period }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT COUNT(DISTINCT expense."id")::int AS "count"
+    FROM "TaxExpense" expense
+    JOIN "TaxExpenseItem" item
+      ON item."taxExpenseId" = expense."id"
+     AND item."branchId" = expense."branchId"
+    WHERE expense."branchId" = ${Number(branchId)}
+      AND expense."expenseDate" >= ${period.startDate}
+      AND expense."expenseDate" <= ${period.endDate}
+      AND expense."status" <> 'VOIDED'::"TaxExpenseStatus"
+      AND (
+        item."vatTreatment" = 'PENDING_REVIEW'::"TaxExpenseVatTreatment"
+        OR item."citTreatment" = 'PENDING_REVIEW'::"TaxExpenseCitTreatment"
+      )
+  `);
+  return Number(rows[0]?.count || 0);
+};
+
 const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
   const args = { branchId, taxPeriodId };
   const [closingPackage, withholdingRaw, vatSettlement] = await Promise.all([
@@ -64,10 +88,20 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     vatSettlementService.loadVatSettlementPreparation(args),
   ]);
   const withholding = normalizeWithholdingTaxWorkspace(withholdingRaw);
+  const pendingVatCitExpenseCount = await loadPendingVatCitExpenseCount({ branchId, period: closingPackage.period });
 
   const closingExceptions = (closingPackage.exceptions || [])
-    .filter((entry) => !LEGACY_WHT_CODES.has(entry.code))
+    .filter((entry) => !LEGACY_WHT_CODES.has(entry.code) && !LEGACY_EXPENSE_CODES.has(entry.code))
     .map((entry) => normalizeException(entry, taxPeriodId, 'MONTHLY_TAX_CLOSING_PACKAGE'));
+  const expenseExceptions = pendingVatCitExpenseCount > 0
+    ? [normalizeException({
+        code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING',
+        source: 'TAX_EXPENSE',
+        severity: 'BLOCKER',
+        count: pendingVatCitExpenseCount,
+        message: 'Tax expenses remain pending VAT/CIT assessment',
+      }, taxPeriodId, 'TAX_EXPENSE_ASSESSMENT')]
+    : [];
   const whtExceptions = (withholding.exceptions || [])
     .map((entry) => normalizeException(entry, taxPeriodId, 'WITHHOLDING_TAX_WORKSPACE'));
   const settlementExceptions = (vatSettlement.exceptions || [])
@@ -75,14 +109,17 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     .map((entry) => normalizeException(entry, taxPeriodId, 'VAT_SETTLEMENT_PREPARATION'));
   const exceptions = Object.freeze(dedupeExceptions([
     ...closingExceptions,
+    ...expenseExceptions,
     ...whtExceptions,
     ...settlementExceptions,
   ]));
 
+  const expensesReady = pendingVatCitExpenseCount === 0
+    && closingPackage.readiness?.expenseEvidenceComplete === true;
   const domains = Object.freeze([
     Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: closingPackage.readiness?.outputVatReady === true, target: 'output-tax-filings' }),
     Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: closingPackage.readiness?.inputVatReady === true, target: 'input-tax-receipts' }),
-    Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: closingPackage.readiness?.expensesReady === true, target: 'tax-expenses' }),
+    Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: expensesReady, target: 'tax-expenses' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', label: 'WHT', ready: withholding.readiness?.readyForAccountant === true, target: `tax-periods/${taxPeriodId}/withholding-tax` }),
     Object.freeze({ key: 'PP30', label: 'PP30', ready: vatSettlement.readiness?.readyForPp30Preparation === true, target: `tax-periods/${taxPeriodId}/vat-settlement` }),
     Object.freeze({ key: 'TAX_PERIOD', label: 'Tax Period', ready: closingPackage.readiness?.periodLockedOrSubmitted === true, target: 'tax-periods' }),
@@ -110,6 +147,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
 
 module.exports = Object.freeze({
   loadUnifiedTaxReadiness,
+  loadPendingVatCitExpenseCount,
   normalizeException,
   routeFor,
 });
