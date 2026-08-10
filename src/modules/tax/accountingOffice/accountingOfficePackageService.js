@@ -106,16 +106,18 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
       record."taxPeriodId",
       record."ledgerType",
       record."documentType",
-      record."taxInvoiceKind",
-      record."issuedDocumentNumber",
+      document."taxInvoiceKind" AS "taxInvoiceKind",
+      COALESCE(document."issuedDocumentNumber", record."documentNumber") AS "issuedDocumentNumber",
       record."documentDate",
       record."currency",
       record."subtotalAmount",
       record."taxAmount",
       record."totalAmount",
-      record."counterpartyName",
-      record."counterpartyTaxId",
-      record."counterpartyBranchCode",
+      record."supplierName" AS "counterpartyName",
+      record."supplierTaxId" AS "counterpartyTaxId",
+      record."supplierBranchCode" AS "counterpartyBranchCode",
+      record."originalTaxDocumentId",
+      record."originalDocumentNumber",
       document."status" AS "taxDocumentStatus"
     FROM "InputVatRecord" record
     JOIN "TaxDocument" document
@@ -129,7 +131,7 @@ const loadAccountingOfficePackage = async ({ branchId, taxPeriodId }, tx = prism
       AND record."documentDate" >= ${period.startDate}
       AND record."documentDate" <= ${period.endDate}
       AND (record."taxPeriodId" IS NULL OR record."taxPeriodId" = ${normalizedPeriodId})
-    ORDER BY record."documentDate" ASC, record."issuedDocumentNumber" ASC, record."taxDocumentId" ASC
+    ORDER BY record."documentDate" ASC, record."documentNumber" ASC, record."taxDocumentId" ASC
   `);
 
   const inputFilingBatches = await tx.$queryRaw(Prisma.sql`
