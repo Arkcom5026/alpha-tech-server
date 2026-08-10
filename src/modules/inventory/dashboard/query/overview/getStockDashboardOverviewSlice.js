@@ -12,6 +12,13 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(number) ? number : fallback;
 };
 
+const buildTrackedSimpleProductWhere = (branchId) => ({
+  mode: 'SIMPLE',
+  inventoryBehavior: 'TRACKED',
+  active: true,
+  productType: { branchId: Number(branchId) },
+});
+
 class GetStockDashboardOverviewRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -68,7 +75,10 @@ class GetStockDashboardOverviewRepository {
 
   async getSimpleSummary(branchId) {
     const aggregate = await this.prisma.stockBalance.aggregate({
-      where: { branchId },
+      where: {
+        branchId,
+        product: buildTrackedSimpleProductWhere(branchId),
+      },
       _sum: { quantity: true, reserved: true },
       _count: { _all: true },
     });
@@ -83,14 +93,20 @@ class GetStockDashboardOverviewRepository {
   }
 
   async getLotSummary(branchId) {
+    const lotWhere = {
+      branchId,
+      status: 'ACTIVE',
+      qtyRemaining: { gt: 0 },
+      product: buildTrackedSimpleProductWhere(branchId),
+    };
     const [aggregate, valuationRows] = await Promise.all([
       this.prisma.simpleLot.aggregate({
-        where: { branchId, status: 'ACTIVE', qtyRemaining: { gt: 0 } },
+        where: lotWhere,
         _count: { _all: true },
         _sum: { qtyRemaining: true },
       }),
       this.prisma.simpleLot.findMany({
-        where: { branchId, status: 'ACTIVE', qtyRemaining: { gt: 0 } },
+        where: lotWhere,
         select: { qtyRemaining: true, unitCost: true },
       }),
     ]);
@@ -213,3 +229,4 @@ module.exports = new GetStockDashboardOverviewController();
 module.exports.GetStockDashboardOverviewController = GetStockDashboardOverviewController;
 module.exports.GetStockDashboardOverviewService = GetStockDashboardOverviewService;
 module.exports.GetStockDashboardOverviewRepository = GetStockDashboardOverviewRepository;
+module.exports.buildTrackedSimpleProductWhere = buildTrackedSimpleProductWhere;
