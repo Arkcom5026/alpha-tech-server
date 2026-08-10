@@ -51,7 +51,41 @@ class RepairJobDetailRepository {
       },
       include: repairJobDetailInclude,
     });
-    if (!job?.deviceId) return job;
+    if (!job) return null;
+
+    const serializedPartMovementsPromise = prisma.stockMovement.findMany({
+      where: {
+        branchId: branch,
+        refType: 'REPAIR_JOB_PART_USAGE',
+        refId: id,
+        stockItemId: { not: null },
+      },
+      orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        productId: true,
+        qty: true,
+        stockItemId: true,
+        previousStockStatus: true,
+        resultingStockStatus: true,
+        occurredAt: true,
+        performedByEmployeeId: true,
+        stockItem: {
+          select: {
+            id: true,
+            barcode: true,
+            serialNumber: true,
+            status: true,
+            product: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!job.deviceId) {
+      const serializedPartMovements = await serializedPartMovementsPromise;
+      return { ...job, serializedPartMovements };
+    }
 
     const eventScope = {
       deviceId: Number(job.deviceId),
@@ -60,7 +94,7 @@ class RepairJobDetailRepository {
       sourceId: String(id),
     };
 
-    const [repairWorkflowEvent, repairDiagnosisEvent, repairWorkflowHistory] = await Promise.all([
+    const [repairWorkflowEvent, repairDiagnosisEvent, repairWorkflowHistory, serializedPartMovements] = await Promise.all([
       prisma.devicePassportEvent.findFirst({
         where: eventScope,
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
@@ -85,9 +119,16 @@ class RepairJobDetailRepository {
           metadata: true,
         },
       }),
+      serializedPartMovementsPromise,
     ]);
 
-    return { ...job, repairWorkflowEvent, repairDiagnosisEvent, repairWorkflowHistory };
+    return {
+      ...job,
+      repairWorkflowEvent,
+      repairDiagnosisEvent,
+      repairWorkflowHistory,
+      serializedPartMovements,
+    };
   }
 }
 
