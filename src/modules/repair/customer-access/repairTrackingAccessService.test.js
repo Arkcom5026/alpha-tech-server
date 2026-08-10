@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   hashToken,
   mapCustomerStatus,
+  mapWorkflowCustomerStatus,
   toPublicProjection,
 } = require('./repairTrackingAccessService');
 
@@ -13,9 +14,12 @@ test('tracking token is stored as a deterministic sha256 hash', () => {
   assert.notEqual(hashToken(token), token);
 });
 
-test('public tracking projects an external registered device without exposing customer data', () => {
-  const projection = toPublicProjection({
+function publicJobFixture(overrides = {}) {
+  return {
+    id: 9,
     jobNo: 'RE-2-20260727-TEST',
+    branchId: 2,
+    deviceId: 2,
     deviceModel: 'Acer Aspire',
     reportedSymptoms: 'เปิดไม่ติด',
     status: 'IN_PROGRESS',
@@ -42,7 +46,13 @@ test('public tracking projects an external registered device without exposing cu
       accessories: [{ accessoryType: 'CHARGER', quantity: 1, remark: null }],
     },
     warrantyClaims: [],
-  });
+    delivery: null,
+    ...overrides,
+  };
+}
+
+test('public tracking projects an external registered device without exposing customer data', () => {
+  const projection = toPublicProjection(publicJobFixture());
 
   assert.equal(projection.repair.device.barcode, 'DEV-2-ABC');
   assert.equal(projection.repair.device.displayName, 'Acer Aspire');
@@ -59,4 +69,25 @@ test('completed repair maps to customer-ready status', () => {
     description: 'กรุณาติดต่อร้านเพื่อรับอุปกรณ์',
     stage: 4,
   });
+});
+
+test('READY_FOR_DELIVERY workflow overrides legacy in-progress projection for customer pickup', () => {
+  const status = mapWorkflowCustomerStatus('READY_FOR_DELIVERY', 'IN_PROGRESS');
+  assert.deepEqual(status, {
+    code: 'READY',
+    label: 'พร้อมรับเครื่อง',
+    description: 'งานซ่อมและการตรวจ QC เสร็จแล้ว กรุณายืนยันการรับเครื่องเพื่อดำเนินการส่งมอบ',
+    stage: 4,
+  });
+
+  const projection = toPublicProjection(publicJobFixture(), [], 'READY_FOR_DELIVERY');
+  assert.equal(projection.repair.status.code, 'READY');
+  assert.equal(projection.repair.status.stage, 4);
+  assert.equal(projection.repair.status.label, 'พร้อมรับเครื่อง');
+});
+
+test('workflow authority keeps waiting-parts and cancellation customer projections aligned', () => {
+  assert.equal(mapWorkflowCustomerStatus('WAITING_PARTS', 'IN_PROGRESS').code, 'WAITING_PARTS');
+  assert.equal(mapWorkflowCustomerStatus('CANCELLED', 'IN_PROGRESS').code, 'CANCELLED');
+  assert.equal(mapWorkflowCustomerStatus('DIAGNOSING', 'RECEIVED').code, 'IN_PROGRESS');
 });
