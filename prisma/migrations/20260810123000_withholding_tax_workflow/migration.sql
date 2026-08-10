@@ -103,6 +103,8 @@ CREATE TABLE "WithholdingTaxFilingItem" (
   CONSTRAINT "WithholdingTaxFilingItem_pkey" PRIMARY KEY ("id")
 );
 
+CREATE UNIQUE INDEX "TaxExpenseItem_id_branchId_key" ON "TaxExpenseItem"("id", "branchId");
+
 CREATE INDEX "WithholdingTaxTreatmentEvent_branchId_taxExpenseId_occurredAt_idx" ON "WithholdingTaxTreatmentEvent"("branchId", "taxExpenseId", "occurredAt");
 CREATE INDEX "WithholdingTaxTreatmentEvent_taxExpenseItemId_occurredAt_idx" ON "WithholdingTaxTreatmentEvent"("taxExpenseItemId", "occurredAt");
 CREATE INDEX "WithholdingTaxTreatmentEvent_actorEmployeeId_idx" ON "WithholdingTaxTreatmentEvent"("actorEmployeeId");
@@ -136,8 +138,8 @@ ALTER TABLE "WithholdingTaxTreatmentEvent"
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxTreatmentEvent"
-  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseItemId_fkey"
-  FOREIGN KEY ("taxExpenseItemId") REFERENCES "TaxExpenseItem"("id")
+  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseItemId_branchId_fkey"
+  FOREIGN KEY ("taxExpenseItemId", "branchId") REFERENCES "TaxExpenseItem"("id", "branchId")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxTreatmentEvent"
@@ -161,8 +163,8 @@ ALTER TABLE "WithholdingTaxRecord"
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxRecord"
-  ADD CONSTRAINT "WithholdingTaxRecord_taxExpenseItemId_fkey"
-  FOREIGN KEY ("taxExpenseItemId") REFERENCES "TaxExpenseItem"("id")
+  ADD CONSTRAINT "WithholdingTaxRecord_taxExpenseItemId_branchId_fkey"
+  FOREIGN KEY ("taxExpenseItemId", "branchId") REFERENCES "TaxExpenseItem"("id", "branchId")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxRecord"
