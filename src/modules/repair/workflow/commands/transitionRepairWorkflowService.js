@@ -143,14 +143,26 @@ function currentWorkflowStatus(repairJob) {
   return latest?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
 }
 
-function assertIntakeCompleteForDiagnosis(repairJob, action) {
-  if (action !== REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS) return;
+function assertIntakeCompleteForEntry(repairJob, action) {
+  if (![REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS, REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE].includes(action)) return;
   const completion = evaluateIntakeCompletion(repairJob.deviceIntake);
   if (!completion.complete) {
     throw new RepairWorkflowCommandError(
       'REPAIR_INTAKE_INCOMPLETE',
-      'Repair intake evidence must be complete before diagnosis can be queued',
+      'Repair intake evidence must be complete before inspection or pre-agreed work can start',
       { repairJobId: repairJob.id, completion }
+    );
+  }
+}
+
+function assertPreAgreedServiceAuthority(repairJob, action) {
+  if (action !== REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE) return;
+  const agreement = repairJob.preAgreedService;
+  if (!agreement?.enabled || !agreement.agreedScope || !agreement.confirmedByName) {
+    throw new RepairWorkflowCommandError(
+      'PRE_AGREED_SERVICE_REQUIRED',
+      'Pre-agreed service evidence is required before the fast path can start',
+      { repairJobId: repairJob.id }
     );
   }
 }
@@ -194,7 +206,8 @@ class TransitionRepairWorkflowService {
         });
       }
 
-      assertIntakeCompleteForDiagnosis(repairJob, action);
+      assertIntakeCompleteForEntry(repairJob, action);
+      assertPreAgreedServiceAuthority(repairJob, action);
       const transition = resolveRepairWorkflowTransition(workflowStatus, action);
       const legacyStatus = projectLegacyServiceStatus(transition.targetStatus);
       const occurredAt = command.occurredAt ? new Date(command.occurredAt) : new Date();
@@ -227,7 +240,7 @@ class TransitionRepairWorkflowService {
                   repairJob.technicianNotes || null,
                   action === REPAIR_WORKFLOW_ACTION.CANCEL
                     ? `ยกเลิกงาน: ${note}`
-                    : `เปิดวินิจฉัยใหม่หลังลูกค้าไม่อนุมัติ: ${note}`,
+                    : `เปิดตรวจสอบใหม่หลังลูกค้าไม่อนุมัติ: ${note}`,
                 ].filter(Boolean).join('\n'),
               }
             : {};
@@ -243,7 +256,15 @@ class TransitionRepairWorkflowService {
         correlationId: command.correlationId || `repair-job:${repairJobId}`,
         causationId: command.causationId || commandKey,
         title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
-        description: note || diagnosis?.customerNote || repairCompletion?.resultSummary || qc?.note || null,
+        description:
+          note ||
+          (action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+            ? repairJob.preAgreedService?.agreedScope
+            : null) ||
+          diagnosis?.customerNote ||
+          repairCompletion?.resultSummary ||
+          qc?.note ||
+          null,
         actorEmployeeId: employeeId,
         customerVisible: command.customerVisible !== false,
         metadata: {
@@ -255,6 +276,10 @@ class TransitionRepairWorkflowService {
           legacyServiceStatus: legacyStatus,
           terminal: transition.terminal,
           note,
+          preAgreedService:
+            action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+              ? repairJob.preAgreedService
+              : null,
           diagnosis,
           repairCompletion,
           qc,
@@ -271,6 +296,10 @@ class TransitionRepairWorkflowService {
         terminal: transition.terminal,
         passportEventId: event.id,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
+        preAgreedService:
+          action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+            ? repairJob.preAgreedService
+            : null,
         diagnosis,
         repairCompletion,
         qc,
@@ -284,7 +313,9 @@ module.exports = new TransitionRepairWorkflowService();
 module.exports.RepairWorkflowCommandError = RepairWorkflowCommandError;
 module.exports.TransitionRepairWorkflowService = TransitionRepairWorkflowService;
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
-module.exports.assertIntakeCompleteForDiagnosis = assertIntakeCompleteForDiagnosis;
+module.exports.assertIntakeCompleteForEntry = assertIntakeCompleteForEntry;
+module.exports.assertIntakeCompleteForDiagnosis = assertIntakeCompleteForEntry;
+module.exports.assertPreAgreedServiceAuthority = assertPreAgreedServiceAuthority;
 module.exports.normalizeDiagnosis = normalizeDiagnosis;
 module.exports.normalizeRepairCompletion = normalizeRepairCompletion;
 module.exports.normalizeQc = normalizeQc;
