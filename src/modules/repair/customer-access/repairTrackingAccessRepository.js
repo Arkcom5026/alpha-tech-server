@@ -67,6 +67,12 @@ class RepairTrackingAccessRepository {
         depositPaid: true,
         createdAt: true,
         updatedAt: true,
+        customer: {
+          select: {
+            name: true,
+            companyName: true,
+          },
+        },
         branch: { select: { name: true, phone: true, address: true } },
         stockItem: {
           select: {
