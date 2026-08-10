@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma, Prisma } = require('../../../../lib/prisma');
+const vatSettlementService = require('./vatSettlementService');
 
 const fail = (code, message, statusCode = 400, details = undefined) => {
   const error = new Error(message);
@@ -66,6 +67,20 @@ const loadPeriodContext = async ({ branchId, taxPeriodId }, tx = prisma, lock = 
   return { target, previousPeriod: previousRows[0] || null };
 };
 
+const loadPriorPeriodSettlement = async ({ branchId, previousPeriod }, tx = prisma) => {
+  if (!previousPeriod || !['LOCKED', 'SUBMITTED'].includes(String(previousPeriod.status))) return null;
+  const settlement = await vatSettlementService.loadVatSettlementPreparation({
+    branchId,
+    taxPeriodId: previousPeriod.id,
+  }, tx);
+  return Object.freeze({
+    readyForPp30Preparation: Boolean(settlement.readiness?.readyForPp30Preparation),
+    pp30VatCredit: settlement.settlement?.pp30VatCredit == null ? null : Number(settlement.settlement.pp30VatCredit),
+    pp30VatPayable: settlement.settlement?.pp30VatPayable == null ? null : Number(settlement.settlement.pp30VatPayable),
+    exceptionCodes: (settlement.exceptions || []).map((entry) => entry.code),
+  });
+};
+
 const loadVatCarryForwardAuthority = async ({ branchId, taxPeriodId }, tx = prisma) => {
   const normalizedBranchId = positiveBranchId(branchId);
   const normalizedPeriodId = periodId(taxPeriodId);
@@ -78,10 +93,20 @@ const loadVatCarryForwardAuthority = async ({ branchId, taxPeriodId }, tx = pris
     LIMIT 1
   `);
   const authority = rows[0] || null;
+  const priorPeriodSettlement = await loadPriorPeriodSettlement({
+    branchId: normalizedBranchId,
+    previousPeriod: context.previousPeriod,
+  }, tx);
+  const suggestedAmount = priorPeriodSettlement?.readyForPp30Preparation
+    ? Number(priorPeriodSettlement.pp30VatCredit || 0)
+    : null;
+
   return Object.freeze({
     branchId: normalizedBranchId,
     period: context.target,
     previousPeriod: context.previousPeriod,
+    priorPeriodSettlement,
+    suggestedAmount,
     authority: authority ? Object.freeze({
       ...authority,
       amount: Number(authority.amount || 0),
@@ -119,12 +144,27 @@ const confirmVatCarryForwardAuthority = async ({
   }
 
   let sourceTaxPeriodId = null;
+  let sourceSettlement = null;
   if (normalizedSourceType === 'PRIOR_PERIOD') {
     if (!previousPeriod) fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_REQUIRED', 'A prior tax period is required for PRIOR_PERIOD authority', 409);
     if (!['LOCKED', 'SUBMITTED'].includes(String(previousPeriod.status))) {
       fail('VAT_CARRY_FORWARD_PREVIOUS_PERIOD_NOT_FINALIZED', 'Prior tax period must be locked or submitted before its VAT credit is carried forward', 409, {
         previousPeriodId: previousPeriod.id,
         previousPeriodStatus: previousPeriod.status,
+      });
+    }
+    sourceSettlement = await loadPriorPeriodSettlement({ branchId: normalizedBranchId, previousPeriod }, tx);
+    if (!sourceSettlement?.readyForPp30Preparation || sourceSettlement.pp30VatCredit == null) {
+      fail('VAT_CARRY_FORWARD_SOURCE_SETTLEMENT_NOT_READY', 'Prior period PP30 settlement must be ready before confirming carried VAT credit', 409, {
+        previousPeriodId: previousPeriod.id,
+        exceptionCodes: sourceSettlement?.exceptionCodes || [],
+      });
+    }
+    const availableCredit = Number(sourceSettlement.pp30VatCredit || 0);
+    if (Number(normalizedAmount) > availableCredit + 0.004) {
+      fail('VAT_CARRY_FORWARD_AMOUNT_EXCEEDS_SOURCE_CREDIT', 'Carry-forward amount cannot exceed prior-period VAT credit', 409, {
+        requestedAmount: normalizedAmount,
+        availableCredit: availableCredit.toFixed(2),
       });
     }
     sourceTaxPeriodId = previousPeriod.id;
@@ -139,6 +179,8 @@ const confirmVatCarryForwardAuthority = async ({
     sourceTaxPeriodId,
     sourcePeriodCode: previousPeriod?.periodCode || null,
     sourcePeriodStatus: previousPeriod?.status || null,
+    sourceAvailableCredit: sourceSettlement?.pp30VatCredit ?? null,
+    sourcePayable: sourceSettlement?.pp30VatPayable ?? null,
     confirmedAmount: normalizedAmount,
     confirmedById: normalizedActorId,
   };
