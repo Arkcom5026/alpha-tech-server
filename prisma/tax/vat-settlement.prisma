@@ -1,0 +1,32 @@
+enum VatCarryForwardSourceType {
+  PRIOR_PERIOD
+  HISTORICAL_OPENING
+}
+
+enum VatCarryForwardStatus {
+  DRAFT
+  CONFIRMED
+  VOIDED
+}
+
+model VatCarryForwardAuthority {
+  id                String                    @id @default(cuid())
+  branchId          Int
+  taxPeriodId       String
+  sourceTaxPeriodId String?
+  sourceType        VatCarryForwardSourceType
+  amount            Decimal                   @db.Decimal(14, 2)
+  status            VatCarryForwardStatus     @default(DRAFT)
+  note              String?
+  confirmedById     Int?
+  confirmedAt       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  taxPeriod         TaxPeriod                 @relation("VatCarryForwardTarget", fields: [taxPeriodId, branchId], references: [id, branchId], onDelete: Restrict)
+  sourceTaxPeriod   TaxPeriod?                @relation("VatCarryForwardSource", fields: [sourceTaxPeriodId, branchId], references: [id, branchId], onDelete: Restrict)
+
+  @@unique([branchId, taxPeriodId])
+  @@index([branchId, status])
+  @@index([sourceTaxPeriodId, branchId])
+  @@index([confirmedById, confirmedAt])
+}
