@@ -46,6 +46,7 @@ const decimal = (value, fieldName) => {
 
 const PERIOD_MUTATION_BLOCKED_STATUSES = new Set(['CLOSED', 'LOCKED', 'SUBMITTED']);
 const PERIOD_FILING_SUBMIT_BLOCKED_STATUSES = new Set(['CLOSED', 'SUBMITTED']);
+const INPUT_VAT_LEDGER_TYPES = new Set(['INPUT_VAT', 'INPUT_VAT_ADJUSTMENT']);
 
 const assertBatchPeriodMutable = async ({ batchId }, tx) => {
   const authority = await repository.findBatchPeriodAuthority({ batchId }, tx);
@@ -132,6 +133,64 @@ const assertLockedBatchSubmittable = (authority) => {
   return authority;
 };
 
+const assertInputVatFilingAuthority = ({ authority, branchId, taxDocumentId, document, eligibility }) => {
+  if (
+    !authority
+    || Number(authority.branchId) !== Number(branchId)
+    || Number(authority.taxDocumentId) !== Number(taxDocumentId)
+    || !INPUT_VAT_LEDGER_TYPES.has(String(authority.ledgerType || ''))
+  ) {
+    throw Object.assign(new Error('Input VAT authority is required before filing selection'), {
+      code: 'INPUT_TAX_FILING_VAT_AUTHORITY_REQUIRED',
+      statusCode: 409,
+      details: { taxDocumentId: Number(taxDocumentId) },
+    });
+  }
+
+  const authoritySubtotal = decimal(authority.subtotalAmount, 'authority.subtotalAmount');
+  const authorityVat = decimal(authority.taxAmount, 'authority.taxAmount');
+  const authorityTotal = decimal(authority.totalAmount, 'authority.totalAmount');
+  const documentSubtotal = decimal(document?.subtotalAmount, 'document.subtotalAmount');
+  const documentVat = decimal(document?.vatAmount ?? document?.taxAmount, 'document.vatAmount');
+  const documentTotal = decimal(document?.totalAmount, 'document.totalAmount');
+
+  if (
+    authoritySubtotal !== documentSubtotal
+    || authorityVat !== documentVat
+    || authorityTotal !== documentTotal
+  ) {
+    throw Object.assign(new Error('Input VAT authority amounts conflict with the tax document'), {
+      code: 'INPUT_TAX_FILING_VAT_AUTHORITY_CONFLICT',
+      statusCode: 409,
+      details: {
+        taxDocumentId: Number(taxDocumentId),
+        authority: { subtotalAmount: authoritySubtotal, taxAmount: authorityVat, totalAmount: authorityTotal },
+        document: { subtotalAmount: documentSubtotal, taxAmount: documentVat, totalAmount: documentTotal },
+      },
+    });
+  }
+
+  const eligibleVat = Number(decimal(eligibility?.eligibleVatAmount, 'eligibility.eligibleVatAmount'));
+  if (eligibleVat > Number(authorityVat)) {
+    throw Object.assign(new Error('Eligible VAT cannot exceed the Input VAT authority amount'), {
+      code: 'INPUT_TAX_FILING_VAT_AUTHORITY_CONFLICT',
+      statusCode: 409,
+      details: {
+        taxDocumentId: Number(taxDocumentId),
+        eligibleVatAmount: eligibleVat.toFixed(2),
+        authorityVatAmount: authorityVat,
+      },
+    });
+  }
+
+  return Object.freeze({
+    authoritySubtotal,
+    authorityVat,
+    authorityTotal,
+    eligibleVatAmount: eligibleVat.toFixed(2),
+  });
+};
+
 const mapRow = (row, replayed = false) => Object.freeze({
   ...createFilingItemProjection({
     id: Number(row.id),
@@ -164,13 +223,13 @@ const selectTaxDocumentForFiling = async ({
   const normalizedBatchId = positiveInt(batchId, 'batchId');
   const normalizedTaxDocumentId = positiveInt(taxDocumentId, 'taxDocumentId');
 
-  const authority = assertLockedBatchMutable(
+  const batchAuthority = assertLockedBatchMutable(
     await repository.lockBatchPeriodAuthority({ batchId: normalizedBatchId }, tx),
   );
   const lockedDocument = await repository.lockTaxDocumentForFiling({
     taxDocumentId: normalizedTaxDocumentId,
   }, tx);
-  if (!lockedDocument || Number(lockedDocument.branchId) !== Number(authority.branchId)) {
+  if (!lockedDocument || Number(lockedDocument.branchId) !== Number(batchAuthority.branchId)) {
     throw Object.assign(new Error('Input tax document was not found in this filing branch'), {
       code: 'TAX_DOCUMENT_NOT_FOUND',
       statusCode: 404,
@@ -211,8 +270,19 @@ const selectTaxDocumentForFiling = async ({
     });
   }
 
-  const claimedSubtotalAmount = decimal(document?.subtotalAmount, 'claimedSubtotalAmount');
-  const claimedVatAmount = decimal(eligibility.eligibleVatAmount, 'claimedVatAmount');
+  const vatAuthority = await repository.lockInputVatAuthorityForFiling({
+    taxDocumentId: normalizedTaxDocumentId,
+  }, tx);
+  const authorityAmounts = assertInputVatFilingAuthority({
+    authority: vatAuthority,
+    branchId: batchAuthority.branchId,
+    taxDocumentId: normalizedTaxDocumentId,
+    document,
+    eligibility,
+  });
+
+  const claimedSubtotalAmount = authorityAmounts.authoritySubtotal;
+  const claimedVatAmount = authorityAmounts.eligibleVatAmount;
   const claimedTotalAmount = decimal(
     Number(claimedSubtotalAmount) + Number(claimedVatAmount),
     'claimedTotalAmount',
@@ -227,15 +297,18 @@ const selectTaxDocumentForFiling = async ({
     eligibilitySnapshot: eligibility,
     documentSnapshot: {
       taxDocumentId: normalizedTaxDocumentId,
+      inputVatRecordId: vatAuthority.id,
+      inputVatLedgerType: vatAuthority.ledgerType,
       documentType: document?.documentType || null,
-      documentNumber: document?.documentNumber || null,
-      documentDate: document?.issuedAt || null,
+      documentNumber: vatAuthority.documentNumber || document?.documentNumber || null,
+      documentDate: vatAuthority.documentDate || document?.issuedAt || null,
       receivedAt: document?.occurredAt || null,
       supplierTaxId: document?.counterpartyTaxId || null,
-      currency: document?.currency || 'THB',
-      subtotalAmount: decimal(document?.subtotalAmount, 'document.subtotalAmount'),
-      vatAmount: decimal(document?.vatAmount ?? document?.taxAmount, 'document.vatAmount'),
-      totalAmount: decimal(document?.totalAmount, 'document.totalAmount'),
+      currency: vatAuthority.currency || document?.currency || 'THB',
+      subtotalAmount: authorityAmounts.authoritySubtotal,
+      vatAmount: authorityAmounts.authorityVat,
+      totalAmount: authorityAmounts.authorityTotal,
+      claimedVatAmount,
     },
     selectedAt,
   }, tx);
@@ -344,9 +417,11 @@ const markInputTaxBatchFiled = async ({ branchId, batchId, filedAt = new Date() 
 });
 
 module.exports = Object.freeze({
+  INPUT_VAT_LEDGER_TYPES,
   PERIOD_FILING_SUBMIT_BLOCKED_STATUSES,
   PERIOD_MUTATION_BLOCKED_STATUSES,
   assertBatchPeriodMutable,
+  assertInputVatFilingAuthority,
   assertLockedBatchSubmittable,
   markInputTaxBatchFiled,
   removeTaxDocumentFromFiling,
