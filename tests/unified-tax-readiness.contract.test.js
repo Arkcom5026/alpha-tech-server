@@ -17,7 +17,7 @@ test('unified readiness composes six existing tax authority domains', () => {
   assert.match(source, /readinessPercent/);
 });
 
-test('unified readiness reuses closing WHT and settlement authorities without legacy WHT duplication', () => {
+test('unified readiness reuses closing WHT and settlement authorities without duplicate blockers', () => {
   const source = read('src/modules/tax/readiness/unifiedTaxReadinessService.js');
   assert.match(source, /loadAccountingOfficePackage/);
   assert.match(source, /loadWithholdingTaxWorkspace/);
@@ -26,8 +26,18 @@ test('unified readiness reuses closing WHT and settlement authorities without le
   assert.match(source, /SETTLEMENT_DUPLICATES/);
 });
 
+test('expense readiness counts only VAT and CIT assessment while WHT remains separate', () => {
+  const source = read('src/modules/tax/readiness/unifiedTaxReadinessService.js');
+  assert.match(source, /loadPendingVatCitExpenseCount/);
+  assert.match(source, /item\."vatTreatment" = 'PENDING_REVIEW'/);
+  assert.match(source, /item\."citTreatment" = 'PENDING_REVIEW'/);
+  assert.doesNotMatch(source.match(/loadPendingVatCitExpenseCount[\s\S]*?return Number\(rows\[0\]/)?.[0] || '', /whtTreatment/);
+  assert.match(source, /TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING/);
+  assert.match(source, /LEGACY_EXPENSE_CODES/);
+});
+
 test('exception targets resolve to source workspaces', () => {
-  assert.equal(routeFor({ code: 'TAX_EXPENSE_ASSESSMENT_PENDING', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
+  assert.equal(routeFor({ code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
   assert.equal(routeFor({ code: 'WHT_CERTIFICATE_NOT_ISSUED', source: 'WHT_CERTIFICATE' }, 'p1'), 'tax-periods/p1/withholding-tax');
   assert.equal(routeFor({ code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED', source: 'PRIOR_PERIOD_VAT_CREDIT' }, 'p1'), 'tax-periods/p1/vat-settlement');
   assert.equal(routeFor({ code: 'INPUT_VAT_PERIOD_UNBOUND', source: 'INPUT_VAT' }, 'p1'), 'input-tax-receipts');
