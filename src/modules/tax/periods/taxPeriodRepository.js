@@ -56,7 +56,7 @@ const createMonthly = async ({ branchId, periodCode, startDate, endDate }) => {
   return mapRow(rows[0]);
 };
 
-const transition = async ({ taxPeriodId, branchId, targetStatus, occurredAt }) => {
+const transition = async ({ taxPeriodId, branchId, expectedStatus, targetStatus, occurredAt }) => {
   const timestamp = occurredAt ? new Date(occurredAt) : new Date();
   const fieldByStatus = {
     CLOSED: 'closedAt',
@@ -65,14 +65,22 @@ const transition = async ({ taxPeriodId, branchId, targetStatus, occurredAt }) =
     REOPENED: 'reopenedAt',
   };
   const field = fieldByStatus[targetStatus];
-  if (!field || !STATUS_VALUES.includes(targetStatus)) throw new Error('Unsupported tax period transition');
+  if (!field || !STATUS_VALUES.includes(targetStatus) || !STATUS_VALUES.includes(expectedStatus)) {
+    throw new Error('Unsupported tax period transition');
+  }
 
   const rows = await prisma.$queryRawUnsafe(
-    `UPDATE "TaxPeriod" SET "status" = $1::"TaxPeriodStatus", "${field}" = $2, "updatedAt" = NOW() WHERE "id" = $3 AND "branchId" = $4 RETURNING *`,
+    `UPDATE "TaxPeriod"
+     SET "status" = $1::"TaxPeriodStatus", "${field}" = $2, "updatedAt" = NOW()
+     WHERE "id" = $3
+       AND "branchId" = $4
+       AND "status" = $5::"TaxPeriodStatus"
+     RETURNING *`,
     targetStatus,
     timestamp,
     String(taxPeriodId),
     Number(branchId),
+    expectedStatus,
   );
   return rows[0] ? mapRow(rows[0]) : null;
 };
