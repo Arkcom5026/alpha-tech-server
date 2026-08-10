@@ -111,6 +111,21 @@ class TaxExpenseAssessmentService {
     return expense;
   }
 
+  async assertMutablePeriod(expense, branchId, tx) {
+    const submittedPeriod = await tx.taxPeriod.findFirst({
+      where: {
+        branchId,
+        status: 'SUBMITTED',
+        startDate: { lte: expense.expenseDate },
+        endDate: { gte: expense.expenseDate },
+      },
+      select: { id: true, periodCode: true },
+    });
+    if (submittedPeriod) {
+      fail('TAX_EXPENSE_ASSESSMENT_PERIOD_IMMUTABLE', `รอบภาษี ${submittedPeriod.periodCode} ถูกยื่นแล้วและห้ามแก้ผลการประเมิน`, 409);
+    }
+  }
+
   async getSuggestion({ branchId, taxExpenseId }) {
     const expense = await this.loadExpense(branchId, taxExpenseId);
     return {
@@ -126,6 +141,7 @@ class TaxExpenseAssessmentService {
 
     return this.prisma.$transaction(async (tx) => {
       const expense = await this.loadExpense(branchId, taxExpenseId, tx);
+      await this.assertMutablePeriod(expense, branchId, tx);
       const itemById = new Map(expense.items.map((item) => [item.id, item]));
       if (decisions.length !== expense.items.length) {
         fail('TAX_EXPENSE_ASSESSMENT_INCOMPLETE', 'ต้องยืนยันผลการประเมินให้ครบทุกรายการ');
@@ -142,6 +158,10 @@ class TaxExpenseAssessmentService {
         return { taxExpenseItemId, vatTreatment, citTreatment };
       });
 
+      if (new Set(normalized.map((row) => row.taxExpenseItemId)).size !== expense.items.length) {
+        fail('TAX_EXPENSE_ASSESSMENT_DUPLICATE_ITEM', 'ห้ามส่งผลการประเมินรายการเดิมซ้ำกัน');
+      }
+
       const suggestions = buildSuggestion(expense);
       const previous = expense.assessments[0] || null;
       const version = Number(previous?.version || 0) + 1;
@@ -156,10 +176,13 @@ class TaxExpenseAssessmentService {
       const assessmentHash = canonicalHash({ taxExpenseId, version, decisions: normalized, note: note || null });
 
       for (const decision of normalized) {
-        await tx.taxExpenseItem.updateMany({
+        const result = await tx.taxExpenseItem.updateMany({
           where: { id: decision.taxExpenseItemId, taxExpenseId, branchId },
           data: { vatTreatment: decision.vatTreatment, citTreatment: decision.citTreatment },
         });
+        if (Number(result?.count || 0) !== 1) {
+          fail('TAX_EXPENSE_ASSESSMENT_CONCURRENT_MODIFICATION', 'รายการค่าใช้จ่ายเปลี่ยนแปลงระหว่างการยืนยัน กรุณาโหลดใหม่', 409);
+        }
       }
 
       if (previous?.status === 'FINALIZED') {
