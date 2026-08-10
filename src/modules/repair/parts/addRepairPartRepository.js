@@ -46,6 +46,18 @@ class AddRepairPartRepository {
     });
   }
 
+  findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
+    return this.prisma.devicePassportEvent.findFirst({
+      where: {
+        deviceId: Number(deviceId),
+        branchId: Number(branchId),
+        sourceType: 'REPAIR_JOB',
+        sourceId: String(repairJobId),
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
   findProduct(productId) {
     return this.prisma.product.findUnique({ where: { id: Number(productId) } });
   }
