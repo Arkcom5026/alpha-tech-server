@@ -121,14 +121,21 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
   const currentPeriodVatCredit = amount(Math.max(0, -currentPeriodNetVat));
   const outputReconciliationDifference = amount(outputVatAuthority - outputVatFiling);
 
-  const carryForwardAmount = previousPeriod
-    ? (carryForwardAuthority ? amount(carryForwardAuthority.amount) : null)
-    : 0;
+  const expectedCarryForwardSourceType = previousPeriod ? 'PRIOR_PERIOD' : 'HISTORICAL_OPENING';
+  const carryForwardSourceMatches = Boolean(carryForwardAuthority)
+    && carryForwardAuthority.sourceType === expectedCarryForwardSourceType
+    && (previousPeriod
+      ? carryForwardAuthority.sourceTaxPeriodId === previousPeriod.id
+      : carryForwardAuthority.sourceTaxPeriodId == null);
+  const carryForwardAmount = carryForwardSourceMatches
+    ? amount(carryForwardAuthority.amount)
+    : null;
   const carryForward = Object.freeze({
     previousPeriodId: previousPeriod?.id || null,
     previousPeriodCode: previousPeriod?.periodCode || null,
     previousPeriodStatus: previousPeriod?.status || null,
-    authorityAvailable: !previousPeriod || Boolean(carryForwardAuthority),
+    requiredSourceType: expectedCarryForwardSourceType,
+    authorityAvailable: carryForwardSourceMatches,
     authorityId: carryForwardAuthority?.id || null,
     authorityStatus: carryForwardAuthority?.status || null,
     sourceType: carryForwardAuthority?.sourceType || null,
@@ -137,9 +144,9 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
     version: carryForwardAuthority ? Number(carryForwardAuthority.version || 1) : null,
     confirmedById: carryForwardAuthority?.confirmedById == null ? null : Number(carryForwardAuthority.confirmedById),
     confirmedAt: carryForwardAuthority?.confirmedAt || null,
-    reason: previousPeriod
-      ? (carryForwardAuthority ? 'CONFIRMED_AUTHORITY' : 'CONFIRMED_AUTHORITY_REQUIRED')
-      : 'NO_PREVIOUS_PERIOD',
+    reason: carryForwardSourceMatches
+      ? 'CONFIRMED_AUTHORITY'
+      : (previousPeriod ? 'PRIOR_PERIOD_AUTHORITY_REQUIRED' : 'HISTORICAL_OPENING_AUTHORITY_REQUIRED'),
   });
 
   const pp30NetVatAfterCarryForward = carryForwardAmount == null
@@ -168,11 +175,14 @@ const loadVatSettlementPreparation = async ({ branchId, taxPeriodId }, tx = pris
   if (readiness.inputFilingPrepared && !readiness.inputCreditAuthorityReady) exceptions.push({ code: 'VAT_SETTLEMENT_INPUT_CREDIT_NOT_READY', source: 'INPUT_VAT', severity: 'BLOCKER' });
   if (!readiness.periodLockedOrSubmitted) exceptions.push({ code: 'VAT_SETTLEMENT_PERIOD_NOT_LOCKED', source: 'TAX_PERIOD', severity: 'BLOCKER' });
   if (!readiness.carryForwardAuthorityReady) exceptions.push({
-    code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED',
-    source: 'PRIOR_PERIOD_VAT_CREDIT',
+    code: previousPeriod
+      ? 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED'
+      : 'VAT_SETTLEMENT_HISTORICAL_OPENING_AUTHORITY_REQUIRED',
+    source: previousPeriod ? 'PRIOR_PERIOD_VAT_CREDIT' : 'HISTORICAL_OPENING_VAT_CREDIT',
     severity: 'BLOCKER',
     previousPeriodId: carryForward.previousPeriodId,
     previousPeriodCode: carryForward.previousPeriodCode,
+    requiredSourceType: expectedCarryForwardSourceType,
   });
 
   return Object.freeze({
