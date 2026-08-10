@@ -57,7 +57,7 @@ function optionalText(value, maxLength = 4000) {
   if (normalized.length > maxLength) {
     throw new RepairWorkflowCommandError(
       'INVALID_REPAIR_WORKFLOW_COMMAND',
-      'diagnosis text is too long',
+      'workflow text is too long',
       { maxLength }
     );
   }
@@ -79,12 +79,49 @@ function normalizeDiagnosis(action, rawDiagnosis) {
   return {
     findings: requireText(diagnosis.findings, 'diagnosis.findings'),
     cause: optionalText(diagnosis.cause),
-    recommendedAction: requireText(
-      diagnosis.recommendedAction,
-      'diagnosis.recommendedAction'
-    ),
+    recommendedAction: requireText(diagnosis.recommendedAction, 'diagnosis.recommendedAction'),
     estimatedCost,
     customerNote: optionalText(diagnosis.customerNote),
+  };
+}
+
+function normalizeRepairCompletion(action, rawCompletion) {
+  if (action !== REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR) return null;
+  const completion = rawCompletion && typeof rawCompletion === 'object' ? rawCompletion : {};
+  return {
+    workPerformed: requireText(completion.workPerformed, 'repairCompletion.workPerformed'),
+    resultSummary: requireText(completion.resultSummary, 'repairCompletion.resultSummary'),
+    technicianNote: optionalText(completion.technicianNote),
+  };
+}
+
+function normalizeQc(action, rawQc) {
+  if (![REPAIR_WORKFLOW_ACTION.PASS_QC, REPAIR_WORKFLOW_ACTION.FAIL_QC].includes(action)) return null;
+  const qc = rawQc && typeof rawQc === 'object' ? rawQc : {};
+  const checks = Array.isArray(qc.checks)
+    ? qc.checks.map((item) => ({
+        key: requireText(item?.key, 'qc.checks.key', 120),
+        label: requireText(item?.label, 'qc.checks.label', 255),
+        passed: item?.passed === true,
+      }))
+    : [];
+  if (!checks.length) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      'qc.checks is required',
+      { field: 'qc.checks' }
+    );
+  }
+  if (action === REPAIR_WORKFLOW_ACTION.PASS_QC && checks.some((item) => !item.passed)) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      'all qc checks must pass before PASS_QC',
+      { field: 'qc.checks' }
+    );
+  }
+  return {
+    checks,
+    note: optionalText(qc.note),
   };
 }
 
@@ -95,16 +132,12 @@ function currentWorkflowStatus(repairJob) {
 
 function assertIntakeCompleteForDiagnosis(repairJob, action) {
   if (action !== REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS) return;
-
   const completion = evaluateIntakeCompletion(repairJob.deviceIntake);
   if (!completion.complete) {
     throw new RepairWorkflowCommandError(
       'REPAIR_INTAKE_INCOMPLETE',
       'Repair intake evidence must be complete before diagnosis can be queued',
-      {
-        repairJobId: repairJob.id,
-        completion,
-      }
+      { repairJobId: repairJob.id, completion }
     );
   }
 }
@@ -124,48 +157,33 @@ class TransitionRepairWorkflowService {
       ? requireText(command.expectedWorkflowStatus, 'expectedWorkflowStatus', 80)
       : null;
     const diagnosis = normalizeDiagnosis(action, command?.diagnosis);
+    const repairCompletion = normalizeRepairCompletion(action, command?.repairCompletion);
+    const qc = normalizeQc(action, command?.qc);
 
     return this.repository.transaction(async (repo) => {
       const repairJob = await repo.findRepairJob(repairJobId);
       if (!repairJob || repairJob.branchId !== branchId) {
-        throw new RepairWorkflowCommandError(
-          'REPAIR_JOB_NOT_FOUND',
-          'Repair job was not found in the actor branch',
-          { repairJobId, branchId }
-        );
+        throw new RepairWorkflowCommandError('REPAIR_JOB_NOT_FOUND', 'Repair job was not found in the actor branch', { repairJobId, branchId });
       }
       if (!repairJob.deviceId || !repairJob.device) {
-        throw new RepairWorkflowCommandError(
-          'REPAIR_DEVICE_REQUIRED',
-          'Repair workflow commands require a linked device passport',
-          { repairJobId }
-        );
+        throw new RepairWorkflowCommandError('REPAIR_DEVICE_REQUIRED', 'Repair workflow commands require a linked device passport', { repairJobId });
       }
 
       const workflowStatus = currentWorkflowStatus(repairJob);
       if (expectedWorkflowStatus && expectedWorkflowStatus !== workflowStatus) {
-        throw new RepairWorkflowCommandError(
-          'REPAIR_WORKFLOW_VERSION_CONFLICT',
-          'Repair workflow status changed before this command was applied',
-          {
-            repairJobId,
-            expectedWorkflowStatus,
-            actualWorkflowStatus: workflowStatus,
-          }
-        );
+        throw new RepairWorkflowCommandError('REPAIR_WORKFLOW_VERSION_CONFLICT', 'Repair workflow status changed before this command was applied', {
+          repairJobId,
+          expectedWorkflowStatus,
+          actualWorkflowStatus: workflowStatus,
+        });
       }
 
       assertIntakeCompleteForDiagnosis(repairJob, action);
-
       const transition = resolveRepairWorkflowTransition(workflowStatus, action);
       const legacyStatus = projectLegacyServiceStatus(transition.targetStatus);
       const occurredAt = command.occurredAt ? new Date(command.occurredAt) : new Date();
       if (Number.isNaN(occurredAt.getTime())) {
-        throw new RepairWorkflowCommandError(
-          'INVALID_REPAIR_WORKFLOW_COMMAND',
-          'occurredAt must be a valid date',
-          { field: 'occurredAt' }
-        );
+        throw new RepairWorkflowCommandError('INVALID_REPAIR_WORKFLOW_COMMAND', 'occurredAt must be a valid date', { field: 'occurredAt' });
       }
 
       const repairUpdate = diagnosis
@@ -176,11 +194,18 @@ class TransitionRepairWorkflowService {
               diagnosis.cause ? `สาเหตุ: ${diagnosis.cause}` : null,
               `แนวทาง: ${diagnosis.recommendedAction}`,
               diagnosis.customerNote ? `หมายเหตุลูกค้า: ${diagnosis.customerNote}` : null,
-            ]
-              .filter(Boolean)
-              .join('\n'),
+            ].filter(Boolean).join('\n'),
           }
-        : {};
+        : repairCompletion
+          ? {
+              technicianNotes: [
+                repairJob.technicianNotes || null,
+                `งานที่ดำเนินการ: ${repairCompletion.workPerformed}`,
+                `ผลหลังซ่อม: ${repairCompletion.resultSummary}`,
+                repairCompletion.technicianNote ? `หมายเหตุช่าง: ${repairCompletion.technicianNote}` : null,
+              ].filter(Boolean).join('\n'),
+            }
+          : {};
 
       const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus, repairUpdate);
       const event = await repo.publishPassportEvent({
@@ -193,7 +218,7 @@ class TransitionRepairWorkflowService {
         correlationId: command.correlationId || `repair-job:${repairJobId}`,
         causationId: command.causationId || commandKey,
         title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
-        description: command.note || diagnosis?.customerNote || null,
+        description: command.note || diagnosis?.customerNote || repairCompletion?.resultSummary || qc?.note || null,
         actorEmployeeId: employeeId,
         customerVisible: command.customerVisible !== false,
         metadata: {
@@ -206,6 +231,8 @@ class TransitionRepairWorkflowService {
           terminal: transition.terminal,
           note: command.note || null,
           diagnosis,
+          repairCompletion,
+          qc,
         },
         occurredAt,
       });
@@ -220,6 +247,8 @@ class TransitionRepairWorkflowService {
         passportEventId: event.id,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
         diagnosis,
+        repairCompletion,
+        qc,
         repairJob: mapRepairJob(updated),
       };
     });
@@ -232,3 +261,5 @@ module.exports.TransitionRepairWorkflowService = TransitionRepairWorkflowService
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
 module.exports.assertIntakeCompleteForDiagnosis = assertIntakeCompleteForDiagnosis;
 module.exports.normalizeDiagnosis = normalizeDiagnosis;
+module.exports.normalizeRepairCompletion = normalizeRepairCompletion;
+module.exports.normalizeQc = normalizeQc;
