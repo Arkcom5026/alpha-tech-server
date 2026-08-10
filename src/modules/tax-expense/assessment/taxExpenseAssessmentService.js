@@ -28,19 +28,11 @@ const vatSuggestionFor = (expense, item) => {
       reason: 'รายการนี้ไม่มีจำนวน VAT ที่บันทึกไว้',
     };
   }
-  if (expense.evidenceStatus === 'VERIFIED' && expense.documentNumber) {
-    return {
-      treatment: 'CREDITABLE',
-      confidence: 'MEDIUM',
-      reasonCode: 'VERIFIED_EVIDENCE_WITH_DOCUMENT',
-      reason: 'มีจำนวน VAT พร้อมเอกสารและหลักฐานที่ตรวจแล้ว แต่ยังต้องให้ผู้ใช้ยืนยันสิทธิภาษีซื้อ',
-    };
-  }
   return {
     treatment: 'PENDING_REVIEW',
-    confidence: 'LOW',
-    reasonCode: 'VAT_EVIDENCE_REVIEW_REQUIRED',
-    reason: 'มีจำนวน VAT แต่หลักฐานหรือข้อมูลเอกสารยังไม่เพียงพอสำหรับข้อเสนออัตโนมัติ',
+    confidence: expense.evidenceStatus === 'VERIFIED' && expense.documentNumber ? 'MEDIUM' : 'LOW',
+    reasonCode: 'INPUT_VAT_ELIGIBILITY_AUTHORITY_REQUIRED',
+    reason: 'มีจำนวน VAT แต่ยังต้องตรวจสิทธิภาษีซื้อและความถูกต้องของเอกสารก่อนยืนยัน CREDITABLE/NON_CREDITABLE',
   };
 };
 
