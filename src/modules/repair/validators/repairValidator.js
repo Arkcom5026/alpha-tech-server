@@ -141,6 +141,9 @@ function validateOpenWarrantyClaim(payload = {}) {
 
 function validateClaimStatusUpdate(payload = {}) {
   const status = requiredText(payload.status, 'status', 80).toUpperCase();
+  const expectedStatus = payload.expectedStatus
+    ? requiredText(payload.expectedStatus, 'expectedStatus', 80).toUpperCase()
+    : null;
   const resolution = payload.resolution
     ? requiredText(payload.resolution, 'resolution', 80).toUpperCase()
     : null;
@@ -156,6 +159,7 @@ function validateClaimStatusUpdate(payload = {}) {
 
   return {
     status,
+    expectedStatus,
     note: optionalText(payload.note, 4000),
     externalClaimRef: optionalText(payload.externalClaimRef, 255),
     trackingNumber: optionalText(payload.trackingNumber, 255),
