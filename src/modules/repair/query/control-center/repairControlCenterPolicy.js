@@ -25,9 +25,7 @@ function hasIntakeConditionPhoto(deviceIntake) {
 }
 
 function isIntakeComplete(job) {
-  return Boolean(
-    job?.deviceIntake?.consent && hasIntakeConditionPhoto(job.deviceIntake)
-  );
+  return Boolean(job?.deviceIntake?.consent);
 }
 
 function projectRepairOperationalState(job, now = new Date()) {
@@ -57,6 +55,7 @@ function projectRepairOperationalState(job, now = new Date()) {
     slaHours,
     overdue,
     intakeComplete: !intakeIncomplete,
+    intakeConditionPhotoPresent: hasIntakeConditionPhoto(job?.deviceIntake),
     exceptions,
     priority: overdue ? 'HIGH' : exceptions.length ? 'MEDIUM' : 'NORMAL',
   };
