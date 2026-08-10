@@ -36,6 +36,17 @@ test('monthly closing package projects tax expense assessment and evidence readi
   assert.match(source, /expensesReady/);
 });
 
+test('withholding readiness requires completed treatment and verified certificate evidence', () => {
+  const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
+  assert.match(source, /'WITHHOLDING_REQUIRED'::"TaxExpenseWhtTreatment"/);
+  assert.match(source, /'WITHHELD'::"TaxExpenseWhtTreatment"/);
+  assert.match(source, /'WITHHOLDING_CERTIFICATE'::"TaxExpenseAttachmentType"/);
+  assert.match(source, /'VERIFIED'::"TaxExpenseEvidenceStatus"/);
+  assert.match(source, /withholdingPendingCount/);
+  assert.match(source, /missingWithholdingCertificateCount/);
+  assert.match(source, /withholdingReady/);
+});
+
 test('accounting office package remains branch and period scoped across authorities', () => {
   const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
   assert.match(source, /record\."branchId" = \$\{normalizedBranchId\}/);
@@ -54,11 +65,12 @@ test('credit note adjustments reduce output and input package totals', () => {
   assert.match(source, /adjustmentCount/);
 });
 
-test('ready for accounting office requires output input expenses and locked period', () => {
+test('ready for accounting office requires output input expenses WHT and locked period', () => {
   const source = read('src/modules/tax/accountingOffice/accountingOfficePackageService.js');
   assert.match(source, /readiness\.outputVatReady/);
   assert.match(source, /readiness\.inputVatReady/);
   assert.match(source, /readiness\.expensesReady/);
+  assert.match(source, /readiness\.withholdingReady/);
   assert.match(source, /readiness\.periodLockedOrSubmitted/);
   assert.match(source, /readyForAccountingOffice/);
   assert.match(source, /authority: 'MONTHLY_TAX_CLOSING_PACKAGE'/);
