@@ -28,8 +28,8 @@ ALTER TABLE "WithholdingTaxTreatmentEvent"
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxTreatmentEvent"
-  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseItemId_fkey"
-  FOREIGN KEY ("taxExpenseItemId") REFERENCES "TaxExpenseItem"("id")
+  ADD CONSTRAINT "WithholdingTaxTreatmentEvent_taxExpenseItemId_branchId_fkey"
+  FOREIGN KEY ("taxExpenseItemId", "branchId") REFERENCES "TaxExpenseItem"("id", "branchId")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "WithholdingTaxTreatmentEvent"
