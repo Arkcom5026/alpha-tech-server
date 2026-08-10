@@ -105,7 +105,7 @@ test('persists structured diagnosis before moving to customer approval', async (
   assert.equal(result.diagnosis.estimatedCost, 1800);
 });
 
-test('rejects incomplete diagnosis before any write', async () => {
+test('rejects incomplete diagnosis before any write', () => {
   const job = repairJob({
     status: 'IN_PROGRESS',
     device: {
@@ -116,8 +116,8 @@ test('rejects incomplete diagnosis before any write', async () => {
   const repo = repositoryFor(job);
   const service = new TransitionRepairWorkflowService(repo);
 
-  await assert.rejects(
-    service.execute(
+  assert.throws(
+    () => service.execute(
       { branchId: 3, employeeId: 7 },
       {
         repairJobId: 41,
