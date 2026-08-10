@@ -39,6 +39,31 @@ test('covers the canonical workflow-command path up to digital handover', () => 
   assert.equal(closed.targetStatus, REPAIR_WORKFLOW_STATUS.CLOSED);
 });
 
+test('supports an optional pre-agreed service path without removing inspection', () => {
+  const receivedActions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.RECEIVED);
+  assert.deepEqual(
+    receivedActions.map((item) => item.action),
+    [
+      REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
+      REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
+      REPAIR_WORKFLOW_ACTION.CANCEL,
+    ]
+  );
+
+  const fastPath = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+  );
+  assert.equal(fastPath.targetStatus, REPAIR_WORKFLOW_STATUS.APPROVED);
+  assert.equal(fastPath.passportEventType, 'REPAIR_STATUS_CHANGED');
+
+  const standardPath = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS
+  );
+  assert.equal(standardPath.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_DIAGNOSIS);
+});
+
 test('supports waiting for parts and resuming repair', () => {
   const waiting = resolveRepairWorkflowTransition(
     REPAIR_WORKFLOW_STATUS.REPAIRING,
@@ -88,7 +113,11 @@ test('rejects illegal transitions and exposes available actions', () => {
       assert.equal(error.details.status, REPAIR_WORKFLOW_STATUS.RECEIVED);
       assert.deepEqual(
         error.details.availableActions.map((item) => item.action),
-        [REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS, REPAIR_WORKFLOW_ACTION.CANCEL]
+        [
+          REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
+          REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
+          REPAIR_WORKFLOW_ACTION.CANCEL,
+        ]
       );
       return true;
     }
