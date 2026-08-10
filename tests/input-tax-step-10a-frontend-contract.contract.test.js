@@ -53,6 +53,10 @@ assert.equal(byId.get('filing-remove').concurrency.versionField, 'version|expect
 assert.equal(byId.get('input-vat-report').bounds.maxRows, 2000);
 assert.equal(byId.get('input-tax-overview').bounds.maxExplicitRangeDays, 366);
 assert.equal(byId.get('tax-period-transition').replay, 'MUTATION_REPLAY_SAFE');
+assert.ok(byId.get('tax-period-transition').errors.includes('TAX_PERIOD_INPUT_FILING_INCOMPLETE'));
+assert.ok(byId.get('tax-period-transition').errors.includes('TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED'));
+assert.equal(contract.InputTaxFrontendErrorCode.TAX_PERIOD_INPUT_FILING_INCOMPLETE, 'TAX_PERIOD_INPUT_FILING_INCOMPLETE');
+assert.equal(contract.InputTaxFrontendErrorCode.TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED, 'TAX_PERIOD_INPUT_FILING_NOT_SUBMITTED');
 assert.ok(contract.unavailableSurfaces.some((item) => item.id === 'investigation-workspace'));
 assert.ok(contract.compatibilityAliases.every((item) => item.aliasBase === '/api/tax'));
 
