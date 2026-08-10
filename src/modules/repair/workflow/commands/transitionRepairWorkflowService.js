@@ -32,7 +32,7 @@ function requirePositiveInteger(value, field) {
   return parsed;
 }
 
-function requireText(value, field) {
+function requireText(value, field, maxLength = 4000) {
   const normalized = String(value ?? '').trim();
   if (!normalized) {
     throw new RepairWorkflowCommandError(
@@ -41,7 +41,51 @@ function requireText(value, field) {
       { field }
     );
   }
+  if (normalized.length > maxLength) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      `${field} is too long`,
+      { field, maxLength }
+    );
+  }
   return normalized;
+}
+
+function optionalText(value, maxLength = 4000) {
+  if (value === undefined || value === null || value === '') return null;
+  const normalized = String(value).trim();
+  if (normalized.length > maxLength) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      'diagnosis text is too long',
+      { maxLength }
+    );
+  }
+  return normalized || null;
+}
+
+function normalizeDiagnosis(action, rawDiagnosis) {
+  if (action !== REPAIR_WORKFLOW_ACTION.COMPLETE_DIAGNOSIS) return null;
+  const diagnosis = rawDiagnosis && typeof rawDiagnosis === 'object' ? rawDiagnosis : {};
+  const estimatedCost = Number(diagnosis.estimatedCost ?? 0);
+  if (!Number.isFinite(estimatedCost) || estimatedCost < 0) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      'diagnosis.estimatedCost must be a non-negative number',
+      { field: 'diagnosis.estimatedCost' }
+    );
+  }
+
+  return {
+    findings: requireText(diagnosis.findings, 'diagnosis.findings'),
+    cause: optionalText(diagnosis.cause),
+    recommendedAction: requireText(
+      diagnosis.recommendedAction,
+      'diagnosis.recommendedAction'
+    ),
+    estimatedCost,
+    customerNote: optionalText(diagnosis.customerNote),
+  };
 }
 
 function currentWorkflowStatus(repairJob) {
@@ -74,11 +118,12 @@ class TransitionRepairWorkflowService {
     const repairJobId = requirePositiveInteger(command?.repairJobId, 'repairJobId');
     const branchId = requirePositiveInteger(actor?.branchId, 'actor.branchId');
     const employeeId = requirePositiveInteger(actor?.employeeId, 'actor.employeeId');
-    const action = requireText(command?.action, 'action');
-    const commandKey = requireText(command?.commandKey, 'commandKey');
+    const action = requireText(command?.action, 'action', 80);
+    const commandKey = requireText(command?.commandKey, 'commandKey', 160);
     const expectedWorkflowStatus = command?.expectedWorkflowStatus
-      ? requireText(command.expectedWorkflowStatus, 'expectedWorkflowStatus')
+      ? requireText(command.expectedWorkflowStatus, 'expectedWorkflowStatus', 80)
       : null;
+    const diagnosis = normalizeDiagnosis(action, command?.diagnosis);
 
     return this.repository.transaction(async (repo) => {
       const repairJob = await repo.findRepairJob(repairJobId);
@@ -123,7 +168,21 @@ class TransitionRepairWorkflowService {
         );
       }
 
-      const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus);
+      const repairUpdate = diagnosis
+        ? {
+            estimatedCost: diagnosis.estimatedCost,
+            technicianNotes: [
+              `ผลตรวจ: ${diagnosis.findings}`,
+              diagnosis.cause ? `สาเหตุ: ${diagnosis.cause}` : null,
+              `แนวทาง: ${diagnosis.recommendedAction}`,
+              diagnosis.customerNote ? `หมายเหตุลูกค้า: ${diagnosis.customerNote}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          }
+        : {};
+
+      const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus, repairUpdate);
       const event = await repo.publishPassportEvent({
         deviceId: repairJob.deviceId,
         branchId,
@@ -134,7 +193,7 @@ class TransitionRepairWorkflowService {
         correlationId: command.correlationId || `repair-job:${repairJobId}`,
         causationId: command.causationId || commandKey,
         title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
-        description: command.note || null,
+        description: command.note || diagnosis?.customerNote || null,
         actorEmployeeId: employeeId,
         customerVisible: command.customerVisible !== false,
         metadata: {
@@ -146,6 +205,7 @@ class TransitionRepairWorkflowService {
           legacyServiceStatus: legacyStatus,
           terminal: transition.terminal,
           note: command.note || null,
+          diagnosis,
         },
         occurredAt,
       });
@@ -159,6 +219,7 @@ class TransitionRepairWorkflowService {
         terminal: transition.terminal,
         passportEventId: event.id,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
+        diagnosis,
         repairJob: mapRepairJob(updated),
       };
     });
@@ -170,3 +231,4 @@ module.exports.RepairWorkflowCommandError = RepairWorkflowCommandError;
 module.exports.TransitionRepairWorkflowService = TransitionRepairWorkflowService;
 module.exports.currentWorkflowStatus = currentWorkflowStatus;
 module.exports.assertIntakeCompleteForDiagnosis = assertIntakeCompleteForDiagnosis;
+module.exports.normalizeDiagnosis = normalizeDiagnosis;
