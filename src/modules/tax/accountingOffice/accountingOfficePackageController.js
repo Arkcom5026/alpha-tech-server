@@ -1,6 +1,7 @@
 'use strict';
 
 const service = require('./accountingOfficePackageService');
+const withholdingTaxService = require('../withholdingTax/withholdingTaxService');
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -33,16 +34,61 @@ const requireBranchAuthority = (req) => {
   return requestedBranchId;
 };
 
+const LEGACY_WHT_EXCEPTION_CODES = new Set([
+  'WITHHOLDING_NOT_COMPLETED',
+  'WITHHOLDING_CERTIFICATE_MISSING',
+]);
+
+const composeWithholdingAuthority = (closingPackage, withholdingWorkspace) => {
+  const legacyExceptions = Array.isArray(closingPackage.exceptions)
+    ? closingPackage.exceptions.filter((entry) => !LEGACY_WHT_EXCEPTION_CODES.has(entry.code))
+    : [];
+  const whtExceptions = (withholdingWorkspace.exceptions || []).map((entry) => Object.freeze({
+    ...entry,
+    severity: entry.severity === 'BLOCKING' ? 'BLOCKER' : entry.severity,
+  }));
+  const readiness = {
+    ...closingPackage.readiness,
+    withholdingComplete: withholdingWorkspace.readiness?.certificatesReady === true,
+    withholdingEvidenceComplete: withholdingWorkspace.readiness?.certificatesReady === true,
+    withholdingFilingsSubmitted: withholdingWorkspace.readiness?.filingsReady === true,
+    withholdingReady: withholdingWorkspace.readiness?.readyForAccountant === true,
+  };
+  readiness.readyForAccountingOffice = Boolean(
+    readiness.outputVatReady
+    && readiness.inputVatReady
+    && readiness.expensesReady
+    && readiness.withholdingReady
+    && readiness.periodLockedOrSubmitted,
+  );
+
+  return Object.freeze({
+    ...closingPackage,
+    authorities: Object.freeze({
+      ...(closingPackage.authorities || {}),
+      withholding: 'WITHHOLDING_TAX_RECORD_CERTIFICATE_AND_FILING',
+    }),
+    readiness: Object.freeze(readiness),
+    exceptions: Object.freeze([...legacyExceptions, ...whtExceptions]),
+    withholdingSummary: withholdingWorkspace.summary,
+    withholdingFilings: withholdingWorkspace.filings,
+    withholdingRows: withholdingWorkspace.rows,
+  });
+};
+
 const getPackage = async (req, res, next) => {
   try {
-    const data = await service.loadAccountingOfficePackage({
-      branchId: requireBranchAuthority(req),
-      taxPeriodId: req.params.taxPeriodId,
-    });
+    const branchId = requireBranchAuthority(req);
+    const args = { branchId, taxPeriodId: req.params.taxPeriodId };
+    const [closingPackage, withholdingWorkspace] = await Promise.all([
+      service.loadAccountingOfficePackage(args),
+      withholdingTaxService.loadWithholdingTaxWorkspace(args),
+    ]);
+    const data = composeWithholdingAuthority(closingPackage, withholdingWorkspace);
     return res.json({ ok: true, data });
   } catch (error) {
     return next(error);
   }
 };
 
-module.exports = Object.freeze({ getPackage });
+module.exports = Object.freeze({ getPackage, composeWithholdingAuthority });
