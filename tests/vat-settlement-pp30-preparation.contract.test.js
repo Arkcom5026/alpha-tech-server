@@ -84,6 +84,15 @@ test('carry-forward Prisma foundation is additive and tax-period scoped', () => 
   assert.doesNotMatch(migration, /INSERT INTO "VatCarryForwardAuthority"/);
 });
 
+test('VAT carry-forward migration verifier casts regclass to text and enforces zero backfill', () => {
+  const source = read('scripts/verify-vat-carry-forward-migration.js');
+  assert.match(source, /to_regclass\('public\."\$\{TABLE_NAME\}"'\)::text AS "tableName"/);
+  assert.match(source, /finished_at/);
+  assert.match(source, /rolled_back_at/);
+  assert.match(source, /rowCount !== 0/);
+  assert.match(source, /must not backfill authority rows/);
+});
+
 test('VAT settlement exposes reconciliation and readiness blockers', () => {
   const source = read('src/modules/tax/settlement/vatSettlementService.js');
   assert.match(source, /outputReconciliationDifference/);
