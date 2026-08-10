@@ -22,9 +22,6 @@ const {
   createExternalDeviceIntake,
 } = require('../external-intake/createExternalDeviceIntakeController');
 const {
-  updateRepairJobStatus,
-} = require('../status/updateRepairJobStatusController');
-const {
   transitionRepairWorkflow,
 } = require('../workflow/http/transitionRepairWorkflowController');
 const {
@@ -101,8 +98,11 @@ router.get('/jobs/:id/handover', allowRepairCapabilities(REPAIR_CAPABILITY.READ)
 router.post('/jobs/:id/handover/finalize', allowRepairCapabilities(REPAIR_CAPABILITY.HANDOVER), finalizeRepairHandover);
 router.get('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getIntakeEvidence);
 router.post('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), intakeEvidenceUpload, saveIntakeEvidence);
+
+// Repair workflow commands are the only staff authority for advancing repair runtime state.
+// The legacy PATCH /jobs/:id/status endpoint is intentionally not mounted because it can
+// bypass diagnosis, approval, QC, claim-hold and handover workflow gates.
 router.post('/jobs/:id/workflow/commands', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), transitionRepairWorkflow);
-router.patch('/jobs/:id/status', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), updateRepairJobStatus);
 router.post('/jobs/:id/parts', allowRepairCapabilities(REPAIR_CAPABILITY.PARTS), addRepairPart);
 router.get('/jobs/:id/warranty-claim-options', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), getWarrantyClaimOptions);
 router.post('/jobs/:id/warranty-claims', allowRepairCapabilities(REPAIR_CAPABILITY.CLAIM), openWarrantyClaim);
