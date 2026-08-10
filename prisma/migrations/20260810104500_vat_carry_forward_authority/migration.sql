@@ -24,6 +24,8 @@ CREATE TABLE "VatCarryForwardAuthority" (
 
 CREATE UNIQUE INDEX "VatCarryForwardAuthority_branchId_taxPeriodId_key"
   ON "VatCarryForwardAuthority"("branchId", "taxPeriodId");
+CREATE UNIQUE INDEX "VatCarryForwardAuthority_taxPeriodId_branchId_key"
+  ON "VatCarryForwardAuthority"("taxPeriodId", "branchId");
 CREATE INDEX "VatCarryForwardAuthority_branchId_status_idx"
   ON "VatCarryForwardAuthority"("branchId", "status");
 CREATE INDEX "VatCarryForwardAuthority_sourceTaxPeriodId_branchId_idx"
