@@ -2,6 +2,7 @@
 
 const service = require('./withholdingTaxService');
 const treatmentService = require('./withholdingTaxTreatmentService');
+const { normalizeWithholdingTaxWorkspace } = require('./withholdingTaxReadiness');
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -36,8 +37,8 @@ const employeeId = (req) => Number(req.user?.employeeId || req.user?.employeePro
 
 const getWorkspace = async (req, res, next) => {
   try {
-    const data = await service.loadWithholdingTaxWorkspace({ branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId });
-    return res.json({ ok: true, data });
+    const workspace = await service.loadWithholdingTaxWorkspace({ branchId: requireAuthority(req), taxPeriodId: req.params.taxPeriodId });
+    return res.json({ ok: true, data: normalizeWithholdingTaxWorkspace(workspace) });
   } catch (error) { return next(error); }
 };
 
