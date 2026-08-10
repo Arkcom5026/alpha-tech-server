@@ -70,17 +70,29 @@ const fakeClient = ({ expense, submittedPeriod = null, updateCounts = [1] } = {}
   };
 };
 
-test('suggestion remains proposal-only and preserves WHT workflow authority', async () => {
+test('suggestion remains proposal-only, eligibility-gated and preserves WHT workflow authority', async () => {
   const { client } = fakeClient({ expense: expenseFixture() });
   const service = new TaxExpenseAssessmentService(client);
   const result = await service.getSuggestion({ branchId: 2, taxExpenseId: 41 });
 
   assert.equal(result.suggestion.autoFinalize, false);
   assert.equal(result.suggestion.authority, 'RULE_ASSISTED_HUMAN_CONFIRMATION');
-  assert.equal(result.suggestion.items[0].suggestions.vat.treatment, 'CREDITABLE');
+  assert.equal(result.suggestion.items[0].suggestions.vat.treatment, 'PENDING_REVIEW');
   assert.equal(result.suggestion.items[0].suggestions.vat.confidence, 'MEDIUM');
+  assert.equal(result.suggestion.items[0].suggestions.vat.reasonCode, 'INPUT_VAT_ELIGIBILITY_AUTHORITY_REQUIRED');
   assert.equal(result.suggestion.items[0].suggestions.cit.treatment, 'PENDING_REVIEW');
   assert.equal(result.suggestion.items[0].suggestions.wht.action, 'REVIEW_IN_WHT_WORKSPACE');
+});
+
+test('zero VAT is safely suggested as out of scope', async () => {
+  const item = { ...expenseFixture().items[0], vatAmount: '0.00', withholdingTaxAmount: '0.00', whtTreatment: 'NOT_APPLICABLE' };
+  const { client } = fakeClient({ expense: expenseFixture({ items: [item] }) });
+  const service = new TaxExpenseAssessmentService(client);
+  const result = await service.getSuggestion({ branchId: 2, taxExpenseId: 41 });
+
+  assert.equal(result.suggestion.items[0].suggestions.vat.treatment, 'OUT_OF_SCOPE');
+  assert.equal(result.suggestion.items[0].suggestions.vat.confidence, 'HIGH');
+  assert.equal(result.suggestion.items[0].suggestions.vat.reasonCode, 'NO_VAT_AMOUNT_RECORDED');
 });
 
 test('human confirmation writes VAT/CIT only, creates finalized version and keeps WHT separate', async () => {
