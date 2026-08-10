@@ -125,6 +125,16 @@ function normalizeQc(action, rawQc) {
   };
 }
 
+function normalizeExceptionalNote(action, note) {
+  if (action === REPAIR_WORKFLOW_ACTION.CANCEL) {
+    return requireText(note, 'note', 2000);
+  }
+  if (action === REPAIR_WORKFLOW_ACTION.REOPEN_AFTER_REJECTION) {
+    return requireText(note, 'note', 2000);
+  }
+  return optionalText(note, 2000);
+}
+
 function currentWorkflowStatus(repairJob) {
   const latest = repairJob.device?.passportEvents?.[0];
   return latest?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
@@ -159,6 +169,7 @@ class TransitionRepairWorkflowService {
     const diagnosis = normalizeDiagnosis(action, command?.diagnosis);
     const repairCompletion = normalizeRepairCompletion(action, command?.repairCompletion);
     const qc = normalizeQc(action, command?.qc);
+    const note = normalizeExceptionalNote(action, command?.note);
 
     return this.repository.transaction(async (repo) => {
       const repairJob = await repo.findRepairJob(repairJobId);
@@ -205,7 +216,16 @@ class TransitionRepairWorkflowService {
                 repairCompletion.technicianNote ? `หมายเหตุช่าง: ${repairCompletion.technicianNote}` : null,
               ].filter(Boolean).join('\n'),
             }
-          : {};
+          : [REPAIR_WORKFLOW_ACTION.CANCEL, REPAIR_WORKFLOW_ACTION.REOPEN_AFTER_REJECTION].includes(action)
+            ? {
+                technicianNotes: [
+                  repairJob.technicianNotes || null,
+                  action === REPAIR_WORKFLOW_ACTION.CANCEL
+                    ? `ยกเลิกงาน: ${note}`
+                    : `เปิดวินิจฉัยใหม่หลังลูกค้าไม่อนุมัติ: ${note}`,
+                ].filter(Boolean).join('\n'),
+              }
+            : {};
 
       const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus, repairUpdate);
       const event = await repo.publishPassportEvent({
@@ -218,7 +238,7 @@ class TransitionRepairWorkflowService {
         correlationId: command.correlationId || `repair-job:${repairJobId}`,
         causationId: command.causationId || commandKey,
         title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
-        description: command.note || diagnosis?.customerNote || repairCompletion?.resultSummary || qc?.note || null,
+        description: note || diagnosis?.customerNote || repairCompletion?.resultSummary || qc?.note || null,
         actorEmployeeId: employeeId,
         customerVisible: command.customerVisible !== false,
         metadata: {
@@ -229,7 +249,7 @@ class TransitionRepairWorkflowService {
           workflowTargetStatus: transition.targetStatus,
           legacyServiceStatus: legacyStatus,
           terminal: transition.terminal,
-          note: command.note || null,
+          note,
           diagnosis,
           repairCompletion,
           qc,
@@ -263,3 +283,4 @@ module.exports.assertIntakeCompleteForDiagnosis = assertIntakeCompleteForDiagnos
 module.exports.normalizeDiagnosis = normalizeDiagnosis;
 module.exports.normalizeRepairCompletion = normalizeRepairCompletion;
 module.exports.normalizeQc = normalizeQc;
+module.exports.normalizeExceptionalNote = normalizeExceptionalNote;
