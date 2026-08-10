@@ -142,7 +142,7 @@ test('replacement consumption conflict aborts before device and claim writes', a
         replacementStockItemId: 90,
       }
     ),
-    (error) => error.code === 'CONFLICT'
+    (error) => error.code === 'REPAIR_CONFLICT'
   );
   assert.equal(deviceWrites, 0);
   assert.equal(claimWrites, 0);
