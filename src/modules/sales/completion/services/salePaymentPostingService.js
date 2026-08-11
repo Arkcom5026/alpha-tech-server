@@ -1,16 +1,38 @@
 const { Prisma } = require('../../../../../lib/prisma');
 const { SaleCompletionError: SalesError } = require('../contracts/saleCompletionError');
 const { assertDepositBalance } = require('../policies/saleDepositPolicy');
+const {
+  calculateAvailableCustomerMoney,
+} = require('../../../customer-money/balance/customerMoneySourcePoolService');
+const {
+  updateCustomerMoneyBalance,
+} = require('../../../customer-money/balance/updateCustomerMoneyBalanceService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../../customer-money/shared/customerMoneyTransactionLock');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
 const n = (value) => Number(value || 0);
 
+const refreshCustomerMoneyBalance = async (tx, { branchId, customerId }) => {
+  if (!tx?.customerDeposit?.findMany || !tx?.customerReceipt?.findMany) return null;
+  const availableAmount = await calculateAvailableCustomerMoney(tx, { branchId, customerId });
+  await updateCustomerMoneyBalance({ client: tx, branchId, customerId, availableAmount });
+  return availableAmount;
+};
+
 const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
+  const customerId = Number(sale?.customerId);
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    throw new SalesError(400, 'DEPOSIT_CUSTOMER_REQUIRED', 'Deposit payment requires a customer sale');
+  }
+
+  await acquireCustomerMoneyTransactionLock(tx, customerId);
   const deposit = await tx.customerDeposit.findFirst({
     where: {
       id: item.customerDepositId,
       branchId,
-      customerId: sale.customerId,
+      customerId,
       status: 'ACTIVE',
     },
     select: { id: true, usedAmount: true, totalAmount: true },
@@ -42,6 +64,7 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
       amountUsed: D(item.amount),
     },
   });
+  await refreshCustomerMoneyBalance(tx, { branchId, customerId });
 };
 
 const acquireSalePaymentProjectionLock = async (tx, saleId) => {
@@ -161,6 +184,7 @@ module.exports = {
   postPaymentEvidence,
   projectSalePaymentStatus,
   consumeDeposit,
+  refreshCustomerMoneyBalance,
   acquireSalePaymentProjectionLock,
   aggregateActiveSettlementAmount,
   findLatestActiveSettlement,
