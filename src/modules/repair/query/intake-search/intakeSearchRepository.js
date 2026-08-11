@@ -38,6 +38,25 @@ const deviceSelect = {
       },
     },
   },
+  repairJobs: {
+    take: 1,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      jobNo: true,
+      status: true,
+      createdAt: true,
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          companyName: true,
+          user: { select: { loginId: true, email: true } },
+        },
+      },
+    },
+  },
+  _count: { select: { repairJobs: true } },
 };
 
 const registeredDeviceSelect = {
@@ -66,8 +85,17 @@ const registeredDeviceSelect = {
       jobNo: true,
       status: true,
       createdAt: true,
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          companyName: true,
+          user: { select: { loginId: true, email: true } },
+        },
+      },
     },
   },
+  _count: { select: { repairJobs: true } },
 };
 
 const customerSelect = {
@@ -80,6 +108,16 @@ const customerSelect = {
   user: { select: { loginId: true, email: true } },
 };
 
+const customerIdentityWhere = (insensitive) => ({
+  OR: [
+    { name: insensitive },
+    { companyName: insensitive },
+    { taxId: insensitive },
+    { user: { loginId: insensitive } },
+    { user: { email: insensitive } },
+  ],
+});
+
 class IntakeSearchRepository {
   constructor(client = prisma) {
     this.prisma = client;
@@ -88,6 +126,7 @@ class IntakeSearchRepository {
   async search(branchId, query, limit = 10) {
     const insensitive = { contains: query, mode: 'insensitive' };
     const normalizedBranchId = Number(branchId);
+    const customerIdentity = customerIdentityWhere(insensitive);
 
     const [devices, registeredDevices, customers] = await Promise.all([
       this.prisma.stockItem.findMany({
@@ -99,6 +138,8 @@ class IntakeSearchRepository {
             { tag: insensitive },
             { product: { name: insensitive } },
             { product: { brand: { name: insensitive } } },
+            { saleItems: { some: { sale: { customer: customerIdentity } } } },
+            { repairJobs: { some: { customer: customerIdentity } } },
           ],
         },
         select: deviceSelect,
@@ -115,6 +156,8 @@ class IntakeSearchRepository {
             { imei: insensitive },
             { brand: insensitive },
             { model: insensitive },
+            { currentOwner: { is: customerIdentity } },
+            { repairJobs: { some: { customer: customerIdentity } } },
           ],
         },
         select: registeredDeviceSelect,
@@ -125,15 +168,7 @@ class IntakeSearchRepository {
         where: {
           AND: [
             buildCustomerBranchEvidence(normalizedBranchId),
-            {
-              OR: [
-                { name: insensitive },
-                { companyName: insensitive },
-                { taxId: insensitive },
-                { user: { loginId: insensitive } },
-                { user: { email: insensitive } },
-              ],
-            },
+            customerIdentity,
           ],
         },
         select: customerSelect,
@@ -148,3 +183,6 @@ class IntakeSearchRepository {
 
 module.exports = new IntakeSearchRepository();
 module.exports.IntakeSearchRepository = IntakeSearchRepository;
+module.exports.customerIdentityWhere = customerIdentityWhere;
+module.exports.deviceSelect = deviceSelect;
+module.exports.registeredDeviceSelect = registeredDeviceSelect;

@@ -14,8 +14,30 @@ const projectCustomer = (customer) => ({
   addressDetail: customer.addressDetail || '',
 });
 
+const projectCustomerSummary = (customer) =>
+  customer
+    ? {
+        id: customer.id,
+        name: customer.name || '',
+        companyName: customer.companyName || '',
+        phone: customer.user?.loginId || '',
+        email: customer.user?.email || '',
+      }
+    : null;
+
+const projectRepairJob = (repairJob) =>
+  repairJob
+    ? {
+        id: repairJob.id,
+        jobNo: repairJob.jobNo,
+        status: repairJob.status,
+        createdAt: repairJob.createdAt,
+      }
+    : null;
+
 const projectDevice = (device, query) => {
   const sale = device.saleItems?.[0]?.sale || null;
+  const latestRepairJob = device.repairJobs?.[0] || null;
   const exactIdentifierMatch = [device.barcode, device.serialNumber, device.tag]
     .filter(Boolean)
     .some((value) => normalize(value) === normalize(query));
@@ -30,16 +52,11 @@ const projectDevice = (device, query) => {
     status: device.status,
     exactIdentifierMatch,
     product: device.product,
-    latestCustomer: sale?.customer
-      ? {
-          id: sale.customer.id,
-          name: sale.customer.name || '',
-          companyName: sale.customer.companyName || '',
-          phone: sale.customer.user?.loginId || '',
-          email: sale.customer.user?.email || '',
-        }
-      : null,
-    latestRepairJob: null,
+    latestCustomer:
+      projectCustomerSummary(latestRepairJob?.customer) ||
+      projectCustomerSummary(sale?.customer),
+    latestRepairJob: projectRepairJob(latestRepairJob),
+    repairHistoryCount: Number(device._count?.repairJobs || 0),
     soldAt: sale?.soldAt || null,
   };
 };
@@ -69,16 +86,10 @@ const projectRegisteredDevice = (device, query) => {
       brand: device.brand ? { id: null, name: device.brand } : null,
       productType: null,
     },
-    latestCustomer: owner
-      ? {
-          id: owner.id,
-          name: owner.name || '',
-          companyName: owner.companyName || '',
-          phone: owner.user?.loginId || '',
-          email: owner.user?.email || '',
-        }
-      : null,
-    latestRepairJob,
+    latestCustomer:
+      projectCustomerSummary(owner) || projectCustomerSummary(latestRepairJob?.customer),
+    latestRepairJob: projectRepairJob(latestRepairJob),
+    repairHistoryCount: Number(device._count?.repairJobs || 0),
     soldAt: null,
   };
 };
@@ -96,7 +107,11 @@ class IntakeSearchService {
       ...(result.registeredDevices || []).map((device) =>
         projectRegisteredDevice(device, query)
       ),
-    ].sort((a, b) => Number(b.exactIdentifierMatch) - Number(a.exactIdentifierMatch));
+    ].sort((a, b) => {
+      const exactDifference = Number(b.exactIdentifierMatch) - Number(a.exactIdentifierMatch);
+      if (exactDifference !== 0) return exactDifference;
+      return Number(b.repairHistoryCount || 0) - Number(a.repairHistoryCount || 0);
+    });
     const customers = (result.customers || []).map(projectCustomer);
 
     return {
@@ -117,3 +132,5 @@ module.exports.IntakeSearchService = IntakeSearchService;
 module.exports.projectDevice = projectDevice;
 module.exports.projectRegisteredDevice = projectRegisteredDevice;
 module.exports.projectCustomer = projectCustomer;
+module.exports.projectCustomerSummary = projectCustomerSummary;
+module.exports.projectRepairJob = projectRepairJob;
