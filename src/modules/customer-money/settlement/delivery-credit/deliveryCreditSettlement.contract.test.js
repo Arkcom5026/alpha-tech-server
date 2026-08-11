@@ -12,6 +12,8 @@ const queryService = read('listEligibleDeliveryCreditsService.js');
 const createService = read('createDeliveryCreditSettlementService.js');
 const detailQueryService = read('queryDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
+const sourcePool = fs.readFileSync(path.join(__dirname, '../../balance/customerMoneySourcePoolService.js'), 'utf8');
+const salePaymentProjection = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/salePaymentPostingService.js'), 'utf8');
 
 test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
@@ -27,9 +29,9 @@ test('write validation uses the same active credit sale eligibility', () => {
   assert.match(createService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
 });
 
-test('eligible delivery credit query is read-only and exposes item references', () => {
+test('eligible delivery credit query is read-only and derives customer money from source authority', () => {
   assert.match(queryService, /prisma\.sale\.findMany/);
-  assert.match(queryService, /prisma\.customerMoneyBalance\.findUnique/);
+  assert.match(queryService, /calculateAvailableCustomerMoney/);
   assert.doesNotMatch(queryService, /\.create\(|\.update\(|\.delete\(/);
   assert.match(queryService, /lineType:\s*'STOCK'/);
   assert.match(queryService, /lineType:\s*'SIMPLE'/);
@@ -57,7 +59,19 @@ test('settlement command rejects the same sale line more than once', () => {
   );
 });
 
-test('settlement write is atomic and serialized across customer money and sale payment projection', () => {
+test('settlement consumes receipt/deposit source projections instead of a free-floating balance', () => {
+  assert.match(sourcePool, /sourceType:\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(sourcePool, /sourceType:\s*'CUSTOMER_DEPOSIT'/);
+  assert.match(sourcePool, /remainingAmount:\s*\{ decrement: chunkAmount \}/);
+  assert.match(sourcePool, /allocatedAmount:\s*\{ increment: chunkAmount \}/);
+  assert.match(sourcePool, /usedAmount:\s*\{ increment: chunkAmount \}/);
+  assert.match(createService, /consumeCustomerMoneySources/);
+  assert.match(createService, /sourceType:\s*allocation\.sourceType/);
+  assert.match(createService, /sourceId:\s*allocation\.sourceId/);
+  assert.doesNotMatch(createService, /sourceType:\s*'CUSTOMER_MONEY_BALANCE'/);
+});
+
+test('settlement write is atomic and uses the shared sale payment projection', () => {
   assert.match(createService, /prisma\.\$transaction/);
   assert.match(createService, /pg_advisory_xact_lock/);
   assert.match(createService, /customerMoneySettlement\.create/);
@@ -65,9 +79,16 @@ test('settlement write is atomic and serialized across customer money and sale p
   assert.match(createService, /eventType:\s*'MONEY_APPLIED'/);
   assert.match(createService, /direction:\s*'DEBIT'/);
   assert.match(createService, /updateCustomerMoneyBalance/);
-  assert.match(createService, /tx\.sale\.update/);
-  assert.match(createService, /paidAmount:\s*nextPaid/);
-  assert.match(createService, /statusPayment:\s*derivePaymentStatus/);
+  assert.match(createService, /projectSalePaymentStatus\(tx, saleId\)/);
+  assert.doesNotMatch(createService, /tx\.sale\.update/);
+});
+
+test('shared sale payment projection includes active delivery credit settlements and serializes projection', () => {
+  assert.match(salePaymentProjection, /pg_advisory_xact_lock/);
+  assert.match(salePaymentProjection, /customerMoneySettlementLine\.aggregate/);
+  assert.match(salePaymentProjection, /settlement:\s*\{ status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' \}/);
+  assert.match(salePaymentProjection, /\.plus\(D\(settlementAggregate\._sum\.appliedAmount \|\| 0\)\)/);
+  assert.match(salePaymentProjection, /data:\s*\{ paid, paidAt, paidAmount, statusPayment \}/);
 });
 
 test('fully paid referenced sales become tax-document ready without creating a new tax engine', () => {
@@ -77,10 +98,9 @@ test('fully paid referenced sales become tax-document ready without creating a n
   assert.doesNotMatch(detailQueryService, /taxDocument\.create|taxInvoice\.create/);
 });
 
-test('settlement write preserves stock and legacy receipt boundaries', () => {
+test('settlement write preserves stock and legacy receipt-allocation boundaries', () => {
   assert.doesNotMatch(createService, /stockItem\.update|stockMovement|inventory|customerReceiptAllocation\.create/);
   assert.match(createService, /targetType:\s*'DELIVERY_CREDIT'/);
-  assert.match(createService, /sourceType:\s*'CUSTOMER_MONEY_BALANCE'/);
   assert.match(route, /router\.post\('\/'/);
   assert.doesNotMatch(route, /customer-receipt|allocation/i);
 });
