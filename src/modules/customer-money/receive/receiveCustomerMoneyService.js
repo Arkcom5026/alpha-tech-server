@@ -3,6 +3,12 @@
 const { Prisma } = require('../../../../lib/prisma');
 const { validateReceiveCustomerMoneyInput } = require('./receiveCustomerMoneyContract');
 const { validateReceiveCustomerMoneyPolicy } = require('./receiveCustomerMoneyPolicy');
+const {
+  calculateAvailableCustomerMoney,
+} = require('../balance/customerMoneySourcePoolService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../shared/customerMoneyTransactionLock');
 
 const buildError = (message, statusCode, code) => {
   const error = new Error(message);
@@ -38,6 +44,9 @@ const serializeReceipt = (receipt) => ({
 });
 
 const createDocumentCode = async (tx, branchId, receivedAt) => {
+  if (tx?.$queryRaw) {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1004}, ${Number(branchId)})`;
+  }
   const date = receivedAt || new Date();
   const yy = String(date.getFullYear()).slice(-2);
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -60,27 +69,6 @@ const sumAvailableMoneyReceipts = (receipts = []) => receipts.reduce(
   new Prisma.Decimal(0),
 );
 
-const calculateAvailableCustomerMoney = async (tx, { branchId, customerId }) => {
-  const [activeDeposits, activeMoneyReceipts] = await Promise.all([
-    tx.customerDeposit.findMany({
-      where: { customerId, branchId, status: 'ACTIVE' },
-      select: { totalAmount: true, usedAmount: true },
-    }),
-    tx.customerReceipt.findMany({
-      where: {
-        customerId,
-        branchId,
-        status: 'ACTIVE',
-        code: { startsWith: 'CMR-' },
-      },
-      select: { remainingAmount: true },
-    }),
-  ]);
-
-  return sumAvailableDeposits(activeDeposits)
-    .plus(sumAvailableMoneyReceipts(activeMoneyReceipts));
-};
-
 const ensureEmployeeInBranch = async (tx, { employeeId, branchId }) => {
   const employee = await tx.employeeProfile.findFirst({
     where: {
@@ -102,6 +90,8 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
   const amount = new Prisma.Decimal(String(command.amount));
 
   return prisma.$transaction(async (tx) => {
+    await acquireCustomerMoneyTransactionLock(tx, command.customerId);
+
     const customer = await tx.customerProfile.findFirst({
       where: { id: command.customerId, branchId: command.branchId }, select: { id: true },
     });
@@ -192,19 +182,14 @@ const getCustomerMoneyReceive = async ({ prisma, getRepository, user, id }) => {
   const receipt = await getRepository({ client: prisma, id: receiptId, branchId });
   if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
 
-  const balance = await prisma.customerMoneyBalance.findUnique({
-    where: {
-      branchId_customerId: {
-        branchId,
-        customerId: receipt.customerId,
-      },
-    },
-    select: { availableAmount: true },
+  const availableBalance = await calculateAvailableCustomerMoney(prisma, {
+    branchId,
+    customerId: receipt.customerId,
   });
 
   return {
     ...serializeReceipt(receipt),
-    availableBalance: Number(balance?.availableAmount ?? 0),
+    availableBalance: Number(availableBalance),
   };
 };
 
@@ -230,7 +215,11 @@ const cancelCustomerMoneyReceive = async ({
   return prisma.$transaction(async (tx) => {
     await ensureEmployeeInBranch(tx, { employeeId, branchId });
 
-    const receipt = await getRepository({ client: tx, id: receiptId, branchId });
+    let receipt = await getRepository({ client: tx, id: receiptId, branchId });
+    if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
+
+    await acquireCustomerMoneyTransactionLock(tx, receipt.customerId);
+    receipt = await getRepository({ client: tx, id: receiptId, branchId });
     if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
     if (receipt.status === 'CANCELLED') throw buildError('เอกสารรับเงินนี้ถูกยกเลิกแล้ว', 409, 'DOCUMENT_ALREADY_CANCELLED');
 
@@ -295,4 +284,6 @@ module.exports = {
   listCustomerMoneyReceives,
   getCustomerMoneyReceive,
   cancelCustomerMoneyReceive,
+  sumAvailableDeposits,
+  sumAvailableMoneyReceipts,
 };
