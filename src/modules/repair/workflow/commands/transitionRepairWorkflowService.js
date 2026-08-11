@@ -143,13 +143,22 @@ function currentWorkflowStatus(repairJob) {
   return latest?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
 }
 
-function assertIntakeCompleteForEntry(repairJob, action) {
-  if (![REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS, REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE].includes(action)) return;
+function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = currentWorkflowStatus(repairJob)) {
+  const requiresCompletedIntake = [
+    REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
+    REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
+  ].includes(action) || (
+    action === REPAIR_WORKFLOW_ACTION.START_REPAIR &&
+    workflowStatus === REPAIR_WORKFLOW_STATUS.RECEIVED
+  );
+
+  if (!requiresCompletedIntake) return;
+
   const completion = evaluateIntakeCompletion(repairJob.deviceIntake);
   if (!completion.complete) {
     throw new RepairWorkflowCommandError(
       'REPAIR_INTAKE_INCOMPLETE',
-      'Repair intake evidence must be complete before inspection or pre-agreed work can start',
+      'Repair intake evidence must be complete before inspection or work can start',
       { repairJobId: repairJob.id, completion }
     );
   }
@@ -206,7 +215,7 @@ class TransitionRepairWorkflowService {
         });
       }
 
-      assertIntakeCompleteForEntry(repairJob, action);
+      assertIntakeCompleteForEntry(repairJob, action, workflowStatus);
       assertPreAgreedServiceAuthority(repairJob, action);
       const transition = resolveRepairWorkflowTransition(workflowStatus, action);
       const legacyStatus = projectLegacyServiceStatus(transition.targetStatus);
