@@ -57,8 +57,9 @@ test('settlement command rejects the same sale line more than once', () => {
   );
 });
 
-test('settlement write is atomic across customer money and sale payment projection', () => {
+test('settlement write is atomic and serialized across customer money and sale payment projection', () => {
   assert.match(createService, /prisma\.\$transaction/);
+  assert.match(createService, /pg_advisory_xact_lock/);
   assert.match(createService, /customerMoneySettlement\.create/);
   assert.match(createService, /createCustomerMoneyApplication/);
   assert.match(createService, /eventType:\s*'MONEY_APPLIED'/);
