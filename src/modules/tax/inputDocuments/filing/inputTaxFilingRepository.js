@@ -3,6 +3,7 @@
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const filingTaxDocumentKey = (value) => String(Number(value));
+const filingNumericAmount = (value) => String(value ?? 0);
 
 const lockBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
@@ -96,9 +97,9 @@ const selectDocumentForFiling = async ({
       ${Number(batchId)},
       ${filingTaxDocumentKey(taxDocumentId)},
       'SELECTED'::"InputTaxFilingItemStatus",
-      ${claimedSubtotalAmount},
-      ${claimedVatAmount},
-      ${claimedTotalAmount},
+      ${filingNumericAmount(claimedSubtotalAmount)}::numeric,
+      ${filingNumericAmount(claimedVatAmount)}::numeric,
+      ${filingNumericAmount(claimedTotalAmount)}::numeric,
       ${JSON.stringify(eligibilitySnapshot)}::jsonb,
       ${JSON.stringify(documentSnapshot)}::jsonb,
       ${selectedAt},
@@ -209,6 +210,7 @@ const findBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
 };
 
 module.exports = Object.freeze({
+  filingNumericAmount,
   filingTaxDocumentKey,
   findActiveByDocument,
   findBatchDocumentItemForUpdate,

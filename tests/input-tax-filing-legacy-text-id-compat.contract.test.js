@@ -28,6 +28,15 @@ test('filing repository writes and queries current document ids through text com
   assert.match(source, /\$\{filingTaxDocumentKey\(taxDocumentId\)\},/);
 });
 
+test('filing repository explicitly casts claimed amounts to numeric for raw SQL writes', () => {
+  const source = read('src/modules/tax/inputDocuments/filing/inputTaxFilingRepository.js');
+  assert.match(source, /const filingNumericAmount = \(value\) => String\(value \?\? 0\)/);
+  assert.match(source, /\$\{filingNumericAmount\(claimedSubtotalAmount\)\}::numeric/);
+  assert.match(source, /\$\{filingNumericAmount\(claimedVatAmount\)\}::numeric/);
+  assert.match(source, /\$\{filingNumericAmount\(claimedTotalAmount\)\}::numeric/);
+  assert.doesNotMatch(source, /\n\s+\$\{claimedSubtotalAmount\},/);
+});
+
 test('tax period input filing completeness guard bridges legacy text ids without mutating data', () => {
   const source = read('src/modules/tax/periods/taxPeriodService.js');
   assert.match(source, /item\."taxDocumentId" = record\."taxDocumentId"::text/);
