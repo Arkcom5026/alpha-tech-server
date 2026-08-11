@@ -10,6 +10,7 @@ const createExpensePayee = require('../expense-payee/create/createExpensePayeeSl
 const listExpensePayees = require('../expense-payee/query/list/listExpensePayeesSlice');
 const taxExpenseAssessment = require('../assessment/taxExpenseAssessmentController');
 const taxExpenseEvidence = require('../evidence/taxExpenseEvidenceController');
+const listRepairExpenseReasons = require('../query/repair-reasons/listRepairExpenseReasonsSlice');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -18,6 +19,7 @@ router.get('/categories', listTaxExpenseCategories.handle);
 router.post('/categories', createTaxExpenseCategory.handle);
 router.get('/expense-payees', listExpensePayees.handle);
 router.post('/expense-payees', createExpensePayee.handle);
+router.get('/repair-reasons', listRepairExpenseReasons.handle);
 router.get('/:taxExpenseId/assessment-suggestion', taxExpenseAssessment.getSuggestion);
 router.post('/:taxExpenseId/assessment-confirmation', taxExpenseAssessment.confirm);
 router.post('/:taxExpenseId/evidence/verify', taxExpenseEvidence.verify);

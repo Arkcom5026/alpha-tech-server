@@ -19,6 +19,10 @@ assert.deepEqual(routeContracts, [
   { path: '/categories', methods: ['post'] },
   { path: '/expense-payees', methods: ['get'] },
   { path: '/expense-payees', methods: ['post'] },
+  { path: '/repair-reasons', methods: ['get'] },
+  { path: '/:taxExpenseId/assessment-suggestion', methods: ['get'] },
+  { path: '/:taxExpenseId/assessment-confirmation', methods: ['post'] },
+  { path: '/:taxExpenseId/evidence/verify', methods: ['post'] },
   { path: '/', methods: ['get'] },
   { path: '/', methods: ['post'] },
 ]);
