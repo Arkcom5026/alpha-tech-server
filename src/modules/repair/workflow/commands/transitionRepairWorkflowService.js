@@ -165,11 +165,12 @@ function currentWorkflowStatus(repairJob) {
 
 function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = currentWorkflowStatus(repairJob)) {
   const requiresCompletedIntake = [
+    REPAIR_WORKFLOW_ACTION.ACCEPT_JOB,
     REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
     REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
   ].includes(action) || (
     action === REPAIR_WORKFLOW_ACTION.START_REPAIR &&
-    workflowStatus === REPAIR_WORKFLOW_STATUS.RECEIVED
+    [REPAIR_WORKFLOW_STATUS.RECEIVED, REPAIR_WORKFLOW_STATUS.ACCEPTED].includes(workflowStatus)
   );
 
   if (!requiresCompletedIntake) return;
@@ -178,7 +179,7 @@ function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = curren
   if (!completion.complete) {
     throw new RepairWorkflowCommandError(
       'REPAIR_INTAKE_INCOMPLETE',
-      'Repair intake evidence must be complete before inspection or work can start',
+      'Repair intake evidence must be complete before the technician can accept, inspect, or start work',
       { repairJobId: repairJob.id, completion }
     );
   }
@@ -244,37 +245,39 @@ class TransitionRepairWorkflowService {
         throw new RepairWorkflowCommandError('INVALID_REPAIR_WORKFLOW_COMMAND', 'occurredAt must be a valid date', { field: 'occurredAt' });
       }
 
-      const repairUpdate = diagnosis
-        ? {
-            estimatedCost: diagnosis.estimatedCost,
-            technicianNotes: [
-              `ผลตรวจ: ${diagnosis.findings}`,
-              diagnosis.cause ? `สาเหตุ: ${diagnosis.cause}` : null,
-              `แนวทาง: ${diagnosis.recommendedAction}`,
-              diagnosis.customerNote ? `หมายเหตุลูกค้า: ${diagnosis.customerNote}` : null,
-            ].filter(Boolean).join('\n'),
-          }
-        : repairCompletion
+      const repairUpdate = action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB
+        ? { technicianId: employeeId }
+        : diagnosis
           ? {
-              estimatedCost: repairCompletion.finalAmount,
+              estimatedCost: diagnosis.estimatedCost,
               technicianNotes: [
-                repairJob.technicianNotes || null,
-                `งานที่ดำเนินการ: ${repairCompletion.workPerformed}`,
-                `ผลหลังซ่อม: ${repairCompletion.resultSummary}`,
-                `ค่าซ่อมจริง: ${repairCompletion.finalAmount}`,
-                repairCompletion.technicianNote ? `หมายเหตุช่าง: ${repairCompletion.technicianNote}` : null,
+                `ผลตรวจ: ${diagnosis.findings}`,
+                diagnosis.cause ? `สาเหตุ: ${diagnosis.cause}` : null,
+                `แนวทาง: ${diagnosis.recommendedAction}`,
+                diagnosis.customerNote ? `หมายเหตุลูกค้า: ${diagnosis.customerNote}` : null,
               ].filter(Boolean).join('\n'),
             }
-          : [REPAIR_WORKFLOW_ACTION.CANCEL, REPAIR_WORKFLOW_ACTION.REOPEN_AFTER_REJECTION].includes(action)
+          : repairCompletion
             ? {
+                estimatedCost: repairCompletion.finalAmount,
                 technicianNotes: [
                   repairJob.technicianNotes || null,
-                  action === REPAIR_WORKFLOW_ACTION.CANCEL
-                    ? `ยกเลิกงาน: ${note}`
-                    : `เปิดตรวจสอบใหม่หลังลูกค้าไม่อนุมัติ: ${note}`,
+                  `งานที่ดำเนินการ: ${repairCompletion.workPerformed}`,
+                  `ผลหลังซ่อม: ${repairCompletion.resultSummary}`,
+                  `ค่าซ่อมจริง: ${repairCompletion.finalAmount}`,
+                  repairCompletion.technicianNote ? `หมายเหตุช่าง: ${repairCompletion.technicianNote}` : null,
                 ].filter(Boolean).join('\n'),
               }
-            : {};
+            : [REPAIR_WORKFLOW_ACTION.CANCEL, REPAIR_WORKFLOW_ACTION.REOPEN_AFTER_REJECTION].includes(action)
+              ? {
+                  technicianNotes: [
+                    repairJob.technicianNotes || null,
+                    action === REPAIR_WORKFLOW_ACTION.CANCEL
+                      ? `ยกเลิกงาน: ${note}`
+                      : `เปิดตรวจสอบใหม่หลังลูกค้าไม่อนุมัติ: ${note}`,
+                  ].filter(Boolean).join('\n'),
+                }
+              : {};
 
       const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus, repairUpdate);
       const event = await repo.publishPassportEvent({
@@ -289,6 +292,9 @@ class TransitionRepairWorkflowService {
         title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
         description:
           note ||
+          (action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB
+            ? 'ช่างรับผิดชอบใบงานแล้ว'
+            : null) ||
           (action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
             ? repairJob.preAgreedService?.agreedScope
             : null) ||
@@ -307,6 +313,8 @@ class TransitionRepairWorkflowService {
           legacyServiceStatus: legacyStatus,
           terminal: transition.terminal,
           note,
+          acceptedByEmployeeId:
+            action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB ? employeeId : null,
           preAgreedService:
             action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
               ? repairJob.preAgreedService
@@ -327,6 +335,8 @@ class TransitionRepairWorkflowService {
         terminal: transition.terminal,
         passportEventId: event.id,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
+        acceptedByEmployeeId:
+          action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB ? employeeId : null,
         preAgreedService:
           action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
             ? repairJob.preAgreedService
