@@ -16,6 +16,7 @@ router.get('/periods/summary', controller.getPeriodSummary);
 router.get('/periods/:taxPeriodId', controller.getPeriodDetail);
 router.get('/accounting-office/packages/:taxPeriodId', accountingOfficeController.getPackage);
 router.get('/tax-closing-handoff/:taxPeriodId', taxClosingHandoffController.getBundle);
+router.post('/tax-closing-handoff/:taxPeriodId/finalize', taxClosingHandoffController.finalizeBundle);
 router.get('/tax-readiness/:taxPeriodId', unifiedTaxReadinessController.getWorkspace);
 router.get('/vat-settlement/:taxPeriodId', vatSettlementController.getPreparation);
 router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
