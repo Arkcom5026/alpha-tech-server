@@ -20,7 +20,19 @@ const parseEligibleSalesQuery = (query = {}, user = {}) => ({
   take: Math.min(Math.max(Number(query.take) || 100, 1), 200),
 });
 
-const parseCreateSettlementInput = (input = {}, user = {}) => {
+const normalizeIdempotencyKey = (value) => {
+  const commandKey = String(value || '').trim();
+  if (!commandKey) return null;
+  if (commandKey.length > 100) {
+    fail('IDEMPOTENCY_KEY_TOO_LONG', 'X-Idempotency-Key ยาวเกิน 100 ตัวอักษร');
+  }
+  if (!/^[A-Za-z0-9._:-]+$/.test(commandKey)) {
+    fail('INVALID_IDEMPOTENCY_KEY', 'X-Idempotency-Key มีรูปแบบไม่ถูกต้อง');
+  }
+  return commandKey;
+};
+
+const parseCreateSettlementInput = (input = {}, user = {}, idempotencyKey = null) => {
   const branchId = positiveInt(user.branchId, 'BRANCH_CONTEXT_REQUIRED', 'branchId');
   const customerId = positiveInt(input.customerId, 'CUSTOMER_REQUIRED', 'customerId');
   const createdById = positiveInt(user.employeeId, 'EMPLOYEE_CONTEXT_REQUIRED', 'employeeId');
@@ -49,9 +61,15 @@ const parseCreateSettlementInput = (input = {}, user = {}) => {
     branchId,
     customerId,
     createdById,
+    commandKey: normalizeIdempotencyKey(idempotencyKey),
     note: String(input.note || '').trim().slice(0, 500) || null,
     lines: normalizedLines,
   };
 };
 
-module.exports = { fail, parseEligibleSalesQuery, parseCreateSettlementInput };
+module.exports = {
+  fail,
+  normalizeIdempotencyKey,
+  parseEligibleSalesQuery,
+  parseCreateSettlementInput,
+};
