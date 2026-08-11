@@ -1,0 +1,17 @@
+model TaxClosingFinalization {
+  id            String   @id @default(cuid())
+  branchId      Int
+  taxPeriodId   String
+  version       Int
+  packageVersion Int
+  snapshotHash  String   @db.VarChar(64)
+  snapshot      Json
+  manifest      Json
+  finalizedById Int?
+  finalizedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@unique([branchId, taxPeriodId, version], map: "TaxClosingFinalization_branch_period_version_key")
+  @@index([branchId, taxPeriodId, finalizedAt], map: "TaxClosingFinalization_branch_period_finalizedAt_idx")
+  @@index([snapshotHash], map: "TaxClosingFinalization_snapshotHash_idx")
+}
