@@ -17,6 +17,19 @@ const customerSelect = {
   user: { select: { loginId: true, email: true } },
 };
 
+const customerDetailInclude = {
+  user: { select: { loginId: true, email: true } },
+  subdistrict: {
+    include: {
+      district: {
+        include: {
+          province: true,
+        },
+      },
+    },
+  },
+};
+
 function buildSearchFilter(query) {
   const value = String(query || '').trim();
   if (!value) return {};
@@ -41,6 +54,13 @@ function listCustomers({ branchId, scope, query, limit = 100 }) {
     select: customerSelect,
     orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     take: Math.min(Math.max(Number(limit) || 100, 1), 200),
+  });
+}
+
+function findCustomerDetail({ customerProfileId }) {
+  return prisma.customerProfile.findUnique({
+    where: { id: Number(customerProfileId) },
+    include: customerDetailInclude,
   });
 }
 
@@ -78,4 +98,4 @@ function claimLegacyCustomer({ customerProfileId, branchId }) {
   });
 }
 
-module.exports = { listCustomers, claimLegacyCustomer };
+module.exports = { listCustomers, findCustomerDetail, claimLegacyCustomer };
