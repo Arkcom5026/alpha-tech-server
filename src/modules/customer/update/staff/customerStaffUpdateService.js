@@ -42,7 +42,7 @@ function presentCustomer(customer) {
     postcode: customer.subdistrict?.postcode || null,
     customerAddress: buildCustomerAddress(customer),
     phone: customer.user?.loginId || null,
-    email: '',
+    email: customer.user?.email || '',
   };
 }
 
