@@ -45,6 +45,8 @@ test('exception targets resolve to source workspaces and exact expense review wh
   assert.equal(routeFor({ code: 'TAX_EXPENSE_EVIDENCE_INCOMPLETE', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
   assert.equal(routeFor({ code: 'WHT_CERTIFICATE_NOT_ISSUED', source: 'WHT_CERTIFICATE' }, 'p1'), 'tax-periods/p1/withholding-tax');
   assert.equal(routeFor({ code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED', source: 'PRIOR_PERIOD_VAT_CREDIT' }, 'p1'), 'tax-periods/p1/vat-settlement');
+  assert.equal(routeFor({ code: 'INPUT_VAT_FILING_NOT_PREPARED', source: 'INPUT_VAT' }, 'p1'), 'tax-periods/p1/input-vat-filing');
+  assert.equal(routeFor({ code: 'INPUT_VAT_FILING_INCOMPLETE', source: 'INPUT_VAT' }, 'p1'), 'tax-periods/p1/input-vat-filing');
   assert.equal(routeFor({ code: 'INPUT_VAT_PERIOD_UNBOUND', source: 'INPUT_VAT' }, 'p1'), 'input-tax-receipts');
   assert.equal(routeFor({ code: 'OUTPUT_VAT_PERIOD_UNBOUND', source: 'OUTPUT_VAT' }, 'p1'), 'output-tax-filings');
 });
