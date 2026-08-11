@@ -2,7 +2,7 @@
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 
-const filingTaxDocumentKey = (value) => String(Number(value));
+const filingTaxDocumentKey = (value) => Number(value);
 const filingNumericAmount = (value) => String(value ?? 0);
 
 const lockBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {

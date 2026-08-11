@@ -86,7 +86,7 @@ const listDocumentProjection = async ({ branchId, periodView = 'DOCUMENT', perio
         item."filedAt"
       FROM "InputTaxFilingItem" item
       JOIN "InputTaxFilingBatch" batch ON batch."id" = item."batchId"
-      WHERE item."taxDocumentId" = document."id"::text
+      WHERE item."taxDocumentId" = document."id"
         AND item."status" IN (
           'SELECTED'::"InputTaxFilingItemStatus",
           'FILED'::"InputTaxFilingItemStatus"

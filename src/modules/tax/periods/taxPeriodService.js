@@ -104,7 +104,7 @@ const countIncompleteInputTaxFilingRecords = async ({ branchId, taxPeriodId, sta
         SELECT 1
         FROM "InputTaxFilingItem" item
         JOIN "InputTaxFilingBatch" batch ON batch."id" = item."batchId"
-        WHERE item."taxDocumentId" = record."taxDocumentId"::text
+        WHERE item."taxDocumentId" = record."taxDocumentId"
           AND batch."branchId" = ${Number(branchId)}
           AND batch."year" = ${year}
           AND batch."month" = ${month}
