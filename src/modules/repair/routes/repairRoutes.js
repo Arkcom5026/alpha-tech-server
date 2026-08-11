@@ -70,6 +70,12 @@ const {
   finalizeRepairHandover,
 } = require('../handover/repairHandoverController');
 const {
+  getRepairSubcontractContext,
+  sendRepairSubcontract,
+  updateRepairSubcontract,
+  commandRepairSubcontract,
+} = require('../subcontract/repairSubcontractController');
+const {
   REPAIR_CAPABILITY,
   loadRepairEmployeeContext,
   allowRepairCapabilities,
@@ -101,6 +107,10 @@ router.get('/jobs/:id/handover', allowRepairCapabilities(REPAIR_CAPABILITY.READ)
 router.post('/jobs/:id/handover/finalize', allowRepairCapabilities(REPAIR_CAPABILITY.HANDOVER), finalizeRepairHandover);
 router.get('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getIntakeEvidence);
 router.post('/jobs/:id/intake-evidence', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), intakeEvidenceUpload, saveIntakeEvidence);
+router.get('/jobs/:id/subcontracts', allowRepairCapabilities(REPAIR_CAPABILITY.READ), getRepairSubcontractContext);
+router.post('/jobs/:id/subcontracts', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), sendRepairSubcontract);
+router.patch('/jobs/:id/subcontracts/:subcontractId', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), updateRepairSubcontract);
+router.post('/jobs/:id/subcontracts/:subcontractId/commands', allowRepairCapabilities(REPAIR_CAPABILITY.WORKFLOW), commandRepairSubcontract);
 
 // Repair workflow commands are the only staff authority for advancing repair runtime state.
 // The legacy PATCH /jobs/:id/status endpoint is intentionally not mounted because it can

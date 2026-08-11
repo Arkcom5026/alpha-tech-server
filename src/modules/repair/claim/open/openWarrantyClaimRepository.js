@@ -84,6 +84,19 @@ class OpenWarrantyClaimRepository {
     });
   }
 
+  async findActiveSubcontract(repairJobId) {
+    const rows = await this.getClient().$queryRawUnsafe(
+      `SELECT "id", "status", "providerName"
+       FROM "RepairSubcontract"
+       WHERE "repairJobId" = $1 AND "status" IN ('SENT','RETURN_REQUESTED')
+       ORDER BY "sentAt" DESC, "id" DESC
+       LIMIT 1
+       FOR UPDATE`,
+      Number(repairJobId)
+    );
+    return rows[0] || null;
+  }
+
   findLatestWorkflowEvent(branchId, repairJobId, deviceId) {
     return this.getClient().devicePassportEvent.findFirst({
       where: {

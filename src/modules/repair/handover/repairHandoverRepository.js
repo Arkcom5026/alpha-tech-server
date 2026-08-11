@@ -27,6 +27,18 @@ class RepairHandoverRepository {
     });
   }
 
+  async findActiveSubcontract(repairJobId) {
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT "id", "status", "providerName"
+       FROM "RepairSubcontract"
+       WHERE "repairJobId" = $1 AND "status" IN ('SENT','RETURN_REQUESTED')
+       ORDER BY "sentAt" DESC, "id" DESC
+       LIMIT 1`,
+      Number(repairJobId)
+    );
+    return rows[0] || null;
+  }
+
   async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
     if (!deviceId) return null;
     return this.prisma.devicePassportEvent.findFirst({

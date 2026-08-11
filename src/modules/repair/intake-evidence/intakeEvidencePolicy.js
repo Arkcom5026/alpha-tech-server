@@ -4,6 +4,11 @@ function parseBoolean(value) {
   return value === true || value === 'true' || value === '1';
 }
 
+function parseOptionalBoolean(body, field) {
+  if (!Object.prototype.hasOwnProperty.call(body, field)) return undefined;
+  return parseBoolean(body[field]);
+}
+
 function parseConsent(body = {}) {
   const customerSignature = String(body.customerSignature || '').trim();
   const confirmed = parseBoolean(body.confirmed);
@@ -19,10 +24,10 @@ function parseConsent(body = {}) {
   return {
     confirmed,
     data: {
-      allowDataErase: parseBoolean(body.allowDataErase),
-      allowFactoryReset: parseBoolean(body.allowFactoryReset),
-      allowDisassembly: parseBoolean(body.allowDisassembly),
-      allowOutsourceRepair: parseBoolean(body.allowOutsourceRepair),
+      allowDataErase: parseOptionalBoolean(body, 'allowDataErase'),
+      allowFactoryReset: parseOptionalBoolean(body, 'allowFactoryReset'),
+      allowDisassembly: parseOptionalBoolean(body, 'allowDisassembly'),
+      allowOutsourceRepair: parseOptionalBoolean(body, 'allowOutsourceRepair'),
       customerSignature: customerSignature || null,
       signedAt: confirmed ? new Date() : null,
     },
@@ -63,6 +68,7 @@ function mapEvidence(intake) {
 
 module.exports = {
   parseBoolean,
+  parseOptionalBoolean,
   parseConsent,
   evaluateIntakeCompletion,
   mapEvidence,

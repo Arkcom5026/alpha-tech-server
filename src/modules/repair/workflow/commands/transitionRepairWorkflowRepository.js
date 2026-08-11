@@ -13,7 +13,7 @@ const repairWorkflowInclude = {
         include: { receipt: { include: { supplier: true } } },
       },
       saleItems: {
-        include: { sale: { include: { customer: { include: { user: true } } } } },
+        include: { sale: { include: { customer: { include: { user: true } } } },
         orderBy: { sale: { soldAt: 'desc' } },
       },
     },
@@ -84,6 +84,19 @@ class TransitionRepairWorkflowRepository {
         passportEvents: latestWorkflowEvent ? [latestWorkflowEvent] : [],
       },
     };
+  }
+
+  async findActiveSubcontract(repairJobId) {
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT "id", "status", "providerName"
+       FROM "RepairSubcontract"
+       WHERE "repairJobId" = $1 AND "status" IN ('SENT','RETURN_REQUESTED')
+       ORDER BY "sentAt" DESC, "id" DESC
+       LIMIT 1
+       FOR UPDATE`,
+      Number(repairJobId)
+    );
+    return rows[0] || null;
   }
 
   updateLegacyStatus(repairJobId, status, extraData = {}) {
