@@ -1,0 +1,173 @@
+'use strict';
+
+const { createCustomerMoneyLedger } = require('../../ledger/createCustomerMoneyLedgerService');
+const { updateCustomerMoneyBalance } = require('../../balance/updateCustomerMoneyBalanceService');
+const {
+  calculateAvailableCustomerMoney,
+  restoreCustomerMoneySources,
+} = require('../../balance/customerMoneySourcePoolService');
+const {
+  projectSalePaymentStatus,
+} = require('../../../sales/completion/services/salePaymentPostingService');
+const { getSettlement } = require('./deliveryCreditSettlementRepository');
+const { getDeliveryCreditSettlement } = require('./queryDeliveryCreditSettlementService');
+
+const buildError = (message, statusCode, code) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+};
+
+const ensureEmployee = async (tx, branchId, employeeId) => {
+  const employee = await tx.employeeProfile.findFirst({
+    where: { id: employeeId, branchId, active: true, approved: true },
+    select: { id: true },
+  });
+  if (!employee) throw buildError('ไม่พบพนักงานผู้ยกเลิกในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
+};
+
+const ensureNoTaxDocumentAuthority = async (tx, { branchId, saleIds }) => {
+  if (!saleIds.length || !tx?.taxCandidate?.findMany || !tx?.taxDocument?.findFirst) return;
+  const candidates = await tx.taxCandidate.findMany({
+    where: {
+      branchId,
+      sourceType: 'SALE',
+      sourceId: { in: saleIds.map(String) },
+    },
+    select: { id: true, sourceId: true },
+  });
+  if (!candidates.length) return;
+
+  const document = await tx.taxDocument.findFirst({
+    where: {
+      branchId,
+      candidateId: { in: candidates.map((candidate) => candidate.id) },
+      status: { notIn: ['CANCELLED', 'ARCHIVED'] },
+    },
+    select: {
+      id: true,
+      status: true,
+      documentNumber: true,
+      issuedDocumentNumber: true,
+    },
+  });
+  if (document) {
+    throw buildError(
+      'ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบขายที่เกี่ยวข้องมีเอกสารภาษีแล้ว',
+      409,
+      'SETTLEMENT_TAX_DOCUMENT_EXISTS',
+    );
+  }
+};
+
+const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }) => {
+  const branchId = Number(user?.branchId);
+  const employeeId = Number(user?.employeeId);
+  const settlementId = Number(id);
+  const reason = String(cancelReason || '').trim();
+
+  if (!Number.isInteger(branchId) || branchId <= 0) throw buildError('ไม่พบสาขาของผู้ใช้งาน', 400, 'BRANCH_CONTEXT_REQUIRED');
+  if (!Number.isInteger(employeeId) || employeeId <= 0) throw buildError('ไม่พบพนักงานผู้ยกเลิก', 400, 'EMPLOYEE_CONTEXT_REQUIRED');
+  if (!Number.isInteger(settlementId) || settlementId <= 0) throw buildError('รหัสเอกสารไม่ถูกต้อง', 400, 'INVALID_SETTLEMENT_ID');
+  if (!reason) throw buildError('กรุณาระบุเหตุผลการยกเลิก', 400, 'CANCEL_REASON_REQUIRED');
+  if (reason.length > 500) throw buildError('เหตุผลการยกเลิกยาวเกิน 500 ตัวอักษร', 400, 'CANCEL_REASON_TOO_LONG');
+
+  return prisma.$transaction(async (tx) => {
+    let settlement = await getSettlement({ client: tx, id: settlementId, branchId });
+    if (!settlement) throw buildError('ไม่พบเอกสารตัดยอดใบส่งของ', 404, 'SETTLEMENT_NOT_FOUND');
+
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1003}, ${Number(settlement.customerId)})`;
+    await ensureEmployee(tx, branchId, employeeId);
+
+    settlement = await getSettlement({ client: tx, id: settlementId, branchId });
+    if (!settlement) throw buildError('ไม่พบเอกสารตัดยอดใบส่งของ', 404, 'SETTLEMENT_NOT_FOUND');
+    if (settlement.status === 'CANCELLED') {
+      throw buildError('เอกสารตัดยอดนี้ถูกยกเลิกแล้ว', 409, 'SETTLEMENT_ALREADY_CANCELLED');
+    }
+    if (settlement.status !== 'ACTIVE') {
+      throw buildError('สถานะเอกสารนี้ไม่อนุญาตให้ยกเลิก', 409, 'SETTLEMENT_NOT_CANCELLABLE');
+    }
+
+    const saleIds = [...new Set((settlement.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
+    await ensureNoTaxDocumentAuthority(tx, { branchId, saleIds });
+
+    const applications = [...new Map(
+      (settlement.lines || [])
+        .map((line) => line.application)
+        .filter(Boolean)
+        .map((application) => [application.id, application]),
+    ).values()];
+
+    await restoreCustomerMoneySources(tx, {
+      branchId,
+      customerId: settlement.customerId,
+      applications,
+    });
+
+    const applicationIds = applications.map((application) => application.id);
+    if (applicationIds.length) {
+      const reversed = await tx.customerMoneyApplication.updateMany({
+        where: { id: { in: applicationIds }, status: 'APPLIED' },
+        data: { status: 'REVERSED' },
+      });
+      if (reversed.count !== applicationIds.length) {
+        throw buildError('สถานะการใช้ Customer Money มีการเปลี่ยนแปลง กรุณาลองใหม่', 409, 'SETTLEMENT_APPLICATION_CONFLICT');
+      }
+    }
+
+    const cancelledAt = new Date();
+    await tx.customerMoneySettlement.update({
+      where: { id: settlement.id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt,
+        cancelledById: employeeId,
+        cancelReason: reason,
+      },
+    });
+
+    for (const application of applications) {
+      await createCustomerMoneyLedger({
+        client: tx,
+        data: {
+          branchId,
+          customerId: settlement.customerId,
+          applicationId: application.id,
+          eventType: 'MONEY_APPLICATION_REVERSED',
+          amount: application.amount,
+          direction: 'CREDIT',
+          referenceType: 'DELIVERY_CREDIT_SETTLEMENT',
+          referenceId: settlement.id,
+          createdById: employeeId,
+        },
+      });
+    }
+
+    for (const saleId of saleIds) {
+      await projectSalePaymentStatus(tx, saleId);
+    }
+
+    const availableAmount = await calculateAvailableCustomerMoney(tx, {
+      branchId,
+      customerId: settlement.customerId,
+    });
+    await updateCustomerMoneyBalance({
+      client: tx,
+      branchId,
+      customerId: settlement.customerId,
+      availableAmount,
+    });
+
+    return getDeliveryCreditSettlement({
+      prisma: tx,
+      user: { ...user, branchId },
+      id: settlement.id,
+    });
+  });
+};
+
+module.exports = {
+  cancelDeliveryCreditSettlement,
+  ensureNoTaxDocumentAuthority,
+};
