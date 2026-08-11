@@ -87,6 +87,33 @@ test('supports waiting for parts and resuming repair', () => {
   assert.equal(resumed.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
 });
 
+test('keeps QC optional while preserving the full QC workflow', () => {
+  const actions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.REPAIRING);
+  assert.deepEqual(
+    actions.map((item) => item.action),
+    [
+      REPAIR_WORKFLOW_ACTION.WAIT_FOR_PARTS,
+      REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR_DIRECT,
+      REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR,
+      REPAIR_WORKFLOW_ACTION.CANCEL,
+    ]
+  );
+
+  const directCompletion = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.REPAIRING,
+    REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR_DIRECT
+  );
+  assert.equal(directCompletion.targetStatus, REPAIR_WORKFLOW_STATUS.READY_FOR_DELIVERY);
+  assert.equal(directCompletion.passportEventType, 'REPAIR_STATUS_CHANGED');
+
+  const qcCompletion = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.REPAIRING,
+    REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR
+  );
+  assert.equal(qcCompletion.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_QC);
+  assert.equal(qcCompletion.passportEventType, 'QC_STARTED');
+});
+
 test('requires failed QC to return through explicit rework', () => {
   const failed = resolveRepairWorkflowTransition(
     REPAIR_WORKFLOW_STATUS.WAITING_QC,
