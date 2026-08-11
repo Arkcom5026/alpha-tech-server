@@ -89,7 +89,7 @@ function normalizeDiagnosis(action, rawDiagnosis) {
 }
 
 function normalizeRepairCompletion(action, rawCompletion) {
-  if (action !== REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR) return null;
+  if (![REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR_DIRECT, REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR].includes(action)) return null;
   const completion = rawCompletion && typeof rawCompletion === 'object' ? rawCompletion : {};
   return {
     workPerformed: requireText(completion.workPerformed, 'repairCompletion.workPerformed'),
