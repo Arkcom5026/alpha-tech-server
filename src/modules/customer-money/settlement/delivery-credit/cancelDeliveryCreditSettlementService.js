@@ -30,6 +30,30 @@ const ensureEmployee = async (tx, branchId, employeeId) => {
   if (!employee) throw buildError('ไม่พบพนักงานผู้ยกเลิกในสาขานี้', 404, 'EMPLOYEE_NOT_FOUND');
 };
 
+const ensureNoDownstreamDocumentAuthority = async (tx, { branchId, saleIds }) => {
+  if (!saleIds.length || !tx?.sale?.findMany) return;
+  const sales = await tx.sale.findMany({
+    where: { id: { in: saleIds }, branchId },
+    select: {
+      id: true,
+      combinedDocumentId: true,
+      combinedBillingId: true,
+      combinedBilling: { select: { status: true } },
+    },
+  });
+  const blocked = sales.find((sale) => (
+    sale.combinedDocumentId
+    || (sale.combinedBillingId && sale.combinedBilling?.status !== 'CANCELLED')
+  ));
+  if (blocked) {
+    throw buildError(
+      'ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบขายที่เกี่ยวข้องถูกนำไปจัดทำเอกสารรวมแล้ว กรุณายกเลิกเอกสารปลายทางก่อน',
+      409,
+      'SETTLEMENT_DOWNSTREAM_DOCUMENT_EXISTS',
+    );
+  }
+};
+
 const ensureNoTaxDocumentAuthority = async (tx, { branchId, saleIds }) => {
   if (!saleIds.length || !tx?.taxCandidate?.findMany || !tx?.taxDocument?.findFirst) return;
   const candidates = await tx.taxCandidate.findMany({
@@ -93,6 +117,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     }
 
     const saleIds = [...new Set((settlement.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
+    await ensureNoDownstreamDocumentAuthority(tx, { branchId, saleIds });
     await ensureNoTaxDocumentAuthority(tx, { branchId, saleIds });
 
     const applications = [...new Map(
@@ -172,5 +197,6 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
 
 module.exports = {
   cancelDeliveryCreditSettlement,
+  ensureNoDownstreamDocumentAuthority,
   ensureNoTaxDocumentAuthority,
 };
