@@ -9,16 +9,18 @@ const {
   REPAIR_WORKFLOW_ACTION,
 } = require('../policies/repairWorkflowPolicy');
 
-test('repair completion requires work performed and result summary', () => {
+test('repair completion requires work performed, result summary and final amount', () => {
   const result = normalizeRepairCompletion(REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR, {
     workPerformed: 'เปลี่ยน SSD และลงระบบใหม่',
     resultSummary: 'บูตและใช้งานได้ปกติ',
+    finalAmount: 1250,
     technicianNote: 'ทดสอบ 2 รอบ',
   });
 
   assert.deepEqual(result, {
     workPerformed: 'เปลี่ยน SSD และลงระบบใหม่',
     resultSummary: 'บูตและใช้งานได้ปกติ',
+    finalAmount: 1250,
     technicianNote: 'ทดสอบ 2 รอบ',
   });
 
@@ -26,8 +28,18 @@ test('repair completion requires work performed and result summary', () => {
     () => normalizeRepairCompletion(REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR, {
       workPerformed: '',
       resultSummary: 'ok',
+      finalAmount: 0,
     }),
     (error) => error.code === 'INVALID_REPAIR_WORKFLOW_COMMAND'
+  );
+  assert.throws(
+    () => normalizeRepairCompletion(REPAIR_WORKFLOW_ACTION.COMPLETE_REPAIR, {
+      workPerformed: 'ตรวจและซ่อมแล้ว',
+      resultSummary: 'ok',
+    }),
+    (error) =>
+      error.code === 'INVALID_REPAIR_WORKFLOW_COMMAND' &&
+      error.details.field === 'repairCompletion.finalAmount'
   );
 });
 

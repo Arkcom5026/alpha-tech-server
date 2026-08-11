@@ -143,9 +143,10 @@ test('does not add a new intake gate to previously approved jobs', async () => {
   assert.equal(repo.calls.event.metadata.workflowPreviousStatus, 'APPROVED');
 });
 
-test('allows repair completion to become ready for delivery without forcing QC', async () => {
+test('allows repair completion to become ready for delivery while persisting the final amount', async () => {
   const job = repairJob({
     status: 'IN_PROGRESS',
+    estimatedCost: 350,
     technicianNotes: 'บันทึกเดิม',
     device: {
       id: 55,
@@ -165,6 +166,7 @@ test('allows repair completion to become ready for delivery without forcing QC',
       repairCompletion: {
         workPerformed: 'เปลี่ยน SSD และลงระบบใหม่',
         resultSummary: 'เปิดเครื่องและใช้งานได้ปกติ',
+        finalAmount: 1250,
         technicianNote: 'ทดสอบ restart แล้ว',
       },
     }
@@ -172,10 +174,35 @@ test('allows repair completion to become ready for delivery without forcing QC',
 
   assert.equal(result.status, 'READY_FOR_DELIVERY');
   assert.equal(result.legacyStatus, 'IN_PROGRESS');
+  assert.equal(result.repairCompletion.finalAmount, 1250);
+  assert.equal(repo.calls.update.extraData.estimatedCost, 1250);
   assert.equal(repo.calls.event.eventType, 'REPAIR_STATUS_CHANGED');
   assert.equal(repo.calls.event.metadata.action, 'COMPLETE_REPAIR_DIRECT');
+  assert.equal(repo.calls.event.metadata.repairCompletion.finalAmount, 1250);
   assert.match(repo.calls.update.extraData.technicianNotes, /เปลี่ยน SSD/);
-  assert.match(repo.calls.update.extraData.technicianNotes, /ทดสอบ restart แล้ว/);
+  assert.match(repo.calls.update.extraData.technicianNotes, /ค่าซ่อมจริง: 1250/);
+});
+
+test('blocks repair completion until a final amount is supplied', () => {
+  const service = new TransitionRepairWorkflowService(repositoryFor(repairJob()));
+
+  assert.throws(
+    () => service.execute(
+      { branchId: 3, employeeId: 7 },
+      {
+        repairJobId: 41,
+        action: 'COMPLETE_REPAIR_DIRECT',
+        commandKey: 'complete-no-final-price',
+        repairCompletion: {
+          workPerformed: 'ลงระบบใหม่',
+          resultSummary: 'ใช้งานได้ปกติ',
+        },
+      }
+    ),
+    (error) =>
+      error.code === 'INVALID_REPAIR_WORKFLOW_COMMAND' &&
+      error.details.field === 'repairCompletion.finalAmount'
+  );
 });
 
 test('allows diagnosis queue with customer consent even when intake condition photo is absent', async () => {

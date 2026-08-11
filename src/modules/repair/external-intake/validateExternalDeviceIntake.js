@@ -61,6 +61,11 @@ function nonNegativeMoney(value, field) {
   return parsed;
 }
 
+function optionalNonNegativeMoney(value, field) {
+  if (value === undefined || value === null || value === '') return null;
+  return nonNegativeMoney(value, field);
+}
+
 function booleanValue(value, defaultValue = false) {
   if (value === undefined || value === null) return defaultValue;
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -85,25 +90,30 @@ function validateAccessories(value) {
   });
 }
 
-function validatePreAgreedService(rawValue, estimatedCost, customerNameFallback = '') {
+function validatePreAgreedService(rawValue, _estimatedCost, customerNameFallback = '') {
   const value = rawValue && typeof rawValue === 'object' ? rawValue : {};
   if (!booleanValue(value.enabled, false)) return null;
 
   return {
     enabled: true,
-    agreedScope: requiredText(value.agreedScope, 'ขอบเขตงานที่ตกลง', 2000),
-    agreedAmount: nonNegativeMoney(
-      value.agreedAmount === undefined ? estimatedCost : value.agreedAmount,
+    authorizationMode: 'REPAIR_AUTHORIZED',
+    agreedScope:
+      optionalText(value.agreedScope, 'ขอบเขตงานที่อนุมัติ', 2000) ||
+      'ลูกค้าอนุมัติให้ดำเนินการซ่อมตามอาการที่แจ้ง',
+    // Kept as a compatibility field for historical records. New repair authorization
+    // does not require a price before work starts.
+    agreedAmount: optionalNonNegativeMoney(
+      value.agreedAmount,
       'preAgreedService.agreedAmount'
     ),
     confirmedByName: requiredText(
       value.confirmedByName || customerNameFallback,
-      'ชื่อผู้ยืนยันข้อตกลง',
+      'ชื่อผู้อนุมัติให้ซ่อม',
       255
     ),
     confirmationNote: optionalText(
       value.confirmationNote,
-      'หมายเหตุข้อตกลง',
+      'หมายเหตุการอนุมัติ',
       2000
     ),
   };
@@ -140,7 +150,8 @@ function validateExternalDeviceIntake(payload = {}) {
     internalRemark: optionalText(payload.internalRemark, 'หมายเหตุภายใน', 4000),
     accessories: validateAccessories(payload.accessories),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid'),
-    estimatedCost: preAgreedService?.agreedAmount ?? estimatedCost,
+    // Price remains provisional until the repair completion command records the final amount.
+    estimatedCost,
     ...(preAgreedService ? { preAgreedService } : {}),
   };
 }

@@ -86,7 +86,7 @@ test('external intake creates device, ownership, intake, repair and passport eve
   assert.equal(result.workflowStatus, 'RECEIVED');
 });
 
-test('external intake preserves pre-agreed service evidence and exposes the fast-path action', async () => {
+test('external intake preserves repair authorization without requiring an agreed price', async () => {
   const writes = [];
   const service = new CreateExternalDeviceIntakeService(repositoryFixture(writes));
 
@@ -101,13 +101,12 @@ test('external intake preserves pre-agreed service evidence and exposes the fast
         model: 'VivoBook',
       },
       customerProblem: 'ลง Windows และโปรแกรมพื้นฐาน',
-      estimatedCost: 900,
+      estimatedCost: 0,
       preAgreedService: {
         enabled: true,
-        agreedScope: 'ลง Windows + Driver + โปรแกรมพื้นฐาน',
-        agreedAmount: 1200,
+        authorizationMode: 'REPAIR_AUTHORIZED',
         confirmedByName: 'ลูกค้าทดสอบ',
-        confirmationNote: 'ตกลงหน้าร้าน',
+        confirmationNote: 'อนุมัติให้ซ่อมโดยไม่ต้องเสนอราคาก่อน',
       },
     }
   );
@@ -115,9 +114,10 @@ test('external intake preserves pre-agreed service evidence and exposes the fast
   const repairWrite = writes.find(([type]) => type === 'repair')[1];
   const createdEvent = writes.filter(([type]) => type === 'event')[1][1];
 
-  assert.equal(repairWrite.estimatedCost, 1200);
-  assert.equal(createdEvent.metadata.preAgreedService.agreedAmount, 1200);
-  assert.equal(createdEvent.metadata.preAgreedService.agreedScope, 'ลง Windows + Driver + โปรแกรมพื้นฐาน');
+  assert.equal(repairWrite.estimatedCost, 0);
+  assert.equal(createdEvent.metadata.preAgreedService.agreedAmount, null);
+  assert.equal(createdEvent.metadata.preAgreedService.authorizationMode, 'REPAIR_AUTHORIZED');
+  assert.match(createdEvent.metadata.preAgreedService.agreedScope, /อนุมัติ/);
   assert.deepEqual(
     result.availableActions.map((item) => item.action),
     ['QUEUE_DIAGNOSIS', 'START_PRE_AGREED_SERVICE']

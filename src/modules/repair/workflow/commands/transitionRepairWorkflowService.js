@@ -67,6 +67,25 @@ function optionalText(value, maxLength = 4000) {
   return normalized || null;
 }
 
+function requireNonNegativeMoney(value, field) {
+  if (value === undefined || value === null || value === '') {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      `${field} is required`,
+      { field }
+    );
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new RepairWorkflowCommandError(
+      'INVALID_REPAIR_WORKFLOW_COMMAND',
+      `${field} must be a non-negative number`,
+      { field }
+    );
+  }
+  return parsed;
+}
+
 function normalizeDiagnosis(action, rawDiagnosis) {
   if (action !== REPAIR_WORKFLOW_ACTION.COMPLETE_DIAGNOSIS) return null;
   const diagnosis = rawDiagnosis && typeof rawDiagnosis === 'object' ? rawDiagnosis : {};
@@ -94,6 +113,7 @@ function normalizeRepairCompletion(action, rawCompletion) {
   return {
     workPerformed: requireText(completion.workPerformed, 'repairCompletion.workPerformed'),
     resultSummary: requireText(completion.resultSummary, 'repairCompletion.resultSummary'),
+    finalAmount: requireNonNegativeMoney(completion.finalAmount, 'repairCompletion.finalAmount'),
     technicianNote: optionalText(completion.technicianNote),
   };
 }
@@ -167,10 +187,10 @@ function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = curren
 function assertPreAgreedServiceAuthority(repairJob, action) {
   if (action !== REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE) return;
   const agreement = repairJob.preAgreedService;
-  if (!agreement?.enabled || !agreement.agreedScope || !agreement.confirmedByName) {
+  if (!agreement?.enabled || !agreement.confirmedByName) {
     throw new RepairWorkflowCommandError(
       'PRE_AGREED_SERVICE_REQUIRED',
-      'Pre-agreed service evidence is required before the fast path can start',
+      'Repair authorization evidence is required before the authorized fast path can start',
       { repairJobId: repairJob.id }
     );
   }
@@ -236,10 +256,12 @@ class TransitionRepairWorkflowService {
           }
         : repairCompletion
           ? {
+              estimatedCost: repairCompletion.finalAmount,
               technicianNotes: [
                 repairJob.technicianNotes || null,
                 `งานที่ดำเนินการ: ${repairCompletion.workPerformed}`,
                 `ผลหลังซ่อม: ${repairCompletion.resultSummary}`,
+                `ค่าซ่อมจริง: ${repairCompletion.finalAmount}`,
                 repairCompletion.technicianNote ? `หมายเหตุช่าง: ${repairCompletion.technicianNote}` : null,
               ].filter(Boolean).join('\n'),
             }
