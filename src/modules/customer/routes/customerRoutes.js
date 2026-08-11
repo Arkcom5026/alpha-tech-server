@@ -16,6 +16,7 @@ router.use(verifyToken);
 
 router.get('/platform/overview', platformCustomerOverviewController.getOverview);
 router.get('/management', customerManagementController.listCustomers);
+router.get('/management/:id', customerManagementController.getCustomerDetail);
 router.post('/management/unassigned/:id/claim', customerManagementController.claimLegacyCustomer);
 router.get('/search', customerSearchController.searchCustomers);
 router.get('/by-phone/:phone', customerByPhoneController.getCustomerByPhone);

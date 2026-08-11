@@ -10,6 +10,9 @@ function normalizeContext(user = {}) {
 }
 
 function presentCustomer(customer) {
+  const subdistrictCode = customer.subdistrict?.code || customer.subdistrictCode || null;
+  const districtCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
+  const provinceCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
   return {
     id: customer.id,
     userId: customer.userId,
@@ -20,6 +23,11 @@ function presentCustomer(customer) {
     email: customer.user?.email || '',
     taxId: customer.taxId || '',
     type: customer.type || 'INDIVIDUAL',
+    addressDetail: customer.addressDetail || '',
+    provinceCode,
+    districtCode,
+    subdistrictCode,
+    postcode: customer.subdistrict?.postcode || null,
     createdAt: customer.createdAt,
     updatedAt: customer.updatedAt,
     creditLimit: customer.creditLimit,
@@ -67,6 +75,26 @@ async function listCustomers({ user, scope, query, limit }) {
   };
 }
 
+async function getCustomerDetail({ user, customerProfileId }) {
+  const authorized = authorizeStoreUser(user);
+  if (authorized.error) return authorized.error;
+
+  const id = Number(customerProfileId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { status: 400, body: { code: 'INVALID_CUSTOMER_ID', message: 'รหัสลูกค้าไม่ถูกต้อง' } };
+  }
+
+  const customer = await repository.findCustomerDetail({ customerProfileId: id });
+  if (!customer) {
+    return { status: 404, body: { code: 'CUSTOMER_NOT_FOUND', message: 'ไม่พบข้อมูลลูกค้า' } };
+  }
+  if (customer.branchId !== authorized.context.branchId) {
+    return { status: 403, body: { code: 'CUSTOMER_DETAIL_BRANCH_FORBIDDEN', message: 'ไม่สามารถเปิดข้อมูลลูกค้าของร้านอื่นได้' } };
+  }
+
+  return { status: 200, body: { customer: presentCustomer(customer) } };
+}
+
 async function claimLegacyCustomer({ user, customerProfileId }) {
   const authorized = authorizeStoreUser(user);
   if (authorized.error) return authorized.error;
@@ -76,35 +104,11 @@ async function claimLegacyCustomer({ user, customerProfileId }) {
     return { status: 400, body: { code: 'INVALID_CUSTOMER_ID', message: 'รหัสลูกค้าไม่ถูกต้อง' } };
   }
 
-  const result = await repository.claimLegacyCustomer({
-    customerProfileId: id,
-    branchId: authorized.context.branchId,
-  });
-
-  if (result.outcome === 'NOT_FOUND') {
-    return { status: 404, body: { code: 'CUSTOMER_NOT_FOUND', message: 'ไม่พบข้อมูลลูกค้า' } };
-  }
-  if (result.outcome === 'ALREADY_ASSIGNED' || result.outcome === 'CLAIM_CONFLICT') {
-    return { status: 409, body: { code: 'CUSTOMER_ALREADY_ASSIGNED', message: 'ลูกค้ารายนี้ถูกร้านอื่นรับไปแล้ว กรุณารีเฟรชรายการ' } };
-  }
-  if (result.outcome === 'STORE_PROFILE_EXISTS') {
-    return {
-      status: 409,
-      body: {
-        code: 'STORE_CUSTOMER_ALREADY_EXISTS',
-        message: 'ผู้ใช้นี้เป็นลูกค้าของร้านอยู่แล้ว',
-        existingCustomerProfileId: result.customerProfileId,
-      },
-    };
-  }
-
-  return {
-    status: 200,
-    body: {
-      message: 'รับลูกค้าเข้าร้านเรียบร้อยแล้ว',
-      customer: presentCustomer(result.customer),
-    },
-  };
+  const result = await repository.claimLegacyCustomer({ customerProfileId: id, branchId: authorized.context.branchId });
+  if (result.outcome === 'NOT_FOUND') return { status: 404, body: { code: 'CUSTOMER_NOT_FOUND', message: 'ไม่พบข้อมูลลูกค้า' } };
+  if (result.outcome === 'ALREADY_ASSIGNED' || result.outcome === 'CLAIM_CONFLICT') return { status: 409, body: { code: 'CUSTOMER_ALREADY_ASSIGNED', message: 'ลูกค้ารายนี้ถูกร้านอื่นรับไปแล้ว กรุณารีเฟรชรายการ' } };
+  if (result.outcome === 'STORE_PROFILE_EXISTS') return { status: 409, body: { code: 'STORE_CUSTOMER_ALREADY_EXISTS', message: 'ผู้ใช้นี้เป็นลูกค้าของร้านอยู่แล้ว', existingCustomerProfileId: result.customerProfileId } };
+  return { status: 200, body: { message: 'รับลูกค้าเข้าร้านเรียบร้อยแล้ว', customer: presentCustomer(result.customer) } };
 }
 
-module.exports = { listCustomers, claimLegacyCustomer };
+module.exports = { listCustomers, getCustomerDetail, claimLegacyCustomer };
