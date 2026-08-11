@@ -12,6 +12,7 @@ const routes = read('src', 'modules', 'customer', 'routes', 'customerRoutes.js')
 const controller = read('src', 'modules', 'customer', 'management', 'customerManagementController.js');
 const service = read('src', 'modules', 'customer', 'management', 'customerManagementService.js');
 const repository = read('src', 'modules', 'customer', 'management', 'customerManagementRepository.js');
+const staffUpdateService = read('src', 'modules', 'customer', 'update', 'staff', 'customerStaffUpdateService.js');
 
 test('customer management exposes branch-scoped detail authority', () => {
   assert.match(routes, /router\.get\('\/management\/:id'/);
@@ -30,4 +31,8 @@ test('detail projection includes tax and authoritative address fields', () => {
 test('detail authority rejects cross-branch customer reads', () => {
   assert.match(service, /CUSTOMER_DETAIL_BRANCH_FORBIDDEN/);
   assert.match(service, /customer\.branchId !== authorized\.context\.branchId/);
+});
+
+test('staff edit response preserves authoritative account email for the detail editor', () => {
+  assert.match(staffUpdateService, /email:\s*customer\.user\?\.email\s*\|\|\s*''/);
 });
