@@ -22,9 +22,10 @@ const route = read('deliveryCreditSettlementRoute.js');
 const controller = read('deliveryCreditSettlementController.js');
 const sourcePool = fs.readFileSync(path.join(__dirname, '../../balance/customerMoneySourcePoolService.js'), 'utf8');
 const sharedLock = fs.readFileSync(path.join(__dirname, '../../shared/customerMoneyTransactionLock.js'), 'utf8');
+const receiveService = fs.readFileSync(path.join(__dirname, '../../receive/receiveCustomerMoneyService.js'), 'utf8');
 const salePaymentProjection = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/salePaymentPostingService.js'), 'utf8');
 const schema = fs.readFileSync(path.join(__dirname, '../../../../../prisma/customer/customer-money.prisma'), 'utf8');
-const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812015500_customer_money_settlement_idempotency/migration.sql'), 'utf8');
+const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812014000_customer_money_settlement_idempotency/migration.sql'), 'utf8');
 
 test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
@@ -126,11 +127,13 @@ test('settlement consumes receipt/deposit source projections instead of a free-f
   assert.doesNotMatch(createService, /sourceType:\s*'CUSTOMER_MONEY_BALANCE'/);
 });
 
-test('customer money mutations share one per-customer transaction lock authority', () => {
+test('customer money receive and settlement mutations share one per-customer transaction lock authority', () => {
   assert.match(sharedLock, /CUSTOMER_MONEY_LOCK_NAMESPACE = -1003/);
   assert.match(sharedLock, /pg_advisory_xact_lock/);
   assert.match(createService, /acquireCustomerMoneyTransactionLock/);
   assert.match(cancelService, /acquireCustomerMoneyTransactionLock/);
+  assert.match(receiveService, /acquireCustomerMoneyTransactionLock/);
+  assert.match(receiveService, /RECEIPT_STATUSES = new Set\(\['ACTIVE', 'FULLY_ALLOCATED', 'CANCELLED'\]\)/);
 });
 
 test('settlement write is atomic and uses the shared sale payment projection', () => {
