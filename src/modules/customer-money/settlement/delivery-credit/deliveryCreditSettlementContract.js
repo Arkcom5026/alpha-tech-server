@@ -27,6 +27,7 @@ const parseCreateSettlementInput = (input = {}, user = {}) => {
   const lines = Array.isArray(input.lines) ? input.lines : [];
   if (!lines.length) fail('SETTLEMENT_LINES_REQUIRED', 'กรุณาเลือกรายการที่จะตัดยอด');
 
+  const seenLineKeys = new Set();
   const normalizedLines = lines.map((line, index) => {
     const saleId = positiveInt(line.saleId, 'SALE_ID_REQUIRED', `lines[${index}].saleId`);
     const saleItemId = positiveInt(line.saleItemId, 'SALE_ITEM_ID_REQUIRED', `lines[${index}].saleItemId`);
@@ -34,6 +35,13 @@ const parseCreateSettlementInput = (input = {}, user = {}) => {
     if (!['STOCK', 'SIMPLE'].includes(lineType)) fail('INVALID_LINE_TYPE', 'ประเภทสินค้าไม่ถูกต้อง');
     const amount = Number(line.amount);
     if (!Number.isFinite(amount) || amount <= 0) fail('INVALID_SETTLEMENT_AMOUNT', 'ยอดตัดชำระต้องมากกว่า 0');
+
+    const lineKey = `${saleId}:${lineType}:${saleItemId}`;
+    if (seenLineKeys.has(lineKey)) {
+      fail('DUPLICATE_SETTLEMENT_LINE', 'พบรายการสินค้าเดิมซ้ำในคำสั่งตัดยอด');
+    }
+    seenLineKeys.add(lineKey);
+
     return { saleId, saleItemId, lineType, amount: Number(amount.toFixed(2)) };
   });
 
