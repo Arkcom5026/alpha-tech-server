@@ -13,6 +13,22 @@ function notFound() {
   return error;
 }
 
+function subcontractHold(activeSubcontract) {
+  const error = new Error('อุปกรณ์ยังอยู่ระหว่างส่งซ่อมภายนอก กรุณารับเครื่องกลับเข้าร้านก่อนส่งมอบลูกค้า');
+  error.statusCode = 409;
+  error.status = 409;
+  error.code = 'REPAIR_ACTIVE_SUBCONTRACT_HOLD';
+  error.details = activeSubcontract
+    ? {
+        repairSubcontractId: Number(activeSubcontract.id),
+        subcontractStatus: activeSubcontract.status,
+        providerName: activeSubcontract.providerName || null,
+      }
+    : undefined;
+  error.isOperational = true;
+  return error;
+}
+
 async function workflowStatusFor(job) {
   const event = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
   return event?.metadata?.workflowTargetStatus || 'RECEIVED';
@@ -25,6 +41,10 @@ async function confirmPublic(token, payload) {
   if (!job) throw notFound();
   const existing = await repository.findDelivery(job.id);
   if (existing?.status === 'DELIVERED') return mapHandover(existing);
+  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
+    ? await repository.findActiveSubcontract(job.id)
+    : null;
+  if (activeSubcontract) throw subcontractHold(activeSubcontract);
   const workflowStatus = await workflowStatusFor(job);
   const input = validateCustomerConfirmation(workflowStatus, payload);
   const delivery = await repository.confirmCustomer(job.id, input);
@@ -36,15 +56,29 @@ async function getStaff(actor, repairJobId) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
   const handover = mapHandover(await repository.findDelivery(job.id));
+  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
+    ? await repository.findActiveSubcontract(job.id)
+    : null;
   return {
     ...handover,
     workflowStatus: await workflowStatusFor(job),
+    subcontractHold: activeSubcontract
+      ? {
+          repairSubcontractId: Number(activeSubcontract.id),
+          status: activeSubcontract.status,
+          providerName: activeSubcontract.providerName || null,
+        }
+      : null,
   };
 }
 
 async function finalize(actor, repairJobId, payload) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
+  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
+    ? await repository.findActiveSubcontract(job.id)
+    : null;
+  if (activeSubcontract) throw subcontractHold(activeSubcontract);
   let delivery = await repository.findDelivery(job.id);
   if (delivery?.status === 'DELIVERED') {
     return { ...mapHandover(delivery), workflowStatus: 'DELIVERED' };
@@ -82,4 +116,4 @@ async function finalize(actor, repairJobId, payload) {
   return { ...mapHandover(finalized), workflowStatus: 'DELIVERED' };
 }
 
-module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor };
+module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold };
