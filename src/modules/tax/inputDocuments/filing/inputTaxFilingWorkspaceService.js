@@ -7,8 +7,12 @@ const overviewService = require('../overview/inputTaxOverviewService');
 const { projectInputTaxEligibility } = require('../eligibility/inputTaxEligibilityService');
 const { projectInputTaxDuplicates } = require('../duplicates/inputTaxDuplicateService');
 const { projectInputTaxReplacementChains } = require('../replacements/inputTaxReplacementService');
+const { TRANSITIONS } = require('../../documents/lifecycle/taxDocumentLifecycle');
 
 const PERIOD_MUTATION_BLOCKED_STATUSES = new Set(['CLOSED', 'LOCKED', 'SUBMITTED']);
+const INPUT_TAX_PENDING_AUTHORITY_STATUSES = new Set(['DRAFT', 'REGISTERED', 'UNDER_REVIEW', 'APPROVED']);
+const INPUT_TAX_VISIBLE_STATUSES = new Set(['DRAFT', 'REGISTERED', 'UNDER_REVIEW', 'REJECTED', 'APPROVED']);
+const APPROVAL_SEQUENCE = Object.freeze(['REGISTERED', 'UNDER_REVIEW', 'APPROVED']);
 
 const fail = (code, message, statusCode = 400, details) => {
   throw Object.assign(new Error(message), { code, statusCode, ...(details ? { details } : {}) });
@@ -37,6 +41,11 @@ const periodToExclusive = (period) => {
   const end = new Date(period.endDate);
   end.setUTCDate(end.getUTCDate() + 1);
   return end;
+};
+
+const nextApprovalTarget = (status) => {
+  const allowed = TRANSITIONS[String(status || '').toUpperCase()] || [];
+  return APPROVAL_SEQUENCE.find((target) => allowed.includes(target)) || null;
 };
 
 const prepareInputTaxFilingBatch = async ({ branchId, taxPeriodId, actorEmployeeId }) => {
@@ -122,18 +131,41 @@ const getInputTaxFilingWorkspace = async ({ branchId, taxPeriodId }) => {
   const authorityByDocumentId = new Map(authorities.map((item) => [Number(item.taxDocumentId), item]));
   const duplicateById = projectInputTaxDuplicates(overviewRows);
   const replacementById = projectInputTaxReplacementChains(overviewRows);
+  const periodMutable = !PERIOD_MUTATION_BLOCKED_STATUSES.has(String(period.status || '').toUpperCase());
 
   const documents = overviewRows
-    .filter((row) => authorityByDocumentId.has(Number(row.id)))
+    .filter((row) => {
+      const hasAuthority = authorityByDocumentId.has(Number(row.id));
+      const status = String(row.status || '').toUpperCase();
+      return hasAuthority || (
+        row.documentType === 'INPUT_TAX_INVOICE'
+        && INPUT_TAX_VISIBLE_STATUSES.has(status)
+      );
+    })
     .map((row) => {
-      const vatAuthority = authorityByDocumentId.get(Number(row.id));
+      const vatAuthority = authorityByDocumentId.get(Number(row.id)) || null;
+      const status = String(row.status || '').toUpperCase();
       const reconciliation = overviewService.projectDocumentReconciliation(row);
       const duplicate = duplicateById.get(row.id);
       const replacement = replacementById.get(row.id);
       const eligibility = projectInputTaxEligibility({ document: row, reconciliation, duplicate, replacement });
       const filingItem = itemByDocumentId.get(Number(row.id)) || null;
+      const hasInputVatAuthority = Boolean(vatAuthority);
+      const requiresInputVatApproval = Boolean(
+        !hasInputVatAuthority
+        && row.documentType === 'INPUT_TAX_INVOICE'
+        && INPUT_TAX_PENDING_AUTHORITY_STATUSES.has(status)
+      );
+      const nextLifecycleTarget = hasInputVatAuthority ? null : nextApprovalTarget(status);
+      const lifecycleBlockedByReconciliation = nextLifecycleTarget === 'APPROVED' && !reconciliation.canApprove;
+      const canAdvanceLifecycle = Boolean(
+        periodMutable
+        && nextLifecycleTarget
+        && !lifecycleBlockedByReconciliation
+      );
       const canSelectForFiling = Boolean(
-        batch
+        hasInputVatAuthority
+        && batch
         && String(batch.status).toUpperCase() === 'DRAFT'
         && !filingItem
         && eligibility.canSelectForFiling
@@ -147,15 +179,21 @@ const getInputTaxFilingWorkspace = async ({ branchId, taxPeriodId }) => {
 
       return Object.freeze({
         taxDocumentId: Number(row.id),
-        inputVatRecordId: vatAuthority.inputVatRecordId,
-        documentNumber: vatAuthority.documentNumber || row.documentNumber,
-        documentDate: vatAuthority.documentDate || row.issuedAt,
-        supplierName: row.snapshot?.supplierName || row.snapshot?.issuerName || row.snapshot?.counterpartyName || 'ไม่ระบุผู้จำหน่าย',
+        inputVatRecordId: vatAuthority?.inputVatRecordId || null,
+        hasInputVatAuthority,
+        requiresInputVatApproval,
+        documentStatus: status,
+        nextLifecycleTarget,
+        canAdvanceLifecycle,
+        lifecycleBlockedReason: lifecycleBlockedByReconciliation ? 'RECONCILIATION_REQUIRED' : null,
+        documentNumber: vatAuthority?.documentNumber || row.documentNumber,
+        documentDate: vatAuthority?.documentDate || row.issuedAt || row.occurredAt,
+        supplierName: vatAuthority?.supplierName || row.snapshot?.supplierName || row.snapshot?.issuerName || row.snapshot?.counterpartyName || 'ไม่ระบุผู้จำหน่าย',
         supplierTaxId: row.counterpartyTaxId || row.snapshot?.supplierTaxId || row.snapshot?.issuerTaxId || null,
-        subtotalAmount: vatAuthority.subtotalAmount,
-        vatAmount: vatAuthority.taxAmount,
-        totalAmount: vatAuthority.totalAmount,
-        currency: vatAuthority.currency,
+        subtotalAmount: vatAuthority?.subtotalAmount ?? Number(row.subtotalAmount || 0),
+        vatAmount: vatAuthority?.taxAmount ?? Number(row.vatAmount ?? row.taxAmount ?? 0),
+        totalAmount: vatAuthority?.totalAmount ?? Number(row.totalAmount || 0),
+        currency: vatAuthority?.currency || row.currency || 'THB',
         reconciliation,
         eligibility,
         filingItem,
@@ -164,9 +202,11 @@ const getInputTaxFilingWorkspace = async ({ branchId, taxPeriodId }) => {
       });
     });
 
-  const selectedCount = documents.filter((item) => ['SELECTED', 'FILED'].includes(String(item.filingItem?.status || '').toUpperCase())).length;
-  const filedCount = documents.filter((item) => String(item.filingItem?.status || '').toUpperCase() === 'FILED').length;
-  const coversAllDocuments = Boolean(batch) && selectedCount === documents.length;
+  const authorityDocuments = documents.filter((item) => item.hasInputVatAuthority);
+  const pendingApprovalCount = documents.filter((item) => item.requiresInputVatApproval).length;
+  const selectedCount = authorityDocuments.filter((item) => ['SELECTED', 'FILED'].includes(String(item.filingItem?.status || '').toUpperCase())).length;
+  const filedCount = authorityDocuments.filter((item) => String(item.filingItem?.status || '').toUpperCase() === 'FILED').length;
+  const coversAllDocuments = Boolean(batch) && selectedCount === authorityDocuments.length;
 
   return Object.freeze({
     authority: 'INPUT_TAX_FILING_WORKSPACE',
@@ -174,13 +214,15 @@ const getInputTaxFilingWorkspace = async ({ branchId, taxPeriodId }) => {
     period,
     batch,
     summary: Object.freeze({
-      authorityDocumentCount: documents.length,
+      visibleDocumentCount: documents.length,
+      authorityDocumentCount: authorityDocuments.length,
+      pendingApprovalCount,
       selectedDocumentCount: selectedCount,
       filedDocumentCount: filedCount,
-      remainingDocumentCount: Math.max(documents.length - selectedCount, 0),
+      remainingDocumentCount: Math.max(authorityDocuments.length - selectedCount, 0),
       filingPrepared: Boolean(batch),
       filingCoversAllDocuments: coversAllDocuments,
-      readyForTaxClosing: Boolean(batch) && coversAllDocuments,
+      readyForTaxClosing: Boolean(batch) && pendingApprovalCount === 0 && coversAllDocuments,
     }),
     documents,
   });
