@@ -84,6 +84,9 @@ test('external intake creates device, ownership, intake, repair and passport eve
   assert.equal(writes[5][1].metadata.workflowTargetStatus, 'RECEIVED');
   assert.equal(result.repairJob.id, 41);
   assert.equal(result.workflowStatus, 'RECEIVED');
+  assert.deepEqual(result.availableActions, [
+    { action: 'ACCEPT_JOB', targetStatus: 'ACCEPTED' },
+  ]);
 });
 
 test('external intake preserves repair authorization without requiring an agreed price', async () => {
@@ -120,7 +123,7 @@ test('external intake preserves repair authorization without requiring an agreed
   assert.match(createdEvent.metadata.preAgreedService.agreedScope, /อนุมัติ/);
   assert.deepEqual(
     result.availableActions.map((item) => item.action),
-    ['QUEUE_DIAGNOSIS', 'START_PRE_AGREED_SERVICE']
+    ['ACCEPT_JOB']
   );
   assert.equal(result.preAgreedService.confirmedByName, 'ลูกค้าทดสอบ');
 });
