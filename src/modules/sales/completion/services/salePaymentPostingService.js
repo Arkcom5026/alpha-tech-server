@@ -44,25 +44,65 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
   });
 };
 
+const acquireSalePaymentProjectionLock = async (tx, saleId) => {
+  if (!tx?.$queryRaw) return;
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1001}, ${Number(saleId)})`;
+};
+
 const projectSalePaymentStatus = async (tx, saleId) => {
+  await acquireSalePaymentProjectionLock(tx, saleId);
+
   const sale = await tx.sale.findUnique({ where: { id: saleId }, select: { totalAmount: true, status: true } });
   if (!sale) throw new SalesError(404, 'SALE_NOT_FOUND', 'Sale not found');
-  const aggregate = await tx.paymentItem.aggregate({
-    _sum: { amount: true },
-    where: { payment: { saleId, isCancelled: false } },
-  });
-  const paidAmount = aggregate._sum.amount || D(0);
+
+  const [paymentAggregate, settlementAggregate] = await Promise.all([
+    tx.paymentItem.aggregate({
+      _sum: { amount: true },
+      where: { payment: { saleId, isCancelled: false } },
+    }),
+    tx.customerMoneySettlementLine.aggregate({
+      _sum: { appliedAmount: true },
+      where: {
+        saleId,
+        settlement: { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
+      },
+    }),
+  ]);
+
+  const paidAmount = D(paymentAggregate._sum.amount || 0)
+    .plus(D(settlementAggregate._sum.appliedAmount || 0));
   const paidNumber = n(paidAmount);
   const total = n(sale.totalAmount);
   const paid = paidNumber + 0.001 >= total;
   const statusPayment = paid ? 'PAID' : paidNumber > 0 ? 'PARTIALLY_PAID' : 'UNPAID';
-  const paidAt = paid
-    ? (await tx.payment.findFirst({
+
+  let paidAt = null;
+  if (paid) {
+    const [latestPayment, latestSettlement] = await Promise.all([
+      tx.payment.findFirst({
         where: { saleId, isCancelled: false },
         orderBy: { receivedAt: 'desc' },
         select: { receivedAt: true },
-      }))?.receivedAt || new Date()
-    : null;
+      }),
+      tx.customerMoneySettlement.findFirst({
+        where: {
+          status: 'ACTIVE',
+          settlementType: 'DELIVERY_CREDIT',
+          lines: { some: { saleId } },
+        },
+        orderBy: { settledAt: 'desc' },
+        select: { settledAt: true },
+      }),
+    ]);
+    const candidates = [latestPayment?.receivedAt, latestSettlement?.settledAt]
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .filter((value) => !Number.isNaN(value.getTime()));
+    paidAt = candidates.length
+      ? new Date(Math.max(...candidates.map((value) => value.getTime())))
+      : new Date();
+  }
+
   await tx.sale.update({
     where: { id: saleId },
     data: { paid, paidAt, paidAmount, statusPayment },
@@ -105,4 +145,9 @@ const postPaymentEvidence = async (tx, { sale, branchId, employeeId, payment, co
   return { payments: [created], summary: await projectSalePaymentStatus(tx, sale.id) };
 };
 
-module.exports = { postPaymentEvidence, projectSalePaymentStatus, consumeDeposit };
+module.exports = {
+  postPaymentEvidence,
+  projectSalePaymentStatus,
+  consumeDeposit,
+  acquireSalePaymentProjectionLock,
+};
