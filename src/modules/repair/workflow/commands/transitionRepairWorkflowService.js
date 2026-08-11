@@ -7,6 +7,9 @@ const {
   assertRepairNotHeldByActiveClaim,
 } = require('../../policies/claimRepairHoldPolicy');
 const {
+  assertRepairNotHeldByActiveSubcontract,
+} = require('../../policies/subcontractRepairHoldPolicy');
+const {
   REPAIR_WORKFLOW_STATUS,
   REPAIR_WORKFLOW_ACTION,
   getAvailableRepairWorkflowActions,
@@ -226,6 +229,13 @@ class TransitionRepairWorkflowService {
       }
 
       assertRepairNotHeldByActiveClaim(repairJob, RepairWorkflowCommandError);
+      const activeSubcontract = typeof repo.findActiveSubcontract === 'function'
+        ? await repo.findActiveSubcontract(repairJobId)
+        : null;
+      assertRepairNotHeldByActiveSubcontract(
+        activeSubcontract,
+        RepairWorkflowCommandError
+      );
 
       const workflowStatus = currentWorkflowStatus(repairJob);
       if (expectedWorkflowStatus && expectedWorkflowStatus !== workflowStatus) {
