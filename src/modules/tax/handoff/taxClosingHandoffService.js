@@ -6,6 +6,8 @@ const accountingOfficeController = require('../accountingOffice/accountingOffice
 const withholdingTaxService = require('../withholdingTax/withholdingTaxService');
 const unifiedTaxReadinessService = require('../readiness/unifiedTaxReadinessService');
 const vatSettlementService = require('../settlement/vatSettlementService');
+const finalizationRepository = require('../finalization/taxClosingFinalizationRepository');
+const { buildIntegrity } = require('../finalization/taxClosingFinalizationIntegrity');
 
 const normalizeForHash = (value) => {
   if (typeof value === 'bigint') return value.toString();
@@ -48,7 +50,7 @@ const buildManifest = ({ periodCode, packageStatus, sourceSnapshot }) => Object.
   }),
 });
 
-const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId }) => {
+const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId, includeFinalizationIntegrity = true }) => {
   const args = { branchId, taxPeriodId };
   const [rawClosingPackage, withholdingWorkspace, readiness, vatSettlement] = await Promise.all([
     accountingOfficeService.loadAccountingOfficePackage(args),
@@ -104,6 +106,11 @@ const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId }) => {
   const periodCode = String(closingPackage.period?.periodCode || taxPeriodId);
   const manifest = buildManifest({ periodCode, packageStatus, sourceSnapshot });
   const snapshotHash = sha256(sourceSnapshot);
+  let finalizationIntegrity = null;
+  if (includeFinalizationIntegrity) {
+    const finalization = await finalizationRepository.findLatest({ branchId, taxPeriodId });
+    finalizationIntegrity = buildIntegrity({ currentSnapshotHash: snapshotHash, finalization });
+  }
 
   return Object.freeze({
     authority: 'TAX_CLOSING_HANDOFF_PACKAGE',
@@ -115,6 +122,7 @@ const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId }) => {
     taxPeriodId: String(taxPeriodId),
     periodCode,
     handoffReady: packageStatus === 'READY_FOR_HANDOFF',
+    finalizationIntegrity,
     manifest,
     snapshot: sourceSnapshot,
   });
