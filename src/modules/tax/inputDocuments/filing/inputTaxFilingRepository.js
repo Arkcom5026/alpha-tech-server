@@ -2,6 +2,8 @@
 
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 
+const filingTaxDocumentKey = (value) => String(Number(value));
+
 const lockBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     SELECT
@@ -60,7 +62,7 @@ const findBatchDocumentItemForUpdate = async ({ batchId, taxDocumentId }, tx = p
     SELECT *
     FROM "InputTaxFilingItem"
     WHERE "batchId" = ${Number(batchId)}
-      AND "taxDocumentId" = ${Number(taxDocumentId)}
+      AND "taxDocumentId" = ${filingTaxDocumentKey(taxDocumentId)}
     LIMIT 1
     FOR UPDATE
   `);
@@ -92,7 +94,7 @@ const selectDocumentForFiling = async ({
       "version"
     ) VALUES (
       ${Number(batchId)},
-      ${Number(taxDocumentId)},
+      ${filingTaxDocumentKey(taxDocumentId)},
       'SELECTED'::"InputTaxFilingItemStatus",
       ${claimedSubtotalAmount},
       ${claimedVatAmount},
@@ -162,7 +164,7 @@ const removeDocumentFromFiling = async ({
       "removedReason" = ${removedReason},
       "version" = "version" + 1
     WHERE "batchId" = ${Number(batchId)}
-      AND "taxDocumentId" = ${Number(taxDocumentId)}
+      AND "taxDocumentId" = ${filingTaxDocumentKey(taxDocumentId)}
       AND "status" = 'SELECTED'::"InputTaxFilingItemStatus"
       ${versionFilter}
     RETURNING *
@@ -175,7 +177,7 @@ const findActiveByDocument = async ({ taxDocumentId }, tx = prisma) => {
     SELECT item.*
     FROM "InputTaxFilingItem" item
     JOIN "InputTaxFilingBatch" batch ON batch."id" = item."batchId"
-    WHERE item."taxDocumentId" = ${Number(taxDocumentId)}
+    WHERE item."taxDocumentId" = ${filingTaxDocumentKey(taxDocumentId)}
       AND item."status" IN (
         'SELECTED'::"InputTaxFilingItemStatus",
         'FILED'::"InputTaxFilingItemStatus"
@@ -207,6 +209,7 @@ const findBatchPeriodAuthority = async ({ batchId }, tx = prisma) => {
 };
 
 module.exports = Object.freeze({
+  filingTaxDocumentKey,
   findActiveByDocument,
   findBatchDocumentItemForUpdate,
   findBatchPeriodAuthority,
