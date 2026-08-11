@@ -29,11 +29,18 @@ const findPeriod = async ({ branchId, taxPeriodId }, tx = prisma, { forUpdate = 
 };
 
 const acquirePeriodPreparationLock = async ({ branchId, year, month }, tx = prisma) => {
+  // PostgreSQL's advisory lock returns the pseudo-type void. Prisma cannot deserialize
+  // a void result column, so execute the lock inside a materialized CTE and expose only
+  // a supported integer sentinel to the client while keeping the lock transaction-scoped.
   await tx.$queryRaw(Prisma.sql`
-    SELECT pg_advisory_xact_lock(
-      ${Number(branchId)}::int,
-      ${Number(year) * 100 + Number(month)}::int
+    WITH lock_state AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(
+        ${Number(branchId)}::int,
+        ${Number(year) * 100 + Number(month)}::int
+      )
     )
+    SELECT 1::int AS "lockAcquired"
+    FROM lock_state
   `);
 };
 
