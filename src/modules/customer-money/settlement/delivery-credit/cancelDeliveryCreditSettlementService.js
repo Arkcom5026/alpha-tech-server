@@ -7,6 +7,9 @@ const {
   restoreCustomerMoneySources,
 } = require('../../balance/customerMoneySourcePoolService');
 const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../shared/customerMoneyTransactionLock');
+const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { getSettlement } = require('./deliveryCreditSettlementRepository');
@@ -77,7 +80,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     let settlement = await getSettlement({ client: tx, id: settlementId, branchId });
     if (!settlement) throw buildError('ไม่พบเอกสารตัดยอดใบส่งของ', 404, 'SETTLEMENT_NOT_FOUND');
 
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1003}, ${Number(settlement.customerId)})`;
+    await acquireCustomerMoneyTransactionLock(tx, settlement.customerId);
     await ensureEmployee(tx, branchId, employeeId);
 
     settlement = await getSettlement({ client: tx, id: settlementId, branchId });
