@@ -2,6 +2,8 @@
 
 const candidateRepository = require('../candidates/repository/taxCandidateRepository');
 const documentRepository = require('../documents/repository/taxDocumentRepository');
+const taxPeriodRepository = require('../periods/taxPeriodRepository');
+const periodProjectionRepository = require('./taxIntakePeriodProjectionRepository');
 const { projectOutputTaxPrintableDocument } = require('../documents/print/projectOutputTaxPrintableDocumentService');
 const { issueOutputTaxDocument } = require('../documents/issue/issueOutputTaxDocumentService');
 const {
@@ -23,21 +25,64 @@ const requirePositiveInt = (value, code, fieldName) => {
   return parsed;
 };
 
-const listCandidates = (input) => candidateRepository.list({
-  branchId: requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId'),
-  status: input.status ? String(input.status).trim().toUpperCase() : null,
-  sourceType: input.sourceType ? String(input.sourceType).trim().toUpperCase() : null,
-  limit: input.limit,
-  offset: input.offset,
-});
+const resolveTaxPeriodScope = async ({ branchId, taxPeriodId }) => {
+  const normalizedTaxPeriodId = String(taxPeriodId || '').trim();
+  if (!normalizedTaxPeriodId) return null;
 
-const listDocuments = (input) => documentRepository.list({
-  branchId: requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId'),
-  status: input.status ? String(input.status).trim().toUpperCase() : null,
-  documentType: input.documentType ? String(input.documentType).trim().toUpperCase() : null,
-  limit: input.limit,
-  offset: input.offset,
-});
+  const period = await taxPeriodRepository.findById({
+    branchId,
+    taxPeriodId: normalizedTaxPeriodId,
+  });
+  if (!period) {
+    throw Object.assign(new Error('Tax period not found'), {
+      code: 'TAX_PERIOD_NOT_FOUND',
+      statusCode: 404,
+    });
+  }
+
+  return Object.freeze({
+    taxPeriodId: period.id,
+    periodCode: period.periodCode,
+    startDate: period.startDate,
+    endDate: period.endDate,
+  });
+};
+
+const listCandidates = async (input) => {
+  const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
+  const period = await resolveTaxPeriodScope({ branchId, taxPeriodId: input.taxPeriodId });
+  const args = {
+    branchId,
+    status: input.status ? String(input.status).trim().toUpperCase() : null,
+    sourceType: input.sourceType ? String(input.sourceType).trim().toUpperCase() : null,
+    limit: input.limit,
+    offset: input.offset,
+  };
+  if (!period) return candidateRepository.list(args);
+  return periodProjectionRepository.listCandidatesForPeriod({
+    ...args,
+    startDate: period.startDate,
+    endDate: period.endDate,
+  });
+};
+
+const listDocuments = async (input) => {
+  const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
+  const period = await resolveTaxPeriodScope({ branchId, taxPeriodId: input.taxPeriodId });
+  const args = {
+    branchId,
+    status: input.status ? String(input.status).trim().toUpperCase() : null,
+    documentType: input.documentType ? String(input.documentType).trim().toUpperCase() : null,
+    limit: input.limit,
+    offset: input.offset,
+  };
+  if (!period) return documentRepository.list(args);
+  return periodProjectionRepository.listDocumentsForPeriod({
+    ...args,
+    startDate: period.startDate,
+    endDate: period.endDate,
+  });
+};
 
 const getDocumentDetail = async (input) => {
   const branchId = requirePositiveInt(input.branchId, 'TAX_BRANCH_REQUIRED', 'branchId');
@@ -65,5 +110,6 @@ module.exports = Object.freeze({
   listDocuments,
   registerSaleTaxCandidate,
   registerTaxCandidate,
+  resolveTaxPeriodScope,
   transitionTaxDocument,
 });
