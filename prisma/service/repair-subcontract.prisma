@@ -1,33 +1,28 @@
 model RepairSubcontract {
-  id                     Int              @id @default(autoincrement())
+  id                     Int      @id @default(autoincrement())
   branchId               Int
   repairJobId            Int
-  status                 String           @default("SENT") @db.VarChar(32)
+  status                 String   @default("SENT") @db.VarChar(32)
   providerName           String
   providerPhone          String?
   workScope              String
   externalReference      String?
   trackingNumber         String?
-  customerEstimateAmount Decimal?         @db.Decimal(12, 2)
+  customerEstimateAmount Decimal? @db.Decimal(12, 2)
   customerApprovalNote   String?
-  providerQuotedAmount   Decimal?         @db.Decimal(12, 2)
+  providerQuotedAmount   Decimal? @db.Decimal(12, 2)
   providerQuoteNote      String?
   customerDecisionNote   String?
-  actualExternalCost     Decimal?         @db.Decimal(12, 2)
+  actualExternalCost     Decimal? @db.Decimal(12, 2)
   resultNote             String?
-  sentAt                 DateTime         @default(now())
+  sentAt                 DateTime @default(now())
   expectedReturnAt       DateTime?
   returnRequestedAt      DateTime?
   returnedAt             DateTime?
   sentByEmployeeId       Int
   returnedByEmployeeId   Int?
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-
-  branch                 Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  repairJob              RepairJob        @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
-  sentBy                 EmployeeProfile  @relation("RepairSubcontractSentBy", fields: [sentByEmployeeId], references: [id], onDelete: Restrict)
-  returnedBy             EmployeeProfile? @relation("RepairSubcontractReturnedBy", fields: [returnedByEmployeeId], references: [id], onDelete: SetNull)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([branchId, status, sentAt])
   @@index([repairJobId, sentAt])
