@@ -138,6 +138,10 @@ class CreateRepairJobRepository {
     });
   }
 
+  createDeviceIntake(data) {
+    return this.prisma.deviceIntake.create({ data });
+  }
+
   publishPassportEvent(event) {
     return publishDevicePassportEvent(this.prisma, event);
   }

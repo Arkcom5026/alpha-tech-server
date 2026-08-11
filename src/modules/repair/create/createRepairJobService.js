@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const repository = require('./createRepairJobRepository');
 const { validateCreateRepairJob } = require('../validators/repairValidator');
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
@@ -12,6 +13,10 @@ const { mapRepairJob } = require('../mappers/repairMapper');
 
 function isPrismaUniqueConflict(error) {
   return error?.code === 'P2002';
+}
+
+function createRepairIntakeReference(branchId) {
+  return `INT-${branchId}-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function assertRegisteredDeviceForIntake(device, actor, payload) {
@@ -52,6 +57,16 @@ function assertRegisteredDeviceForIntake(device, actor, payload) {
   }
 }
 
+function buildDeviceSnapshot(device, stockItem, payload) {
+  return {
+    brand: device?.brand || stockItem?.product?.brand?.name || null,
+    model: device?.model || payload.deviceModel || null,
+    serialNumber: device?.serialNumber || stockItem?.serialNumber || null,
+    imei: device?.imei || null,
+    barcode: device?.barcode || stockItem?.barcode || null,
+  };
+}
+
 class CreateRepairJobService {
   constructor(createRepository = repository) {
     this.repository = createRepository;
@@ -73,6 +88,8 @@ class CreateRepairJobService {
 
         let stockItemId = payload.stockItemId || null;
         let deviceId = payload.deviceId || null;
+        let intakeDevice = null;
+        let intakeStockItem = null;
 
         if (payload.stockItemId) {
           const stockItem = await repo.findStockItemForIntake(payload.stockItemId);
@@ -85,7 +102,9 @@ class CreateRepairJobService {
             payload.allowCustomerOverride && actor.role === 'MANAGER'
           );
 
-          const stockDeviceId = stockItem.devices?.[0]?.id || null;
+          intakeStockItem = stockItem;
+          intakeDevice = stockItem.devices?.[0] || null;
+          const stockDeviceId = intakeDevice?.id || null;
           if (payload.deviceId && stockDeviceId && Number(payload.deviceId) !== Number(stockDeviceId)) {
             throw new RepairError(
               RepairFailureCode.CONFLICT,
@@ -97,6 +116,7 @@ class CreateRepairJobService {
         } else if (payload.deviceId) {
           const device = await repo.findDeviceForIntake(payload.deviceId);
           assertRegisteredDeviceForIntake(device, actor, payload);
+          intakeDevice = device;
           deviceId = device.id;
           stockItemId = device.stockItemId || null;
         }
@@ -131,6 +151,29 @@ class CreateRepairJobService {
           status: 'RECEIVED',
         });
 
+        let deviceIntake = null;
+        if (
+          created.deviceId &&
+          actor.employeeId &&
+          typeof repo.createDeviceIntake === 'function'
+        ) {
+          deviceIntake = await repo.createDeviceIntake({
+            device: { connect: { id: created.deviceId } },
+            branch: { connect: { id: created.branchId } },
+            customer: { connect: { id: created.customerId } },
+            receivedBy: { connect: { id: actor.employeeId } },
+            repairJob: { connect: { id: created.id } },
+            referenceNo: createRepairIntakeReference(created.branchId),
+            customerProblem: created.reportedSymptoms,
+            internalRemark: created.technicianNotes,
+            status: 'LINKED_TO_REPAIR',
+            receivedAt: created.createdAt,
+            snapshot: {
+              create: buildDeviceSnapshot(intakeDevice || created.device, intakeStockItem, payload),
+            },
+          });
+        }
+
         if (created.deviceId && typeof repo.publishPassportEvent === 'function') {
           await repo.publishPassportEvent({
             deviceId: created.deviceId,
@@ -146,6 +189,7 @@ class CreateRepairJobService {
             customerVisible: true,
             metadata: {
               repairJobId: created.id,
+              deviceIntakeId: deviceIntake?.id || null,
               jobNo: created.jobNo,
               customerId: created.customerId,
               stockItemId: created.stockItemId,
@@ -185,3 +229,4 @@ class CreateRepairJobService {
 module.exports = new CreateRepairJobService();
 module.exports.CreateRepairJobService = CreateRepairJobService;
 module.exports.assertRegisteredDeviceForIntake = assertRegisteredDeviceForIntake;
+module.exports.createRepairIntakeReference = createRepairIntakeReference;
