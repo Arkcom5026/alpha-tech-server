@@ -14,9 +14,22 @@ test('unified readiness composes eight tax closing authority domains', () => {
     assert.match(source, new RegExp(`key: '${domain}'`));
   }
   assert.match(source, /documentsReady/);
+  assert.match(source, /inputVatReady/);
   assert.match(source, /reconciliationReady/);
   assert.match(source, /readyForAccountant/);
   assert.match(source, /readinessPercent/);
+});
+
+test('unified readiness blocks active input tax documents that do not yet have Input VAT authority', () => {
+  const source = read('src/modules/tax/readiness/unifiedTaxReadinessService.js');
+  assert.match(source, /loadPendingInputVatApproval/);
+  assert.match(source, /LEFT JOIN "InputVatRecord" record/);
+  assert.match(source, /document\."documentType" = 'INPUT_TAX_INVOICE'/);
+  assert.match(source, /document\."status" IN \('DRAFT', 'REGISTERED', 'UNDER_REVIEW', 'APPROVED'\)/);
+  assert.match(source, /record\."id" IS NULL/);
+  assert.match(source, /INPUT_VAT_DOCUMENT_APPROVAL_REQUIRED/);
+  assert.match(source, /pendingInputVatApproval\.count === 0/);
+  assert.match(source, /INPUT_VAT_FILING_CODES/);
 });
 
 test('unified readiness reuses closing WHT and settlement authorities without duplicate blockers', () => {
@@ -45,6 +58,9 @@ test('exception targets resolve to source workspaces and exact expense review wh
   assert.equal(routeFor({ code: 'TAX_EXPENSE_EVIDENCE_INCOMPLETE', source: 'TAX_EXPENSE' }, 'p1'), 'tax-expenses');
   assert.equal(routeFor({ code: 'WHT_CERTIFICATE_NOT_ISSUED', source: 'WHT_CERTIFICATE' }, 'p1'), 'tax-periods/p1/withholding-tax');
   assert.equal(routeFor({ code: 'VAT_SETTLEMENT_CARRY_FORWARD_AUTHORITY_REQUIRED', source: 'PRIOR_PERIOD_VAT_CREDIT' }, 'p1'), 'tax-periods/p1/vat-settlement');
+  assert.equal(routeFor({ code: 'INPUT_VAT_DOCUMENT_APPROVAL_REQUIRED', source: 'INPUT_VAT' }, 'p1'), 'tax-periods/p1/input-vat-filing');
+  assert.equal(routeFor({ code: 'INPUT_VAT_FILING_NOT_PREPARED', source: 'INPUT_VAT' }, 'p1'), 'tax-periods/p1/input-vat-filing');
+  assert.equal(routeFor({ code: 'INPUT_VAT_FILING_INCOMPLETE', source: 'INPUT_VAT' }, 'p1'), 'tax-periods/p1/input-vat-filing');
   assert.equal(routeFor({ code: 'INPUT_VAT_PERIOD_UNBOUND', source: 'INPUT_VAT' }, 'p1'), 'input-tax-receipts');
   assert.equal(routeFor({ code: 'OUTPUT_VAT_PERIOD_UNBOUND', source: 'OUTPUT_VAT' }, 'p1'), 'output-tax-filings');
 });
