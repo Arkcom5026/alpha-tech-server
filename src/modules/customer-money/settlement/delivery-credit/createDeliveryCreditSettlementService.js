@@ -4,6 +4,13 @@ const { Prisma } = require('../../../../../lib/prisma');
 const { createCustomerMoneyApplication } = require('../../application/createCustomerMoneyApplicationService');
 const { createCustomerMoneyLedger } = require('../../ledger/createCustomerMoneyLedgerService');
 const { updateCustomerMoneyBalance } = require('../../balance/updateCustomerMoneyBalanceService');
+const {
+  calculateAvailableCustomerMoney,
+  consumeCustomerMoneySources,
+} = require('../../balance/customerMoneySourcePoolService');
+const {
+  projectSalePaymentStatus,
+} = require('../../../sales/completion/services/salePaymentPostingService');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -16,11 +23,12 @@ const derivePaymentStatus = ({ totalAmount, paidAmount }) => {
   return 'UNPAID';
 };
 
-const acquireCustomerMoneySettlementLock = (tx, branchId, customerId) => tx.$queryRaw`
-  SELECT pg_advisory_xact_lock(${Number(branchId)}, ${Number(customerId)})
+const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => tx.$queryRaw`
+  SELECT pg_advisory_xact_lock(${-1003}, ${Number(customerId)})
 `;
 
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1002}, ${Number(branchId)})`;
   const yy = String(settledAt.getFullYear()).slice(-2);
   const mm = String(settledAt.getMonth() + 1).padStart(2, '0');
   const dd = String(settledAt.getDate()).padStart(2, '0');
@@ -98,6 +106,36 @@ const lineSnapshot = (sale, requested) => {
   };
 };
 
+const distributeSourcesAcrossLines = (prepared, sourceChunks) => {
+  const sources = sourceChunks.map((source) => ({ ...source, remainingAmount: money(source.amount) }));
+  const allocations = [];
+  let sourceIndex = 0;
+
+  for (const item of prepared) {
+    let lineRemaining = money(item.requested.amount);
+    while (lineRemaining.greaterThan(0)) {
+      const source = sources[sourceIndex];
+      if (!source) {
+        const error = new Error('ไม่สามารถจับคู่แหล่ง Customer Money กับรายการตัดยอดได้ครบ');
+        error.code = 'CUSTOMER_MONEY_ALLOCATION_INCOMPLETE';
+        error.statusCode = 409;
+        throw error;
+      }
+      if (source.remainingAmount.lessThanOrEqualTo(0)) {
+        sourceIndex += 1;
+        continue;
+      }
+      const amount = Prisma.Decimal.min(lineRemaining, source.remainingAmount);
+      allocations.push({ item, sourceType: source.sourceType, sourceId: source.sourceId, amount });
+      lineRemaining = lineRemaining.minus(amount);
+      source.remainingAmount = source.remainingAmount.minus(amount);
+      if (source.remainingAmount.lessThanOrEqualTo(0)) sourceIndex += 1;
+    }
+  }
+
+  return allocations;
+};
+
 const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$transaction(async (tx) => {
   await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId);
   await ensureEmployee(tx, command.branchId, command.createdById);
@@ -113,13 +151,12 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     throw error;
   }
 
-  const balance = await tx.customerMoneyBalance.findUnique({
-    where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
-    select: { id: true, availableAmount: true },
-  });
-  const available = money(balance?.availableAmount);
   const requestedTotal = command.lines.reduce((sum, line) => sum.plus(money(line.amount)), money(0));
-  if (!balance || available.lessThanOrEqualTo(0)) {
+  const available = await calculateAvailableCustomerMoney(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+  });
+  if (available.lessThanOrEqualTo(0)) {
     const error = new Error('ลูกค้าไม่มี Customer Money ที่พร้อมใช้');
     error.code = 'CUSTOMER_MONEY_NOT_AVAILABLE';
     error.statusCode = 409;
@@ -199,17 +236,25 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     },
   });
 
-  for (const item of prepared) {
+  const sourceChunks = await consumeCustomerMoneySources(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+    amount: requestedTotal,
+  });
+  const allocations = distributeSourcesAcrossLines(prepared, sourceChunks);
+
+  for (const allocation of allocations) {
+    const { item } = allocation;
     const application = await createCustomerMoneyApplication({
       client: tx,
       data: {
         branchId: command.branchId,
         customerId: command.customerId,
-        sourceType: 'CUSTOMER_MONEY_BALANCE',
-        sourceId: balance.id,
+        sourceType: allocation.sourceType,
+        sourceId: allocation.sourceId,
         targetType: 'DELIVERY_CREDIT',
         targetId: item.sale.id,
-        amount: money(item.requested.amount),
+        amount: allocation.amount,
         status: 'APPLIED',
         appliedAt: settledAt,
         createdById: command.createdById,
@@ -228,7 +273,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
         quantity: item.snapshot.quantity,
         unitAmount: item.snapshot.unitAmount,
         lineAmount: item.snapshot.lineAmount,
-        appliedAmount: money(item.requested.amount),
+        appliedAmount: allocation.amount,
       },
     });
 
@@ -239,7 +284,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
         customerId: command.customerId,
         applicationId: application.id,
         eventType: 'MONEY_APPLIED',
-        amount: money(item.requested.amount),
+        amount: allocation.amount,
         direction: 'DEBIT',
         referenceType: 'DELIVERY_CREDIT_SETTLEMENT',
         referenceId: settlement.id,
@@ -248,19 +293,14 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     });
   }
 
-  for (const [saleId, applied] of perSale.entries()) {
-    const sale = sales.get(saleId);
-    const nextPaid = money(sale.paidAmount).plus(applied);
-    await tx.sale.update({
-      where: { id: saleId },
-      data: {
-        paidAmount: nextPaid,
-        statusPayment: derivePaymentStatus({ totalAmount: sale.totalAmount, paidAmount: nextPaid }),
-      },
-    });
+  for (const saleId of perSale.keys()) {
+    await projectSalePaymentStatus(tx, saleId);
   }
 
-  const nextBalance = available.minus(requestedTotal);
+  const nextBalance = await calculateAvailableCustomerMoney(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+  });
   await updateCustomerMoneyBalance({
     client: tx,
     branchId: command.branchId,
@@ -282,4 +322,9 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   };
 });
 
-module.exports = { createDeliveryCreditSettlement, derivePaymentStatus, acquireCustomerMoneySettlementLock };
+module.exports = {
+  createDeliveryCreditSettlement,
+  derivePaymentStatus,
+  acquireCustomerMoneySettlementLock,
+  distributeSourcesAcrossLines,
+};
