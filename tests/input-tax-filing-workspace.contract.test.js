@@ -20,6 +20,9 @@ test('exposes period-scoped filing workspace and replay-safe preparation', () =>
   assert.match(controller, /InputTaxCapability\.SELECT_FOR_FILING/);
   assert.match(workspaceService, /prepareInputTaxFilingBatch/);
   assert.match(workspaceRepository, /pg_advisory_xact_lock/);
+  assert.match(workspaceRepository, /\$\{Number\(branchId\)\}::int/);
+  assert.match(workspaceRepository, /\$\{Number\(year\) \* 100 \+ Number\(month\)\}::int/);
+  assert.doesNotMatch(workspaceRepository, /pg_advisory_xact_lock\(\$\{Number\(branchId\)\}, \$\{Number\(year\) \* 100 \+ Number\(month\)\}\)/);
   assert.match(workspaceRepository, /'DRAFT'::"InputTaxFilingStatus"/);
   assert.match(workspaceService, /replayed: true/);
 });
