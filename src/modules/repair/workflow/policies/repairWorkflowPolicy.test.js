@@ -39,16 +39,24 @@ test('covers the canonical workflow-command path up to digital handover', () => 
   assert.equal(closed.targetStatus, REPAIR_WORKFLOW_STATUS.CLOSED);
 });
 
-test('supports an optional pre-agreed service path without removing inspection', () => {
+test('keeps inspection and pre-agreed flows optional while allowing direct work start', () => {
   const receivedActions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.RECEIVED);
   assert.deepEqual(
     receivedActions.map((item) => item.action),
     [
+      REPAIR_WORKFLOW_ACTION.START_REPAIR,
       REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
       REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
       REPAIR_WORKFLOW_ACTION.CANCEL,
     ]
   );
+
+  const directStart = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_ACTION.START_REPAIR
+  );
+  assert.equal(directStart.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
+  assert.equal(directStart.passportEventType, 'REPAIR_STATUS_CHANGED');
 
   const fastPath = resolveRepairWorkflowTransition(
     REPAIR_WORKFLOW_STATUS.RECEIVED,
@@ -57,11 +65,11 @@ test('supports an optional pre-agreed service path without removing inspection',
   assert.equal(fastPath.targetStatus, REPAIR_WORKFLOW_STATUS.APPROVED);
   assert.equal(fastPath.passportEventType, 'REPAIR_STATUS_CHANGED');
 
-  const standardPath = resolveRepairWorkflowTransition(
+  const inspectionPath = resolveRepairWorkflowTransition(
     REPAIR_WORKFLOW_STATUS.RECEIVED,
     REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS
   );
-  assert.equal(standardPath.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_DIAGNOSIS);
+  assert.equal(inspectionPath.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_DIAGNOSIS);
 });
 
 test('supports waiting for parts and resuming repair', () => {
@@ -114,6 +122,7 @@ test('rejects illegal transitions and exposes available actions', () => {
       assert.deepEqual(
         error.details.availableActions.map((item) => item.action),
         [
+          REPAIR_WORKFLOW_ACTION.START_REPAIR,
           REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
           REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
           REPAIR_WORKFLOW_ACTION.CANCEL,
