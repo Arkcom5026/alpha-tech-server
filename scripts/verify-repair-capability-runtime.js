@@ -28,6 +28,7 @@ const syntaxFiles = [
   'src/modules/repair/create/createRepairJobService.js',
   'src/modules/repair/external-intake/createExternalDeviceIntakeService.js',
   'src/modules/repair/workflow/policies/repairWorkflowPolicy.js',
+  'src/modules/repair/workflow/commands/transitionRepairWorkflowRepository.js',
   'src/modules/repair/workflow/commands/transitionRepairWorkflowService.js',
   'src/modules/repair/estimate-approval/repairEstimateApprovalService.js',
   'src/modules/repair/parts/addRepairPartService.js',
