@@ -6,6 +6,7 @@ const {
   createDeliveryCreditSettlementController,
   listDeliveryCreditSettlementsController,
   getDeliveryCreditSettlementController,
+  cancelDeliveryCreditSettlementController,
 } = require('./deliveryCreditSettlementController');
 
 const createDeliveryCreditSettlementRoute = ({ verifyToken, runtime }) => {
@@ -19,6 +20,7 @@ const createDeliveryCreditSettlementRoute = ({ verifyToken, runtime }) => {
   router.get('/', listDeliveryCreditSettlementsController);
   router.get('/:id', getDeliveryCreditSettlementController);
   router.post('/', createDeliveryCreditSettlementController);
+  router.post('/:id/cancel', cancelDeliveryCreditSettlementController);
   return router;
 };
 
