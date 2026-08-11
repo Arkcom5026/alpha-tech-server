@@ -23,7 +23,10 @@ function job(overrides = {}) {
     status: 'RECEIVED',
     estimatedCost: 0,
     technicianNotes: null,
-    device: { id: 77, passportEvents: [] },
+    device: {
+      id: 77,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'ACCEPTED' } }],
+    },
     deviceIntake: completeIntake(),
     preAgreedService: {
       enabled: true,
@@ -57,7 +60,7 @@ function repositoryFor(repairJob) {
   };
 }
 
-test('repair authorization skips inspection and quotation without requiring an agreed amount', async () => {
+test('repair authorization starts repair after technician acceptance without requiring an agreed amount', async () => {
   const repo = repositoryFor(job());
   const service = new TransitionRepairWorkflowService(repo);
 
@@ -67,21 +70,44 @@ test('repair authorization skips inspection and quotation without requiring an a
       repairJobId: 88,
       action: 'START_PRE_AGREED_SERVICE',
       commandKey: 'authorized-88',
-      expectedWorkflowStatus: 'RECEIVED',
+      expectedWorkflowStatus: 'ACCEPTED',
     }
   );
 
-  assert.equal(result.previousStatus, 'RECEIVED');
-  assert.equal(result.status, 'APPROVED');
+  assert.equal(result.previousStatus, 'ACCEPTED');
+  assert.equal(result.status, 'REPAIRING');
   assert.equal(result.legacyStatus, 'IN_PROGRESS');
   assert.equal(result.preAgreedService.agreedAmount, null);
   assert.equal(result.preAgreedService.authorizationMode, 'REPAIR_AUTHORIZED');
-  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'APPROVED');
+  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'REPAIRING');
   assert.deepEqual(repo.calls.event.metadata.preAgreedService, job().preAgreedService);
   assert.match(repo.calls.event.description, /อนุมัติ/);
 });
 
-test('authorized fast path is blocked without customer authorization evidence', async () => {
+test('authorized repair cannot start before technician acceptance', async () => {
+  const repairJob = job({
+    device: { id: 77, passportEvents: [] },
+  });
+  const repo = repositoryFor(repairJob);
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 2, employeeId: 35 },
+      {
+        repairJobId: 88,
+        action: 'START_PRE_AGREED_SERVICE',
+        commandKey: 'authorized-before-accept',
+        expectedWorkflowStatus: 'RECEIVED',
+      }
+    ),
+    (error) => error.code === 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
+});
+
+test('authorized repair is blocked without customer authorization evidence', async () => {
   const repairJob = job({ preAgreedService: null });
   const repo = repositoryFor(repairJob);
   const service = new TransitionRepairWorkflowService(repo);
@@ -93,6 +119,7 @@ test('authorized fast path is blocked without customer authorization evidence', 
         repairJobId: 88,
         action: 'START_PRE_AGREED_SERVICE',
         commandKey: 'authorized-missing',
+        expectedWorkflowStatus: 'ACCEPTED',
       }
     ),
     (error) => error.code === 'PRE_AGREED_SERVICE_REQUIRED'
@@ -101,7 +128,7 @@ test('authorized fast path is blocked without customer authorization evidence', 
   assert.equal(repo.calls.event, undefined);
 });
 
-test('authorized fast path still requires completed intake consent', async () => {
+test('authorized repair still requires completed intake consent', async () => {
   const repairJob = job({ deviceIntake: null });
   const repo = repositoryFor(repairJob);
   const service = new TransitionRepairWorkflowService(repo);
@@ -113,6 +140,7 @@ test('authorized fast path still requires completed intake consent', async () =>
         repairJobId: 88,
         action: 'START_PRE_AGREED_SERVICE',
         commandKey: 'authorized-no-consent',
+        expectedWorkflowStatus: 'ACCEPTED',
       }
     ),
     (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'

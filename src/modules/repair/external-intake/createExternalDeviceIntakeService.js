@@ -165,12 +165,9 @@ class CreateExternalDeviceIntakeService {
         workflowStatus: 'RECEIVED',
         availableActions: [
           {
-            action: 'QUEUE_DIAGNOSIS',
-            targetStatus: 'WAITING_DIAGNOSIS',
+            action: 'ACCEPT_JOB',
+            targetStatus: 'ACCEPTED',
           },
-          ...(payload.preAgreedService
-            ? [{ action: 'START_PRE_AGREED_SERVICE', targetStatus: 'APPROVED' }]
-            : []),
         ],
         preAgreedService: payload.preAgreedService || null,
       };
