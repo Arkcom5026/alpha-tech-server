@@ -45,14 +45,23 @@ async function getStaff(actor, repairJobId) {
 async function finalize(actor, repairJobId, payload) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
-  const delivery = await repository.findDelivery(job.id);
+  let delivery = await repository.findDelivery(job.id);
   if (delivery?.status === 'DELIVERED') {
     return { ...mapHandover(delivery), workflowStatus: 'DELIVERED' };
   }
   const workflowStatus = await workflowStatusFor(job);
   const input = validateFinalization(workflowStatus, delivery, payload);
+
+  if (!delivery?.customerConfirmedAt && input.receiverName) {
+    delivery = await repository.confirmCustomer(job.id, {
+      receiverName: input.receiverName,
+      receiverPhone: input.receiverPhone,
+      note: input.note,
+    });
+  }
+
   const snapshot = {
-    contractVersion: 'repair-handover.v2',
+    contractVersion: 'repair-handover.v3',
     jobNo: job.jobNo, branchId: job.branchId, customerId: job.customerId,
     deviceId: job.deviceId, customerConfirmedBy: delivery.customerConfirmedBy,
     customerConfirmedAt: delivery.customerConfirmedAt,
@@ -61,6 +70,7 @@ async function finalize(actor, repairJobId, payload) {
     accessories: job.deviceIntake?.accessories || [],
     workflowPreviousStatus: workflowStatus,
     workflowTargetStatus: 'DELIVERED',
+    confirmationMode: input.receiverName ? 'STAFF_COUNTER' : 'CUSTOMER_PUBLIC',
     checks: { paymentConfirmed: true, deviceReturned: true, accessoriesReturned: true },
   };
   const finalized = await repository.finalize(job.id, actor.employeeId, input, snapshot);

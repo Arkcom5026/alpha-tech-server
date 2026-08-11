@@ -40,11 +40,19 @@ test('handover finalization publishes DELIVERED as repair workflow authority', (
   assert.match(serviceSource, /workflowStatus: 'DELIVERED'/);
 });
 
-test('handover service preserves delivered idempotency before workflow gating', () => {
+test('staff counter handover creates receiver confirmation when public confirmation was skipped', () => {
   const serviceSource = read('repairHandoverService.js');
-  const deliveredGuard = serviceSource.indexOf("existing?.status === 'DELIVERED'");
-  const workflowLookup = serviceSource.indexOf('const workflowStatus = await workflowStatusFor(job);');
 
-  assert.ok(deliveredGuard >= 0);
-  assert.ok(workflowLookup > deliveredGuard);
+  assert.match(serviceSource, /!delivery\?\.customerConfirmedAt && input\.receiverName/);
+  assert.match(serviceSource, /repository\.confirmCustomer\(job\.id/);
+  assert.match(serviceSource, /confirmationMode: input\.receiverName \? 'STAFF_COUNTER' : 'CUSTOMER_PUBLIC'/);
+  assert.match(serviceSource, /contractVersion: 'repair-handover\.v3'/);
+});
+
+test('public handover confirmation remains supported alongside the counter path', () => {
+  const serviceSource = read('repairHandoverService.js');
+
+  assert.match(serviceSource, /async function confirmPublic/);
+  assert.match(serviceSource, /validateCustomerConfirmation\(workflowStatus, payload\)/);
+  assert.match(serviceSource, /trackingRepository\.touch\(access\.id\)/);
 });
