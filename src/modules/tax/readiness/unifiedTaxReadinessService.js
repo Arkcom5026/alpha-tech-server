@@ -21,11 +21,19 @@ const SETTLEMENT_DUPLICATES = new Set([
   'VAT_SETTLEMENT_PERIOD_NOT_LOCKED',
 ]);
 
+const INPUT_VAT_FILING_CODES = new Set([
+  'INPUT_VAT_FILING_NOT_PREPARED',
+  'INPUT_VAT_FILING_INCOMPLETE',
+]);
+
 const routeFor = (exception, taxPeriodId) => {
   const code = String(exception?.code || '');
   const source = String(exception?.source || '');
   if (source === 'TAX_EXPENSE' && Number.isInteger(Number(exception?.taxExpenseId)) && Number(exception.taxExpenseId) > 0) {
     return `tax-expenses?assessmentExpenseId=${Number(exception.taxExpenseId)}`;
+  }
+  if (INPUT_VAT_FILING_CODES.has(code)) {
+    return `tax-periods/${taxPeriodId}/input-vat-filing`;
   }
   if (code.startsWith('VAT_SETTLEMENT_') || ['PRIOR_PERIOD_VAT_CREDIT', 'HISTORICAL_OPENING_VAT_CREDIT'].includes(source)) {
     return `tax-periods/${taxPeriodId}/vat-settlement`;
@@ -135,9 +143,11 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     && closingPackage.readiness?.expenseEvidenceComplete === true;
   const reconciliationReady = vatSettlement.readiness?.outputFilingReconciled === true
     && vatSettlement.readiness?.inputCreditAuthorityReady === true;
+  const inputVatTarget = exceptions.find((entry) => entry.source === 'INPUT_VAT')?.target?.relativePath
+    || `tax-periods/${taxPeriodId}/input-vat-filing`;
   const domains = Object.freeze([
     Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: closingPackage.readiness?.outputVatReady === true, target: 'output-tax-filings' }),
-    Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: closingPackage.readiness?.inputVatReady === true, target: 'input-tax-receipts' }),
+    Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: closingPackage.readiness?.inputVatReady === true, target: inputVatTarget }),
     Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: expensesReady, target: 'tax-expenses' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', label: 'WHT', ready: withholding.readiness?.readyForAccountant === true, target: `tax-periods/${taxPeriodId}/withholding-tax` }),
     Object.freeze({ key: 'DOCUMENTS', label: 'Documents', ready: documentsReady, target: `tax-periods/${taxPeriodId}/accounting-office` }),
