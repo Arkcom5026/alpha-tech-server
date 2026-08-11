@@ -9,6 +9,13 @@ const {
 const {
   updateCustomerMoneyBalance,
 } = require('../../../customer-money/balance/updateCustomerMoneyBalanceService');
+const {
+  calculateAvailableCustomerMoney,
+  getLegacyBalanceReservation,
+} = require('../../../customer-money/balance/customerMoneySourcePoolService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../../customer-money/shared/customerMoneyTransactionLock');
 
 const NORMALIZE_DECIMAL_TO_NUMBER = process.env.NORMALIZE_DECIMAL_TO_NUMBER !== '0';
 
@@ -75,6 +82,17 @@ const sumMoneyReceipts = (receipts = []) => receipts.reduce(
   new Prisma.Decimal(0)
 );
 
+const calculateCustomerMoneyBalance = async (tx, { customerId, branchId }) => {
+  if (tx?.customerDeposit?.findMany && tx?.customerReceipt?.findMany) {
+    return calculateAvailableCustomerMoney(tx, { customerId, branchId });
+  }
+  const [activeDeposits, activeMoneyReceipts] = await Promise.all([
+    repository.findActiveDepositBalancesByCustomer({ customerId, branchId, client: tx }),
+    repository.findActiveMoneyReceiptBalancesByCustomer({ customerId, branchId, client: tx }),
+  ]);
+  return sumDeposits(activeDeposits).plus(sumMoneyReceipts(activeMoneyReceipts));
+};
+
 const projectDeposit = (deposit) => {
   const base = NORMALIZE_DECIMAL_TO_NUMBER ? normalizeDeposit(deposit) : deposit;
   return {
@@ -130,10 +148,11 @@ const createCustomerDeposit = async ({ body = {}, user = {} }) => {
     note,
     customerId,
   } = body;
-  const employeeId = user.employeeId;
+  const employeeId = Number(user.employeeId);
   const branchId = Number(user.branchId);
+  const normalizedCustomerId = Number(customerId);
 
-  if (!customerId || !employeeId || !branchId) {
+  if (!normalizedCustomerId || !employeeId || !branchId) {
     return {
       status: 400,
       body: { message: 'ข้อมูลไม่ครบ (customerId/employeeId/branchId)' },
@@ -157,19 +176,46 @@ const createCustomerDeposit = async ({ body = {}, user = {} }) => {
     return { status: 400, body: { message: 'ยอดรวมต้องมากกว่า 0' } };
   }
 
-  const deposit = await repository.createDeposit({
-    cashAmount: cash,
-    transferAmount: transfer,
-    cardAmount: card,
-    totalAmount: total,
-    note,
-    customerId,
-    createdBy: employeeId,
-    branchId,
-    status: 'ACTIVE',
+  const result = await repository.runTransaction(async (tx) => {
+    await acquireCustomerMoneyTransactionLock(tx, normalizedCustomerId);
+    const customer = await repository.findCustomerById({
+      customerId: normalizedCustomerId,
+      branchId,
+      client: tx,
+    });
+    if (!customer) {
+      return { error: { status: 404, body: { message: 'ไม่พบลูกค้าในสาขานี้' } } };
+    }
+
+    const deposit = await repository.createDeposit({
+      client: tx,
+      data: {
+        cashAmount: cash,
+        transferAmount: transfer,
+        cardAmount: card,
+        totalAmount: total,
+        note,
+        customerId: normalizedCustomerId,
+        createdBy: employeeId,
+        branchId,
+        status: 'ACTIVE',
+      },
+    });
+    const availableAmount = await calculateCustomerMoneyBalance(tx, {
+      customerId: normalizedCustomerId,
+      branchId,
+    });
+    await updateCustomerMoneyBalance({
+      client: tx,
+      branchId,
+      customerId: normalizedCustomerId,
+      availableAmount,
+    });
+    return { deposit };
   });
 
-  return { status: 201, body: projectDeposit(deposit) };
+  if (result.error) return result.error;
+  return { status: 201, body: projectDeposit(result.deposit) };
 };
 
 const getAllCustomerDeposits = async ({ branchId }) => {
@@ -320,13 +366,6 @@ const updateCustomerDeposit = async ({ id, body = {}, branchId }) => {
   if (!normalizedBranchId) {
     return { status: 401, body: { message: 'unauthorized' } };
   }
-  const existing = await repository.findActiveDepositByIdAndBranch({
-    id: normalizedId,
-    branchId: normalizedBranchId,
-  });
-  if (!existing) {
-    return { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } };
-  }
 
   const moneyFields = ['cashAmount', 'transferAmount', 'cardAmount'];
   for (const field of moneyFields) {
@@ -340,33 +379,83 @@ const updateCustomerDeposit = async ({ id, body = {}, branchId }) => {
     }
   }
 
-  const cash = body.cashAmount !== undefined ? D(body.cashAmount) : D(existing.cashAmount);
-  const transfer = body.transferAmount !== undefined
-    ? D(body.transferAmount)
-    : D(existing.transferAmount);
-  const card = body.cardAmount !== undefined ? D(body.cardAmount) : D(existing.cardAmount);
-  const total = cash.plus(transfer).plus(card);
-  if (total.lessThanOrEqualTo(0)) {
-    return { status: 400, body: { message: 'ยอดรวมต้องมากกว่า 0' } };
-  }
-  if (total.lessThan(D(existing.usedAmount || 0))) {
-    return {
-      status: 400,
-      body: { message: 'ยอดรวมใหม่ต้องไม่น้อยกว่ายอดที่ใช้ไปแล้ว' },
-    };
-  }
+  const result = await repository.runTransaction(async (tx) => {
+    let existing = await repository.findActiveDepositByIdAndBranch({
+      id: normalizedId,
+      branchId: normalizedBranchId,
+      client: tx,
+    });
+    if (!existing) {
+      return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
+    }
 
-  const updated = await repository.updateDepositById({
-    id: normalizedId,
-    data: {
-      cashAmount: cash,
-      transferAmount: transfer,
-      cardAmount: card,
-      totalAmount: total,
-      ...(body.note !== undefined ? { note: body.note } : {}),
-    },
+    await acquireCustomerMoneyTransactionLock(tx, existing.customerId);
+    existing = await repository.findActiveDepositByIdAndBranch({
+      id: normalizedId,
+      branchId: normalizedBranchId,
+      client: tx,
+    });
+    if (!existing) {
+      return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
+    }
+
+    const legacyReserved = await getLegacyBalanceReservation(tx, {
+      branchId: normalizedBranchId,
+      customerId: existing.customerId,
+    });
+    if (legacyReserved.greaterThan(0)) {
+      return {
+        error: {
+          status: 409,
+          body: { message: 'ไม่สามารถแก้ไขเงินมัดจำขณะมีรายการตัดยอด Customer Money เดิมที่ยังใช้งานอยู่' },
+        },
+      };
+    }
+
+    const cash = body.cashAmount !== undefined ? D(body.cashAmount) : D(existing.cashAmount);
+    const transfer = body.transferAmount !== undefined
+      ? D(body.transferAmount)
+      : D(existing.transferAmount);
+    const card = body.cardAmount !== undefined ? D(body.cardAmount) : D(existing.cardAmount);
+    const total = cash.plus(transfer).plus(card);
+    if (total.lessThanOrEqualTo(0)) {
+      return { error: { status: 400, body: { message: 'ยอดรวมต้องมากกว่า 0' } } };
+    }
+    if (total.lessThan(D(existing.usedAmount || 0))) {
+      return {
+        error: {
+          status: 400,
+          body: { message: 'ยอดรวมใหม่ต้องไม่น้อยกว่ายอดที่ใช้ไปแล้ว' },
+        },
+      };
+    }
+
+    const updated = await repository.updateDepositById({
+      id: normalizedId,
+      client: tx,
+      data: {
+        cashAmount: cash,
+        transferAmount: transfer,
+        cardAmount: card,
+        totalAmount: total,
+        ...(body.note !== undefined ? { note: body.note } : {}),
+      },
+    });
+    const availableAmount = await calculateCustomerMoneyBalance(tx, {
+      customerId: existing.customerId,
+      branchId: normalizedBranchId,
+    });
+    await updateCustomerMoneyBalance({
+      client: tx,
+      branchId: normalizedBranchId,
+      customerId: existing.customerId,
+      availableAmount,
+    });
+    return { updated };
   });
-  return { status: 200, body: projectDeposit(updated) };
+
+  if (result.error) return result.error;
+  return { status: 200, body: projectDeposit(result.updated) };
 };
 
 const deleteCustomerDeposit = async ({ id, branchId }) => {
@@ -378,20 +467,60 @@ const deleteCustomerDeposit = async ({ id, branchId }) => {
   if (!normalizedBranchId) {
     return { status: 401, body: { message: 'unauthorized' } };
   }
-  const existing = await repository.findActiveDepositByIdAndBranch({
-    id: normalizedId,
-    branchId: normalizedBranchId,
+
+  const result = await repository.runTransaction(async (tx) => {
+    let existing = await repository.findActiveDepositByIdAndBranch({
+      id: normalizedId,
+      branchId: normalizedBranchId,
+      client: tx,
+    });
+    if (!existing) {
+      return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
+    }
+
+    await acquireCustomerMoneyTransactionLock(tx, existing.customerId);
+    existing = await repository.findActiveDepositByIdAndBranch({
+      id: normalizedId,
+      branchId: normalizedBranchId,
+      client: tx,
+    });
+    if (!existing) {
+      return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
+    }
+    if (D(existing.usedAmount || 0).greaterThan(0)) {
+      return {
+        error: { status: 400, body: { message: 'ไม่สามารถลบเงินมัดจำที่ถูกใช้ไปแล้ว' } },
+      };
+    }
+
+    const legacyReserved = await getLegacyBalanceReservation(tx, {
+      branchId: normalizedBranchId,
+      customerId: existing.customerId,
+    });
+    if (legacyReserved.greaterThan(0)) {
+      return {
+        error: {
+          status: 409,
+          body: { message: 'ไม่สามารถลบเงินมัดจำขณะมีรายการตัดยอด Customer Money เดิมที่ยังใช้งานอยู่' },
+        },
+      };
+    }
+
+    await repository.deleteDepositById({ id: normalizedId, client: tx });
+    const availableAmount = await calculateCustomerMoneyBalance(tx, {
+      customerId: existing.customerId,
+      branchId: normalizedBranchId,
+    });
+    await updateCustomerMoneyBalance({
+      client: tx,
+      branchId: normalizedBranchId,
+      customerId: existing.customerId,
+      availableAmount,
+    });
+    return { deleted: true };
   });
-  if (!existing) {
-    return { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } };
-  }
-  if (D(existing.usedAmount || 0).greaterThan(0)) {
-    return {
-      status: 400,
-      body: { message: 'ไม่สามารถลบเงินมัดจำที่ถูกใช้ไปแล้ว' },
-    };
-  }
-  await repository.deleteDepositById(normalizedId);
+
+  if (result.error) return result.error;
   return { status: 200, body: { message: 'ลบข้อมูลมัดจำสำเร็จ' } };
 };
 
@@ -417,7 +546,7 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
   }
 
   const result = await repository.runTransaction(async (tx) => {
-    const deposit = await repository.findActiveDepositByIdAndBranch({
+    let deposit = await repository.findActiveDepositByIdAndBranch({
       id: depositId,
       branchId,
       client: tx,
@@ -430,16 +559,47 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
         error: { status: 400, body: { message: 'customer deposit must belong to a customer' } },
       };
     }
+
+    await acquireCustomerMoneyTransactionLock(tx, deposit.customerId);
+    deposit = await repository.findActiveDepositByIdAndBranch({
+      id: depositId,
+      branchId,
+      client: tx,
+    });
+    if (!deposit) {
+      return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
+    }
+
+    if (tx?.sale?.findFirst) {
+      const sale = await tx.sale.findFirst({
+        where: {
+          id: saleId,
+          branchId,
+          customerId: deposit.customerId,
+          status: { not: 'CANCELLED' },
+        },
+        select: { id: true },
+      });
+      if (!sale) {
+        return {
+          error: { status: 409, body: { message: 'ใบขายไม่อยู่ในสาขา/ลูกค้าเดียวกับเงินมัดจำ' } },
+        };
+      }
+    }
+
     const remaining = getDepositRemainingDecimal(deposit);
     if (amountDecimal.greaterThan(remaining)) {
       return {
         error: { status: 400, body: { message: 'ยอดมัดจำคงเหลือไม่เพียงพอ' } },
       };
     }
+    const nextUsedAmount = D(deposit.usedAmount || 0).plus(amountDecimal);
+    const fullyUsed = nextUsedAmount.greaterThanOrEqualTo(D(deposit.totalAmount || 0));
     const updated = await repository.updateDepositById({
       id: depositId,
       data: {
-        usedAmount: D(deposit.usedAmount || 0).plus(amountDecimal),
+        usedAmount: nextUsedAmount,
+        ...(fullyUsed ? { status: 'USED' } : {}),
       },
       client: tx,
     });
@@ -471,19 +631,10 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
         createdById: employeeId,
       },
     });
-    const [activeDeposits, activeMoneyReceipts] = await Promise.all([
-      repository.findActiveDepositBalancesByCustomer({
-        customerId: deposit.customerId,
-        branchId,
-        client: tx,
-      }),
-      repository.findActiveMoneyReceiptBalancesByCustomer({
-        customerId: deposit.customerId,
-        branchId,
-        client: tx,
-      }),
-    ]);
-    const availableAmount = sumDeposits(activeDeposits).plus(sumMoneyReceipts(activeMoneyReceipts));
+    const availableAmount = await calculateCustomerMoneyBalance(tx, {
+      customerId: deposit.customerId,
+      branchId,
+    });
     await updateCustomerMoneyBalance({
       client: tx,
       branchId,
@@ -513,4 +664,5 @@ module.exports = {
   getCustomerAndDepositByName,
   getCustomerAndDepositByCustomerId,
   useCustomerDeposit,
+  calculateCustomerMoneyBalance,
 };
