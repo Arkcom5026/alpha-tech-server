@@ -14,9 +14,9 @@ const createRuntime = () => ({
     prisma,
     command: parseEligibleSalesQuery(query, user),
   }),
-  create: (input, user) => createDeliveryCreditSettlement({
+  create: (input, user, idempotencyKey) => createDeliveryCreditSettlement({
     prisma,
-    command: parseCreateSettlementInput(input, user),
+    command: parseCreateSettlementInput(input, user, idempotencyKey),
   }),
   list: (query, user) => listDeliveryCreditSettlements({ prisma, user, query }),
   getById: (id, user) => getDeliveryCreditSettlement({ prisma, user, id }),
