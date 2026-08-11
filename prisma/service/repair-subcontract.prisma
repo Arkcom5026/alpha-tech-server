@@ -27,4 +27,6 @@ model RepairSubcontract {
   @@index([branchId, status, sentAt])
   @@index([repairJobId, sentAt])
   @@index([repairJobId, status])
+  @@index([sentByEmployeeId])
+  @@index([returnedByEmployeeId])
 }

@@ -31,7 +31,15 @@ CREATE TABLE "RepairSubcontract" (
   CONSTRAINT "RepairSubcontract_providerQuotedAmount_check"
     CHECK ("providerQuotedAmount" IS NULL OR "providerQuotedAmount" >= 0),
   CONSTRAINT "RepairSubcontract_actualExternalCost_check"
-    CHECK ("actualExternalCost" IS NULL OR "actualExternalCost" >= 0)
+    CHECK ("actualExternalCost" IS NULL OR "actualExternalCost" >= 0),
+  CONSTRAINT "RepairSubcontract_branchId_fkey"
+    FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "RepairSubcontract_repairJobId_fkey"
+    FOREIGN KEY ("repairJobId") REFERENCES "RepairJob"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "RepairSubcontract_sentByEmployeeId_fkey"
+    FOREIGN KEY ("sentByEmployeeId") REFERENCES "EmployeeProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "RepairSubcontract_returnedByEmployeeId_fkey"
+    FOREIGN KEY ("returnedByEmployeeId") REFERENCES "EmployeeProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 CREATE INDEX "RepairSubcontract_branchId_status_sentAt_idx"
@@ -42,6 +50,12 @@ CREATE INDEX "RepairSubcontract_repairJobId_sentAt_idx"
 
 CREATE INDEX "RepairSubcontract_repairJobId_status_idx"
   ON "RepairSubcontract"("repairJobId", "status");
+
+CREATE INDEX "RepairSubcontract_sentByEmployeeId_idx"
+  ON "RepairSubcontract"("sentByEmployeeId");
+
+CREATE INDEX "RepairSubcontract_returnedByEmployeeId_idx"
+  ON "RepairSubcontract"("returnedByEmployeeId");
 
 CREATE UNIQUE INDEX "RepairSubcontract_one_active_per_job_key"
   ON "RepairSubcontract"("repairJobId")
