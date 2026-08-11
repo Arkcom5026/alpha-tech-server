@@ -4,6 +4,7 @@ const {
   hashToken,
   mapCustomerStatus,
   mapWorkflowCustomerStatus,
+  mapPublicWorkflowEvent,
   toPublicProjection,
 } = require('./repairTrackingAccessService');
 
@@ -82,14 +83,15 @@ test('completed repair maps to customer-ready status', () => {
   });
 });
 
-test('READY_FOR_DELIVERY workflow overrides legacy in-progress projection for customer pickup', () => {
+test('READY_FOR_DELIVERY customer copy stays correct when QC was intentionally skipped', () => {
   const status = mapWorkflowCustomerStatus('READY_FOR_DELIVERY', 'IN_PROGRESS');
   assert.deepEqual(status, {
     code: 'READY',
     label: 'พร้อมรับเครื่อง',
-    description: 'งานซ่อมและการตรวจ QC เสร็จแล้ว กรุณายืนยันการรับเครื่องเพื่อดำเนินการส่งมอบ',
+    description: 'งานเสร็จและพร้อมส่งมอบแล้ว กรุณายืนยันการรับเครื่องเมื่อมาถึงร้าน',
     stage: 4,
   });
+  assert.doesNotMatch(status.description, /QC/);
 
   const projection = toPublicProjection(publicJobFixture(), [], 'READY_FOR_DELIVERY');
   assert.equal(projection.repair.status.code, 'READY');
@@ -101,4 +103,59 @@ test('workflow authority keeps waiting-parts and cancellation customer projectio
   assert.equal(mapWorkflowCustomerStatus('WAITING_PARTS', 'IN_PROGRESS').code, 'WAITING_PARTS');
   assert.equal(mapWorkflowCustomerStatus('CANCELLED', 'IN_PROGRESS').code, 'CANCELLED');
   assert.equal(mapWorkflowCustomerStatus('DIAGNOSING', 'RECEIVED').code, 'IN_PROGRESS');
+});
+
+test('public workflow events replace internal action codes with customer-friendly milestones', () => {
+  const directStart = mapPublicWorkflowEvent({
+    eventType: 'REPAIR_STATUS_CHANGED',
+    title: 'งานซ่อม RE-9: START_REPAIR',
+    description: null,
+    occurredAt: new Date('2026-08-11T04:00:00Z'),
+    metadata: { action: 'START_REPAIR', workflowTargetStatus: 'REPAIRING' },
+  });
+  assert.equal(directStart.type, 'IN_PROGRESS');
+  assert.equal(directStart.title, 'เริ่มดำเนินการแล้ว');
+  assert.doesNotMatch(directStart.title, /START_REPAIR/);
+
+  const directComplete = mapPublicWorkflowEvent({
+    eventType: 'REPAIR_STATUS_CHANGED',
+    title: 'งานซ่อม RE-9: COMPLETE_REPAIR_DIRECT',
+    description: 'ติดตั้งระบบและทดสอบใช้งานปกติ',
+    occurredAt: new Date('2026-08-11T05:00:00Z'),
+    metadata: { action: 'COMPLETE_REPAIR_DIRECT', workflowTargetStatus: 'READY_FOR_DELIVERY' },
+  });
+  assert.equal(directComplete.type, 'READY');
+  assert.equal(directComplete.title, 'พร้อมรับเครื่อง');
+  assert.equal(directComplete.description, 'ติดตั้งระบบและทดสอบใช้งานปกติ');
+  assert.doesNotMatch(directComplete.title, /COMPLETE_REPAIR_DIRECT/);
+});
+
+test('public projection never exposes simplified-flow command names in passport timeline titles', () => {
+  const job = publicJobFixture({
+    device: {
+      ...publicJobFixture().device,
+      passportEvents: [
+        {
+          eventType: 'REPAIR_STATUS_CHANGED',
+          title: 'งานซ่อม RE-9: START_REPAIR',
+          description: null,
+          occurredAt: new Date('2026-08-11T04:00:00Z'),
+          metadata: { action: 'START_REPAIR', workflowTargetStatus: 'REPAIRING' },
+        },
+        {
+          eventType: 'REPAIR_STATUS_CHANGED',
+          title: 'งานซ่อม RE-9: COMPLETE_REPAIR_DIRECT',
+          description: 'พร้อมใช้งาน',
+          occurredAt: new Date('2026-08-11T05:00:00Z'),
+          metadata: { action: 'COMPLETE_REPAIR_DIRECT', workflowTargetStatus: 'READY_FOR_DELIVERY' },
+        },
+      ],
+    },
+  });
+
+  const projection = toPublicProjection(job, [], 'READY_FOR_DELIVERY');
+  const titles = projection.repair.timeline.map((event) => event.title).join(' | ');
+  assert.doesNotMatch(titles, /START_REPAIR|COMPLETE_REPAIR_DIRECT/);
+  assert.match(titles, /เริ่มดำเนินการแล้ว/);
+  assert.match(titles, /พร้อมรับเครื่อง/);
 });
