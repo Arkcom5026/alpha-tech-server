@@ -95,7 +95,9 @@ const listPeriodInputVatAuthorities = async ({ branchId, taxPeriodId, startDate,
       record."subtotalAmount",
       record."taxAmount",
       record."totalAmount",
-      record."currency"
+      record."currency",
+      record."supplierName",
+      record."supplierTaxId"
     FROM "InputVatRecord" record
     WHERE record."branchId" = ${Number(branchId)}
       AND record."ledgerType" IN (
