@@ -140,7 +140,7 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
 };
 
 const PAYMENT_METHODS = new Set(['CASH', 'TRANSFER', 'CARD', 'QR', 'E_WALLET', 'CHEQUE', 'OTHER', 'DEPOSIT']);
-const RECEIPT_STATUSES = new Set(['ACTIVE', 'CANCELLED']);
+const RECEIPT_STATUSES = new Set(['ACTIVE', 'FULLY_ALLOCATED', 'CANCELLED']);
 
 const parseHistoryDate = (value, endOfDay = false) => {
   const raw = String(value || '').trim();
