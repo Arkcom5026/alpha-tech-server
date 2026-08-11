@@ -40,7 +40,7 @@ function mapWorkflowCustomerStatus(workflowStatus, legacyStatus) {
     return {
       code: 'READY',
       label: 'พร้อมรับเครื่อง',
-      description: 'งานซ่อมและการตรวจ QC เสร็จแล้ว กรุณายืนยันการรับเครื่องเพื่อดำเนินการส่งมอบ',
+      description: 'งานเสร็จและพร้อมส่งมอบแล้ว กรุณายืนยันการรับเครื่องเมื่อมาถึงร้าน',
       stage: 4,
     };
   }
@@ -61,6 +61,57 @@ function mapWorkflowCustomerStatus(workflowStatus, legacyStatus) {
     return mapCustomerStatus('IN_PROGRESS');
   }
   return mapCustomerStatus(legacyStatus);
+}
+
+function mapPublicWorkflowEvent(event) {
+  const action = event?.metadata?.action || null;
+  const targetStatus = event?.metadata?.workflowTargetStatus || null;
+
+  const actionCopy = {
+    START_REPAIR: { type: 'IN_PROGRESS', title: 'เริ่มดำเนินการแล้ว' },
+    START_PRE_AGREED_SERVICE: { type: 'IN_PROGRESS', title: 'เริ่มดำเนินการตามที่ตกลงแล้ว' },
+    START_DIAGNOSIS: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการ' },
+    COMPLETE_DIAGNOSIS: { type: 'IN_PROGRESS', title: 'ตรวจสอบอุปกรณ์แล้ว' },
+    APPROVE_QUOTATION: { type: 'IN_PROGRESS', title: 'ยืนยันดำเนินการต่อแล้ว' },
+    WAIT_FOR_PARTS: { type: 'WAITING_PARTS', title: 'กำลังรออะไหล่' },
+    RESUME_REPAIR: { type: 'IN_PROGRESS', title: 'กลับมาดำเนินการต่อแล้ว' },
+    COMPLETE_REPAIR: { type: 'IN_PROGRESS', title: 'งานหลักเสร็จแล้ว กำลังเตรียมส่งมอบ' },
+    COMPLETE_REPAIR_DIRECT: { type: 'READY', title: 'พร้อมรับเครื่อง' },
+    PASS_QC: { type: 'READY', title: 'พร้อมรับเครื่อง' },
+    FAIL_QC: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการเพิ่มเติม' },
+    REWORK_AFTER_QC: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการเพิ่มเติม' },
+    DELIVER: { type: 'COMPLETED', title: 'ส่งมอบเครื่องแล้ว' },
+    CLOSE: { type: 'COMPLETED', title: 'ปิดงานเรียบร้อยแล้ว' },
+    CANCEL: { type: 'CANCELLED', title: 'ยกเลิกงานแล้ว' },
+  };
+
+  const targetCopy = {
+    RECEIVED: { type: 'RECEIVED', title: 'ร้านรับอุปกรณ์แล้ว' },
+    WAITING_DIAGNOSIS: { type: 'RECEIVED', title: 'รับงานไว้แล้ว' },
+    DIAGNOSING: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการ' },
+    WAITING_APPROVAL: { type: 'IN_PROGRESS', title: 'รอการยืนยันจากลูกค้า' },
+    APPROVED: { type: 'IN_PROGRESS', title: 'ยืนยันดำเนินการต่อแล้ว' },
+    REPAIRING: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการ' },
+    WAITING_PARTS: { type: 'WAITING_PARTS', title: 'กำลังรออะไหล่' },
+    WAITING_QC: { type: 'IN_PROGRESS', title: 'กำลังเตรียมส่งมอบ' },
+    QC_FAILED: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการเพิ่มเติม' },
+    READY_FOR_DELIVERY: { type: 'READY', title: 'พร้อมรับเครื่อง' },
+    DELIVERED: { type: 'COMPLETED', title: 'ส่งมอบเครื่องแล้ว' },
+    CLOSED: { type: 'COMPLETED', title: 'ปิดงานเรียบร้อยแล้ว' },
+    CANCELLED: { type: 'CANCELLED', title: 'ยกเลิกงานแล้ว' },
+  };
+
+  const copy = actionCopy[action] || targetCopy[targetStatus] || {
+    type: event?.eventType || 'IN_PROGRESS',
+    title: 'อัปเดตสถานะงาน',
+  };
+
+  return {
+    type: copy.type,
+    title: copy.title,
+    description: event?.description || null,
+    occurredAt: event?.occurredAt,
+  };
 }
 
 function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = null) {
@@ -90,12 +141,7 @@ function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = 
       null,
   };
 
-  const publicEvents = (registeredDevice?.passportEvents || []).map((event) => ({
-    type: event.eventType,
-    title: event.title,
-    description: event.description || null,
-    occurredAt: event.occurredAt,
-  }));
+  const publicEvents = (registeredDevice?.passportEvents || []).map(mapPublicWorkflowEvent);
 
   const statusEvents = persistedTimelineEvents.map(mapPersistedTimelineEvent);
   const timeline = [
@@ -240,5 +286,6 @@ module.exports = {
   hashToken,
   mapCustomerStatus,
   mapWorkflowCustomerStatus,
+  mapPublicWorkflowEvent,
   toPublicProjection,
 };
