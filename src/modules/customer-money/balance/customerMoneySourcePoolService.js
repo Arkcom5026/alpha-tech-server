@@ -149,6 +149,8 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
     if (chunkAmount.lessThanOrEqualTo(0)) continue;
 
     if (source.sourceType === 'CUSTOMER_MONEY_RECEIPT') {
+      const actualRemaining = money(source.snapshot.remainingAmount);
+      const fullyConsumed = chunkAmount.greaterThanOrEqualTo(actualRemaining);
       const updated = await client.customerReceipt.updateMany({
         where: {
           id: source.sourceId,
@@ -160,6 +162,7 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
         data: {
           allocatedAmount: { increment: chunkAmount },
           remainingAmount: { decrement: chunkAmount },
+          ...(fullyConsumed ? { status: 'FULLY_ALLOCATED' } : {}),
         },
       });
       if (updated.count !== 1) {
@@ -221,6 +224,7 @@ const restoreCustomerMoneySources = async (client, { branchId, customerId, appli
         data: {
           allocatedAmount: { decrement: amount },
           remainingAmount: { increment: amount },
+          status: 'ACTIVE',
         },
       });
     } else if (application.sourceType === 'CUSTOMER_DEPOSIT') {
