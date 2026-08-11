@@ -21,6 +21,12 @@ const SETTLEMENT_DUPLICATES = new Set([
   'VAT_SETTLEMENT_PERIOD_NOT_LOCKED',
 ]);
 
+const INPUT_VAT_WORKSPACE_CODES = new Set([
+  'INPUT_VAT_DOCUMENT_APPROVAL_REQUIRED',
+  'INPUT_VAT_FILING_NOT_PREPARED',
+  'INPUT_VAT_FILING_INCOMPLETE',
+]);
+
 const INPUT_VAT_FILING_CODES = new Set([
   'INPUT_VAT_FILING_NOT_PREPARED',
   'INPUT_VAT_FILING_INCOMPLETE',
@@ -32,7 +38,7 @@ const routeFor = (exception, taxPeriodId) => {
   if (source === 'TAX_EXPENSE' && Number.isInteger(Number(exception?.taxExpenseId)) && Number(exception.taxExpenseId) > 0) {
     return `tax-expenses?assessmentExpenseId=${Number(exception.taxExpenseId)}`;
   }
-  if (INPUT_VAT_FILING_CODES.has(code)) {
+  if (INPUT_VAT_WORKSPACE_CODES.has(code)) {
     return `tax-periods/${taxPeriodId}/input-vat-filing`;
   }
   if (code.startsWith('VAT_SETTLEMENT_') || ['PRIOR_PERIOD_VAT_CREDIT', 'HISTORICAL_OPENING_VAT_CREDIT'].includes(source)) {
@@ -100,6 +106,31 @@ const loadPendingVatCitExpenses = async ({ branchId, period }, tx = prisma) => {
   });
 };
 
+const loadPendingInputVatApproval = async ({ branchId, period }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT pending."id", COUNT(*) OVER()::int AS "totalCount"
+    FROM (
+      SELECT document."id"
+      FROM "TaxDocument" document
+      LEFT JOIN "InputVatRecord" record
+        ON record."taxDocumentId" = document."id"
+       AND record."branchId" = document."branchId"
+      WHERE document."branchId" = ${Number(branchId)}
+        AND document."documentType" = 'INPUT_TAX_INVOICE'
+        AND COALESCE(document."issuedAt", document."occurredAt") >= ${period.startDate}
+        AND COALESCE(document."issuedAt", document."occurredAt") <= ${period.endDate}
+        AND document."status" IN ('DRAFT', 'REGISTERED', 'UNDER_REVIEW', 'APPROVED')
+        AND record."id" IS NULL
+    ) pending
+    ORDER BY pending."id" ASC
+    LIMIT 20
+  `);
+  return Object.freeze({
+    count: Number(rows[0]?.totalCount || 0),
+    taxDocumentIds: Object.freeze(rows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)),
+  });
+};
+
 const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
   const args = { branchId, taxPeriodId };
   const [closingPackage, withholdingRaw, vatSettlement] = await Promise.all([
@@ -108,11 +139,25 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     vatSettlementService.loadVatSettlementPreparation(args),
   ]);
   const withholding = normalizeWithholdingTaxWorkspace(withholdingRaw);
-  const pendingVatCit = await loadPendingVatCitExpenses({ branchId, period: closingPackage.period });
+  const [pendingVatCit, pendingInputVatApproval] = await Promise.all([
+    loadPendingVatCitExpenses({ branchId, period: closingPackage.period }),
+    loadPendingInputVatApproval({ branchId, period: closingPackage.period }),
+  ]);
 
   const closingExceptions = (closingPackage.exceptions || [])
     .filter((entry) => !LEGACY_WHT_CODES.has(entry.code) && !LEGACY_EXPENSE_CODES.has(entry.code))
+    .filter((entry) => !(pendingInputVatApproval.count > 0 && INPUT_VAT_FILING_CODES.has(entry.code)))
     .map((entry) => normalizeException(entry, taxPeriodId, 'MONTHLY_TAX_CLOSING_PACKAGE'));
+  const inputVatApprovalExceptions = pendingInputVatApproval.count > 0
+    ? [normalizeException({
+        code: 'INPUT_VAT_DOCUMENT_APPROVAL_REQUIRED',
+        source: 'INPUT_VAT',
+        severity: 'BLOCKER',
+        count: pendingInputVatApproval.count,
+        sourceRefs: pendingInputVatApproval.taxDocumentIds,
+        message: 'Input tax invoices remain pending approval into Input VAT authority',
+      }, taxPeriodId, 'INPUT_VAT_DOCUMENT_LIFECYCLE')]
+    : [];
   const expenseExceptions = pendingVatCit.count > 0
     ? [normalizeException({
         code: 'TAX_EXPENSE_VAT_CIT_ASSESSMENT_PENDING',
@@ -131,6 +176,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     .map((entry) => normalizeException(entry, taxPeriodId, 'VAT_SETTLEMENT_PREPARATION'));
   const exceptions = Object.freeze(dedupeExceptions([
     ...closingExceptions,
+    ...inputVatApprovalExceptions,
     ...expenseExceptions,
     ...whtExceptions,
     ...settlementExceptions,
@@ -140,14 +186,17 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     && closingPackage.readiness?.expenseEvidenceComplete === true;
   const documentsReady = closingPackage.readiness?.outputVatComplete === true
     && closingPackage.readiness?.inputVatComplete === true
+    && pendingInputVatApproval.count === 0
     && closingPackage.readiness?.expenseEvidenceComplete === true;
+  const inputVatReady = closingPackage.readiness?.inputVatReady === true
+    && pendingInputVatApproval.count === 0;
   const reconciliationReady = vatSettlement.readiness?.outputFilingReconciled === true
     && vatSettlement.readiness?.inputCreditAuthorityReady === true;
   const inputVatTarget = exceptions.find((entry) => entry.source === 'INPUT_VAT')?.target?.relativePath
     || `tax-periods/${taxPeriodId}/input-vat-filing`;
   const domains = Object.freeze([
     Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: closingPackage.readiness?.outputVatReady === true, target: 'output-tax-filings' }),
-    Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: closingPackage.readiness?.inputVatReady === true, target: inputVatTarget }),
+    Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: inputVatReady, target: inputVatTarget }),
     Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: expensesReady, target: 'tax-expenses' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', label: 'WHT', ready: withholding.readiness?.readyForAccountant === true, target: `tax-periods/${taxPeriodId}/withholding-tax` }),
     Object.freeze({ key: 'DOCUMENTS', label: 'Documents', ready: documentsReady, target: `tax-periods/${taxPeriodId}/accounting-office` }),
@@ -177,6 +226,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
 };
 
 module.exports = Object.freeze({
+  loadPendingInputVatApproval,
   loadUnifiedTaxReadiness,
   loadPendingVatCitExpenses,
   normalizeException,
