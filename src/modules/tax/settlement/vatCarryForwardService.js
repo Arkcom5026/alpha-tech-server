@@ -196,7 +196,7 @@ const confirmVatCarryForwardAuthority = async ({
       ) VALUES (
         CONCAT('vcf_', md5(random()::text || clock_timestamp()::text)),
         ${normalizedBranchId}, ${normalizedPeriodId}, ${sourceTaxPeriodId},
-        ${normalizedSourceType}::"VatCarryForwardSourceType", ${normalizedAmount},
+        ${normalizedSourceType}::"VatCarryForwardSourceType", ${normalizedAmount}::numeric,
         'CONFIRMED'::"VatCarryForwardStatus", ${normalizedNote}, ${JSON.stringify(sourceSnapshot)}::jsonb,
         1, ${normalizedActorId}, NOW(), NOW(), NOW()
       )
