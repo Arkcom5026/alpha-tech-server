@@ -8,6 +8,10 @@ const mapRow = (row) => ({
   branchId: Number(row.branchId),
   candidateId: row.candidateId == null ? null : Number(row.candidateId),
   supplierId: row.supplierId == null ? null : Number(row.supplierId),
+  activeLinkedReceiptCount: Number(row.activeLinkedReceiptCount || 0),
+  activeAllocatedSubtotal: Number(row.activeAllocatedSubtotal || 0),
+  activeAllocatedVatAmount: Number(row.activeAllocatedVatAmount || 0),
+  activeAllocatedTotalAmount: Number(row.activeAllocatedTotalAmount || 0),
 });
 
 const findByIdentityKey = async (identityKey, tx = prisma) => {
@@ -129,7 +133,6 @@ const issueOutputTaxDocument = async ({
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
-
 const appendLifecycleEvent = async ({ taxDocumentId, fromStatus, toStatus, reason, actorEmployeeId, metadata }, tx = prisma) => {
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxDocumentLifecycleEvent" (
@@ -153,7 +156,11 @@ const list = async ({ branchId, status, documentType, limit = 50, offset = 0 }, 
         NULLIF(document."snapshot"->>'supplierId', '')::int,
         NULLIF(candidate."snapshot"->>'supplierId', '')::int,
         supplier_identity."supplierId"
-      ) AS "supplierId"
+      ) AS "supplierId",
+      COALESCE(link_totals."activeLinkedReceiptCount", 0)::int AS "activeLinkedReceiptCount",
+      COALESCE(link_totals."activeAllocatedSubtotal", 0)::numeric AS "activeAllocatedSubtotal",
+      COALESCE(link_totals."activeAllocatedVatAmount", 0)::numeric AS "activeAllocatedVatAmount",
+      COALESCE(link_totals."activeAllocatedTotalAmount", 0)::numeric AS "activeAllocatedTotalAmount"
     FROM "TaxDocument" document
     LEFT JOIN "TaxCandidate" candidate ON candidate."id" = document."candidateId"
     LEFT JOIN LATERAL (
@@ -177,6 +184,16 @@ const list = async ({ branchId, status, documentType, limit = 50, offset = 0 }, 
       ORDER BY supplier."id" ASC
       LIMIT 1
     ) supplier_identity ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS "activeLinkedReceiptCount",
+        COALESCE(SUM(link."allocatedSubtotal"), 0)::numeric AS "activeAllocatedSubtotal",
+        COALESCE(SUM(link."allocatedVatAmount"), 0)::numeric AS "activeAllocatedVatAmount",
+        COALESCE(SUM(link."allocatedTotalAmount"), 0)::numeric AS "activeAllocatedTotalAmount"
+      FROM "InputTaxDocumentReceiptLink" link
+      WHERE link."taxDocumentId" = document."id"
+        AND link."state" = 'ACTIVE'
+    ) link_totals ON true
     WHERE document."branchId" = ${Number(branchId)}
       AND (${status || null}::text IS NULL OR document."status" = ${status || null})
       AND (${documentType || null}::text IS NULL OR document."documentType" = ${documentType || null})
