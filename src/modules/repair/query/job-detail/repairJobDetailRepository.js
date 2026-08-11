@@ -8,7 +8,7 @@ const repairJobDetailInclude = {
         include: { receipt: { include: { supplier: true } } },
       },
       saleItems: {
-        include: { sale: { include: { customer: { include: { user: true } } } },
+        include: { sale: { include: { customer: { include: { user: true } } } } },
         orderBy: { sale: { soldAt: 'desc' } },
       },
     },
@@ -82,20 +82,22 @@ class RepairJobDetailRepository {
       },
     });
 
-    const activeSubcontractPromise = prisma.$queryRawUnsafe(
-      `SELECT "id", "status", "providerName", "providerPhone", "workScope",
-              "externalReference", "trackingNumber", "customerEstimateAmount",
-              "customerApprovalNote", "providerQuotedAmount", "providerQuoteNote",
-              "customerDecisionNote", "actualExternalCost", "resultNote", "sentAt",
-              "expectedReturnAt", "returnRequestedAt", "returnedAt", "updatedAt"
-       FROM "RepairSubcontract"
-       WHERE "repairJobId" = $1 AND "branchId" = $2
-         AND "status" IN ('SENT','RETURN_REQUESTED')
-       ORDER BY "sentAt" DESC, "id" DESC
-       LIMIT 1`,
-      id,
-      branch
-    ).then((rows) => rows[0] || null);
+    const activeSubcontractPromise = typeof prisma.$queryRawUnsafe === 'function'
+      ? prisma.$queryRawUnsafe(
+          `SELECT "id", "status", "providerName", "providerPhone", "workScope",
+                  "externalReference", "trackingNumber", "customerEstimateAmount",
+                  "customerApprovalNote", "providerQuotedAmount", "providerQuoteNote",
+                  "customerDecisionNote", "actualExternalCost", "resultNote", "sentAt",
+                  "expectedReturnAt", "returnRequestedAt", "returnedAt", "updatedAt"
+           FROM "RepairSubcontract"
+           WHERE "repairJobId" = $1 AND "branchId" = $2
+             AND "status" IN ('SENT','RETURN_REQUESTED')
+           ORDER BY "sentAt" DESC, "id" DESC
+           LIMIT 1`,
+          id,
+          branch
+        ).then((rows) => rows[0] || null)
+      : Promise.resolve(null);
 
     if (!job.deviceId) {
       const [serializedPartMovements, activeSubcontract] = await Promise.all([
