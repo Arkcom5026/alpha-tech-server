@@ -3,17 +3,39 @@
 const { getSettlement, listSettlements } = require('./deliveryCreditSettlementRepository');
 
 const toNumber = (value) => Number(value || 0);
+
+const serializeApplication = (application) => application ? ({
+  ...application,
+  amount: toNumber(application.amount),
+}) : null;
+
+const serializeLines = (lines = []) => {
+  const grouped = new Map();
+  for (const line of lines) {
+    const key = `${line.saleId}:${line.saleItemType}:${line.saleItemId}`;
+    const application = serializeApplication(line.application);
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        ...line,
+        quantity: toNumber(line.quantity),
+        unitAmount: toNumber(line.unitAmount),
+        lineAmount: toNumber(line.lineAmount),
+        appliedAmount: 0,
+        application,
+        applications: [],
+      });
+    }
+    const target = grouped.get(key);
+    target.appliedAmount = Number((target.appliedAmount + toNumber(line.appliedAmount)).toFixed(2));
+    if (application) target.applications.push(application);
+  }
+  return [...grouped.values()];
+};
+
 const serialize = (record) => record ? ({
   ...record,
   totalAmount: toNumber(record.totalAmount),
-  lines: (record.lines || []).map((line) => ({
-    ...line,
-    quantity: toNumber(line.quantity),
-    unitAmount: toNumber(line.unitAmount),
-    lineAmount: toNumber(line.lineAmount),
-    appliedAmount: toNumber(line.appliedAmount),
-    application: line.application ? { ...line.application, amount: toNumber(line.application.amount) } : null,
-  })),
+  lines: serializeLines(record.lines || []),
 }) : null;
 
 const listDeliveryCreditSettlements = async ({ prisma, user, query = {} }) => {
@@ -51,6 +73,8 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
       totalAmount: true,
       paidAmount: true,
       statusPayment: true,
+      paid: true,
+      paidAt: true,
       isCredit: true,
       status: true,
     },
@@ -64,10 +88,17 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
     paidAmount: toNumber(sale.paidAmount),
     outstandingAmount: Math.max(0, Number((toNumber(sale.totalAmount) - toNumber(sale.paidAmount)).toFixed(2))),
     statusPayment: sale.statusPayment,
+    paid: sale.paid,
+    paidAt: sale.paidAt,
     taxDocumentReady: sale.isCredit === true && sale.status !== 'CANCELLED' && sale.statusPayment === 'PAID',
   }));
 
   return result;
 };
 
-module.exports = { serialize, listDeliveryCreditSettlements, getDeliveryCreditSettlement };
+module.exports = {
+  serialize,
+  serializeLines,
+  listDeliveryCreditSettlements,
+  getDeliveryCreditSettlement,
+};
