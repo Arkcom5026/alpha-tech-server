@@ -68,6 +68,81 @@ test('applies a transition and passport event in one transaction boundary', asyn
   assert.equal(result.passportEventId, 91);
 });
 
+test('allows direct work start from received when intake consent is complete', async () => {
+  const repo = repositoryFor(repairJob({
+    deviceIntake: {
+      consent: {
+        customerSignature: 'ลูกค้าทดสอบ',
+        signedAt: new Date('2026-07-27T00:00:00Z'),
+      },
+      photos: [],
+    },
+  }));
+  const service = new TransitionRepairWorkflowService(repo);
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'START_REPAIR',
+      commandKey: 'start-direct-1',
+      expectedWorkflowStatus: 'RECEIVED',
+    }
+  );
+
+  assert.equal(result.previousStatus, 'RECEIVED');
+  assert.equal(result.status, 'REPAIRING');
+  assert.equal(result.legacyStatus, 'IN_PROGRESS');
+  assert.equal(repo.calls.event.metadata.action, 'START_REPAIR');
+  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'REPAIRING');
+});
+
+test('blocks direct work start from received when intake consent is incomplete', async () => {
+  const repo = repositoryFor(repairJob({ deviceIntake: null }));
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 3, employeeId: 7 },
+      {
+        repairJobId: 41,
+        action: 'START_REPAIR',
+        commandKey: 'start-direct-incomplete',
+        expectedWorkflowStatus: 'RECEIVED',
+      }
+    ),
+    (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
+});
+
+test('does not add a new intake gate to previously approved jobs', async () => {
+  const job = repairJob({
+    status: 'IN_PROGRESS',
+    deviceIntake: null,
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'APPROVED' } }],
+    },
+  });
+  const repo = repositoryFor(job);
+  const service = new TransitionRepairWorkflowService(repo);
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'START_REPAIR',
+      commandKey: 'start-approved-legacy',
+      expectedWorkflowStatus: 'APPROVED',
+    }
+  );
+
+  assert.equal(result.status, 'REPAIRING');
+  assert.equal(repo.calls.event.metadata.workflowPreviousStatus, 'APPROVED');
+});
+
 test('allows diagnosis queue with customer consent even when intake condition photo is absent', async () => {
   const repo = repositoryFor(repairJob({
     deviceIntake: {
