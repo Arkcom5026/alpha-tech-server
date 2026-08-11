@@ -76,18 +76,67 @@ const listAvailableCustomerMoneySources = async (client, { branchId, customerId 
     });
 };
 
-const calculateAvailableCustomerMoney = async (client, context) => {
+const getLegacyBalanceReservation = async (client, { branchId, customerId }) => {
+  if (!client?.customerMoneySettlementLine?.aggregate) return money(0);
+  const aggregate = await client.customerMoneySettlementLine.aggregate({
+    where: {
+      settlement: {
+        branchId,
+        customerId,
+        status: 'ACTIVE',
+        settlementType: 'DELIVERY_CREDIT',
+      },
+      application: {
+        sourceType: 'CUSTOMER_MONEY_BALANCE',
+        status: 'APPLIED',
+      },
+    },
+    _sum: { appliedAmount: true },
+  });
+  return money(aggregate?._sum?.appliedAmount);
+};
+
+const buildSpendableSourceState = async (client, context) => {
   const sources = await listAvailableCustomerMoneySources(client, context);
-  return sources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
+  const legacyReservedAmount = await getLegacyBalanceReservation(client, context);
+  let reservationRemaining = legacyReservedAmount;
+
+  const spendableSources = sources.map((source) => {
+    const reservedHere = Prisma.Decimal.min(source.availableAmount, reservationRemaining);
+    reservationRemaining = reservationRemaining.minus(reservedHere);
+    return {
+      ...source,
+      availableAmount: source.availableAmount.minus(reservedHere),
+      legacyReservedAmount: reservedHere,
+    };
+  }).filter((source) => source.availableAmount.greaterThan(0));
+
+  const sourceTotal = sources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
+  const availableAmount = spendableSources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
+  return {
+    sources: spendableSources,
+    sourceTotal,
+    legacyReservedAmount,
+    uncoveredLegacyReservation: Prisma.Decimal.max(reservationRemaining, money(0)),
+    availableAmount,
+  };
+};
+
+const calculateAvailableCustomerMoney = async (client, context) => {
+  const state = await buildSpendableSourceState(client, context);
+  return state.availableAmount;
 };
 
 const consumeCustomerMoneySources = async (client, { branchId, customerId, amount }) => {
   const requested = money(amount);
   if (requested.lessThanOrEqualTo(0)) return [];
 
-  const sources = await listAvailableCustomerMoneySources(client, { branchId, customerId });
-  const available = sources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
-  if (requested.greaterThan(available)) {
+  const state = await buildSpendableSourceState(client, { branchId, customerId });
+  const sources = state.sources;
+  if (state.uncoveredLegacyReservation.greaterThan(0)) {
+    throw buildError('ข้อมูล Customer Money เดิมไม่สมดุลกับยอดต้นทาง กรุณาตรวจสอบก่อนตัดยอด', 409, 'CUSTOMER_MONEY_SOURCE_PROJECTION_CONFLICT');
+  }
+  if (requested.greaterThan(state.availableAmount)) {
     throw buildError('ยอด Customer Money พร้อมใช้ไม่เพียงพอ', 409, 'INSUFFICIENT_CUSTOMER_MONEY');
   }
 
@@ -117,7 +166,8 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
         throw buildError('ยอดใบรับเงินมีการเปลี่ยนแปลงจากรายการอื่น กรุณาลองใหม่', 409, 'CUSTOMER_MONEY_SOURCE_CONFLICT');
       }
     } else if (source.sourceType === 'CUSTOMER_DEPOSIT') {
-      const fullyConsumed = chunkAmount.greaterThanOrEqualTo(source.availableAmount);
+      const actualRemaining = money(source.snapshot.totalAmount).minus(money(source.snapshot.usedAmount));
+      const fullyConsumed = chunkAmount.greaterThanOrEqualTo(actualRemaining);
       const updated = await client.customerDeposit.updateMany({
         where: {
           id: source.sourceId,
@@ -189,8 +239,8 @@ const restoreCustomerMoneySources = async (client, { branchId, customerId, appli
         },
       });
     } else if (application.sourceType === 'CUSTOMER_MONEY_BALANCE') {
-      // Legacy settlement rows created before source-level allocation did not mutate source projections.
-      // Recomputing CustomerMoneyBalance from the source projections is therefore the correct reversal.
+      // Legacy settlement rows did not mutate source projections. Once the settlement is cancelled,
+      // getLegacyBalanceReservation stops reserving this amount and the source projection becomes available again.
     } else {
       throw buildError('ไม่สามารถคืนยอด Customer Money จากแหล่งต้นทางประเภทนี้ได้', 409, 'CUSTOMER_MONEY_SOURCE_RESTORE_UNSUPPORTED');
     }
@@ -200,6 +250,8 @@ const restoreCustomerMoneySources = async (client, { branchId, customerId, appli
 module.exports = {
   money,
   listAvailableCustomerMoneySources,
+  getLegacyBalanceReservation,
+  buildSpendableSourceState,
   calculateAvailableCustomerMoney,
   consumeCustomerMoneySources,
   restoreCustomerMoneySources,
