@@ -68,6 +68,11 @@ function nonNegativeMoney(value, fieldName, defaultValue = 0) {
   return parsed;
 }
 
+function optionalNonNegativeMoney(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  return nonNegativeMoney(value, fieldName, 0);
+}
+
 function booleanValue(value, defaultValue = false) {
   if (value === undefined || value === null) return defaultValue;
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -97,19 +102,21 @@ function validateSearchQuery(rawQuery) {
   return query;
 }
 
-function validatePreAgreedService(rawValue, estimatedCost) {
+function validatePreAgreedService(rawValue, _estimatedCost) {
   const value = rawValue && typeof rawValue === 'object' ? rawValue : {};
   if (!booleanValue(value.enabled, false)) return null;
 
   return {
     enabled: true,
-    agreedScope: requiredText(value.agreedScope, 'ขอบเขตงานที่ตกลง', 2000),
-    agreedAmount: nonNegativeMoney(
-      value.agreedAmount === undefined ? estimatedCost : value.agreedAmount,
-      'preAgreedService.agreedAmount',
-      estimatedCost
+    authorizationMode: 'REPAIR_AUTHORIZED',
+    agreedScope:
+      optionalText(value.agreedScope, 2000) ||
+      'ลูกค้าอนุมัติให้ดำเนินการซ่อมตามอาการที่แจ้ง',
+    agreedAmount: optionalNonNegativeMoney(
+      value.agreedAmount,
+      'preAgreedService.agreedAmount'
     ),
-    confirmedByName: requiredText(value.confirmedByName, 'ชื่อผู้ยืนยันข้อตกลง', 255),
+    confirmedByName: requiredText(value.confirmedByName, 'ชื่อผู้อนุมัติให้ซ่อม', 255),
     confirmationNote: optionalText(value.confirmationNote, 2000),
   };
 }
@@ -124,7 +131,7 @@ function validateCreateRepairJob(payload = {}) {
     deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
-    estimatedCost: preAgreedService?.agreedAmount ?? estimatedCost,
+    estimatedCost,
     technicianId: positiveInt(payload.technicianId, 'technicianId', { optional: true }),
     technicianNotes: optionalText(payload.technicianNotes, 4000),
     allowCustomerOverride: booleanValue(payload.allowCustomerOverride, false),
