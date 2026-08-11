@@ -17,7 +17,7 @@ function validateCustomerConfirmation(workflowStatus, payload = {}) {
   requireReadyForDelivery(
     workflowStatus,
     'REPAIR_NOT_READY_FOR_PICKUP',
-    'งานยังไม่ผ่าน QC หรือยังไม่พร้อมส่งมอบ'
+    'งานยังไม่พร้อมส่งมอบ กรุณารอให้ร้านดำเนินการงานหลักให้เสร็จก่อน'
   );
   const receiverName = String(payload.receiverName || '').trim();
   if (receiverName.length < 2 || receiverName.length > 160) {
@@ -34,7 +34,7 @@ function validateFinalization(workflowStatus, delivery, payload = {}) {
   requireReadyForDelivery(
     workflowStatus,
     'REPAIR_NOT_READY_FOR_HANDOVER',
-    'งานยังไม่ผ่าน QC หรือยังไม่พร้อมส่งมอบ'
+    'งานยังไม่พร้อมส่งมอบ กรุณาดำเนินการงานหลักให้เสร็จก่อน'
   );
   if (!delivery?.customerConfirmedAt) {
     throw createError(409, 'CUSTOMER_PICKUP_NOT_CONFIRMED', 'ลูกค้ายังไม่ได้ยืนยันรับเครื่อง');
