@@ -51,7 +51,7 @@ test('create repository binds transaction work to transaction client', async () 
   assert.equal(receivedRepo.prisma, tx);
 });
 
-test('create repository owns customer, stock, device, technician, repair and passport writes', async () => {
+test('create repository owns customer, stock, device, technician, repair, intake and passport writes', async () => {
   const calls = {};
   const repository = new CreateRepairJobRepository({
     customerProfile: {
@@ -69,6 +69,9 @@ test('create repository owns customer, stock, device, technician, repair and pas
     repairJob: {
       create(args) { calls.create = args; return Promise.resolve(createdJob(args.data)); },
     },
+    deviceIntake: {
+      create(args) { calls.intake = args; return Promise.resolve({ id: 71, ...args.data }); },
+    },
     devicePassportEvent: {
       create(args) { calls.passport = args; return Promise.resolve({ id: 91, ...args.data }); },
     },
@@ -79,6 +82,7 @@ test('create repository owns customer, stock, device, technician, repair and pas
   await repository.findDeviceForIntake('55');
   await repository.findTechnician('5');
   await repository.create({ branchId: 3, customerId: 8 });
+  await repository.createDeviceIntake({ referenceNo: 'INT-3-TEST' });
   await repository.publishPassportEvent({
     deviceId: 12,
     branchId: 3,
@@ -104,6 +108,7 @@ test('create repository owns customer, stock, device, technician, repair and pas
   assert.ok(calls.create.include.customer);
   assert.ok(calls.create.include.device);
   assert.ok(calls.create.include.partsUsed);
+  assert.equal(calls.intake.data.referenceNo, 'INT-3-TEST');
   assert.equal(calls.passport.data.eventType, 'REPAIR_CREATED');
 });
 
@@ -146,8 +151,9 @@ test('create service validates customer and creates a RECEIVED branch-owned job'
   assert.equal(result.estimatedCost, 500);
 });
 
-test('create service links stock device and publishes REPAIR_CREATED atomically', async () => {
+test('create service links stock device, intake authority and REPAIR_CREATED atomically', async () => {
   let written;
+  let intakeWritten;
   let published;
   const service = new CreateRepairJobService({
     transaction(work) {
@@ -156,7 +162,10 @@ test('create service links stock device and publishes REPAIR_CREATED atomically'
         findStockItemForIntake: () => Promise.resolve({
           id: 12,
           branchId: 3,
-          devices: [{ id: 55 }],
+          serialNumber: 'SN-12',
+          barcode: 'STOCK-12',
+          product: { name: 'Notebook', brand: { name: 'Brand A' } },
+          devices: [{ id: 55, brand: 'Brand A', model: 'Notebook', serialNumber: 'SN-12', barcode: 'DEV-55' }],
           repairJobs: [],
           warrantyClaims: [],
           saleItems: [],
@@ -164,6 +173,10 @@ test('create service links stock device and publishes REPAIR_CREATED atomically'
         create(data) {
           written = data;
           return Promise.resolve(createdJob(data));
+        },
+        createDeviceIntake(data) {
+          intakeWritten = data;
+          return Promise.resolve({ id: 71, ...data });
         },
         publishPassportEvent(event) {
           published = event;
@@ -184,15 +197,23 @@ test('create service links stock device and publishes REPAIR_CREATED atomically'
   );
 
   assert.equal(written.deviceId, 55);
+  assert.equal(intakeWritten.device.connect.id, 55);
+  assert.equal(intakeWritten.repairJob.connect.id, 41);
+  assert.equal(intakeWritten.receivedBy.connect.id, 7);
+  assert.equal(intakeWritten.customerProblem, 'เปิดไม่ติด');
+  assert.equal(intakeWritten.status, 'LINKED_TO_REPAIR');
+  assert.equal(intakeWritten.snapshot.create.barcode, 'DEV-55');
   assert.equal(published.deviceId, 55);
   assert.equal(published.eventType, 'REPAIR_CREATED');
   assert.equal(published.eventKey, 'repair-job:41:created');
   assert.equal(published.actorEmployeeId, 7);
+  assert.equal(published.metadata.deviceIntakeId, 71);
   assert.equal(published.metadata.repairJobId, 41);
 });
 
-test('completed registered device starts a new repair job on the same device identity', async () => {
+test('completed registered device starts a new repair job and intake on the same device identity', async () => {
   let written;
+  let intakeWritten;
   let published;
   const service = new CreateRepairJobService({
     transaction(work) {
@@ -205,6 +226,10 @@ test('completed registered device starts a new repair job on the same device ide
             branchId: 3,
             currentOwnerCustomerId: 8,
             stockItemId: null,
+            brand: 'Acer',
+            model: 'Aspire',
+            serialNumber: 'SN-77',
+            barcode: 'DEV-77',
             repairJobs: [{ id: 10, jobNo: 'RE-OLD', status: 'COMPLETED' }],
             warrantyClaims: [],
           });
@@ -212,6 +237,10 @@ test('completed registered device starts a new repair job on the same device ide
         create(data) {
           written = data;
           return Promise.resolve(createdJob(data));
+        },
+        createDeviceIntake(data) {
+          intakeWritten = data;
+          return Promise.resolve({ id: 72, ...data });
         },
         publishPassportEvent(event) {
           published = event;
@@ -235,7 +264,13 @@ test('completed registered device starts a new repair job on the same device ide
   assert.equal(written.deviceId, 77);
   assert.equal(written.status, 'RECEIVED');
   assert.equal(result.deviceId, 77);
+  assert.equal(intakeWritten.device.connect.id, 77);
+  assert.equal(intakeWritten.customer.connect.id, 8);
+  assert.equal(intakeWritten.repairJob.connect.id, 41);
+  assert.equal(intakeWritten.snapshot.create.serialNumber, 'SN-77');
+  assert.equal(intakeWritten.snapshot.create.barcode, 'DEV-77');
   assert.equal(published.deviceId, 77);
+  assert.equal(published.metadata.deviceIntakeId, 72);
   assert.equal(published.metadata.deviceId, 77);
   assert.equal(published.metadata.repairJobId, 41);
 });
