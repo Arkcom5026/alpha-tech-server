@@ -14,7 +14,7 @@ const mapBatch = (row) => row && ({
 const findPeriod = async ({ branchId, taxPeriodId }, tx = prisma, { forUpdate = false } = {}) => {
   const lock = forUpdate ? Prisma.sql`FOR UPDATE` : Prisma.empty;
   const rows = await tx.$queryRaw(Prisma.sql`
-    SELECT "id", "branchId", "periodCode", "startDate", "endDate", "status", "version"
+    SELECT "id", "branchId", "periodCode", "startDate", "endDate", "status"
     FROM "TaxPeriod"
     WHERE "id" = ${String(taxPeriodId)}
       AND "branchId" = ${Number(branchId)}
@@ -25,7 +25,6 @@ const findPeriod = async ({ branchId, taxPeriodId }, tx = prisma, { forUpdate = 
   return row ? {
     ...row,
     branchId: Number(row.branchId),
-    version: Number(row.version || 1),
   } : null;
 };
 
@@ -110,7 +109,7 @@ const listPeriodInputVatAuthorities = async ({ branchId, taxPeriodId, startDate,
   `);
   return rows.map((row) => ({
     ...row,
-    inputVatRecordId: Number(row.inputVatRecordId),
+    inputVatRecordId: String(row.inputVatRecordId),
     taxDocumentId: Number(row.taxDocumentId),
     subtotalAmount: Number(row.subtotalAmount || 0),
     taxAmount: Number(row.taxAmount || 0),
