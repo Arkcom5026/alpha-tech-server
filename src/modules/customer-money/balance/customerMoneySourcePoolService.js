@@ -101,24 +101,46 @@ const buildSpendableSourceState = async (client, context) => {
   const legacyReservedAmount = await getLegacyBalanceReservation(client, context);
   let reservationRemaining = legacyReservedAmount;
 
-  const spendableSources = sources.map((source) => {
+  const sourceStates = sources.map((source) => {
     const reservedHere = Prisma.Decimal.min(source.availableAmount, reservationRemaining);
     reservationRemaining = reservationRemaining.minus(reservedHere);
     return {
       ...source,
+      sourceAvailableAmount: source.availableAmount,
       availableAmount: source.availableAmount.minus(reservedHere),
       legacyReservedAmount: reservedHere,
     };
-  }).filter((source) => source.availableAmount.greaterThan(0));
+  });
+  const spendableSources = sourceStates.filter((source) => source.availableAmount.greaterThan(0));
 
   const sourceTotal = sources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
   const availableAmount = spendableSources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
   return {
     sources: spendableSources,
+    sourceStates,
     sourceTotal,
     legacyReservedAmount,
     uncoveredLegacyReservation: Prisma.Decimal.max(reservationRemaining, money(0)),
     availableAmount,
+  };
+};
+
+const getCustomerMoneySourceState = async (client, {
+  branchId,
+  customerId,
+  sourceType,
+  sourceId,
+}) => {
+  const state = await buildSpendableSourceState(client, { branchId, customerId });
+  const source = state.sourceStates.find((candidate) => (
+    candidate.sourceType === sourceType && Number(candidate.sourceId) === Number(sourceId)
+  ));
+  return {
+    source: source || null,
+    availableAmount: money(source?.availableAmount),
+    sourceAvailableAmount: money(source?.sourceAvailableAmount),
+    legacyReservedAmount: money(source?.legacyReservedAmount),
+    uncoveredLegacyReservation: state.uncoveredLegacyReservation,
   };
 };
 
@@ -256,6 +278,7 @@ module.exports = {
   listAvailableCustomerMoneySources,
   getLegacyBalanceReservation,
   buildSpendableSourceState,
+  getCustomerMoneySourceState,
   calculateAvailableCustomerMoney,
   consumeCustomerMoneySources,
   restoreCustomerMoneySources,
