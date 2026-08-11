@@ -11,6 +11,7 @@ const {
 
 test('covers the canonical workflow-command path up to digital handover', () => {
   const path = [
+    REPAIR_WORKFLOW_ACTION.ACCEPT_JOB,
     REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
     REPAIR_WORKFLOW_ACTION.START_DIAGNOSIS,
     REPAIR_WORKFLOW_ACTION.COMPLETE_DIAGNOSIS,
@@ -39,10 +40,39 @@ test('covers the canonical workflow-command path up to digital handover', () => 
   assert.equal(closed.targetStatus, REPAIR_WORKFLOW_STATUS.CLOSED);
 });
 
-test('keeps inspection and pre-agreed flows optional while allowing direct work start', () => {
+test('requires technician acceptance before inspection or repair can begin', () => {
   const receivedActions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.RECEIVED);
   assert.deepEqual(
     receivedActions.map((item) => item.action),
+    [
+      REPAIR_WORKFLOW_ACTION.ACCEPT_JOB,
+      REPAIR_WORKFLOW_ACTION.CANCEL,
+    ]
+  );
+
+  const accepted = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_ACTION.ACCEPT_JOB
+  );
+  assert.equal(accepted.targetStatus, REPAIR_WORKFLOW_STATUS.ACCEPTED);
+  assert.equal(accepted.passportEventType, 'REPAIR_ASSIGNED');
+
+  for (const action of [
+    REPAIR_WORKFLOW_ACTION.START_REPAIR,
+    REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
+    REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
+  ]) {
+    assert.throws(
+      () => resolveRepairWorkflowTransition(REPAIR_WORKFLOW_STATUS.RECEIVED, action),
+      (error) => error.code === 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED'
+    );
+  }
+});
+
+test('keeps inspection and authorized work optional after the technician accepts the job', () => {
+  const acceptedActions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.ACCEPTED);
+  assert.deepEqual(
+    acceptedActions.map((item) => item.action),
     [
       REPAIR_WORKFLOW_ACTION.START_REPAIR,
       REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
@@ -52,21 +82,21 @@ test('keeps inspection and pre-agreed flows optional while allowing direct work 
   );
 
   const directStart = resolveRepairWorkflowTransition(
-    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_STATUS.ACCEPTED,
     REPAIR_WORKFLOW_ACTION.START_REPAIR
   );
   assert.equal(directStart.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
   assert.equal(directStart.passportEventType, 'REPAIR_STATUS_CHANGED');
 
-  const fastPath = resolveRepairWorkflowTransition(
-    REPAIR_WORKFLOW_STATUS.RECEIVED,
+  const authorizedStart = resolveRepairWorkflowTransition(
+    REPAIR_WORKFLOW_STATUS.ACCEPTED,
     REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
   );
-  assert.equal(fastPath.targetStatus, REPAIR_WORKFLOW_STATUS.APPROVED);
-  assert.equal(fastPath.passportEventType, 'REPAIR_STATUS_CHANGED');
+  assert.equal(authorizedStart.targetStatus, REPAIR_WORKFLOW_STATUS.REPAIRING);
+  assert.equal(authorizedStart.passportEventType, 'REPAIR_STATUS_CHANGED');
 
   const inspectionPath = resolveRepairWorkflowTransition(
-    REPAIR_WORKFLOW_STATUS.RECEIVED,
+    REPAIR_WORKFLOW_STATUS.ACCEPTED,
     REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS
   );
   assert.equal(inspectionPath.targetStatus, REPAIR_WORKFLOW_STATUS.WAITING_DIAGNOSIS);
@@ -149,9 +179,7 @@ test('rejects illegal transitions and exposes available actions', () => {
       assert.deepEqual(
         error.details.availableActions.map((item) => item.action),
         [
-          REPAIR_WORKFLOW_ACTION.START_REPAIR,
-          REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS,
-          REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE,
+          REPAIR_WORKFLOW_ACTION.ACCEPT_JOB,
           REPAIR_WORKFLOW_ACTION.CANCEL,
         ]
       );
@@ -161,6 +189,13 @@ test('rejects illegal transitions and exposes available actions', () => {
 });
 
 test('projects authoritative actions including passport event vocabulary', () => {
+  const acceptanceActions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.RECEIVED);
+  assert.deepEqual(acceptanceActions[0], {
+    action: REPAIR_WORKFLOW_ACTION.ACCEPT_JOB,
+    targetStatus: REPAIR_WORKFLOW_STATUS.ACCEPTED,
+    passportEventType: 'REPAIR_ASSIGNED',
+  });
+
   const actions = getAvailableRepairWorkflowActions(REPAIR_WORKFLOW_STATUS.WAITING_QC);
   assert.deepEqual(actions, [
     {
@@ -178,6 +213,7 @@ test('projects authoritative actions including passport event vocabulary', () =>
 
 test('maps detailed workflow statuses to the current legacy ServiceStatus safely', () => {
   assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.RECEIVED), 'RECEIVED');
+  assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.ACCEPTED), 'RECEIVED');
   assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.WAITING_PARTS), 'WAITING_PARTS');
   assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.DIAGNOSING), 'IN_PROGRESS');
   assert.equal(projectLegacyServiceStatus(REPAIR_WORKFLOW_STATUS.READY_FOR_DELIVERY), 'IN_PROGRESS');
