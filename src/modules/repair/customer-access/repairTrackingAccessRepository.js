@@ -105,6 +105,7 @@ class RepairTrackingAccessRepository {
                 title: true,
                 description: true,
                 occurredAt: true,
+                metadata: true,
               },
             },
           },
