@@ -27,6 +27,17 @@ function repairJob(overrides = {}) {
   };
 }
 
+function acceptedJob(overrides = {}) {
+  return repairJob({
+    technicianId: 7,
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'ACCEPTED' } }],
+    },
+    ...overrides,
+  });
+}
+
 function repositoryFor(job) {
   const calls = {};
   return {
@@ -47,29 +58,77 @@ function repositoryFor(job) {
   };
 }
 
-test('applies a transition and passport event in one transaction boundary', async () => {
+test('technician accepts the job before inspection or repair and becomes the assignee', async () => {
   const repo = repositoryFor(repairJob());
   const service = new TransitionRepairWorkflowService(repo);
   const result = await service.execute(
     { branchId: 3, employeeId: 7 },
     {
       repairJobId: 41,
-      action: 'QUEUE_DIAGNOSIS',
-      commandKey: 'queue-diagnosis-1',
+      action: 'ACCEPT_JOB',
+      commandKey: 'accept-job-1',
       expectedWorkflowStatus: 'RECEIVED',
     }
   );
 
-  assert.deepEqual(repo.calls.update, { id: 41, status: 'RECEIVED', extraData: {} });
-  assert.equal(repo.calls.event.eventType, 'REPAIR_STATUS_CHANGED');
-  assert.equal(repo.calls.event.eventKey, 'repair-workflow:41:queue-diagnosis-1');
-  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'WAITING_DIAGNOSIS');
-  assert.equal(result.status, 'WAITING_DIAGNOSIS');
-  assert.equal(result.passportEventId, 91);
+  assert.deepEqual(repo.calls.update, {
+    id: 41,
+    status: 'RECEIVED',
+    extraData: { technicianId: 7 },
+  });
+  assert.equal(repo.calls.event.eventType, 'REPAIR_ASSIGNED');
+  assert.equal(repo.calls.event.eventKey, 'repair-workflow:41:accept-job-1');
+  assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'ACCEPTED');
+  assert.equal(repo.calls.event.metadata.acceptedByEmployeeId, 7);
+  assert.equal(result.previousStatus, 'RECEIVED');
+  assert.equal(result.status, 'ACCEPTED');
+  assert.equal(result.acceptedByEmployeeId, 7);
 });
 
-test('allows direct work start from received when intake consent is complete', async () => {
-  const repo = repositoryFor(repairJob({
+test('blocks job acceptance when intake consent is incomplete', async () => {
+  const repo = repositoryFor(repairJob({ deviceIntake: null }));
+  const service = new TransitionRepairWorkflowService(repo);
+
+  await assert.rejects(
+    service.execute(
+      { branchId: 3, employeeId: 7 },
+      {
+        repairJobId: 41,
+        action: 'ACCEPT_JOB',
+        commandKey: 'accept-incomplete',
+        expectedWorkflowStatus: 'RECEIVED',
+      }
+    ),
+    (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'
+  );
+  assert.equal(repo.calls.update, undefined);
+  assert.equal(repo.calls.event, undefined);
+});
+
+test('blocks inspection and repair commands before the technician accepts the job', async () => {
+  for (const action of ['START_REPAIR', 'QUEUE_DIAGNOSIS']) {
+    const repo = repositoryFor(repairJob());
+    const service = new TransitionRepairWorkflowService(repo);
+
+    await assert.rejects(
+      service.execute(
+        { branchId: 3, employeeId: 7 },
+        {
+          repairJobId: 41,
+          action,
+          commandKey: `before-accept-${action}`,
+          expectedWorkflowStatus: 'RECEIVED',
+        }
+      ),
+      (error) => error.code === 'REPAIR_WORKFLOW_TRANSITION_NOT_ALLOWED'
+    );
+    assert.equal(repo.calls.update, undefined);
+    assert.equal(repo.calls.event, undefined);
+  }
+});
+
+test('allows direct work start after technician acceptance', async () => {
+  const repo = repositoryFor(acceptedJob({
     deviceIntake: {
       consent: {
         customerSignature: 'ลูกค้าทดสอบ',
@@ -85,36 +144,16 @@ test('allows direct work start from received when intake consent is complete', a
     {
       repairJobId: 41,
       action: 'START_REPAIR',
-      commandKey: 'start-direct-1',
-      expectedWorkflowStatus: 'RECEIVED',
+      commandKey: 'start-after-accept-1',
+      expectedWorkflowStatus: 'ACCEPTED',
     }
   );
 
-  assert.equal(result.previousStatus, 'RECEIVED');
+  assert.equal(result.previousStatus, 'ACCEPTED');
   assert.equal(result.status, 'REPAIRING');
   assert.equal(result.legacyStatus, 'IN_PROGRESS');
   assert.equal(repo.calls.event.metadata.action, 'START_REPAIR');
   assert.equal(repo.calls.event.metadata.workflowTargetStatus, 'REPAIRING');
-});
-
-test('blocks direct work start from received when intake consent is incomplete', async () => {
-  const repo = repositoryFor(repairJob({ deviceIntake: null }));
-  const service = new TransitionRepairWorkflowService(repo);
-
-  await assert.rejects(
-    service.execute(
-      { branchId: 3, employeeId: 7 },
-      {
-        repairJobId: 41,
-        action: 'START_REPAIR',
-        commandKey: 'start-direct-incomplete',
-        expectedWorkflowStatus: 'RECEIVED',
-      }
-    ),
-    (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'
-  );
-  assert.equal(repo.calls.update, undefined);
-  assert.equal(repo.calls.event, undefined);
 });
 
 test('does not add a new intake gate to previously approved jobs', async () => {
@@ -205,8 +244,8 @@ test('blocks repair completion until a final amount is supplied', () => {
   );
 });
 
-test('allows diagnosis queue with customer consent even when intake condition photo is absent', async () => {
-  const repo = repositoryFor(repairJob({
+test('allows diagnosis queue after acceptance with customer consent even when intake photo is absent', async () => {
+  const repo = repositoryFor(acceptedJob({
     deviceIntake: {
       consent: {
         customerSignature: 'ลูกค้าทดสอบ',
@@ -222,8 +261,8 @@ test('allows diagnosis queue with customer consent even when intake condition ph
     {
       repairJobId: 41,
       action: 'QUEUE_DIAGNOSIS',
-      commandKey: 'queue-without-photo',
-      expectedWorkflowStatus: 'RECEIVED',
+      commandKey: 'queue-after-accept',
+      expectedWorkflowStatus: 'ACCEPTED',
     }
   );
 
@@ -328,7 +367,7 @@ test('requires branch ownership and a linked device passport', async () => {
   await assert.rejects(
     wrongBranch.execute(
       { branchId: 4, employeeId: 7 },
-      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'x' }
+      { repairJobId: 41, action: 'ACCEPT_JOB', commandKey: 'x' }
     ),
     (error) => error.code === 'REPAIR_JOB_NOT_FOUND'
   );
@@ -339,23 +378,8 @@ test('requires branch ownership and a linked device passport', async () => {
   await assert.rejects(
     noDevice.execute(
       { branchId: 3, employeeId: 7 },
-      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'x' }
+      { repairJobId: 41, action: 'ACCEPT_JOB', commandKey: 'x' }
     ),
     (error) => error.code === 'REPAIR_DEVICE_REQUIRED'
   );
-});
-
-test('blocks diagnosis queue when intake consent is incomplete', async () => {
-  const repo = repositoryFor(repairJob({ deviceIntake: null }));
-  const service = new TransitionRepairWorkflowService(repo);
-
-  await assert.rejects(
-    service.execute(
-      { branchId: 3, employeeId: 7 },
-      { repairJobId: 41, action: 'QUEUE_DIAGNOSIS', commandKey: 'incomplete' }
-    ),
-    (error) => error.code === 'REPAIR_INTAKE_INCOMPLETE'
-  );
-  assert.equal(repo.calls.update, undefined);
-  assert.equal(repo.calls.event, undefined);
 });
