@@ -34,6 +34,16 @@ test('workspace is driven by authoritative VAT, reconciliation and eligibility p
   assert.match(workspaceService, /canSelectForFiling/);
 });
 
+test('workspace surfaces active input tax documents before Input VAT authority exists', () => {
+  assert.match(workspaceService, /INPUT_TAX_PENDING_AUTHORITY_STATUSES/);
+  assert.match(workspaceService, /INPUT_TAX_VISIBLE_STATUSES/);
+  assert.match(workspaceService, /requiresInputVatApproval/);
+  assert.match(workspaceService, /nextLifecycleTarget/);
+  assert.match(workspaceService, /canAdvanceLifecycle/);
+  assert.match(workspaceService, /pendingApprovalCount/);
+  assert.match(workspaceService, /pendingApprovalCount === 0 && coversAllDocuments/);
+});
+
 test('selection mutation reuses full-context duplicate replacement and eligibility authority', () => {
   assert.match(controller, /projectInputTaxDuplicates\(rows\)\.get\(row\.id\)/);
   assert.match(controller, /projectInputTaxReplacementChains\(rows\)\.get\(row\.id\)/);
