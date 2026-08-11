@@ -115,6 +115,22 @@ class AddRepairPartService {
         );
       }
 
+      const activeSubcontract = typeof repo.findActiveSubcontract === 'function'
+        ? await repo.findActiveSubcontract(job.id)
+        : null;
+      if (activeSubcontract) {
+        throw new RepairError(
+          RepairFailureCode.CONFLICT,
+          'อุปกรณ์อยู่ระหว่างส่งซ่อมภายนอก จึงยังไม่สามารถเบิกอะไหล่เข้าร้านให้ใบงานนี้ได้',
+          409,
+          {
+            repairSubcontractId: Number(activeSubcontract.id),
+            subcontractStatus: activeSubcontract.status,
+            providerName: activeSubcontract.providerName || null,
+          }
+        );
+      }
+
       const workflowEvent = job.deviceId
         ? await repo.findLatestWorkflowEvent(actor.branchId, job.id, job.deviceId)
         : null;
