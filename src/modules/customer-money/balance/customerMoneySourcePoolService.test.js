@@ -55,6 +55,7 @@ test('customer money source pool consumes oldest receipt then deposit and preser
   assert.equal(updates[0][0], 'receipt');
   assert.equal(updates[0][1].data.allocatedAmount.increment.toString(), '60');
   assert.equal(updates[0][1].data.remainingAmount.decrement.toString(), '60');
+  assert.equal(updates[0][1].data.status, 'FULLY_ALLOCATED');
   assert.equal(updates[1][0], 'deposit');
   assert.equal(updates[1][1].data.usedAmount.increment.toString(), '30');
 });
@@ -84,6 +85,7 @@ test('customer money source pool restores traced receipt and deposit application
   assert.equal(updates[0][0], 'receipt');
   assert.equal(updates[0][1].data.allocatedAmount.decrement.toString(), '25');
   assert.equal(updates[0][1].data.remainingAmount.increment.toString(), '25');
+  assert.equal(updates[0][1].data.status, 'ACTIVE');
   assert.equal(updates[1][0], 'deposit');
   assert.equal(updates[1][1].data.usedAmount.decrement.toString(), '15');
   assert.equal(updates[1][1].data.status, 'ACTIVE');
