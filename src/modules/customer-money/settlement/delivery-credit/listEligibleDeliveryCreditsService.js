@@ -1,5 +1,9 @@
 'use strict';
 
+const {
+  calculateAvailableCustomerMoney,
+} = require('../../balance/customerMoneySourcePoolService');
+
 const money = (value) => Number(value || 0);
 const outstanding = (sale) => Math.max(0, Number((money(sale.totalAmount) - money(sale.paidAmount)).toFixed(2)));
 
@@ -105,17 +109,25 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     return map;
   }, new Map());
 
-  const balance = await prisma.customerMoneyBalance.findUnique({
-    where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
-    select: { id: true, availableAmount: true, updatedAt: true },
-  });
+  const [balance, availableAmount] = await Promise.all([
+    prisma.customerMoneyBalance.findUnique({
+      where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
+      select: { id: true, availableAmount: true, updatedAt: true },
+    }),
+    calculateAvailableCustomerMoney(prisma, {
+      branchId: command.branchId,
+      customerId: command.customerId,
+    }),
+  ]);
 
   return {
     customer,
     balance: {
       id: balance?.id || null,
-      availableAmount: money(balance?.availableAmount),
+      availableAmount: money(availableAmount),
       updatedAt: balance?.updatedAt || null,
+      projectedAmount: money(balance?.availableAmount),
+      projectionMatchesSource: balance ? money(balance.availableAmount) === money(availableAmount) : money(availableAmount) === 0,
     },
     sales: sales.map((sale) => {
       const lines = [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)]
