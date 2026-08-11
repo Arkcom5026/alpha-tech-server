@@ -2,6 +2,7 @@
 
 const { prisma } = require('../../../lib/prisma');
 const repository = require('./taxClosingFinalizationRepository');
+const { buildIntegrity } = require('./taxClosingFinalizationIntegrity');
 const handoffService = require('../handoff/taxClosingHandoffService');
 
 const fail = (code, message, statusCode = 400, details) => {
@@ -11,19 +12,6 @@ const fail = (code, message, statusCode = 400, details) => {
   if (details) error.details = details;
   throw error;
 };
-
-const buildIntegrity = ({ currentSnapshotHash, finalization }) => Object.freeze({
-  status: !finalization
-    ? 'NOT_FINALIZED'
-    : (finalization.snapshotHash === currentSnapshotHash ? 'CURRENT' : 'STALE'),
-  currentSnapshotHash,
-  finalizedSnapshotHash: finalization?.snapshotHash || null,
-  finalizationVersion: finalization?.version || null,
-  packageVersion: finalization?.packageVersion || null,
-  finalizedAt: finalization?.finalizedAt || null,
-  finalizedById: finalization?.finalizedById ?? null,
-  requiresRefinalization: Boolean(finalization && finalization.snapshotHash !== currentSnapshotHash),
-});
 
 const loadIntegrity = async ({ branchId, taxPeriodId, currentSnapshotHash }, tx = prisma) => {
   const finalization = await repository.findLatest({ branchId, taxPeriodId }, tx);
