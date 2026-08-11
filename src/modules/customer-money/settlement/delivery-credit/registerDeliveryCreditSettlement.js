@@ -5,6 +5,7 @@ const verifyToken = require('../../../../../middlewares/verifyToken');
 const { parseEligibleSalesQuery, parseCreateSettlementInput } = require('./deliveryCreditSettlementContract');
 const { listEligibleDeliveryCredits } = require('./listEligibleDeliveryCreditsService');
 const { createDeliveryCreditSettlement } = require('./createDeliveryCreditSettlementService');
+const { cancelDeliveryCreditSettlement } = require('./cancelDeliveryCreditSettlementService');
 const { listDeliveryCreditSettlements, getDeliveryCreditSettlement } = require('./queryDeliveryCreditSettlementService');
 const { createDeliveryCreditSettlementRoute } = require('./deliveryCreditSettlementRoute');
 
@@ -19,6 +20,12 @@ const createRuntime = () => ({
   }),
   list: (query, user) => listDeliveryCreditSettlements({ prisma, user, query }),
   getById: (id, user) => getDeliveryCreditSettlement({ prisma, user, id }),
+  cancel: (id, cancelReason, user) => cancelDeliveryCreditSettlement({
+    prisma,
+    user,
+    id,
+    cancelReason,
+  }),
 });
 
 const mountDeliveryCreditSettlementModule = (app) => {
