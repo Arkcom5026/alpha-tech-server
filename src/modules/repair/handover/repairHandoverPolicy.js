@@ -13,12 +13,7 @@ function requireReadyForDelivery(workflowStatus, code, message) {
   }
 }
 
-function validateCustomerConfirmation(workflowStatus, payload = {}) {
-  requireReadyForDelivery(
-    workflowStatus,
-    'REPAIR_NOT_READY_FOR_PICKUP',
-    'งานยังไม่พร้อมส่งมอบ กรุณารอให้ร้านดำเนินการงานหลักให้เสร็จก่อน'
-  );
+function normalizeReceiver(payload = {}) {
   const receiverName = String(payload.receiverName || '').trim();
   if (receiverName.length < 2 || receiverName.length > 160) {
     throw createError(400, 'INVALID_PICKUP_RECEIVER', 'กรุณาระบุชื่อผู้รับเครื่อง');
@@ -30,26 +25,45 @@ function validateCustomerConfirmation(workflowStatus, payload = {}) {
   };
 }
 
+function validateCustomerConfirmation(workflowStatus, payload = {}) {
+  requireReadyForDelivery(
+    workflowStatus,
+    'REPAIR_NOT_READY_FOR_PICKUP',
+    'งานยังไม่พร้อมส่งมอบ'
+  );
+  return normalizeReceiver(payload);
+}
+
 function validateFinalization(workflowStatus, delivery, payload = {}) {
   requireReadyForDelivery(
     workflowStatus,
     'REPAIR_NOT_READY_FOR_HANDOVER',
-    'งานยังไม่พร้อมส่งมอบ กรุณาดำเนินการงานหลักให้เสร็จก่อน'
+    'งานยังไม่พร้อมส่งมอบ'
   );
+
+  let staffReceiver = null;
   if (!delivery?.customerConfirmedAt) {
-    throw createError(409, 'CUSTOMER_PICKUP_NOT_CONFIRMED', 'ลูกค้ายังไม่ได้ยืนยันรับเครื่อง');
+    staffReceiver = normalizeReceiver(payload);
   }
-  if (!payload.paymentConfirmed || !payload.deviceReturned || !payload.accessoriesReturned) {
+
+  const consolidatedConfirmation = payload.handoverConfirmed === true;
+  const legacyChecksComplete = Boolean(
+    payload.paymentConfirmed && payload.deviceReturned && payload.accessoriesReturned
+  );
+  if (!consolidatedConfirmation && !legacyChecksComplete) {
     throw createError(
       400,
-      'HANDOVER_CHECKLIST_INCOMPLETE',
-      'กรุณาตรวจสอบการชำระเงิน เครื่อง และอุปกรณ์ที่ฝากไว้ให้ครบ'
+      'HANDOVER_CONFIRMATION_REQUIRED',
+      'กรุณายืนยันการชำระเงินและการส่งคืนเครื่องกับอุปกรณ์ให้ครบ'
     );
   }
+
   return {
     paymentConfirmed: true,
     deviceReturned: true,
     accessoriesReturned: true,
+    receiverName: staffReceiver?.receiverName || null,
+    receiverPhone: staffReceiver?.receiverPhone || null,
     note: String(payload.note || '').trim().slice(0, 1000) || null,
   };
 }
