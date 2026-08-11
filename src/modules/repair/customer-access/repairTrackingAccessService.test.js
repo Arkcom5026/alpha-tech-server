@@ -99,13 +99,25 @@ test('READY_FOR_DELIVERY customer copy stays correct when QC was intentionally s
   assert.equal(projection.repair.status.label, 'พร้อมรับเครื่อง');
 });
 
-test('workflow authority keeps waiting-parts and cancellation customer projections aligned', () => {
+test('workflow authority keeps accepted, waiting-parts and cancellation customer projections aligned', () => {
+  assert.equal(mapWorkflowCustomerStatus('ACCEPTED', 'RECEIVED').code, 'RECEIVED');
   assert.equal(mapWorkflowCustomerStatus('WAITING_PARTS', 'IN_PROGRESS').code, 'WAITING_PARTS');
   assert.equal(mapWorkflowCustomerStatus('CANCELLED', 'IN_PROGRESS').code, 'CANCELLED');
   assert.equal(mapWorkflowCustomerStatus('DIAGNOSING', 'RECEIVED').code, 'IN_PROGRESS');
 });
 
 test('public workflow events replace internal action codes with customer-friendly milestones', () => {
+  const accepted = mapPublicWorkflowEvent({
+    eventType: 'REPAIR_ASSIGNED',
+    title: 'งานซ่อม RE-9: ACCEPT_JOB',
+    description: 'ช่างรับผิดชอบใบงานแล้ว',
+    occurredAt: new Date('2026-08-11T03:30:00Z'),
+    metadata: { action: 'ACCEPT_JOB', workflowTargetStatus: 'ACCEPTED' },
+  });
+  assert.equal(accepted.type, 'RECEIVED');
+  assert.equal(accepted.title, 'ช่างรับงานแล้ว');
+  assert.doesNotMatch(accepted.title, /ACCEPT_JOB/);
+
   const directStart = mapPublicWorkflowEvent({
     eventType: 'REPAIR_STATUS_CHANGED',
     title: 'งานซ่อม RE-9: START_REPAIR',
@@ -136,6 +148,13 @@ test('public projection never exposes simplified-flow command names in passport 
       ...publicJobFixture().device,
       passportEvents: [
         {
+          eventType: 'REPAIR_ASSIGNED',
+          title: 'งานซ่อม RE-9: ACCEPT_JOB',
+          description: 'ช่างรับผิดชอบใบงานแล้ว',
+          occurredAt: new Date('2026-08-11T03:30:00Z'),
+          metadata: { action: 'ACCEPT_JOB', workflowTargetStatus: 'ACCEPTED' },
+        },
+        {
           eventType: 'REPAIR_STATUS_CHANGED',
           title: 'งานซ่อม RE-9: START_REPAIR',
           description: null,
@@ -155,7 +174,8 @@ test('public projection never exposes simplified-flow command names in passport 
 
   const projection = toPublicProjection(job, [], 'READY_FOR_DELIVERY');
   const titles = projection.repair.timeline.map((event) => event.title).join(' | ');
-  assert.doesNotMatch(titles, /START_REPAIR|COMPLETE_REPAIR_DIRECT/);
+  assert.doesNotMatch(titles, /ACCEPT_JOB|START_REPAIR|COMPLETE_REPAIR_DIRECT/);
+  assert.match(titles, /ช่างรับงานแล้ว/);
   assert.match(titles, /เริ่มดำเนินการแล้ว/);
   assert.match(titles, /พร้อมรับเครื่อง/);
 });
