@@ -13,7 +13,7 @@ const repairWorkflowInclude = {
         include: { receipt: { include: { supplier: true } } },
       },
       saleItems: {
-        include: { sale: { include: { customer: { include: { user: true } } } },
+        include: { sale: { include: { customer: { include: { user: true } } } } },
         orderBy: { sale: { soldAt: 'desc' } },
       },
     },
@@ -87,6 +87,7 @@ class TransitionRepairWorkflowRepository {
   }
 
   async findActiveSubcontract(repairJobId) {
+    // Custody hold is repository-owned so workflow mutations cannot bypass it.
     const rows = await this.prisma.$queryRawUnsafe(
       `SELECT "id", "status", "providerName"
        FROM "RepairSubcontract"
