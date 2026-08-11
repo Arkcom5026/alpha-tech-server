@@ -33,6 +33,9 @@ const syntaxFiles = [
   'src/modules/repair/parts/addRepairPartService.js',
   'src/modules/repair/claim/open/openWarrantyClaimService.js',
   'src/modules/repair/claim/status/updateWarrantyClaimStatusService.js',
+  'src/modules/repair/subcontract/repairSubcontractRepository.js',
+  'src/modules/repair/subcontract/repairSubcontractService.js',
+  'src/modules/repair/subcontract/repairSubcontractController.js',
   'src/modules/repair/handover/repairHandoverService.js',
   'src/modules/repair/customer-access/repairTrackingAccessService.js',
 ];
@@ -68,6 +71,9 @@ assertContains(routes, "'/jobs'", 'repair job endpoint');
 assertContains(routes, "'/jobs/:id/workflow/commands'", 'repair workflow command endpoint');
 assertContains(routes, "'/jobs/:id/parts'", 'repair parts endpoint');
 assertContains(routes, "'/jobs/:id/estimate-approval'", 'repair estimate approval endpoint');
+assertContains(routes, "'/jobs/:id/subcontracts'", 'repair subcontract context and send endpoint');
+assertContains(routes, "'/jobs/:id/subcontracts/:subcontractId'", 'repair subcontract update endpoint');
+assertContains(routes, "'/jobs/:id/subcontracts/:subcontractId/commands'", 'repair subcontract command endpoint');
 assertContains(routes, "'/jobs/:id/warranty-claims'", 'warranty claim opening endpoint');
 assertContains(routes, "'/warranty-claims/:claimId/status'", 'warranty claim lifecycle endpoint');
 assertContains(routes, "'/jobs/:id/handover/finalize'", 'repair handover endpoint');
@@ -104,11 +110,23 @@ assertContains(workflowService, 'this.repository.transaction', 'repair workflow 
 assertContains(workflowService, 'repairJob.branchId !== branchId', 'repair branch ownership guard');
 assertContains(workflowService, 'REPAIR_DEVICE_REQUIRED', 'repair device authority guard');
 assertContains(workflowService, 'REPAIR_WORKFLOW_VERSION_CONFLICT', 'repair optimistic workflow guard');
+assertContains(workflowService, 'assertRepairNotHeldByActiveSubcontract', 'repair subcontract workflow hold');
 assertContains(workflowService, 'resolveRepairWorkflowTransition', 'repair transition policy authority');
 assertContains(workflowService, 'publishPassportEvent', 'repair device passport publication');
 assertContains(workflowService, "sourceType: 'REPAIR_JOB'", 'repair passport source identity');
 assertContains(workflowService, 'eventKey: `repair-workflow:${repairJobId}:${commandKey}`', 'repair workflow idempotency key');
 assertContains(workflowService, 'workflowTargetStatus', 'repair workflow event projection');
+
+const subcontractService = read('src/modules/repair/subcontract/repairSubcontractService.js');
+assertContains(subcontractService, 'allowOutsourceRepair', 'repair subcontract customer consent gate');
+assertContains(subcontractService, "['APPROVED', 'REPAIRING']", 'repair subcontract workflow eligibility');
+assertContains(subcontractService, 'customerEstimateAmount', 'repair subcontract rough customer price snapshot');
+assertContains(subcontractService, 'customerApprovalNote', 'repair subcontract flexible customer agreement note');
+assertContains(subcontractService, 'providerQuotedAmount', 'repair subcontract provider quote projection');
+assertContains(subcontractService, "action === 'REQUEST_RETURN'", 'repair subcontract return request command');
+assertContains(subcontractService, "action === 'RECEIVE_RETURN'", 'repair subcontract physical return command');
+assertNotContains(subcontractService, 'EXACT_PRICE', 'repair subcontract hard exact-price mode');
+assertNotContains(subcontractService, 'MAX_BUDGET', 'repair subcontract hard max-budget mode');
 
 const repairContract = read('src/modules/repair/contracts/repairContract.js');
 assertContains(repairContract, 'REPAIR_ACTIVE_STATUSES', 'repair active status contract');
@@ -133,12 +151,14 @@ assertContains(packageJson, '"test:certification"', 'repository certification co
 const requiredTests = [
   'src/modules/repair/create/createRepairJobSlice.test.js',
   'src/modules/repair/external-intake/createExternalDeviceIntakeSlice.test.js',
+  'src/modules/repair/intake-evidence/intakeEvidencePolicy.test.js',
   'src/modules/repair/workflow/commands/transitionRepairWorkflowService.test.js',
   'src/modules/repair/workflow/policies/repairWorkflowPolicy.test.js',
   'src/modules/repair/parts/addRepairPartSlice.test.js',
   'src/modules/repair/estimate-approval/__tests__/repairEstimateApprovalPolicy.test.js',
   'src/modules/repair/claim/open/openWarrantyClaimSlice.test.js',
   'src/modules/repair/claim/status/updateWarrantyClaimStatusSlice.test.js',
+  'src/modules/repair/subcontract/repairSubcontractService.test.js',
   'src/modules/repair/handover/repairHandoverPolicy.test.js',
   'src/modules/repair/customer-access/repairTrackingAccessService.test.js',
 ];
