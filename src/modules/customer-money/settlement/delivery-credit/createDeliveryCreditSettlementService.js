@@ -9,6 +9,9 @@ const {
   consumeCustomerMoneySources,
 } = require('../../balance/customerMoneySourcePoolService');
 const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../shared/customerMoneyTransactionLock');
+const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 
@@ -23,9 +26,9 @@ const derivePaymentStatus = ({ totalAmount, paidAmount }) => {
   return 'UNPAID';
 };
 
-const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => tx.$queryRaw`
-  SELECT pg_advisory_xact_lock(${-1003}, ${Number(customerId)})
-`;
+const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => (
+  acquireCustomerMoneyTransactionLock(tx, customerId)
+);
 
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1002}, ${Number(branchId)})`;
