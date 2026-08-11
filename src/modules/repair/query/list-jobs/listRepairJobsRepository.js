@@ -34,6 +34,22 @@ const repairJobDetailInclude = {
       photos: true,
     },
   },
+  subcontracts: {
+    where: { status: { in: ['SENT', 'RETURN_REQUESTED'] } },
+    orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: {
+      id: true,
+      expensePayeeId: true,
+      status: true,
+      providerName: true,
+      providerPhone: true,
+      workScope: true,
+      sentAt: true,
+      expectedReturnAt: true,
+      returnRequestedAt: true,
+    },
+  },
   delivery: true,
 };
 
