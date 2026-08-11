@@ -1,6 +1,7 @@
 'use strict';
 
 const filingService = require('./inputTaxFilingService');
+const filingWorkspaceService = require('./inputTaxFilingWorkspaceService');
 const overviewRepository = require('../overview/inputTaxOverviewRepository');
 const overviewService = require('../overview/inputTaxOverviewService');
 const {
@@ -8,14 +9,14 @@ const {
   assertInputTaxAuthority,
 } = require('../../policies/inputTaxAccessPolicy');
 
-const resolveAuthority = (req, source, capability) => assertInputTaxAuthority({
+const resolveAuthority = (req, source, capability, { requireActor = true } = {}) => assertInputTaxAuthority({
   user: req.user,
   requestedBranchId: source?.branchId,
   capability,
   accessForbiddenCode: 'INPUT_TAX_FILING_ACCESS_FORBIDDEN',
   branchForbiddenCode: 'INPUT_TAX_FILING_BRANCH_FORBIDDEN',
   actorRequiredCode: 'INPUT_TAX_FILING_ACTOR_REQUIRED',
-  requireActor: true,
+  requireActor,
 });
 
 const handle = (operation, successStatus = 200) => async (req, res, next) => {
@@ -56,6 +57,23 @@ const loadAuthoritativeDocument = async ({ branchId, taxDocumentId }) => {
   const recent = aggregate.recentDocuments[0];
   return { document: row, reconciliation, eligibility: recent?.eligibility };
 };
+
+const getPeriodWorkspace = handle(async (req) => {
+  const authority = resolveAuthority(req, req.query, InputTaxCapability.VIEW, { requireActor: false });
+  return filingWorkspaceService.getInputTaxFilingWorkspace({
+    branchId: authority.branchId,
+    taxPeriodId: req.params.taxPeriodId,
+  });
+});
+
+const preparePeriod = handle(async (req) => {
+  const authority = resolveAuthority(req, req.body, InputTaxCapability.SELECT_FOR_FILING);
+  return filingWorkspaceService.prepareInputTaxFilingBatch({
+    branchId: authority.branchId,
+    taxPeriodId: req.params.taxPeriodId,
+    actorEmployeeId: authority.actorEmployeeId,
+  });
+});
 
 const selectDocument = handle(async (req) => {
   const authority = resolveAuthority(req, req.body, InputTaxCapability.SELECT_FOR_FILING);
@@ -101,4 +119,10 @@ const markBatchFiled = handle(async (req) => {
   });
 });
 
-module.exports = Object.freeze({ markBatchFiled, removeDocument, selectDocument });
+module.exports = Object.freeze({
+  getPeriodWorkspace,
+  markBatchFiled,
+  preparePeriod,
+  removeDocument,
+  selectDocument,
+});
