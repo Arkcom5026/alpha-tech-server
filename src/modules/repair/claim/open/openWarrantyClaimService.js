@@ -60,6 +60,22 @@ class OpenWarrantyClaimService {
         assertRepairCanOpenClaim(job, workflowStatus);
         assertNoActiveClaimForJob(job);
 
+        const activeSubcontract = typeof repo.findActiveSubcontract === 'function'
+          ? await repo.findActiveSubcontract(job.id)
+          : null;
+        if (activeSubcontract) {
+          throw new RepairError(
+            RepairFailureCode.CONFLICT,
+            'อุปกรณ์อยู่ระหว่างส่งซ่อมภายนอก กรุณารับเครื่องกลับก่อนเปิดรายการเคลม',
+            409,
+            {
+              repairSubcontractId: Number(activeSubcontract.id),
+              subcontractStatus: activeSubcontract.status,
+              providerName: activeSubcontract.providerName || null,
+            }
+          );
+        }
+
         const sourceSupplierId = inferSourceSupplierId(job.stockItem);
         const selectedSupplierId = payload.supplierId || sourceSupplierId || null;
 
