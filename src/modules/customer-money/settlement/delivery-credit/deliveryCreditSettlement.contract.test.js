@@ -10,6 +10,7 @@ const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const contract = read('deliveryCreditSettlementContract.js');
 const queryService = read('listEligibleDeliveryCreditsService.js');
 const createService = read('createDeliveryCreditSettlementService.js');
+const cancelService = read('cancelDeliveryCreditSettlementService.js');
 const detailQueryService = read('queryDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
 const sourcePool = fs.readFileSync(path.join(__dirname, '../../balance/customerMoneySourcePoolService.js'), 'utf8');
@@ -65,6 +66,7 @@ test('settlement consumes receipt/deposit source projections instead of a free-f
   assert.match(sourcePool, /remainingAmount:\s*\{ decrement: chunkAmount \}/);
   assert.match(sourcePool, /allocatedAmount:\s*\{ increment: chunkAmount \}/);
   assert.match(sourcePool, /usedAmount:\s*\{ increment: chunkAmount \}/);
+  assert.match(sourcePool, /getLegacyBalanceReservation/);
   assert.match(createService, /consumeCustomerMoneySources/);
   assert.match(createService, /sourceType:\s*allocation\.sourceType/);
   assert.match(createService, /sourceId:\s*allocation\.sourceId/);
@@ -89,6 +91,25 @@ test('shared sale payment projection includes active delivery credit settlements
   assert.match(salePaymentProjection, /settlement:\s*\{ status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' \}/);
   assert.match(salePaymentProjection, /\.plus\(D\(settlementAggregate\._sum\.appliedAmount \|\| 0\)\)/);
   assert.match(salePaymentProjection, /data:\s*\{ paid, paidAt, paidAmount, statusPayment \}/);
+});
+
+test('settlement cancellation reverses source, application, ledger, balance and sale projection atomically', () => {
+  assert.match(cancelService, /prisma\.\$transaction/);
+  assert.match(cancelService, /restoreCustomerMoneySources/);
+  assert.match(cancelService, /status:\s*'REVERSED'/);
+  assert.match(cancelService, /status:\s*'CANCELLED'/);
+  assert.match(cancelService, /eventType:\s*'MONEY_APPLICATION_REVERSED'/);
+  assert.match(cancelService, /direction:\s*'CREDIT'/);
+  assert.match(cancelService, /calculateAvailableCustomerMoney/);
+  assert.match(cancelService, /projectSalePaymentStatus\(tx, saleId\)/);
+  assert.match(route, /router\.post\('\/:id\/cancel'/);
+});
+
+test('settlement cancellation fails closed when a sale already has tax document authority', () => {
+  assert.match(cancelService, /taxCandidate\.findMany/);
+  assert.match(cancelService, /taxDocument\.findFirst/);
+  assert.match(cancelService, /SETTLEMENT_TAX_DOCUMENT_EXISTS/);
+  assert.match(cancelService, /status:\s*\{ notIn: \['CANCELLED', 'ARCHIVED'\] \}/);
 });
 
 test('fully paid referenced sales become tax-document ready without creating a new tax engine', () => {
