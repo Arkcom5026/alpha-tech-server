@@ -1,0 +1,53 @@
+'use strict';
+
+const CURRENT_TENANT_ISOLATION_AUDIT_V1 = Object.freeze({
+  version: 'CURRENT_TENANT_ISOLATION_AUDIT_V1',
+  classification: 'REPOSITORY_AUDIT_ONLY',
+  currentAuthority: Object.freeze({
+    identityRoot: 'User',
+    employeeAccessProjection: 'EmployeeProfile.branchId',
+    operationalPartitionKey: 'Branch.id',
+    requestBranchAuthority: 'req.user.branchId',
+    tenantIdentityAvailable: false,
+    multiBranchMembershipAvailable: false,
+  }),
+  isolationCategories: Object.freeze({
+    SERVER_DERIVED_BRANCH: 'SERVER_DERIVED_BRANCH',
+    CLIENT_BRANCH_REVALIDATED: 'CLIENT_BRANCH_REVALIDATED',
+    CLIENT_BRANCH_UNVALIDATED: 'CLIENT_BRANCH_UNVALIDATED',
+    UNSCOPED_BRANCH_OWNED: 'UNSCOPED_BRANCH_OWNED',
+    PUBLIC_OR_PLATFORM_GLOBAL: 'PUBLIC_OR_PLATFORM_GLOBAL',
+  }),
+  invariants: Object.freeze([
+    'PRIVATE_OPERATIONAL_RECORD_RESOLVES_TO_ONE_TENANT',
+    'BRANCH_BELONGS_TO_ONE_TENANT',
+    'TENANT_ACCESS_IS_DATABASE_REVALIDATED',
+    'BRANCH_ACCESS_IS_PROVEN_WITHIN_TENANT',
+    'CLIENT_IDENTIFIERS_ARE_SELECTORS_NOT_AUTHORITY',
+    'CROSS_TENANT_ACCESS_DENIED_BY_DEFAULT',
+    'PLATFORM_ADMINISTRATION_IS_SEPARATE_FROM_TENANT_AUTHORITY',
+    'BRANCH_API_COMPATIBILITY_IS_MIGRATED_INCREMENTALLY',
+    'TENANT_REMEDIATION_IS_SCOPE_ISOLATED',
+    'RUNTIME_PASS_REQUIRES_EXECUTED_EVIDENCE',
+  ]),
+  risks: Object.freeze([
+    'TIA-001',
+    'TIA-002',
+    'TIA-003',
+    'TIA-004',
+    'TIA-005',
+    'TIA-006',
+  ]),
+  prohibitedChanges: Object.freeze([
+    'PRISMA_SCHEMA_CHANGE',
+    'MIGRATION_CHANGE',
+    'ROUTE_BEHAVIOR_CHANGE',
+    'AUTHORIZATION_BEHAVIOR_CHANGE',
+    'API_CONTRACT_CHANGE',
+  ]),
+  nextStep: 'P1_STEP_2_TENANT_DOMAIN_CONTRACT',
+});
+
+module.exports = {
+  CURRENT_TENANT_ISOLATION_AUDIT_V1,
+};
