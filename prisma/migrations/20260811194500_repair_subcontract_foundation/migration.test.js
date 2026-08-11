@@ -4,6 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const migration = fs.readFileSync(path.join(__dirname, 'migration.sql'), 'utf8');
+const schemaVerifier = fs.readFileSync(
+  path.join(__dirname, '../../../scripts/verify-repair-subcontract-schema.js'),
+  'utf8'
+);
 
 test('repair subcontract migration is additive and branch-owned', () => {
   assert.match(migration, /CREATE TABLE "RepairSubcontract"/);
@@ -38,4 +42,12 @@ test('repair subcontract migration permits only one active custody record per re
   assert.match(migration, /RepairSubcontract_one_active_per_job_key/);
   assert.match(migration, /WHERE "status" IN \('SENT', 'RETURN_REQUESTED'\)/);
   assert.match(migration, /CHECK \("status" IN \('SENT', 'RETURN_REQUESTED', 'RETURNED'\)\)/);
+});
+
+test('repair subcontract schema verification is repository-owned and checks live database authority', () => {
+  assert.match(schemaVerifier, /RepairSubcontract table not found in public schema/);
+  assert.match(schemaVerifier, /REQUIRED_CONSTRAINTS/);
+  assert.match(schemaVerifier, /REQUIRED_INDEXES/);
+  assert.match(schemaVerifier, /RepairSubcontract_one_active_per_job_key/);
+  assert.match(schemaVerifier, /REPAIR SUBCONTRACT SCHEMA VERIFICATION: PASS/);
 });
