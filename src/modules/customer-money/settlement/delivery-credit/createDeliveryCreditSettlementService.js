@@ -16,6 +16,10 @@ const derivePaymentStatus = ({ totalAmount, paidAmount }) => {
   return 'UNPAID';
 };
 
+const acquireCustomerMoneySettlementLock = (tx, branchId, customerId) => tx.$queryRaw`
+  SELECT pg_advisory_xact_lock(${Number(branchId)}, ${Number(customerId)})
+`;
+
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
   const yy = String(settledAt.getFullYear()).slice(-2);
   const mm = String(settledAt.getMonth() + 1).padStart(2, '0');
@@ -95,6 +99,7 @@ const lineSnapshot = (sale, requested) => {
 };
 
 const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$transaction(async (tx) => {
+  await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId);
   await ensureEmployee(tx, command.branchId, command.createdById);
 
   const customer = await tx.customerProfile.findFirst({
@@ -277,4 +282,4 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   };
 });
 
-module.exports = { createDeliveryCreditSettlement, derivePaymentStatus };
+module.exports = { createDeliveryCreditSettlement, derivePaymentStatus, acquireCustomerMoneySettlementLock };
