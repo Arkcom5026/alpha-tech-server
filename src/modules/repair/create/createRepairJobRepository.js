@@ -39,6 +39,29 @@ const stockItemIntakeInclude = {
   },
 };
 
+const registeredDeviceIntakeInclude = {
+  currentOwner: { include: { user: true } },
+  repairJobs: {
+    select: {
+      id: true,
+      jobNo: true,
+      status: true,
+      customerId: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  },
+  warrantyClaims: {
+    select: {
+      id: true,
+      claimNo: true,
+      status: true,
+      openedAt: true,
+    },
+    orderBy: { openedAt: 'desc' },
+  },
+};
+
 const repairJobDetailInclude = {
   branch: true,
   customer: { include: { user: true } },
@@ -95,6 +118,13 @@ class CreateRepairJobRepository {
     });
   }
 
+  findDeviceForIntake(deviceId) {
+    return this.prisma.device.findUnique({
+      where: { id: Number(deviceId) },
+      include: registeredDeviceIntakeInclude,
+    });
+  }
+
   findTechnician(technicianId) {
     return this.prisma.employeeProfile.findUnique({
       where: { id: Number(technicianId) },
@@ -115,3 +145,4 @@ class CreateRepairJobRepository {
 
 module.exports = new CreateRepairJobRepository();
 module.exports.CreateRepairJobRepository = CreateRepairJobRepository;
+module.exports.registeredDeviceIntakeInclude = registeredDeviceIntakeInclude;
