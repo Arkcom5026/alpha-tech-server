@@ -51,7 +51,7 @@ test('create repository binds transaction work to transaction client', async () 
   assert.equal(receivedRepo.prisma, tx);
 });
 
-test('create repository owns customer, stock, technician, repair and passport writes', async () => {
+test('create repository owns customer, stock, device, technician, repair and passport writes', async () => {
   const calls = {};
   const repository = new CreateRepairJobRepository({
     customerProfile: {
@@ -59,6 +59,9 @@ test('create repository owns customer, stock, technician, repair and passport wr
     },
     stockItem: {
       findUnique(args) { calls.stock = args; return Promise.resolve(null); },
+    },
+    device: {
+      findUnique(args) { calls.device = args; return Promise.resolve(null); },
     },
     employeeProfile: {
       findUnique(args) { calls.technician = args; return Promise.resolve(null); },
@@ -73,6 +76,7 @@ test('create repository owns customer, stock, technician, repair and passport wr
 
   await repository.findCustomer(3, '8');
   await repository.findStockItemForIntake('12');
+  await repository.findDeviceForIntake('55');
   await repository.findTechnician('5');
   await repository.create({ branchId: 3, customerId: 8 });
   await repository.publishPassportEvent({
@@ -91,6 +95,10 @@ test('create repository owns customer, stock, technician, repair and passport wr
   assert.ok(calls.stock.include.devices);
   assert.ok(calls.stock.include.repairJobs);
   assert.ok(calls.stock.include.warrantyClaims);
+  assert.deepEqual(calls.device.where, { id: 55 });
+  assert.ok(calls.device.include.currentOwner);
+  assert.ok(calls.device.include.repairJobs);
+  assert.ok(calls.device.include.warrantyClaims);
   assert.deepEqual(calls.technician.where, { id: 5 });
   assert.equal(calls.create.data.branchId, 3);
   assert.ok(calls.create.include.customer);
@@ -181,6 +189,119 @@ test('create service links stock device and publishes REPAIR_CREATED atomically'
   assert.equal(published.eventKey, 'repair-job:41:created');
   assert.equal(published.actorEmployeeId, 7);
   assert.equal(published.metadata.repairJobId, 41);
+});
+
+test('completed registered device starts a new repair job on the same device identity', async () => {
+  let written;
+  let published;
+  const service = new CreateRepairJobService({
+    transaction(work) {
+      return work({
+        findCustomer: () => Promise.resolve({ id: 8 }),
+        findDeviceForIntake(deviceId) {
+          assert.equal(deviceId, 77);
+          return Promise.resolve({
+            id: 77,
+            branchId: 3,
+            currentOwnerCustomerId: 8,
+            stockItemId: null,
+            repairJobs: [{ id: 10, jobNo: 'RE-OLD', status: 'COMPLETED' }],
+            warrantyClaims: [],
+          });
+        },
+        create(data) {
+          written = data;
+          return Promise.resolve(createdJob(data));
+        },
+        publishPassportEvent(event) {
+          published = event;
+          return Promise.resolve({ id: 92, ...event });
+        },
+      });
+    },
+  });
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7, role: 'CASHIER' },
+    {
+      customerId: 8,
+      deviceId: 77,
+      deviceModel: 'Acer Aspire',
+      reportedSymptoms: 'กลับมาซ่อมอาการใหม่',
+    }
+  );
+
+  assert.equal(written.stockItemId, null);
+  assert.equal(written.deviceId, 77);
+  assert.equal(written.status, 'RECEIVED');
+  assert.equal(result.deviceId, 77);
+  assert.equal(published.deviceId, 77);
+  assert.equal(published.metadata.deviceId, 77);
+  assert.equal(published.metadata.repairJobId, 41);
+});
+
+test('registered device with an active repair cannot create a duplicate repair job', async () => {
+  const service = new CreateRepairJobService({
+    transaction(work) {
+      return work({
+        findCustomer: () => Promise.resolve({ id: 8 }),
+        findDeviceForIntake: () => Promise.resolve({
+          id: 77,
+          branchId: 3,
+          currentOwnerCustomerId: 8,
+          repairJobs: [{ id: 11, jobNo: 'RE-ACTIVE', status: 'IN_PROGRESS' }],
+          warrantyClaims: [],
+        }),
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => service.execute(
+      { branchId: 3, role: 'CASHIER' },
+      {
+        customerId: 8,
+        deviceId: 77,
+        deviceModel: 'Acer Aspire',
+        reportedSymptoms: 'อาการใหม่',
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, RepairFailureCode.ACTIVE_REPAIR_EXISTS);
+      assert.equal(error.details.repairJobId, 11);
+      return true;
+    }
+  );
+});
+
+test('registered device must still belong to the selected customer', async () => {
+  const service = new CreateRepairJobService({
+    transaction(work) {
+      return work({
+        findCustomer: () => Promise.resolve({ id: 8 }),
+        findDeviceForIntake: () => Promise.resolve({
+          id: 77,
+          branchId: 3,
+          currentOwnerCustomerId: 9,
+          repairJobs: [{ id: 10, jobNo: 'RE-OLD', status: 'COMPLETED' }],
+          warrantyClaims: [],
+        }),
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => service.execute(
+      { branchId: 3, role: 'CASHIER' },
+      {
+        customerId: 8,
+        deviceId: 77,
+        deviceModel: 'Acer Aspire',
+        reportedSymptoms: 'อาการใหม่',
+      }
+    ),
+    (error) => error.code === RepairFailureCode.DEVICE_CUSTOMER_MISMATCH
+  );
 });
 
 test('create service preserves customer-not-found and unique-conflict contracts', async () => {
