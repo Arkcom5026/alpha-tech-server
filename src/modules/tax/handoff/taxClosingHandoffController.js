@@ -1,6 +1,7 @@
 'use strict';
 
 const handoffService = require('./taxClosingHandoffService');
+const finalizationService = require('../finalization/taxClosingFinalizationService');
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -33,6 +34,11 @@ const requireBranchAuthority = (req) => {
   return requestedBranchId;
 };
 
+const actorEmployeeId = (req) => {
+  const value = Number(req.user?.employeeId || req.user?.employeeProfileId || req.user?.id || 0);
+  return Number.isInteger(value) && value > 0 ? value : null;
+};
+
 const getBundle = async (req, res, next) => {
   try {
     const branchId = requireBranchAuthority(req);
@@ -46,4 +52,18 @@ const getBundle = async (req, res, next) => {
   }
 };
 
-module.exports = Object.freeze({ getBundle, requireBranchAuthority });
+const finalizeBundle = async (req, res, next) => {
+  try {
+    const branchId = requireBranchAuthority(req);
+    const data = await finalizationService.finalizeCurrentPackage({
+      branchId,
+      taxPeriodId: req.params.taxPeriodId,
+      finalizedById: actorEmployeeId(req),
+    });
+    return res.status(data.replayed ? 200 : 201).json({ ok: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+module.exports = Object.freeze({ getBundle, finalizeBundle, requireBranchAuthority });
