@@ -128,6 +128,7 @@ function validateCreateRepairJob(payload = {}) {
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
     stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
+    deviceId: positiveInt(payload.deviceId, 'deviceId', { optional: true }),
     deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
@@ -180,7 +181,7 @@ function validateClaimStatusUpdate(payload = {}) {
   if (resolution && !WARRANTY_CLAIM_RESOLUTIONS.includes(resolution)) {
     throw new RepairError(
       RepairFailureCode.INVALID_INPUT,
-      'ผลการเคลมไม่อยู่ในค่าที่ระบบรองรับ',
+      'resolution ไม่ถูกต้อง',
       400,
       { resolution }
     );
@@ -189,45 +190,28 @@ function validateClaimStatusUpdate(payload = {}) {
   return {
     status,
     expectedStatus,
+    resolution,
     note: optionalText(payload.note, 4000),
+    serviceProvider: optionalText(payload.serviceProvider, 255),
     externalClaimRef: optionalText(payload.externalClaimRef, 255),
     trackingNumber: optionalText(payload.trackingNumber, 255),
-    serviceProvider: optionalText(payload.serviceProvider, 255),
-    resolution,
     resolutionNote: optionalText(payload.resolutionNote, 4000),
-    replacementStockItemId: positiveInt(
-      payload.replacementStockItemId,
-      'replacementStockItemId',
-      { optional: true }
-    ),
-    creditAmount:
-      payload.creditAmount === undefined || payload.creditAmount === null
-        ? null
-        : nonNegativeMoney(payload.creditAmount, 'creditAmount', 0),
-  };
-}
-
-function validateListQuery(query = {}) {
-  const parsedLimit = Number(query.limit || 50);
-  const parsedOffset = Number(query.offset || 0);
-
-  return {
-    status: query.status ? String(query.status).trim().toUpperCase() : null,
-    stockItemId: positiveInt(query.stockItemId, 'stockItemId', { optional: true }),
-    customerId: positiveInt(query.customerId, 'customerId', { optional: true }),
-    limit: Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50,
-    offset: Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0,
+    replacementStockItemId: positiveInt(payload.replacementStockItemId, 'replacementStockItemId', { optional: true }),
+    creditAmount: optionalNonNegativeMoney(payload.creditAmount, 'creditAmount'),
   };
 }
 
 module.exports = {
+  requiredText,
+  optionalText,
+  positiveInt,
+  nonNegativeMoney,
+  booleanValue,
   validateLookup,
   validateSearchQuery,
   validateCreateRepairJob,
-  validatePreAgreedService,
   validateRepairStatusUpdate,
   validateAddPart,
   validateOpenWarrantyClaim,
   validateClaimStatusUpdate,
-  validateListQuery,
 };
