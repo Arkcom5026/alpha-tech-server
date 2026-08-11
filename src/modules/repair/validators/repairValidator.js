@@ -128,6 +128,7 @@ function validateCreateRepairJob(payload = {}) {
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
     stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
+    deviceId: positiveInt(payload.deviceId, 'deviceId', { optional: true }),
     deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
@@ -200,10 +201,7 @@ function validateClaimStatusUpdate(payload = {}) {
       'replacementStockItemId',
       { optional: true }
     ),
-    creditAmount:
-      payload.creditAmount === undefined || payload.creditAmount === null
-        ? null
-        : nonNegativeMoney(payload.creditAmount, 'creditAmount', 0),
+    creditAmount: optionalNonNegativeMoney(payload.creditAmount, 'creditAmount'),
   };
 }
 
@@ -221,6 +219,11 @@ function validateListQuery(query = {}) {
 }
 
 module.exports = {
+  requiredText,
+  optionalText,
+  positiveInt,
+  nonNegativeMoney,
+  booleanValue,
   validateLookup,
   validateSearchQuery,
   validateCreateRepairJob,

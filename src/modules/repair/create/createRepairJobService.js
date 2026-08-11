@@ -14,6 +14,44 @@ function isPrismaUniqueConflict(error) {
   return error?.code === 'P2002';
 }
 
+function assertRegisteredDeviceForIntake(device, actor, payload) {
+  if (!device) {
+    throw new RepairError(
+      RepairFailureCode.DEVICE_NOT_FOUND,
+      'ไม่พบอุปกรณ์เดิมที่เลือกสำหรับเปิดงานซ่อมใหม่',
+      404
+    );
+  }
+
+  if (Number(device.branchId) !== Number(actor.branchId)) {
+    throw new RepairError(
+      RepairFailureCode.DEVICE_BRANCH_MISMATCH,
+      'อุปกรณ์นี้ไม่ได้อยู่ภายใต้สาขาของผู้ใช้งาน',
+      403
+    );
+  }
+
+  assertNoActiveRepair(device);
+  assertNoActiveClaim(device);
+
+  const ownerCustomerId = device.currentOwnerCustomerId || device.currentOwner?.id || null;
+  if (
+    ownerCustomerId &&
+    Number(ownerCustomerId) !== Number(payload.customerId) &&
+    !(payload.allowCustomerOverride && actor.role === 'MANAGER')
+  ) {
+    throw new RepairError(
+      RepairFailureCode.DEVICE_CUSTOMER_MISMATCH,
+      'ลูกค้าที่นำอุปกรณ์มารับบริการไม่ตรงกับเจ้าของอุปกรณ์ปัจจุบัน กรุณาตรวจสอบก่อนเปิดงานใหม่',
+      409,
+      {
+        expectedCustomerId: ownerCustomerId,
+        providedCustomerId: payload.customerId,
+      }
+    );
+  }
+}
+
 class CreateRepairJobService {
   constructor(createRepository = repository) {
     this.repository = createRepository;
@@ -33,7 +71,9 @@ class CreateRepairJobService {
           );
         }
 
-        let deviceId = null;
+        let stockItemId = payload.stockItemId || null;
+        let deviceId = payload.deviceId || null;
+
         if (payload.stockItemId) {
           const stockItem = await repo.findStockItemForIntake(payload.stockItemId);
           assertStockItemBranch(stockItem, actor.branchId);
@@ -44,7 +84,21 @@ class CreateRepairJobService {
             payload.customerId,
             payload.allowCustomerOverride && actor.role === 'MANAGER'
           );
-          deviceId = stockItem.devices?.[0]?.id || null;
+
+          const stockDeviceId = stockItem.devices?.[0]?.id || null;
+          if (payload.deviceId && stockDeviceId && Number(payload.deviceId) !== Number(stockDeviceId)) {
+            throw new RepairError(
+              RepairFailureCode.CONFLICT,
+              'อุปกรณ์ที่เลือกไม่ตรงกับสินค้าที่ใช้เปิดงานซ่อม',
+              409
+            );
+          }
+          deviceId = stockDeviceId || payload.deviceId || null;
+        } else if (payload.deviceId) {
+          const device = await repo.findDeviceForIntake(payload.deviceId);
+          assertRegisteredDeviceForIntake(device, actor, payload);
+          deviceId = device.id;
+          stockItemId = device.stockItemId || null;
         }
 
         if (payload.technicianId) {
@@ -66,7 +120,7 @@ class CreateRepairJobService {
           jobNo: createRepairJobNo(actor.branchId),
           branchId: actor.branchId,
           customerId: payload.customerId,
-          stockItemId: payload.stockItemId,
+          stockItemId,
           deviceId,
           deviceModel: payload.deviceModel,
           reportedSymptoms: payload.reportedSymptoms,
@@ -95,6 +149,7 @@ class CreateRepairJobService {
               jobNo: created.jobNo,
               customerId: created.customerId,
               stockItemId: created.stockItemId,
+              deviceId: created.deviceId,
               status: created.status,
               deviceModel: created.deviceModel,
               preAgreedService: payload.preAgreedService || null,
@@ -129,3 +184,4 @@ class CreateRepairJobService {
 
 module.exports = new CreateRepairJobService();
 module.exports.CreateRepairJobService = CreateRepairJobService;
+module.exports.assertRegisteredDeviceForIntake = assertRegisteredDeviceForIntake;
