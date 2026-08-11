@@ -38,6 +38,9 @@ const routeFor = (exception, taxPeriodId) => {
   if (source === 'TAX_EXPENSE' && Number.isInteger(Number(exception?.taxExpenseId)) && Number(exception.taxExpenseId) > 0) {
     return `tax-expenses?assessmentExpenseId=${Number(exception.taxExpenseId)}`;
   }
+  if (code === 'OUTPUT_VAT_DRAFTS_REMAIN') {
+    return `tax-intake?taxPeriodId=${encodeURIComponent(String(taxPeriodId))}&documentStatus=DRAFT&documentType=OUTPUT_TAX_INVOICE`;
+  }
   if (INPUT_VAT_WORKSPACE_CODES.has(code)) {
     return `tax-periods/${taxPeriodId}/input-vat-filing`;
   }
@@ -131,6 +134,27 @@ const loadPendingInputVatApproval = async ({ branchId, period }, tx = prisma) =>
   });
 };
 
+const loadPendingOutputVatDrafts = async ({ branchId, period }, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    SELECT pending."id", COUNT(*) OVER()::int AS "totalCount"
+    FROM (
+      SELECT document."id"
+      FROM "TaxDocument" document
+      WHERE document."branchId" = ${Number(branchId)}
+        AND document."documentType" = 'OUTPUT_TAX_INVOICE'
+        AND document."status" = 'DRAFT'
+        AND document."occurredAt" >= ${period.startDate}
+        AND document."occurredAt" <= ${period.endDate}
+    ) pending
+    ORDER BY pending."id" ASC
+    LIMIT 20
+  `);
+  return Object.freeze({
+    count: Number(rows[0]?.totalCount || 0),
+    taxDocumentIds: Object.freeze(rows.map((row) => Number(row.id)).filter((value) => Number.isInteger(value) && value > 0)),
+  });
+};
+
 const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
   const args = { branchId, taxPeriodId };
   const [closingPackage, withholdingRaw, vatSettlement] = await Promise.all([
@@ -139,9 +163,10 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     vatSettlementService.loadVatSettlementPreparation(args),
   ]);
   const withholding = normalizeWithholdingTaxWorkspace(withholdingRaw);
-  const [pendingVatCit, pendingInputVatApproval] = await Promise.all([
+  const [pendingVatCit, pendingInputVatApproval, pendingOutputVatDrafts] = await Promise.all([
     loadPendingVatCitExpenses({ branchId, period: closingPackage.period }),
     loadPendingInputVatApproval({ branchId, period: closingPackage.period }),
+    loadPendingOutputVatDrafts({ branchId, period: closingPackage.period }),
   ]);
 
   const closingExceptions = (closingPackage.exceptions || [])
@@ -157,6 +182,16 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
         sourceRefs: pendingInputVatApproval.taxDocumentIds,
         message: 'Input tax invoices remain pending approval into Input VAT authority',
       }, taxPeriodId, 'INPUT_VAT_DOCUMENT_LIFECYCLE')]
+    : [];
+  const outputVatDraftExceptions = pendingOutputVatDrafts.count > 0
+    ? [normalizeException({
+        code: 'OUTPUT_VAT_DRAFTS_REMAIN',
+        source: 'OUTPUT_VAT',
+        severity: 'BLOCKER',
+        count: pendingOutputVatDrafts.count,
+        sourceRefs: pendingOutputVatDrafts.taxDocumentIds,
+        message: 'Draft output tax documents remain inside the tax period',
+      }, taxPeriodId, 'OUTPUT_VAT_DOCUMENT_LIFECYCLE')]
     : [];
   const expenseExceptions = pendingVatCit.count > 0
     ? [normalizeException({
@@ -176,26 +211,32 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
     .map((entry) => normalizeException(entry, taxPeriodId, 'VAT_SETTLEMENT_PREPARATION'));
   const exceptions = Object.freeze(dedupeExceptions([
     ...closingExceptions,
+    ...outputVatDraftExceptions,
     ...inputVatApprovalExceptions,
     ...expenseExceptions,
     ...whtExceptions,
     ...settlementExceptions,
   ]));
 
+  const outputVatReady = closingPackage.readiness?.outputVatReady === true
+    && pendingOutputVatDrafts.count === 0;
   const expensesReady = pendingVatCit.count === 0
     && closingPackage.readiness?.expenseEvidenceComplete === true;
   const documentsReady = closingPackage.readiness?.outputVatComplete === true
     && closingPackage.readiness?.inputVatComplete === true
+    && pendingOutputVatDrafts.count === 0
     && pendingInputVatApproval.count === 0
     && closingPackage.readiness?.expenseEvidenceComplete === true;
   const inputVatReady = closingPackage.readiness?.inputVatReady === true
     && pendingInputVatApproval.count === 0;
   const reconciliationReady = vatSettlement.readiness?.outputFilingReconciled === true
     && vatSettlement.readiness?.inputCreditAuthorityReady === true;
+  const outputVatTarget = exceptions.find((entry) => entry.source === 'OUTPUT_VAT')?.target?.relativePath
+    || 'output-tax-filings';
   const inputVatTarget = exceptions.find((entry) => entry.source === 'INPUT_VAT')?.target?.relativePath
     || `tax-periods/${taxPeriodId}/input-vat-filing`;
   const domains = Object.freeze([
-    Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: closingPackage.readiness?.outputVatReady === true, target: 'output-tax-filings' }),
+    Object.freeze({ key: 'OUTPUT_VAT', label: 'Output VAT', ready: outputVatReady, target: outputVatTarget }),
     Object.freeze({ key: 'INPUT_VAT', label: 'Input VAT', ready: inputVatReady, target: inputVatTarget }),
     Object.freeze({ key: 'TAX_EXPENSE', label: 'Expenses', ready: expensesReady, target: 'tax-expenses' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', label: 'WHT', ready: withholding.readiness?.readyForAccountant === true, target: `tax-periods/${taxPeriodId}/withholding-tax` }),
@@ -227,6 +268,7 @@ const loadUnifiedTaxReadiness = async ({ branchId, taxPeriodId }) => {
 
 module.exports = Object.freeze({
   loadPendingInputVatApproval,
+  loadPendingOutputVatDrafts,
   loadUnifiedTaxReadiness,
   loadPendingVatCitExpenses,
   normalizeException,
