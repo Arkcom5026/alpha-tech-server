@@ -155,6 +155,24 @@ function mapClaimAsset(claim) {
   };
 }
 
+function mapActiveSubcontract(job) {
+  const subcontract = Array.isArray(job.subcontracts) ? job.subcontracts[0] : null;
+  if (!subcontract) return null;
+
+  return {
+    id: subcontract.id,
+    expensePayeeId: subcontract.expensePayeeId,
+    status: subcontract.status,
+    providerName: subcontract.providerName,
+    providerPhone: subcontract.providerPhone || null,
+    workScope: subcontract.workScope,
+    sentAt: subcontract.sentAt,
+    expectedReturnAt: subcontract.expectedReturnAt || null,
+    returnRequestedAt: subcontract.returnRequestedAt || null,
+    active: ['SENT', 'RETURN_REQUESTED'].includes(subcontract.status),
+  };
+}
+
 function mapRepairJob(job) {
   const customer = mapCustomer(job.customer);
 
@@ -200,6 +218,7 @@ function mapRepairJob(job) {
       openedAt: claim.openedAt,
       resolvedAt: claim.resolvedAt,
     })),
+    activeSubcontract: mapActiveSubcontract(job),
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -288,4 +307,5 @@ module.exports = {
   mapDeviceIdentity,
   mapRepairAsset,
   mapClaimAsset,
+  mapActiveSubcontract,
 };
