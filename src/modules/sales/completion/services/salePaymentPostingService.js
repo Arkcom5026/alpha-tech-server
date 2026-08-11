@@ -49,6 +49,32 @@ const acquireSalePaymentProjectionLock = async (tx, saleId) => {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1001}, ${Number(saleId)})`;
 };
 
+const aggregateActiveSettlementAmount = async (tx, saleId) => {
+  if (!tx?.customerMoneySettlementLine?.aggregate) {
+    return { _sum: { appliedAmount: null } };
+  }
+  return tx.customerMoneySettlementLine.aggregate({
+    _sum: { appliedAmount: true },
+    where: {
+      saleId,
+      settlement: { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
+    },
+  });
+};
+
+const findLatestActiveSettlement = async (tx, saleId) => {
+  if (!tx?.customerMoneySettlement?.findFirst) return null;
+  return tx.customerMoneySettlement.findFirst({
+    where: {
+      status: 'ACTIVE',
+      settlementType: 'DELIVERY_CREDIT',
+      lines: { some: { saleId } },
+    },
+    orderBy: { settledAt: 'desc' },
+    select: { settledAt: true },
+  });
+};
+
 const projectSalePaymentStatus = async (tx, saleId) => {
   await acquireSalePaymentProjectionLock(tx, saleId);
 
@@ -60,13 +86,7 @@ const projectSalePaymentStatus = async (tx, saleId) => {
       _sum: { amount: true },
       where: { payment: { saleId, isCancelled: false } },
     }),
-    tx.customerMoneySettlementLine.aggregate({
-      _sum: { appliedAmount: true },
-      where: {
-        saleId,
-        settlement: { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
-      },
-    }),
+    aggregateActiveSettlementAmount(tx, saleId),
   ]);
 
   const paidAmount = D(paymentAggregate._sum.amount || 0)
@@ -84,15 +104,7 @@ const projectSalePaymentStatus = async (tx, saleId) => {
         orderBy: { receivedAt: 'desc' },
         select: { receivedAt: true },
       }),
-      tx.customerMoneySettlement.findFirst({
-        where: {
-          status: 'ACTIVE',
-          settlementType: 'DELIVERY_CREDIT',
-          lines: { some: { saleId } },
-        },
-        orderBy: { settledAt: 'desc' },
-        select: { settledAt: true },
-      }),
+      findLatestActiveSettlement(tx, saleId),
     ]);
     const candidates = [latestPayment?.receivedAt, latestSettlement?.settledAt]
       .filter(Boolean)
@@ -150,4 +162,6 @@ module.exports = {
   projectSalePaymentStatus,
   consumeDeposit,
   acquireSalePaymentProjectionLock,
+  aggregateActiveSettlementAmount,
+  findLatestActiveSettlement,
 };
