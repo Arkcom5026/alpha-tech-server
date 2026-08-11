@@ -30,7 +30,10 @@ const findPeriod = async ({ branchId, taxPeriodId }, tx = prisma, { forUpdate = 
 
 const acquirePeriodPreparationLock = async ({ branchId, year, month }, tx = prisma) => {
   await tx.$queryRaw(Prisma.sql`
-    SELECT pg_advisory_xact_lock(${Number(branchId)}, ${Number(year) * 100 + Number(month)})
+    SELECT pg_advisory_xact_lock(
+      ${Number(branchId)}::int,
+      ${Number(year) * 100 + Number(month)}::int
+    )
   `);
 };
 
