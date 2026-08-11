@@ -38,6 +38,8 @@ function repositoryFor(options = {}) {
       return { metadata: { workflowTargetStatus: workflowStatus } };
     },
     async findActive() { return active; },
+    async findExpensePayee() { return { id: 19, name: 'External Repair A', phone: '0800000000', taxId: null }; },
+    async listRelatedExpenses() { return []; },
     async create(data) {
       calls.create = data;
       return {
@@ -66,6 +68,7 @@ test('uses the existing rough repair estimate as a flexible send snapshot', asyn
     { branchId: 2, employeeId: 35 },
     41,
     {
+      expensePayeeId: 19,
       providerName: 'ร้านซ่อมภายนอก A',
       workScope: 'ตรวจและซ่อมเมนบอร์ด',
       customerApprovalNote: 'ถ้าเกินประมาณการให้โทรถามก่อน',
@@ -90,6 +93,7 @@ test('allows a flexible customer agreement note without forcing a numeric ceilin
     { branchId: 2, employeeId: 35 },
     41,
     {
+      expensePayeeId: 19,
       providerName: 'ร้านซ่อมภายนอก B',
       workScope: 'ตรวจอาการเชิงลึก',
       customerApprovalNote: 'ลูกค้าตกลงให้ส่งตรวจ ถ้าราคาสูงให้ติดต่ออีกครั้ง',
@@ -144,7 +148,7 @@ test('requires either a rough amount or a customer agreement note before sending
     service.send(
       { branchId: 2, employeeId: 35 },
       41,
-      { providerName: 'ร้าน A', workScope: 'ตรวจเมนบอร์ด' }
+      { expensePayeeId: 19, providerName: 'ร้าน A', workScope: 'ตรวจเมนบอร์ด' }
     ),
     (error) => error.code === 'REPAIR_INVALID_INPUT'
   );

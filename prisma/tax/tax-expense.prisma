@@ -105,6 +105,7 @@ model ExpensePayee {
   branch              Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
   createdByEmployee   EmployeeProfile  @relation("ExpensePayeeCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
   taxExpenses         TaxExpense[]     @relation("TaxExpenseExpensePayee")
+  repairSubcontracts  RepairSubcontract[]
 
   @@unique([id, branchId])
   @@index([branchId, active])
@@ -118,6 +119,8 @@ model TaxExpense {
   branchId             Int
   supplierId           Int?
   expensePayeeId       Int?
+  repairJobId          Int?
+  repairSubcontractId  Int?
   expenseNumber        String
   counterpartyType     TaxExpenseCounterpartyType
   counterpartyName     String
@@ -141,6 +144,8 @@ model TaxExpense {
   branch               Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
   supplier             Supplier?                 @relation("TaxExpenseSupplier", fields: [supplierId, branchId], references: [id, branchId], onDelete: Restrict)
   expensePayee         ExpensePayee?              @relation("TaxExpenseExpensePayee", fields: [expensePayeeId, branchId], references: [id, branchId], onDelete: Restrict)
+  repairJob            RepairJob?                 @relation("TaxExpenseRepairJob", fields: [repairJobId], references: [id], onDelete: Restrict)
+  repairSubcontract     RepairSubcontract?         @relation("TaxExpenseRepairSubcontract", fields: [repairSubcontractId], references: [id], onDelete: Restrict)
   createdByEmployee    EmployeeProfile           @relation("TaxExpenseCreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
   items                TaxExpenseItem[]          @relation("TaxExpenseItemExpense")
   assessments          TaxExpenseAssessment[]
@@ -152,6 +157,8 @@ model TaxExpense {
   @@index([branchId, status, expenseDate])
   @@index([branchId, supplierId])
   @@index([branchId, expensePayeeId])
+  @@index([branchId, repairJobId])
+  @@index([branchId, repairSubcontractId])
   @@index([branchId, documentNumber])
   @@index([createdByEmployeeId])
 }

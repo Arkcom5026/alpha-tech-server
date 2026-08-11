@@ -194,6 +194,8 @@ model RepairJob {
   delivery       RepairDelivery?
   trackingAccesses RepairTrackingAccess[]
   estimateApprovals RepairEstimateApproval[]
+  subcontracts RepairSubcontract[]
+  taxExpenses TaxExpense[] @relation("TaxExpenseRepairJob")
 
   @@index([branchId])
   @@index([stockItemId])

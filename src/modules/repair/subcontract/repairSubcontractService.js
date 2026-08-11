@@ -88,6 +88,7 @@ function mapSubcontract(row) {
     id: Number(row.id),
     branchId: Number(row.branchId),
     repairJobId: Number(row.repairJobId),
+    expensePayeeId: Number(row.expensePayeeId),
     status: row.status,
     active: ACTIVE_SUBCONTRACT_STATUSES.includes(row.status),
     providerName: row.providerName,
@@ -110,6 +111,9 @@ function mapSubcontract(row) {
       row.actualExternalCost === null || row.actualExternalCost === undefined
         ? null
         : Number(row.actualExternalCost),
+    transportCost: row.transportCost == null ? null : Number(row.transportCost),
+    materialCost: row.materialCost == null ? null : Number(row.materialCost),
+    otherOperationalCost: row.otherOperationalCost == null ? null : Number(row.otherOperationalCost),
     resultNote: row.resultNote || null,
     sentAt: row.sentAt,
     expectedReturnAt: row.expectedReturnAt || null,
@@ -186,6 +190,9 @@ class RepairSubcontractService {
     ]);
     const items = rows.map(mapSubcontract);
     const active = items.find((item) => item.active) || null;
+    const relatedExpenses = active
+      ? await this.repository.listRelatedExpenses(job.branchId, job.id, active.id)
+      : [];
     return {
       repairJobId: job.id,
       jobNo: job.jobNo,
@@ -193,14 +200,20 @@ class RepairSubcontractService {
       outsourceConsent: Boolean(job.deviceIntake?.consent?.allowOutsourceRepair),
       active,
       items,
+      relatedExpenses: relatedExpenses.map((expense) => ({
+        ...expense,
+        totalAmount: Number(expense.totalAmount),
+        paymentDueAmount: Number(expense.paymentDueAmount),
+      })),
     };
   }
 
   send(actor, repairJobIdInput, input = {}) {
     const repairJobId = positiveInteger(repairJobIdInput, 'repairJobId');
-    const providerName = requiredText(input.providerName, 'ผู้รับซ่อมภายนอก', 255);
+    const expensePayeeId = positiveInteger(input.expensePayeeId, 'expensePayeeId');
+    let providerName = optionalText(input.providerName, 255);
     const workScope = requiredText(input.workScope, 'ขอบเขตงานที่ส่งซ่อม');
-    const providerPhone = optionalText(input.providerPhone, 120);
+    let providerPhone = optionalText(input.providerPhone, 120);
     const externalReference = optionalText(input.externalReference, 255);
     const trackingNumber = optionalText(input.trackingNumber, 255);
     const customerApprovalNote = optionalText(input.customerApprovalNote, 2000);
@@ -216,6 +229,12 @@ class RepairSubcontractService {
       const workflowStatus = workflowStatusFromEvent(workflowEvent);
       const activeSubcontract = await repo.findActive(job.id, { forUpdate: true });
       assertCanSend(job, workflowStatus, activeSubcontract);
+      const expensePayee = await repo.findExpensePayee(job.branchId, expensePayeeId);
+      if (!expensePayee) {
+        throw new RepairError(RepairFailureCode.INVALID_INPUT, 'ExpensePayee not found or inactive for this branch', 400, { field: 'expensePayeeId' });
+      }
+      providerName = expensePayee.name;
+      providerPhone = expensePayee.phone || providerPhone;
 
       const customerEstimateAmount = requestedEstimate ??
         (Number(job.estimatedCost || 0) > 0 ? Number(job.estimatedCost) : null);
@@ -231,6 +250,7 @@ class RepairSubcontractService {
       const created = await repo.create({
         branchId: job.branchId,
         repairJobId: job.id,
+        expensePayeeId: expensePayee.id,
         providerName,
         providerPhone,
         workScope,
@@ -254,6 +274,7 @@ class RepairSubcontractService {
         performedByEmployeeId: actor.employeeId,
         metadata: {
           repairSubcontractId: Number(created.id),
+          expensePayeeId: expensePayee.id,
           providerName,
           workflowStatusAtSend: workflowStatus,
           customerEstimateAmount,
@@ -328,8 +349,14 @@ class RepairSubcontractService {
       if (action === 'RECEIVE_RETURN') {
         const resultNote = requiredText(input.resultNote, 'ผลการรับเครื่องกลับ', 4000);
         const actualExternalCost = optionalMoney(input.actualExternalCost, 'actualExternalCost');
+        const transportCost = optionalMoney(input.transportCost, 'transportCost');
+        const materialCost = optionalMoney(input.materialCost, 'materialCost');
+        const otherOperationalCost = optionalMoney(input.otherOperationalCost, 'otherOperationalCost');
         const updated = await repo.receiveReturn(job.branchId, job.id, subcontractId, {
           actualExternalCost,
+          transportCost,
+          materialCost,
+          otherOperationalCost,
           resultNote,
           returnedByEmployeeId: actor.employeeId,
         });
@@ -349,6 +376,9 @@ class RepairSubcontractService {
           metadata: {
             repairSubcontractId: subcontractId,
             actualExternalCost,
+            transportCost,
+            materialCost,
+            otherOperationalCost,
           },
         });
         return mapSubcontract(updated);

@@ -1,10 +1,10 @@
 const prisma = require('../../../database/prisma/client');
 
 const ACTIVE_STATUSES = ['SENT', 'RETURN_REQUESTED'];
-const subcontractColumns = `"id", "branchId", "repairJobId", "status", "providerName", "providerPhone",
+const subcontractColumns = `"id", "branchId", "repairJobId", "expensePayeeId", "status", "providerName", "providerPhone",
   "workScope", "externalReference", "trackingNumber", "customerEstimateAmount",
   "customerApprovalNote", "providerQuotedAmount", "providerQuoteNote", "customerDecisionNote",
-  "actualExternalCost", "resultNote", "sentAt", "expectedReturnAt", "returnRequestedAt",
+  "actualExternalCost", "transportCost", "materialCost", "otherOperationalCost", "resultNote", "sentAt", "expectedReturnAt", "returnRequestedAt",
   "returnedAt", "sentByEmployeeId", "returnedByEmployeeId", "createdAt", "updatedAt"`;
 
 class RepairSubcontractRepository {
@@ -57,6 +57,21 @@ class RepairSubcontractRepository {
     });
   }
 
+  findExpensePayee(branchId, expensePayeeId) {
+    return this.prisma.expensePayee.findFirst({
+      where: { id: Number(expensePayeeId), branchId: Number(branchId), active: true },
+      select: { id: true, name: true, phone: true, taxId: true },
+    });
+  }
+
+  listRelatedExpenses(branchId, repairJobId, repairSubcontractId) {
+    return this.prisma.taxExpense.findMany({
+      where: { branchId: Number(branchId), repairJobId: Number(repairJobId), repairSubcontractId: Number(repairSubcontractId) },
+      select: { id: true, expenseNumber: true, documentNumber: true, totalAmount: true, paymentDueAmount: true, evidenceStatus: true, expenseDate: true },
+      orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
+    });
+  }
+
   async findActive(repairJobId, { forUpdate = false } = {}) {
     const suffix = forUpdate ? ' FOR UPDATE' : '';
     const rows = await this.prisma.$queryRawUnsafe(
@@ -97,13 +112,14 @@ class RepairSubcontractRepository {
   async create(data) {
     const rows = await this.prisma.$queryRawUnsafe(
       `INSERT INTO "RepairSubcontract"
-        ("branchId", "repairJobId", "status", "providerName", "providerPhone", "workScope",
+        ("branchId", "repairJobId", "expensePayeeId", "status", "providerName", "providerPhone", "workScope",
          "externalReference", "trackingNumber", "customerEstimateAmount", "customerApprovalNote",
          "sentAt", "expectedReturnAt", "sentByEmployeeId", "createdAt", "updatedAt")
-       VALUES ($1,$2,'SENT',$3,$4,$5,$6,$7,$8,$9,NOW(),$10,$11,NOW(),NOW())
+       VALUES ($1,$2,$3,'SENT',$4,$5,$6,$7,$8,$9,$10,NOW(),$11,$12,NOW(),NOW())
        RETURNING ${subcontractColumns}`,
       Number(data.branchId),
       Number(data.repairJobId),
+      Number(data.expensePayeeId),
       data.providerName,
       data.providerPhone,
       data.workScope,
@@ -168,9 +184,12 @@ class RepairSubcontractRepository {
       `UPDATE "RepairSubcontract"
        SET "status" = 'RETURNED',
            "actualExternalCost" = COALESCE($4, "actualExternalCost"),
-           "resultNote" = COALESCE($5, "resultNote"),
+           "transportCost" = COALESCE($5, "transportCost"),
+           "materialCost" = COALESCE($6, "materialCost"),
+           "otherOperationalCost" = COALESCE($7, "otherOperationalCost"),
+           "resultNote" = COALESCE($8, "resultNote"),
            "returnedAt" = NOW(),
-           "returnedByEmployeeId" = $6,
+           "returnedByEmployeeId" = $9,
            "updatedAt" = NOW()
        WHERE "id" = $1 AND "repairJobId" = $2 AND "branchId" = $3
          AND "status" IN ('SENT','RETURN_REQUESTED')
@@ -179,6 +198,9 @@ class RepairSubcontractRepository {
       Number(repairJobId),
       Number(branchId),
       data.actualExternalCost,
+      data.transportCost,
+      data.materialCost,
+      data.otherOperationalCost,
       data.resultNote,
       Number(data.returnedByEmployeeId)
     );

@@ -81,6 +81,14 @@ class CreateTaxExpenseService {
 
   async execute({ branchId, employeeId, input }) {
     const expensePayeeId = asPositiveInt(input?.expensePayeeId);
+    const repairJobId = asPositiveInt(input?.repairJobId);
+    const repairSubcontractId = asPositiveInt(input?.repairSubcontractId);
+    if (Boolean(repairJobId) !== Boolean(repairSubcontractId)) {
+      const error = new Error('ต้องระบุทั้ง Repair Job และรายการส่งซ่อมภายนอกเป็นเหตุผลการจ่าย');
+      error.statusCode = 400;
+      error.code = 'TAX_EXPENSE_REPAIR_REASON_INCOMPLETE';
+      throw error;
+    }
     if (!expensePayeeId) {
       const error = new Error('ต้องระบุผู้รับเงินค่าใช้จ่าย');
       error.statusCode = 400;
@@ -105,6 +113,19 @@ class CreateTaxExpenseService {
         error.statusCode = 404;
         error.code = 'TAX_EXPENSE_PAYEE_NOT_FOUND';
         throw error;
+      }
+
+      if (repairSubcontractId) {
+        const reason = await tx.repairSubcontract.findFirst({
+          where: { id: repairSubcontractId, repairJobId, branchId, expensePayeeId },
+          select: { id: true, repairJobId: true },
+        });
+        if (!reason) {
+          const error = new Error('รายการส่งซ่อมไม่ตรงกับใบงาน สาขา หรือผู้รับเงินที่เลือก');
+          error.statusCode = 400;
+          error.code = 'TAX_EXPENSE_REPAIR_REASON_MISMATCH';
+          throw error;
+        }
       }
 
       const categories = await tx.taxExpenseCategory.findMany({
@@ -135,6 +156,8 @@ class CreateTaxExpenseService {
         data: {
           branchId,
           expensePayeeId: expensePayee.id,
+          repairJobId: repairJobId || null,
+          repairSubcontractId: repairSubcontractId || null,
           supplierId: null,
           expenseNumber,
           counterpartyType: 'EXPENSE_PAYEE',
@@ -161,7 +184,7 @@ class CreateTaxExpenseService {
               previousStatus: 'DRAFT',
               resultingStatus: 'RECORDED',
               actorEmployeeId: employeeId,
-              metadata: { source: 'tax-expense-runtime', payeeAuthority: 'ExpensePayee' },
+              metadata: { source: 'tax-expense-runtime', payeeAuthority: 'ExpensePayee', repairJobId: repairJobId || null, repairSubcontractId: repairSubcontractId || null },
             },
           },
         },
