@@ -2,6 +2,15 @@ const { prisma } = require('../../../../lib/prisma');
 const {
   projectSalePaymentStatus,
 } = require('../../completion/services/salePaymentPostingService');
+const {
+  calculateAvailableCustomerMoney,
+} = require('../../../customer-money/balance/customerMoneySourcePoolService');
+const {
+  updateCustomerMoneyBalance,
+} = require('../../../customer-money/balance/updateCustomerMoneyBalanceService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../../customer-money/shared/customerMoneyTransactionLock');
 
 const cancelPayment = async (req, res) => {
   try {
@@ -11,7 +20,10 @@ const cancelPayment = async (req, res) => {
 
     const payment = await prisma.payment.findUnique({
       where: { id: Number(paymentId) },
-      include: { items: true },
+      include: {
+        items: true,
+        sale: { select: { customerId: true } },
+      },
     });
 
     if (!payment || Number(payment.branchId) !== branchId) {
@@ -23,6 +35,17 @@ const cancelPayment = async (req, res) => {
 
     await prisma.$transaction(
       async (tx) => {
+        const usages = tx.depositUsage && typeof tx.depositUsage.findMany === 'function'
+          ? await tx.depositUsage.findMany({ where: { paymentId: payment.id } })
+          : [];
+        const hasDepositPayment = usages.length > 0
+          || payment.items.some((item) => item.paymentMethod === 'DEPOSIT');
+        const customerId = Number(payment.sale?.customerId);
+
+        if (hasDepositPayment && Number.isInteger(customerId) && customerId > 0) {
+          await acquireCustomerMoneyTransactionLock(tx, customerId);
+        }
+
         await tx.payment.update({
           where: { id: payment.id },
           data: {
@@ -32,8 +55,7 @@ const cancelPayment = async (req, res) => {
           },
         });
 
-        if (tx.depositUsage && typeof tx.depositUsage.findMany === 'function') {
-          const usages = await tx.depositUsage.findMany({ where: { paymentId: payment.id } });
+        if (usages.length > 0) {
           for (const usage of usages) {
             await tx.customerDeposit.update({
               where: { id: usage.customerDepositId },
@@ -75,6 +97,22 @@ const cancelPayment = async (req, res) => {
               }
             }
           }
+        }
+
+        if (
+          hasDepositPayment
+          && Number.isInteger(customerId)
+          && customerId > 0
+          && tx?.customerDeposit?.findMany
+          && tx?.customerReceipt?.findMany
+        ) {
+          const availableAmount = await calculateAvailableCustomerMoney(tx, { branchId, customerId });
+          await updateCustomerMoneyBalance({
+            client: tx,
+            branchId,
+            customerId,
+            availableAmount,
+          });
         }
 
         await projectSalePaymentStatus(tx, payment.saleId);
