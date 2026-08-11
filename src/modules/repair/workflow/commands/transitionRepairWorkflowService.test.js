@@ -143,6 +143,41 @@ test('does not add a new intake gate to previously approved jobs', async () => {
   assert.equal(repo.calls.event.metadata.workflowPreviousStatus, 'APPROVED');
 });
 
+test('allows repair completion to become ready for delivery without forcing QC', async () => {
+  const job = repairJob({
+    status: 'IN_PROGRESS',
+    technicianNotes: 'บันทึกเดิม',
+    device: {
+      id: 55,
+      passportEvents: [{ metadata: { workflowTargetStatus: 'REPAIRING' } }],
+    },
+  });
+  const repo = repositoryFor(job);
+  const service = new TransitionRepairWorkflowService(repo);
+
+  const result = await service.execute(
+    { branchId: 3, employeeId: 7 },
+    {
+      repairJobId: 41,
+      action: 'COMPLETE_REPAIR_DIRECT',
+      commandKey: 'complete-direct-1',
+      expectedWorkflowStatus: 'REPAIRING',
+      repairCompletion: {
+        workPerformed: 'เปลี่ยน SSD และลงระบบใหม่',
+        resultSummary: 'เปิดเครื่องและใช้งานได้ปกติ',
+        technicianNote: 'ทดสอบ restart แล้ว',
+      },
+    }
+  );
+
+  assert.equal(result.status, 'READY_FOR_DELIVERY');
+  assert.equal(result.legacyStatus, 'IN_PROGRESS');
+  assert.equal(repo.calls.event.eventType, 'REPAIR_STATUS_CHANGED');
+  assert.equal(repo.calls.event.metadata.action, 'COMPLETE_REPAIR_DIRECT');
+  assert.match(repo.calls.update.extraData.technicianNotes, /เปลี่ยน SSD/);
+  assert.match(repo.calls.update.extraData.technicianNotes, /ทดสอบ restart แล้ว/);
+});
+
 test('allows diagnosis queue with customer consent even when intake condition photo is absent', async () => {
   const repo = repositoryFor(repairJob({
     deviceIntake: {
