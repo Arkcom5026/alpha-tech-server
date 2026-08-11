@@ -5,11 +5,14 @@ const accountingOfficeService = require('../accountingOffice/accountingOfficePac
 const accountingOfficeController = require('../accountingOffice/accountingOfficePackageController');
 const withholdingTaxService = require('../withholdingTax/withholdingTaxService');
 const unifiedTaxReadinessService = require('../readiness/unifiedTaxReadinessService');
+const vatSettlementService = require('../settlement/vatSettlementService');
 
 const normalizeForHash = (value) => {
+  if (typeof value === 'bigint') return value.toString();
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(normalizeForHash);
   if (value && typeof value === 'object') {
+    if (value.constructor?.name === 'Decimal' && typeof value.toString === 'function') return value.toString();
     return Object.fromEntries(
       Object.keys(value)
         .sort()
@@ -34,6 +37,7 @@ const buildManifest = ({ periodCode, packageStatus, sourceSnapshot }) => Object.
     Object.freeze({ key: 'INPUT_VAT', filename: `input-vat-${periodCode}.csv`, mediaType: 'text/csv' }),
     Object.freeze({ key: 'TAX_EXPENSES', filename: `tax-expenses-${periodCode}.csv`, mediaType: 'text/csv' }),
     Object.freeze({ key: 'WITHHOLDING_TAX', filename: `withholding-tax-${periodCode}.csv`, mediaType: 'text/csv' }),
+    Object.freeze({ key: 'PP30_SETTLEMENT', filename: `pp30-settlement-${periodCode}.json`, mediaType: 'application/json' }),
   ]),
   counts: Object.freeze({
     outputVatDocuments: sourceSnapshot.outputVat.documents.length,
@@ -46,10 +50,11 @@ const buildManifest = ({ periodCode, packageStatus, sourceSnapshot }) => Object.
 
 const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId }) => {
   const args = { branchId, taxPeriodId };
-  const [rawClosingPackage, withholdingWorkspace, readiness] = await Promise.all([
+  const [rawClosingPackage, withholdingWorkspace, readiness, vatSettlement] = await Promise.all([
     accountingOfficeService.loadAccountingOfficePackage(args),
     withholdingTaxService.loadWithholdingTaxWorkspace(args),
     unifiedTaxReadinessService.loadUnifiedTaxReadiness(args),
+    vatSettlementService.loadVatSettlementPreparation(args),
   ]);
   const closingPackage = accountingOfficeController.composeWithholdingAuthority(rawClosingPackage, withholdingWorkspace);
   const packageStatus = readiness.summary?.readyForAccountant === true
@@ -83,6 +88,16 @@ const loadTaxClosingHandoffBundle = async ({ branchId, taxPeriodId }) => {
       summary: closingPackage.withholdingSummary || null,
       filings: closingPackage.withholdingFilings || [],
       rows: closingPackage.withholdingRows || [],
+    }),
+    pp30: Object.freeze({
+      authority: vatSettlement.authority,
+      purpose: vatSettlement.purpose,
+      outputFiling: vatSettlement.outputFiling,
+      inputFiling: vatSettlement.inputFiling,
+      carryForward: vatSettlement.carryForward,
+      settlement: vatSettlement.settlement,
+      readiness: vatSettlement.readiness,
+      exceptions: vatSettlement.exceptions,
     }),
   });
 
