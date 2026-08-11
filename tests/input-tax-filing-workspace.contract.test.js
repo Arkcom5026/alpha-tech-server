@@ -34,6 +34,13 @@ test('workspace is driven by authoritative VAT, reconciliation and eligibility p
   assert.match(workspaceService, /canSelectForFiling/);
 });
 
+test('selection mutation reuses full-context duplicate replacement and eligibility authority', () => {
+  assert.match(controller, /projectInputTaxDuplicates\(rows\)\.get\(row\.id\)/);
+  assert.match(controller, /projectInputTaxReplacementChains\(rows\)\.get\(row\.id\)/);
+  assert.match(controller, /projectInputTaxEligibility\(\{/);
+  assert.doesNotMatch(controller, /documents: \[row\]/);
+});
+
 test('preparing a closing batch does not mark it as filed or government-submitted', () => {
   assert.doesNotMatch(workspaceService, /markInputTaxBatchFiled/);
   assert.doesNotMatch(workspaceService, /submitBatch/);
