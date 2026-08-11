@@ -4,6 +4,9 @@ const filingService = require('./inputTaxFilingService');
 const filingWorkspaceService = require('./inputTaxFilingWorkspaceService');
 const overviewRepository = require('../overview/inputTaxOverviewRepository');
 const overviewService = require('../overview/inputTaxOverviewService');
+const { projectInputTaxEligibility } = require('../eligibility/inputTaxEligibilityService');
+const { projectInputTaxDuplicates } = require('../duplicates/inputTaxDuplicateService');
+const { projectInputTaxReplacementChains } = require('../replacements/inputTaxReplacementService');
 const {
   InputTaxCapability,
   assertInputTaxAuthority,
@@ -45,17 +48,18 @@ const loadAuthoritativeDocument = async ({ branchId, taxDocumentId }) => {
       statusCode: 404,
     });
   }
+
   const reconciliation = overviewService.projectDocumentReconciliation(row);
-  const aggregate = overviewService.aggregateDocuments({
-    branchId,
-    periodView: 'DOCUMENT',
-    periodFrom: periodFrom.toISOString().slice(0, 10),
-    periodTo: new Date(periodToExclusive.getTime() - 86400000).toISOString().slice(0, 10),
-    documents: [row],
-    previousDocuments: [],
+  const duplicate = projectInputTaxDuplicates(rows).get(row.id);
+  const replacement = projectInputTaxReplacementChains(rows).get(row.id);
+  const eligibility = projectInputTaxEligibility({
+    document: row,
+    reconciliation,
+    duplicate,
+    replacement,
   });
-  const recent = aggregate.recentDocuments[0];
-  return { document: row, reconciliation, eligibility: recent?.eligibility };
+
+  return { document: row, reconciliation, eligibility };
 };
 
 const getPeriodWorkspace = handle(async (req) => {
