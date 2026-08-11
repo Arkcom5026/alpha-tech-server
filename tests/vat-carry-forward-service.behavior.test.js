@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const carryForwardService = require('../src/modules/tax/settlement/vatCarryForwardService');
@@ -73,6 +75,18 @@ test('historical opening can explicitly confirm zero credit without touching a r
   assert.equal(result.amount, 0);
   assert.equal(result.version, 1);
   assert.equal(database.writeCount, 1);
+});
+
+test('carry-forward raw SQL casts confirmed amount to numeric', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/modules/tax/settlement/vatCarryForwardService.js'),
+    'utf8',
+  );
+
+  assert.match(
+    source,
+    /\$\{normalizedSourceType\}::"VatCarryForwardSourceType",\s*\$\{normalizedAmount\}::numeric/,
+  );
 });
 
 test('prior-period carry-forward rejects an amount above available PP30 credit before write', async () => {
