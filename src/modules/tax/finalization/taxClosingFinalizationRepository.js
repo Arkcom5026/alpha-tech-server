@@ -2,6 +2,17 @@
 
 const { prisma, Prisma } = require('../../../lib/prisma');
 
+const normalizeJson = (value) => {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalizeJson);
+  if (value && typeof value === 'object') {
+    if (value.constructor?.name === 'Decimal' && typeof value.toString === 'function') return value.toString();
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalizeJson(entry)]));
+  }
+  return value;
+};
+
 const mapRow = (row) => row ? Object.freeze({
   ...row,
   branchId: Number(row.branchId),
@@ -33,8 +44,8 @@ const insertVersion = async ({
   finalizedById,
 }, tx = prisma) => {
   const id = require('node:crypto').randomUUID();
-  const snapshotJson = JSON.stringify(snapshot);
-  const manifestJson = JSON.stringify(manifest);
+  const snapshotJson = JSON.stringify(normalizeJson(snapshot));
+  const manifestJson = JSON.stringify(normalizeJson(manifest));
   const rows = await tx.$queryRaw(Prisma.sql`
     INSERT INTO "TaxClosingFinalization" (
       "id", "branchId", "taxPeriodId", "version", "packageVersion", "snapshotHash",
@@ -48,4 +59,4 @@ const insertVersion = async ({
   return mapRow(rows[0]);
 };
 
-module.exports = Object.freeze({ findLatest, insertVersion });
+module.exports = Object.freeze({ findLatest, insertVersion, normalizeJson });
