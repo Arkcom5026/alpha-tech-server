@@ -18,6 +18,7 @@ function jobFixture(overrides = {}) {
     customer: { name: 'Customer A' },
     stockItemId: null,
     stockItem: null,
+    device: null,
     deviceModel: 'Notebook',
     reportedSymptoms: 'No power',
     technicianNotes: null,
@@ -30,6 +31,7 @@ function jobFixture(overrides = {}) {
     delivery: null,
     partsUsed: [],
     warrantyClaims: [],
+    subcontracts: [],
     createdAt: new Date('2026-07-01T00:00:00Z'),
     updatedAt: new Date('2026-07-01T00:00:00Z'),
     ...overrides,
@@ -66,6 +68,10 @@ test('list jobs repository always scopes by branch and normalized filters', asyn
   assert.deepEqual(received.orderBy, { createdAt: 'desc' });
   assert.ok(received.include.deviceIntake);
   assert.equal(received.include.delivery, true);
+  assert.deepEqual(received.include.subcontracts.where, {
+    status: { in: ['SENT', 'RETURN_REQUESTED'] },
+  });
+  assert.equal(received.include.subcontracts.take, 1);
 });
 
 test('list jobs validation normalizes and clamps query values', () => {
@@ -107,8 +113,44 @@ test('list jobs service returns mapped items and server-owned operational summar
   assert.equal(result.items[0].id, 12);
   assert.equal(result.items[0].customerName, 'Customer A');
   assert.equal(result.items[0].estimatedCost, 500);
+  assert.equal(result.items[0].activeSubcontract, null);
   assert.ok(result.items[0].operational);
   assert.equal(result.summary.total, 1);
   assert.equal(result.summary.active, 1);
   assert.equal(result.summary.unassigned, 1);
+});
+
+test('list jobs projects active subcontract custody without replacing repair status', async () => {
+  const service = new ListRepairJobsService({
+    findMany() {
+      return Promise.resolve([
+        jobFixture({
+          status: 'IN_PROGRESS',
+          subcontracts: [
+            {
+              id: 77,
+              expensePayeeId: 9,
+              status: 'SENT',
+              providerName: 'ช่างวา',
+              providerPhone: '0812345678',
+              workScope: 'ซ่อมเมนบอร์ด',
+              sentAt: new Date('2026-08-11T16:15:23Z'),
+              expectedReturnAt: null,
+              returnRequestedAt: null,
+            },
+          ],
+        }),
+      ]);
+    },
+  });
+
+  const result = await service.execute({ branchId: 4 }, {});
+  const item = result.items[0];
+
+  assert.equal(item.status, 'IN_PROGRESS');
+  assert.equal(item.activeSubcontract.id, 77);
+  assert.equal(item.activeSubcontract.status, 'SENT');
+  assert.equal(item.activeSubcontract.providerName, 'ช่างวา');
+  assert.equal(item.activeSubcontract.workScope, 'ซ่อมเมนบอร์ด');
+  assert.equal(item.activeSubcontract.active, true);
 });
