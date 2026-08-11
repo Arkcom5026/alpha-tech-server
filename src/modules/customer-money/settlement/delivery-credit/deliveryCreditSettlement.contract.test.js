@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const { parseCreateSettlementInput } = require('./deliveryCreditSettlementContract');
 
 const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const contract = read('deliveryCreditSettlementContract.js');
@@ -41,6 +42,19 @@ test('settlement command supports multi-sale item-level partial application', ()
   assert.match(contract, /saleItemId/);
   assert.match(contract, /lineType/);
   assert.match(contract, /amount/);
+});
+
+test('settlement command rejects the same sale line more than once', () => {
+  assert.throws(
+    () => parseCreateSettlementInput({
+      customerId: 7,
+      lines: [
+        { saleId: 11, saleItemId: 101, lineType: 'stock', amount: 40 },
+        { saleId: 11, saleItemId: 101, lineType: 'STOCK', amount: 30 },
+      ],
+    }, { branchId: 3, employeeId: 9 }),
+    (error) => error?.code === 'DUPLICATE_SETTLEMENT_LINE' && error?.statusCode === 400,
+  );
 });
 
 test('settlement write is atomic across customer money and sale payment projection', () => {
