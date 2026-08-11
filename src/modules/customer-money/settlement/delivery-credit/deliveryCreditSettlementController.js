@@ -11,8 +11,12 @@ const listEligibleDeliveryCreditsController = async (req, res, next) => {
 
 const createDeliveryCreditSettlementController = async (req, res, next) => {
   try {
-    const data = await req.customerMoneyDeliverySettlement.create(req.body, req.user);
-    return res.status(201).json({ ok: true, data });
+    const data = await req.customerMoneyDeliverySettlement.create(
+      req.body,
+      req.user,
+      req.get('X-Idempotency-Key'),
+    );
+    return res.status(data?.idempotentReplay ? 200 : 201).json({ ok: true, data });
   } catch (error) {
     return next(error);
   }
