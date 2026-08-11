@@ -54,7 +54,7 @@ function mapWorkflowCustomerStatus(workflowStatus, legacyStatus) {
   if (workflowStatus === 'WAITING_PARTS') {
     return mapCustomerStatus('WAITING_PARTS');
   }
-  if (['RECEIVED', 'WAITING_DIAGNOSIS'].includes(workflowStatus)) {
+  if (['RECEIVED', 'ACCEPTED', 'WAITING_DIAGNOSIS'].includes(workflowStatus)) {
     return mapCustomerStatus('RECEIVED');
   }
   if (workflowStatus) {
@@ -68,8 +68,9 @@ function mapPublicWorkflowEvent(event) {
   const targetStatus = event?.metadata?.workflowTargetStatus || null;
 
   const actionCopy = {
+    ACCEPT_JOB: { type: 'RECEIVED', title: 'ช่างรับงานแล้ว' },
     START_REPAIR: { type: 'IN_PROGRESS', title: 'เริ่มดำเนินการแล้ว' },
-    START_PRE_AGREED_SERVICE: { type: 'IN_PROGRESS', title: 'เริ่มดำเนินการตามที่ตกลงแล้ว' },
+    START_PRE_AGREED_SERVICE: { type: 'IN_PROGRESS', title: 'เริ่มดำเนินการตามที่อนุมัติแล้ว' },
     START_DIAGNOSIS: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการ' },
     COMPLETE_DIAGNOSIS: { type: 'IN_PROGRESS', title: 'ตรวจสอบอุปกรณ์แล้ว' },
     APPROVE_QUOTATION: { type: 'IN_PROGRESS', title: 'ยืนยันดำเนินการต่อแล้ว' },
@@ -87,6 +88,7 @@ function mapPublicWorkflowEvent(event) {
 
   const targetCopy = {
     RECEIVED: { type: 'RECEIVED', title: 'ร้านรับอุปกรณ์แล้ว' },
+    ACCEPTED: { type: 'RECEIVED', title: 'ช่างรับงานแล้ว' },
     WAITING_DIAGNOSIS: { type: 'RECEIVED', title: 'รับงานไว้แล้ว' },
     DIAGNOSING: { type: 'IN_PROGRESS', title: 'กำลังดำเนินการ' },
     WAITING_APPROVAL: { type: 'IN_PROGRESS', title: 'รอการยืนยันจากลูกค้า' },
