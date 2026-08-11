@@ -4,7 +4,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { parseCreateSettlementInput } = require('./deliveryCreditSettlementContract');
+const {
+  normalizeIdempotencyKey,
+  parseCreateSettlementInput,
+} = require('./deliveryCreditSettlementContract');
+const {
+  buildSettlementRequestHash,
+} = require('./createDeliveryCreditSettlementService');
 
 const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const contract = read('deliveryCreditSettlementContract.js');
@@ -13,8 +19,12 @@ const createService = read('createDeliveryCreditSettlementService.js');
 const cancelService = read('cancelDeliveryCreditSettlementService.js');
 const detailQueryService = read('queryDeliveryCreditSettlementService.js');
 const route = read('deliveryCreditSettlementRoute.js');
+const controller = read('deliveryCreditSettlementController.js');
 const sourcePool = fs.readFileSync(path.join(__dirname, '../../balance/customerMoneySourcePoolService.js'), 'utf8');
+const sharedLock = fs.readFileSync(path.join(__dirname, '../../shared/customerMoneyTransactionLock.js'), 'utf8');
 const salePaymentProjection = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/salePaymentPostingService.js'), 'utf8');
+const schema = fs.readFileSync(path.join(__dirname, '../../../../../prisma/customer/customer-money.prisma'), 'utf8');
+const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812015500_customer_money_settlement_idempotency/migration.sql'), 'utf8');
 
 test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
@@ -60,11 +70,54 @@ test('settlement command rejects the same sale line more than once', () => {
   );
 });
 
+test('settlement command accepts a bounded idempotency key and hashes semantic payload deterministically', () => {
+  assert.equal(normalizeIdempotencyKey(' cms.retry-001 '), 'cms.retry-001');
+  assert.throws(
+    () => normalizeIdempotencyKey('bad key with spaces'),
+    (error) => error?.code === 'INVALID_IDEMPOTENCY_KEY',
+  );
+
+  const left = parseCreateSettlementInput({
+    customerId: 7,
+    note: 'same',
+    lines: [
+      { saleId: 12, saleItemId: 202, lineType: 'simple', amount: 60 },
+      { saleId: 11, saleItemId: 101, lineType: 'stock', amount: 40 },
+    ],
+  }, { branchId: 3, employeeId: 9 }, 'cms.retry-001');
+  const right = parseCreateSettlementInput({
+    customerId: 7,
+    note: 'same',
+    lines: [
+      { saleId: 11, saleItemId: 101, lineType: 'STOCK', amount: 40 },
+      { saleId: 12, saleItemId: 202, lineType: 'SIMPLE', amount: 60 },
+    ],
+  }, { branchId: 3, employeeId: 9 }, 'cms.retry-001');
+
+  assert.equal(left.commandKey, 'cms.retry-001');
+  assert.equal(buildSettlementRequestHash(left), buildSettlementRequestHash(right));
+});
+
+test('settlement idempotency has durable schema and migration authority', () => {
+  assert.match(schema, /model CustomerMoneySettlementCommand/);
+  assert.match(schema, /@@unique\(\[branchId, commandKey\]\)/);
+  assert.match(schema, /settlementId Int\s+@unique/);
+  assert.match(migration, /CREATE TABLE "public"\."CustomerMoneySettlementCommand"/);
+  assert.match(migration, /CustomerMoneySettlementCommand_branchId_commandKey_key/);
+  assert.match(migration, /CustomerMoneySettlementCommand_settlementId_fkey/);
+  assert.match(createService, /customerMoneySettlementCommand\.findUnique/);
+  assert.match(createService, /customerMoneySettlementCommand\.create/);
+  assert.match(createService, /IDEMPOTENCY_KEY_REUSED/);
+  assert.match(controller, /X-Idempotency-Key/);
+  assert.match(controller, /idempotentReplay \? 200 : 201/);
+});
+
 test('settlement consumes receipt/deposit source projections instead of a free-floating balance', () => {
   assert.match(sourcePool, /sourceType:\s*'CUSTOMER_MONEY_RECEIPT'/);
   assert.match(sourcePool, /sourceType:\s*'CUSTOMER_DEPOSIT'/);
   assert.match(sourcePool, /remainingAmount:\s*\{ decrement: chunkAmount \}/);
   assert.match(sourcePool, /allocatedAmount:\s*\{ increment: chunkAmount \}/);
+  assert.match(sourcePool, /status:\s*'FULLY_ALLOCATED'/);
   assert.match(sourcePool, /usedAmount:\s*\{ increment: chunkAmount \}/);
   assert.match(sourcePool, /getLegacyBalanceReservation/);
   assert.match(createService, /consumeCustomerMoneySources/);
@@ -73,9 +126,15 @@ test('settlement consumes receipt/deposit source projections instead of a free-f
   assert.doesNotMatch(createService, /sourceType:\s*'CUSTOMER_MONEY_BALANCE'/);
 });
 
+test('customer money mutations share one per-customer transaction lock authority', () => {
+  assert.match(sharedLock, /CUSTOMER_MONEY_LOCK_NAMESPACE = -1003/);
+  assert.match(sharedLock, /pg_advisory_xact_lock/);
+  assert.match(createService, /acquireCustomerMoneyTransactionLock/);
+  assert.match(cancelService, /acquireCustomerMoneyTransactionLock/);
+});
+
 test('settlement write is atomic and uses the shared sale payment projection', () => {
   assert.match(createService, /prisma\.\$transaction/);
-  assert.match(createService, /pg_advisory_xact_lock/);
   assert.match(createService, /customerMoneySettlement\.create/);
   assert.match(createService, /createCustomerMoneyApplication/);
   assert.match(createService, /eventType:\s*'MONEY_APPLIED'/);
@@ -103,6 +162,12 @@ test('settlement cancellation reverses source, application, ledger, balance and 
   assert.match(cancelService, /calculateAvailableCustomerMoney/);
   assert.match(cancelService, /projectSalePaymentStatus\(tx, saleId\)/);
   assert.match(route, /router\.post\('\/:id\/cancel'/);
+});
+
+test('settlement cancellation fails closed when a sale already has downstream document authority', () => {
+  assert.match(cancelService, /combinedDocumentId/);
+  assert.match(cancelService, /combinedBillingId/);
+  assert.match(cancelService, /SETTLEMENT_DOWNSTREAM_DOCUMENT_EXISTS/);
 });
 
 test('settlement cancellation fails closed when a sale already has tax document authority', () => {
