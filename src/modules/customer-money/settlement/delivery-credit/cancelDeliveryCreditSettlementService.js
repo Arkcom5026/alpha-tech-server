@@ -13,6 +13,9 @@ const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  findSettlementGeneratedDocumentAnchor,
+} = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 const { getSettlement } = require('./deliveryCreditSettlementRepository');
 const { getDeliveryCreditSettlement } = require('./queryDeliveryCreditSettlementService');
 
@@ -91,15 +94,12 @@ const ensureNoTaxDocumentAuthority = async (tx, { branchId, saleIds }) => {
   }
 };
 
-const cancelGeneratedConsolidatedDelivery = async (tx, { branchId, settlementId, cancelledAt }) => {
-  if (!tx?.customerMoneySettlementGeneratedDocument) return null;
-  const link = await tx.customerMoneySettlementGeneratedDocument.findUnique({
-    where: { settlementId: Number(settlementId) },
-  });
-  if (!link || Number(link.branchId) !== Number(branchId)) return null;
+const cancelGeneratedConsolidatedDelivery = async (tx, { branchId, settlementId }) => {
+  const anchor = await findSettlementGeneratedDocumentAnchor(tx, { branchId, settlementId });
+  if (!anchor) return null;
 
   const document = await tx.combinedBillingDocument.findFirst({
-    where: { id: link.combinedBillingId, branchId: Number(branchId) },
+    where: { id: anchor.combinedBillingId, branchId: Number(branchId) },
     select: { id: true, code: true, status: true },
   });
   if (!document) {
@@ -141,10 +141,6 @@ const cancelGeneratedConsolidatedDelivery = async (tx, { branchId, settlementId,
       data: { status: 'CANCELLED' },
     });
   }
-  await tx.customerMoneySettlementGeneratedDocument.update({
-    where: { id: link.id },
-    data: { status: 'CANCELLED', cancelledAt },
-  });
   return document;
 };
 
@@ -184,8 +180,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     await ensureNoDownstreamDocumentAuthority(tx, { branchId, saleIds });
     await ensureNoTaxDocumentAuthority(tx, { branchId, saleIds });
 
-    const cancelledAt = new Date();
-    await cancelGeneratedConsolidatedDelivery(tx, { branchId, settlementId: settlement.id, cancelledAt });
+    await cancelGeneratedConsolidatedDelivery(tx, { branchId, settlementId: settlement.id });
 
     const applications = [...new Map(
       (settlement.lines || [])
@@ -212,6 +207,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
       }
     }
 
+    const cancelledAt = new Date();
     await tx.customerMoneySettlement.update({
       where: { id: settlement.id },
       data: {
