@@ -23,7 +23,7 @@ const execute = async ({ id, branchId }) => {
   }
 
   if (String(receipt.statusReceipt || '').toUpperCase() === 'COMPLETED') {
-    const poStatus = await repository.computePoStatus(receipt.purchaseOrderId);
+    const poStatus = await repository.syncPoStatus(receipt.purchaseOrderId);
     return { status: 200, body: { success: true, alreadyCompleted: true, poStatus } };
   }
 
