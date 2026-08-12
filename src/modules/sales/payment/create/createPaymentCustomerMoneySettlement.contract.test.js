@@ -23,6 +23,14 @@ test('normal payment creation projects and locks sale payment state before consu
   assert.ok(projectionIndex >= 0 && createIndex > projectionIndex, 'payment projection/lock must occur before payment write');
 });
 
+test('deposit payment keeps customer-to-sale lock order used by customer money settlement', () => {
+  assert.match(createPaymentController, /usesCustomerDeposit/);
+  assert.match(createPaymentController, /await acquireCustomerMoneyTransactionLock\(tx, sale\.customerId\)/);
+  const customerLockIndex = createPaymentController.indexOf('await acquireCustomerMoneyTransactionLock(tx, sale.customerId)');
+  const saleLockIndex = createPaymentController.indexOf('currentPaymentState = await projectSalePaymentStatus');
+  assert.ok(customerLockIndex >= 0 && saleLockIndex > customerLockIndex, 'customer lock must precede sale projection lock');
+});
+
 test('legacy mark-paid uses unified payment projection instead of native PaymentItem-only evidence', () => {
   assert.match(markPaidController, /projectSalePaymentStatus\(tx, saleId\)/);
   assert.match(markPaidController, /projectedPaidAmount/);
