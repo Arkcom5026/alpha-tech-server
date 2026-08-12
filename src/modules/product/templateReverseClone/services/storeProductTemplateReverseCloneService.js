@@ -234,7 +234,9 @@ const buildReverseCloneLockKey = ({ sourceProduct, templateBranchId }) => {
 
 const acquireReverseCloneFingerprintLock = async ({ sourceProduct, templateBranchId, db }) => {
   const lockKey = buildReverseCloneLockKey({ sourceProduct, templateBranchId })
-  await db.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', lockKey)
+  // PostgreSQL returns `void` from pg_advisory_xact_lock. Cast it so Prisma can
+  // deserialize the query result after the transaction-scoped lock is acquired.
+  await db.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))::text', lockKey)
   return lockKey
 }
 

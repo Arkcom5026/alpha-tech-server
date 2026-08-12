@@ -46,7 +46,7 @@ assert.match(reverseCloneSource, /status: 'LINKED_TEMPLATE'/)
 assert.match(reverseCloneSource, /buildReverseCloneLockKey/)
 assert.match(reverseCloneSource, /acquireReverseCloneFingerprintLock/)
 assert.match(reverseCloneSource, /product-template-reverse-clone:/)
-assert.match(reverseCloneSource, /pg_advisory_xact_lock\(hashtext\(\$1\)\)/)
+assert.match(reverseCloneSource, /pg_advisory_xact_lock\(hashtext\(\$1\)\)::text/)
 assert.match(reverseCloneSource, /\$queryRawUnsafe/)
 assert.match(reverseCloneSource, /SOURCE_PRODUCT_FINGERPRINT_REQUIRED/)
 
