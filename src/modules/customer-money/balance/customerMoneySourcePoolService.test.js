@@ -6,6 +6,7 @@ const { Prisma } = require('../../../../lib/prisma');
 const {
   calculateAvailableCustomerMoney,
   consumeCustomerMoneySources,
+  getCustomerMoneySourceState,
   restoreCustomerMoneySources,
 } = require('./customerMoneySourcePoolService');
 
@@ -58,6 +59,53 @@ test('customer money source pool consumes oldest receipt then deposit and preser
   assert.equal(updates[0][1].data.status, 'FULLY_ALLOCATED');
   assert.equal(updates[1][0], 'deposit');
   assert.equal(updates[1][1].data.usedAmount.increment.toString(), '30');
+});
+
+test('legacy balance settlements reserve oldest source money and expose source-specific spendable amount', async () => {
+  const client = {
+    customerReceipt: {
+      findMany: async () => [{
+        id: 10,
+        remainingAmount: D(60),
+        allocatedAmount: D(0),
+        receivedAt: new Date('2026-08-01T03:00:00Z'),
+        createdAt: new Date('2026-08-01T03:00:00Z'),
+      }],
+    },
+    customerDeposit: {
+      findMany: async () => [{
+        id: 20,
+        totalAmount: D(100),
+        usedAmount: D(0),
+        createdAt: new Date('2026-08-02T03:00:00Z'),
+      }],
+    },
+    customerMoneySettlementLine: {
+      aggregate: async () => ({ _sum: { appliedAmount: D(80) } }),
+    },
+  };
+
+  const available = await calculateAvailableCustomerMoney(client, { branchId: 2, customerId: 3 });
+  assert.equal(available.toString(), '80');
+
+  const receiptState = await getCustomerMoneySourceState(client, {
+    branchId: 2,
+    customerId: 3,
+    sourceType: 'CUSTOMER_MONEY_RECEIPT',
+    sourceId: 10,
+  });
+  assert.equal(receiptState.legacyReservedAmount.toString(), '60');
+  assert.equal(receiptState.availableAmount.toString(), '0');
+
+  const depositState = await getCustomerMoneySourceState(client, {
+    branchId: 2,
+    customerId: 3,
+    sourceType: 'CUSTOMER_DEPOSIT',
+    sourceId: 20,
+  });
+  assert.equal(depositState.legacyReservedAmount.toString(), '20');
+  assert.equal(depositState.availableAmount.toString(), '80');
+  assert.equal(depositState.uncoveredLegacyReservation.toString(), '0');
 });
 
 test('customer money source pool restores traced receipt and deposit applications', async () => {
