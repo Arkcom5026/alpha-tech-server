@@ -92,12 +92,12 @@ const createCustomerReceipt = async (req, res) => {
       });
 
       const customer = await tx.customerProfile.findFirst({
-        where: { id: customerId },
+        where: { id: customerId, branchId },
         select: { id: true },
       });
 
       if (!customer) {
-        const error = new Error('ไม่พบข้อมูลลูกค้าที่ต้องการรับชำระ');
+        const error = new Error('ไม่พบข้อมูลลูกค้าที่ต้องการรับชำระในสาขานี้');
         error.statusCode = 404;
         throw error;
       }
