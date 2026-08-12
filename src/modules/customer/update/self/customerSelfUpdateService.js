@@ -22,6 +22,8 @@ const presentUpdatedCustomer = (customer) => {
     name: customer.name,
     type: customer.type,
     companyName: customer.companyName,
+    departmentName: customer.departmentName,
+    financialOwnerCustomerId: customer.financialOwnerCustomerId,
     taxId: customer.taxId,
     provinceCode,
     districtCode,
@@ -105,6 +107,12 @@ const updateCustomerSelf = async ({ user, body = {} }) => {
         message: 'ไม่พบข้อมูลลูกค้าสำหรับร้านที่เลือก',
       },
     };
+  }
+
+  if (existing.financialOwnerCustomerId) {
+    delete profileData.type;
+    delete profileData.companyName;
+    delete profileData.taxId;
   }
 
   const updated = await repository.updateCustomerSelf({

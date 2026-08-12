@@ -6,6 +6,7 @@ const { buildTaxCandidateRegistration } = require('../../tax/candidates/contract
 const { mapCandidateToTaxDocumentDraft } = require('../../tax/candidates/mapping/mapCandidateToTaxDocument');
 const candidateRepository = require('../../tax/candidates/repository/taxCandidateRepository');
 const taxDocumentRepository = require('../../tax/documents/repository/taxDocumentRepository');
+const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
 
 const money = (value) => Number(Number(value || 0).toFixed(2));
 const keyOf = (type, id) => `${type}:${id}`;
@@ -52,10 +53,11 @@ const lineProjection = (sale, type, item, settledAmount) => {
 const listDocumentWorkspace = async ({ branchId, customerId }) => {
   branchId = Number(branchId); customerId = Number(customerId);
   if (!branchId || !customerId) fail('DOCUMENT_WORKSPACE_CONTEXT_REQUIRED', 'branchId and customerId are required');
+  const group = await resolveFinancialCustomerGroup(prisma, { branchId, customerId });
   const sales = await prisma.sale.findMany({
-    where: { branchId, customerId, isCredit: true, status: { not: 'CANCELLED' } },
+    where: { branchId, customerId: { in: group.memberIds }, isCredit: true, status: { not: 'CANCELLED' } },
     select: {
-      id: true, code: true, officialDocumentNumber: true, soldAt: true,
+      id: true, customerId: true, code: true, officialDocumentNumber: true, soldAt: true,
       items: { select: { id: true, price: true, documentDescription: true, stockItem: { select: { product: { select: { name: true } } } } } },
       simpleItems: { select: { id: true, quantity: true, price: true, documentDescription: true, product: { select: { name: true } } } },
     },
@@ -76,7 +78,7 @@ const listDocumentWorkspace = async ({ branchId, customerId }) => {
     ].map((line) => consumed.has(keyOf(line.lineType, line.lineId)) ? { ...line, status: 'DOCUMENTED', combinedBillingId: consumed.get(keyOf(line.lineType, line.lineId)) } : line);
     const counts = lines.reduce((acc, line) => ({ ...acc, [line.status]: (acc[line.status] || 0) + 1 }), {});
     const documentStatus = lines.length && lines.every((line) => line.status === 'DOCUMENTED') ? 'CLOSED' : lines.some((line) => line.status === 'DOCUMENTED') ? 'PARTIALLY_DOCUMENTED' : 'OPEN';
-    return { id: sale.id, code: sale.code, documentNo: sale.officialDocumentNumber || sale.code, soldAt: sale.soldAt, documentStatus, counts, lines };
+    return { id: sale.id, customerId: sale.customerId, code: sale.code, documentNo: sale.officialDocumentNumber || sale.code, soldAt: sale.soldAt, documentStatus, counts, lines };
   });
 };
 
@@ -88,9 +90,10 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
   if (requested.some((line) => !['STOCK', 'SIMPLE'].includes(line.lineType) || !line.lineId || line.documentUnitPrice < 0)) fail('DOCUMENT_WORKSPACE_LINE_INVALID', 'One or more document lines are invalid');
 
   const document = await prisma.$transaction(async (tx) => {
+    const group = await resolveFinancialCustomerGroup(tx, { branchId, customerId });
     const stockIds = requested.filter((x) => x.lineType === 'STOCK').map((x) => x.lineId);
     const simpleIds = requested.filter((x) => x.lineType === 'SIMPLE').map((x) => x.lineId);
-    const sales = await tx.sale.findMany({ where: { branchId, customerId, isCredit: true, status: { not: 'CANCELLED' }, OR: [{ items: { some: { id: { in: stockIds } } } }, { simpleItems: { some: { id: { in: simpleIds } } } }] }, include: { customer: true, items: { where: { id: { in: stockIds } }, include: { stockItem: { include: { product: true } } } }, simpleItems: { where: { id: { in: simpleIds } }, include: { product: true } } } });
+    const sales = await tx.sale.findMany({ where: { branchId, customerId: { in: group.memberIds }, isCredit: true, status: { not: 'CANCELLED' }, OR: [{ items: { some: { id: { in: stockIds } } } }, { simpleItems: { some: { id: { in: simpleIds } } } }] }, include: { customer: true, items: { where: { id: { in: stockIds } }, include: { stockItem: { include: { product: true } } } }, simpleItems: { where: { id: { in: simpleIds } }, include: { product: true } } } });
     const source = new Map();
     for (const sale of sales) {
       for (const item of sale.items) source.set(keyOf('STOCK', item.id), lineProjection(sale, 'STOCK', item, 0));
@@ -111,7 +114,7 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
         409,
       );
     }
-    const settlementRows = await tx.customerMoneySettlementLine.findMany({ where: { OR: requested.map((line) => ({ saleItemType: line.lineType, saleItemId: line.lineId })), settlement: { status: 'ACTIVE', branchId, customerId } }, select: { saleItemType: true, saleItemId: true, appliedAmount: true } });
+    const settlementRows = await tx.customerMoneySettlementLine.findMany({ where: { OR: requested.map((line) => ({ saleItemType: line.lineType, saleItemId: line.lineId })), settlement: { status: 'ACTIVE', branchId, customerId: group.ownerId } }, select: { saleItemType: true, saleItemId: true, appliedAmount: true } });
     const settled = new Map(); for (const row of settlementRows) settled.set(keyOf(row.saleItemType, row.saleItemId), money((settled.get(keyOf(row.saleItemType, row.saleItemId)) || 0) + Number(row.appliedAmount)));
     const data = requested.map((request) => {
       const item = source.get(keyOf(request.lineType, request.lineId)); const settledAmount = settled.get(keyOf(request.lineType, request.lineId)) || 0;
@@ -125,11 +128,11 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
     const code = await generateCombinedBillingCode(tx, branchId, new Date());
     const created = await tx.combinedBillingDocument.create({
       data: {
-        code, note: String(note || ''), createdBy: employeeId, customerId, branchId,
+        code, note: String(note || ''), createdBy: employeeId, customerId: group.ownerId, branchId,
         totalBeforeVat: new Prisma.Decimal(totalAmount), vatAmount: new Prisma.Decimal(0),
         totalAmount: new Prisma.Decimal(totalAmount), status: 'ISSUED',
         documentLines: { create: data.map(({ request, item, settledAmount, documentAmount, priceAdjustment }) => ({
-          branchId, customerId, sourceSaleId: item.saleId, sourceSaleCode: item.saleCode,
+          branchId, customerId: group.ownerId, sourceSaleId: item.saleId, sourceSaleCode: item.saleCode,
           sourceDocumentNo: item.sourceDocumentNo, sourceLineType: request.lineType,
           sourceLineId: request.lineId, description: item.description,
           quantity: new Prisma.Decimal(item.quantity), sourceUnitPrice: new Prisma.Decimal(item.sourceUnitPrice),
@@ -144,8 +147,8 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
     });
     const refund = money(data.reduce((sum, row) => sum + Math.max(0, row.settledAmount - row.documentAmount), 0));
     if (refund > 0) {
-      await tx.customerMoneyBalance.upsert({ where: { branchId_customerId: { branchId, customerId } }, create: { branchId, customerId, availableAmount: new Prisma.Decimal(refund) }, update: { availableAmount: { increment: new Prisma.Decimal(refund) } } });
-      await tx.customerMoneyLedger.create({ data: { branchId, customerId, eventType: 'DOCUMENT_PRICE_ADJUSTMENT_RELEASE', amount: new Prisma.Decimal(refund), direction: 'CREDIT', referenceType: 'CONSOLIDATED_DELIVERY', referenceId: created.id, createdById: employeeId } });
+      await tx.customerMoneyBalance.upsert({ where: { branchId_customerId: { branchId, customerId: group.ownerId } }, create: { branchId, customerId: group.ownerId, availableAmount: new Prisma.Decimal(refund) }, update: { availableAmount: { increment: new Prisma.Decimal(refund) } } });
+      await tx.customerMoneyLedger.create({ data: { branchId, customerId: group.ownerId, eventType: 'DOCUMENT_PRICE_ADJUSTMENT_RELEASE', amount: new Prisma.Decimal(refund), direction: 'CREDIT', referenceType: 'CONSOLIDATED_DELIVERY', referenceId: created.id, createdById: employeeId } });
     }
     const taxDocument = await registerConsolidatedTaxCandidate({ tx, document: created, branchId, employeeId });
     return { ...created, taxDocument };

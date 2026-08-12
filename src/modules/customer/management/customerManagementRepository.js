@@ -6,6 +6,8 @@ const customerSelect = {
   branchId: true,
   name: true,
   companyName: true,
+  departmentName: true,
+  financialOwnerCustomerId: true,
   taxId: true,
   type: true,
   createdAt: true,
@@ -28,6 +30,8 @@ const customerDetailInclude = {
       },
     },
   },
+  financialOwner: { select: { id: true, name: true, companyName: true, departmentName: true, taxId: true } },
+  financialMembers: { select: { id: true, name: true, companyName: true, departmentName: true, taxId: true }, orderBy: { id: 'asc' } },
 };
 
 function buildSearchFilter(query) {
@@ -38,6 +42,7 @@ function buildSearchFilter(query) {
     OR: [
       { name: contains },
       { companyName: contains },
+      { departmentName: contains },
       { taxId: contains },
       { user: { loginId: contains } },
       { user: { email: contains } },

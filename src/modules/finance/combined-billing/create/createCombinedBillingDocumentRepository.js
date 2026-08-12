@@ -1,4 +1,5 @@
 const { Prisma } = require('../../../../../lib/prisma');
+const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 
 const toDecimal = (value) => (
   value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value ?? 0)
@@ -37,8 +38,9 @@ const createCombinedBillingDocumentRepository = ({ prisma }) => ({
         throw new Error('ไม่พบรายการขายที่เลือกหรือไม่สามารถรวมบิลได้');
       }
 
-      const customerId = sales[0].customerId;
-      if (!sales.every((sale) => sale.customerId === customerId)) {
+      const group = await resolveFinancialCustomerGroup(tx, { customerId: sales[0].customerId, branchId });
+      const customerId = group.ownerId;
+      if (!sales.every((sale) => group.memberIds.includes(sale.customerId))) {
         throw new Error('ใบส่งของต้องเป็นลูกค้ารายเดียวกัน');
       }
 

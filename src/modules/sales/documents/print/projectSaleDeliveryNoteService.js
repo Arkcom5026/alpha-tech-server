@@ -52,7 +52,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       vat: true,
       vatRate: true,
       customer: {
-        select: { name: true, companyName: true, taxId: true },
+        select: { name: true, companyName: true, departmentName: true, taxId: true, addressDetail: true },
       },
       branch: {
         select: {
@@ -147,6 +147,9 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     issuer: sale.branch,
     recipient: {
       name: sale.customer?.companyName || sale.customer?.name || null,
+      departmentName: sale.customer?.departmentName || null,
+      contactName: sale.customer?.name || null,
+      operationalAddress: sale.customer?.addressDetail || null,
       taxId: sale.customer?.taxId || null,
     },
     note: sale.note || null,

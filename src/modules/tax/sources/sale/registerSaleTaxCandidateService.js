@@ -3,6 +3,7 @@
 const { prisma } = require('../../../../../lib/prisma');
 const { registerTaxCandidate } = require('../../intake/registerTaxCandidateService');
 const { assertSaleTaxDocumentEligibility } = require('./saleTaxDocumentEligibilityPolicy');
+const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 
 const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -36,6 +37,7 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
         select: {
           name: true,
           companyName: true,
+          departmentName: true,
           taxId: true,
           type: true,
           addressDetail: true,
@@ -69,15 +71,27 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
   }
 
   assertSaleTaxDocumentEligibility(sale);
+  const group = sale.customerId
+    ? await resolveFinancialCustomerGroup(prisma, { customerId: sale.customerId, branchId: normalizedBranchId })
+    : null;
+  const legalCustomer = group?.ownerId && group.ownerId !== sale.customerId
+    ? await prisma.customerProfile.findFirst({
+        where: { id: group.ownerId, branchId: normalizedBranchId },
+        select: {
+          id: true, name: true, companyName: true, taxId: true, type: true, addressDetail: true,
+          subdistrict: { select: { nameTh: true, district: { select: { nameTh: true, province: { select: { nameTh: true } } } } } },
+        },
+      })
+    : sale.customer;
 
   const gross = Number(sale.totalAmount || 0);
   const taxAmount = Number(sale.vat || 0);
   const subtotalAmount = Math.max(0, gross - taxAmount);
   const customerAddress = [
-    sale.customer?.addressDetail,
-    sale.customer?.subdistrict?.nameTh,
-    sale.customer?.subdistrict?.district?.nameTh,
-    sale.customer?.subdistrict?.district?.province?.nameTh,
+    legalCustomer?.addressDetail,
+    legalCustomer?.subdistrict?.nameTh,
+    legalCustomer?.subdistrict?.district?.nameTh,
+    legalCustomer?.subdistrict?.district?.province?.nameTh,
   ].filter(Boolean).join(' ');
   const items = [
     ...sale.items.map((item) => ({
@@ -117,16 +131,18 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
       saleId: sale.id,
       saleCode: sale.code,
       customerId: sale.customerId,
-      counterpartyName: sale.customer?.companyName || sale.customer?.name || null,
-      counterpartyTaxId: sale.customer?.taxId || null,
+      financialOwnerCustomerId: group?.ownerId || sale.customerId,
+      sourceDepartmentName: sale.customer?.departmentName || null,
+      counterpartyName: legalCustomer?.companyName || legalCustomer?.name || null,
+      counterpartyTaxId: legalCustomer?.taxId || null,
       recipient: {
-        legalName: sale.customer?.companyName || sale.customer?.name || null,
-        taxId: sale.customer?.taxId || null,
+        legalName: legalCustomer?.companyName || legalCustomer?.name || null,
+        taxId: legalCustomer?.taxId || null,
         registeredAddress: customerAddress || null,
         branchCode: '00000',
         isHeadOffice: true,
       },
-      customerType: sale.customer?.type || null,
+      customerType: legalCustomer?.type || null,
       isTaxInvoice: Boolean(sale.isTaxInvoice),
       saleStatus: sale.status,
       paymentStatus: sale.statusPayment,

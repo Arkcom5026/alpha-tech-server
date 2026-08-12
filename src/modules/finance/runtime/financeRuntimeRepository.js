@@ -1,5 +1,6 @@
 const prismaImport = require('../../../../lib/prisma');
 const prisma = prismaImport?.prisma || prismaImport;
+const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
 
 const money = (value) => {
   if (value == null) return 0;
@@ -37,6 +38,7 @@ const findCustomerIds = async (keyword, take = 5000) => {
           { name: { contains: keyword, mode: 'insensitive' } },
           { companyName: { contains: keyword, mode: 'insensitive' } },
           { taxId: { contains: keyword, mode: 'insensitive' } },
+          { departmentName: { contains: keyword, mode: 'insensitive' } },
         ],
       },
       select: { id: true },
@@ -66,7 +68,7 @@ const loadCustomerMap = async (customerIds) => {
   try {
     const customers = await prisma.customerProfile.findMany({
       where: { id: { in: customerIds } },
-      select: { id: true, name: true, companyName: true, taxId: true, creditLimit: true },
+      select: { id: true, branchId: true, name: true, companyName: true, departmentName: true, taxId: true, creditLimit: true, financialOwnerCustomerId: true },
     });
     return new Map((customers || []).map((customer) => [customer.id, customer]));
   } catch (_error) {
@@ -87,10 +89,13 @@ const getAccountsReceivableSummary = async (input) => {
       where: { ...where, customerId: { not: null } },
     }),
   ]);
+  const customerIds = (customers || []).map((row) => row.customerId).filter(Boolean);
+  const customerMap = await loadCustomerMap(customerIds);
   return {
     totalBills: Number(aggregate?._count?._all || 0),
     totalOutstanding: Math.max(0, money(aggregate?._sum?.totalAmount) - money(aggregate?._sum?.paidAmount)),
     totalCustomers: (customers || []).map((row) => row.customerId).filter(Boolean).length,
+    totalFinancialGroups: new Set(customerIds.map((id) => customerMap.get(id)?.financialOwnerCustomerId || id)).size,
   };
 };
 
@@ -137,6 +142,7 @@ const getAccountsReceivableRows = async (input) => {
         paidAmount,
         outstandingAmount: Math.max(0, totalAmount - paidAmount),
         customerId: row.customerId,
+        financialOwnerCustomerId: customer?.financialOwnerCustomerId || customer?.id || null,
         customerName: String(customer?.companyName || customer?.name || '').trim(),
         customer,
         refCode: row.refCode || null,
@@ -187,12 +193,13 @@ const groupCredit = async (where) => {
 const toCreditRows = async (grouped) => {
   const customerIds = (grouped || []).map((row) => row.customerId).filter(Boolean);
   const customerMap = await loadCustomerMap(customerIds);
-  return (grouped || []).map((row) => {
+  const memberRows = (grouped || []).map((row) => {
     const customer = customerMap.get(row.customerId) || null;
     const outstandingAmount = row.__fallbackOutstanding ?? Math.max(0, money(row?._sum?.totalAmount) - money(row?._sum?.paidAmount));
     const creditLimit = money(customer?.creditLimit);
     return {
       customerId: row.customerId,
+      financialOwnerCustomerId: customer?.financialOwnerCustomerId || row.customerId,
       customerName: String(customer?.companyName || customer?.name || '').trim(),
       customer,
       outstandingAmount,
@@ -200,6 +207,15 @@ const toCreditRows = async (grouped) => {
       remainingLimit: Math.max(0, creditLimit - outstandingAmount),
     };
   });
+  const owners = new Map();
+  for (const row of memberRows) {
+    const ownerId = row.financialOwnerCustomerId;
+    const current = owners.get(ownerId) || { financialOwnerCustomerId: ownerId, outstandingAmount: 0, members: [] };
+    current.outstandingAmount += row.outstandingAmount;
+    current.members.push({ customerId: row.customerId, departmentName: row.customer?.departmentName || null, outstandingAmount: row.outstandingAmount });
+    owners.set(ownerId, current);
+  }
+  return memberRows.map((row) => ({ ...row, groupOutstandingAmount: owners.get(row.financialOwnerCustomerId).outstandingAmount, groupMembers: owners.get(row.financialOwnerCustomerId).members }));
 };
 
 const getCustomerCreditSummary = async (input) => {
@@ -229,9 +245,10 @@ const getCustomerCreditByCustomerId = async (input) => {
   const customerMap = await loadCustomerMap([input.customerId]);
   const customer = customerMap.get(input.customerId);
   if (!customer) return null;
+  const group = await resolveFinancialCustomerGroup(prisma, { customerId: input.customerId, branchId: input.branchId });
   const where = withDateRange({
     branchId: input.branchId,
-    customerId: input.customerId,
+    customerId: { in: group.memberIds },
     statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID', 'WAITING_APPROVAL'] },
   }, input.fromDate, input.toDate);
   const sales = await prisma.sale.findMany({
@@ -258,6 +275,8 @@ const getCustomerCreditByCustomerId = async (input) => {
   const creditLimit = money(customer.creditLimit);
   return {
     customer,
+    financialOwner: group.owner,
+    members: group.members,
     outstandingAmount,
     creditLimit,
     remainingLimit: Math.max(0, creditLimit - outstandingAmount),
