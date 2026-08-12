@@ -190,6 +190,23 @@ const findExactTemplateProduct = async ({ sourceProduct, templateBranchId, db })
   return candidates.find((product) => buildCatalogFingerprint(product) === sourceFingerprint) || null
 }
 
+const buildReverseCloneLockKey = ({ sourceProduct, templateBranchId }) => {
+  const fingerprint = buildCatalogFingerprint(sourceProduct)
+  if (!fingerprint) {
+    throw makeError('SOURCE_PRODUCT_FINGERPRINT_REQUIRED', 409)
+  }
+  return `product-template-reverse-clone:${Number(templateBranchId)}:${fingerprint}`
+}
+
+const acquireReverseCloneFingerprintLock = async ({ sourceProduct, templateBranchId, db }) => {
+  const lockKey = buildReverseCloneLockKey({ sourceProduct, templateBranchId })
+  await db.$queryRawUnsafe(
+    'SELECT pg_advisory_xact_lock(hashtext($1))',
+    lockKey
+  )
+  return lockKey
+}
+
 const assertSourceProductTypeIntegrity = (sourceProduct) => {
   const productType = sourceProduct?.productType
   const globalType = productType?.globalProductType
@@ -412,6 +429,38 @@ const reverseCloneStoreProductToMatchingTemplate = async ({
   const templateBranchId = branchResolution.templateBranch.id
 
   return db.$transaction(async (tx) => {
+    const initialProduct = await findSourceProduct({
+      sourceProductId: sourceProduct,
+      sourceBranchId: sourceBranch,
+      db: tx,
+    })
+    if (!initialProduct) throw makeError('SOURCE_PRODUCT_NOT_FOUND', 404)
+
+    const initialLinkedTemplate = await findLinkedTemplateProduct({
+      templateProductId: initialProduct.templateProductId,
+      templateBranchId,
+      db: tx,
+    })
+    if (initialLinkedTemplate) {
+      return {
+        success: true,
+        status: 'LINKED_TEMPLATE',
+        reason: null,
+        sourceBranchId: sourceBranch,
+        sourceProductId: initialProduct.id,
+        templateBranchId,
+        templateProductId: initialLinkedTemplate.id,
+        created: false,
+        templateProduct: initialLinkedTemplate,
+      }
+    }
+
+    await acquireReverseCloneFingerprintLock({
+      sourceProduct: initialProduct,
+      templateBranchId,
+      db: tx,
+    })
+
     const product = await findSourceProduct({
       sourceProductId: sourceProduct,
       sourceBranchId: sourceBranch,
@@ -533,6 +582,8 @@ module.exports = {
   BUSINESS_TYPE_TEMPLATE_BRANCH_CODE,
   normalizeCatalogText,
   buildCatalogFingerprint,
+  buildReverseCloneLockKey,
+  acquireReverseCloneFingerprintLock,
   resolveTemplateBranchCode,
   resolveMatchingTemplateBranch,
   findExactTemplateProduct,
