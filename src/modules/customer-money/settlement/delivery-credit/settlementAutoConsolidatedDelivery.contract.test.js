@@ -7,6 +7,7 @@ const test = require('node:test');
 const { Prisma } = require('../../../../../lib/prisma');
 const {
   createSettlementConsolidatedDelivery,
+  isAutoConsolidationBatch,
 } = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 
 const read = (relative) => fs.readFileSync(path.join(__dirname, relative), 'utf8');
@@ -40,6 +41,7 @@ test('settlement completion is the automatic consolidated-delivery boundary and 
   assert.doesNotMatch(generator, /stockMovement|stockItem\.update|inventory/i);
   assert.match(generator, /sourceCustomerId/);
   assert.match(generator, /completedBySettlementId/);
+  assert.match(generator, /pg_advisory_xact_lock/);
 });
 
 test('generated document authority is durable and one-to-one per settlement', () => {
@@ -51,10 +53,29 @@ test('generated document authority is durable and one-to-one per settlement', ()
   assert.match(migration, /CustomerMoneySettlementGeneratedDocument_combinedBillingId_key/);
 });
 
-test('auto document contains only lines that become paid-ready and preserves prior partial settlement provenance', async () => {
+test('automatic consolidation requires a complete batch spanning at least two source deliveries', () => {
+  const oneSale = [
+    preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 }),
+  ];
+  const partialBatch = [
+    preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 }),
+    preparedLine({ saleId: 11, customerId: 127, lineId: 1002, lineAmount: 1000, applied: 500, completesLine: false }),
+  ];
+  const completeMultiSale = [
+    preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 }),
+    preparedLine({ saleId: 11, customerId: 127, lineId: 1002, lineAmount: 1000, applied: 400, previously: 600 }),
+  ];
+
+  assert.equal(isAutoConsolidationBatch(oneSale), false);
+  assert.equal(isAutoConsolidationBatch(partialBatch), false);
+  assert.equal(isAutoConsolidationBatch(completeMultiSale), true);
+});
+
+test('auto document reproduces the complete paid-ready batch and preserves source department/provenance', async () => {
   let createdData = null;
   let linkData = null;
   const tx = {
+    $queryRaw: async () => [{ locked: 1 }],
     customerMoneySettlementGeneratedDocument: {
       findUnique: async () => null,
       create: async ({ data }) => { linkData = data; return { id: 1, ...data }; },
@@ -78,8 +99,7 @@ test('auto document contains only lines that become paid-ready and preserves pri
     customerId: 35,
     prepared: [
       preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 }),
-      preparedLine({ saleId: 11, customerId: 127, lineId: 1002, lineAmount: 1000, applied: 500, completesLine: false }),
-      preparedLine({ saleId: 12, customerId: 127, lineId: 1003, lineAmount: 1000, applied: 400, previously: 600, completesLine: true }),
+      preparedLine({ saleId: 12, customerId: 127, lineId: 1003, lineAmount: 1000, applied: 400, previously: 600 }),
     ],
     note: 'ทดสอบ',
   });
@@ -89,11 +109,44 @@ test('auto document contains only lines that become paid-ready and preserves pri
   assert.equal(createdData.status, 'ISSUED');
   assert.equal(createdData.documentLines.create.length, 2);
   assert.equal(Number(createdData.totalAmount), 1300);
-  assert.equal(createdData.documentLines.create[0].sourceCustomerId, undefined);
   assert.equal(createdData.documentLines.create[0].sourceSnapshot.sourceCustomerId, 102);
+  assert.equal(createdData.documentLines.create[1].sourceSnapshot.sourceCustomerId, 127);
   assert.equal(createdData.documentLines.create[1].sourceSnapshot.previouslySettledAmount, 600);
+  assert.equal(createdData.documentLines.create[1].sourceSnapshot.settlementAppliedAmount, 400);
   assert.equal(Number(createdData.documentLines.create[1].documentAmount), 1000);
   assert.deepEqual(linkData, { branchId: 2, settlementId: 77, combinedBillingId: 91, status: 'ACTIVE' });
+});
+
+test('single-delivery and partial batches do not create duplicate/incomplete combined delivery documents', async () => {
+  let creates = 0;
+  const tx = {
+    customerMoneySettlementGeneratedDocument: { findUnique: async () => null },
+    combinedBillingDocument: { create: async () => { creates += 1; } },
+  };
+
+  const single = await createSettlementConsolidatedDelivery({
+    tx,
+    branchId: 2,
+    employeeId: 35,
+    settlementId: 80,
+    customerId: 35,
+    prepared: [preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 })],
+  });
+  const partial = await createSettlementConsolidatedDelivery({
+    tx,
+    branchId: 2,
+    employeeId: 35,
+    settlementId: 81,
+    customerId: 35,
+    prepared: [
+      preparedLine({ saleId: 10, customerId: 102, lineId: 1001, lineAmount: 300, applied: 300 }),
+      preparedLine({ saleId: 11, customerId: 127, lineId: 1002, lineAmount: 1000, applied: 500, completesLine: false }),
+    ],
+  });
+
+  assert.equal(single, null);
+  assert.equal(partial, null);
+  assert.equal(creates, 0);
 });
 
 test('idempotent replay reuses the generated document instead of creating another', async () => {
