@@ -164,6 +164,7 @@ class CreateRepairJobService {
             receivedBy: { connect: { id: actor.employeeId } },
             repairJob: { connect: { id: created.id } },
             referenceNo: createRepairIntakeReference(created.branchId),
+            assetDescription: created.deviceModel,
             customerProblem: created.reportedSymptoms,
             internalRemark: created.technicianNotes,
             status: 'LINKED_TO_REPAIR',

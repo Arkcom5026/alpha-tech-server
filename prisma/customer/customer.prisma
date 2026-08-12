@@ -53,6 +53,7 @@ model CustomerProfile {
   ownedDevices              Device[]                   @relation("DeviceCurrentOwner")
   deviceOwnershipHistory    DeviceOwnershipHistory[]
   deviceIntakes             DeviceIntake[]
+  contactChannels           CustomerContactChannel[]
   actedDevicePassportEvents DevicePassportEvent[]      @relation("DevicePassportCustomerActor")
   sales                     Sale[]
   services                  ServiceOrder[]

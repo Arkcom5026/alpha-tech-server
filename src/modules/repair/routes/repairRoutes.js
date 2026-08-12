@@ -93,6 +93,7 @@ router.use(loadRepairEmployeeContext);
 router.get('/intake-search', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), searchIntake);
 router.get('/intake-context/:lookup', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), getIntakeContext);
 router.get('/customers/:customerId/warranty-assets', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), listCustomerWarrantyAssets);
+router.post('/intakes/manual', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), createExternalDeviceIntake);
 router.post('/intakes/external-device', allowRepairCapabilities(REPAIR_CAPABILITY.INTAKE), createExternalDeviceIntake);
 
 router.get('/jobs', allowRepairCapabilities(REPAIR_CAPABILITY.READ), listRepairJobs);

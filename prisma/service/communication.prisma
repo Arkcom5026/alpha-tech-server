@@ -1,0 +1,92 @@
+enum CommunicationChannelType {
+  PHONE
+  SMS
+  EMAIL
+  LINE
+  FACEBOOK
+  OTHER
+}
+
+enum CommunicationConsentStatus {
+  UNKNOWN
+  GRANTED
+  REVOKED
+}
+
+model CustomerContactChannel {
+  id Int @id @default(autoincrement())
+  branchId Int
+  customerId Int
+  channelType CommunicationChannelType
+  address String
+  displayLabel String?
+  consentStatus CommunicationConsentStatus @default(UNKNOWN)
+  verifiedAt DateTime?
+  active Boolean @default(true)
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  repairPreferences RepairCommunicationPreference[]
+  @@unique([branchId, customerId, channelType, address])
+  @@index([branchId, customerId, active])
+}
+
+model CommunicationProfile {
+  id Int @id @default(autoincrement())
+  branchId Int
+  channelType CommunicationChannelType
+  displayName String
+  address String?
+  publicUri String?
+  qrPayload String?
+  enabled Boolean @default(true)
+  integrationRef String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  repairPreferences RepairCommunicationPreference[]
+  @@unique([branchId, channelType, displayName])
+  @@index([branchId, enabled])
+}
+
+model RepairCommunicationPreference {
+  id Int @id @default(autoincrement())
+  branchId Int
+  repairJobId Int @unique
+  channelType CommunicationChannelType
+  contactChannelId Int?
+  profileId Int?
+  destinationSnapshot String?
+  displayLabelSnapshot String?
+  consentGranted Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  repairJob RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  contactChannel CustomerContactChannel? @relation(fields: [contactChannelId], references: [id], onDelete: SetNull)
+  profile CommunicationProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  @@index([branchId, channelType])
+  @@index([contactChannelId])
+  @@index([profileId])
+}
+
+model RepairCommunicationActivity {
+  id Int @id @default(autoincrement())
+  branchId Int
+  repairJobId Int
+  actorEmployeeId Int
+  channelType CommunicationChannelType
+  direction String @default("OUTBOUND")
+  activityType String
+  destinationSnapshot String?
+  note String?
+  occurredAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  repairJob RepairJob @relation(fields: [repairJobId], references: [id], onDelete: Cascade)
+  @@index([branchId, repairJobId, occurredAt])
+  @@index([actorEmployeeId])
+}

@@ -37,6 +37,7 @@ const brandRoutes = require('./src/modules/brand/routes/brandRoutes');
 const unitRoutes = require('./src/modules/unit/routes/unitRoutes');
 const { mountProductModule } = require('./src/modules/product');
 const repairRoutes = require('./src/modules/repair/routes/repairRoutes');
+const communicationRoutes = require('./src/modules/communication/communicationRoutes');
 const uploadProductRoutes = require('./src/modules/product/media/routes/uploadProductRoutes');
 const purchaseOrderRoutes = require('./src/modules/procurement/purchase-order/routes/purchaseOrderRoutes');
 const purchaseOrderReceiptRoutes = require('./src/modules/procurement/receipt/routes/purchaseOrderReceiptRoutes');
@@ -191,6 +192,7 @@ mountProductModule(app);
 
 app.use('/api/repairs', repairRoutes);
 app.use('/api/repair', repairRoutes);
+app.use('/api/communication', communicationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/purchase-order-receipts', purchaseOrderReceiptRoutes);
 app.use('/api/purchase-order-receipt-items', purchaseOrderReceiptItemRoutes);

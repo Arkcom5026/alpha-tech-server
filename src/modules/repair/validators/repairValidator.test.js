@@ -32,6 +32,8 @@ test('validateCreateRepairJob normalizes identifiers, money, text and override f
   assert.deepEqual(result, {
     customerId: 10,
     stockItemId: 20,
+    deviceId: null,
+    assetDescription: 'Model X',
     deviceModel: 'Model X',
     reportedSymptoms: 'No power',
     depositPaid: 500.25,

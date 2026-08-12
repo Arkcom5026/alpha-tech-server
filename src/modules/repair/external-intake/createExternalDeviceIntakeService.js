@@ -20,10 +20,7 @@ class CreateExternalDeviceIntakeService {
 
   execute(actor, rawPayload) {
     const payload = validateExternalDeviceIntake(rawPayload);
-    const deviceIdentity = {
-      ...payload.device,
-      barcode: payload.device.barcode || createInternalDeviceBarcode(actor.branchId),
-    };
+    const deviceIdentity = payload.registerAsset ? { ...payload.asset, barcode: payload.asset.barcode || createInternalDeviceBarcode(actor.branchId) } : null;
 
     return this.repository.transaction(async (repo) => {
       const customer = await repo.findCustomer(actor.branchId, payload.customerId);
@@ -35,7 +32,7 @@ class CreateExternalDeviceIntakeService {
         );
       }
 
-      const duplicate = await repo.findDeviceByIdentity(actor.branchId, deviceIdentity);
+      const duplicate = deviceIdentity ? await repo.findDeviceByIdentity(actor.branchId, deviceIdentity) : null;
       if (duplicate) {
         throw new RepairError(
           RepairFailureCode.CONFLICT,
@@ -47,27 +44,27 @@ class CreateExternalDeviceIntakeService {
 
       const occurredAt = new Date();
       const referenceNo = createExternalIntakeReference(actor.branchId);
-      const device = await repo.createDevice({
+      const device = deviceIdentity ? await repo.createDevice({
         branchId: actor.branchId,
         currentOwnerCustomerId: payload.customerId,
         stockItemId: null,
         fingerprint: randomUUID(),
-        category: payload.device.category,
-        brand: payload.device.brand,
-        model: payload.device.model,
+        category: payload.asset.category,
+        brand: payload.asset.brand,
+        model: payload.asset.model,
         serialNumber: deviceIdentity.serialNumber,
         imei: deviceIdentity.imei,
         barcode: deviceIdentity.barcode,
         status: 'IN_REPAIR',
-      });
+      }) : null;
 
       const repairJob = await repo.createRepairJob({
         jobNo: createRepairJobNo(actor.branchId),
         branchId: actor.branchId,
         customerId: payload.customerId,
         stockItemId: null,
-        deviceId: device.id,
-        deviceModel: [payload.device.brand, payload.device.model].filter(Boolean).join(' '),
+        deviceId: device?.id || null,
+        deviceModel: payload.assetDescription,
         reportedSymptoms: payload.customerProblem,
         technicianNotes: payload.internalRemark,
         estimatedCost: payload.estimatedCost,
@@ -76,23 +73,24 @@ class CreateExternalDeviceIntakeService {
       });
 
       const intake = await repo.createDeviceIntake({
-        device: { connect: { id: device.id } },
+        ...(device ? { device: { connect: { id: device.id } } } : {}),
         branch: { connect: { id: actor.branchId } },
         customer: { connect: { id: payload.customerId } },
         receivedBy: { connect: { id: actor.employeeId } },
         repairJob: { connect: { id: repairJob.id } },
         referenceNo,
+        assetDescription: payload.assetDescription,
         customerProblem: payload.customerProblem,
         internalRemark: payload.internalRemark,
         status: 'LINKED_TO_REPAIR',
         receivedAt: occurredAt,
         snapshot: {
           create: {
-            brand: payload.device.brand,
-            model: payload.device.model,
-            serialNumber: deviceIdentity.serialNumber,
-            imei: deviceIdentity.imei,
-            barcode: deviceIdentity.barcode,
+            brand: payload.asset.brand,
+            model: payload.asset.model,
+            serialNumber: payload.asset.serialNumber,
+            imei: payload.asset.imei,
+            barcode: payload.asset.barcode,
             accessoriesSummary: payload.accessories
               .map((item) => `${item.accessoryType} x${item.quantity}`)
               .join(', ') || null,
@@ -103,6 +101,7 @@ class CreateExternalDeviceIntakeService {
         },
       });
 
+      if (device) {
       await repo.createOwnership({
         deviceId: device.id,
         customerId: payload.customerId,
@@ -121,7 +120,7 @@ class CreateExternalDeviceIntakeService {
         sourceId: String(intake.id),
         eventKey: `device-intake:${intake.id}:registered`,
         correlationId: `repair-job:${repairJob.id}`,
-        title: `ลงทะเบียนอุปกรณ์ภายนอก ${payload.device.model}`,
+        title: `ลงทะเบียนสิ่งที่รับซ่อม ${payload.assetDescription}`,
         description: payload.customerProblem,
         actorEmployeeId: actor.employeeId,
         customerVisible: true,
@@ -157,9 +156,12 @@ class CreateExternalDeviceIntakeService {
         },
         occurredAt,
       });
+      }
 
       return {
         device,
+        assetDescription: payload.assetDescription,
+        assetRegistered: Boolean(device),
         deviceIntake: intake,
         repairJob: mapRepairJob(repairJob),
         workflowStatus: 'RECEIVED',

@@ -124,12 +124,14 @@ function validatePreAgreedService(rawValue, _estimatedCost) {
 function validateCreateRepairJob(payload = {}) {
   const estimatedCost = nonNegativeMoney(payload.estimatedCost, 'estimatedCost', 0);
   const preAgreedService = validatePreAgreedService(payload.preAgreedService, estimatedCost);
+  const assetDescription = requiredText(payload.assetDescription ?? payload.deviceModel, 'assetDescription', 255);
 
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
     stockItemId: positiveInt(payload.stockItemId, 'stockItemId', { optional: true }),
     deviceId: positiveInt(payload.deviceId, 'deviceId', { optional: true }),
-    deviceModel: requiredText(payload.deviceModel, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
+    assetDescription,
+    deviceModel: assetDescription,
     reportedSymptoms: requiredText(payload.reportedSymptoms, 'อาการที่ลูกค้าแจ้ง', 4000),
     depositPaid: nonNegativeMoney(payload.depositPaid, 'depositPaid', 0),
     estimatedCost,

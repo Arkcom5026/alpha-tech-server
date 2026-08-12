@@ -120,15 +120,18 @@ function validatePreAgreedService(rawValue, _estimatedCost, customerNameFallback
 }
 
 function validateExternalDeviceIntake(payload = {}) {
-  const device = payload.device || {};
-  const category = String(device.category || '').trim().toUpperCase();
-  if (!DEVICE_CATEGORIES.has(category)) {
+  const asset = payload.asset || payload.device || {};
+  const legacyDeviceContract = !payload.asset && Boolean(payload.device);
+  const registerAsset = booleanValue(payload.registerAsset, legacyDeviceContract);
+  const assetDescription = requiredText(payload.assetDescription || asset.description || asset.model, 'assetDescription', 255);
+  const category = String(asset.category || '').trim().toUpperCase() || null;
+  if (category && !DEVICE_CATEGORIES.has(category)) {
     invalid('ประเภทอุปกรณ์ไม่อยู่ในค่าที่ระบบรองรับ', 'device.category');
   }
 
-  const serialNumber = optionalText(device.serialNumber, 'Serial Number', 255);
-  const imei = optionalText(device.imei, 'IMEI', 255);
-  const barcode = optionalText(device.barcode, 'Barcode/QR ร้าน', 255);
+  const serialNumber = optionalText(asset.serialNumber, 'Serial Number', 255);
+  const imei = optionalText(asset.imei, 'IMEI', 255);
+  const barcode = optionalText(asset.barcode, 'Barcode/QR ร้าน', 255);
   const estimatedCost = nonNegativeMoney(payload.estimatedCost, 'estimatedCost');
   const preAgreedService = validatePreAgreedService(
     payload.preAgreedService,
@@ -138,10 +141,12 @@ function validateExternalDeviceIntake(payload = {}) {
 
   return {
     customerId: positiveInt(payload.customerId, 'customerId'),
-    device: {
+    assetDescription,
+    registerAsset,
+    asset: {
       category,
-      brand: optionalText(device.brand, 'ยี่ห้อ', 255),
-      model: requiredText(device.model, 'รุ่นหรือรายละเอียดอุปกรณ์', 255),
+      brand: optionalText(asset.brand, 'ยี่ห้อ', 255),
+      model: optionalText(asset.model, 'รุ่น', 255),
       serialNumber,
       imei,
       barcode,

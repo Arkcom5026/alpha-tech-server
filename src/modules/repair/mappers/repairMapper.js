@@ -188,6 +188,7 @@ function mapRepairJob(job) {
     deviceId: job.deviceId ?? job.device?.id ?? null,
     device: mapDeviceIdentity(job.device),
     repairAsset: mapRepairAsset(job),
+    assetDescription: job.deviceModel,
     deviceModel: job.deviceModel,
     reportedSymptoms: job.reportedSymptoms,
     technicianNotes: job.technicianNotes,
