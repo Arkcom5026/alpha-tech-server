@@ -11,7 +11,29 @@ assert.match(reverseCloneSource, /BUSINESS_TYPE_TEMPLATE_BRANCH_CODE/)
 assert.match(reverseCloneSource, /\[BusinessType\.IT\]: DEFAULT_TEMPLATE_BRANCH_CODE/)
 assert.match(reverseCloneSource, /resolveMatchingTemplateBranch/)
 assert.match(reverseCloneSource, /sourceBranch\.businessType/)
-assert.match(reverseCloneSource, /SOURCE_TEMPLATE_CATEGORY_MISMATCH/)
+
+// Runtime routing authority: Store branch category is not catalog truth.
+// Product -> ProductType -> GlobalProductType.categoryId selects the matching Template Store.
+assert.match(reverseCloneSource, /productCategoryId = Number\(sourceProduct\?\.productType\?\.globalProductType\?\.categoryId\)/)
+assert.match(reverseCloneSource, /SOURCE_PRODUCT_GLOBAL_CATEGORY_REQUIRED/)
+assert.match(reverseCloneSource, /categoryId: productCategoryId/)
+assert.match(reverseCloneSource, /branchCode: \{ startsWith: 'T' \}/)
+assert.match(reverseCloneSource, /PRODUCT_TEMPLATE_CATEGORY_MISMATCH/)
+assert.match(reverseCloneSource, /sourceBranchCategoryId: sourceBranch\.categoryId/)
+assert.doesNotMatch(reverseCloneSource, /Number\(templateBranch\.categoryId\) !== Number\(sourceBranch\.categoryId\)/)
+assert.doesNotMatch(reverseCloneSource, /SOURCE_TEMPLATE_CATEGORY_MISMATCH/)
+
+// GENERAL stores are allowed to fall back to the catalog Template branch when taxonomy matches.
+assert.match(reverseCloneSource, /\[preferredBranchCode, DEFAULT_TEMPLATE_BRANCH_CODE\]/)
+assert.match(reverseCloneSource, /resolveTemplateBranchCode\(sourceBranch\.businessType\)/)
+
+// Product must be loaded before Template Store resolution so Global taxonomy is available.
+const routingProductIndex = reverseCloneSource.indexOf('const routingProduct = await findSourceProduct')
+const branchResolutionIndex = reverseCloneSource.indexOf('const branchResolution = await resolveMatchingTemplateBranch', routingProductIndex)
+assert.ok(routingProductIndex > 0, 'source Product must be loaded for taxonomy routing')
+assert.ok(branchResolutionIndex > routingProductIndex, 'Template Store resolution must occur after source Product taxonomy is loaded')
+assert.match(reverseCloneSource, /sourceProduct: routingProduct/)
+assert.match(reverseCloneSource, /SOURCE_PRODUCT_CATEGORY_CHANGED_DURING_SYNC/)
 
 assert.match(reverseCloneSource, /normalizeCatalogText/)
 assert.match(reverseCloneSource, /buildCatalogFingerprint/)
