@@ -3,7 +3,6 @@ const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolic
 const {
   createOperationalProductRecordFromTemplate,
   fetchOperationalRuntimeProduct,
-  findBranchProductTypeByGlobalProductTypeId,
   findOperationalRuntimeProductByTemplateId,
   findTemplateBranchByCode,
   findTemplateProductForClone,
@@ -22,21 +21,133 @@ const requireBranchId = (branchId) => {
   return id
 }
 
-const adoptBranchProductType = async ({ branchId, templateBranchId, globalProductTypeId, db }) => {
-  const existing = await findBranchProductTypeByGlobalProductTypeId({ branchId, globalProductTypeId, db })
-  if (existing) return existing
+const normalizeTaxonomyLabel = (value) =>
+  String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('th-TH')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
+const isTaxonomyLabelCompatible = (left, right) => {
+  const a = normalizeTaxonomyLabel(left)
+  const b = normalizeTaxonomyLabel(right)
+  if (!a || !b) return false
+  if (a === b) return true
+
+  const shorter = a.length <= b.length ? a : b
+  const longer = a.length > b.length ? a : b
+  return shorter.length >= 4 && longer.includes(shorter)
+}
+
+const mappingConflict = ({ templateType, branchType, globalProductTypeId, globalName, reason, existingProduct }) => {
+  const error = new Error('PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT')
+  error.statusCode = 409
+  error.code = 'PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT'
+  error.details = {
+    reason,
+    globalProductTypeId: Number(globalProductTypeId) || null,
+    globalProductTypeName: globalName || null,
+    templateProductTypeId: Number(templateType?.id) || null,
+    templateProductTypeName: templateType?.name || null,
+    branchProductTypeId: Number(branchType?.id) || null,
+    branchProductTypeName: branchType?.name || null,
+    existingProductId: Number(existingProduct?.id) || null,
+    existingProductTypeId: Number(existingProduct?.productTypeId) || null,
+    existingProductTypeName: existingProduct?.productType?.name || null,
+  }
+  return error
+}
+
+const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, globalProductTypeId }) => {
+  const templateGlobal = templateType?.globalProductType
+  const branchGlobal = branchType?.globalProductType
+  const globalName = templateGlobal?.name || branchGlobal?.name || ''
+
+  if (!templateType || !branchType || !globalName) {
+    throw mappingConflict({
+      templateType,
+      branchType,
+      globalProductTypeId,
+      globalName,
+      reason: 'GLOBAL_PRODUCT_TYPE_AUTHORITY_MISSING',
+    })
+  }
+
+  if (
+    Number(templateType.globalProductTypeId) !== Number(globalProductTypeId) ||
+    Number(branchType.globalProductTypeId) !== Number(globalProductTypeId)
+  ) {
+    throw mappingConflict({
+      templateType,
+      branchType,
+      globalProductTypeId,
+      globalName,
+      reason: 'GLOBAL_PRODUCT_TYPE_ID_MISMATCH',
+    })
+  }
+
+  if (!isTaxonomyLabelCompatible(templateType.name, globalName)) {
+    throw mappingConflict({
+      templateType,
+      branchType,
+      globalProductTypeId,
+      globalName,
+      reason: 'TEMPLATE_PRODUCT_TYPE_SEMANTIC_DRIFT',
+    })
+  }
+
+  if (!isTaxonomyLabelCompatible(branchType.name, globalName)) {
+    throw mappingConflict({
+      templateType,
+      branchType,
+      globalProductTypeId,
+      globalName,
+      reason: 'BRANCH_PRODUCT_TYPE_SEMANTIC_DRIFT',
+    })
+  }
+
+  return true
+}
+
+const assertExistingTemplateTraceProductType = ({ existingProduct, branchType, templateType, globalProductTypeId }) => {
+  if (!existingProduct) return true
+  if (Number(existingProduct.productTypeId) === Number(branchType?.id)) return true
+
+  throw mappingConflict({
+    templateType,
+    branchType,
+    globalProductTypeId,
+    globalName: templateType?.globalProductType?.name || branchType?.globalProductType?.name || '',
+    reason: 'EXISTING_TEMPLATE_TRACE_PRODUCT_TYPE_MISMATCH',
+    existingProduct,
+  })
+}
+
+const selectTypeIntegrityFields = {
+  id: true,
+  name: true,
+  active: true,
+  branchId: true,
+  globalProductTypeId: true,
+  globalProductType: {
+    select: {
+      id: true,
+      name: true,
+      categoryId: true,
+    },
+  },
+}
+
+const adoptBranchProductType = async ({ branchId, templateBranchId, globalProductTypeId, db }) => {
   const templateType = await db.productType.findFirst({
     where: {
       branchId: Number(templateBranchId),
       globalProductTypeId: Number(globalProductTypeId),
     },
-    select: {
-      name: true,
-      active: true,
-      globalProductTypeId: true,
-      globalProductType: { select: { categoryId: true } },
-    },
+    select: selectTypeIntegrityFields,
   })
 
   if (!templateType) {
@@ -46,23 +157,59 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
     throw error
   }
 
+  const existing = await db.productType.findFirst({
+    where: {
+      branchId: Number(branchId),
+      globalProductTypeId: Number(globalProductTypeId),
+    },
+    select: selectTypeIntegrityFields,
+  })
+
+  if (existing) {
+    assertProductTypeGlobalMappingIntegrity({
+      templateType,
+      branchType: existing,
+      globalProductTypeId,
+    })
+    return { templateType, branchType: existing }
+  }
+
   try {
-    return await db.productType.create({
+    const created = await db.productType.create({
       data: {
         branchId: Number(branchId),
         globalProductTypeId: templateType.globalProductTypeId,
         name: templateType.name,
         active: templateType.active !== false,
       },
-      select: {
-        id: true,
-        globalProductType: { select: { categoryId: true } },
-      },
+      select: selectTypeIntegrityFields,
     })
+
+    assertProductTypeGlobalMappingIntegrity({
+      templateType,
+      branchType: created,
+      globalProductTypeId,
+    })
+    return { templateType, branchType: created }
   } catch (error) {
     if (error?.code !== 'P2002') throw error
-    const concurrent = await findBranchProductTypeByGlobalProductTypeId({ branchId, globalProductTypeId, db })
-    if (concurrent) return concurrent
+
+    const concurrent = await db.productType.findFirst({
+      where: {
+        branchId: Number(branchId),
+        globalProductTypeId: Number(globalProductTypeId),
+      },
+      select: selectTypeIntegrityFields,
+    })
+
+    if (concurrent) {
+      assertProductTypeGlobalMappingIntegrity({
+        templateType,
+        branchType: concurrent,
+        globalProductTypeId,
+      })
+      return { templateType, branchType: concurrent }
+    }
     throw error
   }
 }
@@ -239,12 +386,34 @@ const cloneOperationalProductFromTemplate = async ({
       throw error
     }
 
+    const globalProductTypeId = template.productType?.globalProductTypeId
+    if (!globalProductTypeId) {
+      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
+      error.statusCode = 404
+      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
+      throw error
+    }
+
+    const { templateType, branchType } = await adoptBranchProductType({
+      branchId: brId,
+      templateBranchId: templateBranch.id,
+      globalProductTypeId,
+      db: tx,
+    })
+
     const existing = await findOperationalRuntimeProductByTemplateId({
       branchId: brId,
       templateProductId: tplId,
       db: tx,
     })
     if (existing) {
+      assertExistingTemplateTraceProductType({
+        existingProduct: existing,
+        branchType,
+        templateType,
+        globalProductTypeId,
+      })
+
       const mapped = toOperationalRuntimeProduct(existing, brId)
       return {
         success: true,
@@ -257,21 +426,6 @@ const cloneOperationalProductFromTemplate = async ({
         statusCode: 200,
       }
     }
-
-    const globalProductTypeId = template.productType?.globalProductTypeId
-    if (!globalProductTypeId) {
-      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
-      error.statusCode = 404
-      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
-      throw error
-    }
-
-    const branchType = await adoptBranchProductType({
-      branchId: brId,
-      templateBranchId: templateBranch.id,
-      globalProductTypeId,
-      db: tx,
-    })
 
     await ensureSelectedBrandMapping({
       productTypeId: branchType.id,
@@ -354,6 +508,10 @@ const cloneOperationalProductFromTemplate = async ({
 }
 
 module.exports = {
+  normalizeTaxonomyLabel,
+  isTaxonomyLabelCompatible,
+  assertProductTypeGlobalMappingIntegrity,
+  assertExistingTemplateTraceProductType,
   adoptBranchProductType,
   fetchTemplateCloneDefaults,
   ensureSelectedBrandMapping,
