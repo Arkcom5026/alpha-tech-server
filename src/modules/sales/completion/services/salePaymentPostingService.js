@@ -119,6 +119,21 @@ const aggregateActiveReceiptAllocationAmount = async (tx, saleId) => {
   });
 };
 
+const aggregateActiveDepositSaleApplicationAmount = async (tx, saleId) => {
+  if (!tx?.customerMoneyApplication?.aggregate) {
+    return { _sum: { amount: null } };
+  }
+  return tx.customerMoneyApplication.aggregate({
+    _sum: { amount: true },
+    where: {
+      sourceType: 'CUSTOMER_DEPOSIT',
+      targetType: 'SALE',
+      targetId: saleId,
+      status: 'APPLIED',
+    },
+  });
+};
+
 const findLatestActiveSettlement = async (tx, saleId) => {
   if (!tx?.customerMoneySettlement?.findFirst) return null;
   return tx.customerMoneySettlement.findFirst({
@@ -144,23 +159,39 @@ const findLatestActiveReceiptAllocation = async (tx, saleId) => {
   });
 };
 
+const findLatestActiveDepositSaleApplication = async (tx, saleId) => {
+  if (!tx?.customerMoneyApplication?.findFirst) return null;
+  return tx.customerMoneyApplication.findFirst({
+    where: {
+      sourceType: 'CUSTOMER_DEPOSIT',
+      targetType: 'SALE',
+      targetId: saleId,
+      status: 'APPLIED',
+    },
+    orderBy: { appliedAt: 'desc' },
+    select: { appliedAt: true },
+  });
+};
+
 const projectSalePaymentStatus = async (tx, saleId) => {
   await acquireSalePaymentProjectionLock(tx, saleId);
 
   const sale = await tx.sale.findUnique({ where: { id: saleId }, select: { totalAmount: true, status: true } });
   if (!sale) throw new SalesError(404, 'SALE_NOT_FOUND', 'Sale not found');
 
-  const [paymentAggregate, receiptAllocationAggregate, settlementAggregate] = await Promise.all([
+  const [paymentAggregate, receiptAllocationAggregate, depositApplicationAggregate, settlementAggregate] = await Promise.all([
     tx.paymentItem.aggregate({
       _sum: { amount: true },
       where: { payment: { saleId, isCancelled: false } },
     }),
     aggregateActiveReceiptAllocationAmount(tx, saleId),
+    aggregateActiveDepositSaleApplicationAmount(tx, saleId),
     aggregateActiveSettlementAmount(tx, saleId),
   ]);
 
   const paidAmount = D(paymentAggregate._sum.amount || 0)
     .plus(D(receiptAllocationAggregate._sum.amount || 0))
+    .plus(D(depositApplicationAggregate._sum.amount || 0))
     .plus(D(settlementAggregate._sum.appliedAmount || 0));
   const paidNumber = n(paidAmount);
   const total = n(sale.totalAmount);
@@ -169,18 +200,20 @@ const projectSalePaymentStatus = async (tx, saleId) => {
 
   let paidAt = null;
   if (paid) {
-    const [latestPayment, latestReceiptAllocation, latestSettlement] = await Promise.all([
+    const [latestPayment, latestReceiptAllocation, latestDepositApplication, latestSettlement] = await Promise.all([
       tx.payment.findFirst({
         where: { saleId, isCancelled: false },
         orderBy: { receivedAt: 'desc' },
         select: { receivedAt: true },
       }),
       findLatestActiveReceiptAllocation(tx, saleId),
+      findLatestActiveDepositSaleApplication(tx, saleId),
       findLatestActiveSettlement(tx, saleId),
     ]);
     const candidates = [
       latestPayment?.receivedAt,
       latestReceiptAllocation?.allocatedAt,
+      latestDepositApplication?.appliedAt,
       latestSettlement?.settledAt,
     ]
       .filter(Boolean)
@@ -241,6 +274,8 @@ module.exports = {
   acquireSalePaymentProjectionLock,
   aggregateActiveSettlementAmount,
   aggregateActiveReceiptAllocationAmount,
+  aggregateActiveDepositSaleApplicationAmount,
   findLatestActiveSettlement,
   findLatestActiveReceiptAllocation,
+  findLatestActiveDepositSaleApplication,
 };
