@@ -91,7 +91,7 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
   const amount = new Prisma.Decimal(String(command.amount));
 
   return prisma.$transaction(async (tx) => {
-    await acquireCustomerMoneyTransactionLock(tx, command.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, command.customerId, command.branchId);
 
     const customer = await tx.customerProfile.findFirst({
       where: { id: command.customerId, branchId: command.branchId }, select: { id: true },
@@ -219,7 +219,7 @@ const cancelCustomerMoneyReceive = async ({
     let receipt = await getRepository({ client: tx, id: receiptId, branchId });
     if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
 
-    await acquireCustomerMoneyTransactionLock(tx, receipt.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, receipt.customerId, receipt.branchId);
     receipt = await getRepository({ client: tx, id: receiptId, branchId });
     if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
     if (receipt.status === 'CANCELLED') throw buildError('เอกสารรับเงินนี้ถูกยกเลิกแล้ว', 409, 'DOCUMENT_ALREADY_CANCELLED');

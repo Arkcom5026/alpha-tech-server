@@ -7,6 +7,8 @@ const customerSelect = {
   id: true,
   name: true,
   companyName: true,
+  departmentName: true,
+  financialOwnerCustomerId: true,
   taxId: true,
   type: true,
   addressDetail: true,
@@ -29,6 +31,7 @@ async function searchBranchCustomers({ branchId, query, limit = 20 }) {
           OR: [
             { name: contains },
             { companyName: contains },
+            { departmentName: contains },
             { taxId: contains },
             { user: { loginId: contains } },
             { user: { email: contains } },

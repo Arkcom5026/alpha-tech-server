@@ -34,6 +34,8 @@ function presentCustomer(customer) {
     name: customer.name,
     type: customer.type,
     companyName: customer.companyName,
+    departmentName: customer.departmentName,
+    financialOwnerCustomerId: customer.financialOwnerCustomerId,
     taxId: customer.taxId,
     provinceCode,
     districtCode,
@@ -69,7 +71,7 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
     throw serviceError(400, { message: 'รหัสลูกค้าไม่ถูกต้อง' }, 'INVALID_CUSTOMER_ID');
   }
 
-  const { name, phone, type, companyName, taxId, subdistrictCode, addressDetail } = body;
+  const { name, phone, type, companyName, departmentName, financialOwnerCustomerId, taxId, subdistrictCode, addressDetail } = body;
   if (!validateCustomerType(type)) {
     throw serviceError(400, { message: 'ประเภทลูกค้าไม่ถูกต้อง' }, 'INVALID_CUSTOMER_TYPE');
   }
@@ -102,6 +104,8 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
       name: sanitize(name),
       type,
       companyName: sanitize(companyName),
+      departmentName: sanitize(departmentName),
+      financialOwnerCustomerId,
       taxId: sanitize(taxId),
       addressDetail: sanitize(addressDetail),
     }).filter(([, value]) => value !== undefined)

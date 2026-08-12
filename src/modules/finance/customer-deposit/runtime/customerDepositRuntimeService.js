@@ -177,7 +177,7 @@ const createCustomerDeposit = async ({ body = {}, user = {} }) => {
   }
 
   const result = await repository.runTransaction(async (tx) => {
-    await acquireCustomerMoneyTransactionLock(tx, normalizedCustomerId);
+    await acquireCustomerMoneyTransactionLock(tx, normalizedCustomerId, branchId);
     const customer = await repository.findCustomerById({
       customerId: normalizedCustomerId,
       branchId,
@@ -389,7 +389,7 @@ const updateCustomerDeposit = async ({ id, body = {}, branchId }) => {
       return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
     }
 
-    await acquireCustomerMoneyTransactionLock(tx, existing.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, existing.customerId, existing.branchId);
     existing = await repository.findActiveDepositByIdAndBranch({
       id: normalizedId,
       branchId: normalizedBranchId,
@@ -478,7 +478,7 @@ const deleteCustomerDeposit = async ({ id, branchId }) => {
       return { error: { status: 404, body: { message: 'ไม่พบข้อมูลมัดจำ' } } };
     }
 
-    await acquireCustomerMoneyTransactionLock(tx, existing.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, existing.customerId, existing.branchId);
     existing = await repository.findActiveDepositByIdAndBranch({
       id: normalizedId,
       branchId: normalizedBranchId,
@@ -560,7 +560,7 @@ const useCustomerDeposit = async ({ body = {}, user = {} }) => {
       };
     }
 
-    await acquireCustomerMoneyTransactionLock(tx, deposit.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, deposit.customerId, deposit.branchId);
     deposit = await repository.findActiveDepositByIdAndBranch({
       id: depositId,
       branchId,

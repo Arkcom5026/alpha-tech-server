@@ -10,7 +10,7 @@ const service = fs.readFileSync(path.join(__dirname, 'createDeliveryCreditSettle
 test('settlement keeps customer-to-sale lock order and reconciles payment evidence before outstanding validation', () => {
   assert.match(service, /await acquireCustomerMoneySettlementLock\(tx, command\.branchId, command\.customerId\)/);
   assert.match(service, /await projectSalePaymentStatus\(tx, saleId\)/);
-  assert.match(service, /const sale = await selectSale\(tx, saleId, command\.branchId, command\.customerId\)/);
+  assert.match(service, /const sale = await selectSale\(tx, saleId, command\.branchId, group\.memberIds\)/);
 
   const customerLockIndex = service.indexOf('await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId)');
   const saleProjectionIndex = service.indexOf('await projectSalePaymentStatus(tx, saleId)');
@@ -21,7 +21,7 @@ test('settlement keeps customer-to-sale lock order and reconciles payment eviden
 
 test('settlement validates immutable branch/customer/credit identity before sale projection', () => {
   assert.match(service, /const selectSaleIdentity/);
-  assert.match(service, /branchId,[\s\S]*customerId,[\s\S]*isCredit: true,[\s\S]*status: \{ not: 'CANCELLED' \}/);
+  assert.match(service, /branchId,[\s\S]*customerId: \{ in: customerIds \},[\s\S]*isCredit: true,[\s\S]*status: \{ not: 'CANCELLED' \}/);
   const identityIndex = service.indexOf('const identity = await selectSaleIdentity');
   const projectionIndex = service.indexOf('await projectSalePaymentStatus(tx, saleId)');
   assert.ok(identityIndex >= 0 && projectionIndex > identityIndex, 'sale identity must be tenant validated before projection write');

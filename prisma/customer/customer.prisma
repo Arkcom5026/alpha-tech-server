@@ -31,6 +31,8 @@ model CustomerProfile {
   paymentTerms              Int?
   type                      CustomerType               @default(INDIVIDUAL)
   companyName               String?
+  departmentName            String?
+  financialOwnerCustomerId  Int?
   subdistrictCode           String?
   taxId                     String?
   addressDetail             String?
@@ -60,11 +62,15 @@ model CustomerProfile {
   v2CustomerDeposits        V2CustomerDeposit[]
   posHeldCarts              PosHeldCart[]
   productReservations       ProductReservation[]
+  financialOwner            CustomerProfile?           @relation("CustomerFinancialGroup", fields: [financialOwnerCustomerId], references: [id], onDelete: Restrict)
+  financialMembers          CustomerProfile[]           @relation("CustomerFinancialGroup")
 
   @@unique([branchId, userId])
   @@index([userId])
   @@index([subdistrictCode])
   @@index([branchId])
+  @@index([financialOwnerCustomerId])
+  @@index([branchId, financialOwnerCustomerId])
 }
 
 model CustomerDeposit {

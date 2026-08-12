@@ -3,6 +3,7 @@
 const {
   calculateAvailableCustomerMoney,
 } = require('../../balance/customerMoneySourcePoolService');
+const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 
 const money = (value) => Number(value || 0);
 const outstanding = (sale) => Math.max(0, Number((money(sale.totalAmount) - money(sale.paidAmount)).toFixed(2)));
@@ -32,6 +33,7 @@ const mapSimpleLine = (item) => ({
 const lineKey = (saleId, lineType, saleItemId) => `${saleId}:${lineType}:${saleItemId}`;
 
 const listEligibleDeliveryCredits = async ({ prisma, command }) => {
+  const group = await resolveFinancialCustomerGroup(prisma, { customerId: command.customerId, branchId: command.branchId });
   const customer = await prisma.customerProfile.findFirst({
     where: { id: command.customerId, branchId: command.branchId },
     select: { id: true, name: true, companyName: true, taxId: true },
@@ -47,7 +49,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   const sales = await prisma.sale.findMany({
     where: {
       branchId: command.branchId,
-      customerId: command.customerId,
+      customerId: { in: group.memberIds },
       isCredit: true,
       status: { not: 'CANCELLED' },
       statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
@@ -61,6 +63,8 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     },
     select: {
       id: true,
+      customerId: true,
+      customer: { select: { id: true, name: true, companyName: true, departmentName: true } },
       code: true,
       officialDocumentNumber: true,
       soldAt: true,
@@ -111,7 +115,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
 
   const [balance, availableAmount] = await Promise.all([
     prisma.customerMoneyBalance.findUnique({
-      where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
+      where: { branchId_customerId: { branchId: command.branchId, customerId: group.ownerId } },
       select: { id: true, availableAmount: true, updatedAt: true },
     }),
     calculateAvailableCustomerMoney(prisma, {
@@ -121,7 +125,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   ]);
 
   return {
-    customer,
+    customer: { ...customer, financialOwner: group.owner, members: group.members },
     balance: {
       id: balance?.id || null,
       availableAmount: money(availableAmount),
@@ -142,6 +146,8 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
         .filter((line) => line.remainingAmount > 0);
       return {
         id: sale.id,
+        customerId: sale.customerId,
+        department: sale.customer,
         code: sale.code,
         documentNo: sale.officialDocumentNumber || sale.code,
         soldAt: sale.soldAt,

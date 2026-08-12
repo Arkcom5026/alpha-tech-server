@@ -15,6 +15,7 @@ const {
 const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
+const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -56,7 +57,7 @@ const acquireSettlementCommandLock = async (tx, commandKey) => {
 };
 
 const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => (
-  acquireCustomerMoneyTransactionLock(tx, customerId)
+  acquireCustomerMoneyTransactionLock(tx, customerId, _branchId)
 );
 
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
@@ -82,22 +83,22 @@ const ensureEmployee = async (tx, branchId, employeeId) => {
   }
 };
 
-const selectSaleIdentity = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
+const selectSaleIdentity = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
   where: {
     id: saleId,
     branchId,
-    customerId,
+    customerId: { in: customerIds },
     isCredit: true,
     status: { not: 'CANCELLED' },
   },
   select: { id: true },
 });
 
-const selectSale = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
+const selectSale = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
   where: {
     id: saleId,
     branchId,
-    customerId,
+    customerId: { in: customerIds },
     isCredit: true,
     status: { not: 'CANCELLED' },
     statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
@@ -205,6 +206,7 @@ const loadSettlementCreateResult = async (tx, settlementId, { branchId, customer
 };
 
 const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$transaction(async (tx) => {
+  const group = await resolveFinancialCustomerGroup(tx, { customerId: command.customerId, branchId: command.branchId });
   const requestHash = command.commandKey ? buildSettlementRequestHash(command) : null;
   if (command.commandKey) {
     await acquireSettlementCommandLock(tx, command.commandKey);
@@ -218,7 +220,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       select: { customerId: true, requestHash: true, settlementId: true },
     });
     if (existingCommand) {
-      if (existingCommand.customerId !== command.customerId || existingCommand.requestHash !== requestHash) {
+      if (existingCommand.customerId !== group.ownerId || existingCommand.requestHash !== requestHash) {
         const error = new Error('X-Idempotency-Key นี้เคยถูกใช้กับคำสั่งตัดยอดอื่นแล้ว');
         error.code = 'IDEMPOTENCY_KEY_REUSED';
         error.statusCode = 409;
@@ -227,7 +229,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId);
       return loadSettlementCreateResult(tx, existingCommand.settlementId, {
         branchId: command.branchId,
-        customerId: command.customerId,
+        customerId: group.ownerId,
         idempotentReplay: true,
       });
     }
@@ -269,7 +271,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     .sort((left, right) => left - right);
   const sales = new Map();
   for (const saleId of saleIds) {
-    const identity = await selectSaleIdentity(tx, saleId, command.branchId, command.customerId);
+    const identity = await selectSaleIdentity(tx, saleId, command.branchId, group.memberIds);
     if (!identity) {
       const error = new Error('ไม่พบใบส่งของเครดิตที่ยังใช้งานสำหรับลูกค้ารายนี้');
       error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
@@ -280,7 +282,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     // Customer lock is already held. The unified projection now acquires the sale lock,
     // reconciles every payment evidence source, and keeps the sale stable until commit.
     await projectSalePaymentStatus(tx, saleId);
-    const sale = await selectSale(tx, saleId, command.branchId, command.customerId);
+    const sale = await selectSale(tx, saleId, command.branchId, group.memberIds);
     if (!sale) {
       const error = new Error('ใบส่งของเครดิตนี้ไม่มีรายการค้างที่สามารถตัดยอดได้แล้ว');
       error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
@@ -334,7 +336,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     data: {
       code,
       branchId: command.branchId,
-      customerId: command.customerId,
+      customerId: group.ownerId,
       settlementType: 'DELIVERY_CREDIT',
       totalAmount: requestedTotal,
       status: 'ACTIVE',
@@ -357,7 +359,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       client: tx,
       data: {
         branchId: command.branchId,
-        customerId: command.customerId,
+        customerId: group.ownerId,
         sourceType: allocation.sourceType,
         sourceId: allocation.sourceId,
         targetType: 'DELIVERY_CREDIT',
@@ -389,7 +391,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       client: tx,
       data: {
         branchId: command.branchId,
-        customerId: command.customerId,
+        customerId: group.ownerId,
         applicationId: application.id,
         eventType: 'MONEY_APPLIED',
         amount: allocation.amount,
@@ -407,12 +409,12 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
 
   const nextBalance = await calculateAvailableCustomerMoney(tx, {
     branchId: command.branchId,
-    customerId: command.customerId,
+    customerId: group.ownerId,
   });
   await updateCustomerMoneyBalance({
     client: tx,
     branchId: command.branchId,
-    customerId: command.customerId,
+    customerId: group.ownerId,
     availableAmount: nextBalance,
   });
 
@@ -420,7 +422,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     await tx.customerMoneySettlementCommand.create({
       data: {
         branchId: command.branchId,
-        customerId: command.customerId,
+        customerId: group.ownerId,
         commandKey: command.commandKey,
         requestHash,
         settlementId: settlement.id,
@@ -430,7 +432,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
 
   return loadSettlementCreateResult(tx, settlement.id, {
     branchId: command.branchId,
-    customerId: command.customerId,
+    customerId: group.ownerId,
   });
 });
 

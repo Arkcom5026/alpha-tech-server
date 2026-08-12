@@ -1,6 +1,7 @@
 'use strict';
 
 const { Prisma } = require('../../../../lib/prisma');
+const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 
@@ -17,17 +18,19 @@ const sourceTimestamp = (value) => {
 };
 
 const listAvailableCustomerMoneySources = async (client, { branchId, customerId }) => {
+  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
   const [receipts, deposits] = await Promise.all([
     client.customerReceipt.findMany({
       where: {
         branchId,
-        customerId,
+        customerId: { in: group.memberIds },
         status: 'ACTIVE',
         code: { startsWith: 'CMR-' },
         remainingAmount: { gt: 0 },
       },
       select: {
         id: true,
+        customerId: true,
         remainingAmount: true,
         allocatedAmount: true,
         receivedAt: true,
@@ -38,11 +41,12 @@ const listAvailableCustomerMoneySources = async (client, { branchId, customerId 
     client.customerDeposit.findMany({
       where: {
         branchId,
-        customerId,
+        customerId: { in: group.memberIds },
         status: 'ACTIVE',
       },
       select: {
         id: true,
+        customerId: true,
         totalAmount: true,
         usedAmount: true,
         createdAt: true,
@@ -78,11 +82,12 @@ const listAvailableCustomerMoneySources = async (client, { branchId, customerId 
 
 const getLegacyBalanceReservation = async (client, { branchId, customerId }) => {
   if (!client?.customerMoneySettlementLine?.aggregate) return money(0);
+  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
   const aggregate = await client.customerMoneySettlementLine.aggregate({
     where: {
       settlement: {
         branchId,
-        customerId,
+        customerId: group.ownerId,
         status: 'ACTIVE',
         settlementType: 'DELIVERY_CREDIT',
       },
@@ -177,7 +182,7 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
         where: {
           id: source.sourceId,
           branchId,
-          customerId,
+          customerId: source.snapshot.customerId,
           status: 'ACTIVE',
           remainingAmount: source.snapshot.remainingAmount,
         },
@@ -197,7 +202,7 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
         where: {
           id: source.sourceId,
           branchId,
-          customerId,
+          customerId: source.snapshot.customerId,
           status: 'ACTIVE',
           usedAmount: source.snapshot.usedAmount,
         },
@@ -229,13 +234,14 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
 };
 
 const restoreCustomerMoneySources = async (client, { branchId, customerId, applications }) => {
+  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
   for (const application of applications || []) {
     const amount = money(application.amount);
     if (amount.lessThanOrEqualTo(0)) continue;
 
     if (application.sourceType === 'CUSTOMER_MONEY_RECEIPT') {
       const receipt = await client.customerReceipt.findFirst({
-        where: { id: application.sourceId, branchId, customerId },
+        where: { id: application.sourceId, branchId, customerId: { in: group.memberIds } },
         select: { id: true, allocatedAmount: true },
       });
       if (!receipt || money(receipt.allocatedAmount).lessThan(amount)) {
@@ -251,7 +257,7 @@ const restoreCustomerMoneySources = async (client, { branchId, customerId, appli
       });
     } else if (application.sourceType === 'CUSTOMER_DEPOSIT') {
       const deposit = await client.customerDeposit.findFirst({
-        where: { id: application.sourceId, branchId, customerId },
+        where: { id: application.sourceId, branchId, customerId: { in: group.memberIds } },
         select: { id: true, usedAmount: true },
       });
       if (!deposit || money(deposit.usedAmount).lessThan(amount)) {
