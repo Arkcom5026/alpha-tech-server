@@ -31,6 +31,7 @@ class TemplateProductSearchService {
       throw new Error('[TemplateProductSearchService] prisma or repository is required')
     }
 
+    this.prisma = prisma || repository?.prisma
     this.repository = repository || new ProductTemplateRepository(prisma)
   }
 
@@ -44,6 +45,57 @@ class TemplateProductSearchService {
         : Math.max(0, ((toPositiveInt(params.page) || 1) - 1) * take)
 
     return { take, skip }
+  }
+
+  async resolveTemplateProductTypeId({ productTypeId, sourceBranchId, templateBranchId } = {}) {
+    const requestedTypeId = toPositiveInt(productTypeId)
+    if (!requestedTypeId) return { requested: false, templateProductTypeId: null }
+
+    const sourceBranch = toPositiveInt(sourceBranchId)
+    const templateBranch = toPositiveInt(templateBranchId)
+
+    if (!this.prisma || !templateBranch || !sourceBranch || sourceBranch === templateBranch) {
+      return { requested: true, templateProductTypeId: requestedTypeId }
+    }
+
+    const sourceType = await this.prisma.productType.findFirst({
+      where: {
+        id: requestedTypeId,
+        branchId: sourceBranch,
+      },
+      select: {
+        id: true,
+        globalProductTypeId: true,
+      },
+    })
+
+    if (sourceType?.globalProductTypeId) {
+      const templateType = await this.prisma.productType.findFirst({
+        where: {
+          branchId: templateBranch,
+          globalProductTypeId: sourceType.globalProductTypeId,
+        },
+        select: { id: true },
+      })
+
+      return {
+        requested: true,
+        templateProductTypeId: templateType?.id || null,
+      }
+    }
+
+    const directTemplateType = await this.prisma.productType.findFirst({
+      where: {
+        id: requestedTypeId,
+        branchId: templateBranch,
+      },
+      select: { id: true },
+    })
+
+    return {
+      requested: true,
+      templateProductTypeId: directTemplateType?.id || null,
+    }
   }
 
   mapTemplateProduct(product, templateBranch) {
@@ -97,6 +149,7 @@ class TemplateProductSearchService {
       productTypeId: product.productTypeId ?? product.productType?.id ?? null,
       productTypeName: product.productType?.name ?? null,
       productType: product.productType?.name ?? null,
+      globalProductTypeId: product.productType?.globalProductTypeId ?? null,
       brandId: product.brandId ?? product.brand?.id ?? null,
       brandName: product.brand?.name ?? null,
       unitId: product.unitId ?? product.unit?.id ?? null,
@@ -129,12 +182,22 @@ class TemplateProductSearchService {
       throw err
     }
 
+    const typeResolution = await this.resolveTemplateProductTypeId({
+      productTypeId: params.productTypeId,
+      sourceBranchId: params.sourceBranchId,
+      templateBranchId: templateBranch.id,
+    })
+
+    if (typeResolution.requested && !typeResolution.templateProductTypeId) {
+      return []
+    }
+
     const { take, skip } = this.getPagination(params)
     const products = await this.repository.searchTemplateProducts({
       templateBranchId: templateBranch.id,
       search: params.search,
       searchText: params.searchText,
-      productTypeId: params.productTypeId,
+      productTypeId: typeResolution.templateProductTypeId,
       brandId: params.brandId,
       mode: params.mode,
       includeInactive: params.includeInactive,
