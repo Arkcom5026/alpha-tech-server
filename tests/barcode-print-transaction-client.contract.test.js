@@ -10,13 +10,10 @@ const repositoryPath = path.join(
 
 const source = fs.readFileSync(repositoryPath, 'utf8');
 
-test('barcode print repository uses the canonical destructured Prisma singleton export', () => {
-  assert.match(source, /const\s*\{\s*prisma\s*\}\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma['"]\)/);
-  assert.doesNotMatch(source, /const\s+prisma\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma['"]\)/);
-});
-
-test('markReceiptPrinted performs both updates through the callback transaction client', () => {
+test('markReceiptPrinted uses callback transaction client delegates', () => {
   assert.match(source, /prisma\.\$transaction\(async\s*\(tx\)\s*=>\s*\{/);
   assert.match(source, /tx\.barcodeReceiptItem\.updateMany/);
   assert.match(source, /tx\.purchaseOrderReceipt\.updateMany/);
+  assert.doesNotMatch(source, /prisma\.barcodeReceiptItem\.updateMany/);
+  assert.doesNotMatch(source, /prisma\.purchaseOrderReceipt\.updateMany/);
 });

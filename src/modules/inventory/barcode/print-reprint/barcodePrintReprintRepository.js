@@ -38,16 +38,17 @@ const findProductsByIds = (ids) =>
   });
 
 const markReceiptPrinted = (branchId, purchaseOrderReceiptId) =>
-  prisma.$transaction([
-    prisma.barcodeReceiptItem.updateMany({
+  prisma.$transaction(async (tx) => {
+    const barcodeResult = await tx.barcodeReceiptItem.updateMany({
       where: { branchId, purchaseOrderReceiptId, printed: false },
       data: { printed: true },
-    }),
-    prisma.purchaseOrderReceipt.updateMany({
+    });
+    const receiptResult = await tx.purchaseOrderReceipt.updateMany({
       where: { id: purchaseOrderReceiptId, branchId },
       data: { printed: true },
-    }),
-  ]);
+    });
+    return { barcodeResult, receiptResult };
+  });
 
 const findReceiptsWaitingForPrint = (branchId) =>
   prisma.purchaseOrderReceipt.findMany({
