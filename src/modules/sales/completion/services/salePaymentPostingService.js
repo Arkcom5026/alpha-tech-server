@@ -3,6 +3,7 @@ const { SaleCompletionError: SalesError } = require('../contracts/saleCompletion
 const { assertDepositBalance } = require('../policies/saleDepositPolicy');
 const {
   calculateAvailableCustomerMoney,
+  getCustomerMoneySourceState,
 } = require('../../../customer-money/balance/customerMoneySourcePoolService');
 const {
   updateCustomerMoneyBalance,
@@ -40,6 +41,26 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
   if (!deposit) {
     throw new SalesError(400, 'DEPOSIT_NOT_USABLE', 'Deposit is not active or does not belong to this branch and customer');
   }
+
+  const sourceState = await getCustomerMoneySourceState(tx, {
+    branchId,
+    customerId,
+    sourceType: 'CUSTOMER_DEPOSIT',
+    sourceId: deposit.id,
+  });
+  const requestedAmount = D(item.amount);
+  if (
+    !sourceState.source
+    || sourceState.uncoveredLegacyReservation.greaterThan(0)
+    || requestedAmount.greaterThan(sourceState.availableAmount)
+  ) {
+    throw new SalesError(
+      409,
+      'DEPOSIT_CUSTOMER_MONEY_RESERVED',
+      'Deposit balance is reserved by an active legacy Customer Money settlement',
+    );
+  }
+
   const remaining = assertDepositBalance({
     amount: item.amount,
     totalAmount: deposit.totalAmount,
@@ -49,7 +70,7 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
   const updated = await tx.customerDeposit.updateMany({
     where: { id: deposit.id, status: 'ACTIVE', usedAmount: deposit.usedAmount },
     data: {
-      usedAmount: { increment: D(item.amount) },
+      usedAmount: { increment: requestedAmount },
       ...(Math.abs(item.amount - remaining) <= 0.001 ? { status: 'USED', usedSaleId: sale.id } : {}),
     },
   });
@@ -61,7 +82,7 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
       customerDepositId: deposit.id,
       saleId: sale.id,
       paymentId,
-      amountUsed: D(item.amount),
+      amountUsed: requestedAmount,
     },
   });
   await refreshCustomerMoneyBalance(tx, { branchId, customerId });
