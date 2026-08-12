@@ -26,8 +26,10 @@ const prepared = [
 ];
 
 const baseTx = (priorDocumentLines) => ({
-  customerMoneySettlementGeneratedDocument: { findUnique: async () => null },
-  consolidatedDeliveryLine: { findMany: async () => priorDocumentLines },
+  consolidatedDeliveryLine: {
+    findFirst: async () => null,
+    findMany: async () => priorDocumentLines,
+  },
   combinedBillingDocument: { create: async () => { throw new Error('should not create'); } },
 });
 
