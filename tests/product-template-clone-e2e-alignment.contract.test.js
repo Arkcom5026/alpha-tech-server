@@ -7,8 +7,11 @@ const read = (relativePath) => fs.readFileSync(path.resolve(__dirname, '..', rel
 const serviceSource = read('src/modules/product/templateClone/services/productTemplateCloneService.js')
 const controllerSource = read('src/modules/product/templateClone/controllers/productTemplateCloneController.js')
 const routeSource = read('src/modules/product/routes/productRoutes.js')
+const quickStockServiceSource = read('src/modules/product/quickStock/services/QuickStockService.js')
 
 assert.match(routeSource, /router\.post\('\/pos\/create-from-template', productTemplateCloneController\.createOperationalProductFromTemplate\)/)
+assert.doesNotMatch(quickStockServiceSource, /productTemplateEngine/)
+assert.doesNotMatch(quickStockServiceSource, /cloneProductFromTemplate/)
 
 assert.match(controllerSource, /branchId:\s*req\.user\?\.branchId/)
 assert.match(controllerSource, /employeeId:\s*req\.employee\?\.id\s*\|\|\s*req\.user\?\.employeeId/)
