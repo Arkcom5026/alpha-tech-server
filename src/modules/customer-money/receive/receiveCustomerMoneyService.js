@@ -5,6 +5,7 @@ const { validateReceiveCustomerMoneyInput } = require('./receiveCustomerMoneyCon
 const { validateReceiveCustomerMoneyPolicy } = require('./receiveCustomerMoneyPolicy');
 const {
   calculateAvailableCustomerMoney,
+  getCustomerMoneySourceState,
 } = require('../balance/customerMoneySourcePoolService');
 const {
   acquireCustomerMoneyTransactionLock,
@@ -231,6 +232,23 @@ const cancelCustomerMoneyReceive = async ({
         'ไม่สามารถยกเลิกเอกสารรับเงินที่ถูกนำไปใช้แล้ว',
         409,
         'CUSTOMER_MONEY_RECEIVE_ALREADY_USED',
+      );
+    }
+
+    const sourceState = await getCustomerMoneySourceState(tx, {
+      branchId,
+      customerId: receipt.customerId,
+      sourceType: 'CUSTOMER_MONEY_RECEIPT',
+      sourceId: receiptId,
+    });
+    if (
+      sourceState.uncoveredLegacyReservation.greaterThan(0)
+      || sourceState.legacyReservedAmount.greaterThan(0)
+    ) {
+      throw buildError(
+        'ไม่สามารถยกเลิกใบรับเงินที่กำลังรองรับรายการตัดยอด Customer Money เดิม',
+        409,
+        'CUSTOMER_MONEY_RECEIVE_LEGACY_RESERVED',
       );
     }
 
