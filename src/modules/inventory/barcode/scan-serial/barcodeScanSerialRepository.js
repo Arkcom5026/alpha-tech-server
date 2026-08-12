@@ -1,13 +1,28 @@
 const { prisma } = require('../../../../../lib/prisma');
 
+const barcodeReceiptItemSelect = {
+  kind: true,
+  stockItemId: true,
+  simpleLotId: true,
+  status: true,
+  receiptItem: {
+    select: {
+      product: { select: { mode: true } },
+      purchaseOrderItem: {
+        select: { product: { select: { mode: true } } },
+      },
+    },
+  },
+};
+
 const findReadyToScanSnReceipts = ({ branchId }) => prisma.purchaseOrderReceipt.findMany({
   where: {
     branchId,
-    barcodeReceiptItem: { some: { OR: [{ kind: 'SN' }, { stockItemId: { not: null } }] } },
+    barcodeReceiptItem: { some: {} },
   },
   include: {
     purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
-    barcodeReceiptItem: { select: { kind: true, stockItemId: true, simpleLotId: true } },
+    barcodeReceiptItem: { select: barcodeReceiptItemSelect },
   },
   orderBy: { createdAt: 'desc' },
   take: 200,
@@ -17,7 +32,7 @@ const findReadyToScanReceipts = ({ branchId }) => prisma.purchaseOrderReceipt.fi
   where: { branchId, barcodeReceiptItem: { some: {} } },
   include: {
     purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
-    barcodeReceiptItem: { select: { kind: true, stockItemId: true, simpleLotId: true, status: true } },
+    barcodeReceiptItem: { select: barcodeReceiptItemSelect },
   },
   orderBy: { createdAt: 'desc' },
   take: 200,
