@@ -1,10 +1,37 @@
 const { prisma } = require('../../../../../lib/prisma');
 
 const findProductById = (productId) =>
-  prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+  prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      templateProductId: true,
+      templateProduct: {
+        select: {
+          id: true,
+          active: true,
+        },
+      },
+    },
+  });
 
-const createProductImage = ({ productId, uploadResult, caption, isCover }) =>
-  prisma.$transaction(async (tx) => {
+const createProductImage = ({
+  productId,
+  uploadResult,
+  url,
+  publicId,
+  secureUrl,
+  caption,
+  isCover,
+}) => {
+  const resolvedSecureUrl = uploadResult?.secure_url || secureUrl || url;
+  const resolvedPublicId = uploadResult?.public_id || publicId;
+
+  if (!resolvedSecureUrl || !resolvedPublicId) {
+    throw new Error('PRODUCT_IMAGE_UPLOAD_RESULT_REQUIRED');
+  }
+
+  return prisma.$transaction(async (tx) => {
     if (isCover) {
       await tx.productImage.updateMany({ where: { productId }, data: { isCover: false } });
     }
@@ -12,14 +39,15 @@ const createProductImage = ({ productId, uploadResult, caption, isCover }) =>
     return tx.productImage.create({
       data: {
         productId,
-        url: uploadResult.secure_url,
-        public_id: uploadResult.public_id,
-        secure_url: uploadResult.secure_url,
+        url: resolvedSecureUrl,
+        public_id: resolvedPublicId,
+        secure_url: resolvedSecureUrl,
         caption: caption || '',
         isCover,
       },
     });
   });
+};
 
 const findActiveProductImage = ({ productId, imageId }) =>
   prisma.productImage.findFirst({
