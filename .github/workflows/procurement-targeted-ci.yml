@@ -1,0 +1,37 @@
+name: Procurement Sellable Stock Targeted CI
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-procurement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Check changed procurement JavaScript syntax
+        run: |
+          node --check src/modules/procurement/receipt/barcode/generate/generateReceiptBarcodesRepository.js
+          node --check src/modules/procurement/receipt/barcode/generate/generateReceiptBarcodesService.js
+          node --check src/modules/procurement/receipt/commit/commitReceiptRepository.js
+          node --check src/modules/procurement/receipt/finalize/finalizeReceiptRepository.js
+          node --check src/modules/procurement/receipt/finalize/finalizeReceiptService.js
+      - name: Run procurement gap-closure unit contracts
+        run: |
+          node src/modules/procurement/receipt/barcode/generate/generateReceiptBarcodesRepository.test.js
+          node src/modules/procurement/receipt/commit/commitReceiptRepository.test.js
+          node src/modules/procurement/receipt/finalize/finalizeReceiptRepository.test.js
+      - name: Run stock-item receiving regression
+        run: node src/modules/inventory/stock-item/stockItemSlices.test.js
+      - name: Run SIMPLE receiving authority regression
+        run: npm run verify:simple-receive-authority
