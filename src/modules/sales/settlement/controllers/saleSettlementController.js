@@ -1,13 +1,8 @@
-const { prisma, Prisma } = require('../../../../../lib/prisma');
+const { prisma } = require('../../../../../lib/prisma');
 const { projectSalePaymentStatus } = require('../../completion/services/salePaymentPostingService');
 const {
   resolveCanonicalTotalAmount,
-  round2,
-  toNum,
 } = require('../../shared/saleLegacyProjection');
-
-const D = (value) =>
-  new Prisma.Decimal(typeof value === 'string' ? value : Number(value));
 
 const createSettlementError = ({ message, status, code, detail }) =>
   Object.assign(new Error(message), {
@@ -45,49 +40,26 @@ const markSaleAsPaid = async (req, res) => {
     }
 
     const canonicalTotalAmount = resolveCanonicalTotalAmount(sale);
-    const canonicalTotalDecimal = D(canonicalTotalAmount);
-
-    const agg = await prisma.paymentItem.aggregate({
-      _sum: { amount: true },
-      where: { payment: { saleId, isCancelled: false } },
-    });
-
-    const paidSum = agg._sum.amount || new Prisma.Decimal(0);
-    const paidAmount = round2(toNum(paidSum));
-    const balanceAmount = round2(Math.max(0, canonicalTotalAmount - paidAmount));
-
-    const isFullyPaid =
-      typeof paidSum?.greaterThanOrEqualTo === 'function'
-        ? paidSum.greaterThanOrEqualTo(canonicalTotalDecimal)
-        : paidAmount >= canonicalTotalAmount;
-
-    if (sale.paid && isFullyPaid) {
+    if (sale.paid && Number(sale.paidAmount || 0) + 0.001 >= canonicalTotalAmount) {
       return res.status(200).json({ success: true });
     }
 
-    if (!isFullyPaid) {
-      throw createSettlementError({
-        message: 'ยอดชำระยังไม่ครบ ไม่สามารถปิดบิลได้',
-        status: 409,
-        code: 'PAYMENT_EVIDENCE_INSUFFICIENT',
-        detail: {
-          totalAmount: canonicalTotalAmount,
-          paidAmount,
-          balanceAmount,
-        },
-      });
-    }
-
     await prisma.$transaction(async (tx) => {
+      // This is the sole payment truth for closing a sale: normal Payment evidence plus
+      // active Customer Money Settlement evidence under the shared sale-level lock.
       const projection = await projectSalePaymentStatus(tx, saleId);
+      const projectedPaidAmount = Number(projection.paidAmount || 0);
+      const projectedTotalAmount = Number(projection.totalAmount || canonicalTotalAmount);
+      const balanceAmount = Math.max(0, Number((projectedTotalAmount - projectedPaidAmount).toFixed(2)));
+
       if (!projection.paid) {
         throw createSettlementError({
-          message: 'หลักฐานการชำระเงินไม่เพียงพอ ไม่สามารถปิดบิลได้',
+          message: 'ยอดชำระยังไม่ครบ ไม่สามารถปิดบิลได้',
           status: 409,
           code: 'PAYMENT_EVIDENCE_INSUFFICIENT',
           detail: {
-            totalAmount: canonicalTotalAmount,
-            paidAmount,
+            totalAmount: projectedTotalAmount,
+            paidAmount: projectedPaidAmount,
             balanceAmount,
           },
         });

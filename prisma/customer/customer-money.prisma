@@ -40,12 +40,28 @@ model CustomerMoneySettlement {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  customer CustomerProfile               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer CustomerProfile                 @relation(fields: [customerId], references: [id], onDelete: Restrict)
   lines    CustomerMoneySettlementLine[]
+  command  CustomerMoneySettlementCommand?
 
   @@index([branchId])
   @@index([customerId])
   @@index([branchId, status, settledAt])
+}
+
+model CustomerMoneySettlementCommand {
+  id           Int      @id @default(autoincrement())
+  branchId     Int
+  customerId   Int
+  commandKey   String   @db.VarChar(100)
+  requestHash  String   @db.VarChar(64)
+  settlementId Int      @unique
+  createdAt    DateTime @default(now())
+
+  settlement CustomerMoneySettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, commandKey])
+  @@index([customerId, createdAt])
 }
 
 model CustomerMoneySettlementLine {

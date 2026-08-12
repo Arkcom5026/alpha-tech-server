@@ -3,6 +3,9 @@ const {
   projectSalePaymentStatus,
   consumeDeposit,
 } = require('../../completion/services/salePaymentPostingService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../../customer-money/shared/customerMoneyTransactionLock');
 const { nextPaymentCode } = require('../code/nextPaymentCode');
 const { D, isMoneyLike } = require('../shared/paymentMoney');
 const {
@@ -37,6 +40,13 @@ const createPayments = async (req, res) => {
         });
       }
     }
+    const requestedTotal = normalizedPaymentItems.reduce(
+      (sum, item) => sum.plus(D(item.amount)),
+      D(0),
+    );
+    const usesCustomerDeposit = normalizedPaymentItems.some(
+      (item) => item.paymentMethod === 'DEPOSIT',
+    );
 
     const result = await prisma.$transaction(
       async (tx) => {
@@ -45,6 +55,31 @@ const createPayments = async (req, res) => {
           select: { id: true, totalAmount: true, customerId: true },
         });
         if (!sale) throw Object.assign(new Error('ไม่พบใบขายในสาขานี้'), { status: 404 });
+
+        // All Customer Money writers acquire customer -> sale locks in that order.
+        // Keeping the order consistent avoids a deposit-payment/settlement deadlock.
+        if (usesCustomerDeposit) {
+          if (!sale.customerId) {
+            throw Object.assign(
+              new Error('การใช้เงินมัดจำต้องเป็นใบขายที่มีลูกค้า'),
+              { status: 409, code: 'DEPOSIT_CUSTOMER_REQUIRED' },
+            );
+          }
+          await acquireCustomerMoneyTransactionLock(tx, sale.customerId);
+        }
+
+        // projectSalePaymentStatus acquires the shared sale-level transaction lock. Keeping that
+        // lock until this transaction commits prevents a normal Payment and a Customer Money
+        // Settlement from both consuming the same outstanding amount concurrently.
+        const currentPaymentState = await projectSalePaymentStatus(tx, sale.id);
+        const outstandingAmount = D(currentPaymentState.totalAmount)
+          .minus(D(currentPaymentState.paidAmount));
+        if (requestedTotal.greaterThan(outstandingAmount.plus(D('0.001')))) {
+          throw Object.assign(
+            new Error('ยอดรับชำระมากกว่ายอดค้างของใบขาย'),
+            { status: 409, code: 'PAYMENT_EXCEEDS_OUTSTANDING' },
+          );
+        }
 
         const receivedAtDate = receivedAt ? new Date(receivedAt) : new Date();
         if (Number.isNaN(receivedAtDate.getTime())) {
@@ -102,6 +137,7 @@ const createPayments = async (req, res) => {
     const status = error?.status || 500;
     return res.status(status).json({
       message: error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล',
+      ...(error?.code ? { code: error.code } : {}),
     });
   }
 };

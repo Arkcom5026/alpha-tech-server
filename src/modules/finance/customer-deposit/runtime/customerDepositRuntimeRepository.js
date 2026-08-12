@@ -2,8 +2,11 @@ const { prisma } = require('../../../../../lib/prisma');
 const {
   buildCustomerBranchEvidence,
 } = require('../../../customer/policies/customerBranchAccessPolicy');
+const {
+  getCustomerMoneySourceState,
+} = require('../../../customer-money/balance/customerMoneySourcePoolService');
 
-const createDeposit = (data) => prisma.customerDeposit.create({
+const createDeposit = ({ data, client = prisma }) => client.customerDeposit.create({
   data,
   include: { customer: { include: { user: true } } },
 });
@@ -19,7 +22,7 @@ const findActiveDepositByIdAndBranch = ({ id, branchId, client = prisma }) => cl
   include: { customer: { include: { user: true } } },
 });
 
-const findCustomerByPhone = ({ phone, branchId }) => prisma.customerProfile.findFirst({
+const findCustomerByPhone = ({ phone, branchId, client = prisma }) => client.customerProfile.findFirst({
   where: {
     AND: [
       buildCustomerBranchEvidence(branchId),
@@ -36,7 +39,7 @@ const findCustomerByPhone = ({ phone, branchId }) => prisma.customerProfile.find
   },
 });
 
-const findCustomersByName = ({ query, branchId }) => prisma.customerProfile.findMany({
+const findCustomersByName = ({ query, branchId, client = prisma }) => client.customerProfile.findMany({
   where: {
     AND: [
       buildCustomerBranchEvidence(branchId),
@@ -60,7 +63,7 @@ const findCustomersByName = ({ query, branchId }) => prisma.customerProfile.find
   },
 });
 
-const findCustomerById = ({ customerId, branchId }) => prisma.customerProfile.findFirst({
+const findCustomerById = ({ customerId, branchId, client = prisma }) => client.customerProfile.findFirst({
   where: {
     id: customerId,
     ...buildCustomerBranchEvidence(branchId),
@@ -75,13 +78,48 @@ const findCustomerById = ({ customerId, branchId }) => prisma.customerProfile.fi
   },
 });
 
-const updateDepositById = ({ id, data, client = prisma }) => client.customerDeposit.update({
-  where: { id },
-  data,
-  include: { customer: { include: { user: true } } },
-});
+const buildDepositReservationError = () => {
+  const error = new Error('ยอดเงินมัดจำส่วนนี้ถูกกันไว้รองรับรายการตัดยอด Customer Money เดิม');
+  error.statusCode = 409;
+  error.code = 'DEPOSIT_CUSTOMER_MONEY_RESERVED';
+  return error;
+};
 
-const deleteDepositById = (id) => prisma.customerDeposit.delete({ where: { id } });
+const updateDepositById = async ({ id, data, client = prisma }) => {
+  if (data?.usedAmount !== undefined && client?.customerDeposit?.findUnique) {
+    const current = await client.customerDeposit.findUnique({
+      where: { id },
+      select: { branchId: true, customerId: true, usedAmount: true },
+    });
+    const nextUsedAmount = Number(data.usedAmount);
+    const currentUsedAmount = Number(current?.usedAmount || 0);
+    const spendAmount = nextUsedAmount - currentUsedAmount;
+
+    if (current?.branchId && current?.customerId && spendAmount > 0.0001) {
+      const sourceState = await getCustomerMoneySourceState(client, {
+        branchId: current.branchId,
+        customerId: current.customerId,
+        sourceType: 'CUSTOMER_DEPOSIT',
+        sourceId: id,
+      });
+      if (
+        !sourceState.source
+        || sourceState.uncoveredLegacyReservation.greaterThan(0)
+        || spendAmount > Number(sourceState.availableAmount) + 0.0001
+      ) {
+        throw buildDepositReservationError();
+      }
+    }
+  }
+
+  return client.customerDeposit.update({
+    where: { id },
+    data,
+    include: { customer: { include: { user: true } } },
+  });
+};
+
+const deleteDepositById = ({ id, client = prisma }) => client.customerDeposit.delete({ where: { id } });
 
 const findActiveDepositBalancesByCustomer = ({ customerId, branchId, client = prisma }) => (
   client.customerDeposit.findMany({

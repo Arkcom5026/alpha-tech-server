@@ -106,6 +106,13 @@ const useCustomerDeposit = async (req, res) => {
     }));
   } catch (error) {
     console.error('❌ useCustomerDeposit error:', error);
+    const statusCode = Number(error?.statusCode);
+    if (Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 500) {
+      return res.status(statusCode).json({
+        message: error.message || 'ไม่สามารถใช้เงินมัดจำได้',
+        code: error.code || 'CUSTOMER_DEPOSIT_CONFLICT',
+      });
+    }
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการใช้เงินมัดจำ' });
   }
 };

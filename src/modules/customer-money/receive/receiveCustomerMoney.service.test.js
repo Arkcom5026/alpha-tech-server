@@ -16,10 +16,10 @@ test('receive customer money writes receipt, ledger and combined balance in one 
     employeeProfile: { findFirst: async () => ({ id: 22 }) },
     customerReceipt: {
       count: async () => 0,
-      findMany: async () => [{ remainingAmount: D(30) }, { remainingAmount: D(50) }],
+      findMany: async () => [{ remainingAmount: D(30), allocatedAmount: D(0), receivedAt: new Date('2026-08-08T03:00:00Z'), createdAt: new Date('2026-08-08T03:00:00Z') }, { remainingAmount: D(50), allocatedAmount: D(0), receivedAt: new Date('2026-08-09T03:00:00Z'), createdAt: new Date('2026-08-09T03:00:00Z') }],
     },
     customerDeposit: {
-      findMany: async () => [{ totalAmount: D(100), usedAmount: D(20) }],
+      findMany: async () => [{ totalAmount: D(100), usedAmount: D(20), id: 1, createdAt: new Date('2026-08-07T03:00:00Z') }],
     },
   };
   const prisma = { $transaction: async (callback) => callback(tx) };
@@ -69,7 +69,7 @@ test('receive customer money writes receipt, ledger and combined balance in one 
   assert.equal(result.balance.availableAmount, 160);
 });
 
-test('cancel customer money receive reverses unused receipt and recomputes balance atomically', async () => {
+test('cancel customer money receive rechecks under shared customer lock and recomputes balance atomically', async () => {
   const receipt = {
     id: 77,
     code: 'CMR-260809-0001',
@@ -93,10 +93,21 @@ test('cancel customer money receive reverses unused receipt and recomputes balan
     employeeProfile: { findFirst: async () => ({ id: 22 }) },
     customerReceipt: {
       update: async (args) => { calls.update = args; return args; },
-      findMany: async () => [{ remainingAmount: D(20) }],
+      findMany: async () => [{
+        id: 80,
+        remainingAmount: D(20),
+        allocatedAmount: D(0),
+        receivedAt: new Date('2026-08-10T03:00:00Z'),
+        createdAt: new Date('2026-08-10T03:00:00Z'),
+      }],
     },
     customerDeposit: {
-      findMany: async () => [{ totalAmount: D(100), usedAmount: D(40) }],
+      findMany: async () => [{
+        id: 1,
+        totalAmount: D(100),
+        usedAmount: D(40),
+        createdAt: new Date('2026-08-08T03:00:00Z'),
+      }],
     },
   };
   const prisma = { $transaction: async (callback) => callback(tx) };
@@ -107,7 +118,7 @@ test('cancel customer money receive reverses unused receipt and recomputes balan
     getRepository: async ({ client }) => {
       assert.equal(client, tx);
       readCount += 1;
-      if (readCount === 1) return receipt;
+      if (readCount <= 2) return receipt;
       return {
         ...receipt,
         status: 'CANCELLED',
@@ -127,6 +138,7 @@ test('cancel customer money receive reverses unused receipt and recomputes balan
     cancelReason: 'ลูกค้าขอคืนเงิน',
   });
 
+  assert.equal(readCount, 3);
   assert.equal(calls.update.data.status, 'CANCELLED');
   assert.equal(Number(calls.update.data.remainingAmount), 0);
   assert.equal(calls.update.data.cancelledByEmployeeProfileId, 22);

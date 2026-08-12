@@ -10,14 +10,15 @@ const {
   roundMoney,
   isPositiveMoney,
   asNullableString,
-  deriveSalePaymentStatus,
-  getSaleOutstandingAmount,
 } = require('../shared/customerReceiptValue');
 const { receiptInclude } = require('../shared/customerReceiptIncludes');
 const {
   buildReceiptResponse,
   normalizeAllocationSale,
 } = require('../shared/customerReceiptResponse');
+const {
+  projectSalePaymentStatus,
+} = require('../../../sales/completion/services/salePaymentPostingService');
 
 const findReceiptOrThrow = async (tx, { receiptId, branchId }) => {
   const receipt = await tx.customerReceipt.findFirst({
@@ -36,7 +37,7 @@ const findReceiptOrThrow = async (tx, { receiptId, branchId }) => {
 
 const findSaleOrThrow = async (tx, { saleId, branchId }) => {
   const sale = await tx.sale.findFirst({
-    where: { id: saleId, branchId },
+    where: { id: saleId, branchId, status: { not: 'CANCELLED' } },
     include: { customer: true },
   });
 
@@ -49,10 +50,16 @@ const findSaleOrThrow = async (tx, { saleId, branchId }) => {
   return sale;
 };
 
+const acquireCustomerReceiptAllocationLock = async (tx, receiptId) => {
+  if (!tx?.$queryRaw) return;
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1006}, ${Number(receiptId)})`;
+};
+
 const sendError = (res, error, fallbackMessage) =>
   res.status(error?.statusCode || 500).json({
     success: false,
     message: error?.message || fallbackMessage || 'เกิดข้อผิดพลาดภายในระบบ',
+    ...(error?.code ? { code: error.code } : {}),
   });
 
 const allocateCustomerReceipt = async (req, res) => {
@@ -85,8 +92,16 @@ const allocateCustomerReceipt = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
+      await acquireCustomerReceiptAllocationLock(tx, receiptId);
 
       const receipt = await findReceiptOrThrow(tx, { receiptId, branchId });
+
+      if (String(receipt.code || '').startsWith('CMR-')) {
+        const error = new Error('ใบรับเงิน Customer Money ต้องนำไปใช้ผ่านหน้าตัดยอด Customer Money เท่านั้น');
+        error.statusCode = 409;
+        error.code = 'CUSTOMER_MONEY_RECEIPT_LEGACY_ALLOCATION_FORBIDDEN';
+        throw error;
+      }
 
       if (receipt.status === RECEIPT_STATUS.CANCELLED) {
         const error = new Error('ไม่สามารถตัดชำระได้ เนื่องจากรายการรับชำระถูกยกเลิกแล้ว');
@@ -119,7 +134,13 @@ const allocateCustomerReceipt = async (req, res) => {
         throw error;
       }
 
-      const saleOutstandingAmount = getSaleOutstandingAmount(sale);
+      // This projection acquires the shared sale-payment lock and includes normal payments,
+      // legacy CR allocations and Customer Money settlements before we consume outstanding.
+      const currentPaymentState = await projectSalePaymentStatus(tx, saleId);
+      const saleOutstandingAmount = Math.max(
+        0,
+        roundMoney(Number(currentPaymentState.totalAmount) - Number(currentPaymentState.paidAmount)),
+      );
 
       if (saleOutstandingAmount <= 0) {
         const error = new Error('บิลนี้ถูกชำระครบแล้ว');
@@ -127,7 +148,7 @@ const allocateCustomerReceipt = async (req, res) => {
         throw error;
       }
 
-      if (amount > saleOutstandingAmount) {
+      if (amount > saleOutstandingAmount + 0.001) {
         const error = new Error('จำนวนเงินที่ตัดชำระมากกว่ายอดค้างชำระของบิล');
         error.statusCode = 400;
         throw error;
@@ -185,18 +206,7 @@ const allocateCustomerReceipt = async (req, res) => {
         },
       });
 
-      const nextSalePaidAmount = roundMoney(roundMoney(sale.paidAmount || 0) + amount);
-      await tx.sale.update({
-        where: { id: saleId },
-        data: {
-          paidAmount: nextSalePaidAmount,
-          statusPayment: deriveSalePaymentStatus({
-            totalAmount: sale.totalAmount,
-            paidAmount: nextSalePaidAmount,
-          }),
-        },
-      });
-
+      await projectSalePaymentStatus(tx, saleId);
       const freshReceipt = await findReceiptOrThrow(tx, { receiptId, branchId });
 
       return {
@@ -220,4 +230,7 @@ const allocateCustomerReceipt = async (req, res) => {
   }
 };
 
-module.exports = { allocateCustomerReceipt };
+module.exports = {
+  allocateCustomerReceipt,
+  acquireCustomerReceiptAllocationLock,
+};

@@ -1,9 +1,20 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const { Prisma } = require('../../../../../lib/prisma');
 const { createCustomerMoneyApplication } = require('../../application/createCustomerMoneyApplicationService');
 const { createCustomerMoneyLedger } = require('../../ledger/createCustomerMoneyLedgerService');
 const { updateCustomerMoneyBalance } = require('../../balance/updateCustomerMoneyBalanceService');
+const {
+  calculateAvailableCustomerMoney,
+  consumeCustomerMoneySources,
+} = require('../../balance/customerMoneySourcePoolService');
+const {
+  acquireCustomerMoneyTransactionLock,
+} = require('../../shared/customerMoneyTransactionLock');
+const {
+  projectSalePaymentStatus,
+} = require('../../../sales/completion/services/salePaymentPostingService');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -16,7 +27,40 @@ const derivePaymentStatus = ({ totalAmount, paidAmount }) => {
   return 'UNPAID';
 };
 
+const buildSettlementRequestHash = (command) => {
+  const lines = [...command.lines]
+    .map((line) => ({
+      saleId: line.saleId,
+      saleItemId: line.saleItemId,
+      lineType: line.lineType,
+      amount: Number(Number(line.amount).toFixed(2)),
+    }))
+    .sort((left, right) => (
+      left.saleId - right.saleId
+      || left.lineType.localeCompare(right.lineType)
+      || left.saleItemId - right.saleItemId
+      || left.amount - right.amount
+    ));
+  return crypto.createHash('sha256').update(JSON.stringify({
+    customerId: command.customerId,
+    note: command.note || null,
+    lines,
+  })).digest('hex');
+};
+
+const acquireSettlementCommandLock = async (tx, commandKey) => {
+  if (!commandKey || !tx?.$queryRaw) return;
+  const digest = crypto.createHash('sha256').update(commandKey).digest();
+  const lockId = digest.readInt32BE(0);
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1005}, ${lockId})`;
+};
+
+const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => (
+  acquireCustomerMoneyTransactionLock(tx, customerId)
+);
+
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1002}, ${Number(branchId)})`;
   const yy = String(settledAt.getFullYear()).slice(-2);
   const mm = String(settledAt.getMonth() + 1).padStart(2, '0');
   const dd = String(settledAt.getDate()).padStart(2, '0');
@@ -37,6 +81,17 @@ const ensureEmployee = async (tx, branchId, employeeId) => {
     throw error;
   }
 };
+
+const selectSaleIdentity = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
+  where: {
+    id: saleId,
+    branchId,
+    customerId,
+    isCredit: true,
+    status: { not: 'CANCELLED' },
+  },
+  select: { id: true },
+});
 
 const selectSale = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
   where: {
@@ -94,7 +149,91 @@ const lineSnapshot = (sale, requested) => {
   };
 };
 
+const distributeSourcesAcrossLines = (prepared, sourceChunks) => {
+  const sources = sourceChunks.map((source) => ({ ...source, remainingAmount: money(source.amount) }));
+  const allocations = [];
+  let sourceIndex = 0;
+
+  for (const item of prepared) {
+    let lineRemaining = money(item.requested.amount);
+    while (lineRemaining.greaterThan(0)) {
+      const source = sources[sourceIndex];
+      if (!source) {
+        const error = new Error('ไม่สามารถจับคู่แหล่ง Customer Money กับรายการตัดยอดได้ครบ');
+        error.code = 'CUSTOMER_MONEY_ALLOCATION_INCOMPLETE';
+        error.statusCode = 409;
+        throw error;
+      }
+      if (source.remainingAmount.lessThanOrEqualTo(0)) {
+        sourceIndex += 1;
+        continue;
+      }
+      const amount = Prisma.Decimal.min(lineRemaining, source.remainingAmount);
+      allocations.push({ item, sourceType: source.sourceType, sourceId: source.sourceId, amount });
+      lineRemaining = lineRemaining.minus(amount);
+      source.remainingAmount = source.remainingAmount.minus(amount);
+      if (source.remainingAmount.lessThanOrEqualTo(0)) sourceIndex += 1;
+    }
+  }
+
+  return allocations;
+};
+
+const loadSettlementCreateResult = async (tx, settlementId, { branchId, customerId, idempotentReplay = false }) => {
+  const [fresh, availableAmount] = await Promise.all([
+    tx.customerMoneySettlement.findFirst({
+      where: { id: settlementId, branchId, customerId, settlementType: 'DELIVERY_CREDIT' },
+      include: {
+        customer: { select: { id: true, name: true, companyName: true, taxId: true } },
+        lines: { orderBy: [{ saleId: 'asc' }, { id: 'asc' }], include: { application: true } },
+      },
+    }),
+    calculateAvailableCustomerMoney(tx, { branchId, customerId }),
+  ]);
+  if (!fresh) {
+    const error = new Error('ไม่พบเอกสารตัดยอดสำหรับคำสั่งเดิม');
+    error.code = 'SETTLEMENT_REPLAY_NOT_FOUND';
+    error.statusCode = 409;
+    throw error;
+  }
+  return {
+    ...fresh,
+    totalAmount: asNumber(fresh.totalAmount),
+    customerMoneyBalance: asNumber(availableAmount),
+    idempotentReplay,
+  };
+};
+
 const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$transaction(async (tx) => {
+  const requestHash = command.commandKey ? buildSettlementRequestHash(command) : null;
+  if (command.commandKey) {
+    await acquireSettlementCommandLock(tx, command.commandKey);
+    const existingCommand = await tx.customerMoneySettlementCommand.findUnique({
+      where: {
+        branchId_commandKey: {
+          branchId: command.branchId,
+          commandKey: command.commandKey,
+        },
+      },
+      select: { customerId: true, requestHash: true, settlementId: true },
+    });
+    if (existingCommand) {
+      if (existingCommand.customerId !== command.customerId || existingCommand.requestHash !== requestHash) {
+        const error = new Error('X-Idempotency-Key นี้เคยถูกใช้กับคำสั่งตัดยอดอื่นแล้ว');
+        error.code = 'IDEMPOTENCY_KEY_REUSED';
+        error.statusCode = 409;
+        throw error;
+      }
+      await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId);
+      return loadSettlementCreateResult(tx, existingCommand.settlementId, {
+        branchId: command.branchId,
+        customerId: command.customerId,
+        idempotentReplay: true,
+      });
+    }
+  }
+
+  await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId);
   await ensureEmployee(tx, command.branchId, command.createdById);
 
   const customer = await tx.customerProfile.findFirst({
@@ -108,13 +247,12 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     throw error;
   }
 
-  const balance = await tx.customerMoneyBalance.findUnique({
-    where: { branchId_customerId: { branchId: command.branchId, customerId: command.customerId } },
-    select: { id: true, availableAmount: true },
-  });
-  const available = money(balance?.availableAmount);
   const requestedTotal = command.lines.reduce((sum, line) => sum.plus(money(line.amount)), money(0));
-  if (!balance || available.lessThanOrEqualTo(0)) {
+  const available = await calculateAvailableCustomerMoney(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+  });
+  if (available.lessThanOrEqualTo(0)) {
     const error = new Error('ลูกค้าไม่มี Customer Money ที่พร้อมใช้');
     error.code = 'CUSTOMER_MONEY_NOT_AVAILABLE';
     error.statusCode = 409;
@@ -127,12 +265,24 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     throw error;
   }
 
-  const saleIds = [...new Set(command.lines.map((line) => line.saleId))];
+  const saleIds = [...new Set(command.lines.map((line) => line.saleId))]
+    .sort((left, right) => left - right);
   const sales = new Map();
   for (const saleId of saleIds) {
+    const identity = await selectSaleIdentity(tx, saleId, command.branchId, command.customerId);
+    if (!identity) {
+      const error = new Error('ไม่พบใบส่งของเครดิตที่ยังใช้งานสำหรับลูกค้ารายนี้');
+      error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Customer lock is already held. The unified projection now acquires the sale lock,
+    // reconciles every payment evidence source, and keeps the sale stable until commit.
+    await projectSalePaymentStatus(tx, saleId);
     const sale = await selectSale(tx, saleId, command.branchId, command.customerId);
     if (!sale) {
-      const error = new Error('ไม่พบใบส่งของเครดิตที่ยังค้างสำหรับลูกค้ารายนี้');
+      const error = new Error('ใบส่งของเครดิตนี้ไม่มีรายการค้างที่สามารถตัดยอดได้แล้ว');
       error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
       error.statusCode = 409;
       throw error;
@@ -194,17 +344,25 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     },
   });
 
-  for (const item of prepared) {
+  const sourceChunks = await consumeCustomerMoneySources(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+    amount: requestedTotal,
+  });
+  const allocations = distributeSourcesAcrossLines(prepared, sourceChunks);
+
+  for (const allocation of allocations) {
+    const { item } = allocation;
     const application = await createCustomerMoneyApplication({
       client: tx,
       data: {
         branchId: command.branchId,
         customerId: command.customerId,
-        sourceType: 'CUSTOMER_MONEY_BALANCE',
-        sourceId: balance.id,
+        sourceType: allocation.sourceType,
+        sourceId: allocation.sourceId,
         targetType: 'DELIVERY_CREDIT',
         targetId: item.sale.id,
-        amount: money(item.requested.amount),
+        amount: allocation.amount,
         status: 'APPLIED',
         appliedAt: settledAt,
         createdById: command.createdById,
@@ -223,7 +381,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
         quantity: item.snapshot.quantity,
         unitAmount: item.snapshot.unitAmount,
         lineAmount: item.snapshot.lineAmount,
-        appliedAmount: money(item.requested.amount),
+        appliedAmount: allocation.amount,
       },
     });
 
@@ -234,7 +392,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
         customerId: command.customerId,
         applicationId: application.id,
         eventType: 'MONEY_APPLIED',
-        amount: money(item.requested.amount),
+        amount: allocation.amount,
         direction: 'DEBIT',
         referenceType: 'DELIVERY_CREDIT_SETTLEMENT',
         referenceId: settlement.id,
@@ -243,19 +401,14 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     });
   }
 
-  for (const [saleId, applied] of perSale.entries()) {
-    const sale = sales.get(saleId);
-    const nextPaid = money(sale.paidAmount).plus(applied);
-    await tx.sale.update({
-      where: { id: saleId },
-      data: {
-        paidAmount: nextPaid,
-        statusPayment: derivePaymentStatus({ totalAmount: sale.totalAmount, paidAmount: nextPaid }),
-      },
-    });
+  for (const saleId of perSale.keys()) {
+    await projectSalePaymentStatus(tx, saleId);
   }
 
-  const nextBalance = available.minus(requestedTotal);
+  const nextBalance = await calculateAvailableCustomerMoney(tx, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+  });
   await updateCustomerMoneyBalance({
     client: tx,
     branchId: command.branchId,
@@ -263,18 +416,31 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     availableAmount: nextBalance,
   });
 
-  const fresh = await tx.customerMoneySettlement.findUnique({
-    where: { id: settlement.id },
-    include: {
-      customer: { select: { id: true, name: true, companyName: true, taxId: true } },
-      lines: { orderBy: [{ saleId: 'asc' }, { id: 'asc' }], include: { application: true } },
-    },
+  if (command.commandKey) {
+    await tx.customerMoneySettlementCommand.create({
+      data: {
+        branchId: command.branchId,
+        customerId: command.customerId,
+        commandKey: command.commandKey,
+        requestHash,
+        settlementId: settlement.id,
+      },
+    });
+  }
+
+  return loadSettlementCreateResult(tx, settlement.id, {
+    branchId: command.branchId,
+    customerId: command.customerId,
   });
-  return {
-    ...fresh,
-    totalAmount: asNumber(fresh.totalAmount),
-    customerMoneyBalance: asNumber(nextBalance),
-  };
 });
 
-module.exports = { createDeliveryCreditSettlement, derivePaymentStatus };
+module.exports = {
+  createDeliveryCreditSettlement,
+  derivePaymentStatus,
+  buildSettlementRequestHash,
+  acquireSettlementCommandLock,
+  acquireCustomerMoneySettlementLock,
+  selectSaleIdentity,
+  distributeSourcesAcrossLines,
+  loadSettlementCreateResult,
+};
