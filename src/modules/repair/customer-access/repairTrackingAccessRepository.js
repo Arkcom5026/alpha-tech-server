@@ -71,6 +71,7 @@ class RepairTrackingAccessRepository {
           select: {
             name: true,
             companyName: true,
+            departmentName: true,
           },
         },
         branch: { select: { name: true, phone: true, address: true } },

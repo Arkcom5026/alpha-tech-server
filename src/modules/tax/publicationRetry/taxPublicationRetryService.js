@@ -9,7 +9,7 @@ const listSalePublicationGaps = async ({ branchId, limit = 100 }) => {
       branchId, status: { in: ['COMPLETED', 'FINALIZED', 'DELIVERED'] }, statusPayment: 'PAID',
       NOT: { id: { in: (await prisma.taxCandidate.findMany({ where: { branchId, sourceType: 'SALE' }, select: { sourceId: true } })).map((row) => Number(row.sourceId)).filter(Boolean) } },
     },
-    select: { id: true, code: true, soldAt: true, totalAmount: true, status: true, statusPayment: true, customer: { select: { name: true, companyName: true } } },
+    select: { id: true, code: true, soldAt: true, totalAmount: true, status: true, statusPayment: true, customer: { select: { name: true, companyName: true, departmentName: true } } },
     orderBy: { soldAt: 'asc' }, take: Math.min(Math.max(Number(limit) || 100, 1), 500),
   });
   return { gaps: sales, total: sales.length };

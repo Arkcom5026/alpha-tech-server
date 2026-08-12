@@ -84,6 +84,7 @@ const projectSaleReceiptPrintablePayment = async ({ branchId, paymentId }) => {
               id: true,
               name: true,
               companyName: true,
+              departmentName: true,
               taxId: true,
             },
           },

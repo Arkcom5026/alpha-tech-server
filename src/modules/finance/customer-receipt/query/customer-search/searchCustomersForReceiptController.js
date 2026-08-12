@@ -81,6 +81,7 @@ const searchCustomersForReceipt = async (req, res) => {
         id: true,
         name: true,
         companyName: true,
+        departmentName: true,
         taxId: true,
         user: {
           select: {
@@ -98,6 +99,7 @@ const searchCustomersForReceipt = async (req, res) => {
       customerCode: null,
       name: item.name || null,
       companyName: item.companyName || null,
+      departmentName: item.departmentName || null,
       phone: item.user?.loginId || null,
       email: item.user?.email || null,
       taxId: item.taxId || null,

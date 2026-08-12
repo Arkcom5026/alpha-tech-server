@@ -2,7 +2,7 @@
 
 const settlementInclude = {
   customer: {
-    select: { id: true, name: true, companyName: true, taxId: true },
+    select: { id: true, name: true, companyName: true, departmentName: true, taxId: true },
   },
   lines: {
     orderBy: [{ saleId: 'asc' }, { id: 'asc' }],

@@ -185,7 +185,7 @@ const loadSettlementCreateResult = async (tx, settlementId, { branchId, customer
     tx.customerMoneySettlement.findFirst({
       where: { id: settlementId, branchId, customerId, settlementType: 'DELIVERY_CREDIT' },
       include: {
-        customer: { select: { id: true, name: true, companyName: true, taxId: true } },
+        customer: { select: { id: true, name: true, companyName: true, departmentName: true, taxId: true } },
         lines: { orderBy: [{ saleId: 'asc' }, { id: 'asc' }], include: { application: true } },
       },
     }),

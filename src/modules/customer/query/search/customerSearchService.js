@@ -12,6 +12,8 @@ const presentCustomer = (customer) => ({
   email: customer.user?.email || '',
   type: customer.type || 'INDIVIDUAL',
   companyName: customer.companyName || '',
+  departmentName: customer.departmentName || '',
+  financialOwnerCustomerId: customer.financialOwnerCustomerId || null,
   taxId: customer.taxId || '',
   creditLimit: customer.creditLimit,
   creditBalance: customer.creditBalance,

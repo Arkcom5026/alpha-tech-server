@@ -82,6 +82,7 @@ function listPlatformIdentityOverview(filters = {}) {
           branchId: true,
           name: true,
           companyName: true,
+          departmentName: true,
           type: true,
           createdAt: true,
           updatedAt: true,

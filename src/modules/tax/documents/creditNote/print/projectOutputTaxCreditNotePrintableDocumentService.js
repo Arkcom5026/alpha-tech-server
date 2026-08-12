@@ -112,7 +112,7 @@ const projectOutputTaxCreditNotePrintableDocument = async ({ branchId, taxDocume
       code: true,
       soldAt: true,
       customer: {
-        select: { name: true, companyName: true, taxId: true },
+        select: { name: true, companyName: true, departmentName: true, taxId: true },
       },
       items: {
         select: {

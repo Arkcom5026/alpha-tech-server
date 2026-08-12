@@ -36,7 +36,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   const group = await resolveFinancialCustomerGroup(prisma, { customerId: command.customerId, branchId: command.branchId });
   const customer = await prisma.customerProfile.findFirst({
     where: { id: command.customerId, branchId: command.branchId },
-    select: { id: true, name: true, companyName: true, taxId: true },
+    select: { id: true, name: true, companyName: true, departmentName: true, taxId: true },
   });
   if (!customer) {
     const error = new Error('ไม่พบลูกค้าในสาขานี้');
