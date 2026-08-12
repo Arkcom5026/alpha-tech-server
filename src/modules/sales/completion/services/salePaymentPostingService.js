@@ -106,6 +106,19 @@ const aggregateActiveSettlementAmount = async (tx, saleId) => {
   });
 };
 
+const aggregateActiveReceiptAllocationAmount = async (tx, saleId) => {
+  if (!tx?.customerReceiptAllocation?.aggregate) {
+    return { _sum: { amount: null } };
+  }
+  return tx.customerReceiptAllocation.aggregate({
+    _sum: { amount: true },
+    where: {
+      saleId,
+      receipt: { status: { not: 'CANCELLED' } },
+    },
+  });
+};
+
 const findLatestActiveSettlement = async (tx, saleId) => {
   if (!tx?.customerMoneySettlement?.findFirst) return null;
   return tx.customerMoneySettlement.findFirst({
@@ -119,21 +132,35 @@ const findLatestActiveSettlement = async (tx, saleId) => {
   });
 };
 
+const findLatestActiveReceiptAllocation = async (tx, saleId) => {
+  if (!tx?.customerReceiptAllocation?.findFirst) return null;
+  return tx.customerReceiptAllocation.findFirst({
+    where: {
+      saleId,
+      receipt: { status: { not: 'CANCELLED' } },
+    },
+    orderBy: { allocatedAt: 'desc' },
+    select: { allocatedAt: true },
+  });
+};
+
 const projectSalePaymentStatus = async (tx, saleId) => {
   await acquireSalePaymentProjectionLock(tx, saleId);
 
   const sale = await tx.sale.findUnique({ where: { id: saleId }, select: { totalAmount: true, status: true } });
   if (!sale) throw new SalesError(404, 'SALE_NOT_FOUND', 'Sale not found');
 
-  const [paymentAggregate, settlementAggregate] = await Promise.all([
+  const [paymentAggregate, receiptAllocationAggregate, settlementAggregate] = await Promise.all([
     tx.paymentItem.aggregate({
       _sum: { amount: true },
       where: { payment: { saleId, isCancelled: false } },
     }),
+    aggregateActiveReceiptAllocationAmount(tx, saleId),
     aggregateActiveSettlementAmount(tx, saleId),
   ]);
 
   const paidAmount = D(paymentAggregate._sum.amount || 0)
+    .plus(D(receiptAllocationAggregate._sum.amount || 0))
     .plus(D(settlementAggregate._sum.appliedAmount || 0));
   const paidNumber = n(paidAmount);
   const total = n(sale.totalAmount);
@@ -142,15 +169,20 @@ const projectSalePaymentStatus = async (tx, saleId) => {
 
   let paidAt = null;
   if (paid) {
-    const [latestPayment, latestSettlement] = await Promise.all([
+    const [latestPayment, latestReceiptAllocation, latestSettlement] = await Promise.all([
       tx.payment.findFirst({
         where: { saleId, isCancelled: false },
         orderBy: { receivedAt: 'desc' },
         select: { receivedAt: true },
       }),
+      findLatestActiveReceiptAllocation(tx, saleId),
       findLatestActiveSettlement(tx, saleId),
     ]);
-    const candidates = [latestPayment?.receivedAt, latestSettlement?.settledAt]
+    const candidates = [
+      latestPayment?.receivedAt,
+      latestReceiptAllocation?.allocatedAt,
+      latestSettlement?.settledAt,
+    ]
       .filter(Boolean)
       .map((value) => new Date(value))
       .filter((value) => !Number.isNaN(value.getTime()));
@@ -208,5 +240,7 @@ module.exports = {
   refreshCustomerMoneyBalance,
   acquireSalePaymentProjectionLock,
   aggregateActiveSettlementAmount,
+  aggregateActiveReceiptAllocationAmount,
   findLatestActiveSettlement,
+  findLatestActiveReceiptAllocation,
 };
