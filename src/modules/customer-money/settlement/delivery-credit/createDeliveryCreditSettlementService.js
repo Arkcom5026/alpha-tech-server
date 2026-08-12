@@ -17,6 +17,10 @@ const {
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 const { buildActiveCreditReceivableWhere } = require('../../../sales/shared/creditReceivableAuthority');
+const {
+  createSettlementConsolidatedDelivery,
+  loadSettlementGeneratedDocument,
+} = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -108,8 +112,14 @@ const selectSale = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
   select: {
     id: true,
     code: true,
+    customerId: true,
+    officialDocumentNumber: true,
+    soldAt: true,
     totalAmount: true,
     paidAmount: true,
+    customer: {
+      select: { id: true, name: true, companyName: true, departmentName: true, taxId: true },
+    },
     items: {
       select: {
         id: true,
@@ -188,7 +198,7 @@ const loadSettlementCreateResult = async (tx, settlementId, {
   financialGroup = null,
   idempotentReplay = false,
 }) => {
-  const [fresh, availableAmount] = await Promise.all([
+  const [fresh, availableAmount, generatedDocument] = await Promise.all([
     tx.customerMoneySettlement.findFirst({
       where: { id: settlementId, branchId, customerId, settlementType: 'DELIVERY_CREDIT' },
       include: {
@@ -197,6 +207,7 @@ const loadSettlementCreateResult = async (tx, settlementId, {
       },
     }),
     calculateAvailableCustomerMoney(tx, { branchId, customerId, financialGroup }),
+    loadSettlementGeneratedDocument(tx, { branchId, settlementId }),
   ]);
   if (!fresh) {
     const error = new Error('ไม่พบเอกสารตัดยอดสำหรับคำสั่งเดิม');
@@ -208,6 +219,7 @@ const loadSettlementCreateResult = async (tx, settlementId, {
     ...fresh,
     totalAmount: asNumber(fresh.totalAmount),
     customerMoneyBalance: asNumber(availableAmount),
+    generatedDocument,
     idempotentReplay,
   };
 };
@@ -288,8 +300,6 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       throw error;
     }
 
-    // Customer lock is already held. The unified projection now acquires the sale lock,
-    // reconciles every payment evidence source, and keeps the sale stable until commit.
     await projectSalePaymentStatus(tx, saleId);
     const sale = await selectSale(tx, saleId, command.branchId, group.memberIds);
     if (!sale) {
@@ -314,14 +324,22 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       },
       _sum: { appliedAmount: true },
     });
-    const remainingLine = snapshot.lineAmount.minus(money(alreadyApplied._sum.appliedAmount));
+    const alreadyAppliedAmount = money(alreadyApplied._sum.appliedAmount);
+    const remainingLine = snapshot.lineAmount.minus(alreadyAppliedAmount);
     if (money(requested.amount).greaterThan(remainingLine)) {
       const error = new Error('ยอดที่เลือกมากกว่ายอดคงเหลือของรายการสินค้า');
       error.code = 'SETTLEMENT_LINE_EXCEEDS_REMAINING';
       error.statusCode = 409;
       throw error;
     }
-    prepared.push({ requested, sale, snapshot });
+    prepared.push({
+      requested,
+      sale,
+      snapshot,
+      alreadyAppliedAmount,
+      remainingLine,
+      completesLine: money(requested.amount).greaterThanOrEqualTo(remainingLine),
+    });
   }
 
   const perSale = new Map();
@@ -416,6 +434,16 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   for (const saleId of perSale.keys()) {
     await projectSalePaymentStatus(tx, saleId);
   }
+
+  await createSettlementConsolidatedDelivery({
+    tx,
+    branchId: command.branchId,
+    employeeId: command.createdById,
+    settlementId: settlement.id,
+    customerId: group.ownerId,
+    prepared,
+    note: command.note,
+  });
 
   const nextBalance = await calculateAvailableCustomerMoney(tx, {
     branchId: command.branchId,
