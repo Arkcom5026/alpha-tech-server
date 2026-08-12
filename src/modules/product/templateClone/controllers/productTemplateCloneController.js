@@ -26,6 +26,7 @@ const createOperationalProductFromTemplate = async (req, res) => {
       return res.status(status).json({
         success: false,
         error: code || 'CREATE_OPERATIONAL_PRODUCT_FROM_TEMPLATE_REJECTED',
+        ...(error?.details ? { details: error.details } : {}),
       })
     }
 
