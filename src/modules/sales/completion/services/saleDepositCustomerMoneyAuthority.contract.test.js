@@ -18,6 +18,14 @@ test('sale deposit payment joins the shared per-customer money lock before consu
   assert.match(posting, /customerId,\s*status: 'ACTIVE'/);
 });
 
+test('sale deposit payment honors source-specific legacy Customer Money reservations', () => {
+  assert.match(posting, /getCustomerMoneySourceState/);
+  assert.match(posting, /sourceType:\s*'CUSTOMER_DEPOSIT'/);
+  assert.match(posting, /sourceState\.uncoveredLegacyReservation\.greaterThan\(0\)/);
+  assert.match(posting, /requestedAmount\.greaterThan\(sourceState\.availableAmount\)/);
+  assert.match(posting, /DEPOSIT_CUSTOMER_MONEY_RESERVED/);
+});
+
 test('sale deposit payment refreshes customer money balance after source mutation', () => {
   assert.match(posting, /calculateAvailableCustomerMoney/);
   assert.match(posting, /updateCustomerMoneyBalance/);
