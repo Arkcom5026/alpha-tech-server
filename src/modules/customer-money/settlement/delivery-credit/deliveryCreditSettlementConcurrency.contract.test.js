@@ -6,6 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const service = fs.readFileSync(path.join(__dirname, 'createDeliveryCreditSettlementService.js'), 'utf8');
+const cancelService = fs.readFileSync(path.join(__dirname, 'cancelDeliveryCreditSettlementService.js'), 'utf8');
 
 test('settlement keeps owner-to-sale lock order and reconciles payment evidence before outstanding validation', () => {
   assert.match(service, /await acquireCustomerMoneySettlementLock\(tx, command\.branchId, command\.customerId, group\.ownerId\)/);
@@ -33,4 +34,13 @@ test('settlement extends the interactive transaction lifetime and reuses the res
   assert.match(service, /calculateAvailableCustomerMoney\(tx, \{[\s\S]*financialGroup: group/);
   assert.match(service, /consumeCustomerMoneySources\(tx, \{[\s\S]*financialGroup: group/);
   assert.match(service, /loadSettlementCreateResult\(tx, settlement\.id, \{[\s\S]*financialGroup: group/);
+});
+
+test('settlement cancellation uses the same extended transaction lifetime and resolved financial owner', () => {
+  assert.match(cancelService, /SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS = Object\.freeze\(\{ maxWait: 10000, timeout: 30000 \}\)/);
+  assert.match(cancelService, /resolveFinancialCustomerGroup\(tx/);
+  assert.match(cancelService, /acquireCustomerMoneyTransactionLock\(tx, financialGroup\.ownerId\)/);
+  assert.match(cancelService, /restoreCustomerMoneySources\(tx, \{[\s\S]*financialGroup/);
+  assert.match(cancelService, /calculateAvailableCustomerMoney\(tx, \{[\s\S]*financialGroup/);
+  assert.match(cancelService, /\}, SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS\);/);
 });
