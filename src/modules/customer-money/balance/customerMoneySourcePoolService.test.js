@@ -138,3 +138,48 @@ test('customer money source pool restores traced receipt and deposit application
   assert.equal(updates[1][1].data.usedAmount.decrement.toString(), '15');
   assert.equal(updates[1][1].data.status, 'ACTIVE');
 });
+
+test('customer money source pool reuses a pre-resolved financial group without re-querying customer profiles', async () => {
+  const financialGroup = { ownerId: 35, memberIds: [35, 102] };
+  let profileQueries = 0;
+  const client = {
+    customerProfile: {
+      findFirst: async () => { profileQueries += 1; throw new Error('customerProfile.findFirst should not run'); },
+      findMany: async () => { profileQueries += 1; throw new Error('customerProfile.findMany should not run'); },
+    },
+    customerReceipt: {
+      findMany: async (args) => {
+        assert.deepEqual(args.where.customerId, { in: [35, 102] });
+        return [{
+          id: 25,
+          customerId: 102,
+          remainingAmount: D(50),
+          allocatedAmount: D(0),
+          receivedAt: new Date('2026-08-10T03:00:00Z'),
+          createdAt: new Date('2026-08-10T03:00:00Z'),
+        }];
+      },
+    },
+    customerDeposit: {
+      findMany: async (args) => {
+        assert.deepEqual(args.where.customerId, { in: [35, 102] });
+        return [];
+      },
+    },
+    customerMoneySettlementLine: {
+      aggregate: async (args) => {
+        assert.equal(args.where.settlement.customerId, 35);
+        return { _sum: { appliedAmount: D(0) } };
+      },
+    },
+  };
+
+  const available = await calculateAvailableCustomerMoney(client, {
+    branchId: 2,
+    customerId: 102,
+    financialGroup,
+  });
+
+  assert.equal(available.toString(), '50');
+  assert.equal(profileQueries, 0);
+});
