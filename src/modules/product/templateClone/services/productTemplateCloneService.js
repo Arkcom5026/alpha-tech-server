@@ -1,4 +1,5 @@
 const { prisma } = require('../../../../lib/prisma')
+const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 const {
   createOperationalProductRecordFromTemplate,
   fetchOperationalRuntimeProduct,
@@ -66,7 +67,141 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
   }
 }
 
-const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId, db = prisma } = {}) => {
+const fetchTemplateCloneDefaults = ({ templateProductId, templateBranchId, db }) => (
+  db.product.findFirst({
+    where: {
+      id: Number(templateProductId),
+      active: true,
+      productType: { branchId: Number(templateBranchId) },
+    },
+    select: {
+      productImages: {
+        where: { active: true },
+        orderBy: [{ isCover: 'desc' }, { id: 'asc' }],
+        select: {
+          url: true,
+          public_id: true,
+          secure_url: true,
+          caption: true,
+          isCover: true,
+          active: true,
+        },
+      },
+      branchPrice: {
+        where: { branchId: Number(templateBranchId) },
+        take: 1,
+        select: {
+          effectiveDate: true,
+          expiredDate: true,
+          costPrice: true,
+          priceRetail: true,
+          priceWholesale: true,
+          priceTechnician: true,
+          priceOnline: true,
+          isActive: true,
+        },
+      },
+    },
+  })
+)
+
+const ensureSelectedBrandMapping = async ({ productTypeId, brandId, db }) => {
+  const typeId = toInt(productTypeId)
+  const selectedBrandId = toInt(brandId)
+  if (!typeId || !selectedBrandId) return
+
+  try {
+    await db.productTypeBrand.create({
+      data: {
+        productTypeId: typeId,
+        brandId: selectedBrandId,
+      },
+    })
+  } catch (error) {
+    if (error?.code === 'P2002') return
+    throw error
+  }
+}
+
+const resolveCloneSaleBarcode = async ({ branchId, template, db }) => {
+  const structured = template.mode === 'STRUCTURED' || template.trackSerialNumber === true
+  if (structured) return null
+
+  const saleBarcode = String(template.saleBarcode || '').trim()
+  if (!saleBarcode) return null
+
+  const conflict = await db.product.findFirst({
+    where: {
+      saleBarcode,
+      productType: { branchId: Number(branchId) },
+    },
+    select: { id: true },
+  })
+
+  return conflict ? null : saleBarcode
+}
+
+const cloneTemplateBranchPrice = async ({
+  productId,
+  branchId,
+  employeeId,
+  role,
+  v2Role,
+  sourcePrice,
+  db,
+}) => {
+  if (!sourcePrice) return null
+
+  const costPrice = Number(sourcePrice.costPrice)
+  const priceRetail = Number(sourcePrice.priceRetail)
+  if (!Number.isFinite(costPrice) || costPrice <= 0 || !Number.isFinite(priceRetail) || priceRetail <= 0) {
+    return null
+  }
+
+  const authority = priceAuthorityPolicy.assertPricePayload({
+    actor: {
+      branchId,
+      employeeId: toInt(employeeId),
+      role,
+      v2Role,
+    },
+    payload: {
+      costPrice: sourcePrice.costPrice,
+      priceRetail: sourcePrice.priceRetail,
+      priceWholesale: sourcePrice.priceWholesale,
+      priceTechnician: sourcePrice.priceTechnician,
+      priceOnline: sourcePrice.priceOnline,
+    },
+    effectiveDate: sourcePrice.effectiveDate,
+    expiredDate: sourcePrice.expiredDate,
+  })
+
+  return db.branchPrice.create({
+    data: {
+      productId: Number(productId),
+      branchId: authority.branchId,
+      effectiveDate: sourcePrice.effectiveDate ?? null,
+      expiredDate: sourcePrice.expiredDate ?? null,
+      note: 'Cloned from Product Template',
+      updatedBy: authority.employeeId,
+      isActive: sourcePrice.isActive !== false,
+      costPrice: sourcePrice.costPrice,
+      priceRetail: sourcePrice.priceRetail,
+      priceWholesale: sourcePrice.priceWholesale ?? null,
+      priceTechnician: sourcePrice.priceTechnician ?? null,
+      priceOnline: sourcePrice.priceOnline ?? null,
+    },
+  })
+}
+
+const cloneOperationalProductFromTemplate = async ({
+  branchId,
+  templateProductId,
+  employeeId = null,
+  role,
+  v2Role,
+  db = prisma,
+} = {}) => {
   const brId = requireBranchId(branchId)
   const tplId = toInt(templateProductId)
   if (!tplId) {
@@ -85,7 +220,18 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
       throw error
     }
 
-    const template = await findTemplateProductForClone({ templateProductId: tplId, templateBranchId: templateBranch.id, db: tx })
+    if (Number(templateBranch.id) === Number(brId)) {
+      const error = new Error('TARGET_BRANCH_CANNOT_BE_TEMPLATE_BRANCH')
+      error.statusCode = 400
+      error.code = 'TARGET_BRANCH_CANNOT_BE_TEMPLATE_BRANCH'
+      throw error
+    }
+
+    const template = await findTemplateProductForClone({
+      templateProductId: tplId,
+      templateBranchId: templateBranch.id,
+      db: tx,
+    })
     if (!template) {
       const error = new Error('TEMPLATE_PRODUCT_NOT_FOUND')
       error.statusCode = 404
@@ -93,7 +239,11 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
       throw error
     }
 
-    const existing = await findOperationalRuntimeProductByTemplateId({ branchId: brId, templateProductId: tplId, db: tx })
+    const existing = await findOperationalRuntimeProductByTemplateId({
+      branchId: brId,
+      templateProductId: tplId,
+      db: tx,
+    })
     if (existing) {
       const mapped = toOperationalRuntimeProduct(existing, brId)
       return {
@@ -123,14 +273,36 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
       db: tx,
     })
 
+    await ensureSelectedBrandMapping({
+      productTypeId: branchType.id,
+      brandId: template.brandId,
+      db: tx,
+    })
+
+    const defaults = await fetchTemplateCloneDefaults({
+      templateProductId: tplId,
+      templateBranchId: templateBranch.id,
+      db: tx,
+    })
+
     const structured = template.mode === 'STRUCTURED' || template.trackSerialNumber === true
+    const saleBarcode = await resolveCloneSaleBarcode({
+      branchId: brId,
+      template,
+      db: tx,
+    })
+
+    const productImages = Array.isArray(defaults?.productImages)
+      ? defaults.productImages.filter((image) => image?.url || image?.secure_url)
+      : []
+
     const created = await createOperationalProductRecordFromTemplate({
       db: tx,
       data: {
         name: template.name,
         mode: structured ? 'STRUCTURED' : 'SIMPLE',
         inventoryBehavior: template.inventoryBehavior ?? 'TRACKED',
-        saleBarcode: null,
+        saleBarcode,
         noSN: !structured,
         trackSerialNumber: structured,
         active: true,
@@ -139,7 +311,31 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
         branch: { connect: { id: brId } },
         ...(template.brandId ? { brand: { connect: { id: template.brandId } } } : {}),
         ...(template.unitId ? { unit: { connect: { id: template.unitId } } } : {}),
+        ...(productImages.length
+          ? {
+              productImages: {
+                create: productImages.map((image) => ({
+                  url: image.url,
+                  public_id: image.public_id,
+                  secure_url: image.secure_url,
+                  caption: image.caption || null,
+                  isCover: !!image.isCover,
+                  active: image.active !== false,
+                })),
+              },
+            }
+          : {}),
       },
+    })
+
+    await cloneTemplateBranchPrice({
+      productId: created.id,
+      branchId: brId,
+      employeeId,
+      role,
+      v2Role,
+      sourcePrice: defaults?.branchPrice?.[0] || null,
+      db: tx,
     })
 
     const runtime = await fetchOperationalRuntimeProduct(created.id, brId, tx)
@@ -157,4 +353,11 @@ const cloneOperationalProductFromTemplate = async ({ branchId, templateProductId
   }, { timeout: 15000 })
 }
 
-module.exports = { adoptBranchProductType, cloneOperationalProductFromTemplate }
+module.exports = {
+  adoptBranchProductType,
+  fetchTemplateCloneDefaults,
+  ensureSelectedBrandMapping,
+  resolveCloneSaleBarcode,
+  cloneTemplateBranchPrice,
+  cloneOperationalProductFromTemplate,
+}
