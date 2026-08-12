@@ -9,7 +9,10 @@ const service = new TemplateProductSearchService(prisma)
 
 const searchTemplateProducts = async (req, res) => {
   try {
-    const result = await service.searchTemplateProducts(req.query || {})
+    const result = await service.searchTemplateProducts({
+      ...(req.query || {}),
+      sourceBranchId: req.user?.branchId,
+    })
     return res.status(200).json({
       success: true,
       data: result,

@@ -2,13 +2,10 @@
 // QuickStockService Runtime Trace Edition v3
 
 const { PrismaClient } = require('@prisma/client')
-const productTemplateEngine = require('../../services/productTemplateEngine')
 const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 const { decideOperationalProductMode } = require('../../runtime/policies/operationalProductModePolicy')
 const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy')
 const { QuickStockRepository, toInt, toNumber } = require('../repositories/quickStockRepository')
-
-const cloneProductFromTemplate = productTemplateEngine.cloneProductFromTemplate || productTemplateEngine.default || productTemplateEngine
 
 class QuickStockService {
   constructor(prisma, repository = null) {

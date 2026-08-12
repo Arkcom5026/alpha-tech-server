@@ -7,6 +7,9 @@ const createOperationalProductFromTemplate = async (req, res) => {
     const result = await cloneOperationalProductFromTemplate({
       branchId: req.user?.branchId,
       templateProductId: req.body?.templateProductId,
+      employeeId: req.employee?.id || req.user?.employeeId || null,
+      role: req.user?.role,
+      v2Role: req.employee?.role,
     })
 
     const status = result.statusCode || (result.created ? 201 : 200)
@@ -17,16 +20,12 @@ const createOperationalProductFromTemplate = async (req, res) => {
     console.error('createOperationalProductFromTemplate error:', error)
 
     const code = error?.code || error?.message
-    if (
-      code === 'BRANCH_ID_MISSING' ||
-      code === 'TEMPLATE_PRODUCT_ID_MISSING' ||
-      code === 'TEMPLATE_BRANCH_NOT_FOUND' ||
-      code === 'TEMPLATE_PRODUCT_NOT_FOUND' ||
-      code === 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
-    ) {
-      return res.status(error?.status || error?.statusCode || 400).json({
+    const status = Number(error?.status || error?.statusCode)
+
+    if (Number.isInteger(status) && status >= 400 && status < 500) {
+      return res.status(status).json({
         success: false,
-        error: code,
+        error: code || 'CREATE_OPERATIONAL_PRODUCT_FROM_TEMPLATE_REJECTED',
       })
     }
 
