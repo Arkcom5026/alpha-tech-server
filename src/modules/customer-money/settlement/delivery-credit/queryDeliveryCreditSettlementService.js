@@ -1,6 +1,9 @@
 'use strict';
 
 const { getSettlement, listSettlements } = require('./deliveryCreditSettlementRepository');
+const {
+  loadSettlementGeneratedDocument,
+} = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 
 const toNumber = (value) => Number(value || 0);
 
@@ -39,22 +42,7 @@ const serialize = (record) => record ? ({
 }) : null;
 
 const getGeneratedDocumentSummary = async ({ prisma, branchId, settlementId }) => {
-  if (!prisma?.customerMoneySettlementGeneratedDocument) return null;
-  const link = await prisma.customerMoneySettlementGeneratedDocument.findUnique({
-    where: { settlementId: Number(settlementId) },
-  });
-  if (!link || Number(link.branchId) !== Number(branchId)) return null;
-  const document = await prisma.combinedBillingDocument.findFirst({
-    where: { id: link.combinedBillingId, branchId: Number(branchId) },
-    select: {
-      id: true,
-      code: true,
-      issueDate: true,
-      status: true,
-      totalAmount: true,
-      _count: { select: { documentLines: true } },
-    },
-  });
+  const document = await loadSettlementGeneratedDocument(prisma, { branchId, settlementId });
   if (!document) return null;
   return {
     id: document.id,
@@ -62,8 +50,8 @@ const getGeneratedDocumentSummary = async ({ prisma, branchId, settlementId }) =
     issueDate: document.issueDate,
     status: document.status,
     totalAmount: toNumber(document.totalAmount),
-    lineCount: document._count.documentLines,
-    generationStatus: link.status,
+    lineCount: Array.isArray(document.documentLines) ? document.documentLines.length : 0,
+    generationStatus: document.generationStatus,
   };
 };
 
