@@ -9,42 +9,24 @@ const {
   toInt,
   roundMoney,
   asNullableString,
-  deriveSalePaymentStatus,
 } = require('../shared/customerReceiptValue');
 const { receiptInclude } = require('../shared/customerReceiptIncludes');
 const { buildReceiptResponse } = require('../shared/customerReceiptResponse');
+const {
+  acquireSalePaymentProjectionLock,
+  projectSalePaymentStatus,
+} = require('../../../sales/completion/services/salePaymentPostingService');
 
-const recalculateSalePaymentState = async (tx, saleId) => {
-  const sale = await tx.sale.findUnique({
-    where: { id: saleId },
-    select: {
-      id: true,
-      totalAmount: true,
-      paidAmount: true,
-    },
-  });
-
-  if (!sale) return null;
-
-  const nextPaidAmount = roundMoney(sale.paidAmount || 0);
-  const nextStatusPayment = deriveSalePaymentStatus({
-    totalAmount: sale.totalAmount,
-    paidAmount: nextPaidAmount,
-  });
-
-  return tx.sale.update({
-    where: { id: saleId },
-    data: {
-      paidAmount: nextPaidAmount,
-      statusPayment: nextStatusPayment,
-    },
-  });
+const acquireCustomerReceiptCancellationLock = async (tx, receiptId) => {
+  if (!tx?.$queryRaw) return;
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1006}, ${Number(receiptId)})`;
 };
 
 const sendError = (res, error, fallbackMessage) =>
   res.status(error?.statusCode || 500).json({
     success: false,
     message: error?.message || fallbackMessage || 'เกิดข้อผิดพลาดภายในระบบ',
+    ...(error?.code ? { code: error.code } : {}),
   });
 
 const cancelCustomerReceipt = async (req, res) => {
@@ -64,6 +46,7 @@ const cancelCustomerReceipt = async (req, res) => {
 
     const cancelledReceipt = await prisma.$transaction(async (tx) => {
       await ensureEmployeeBelongsToBranchOrThrow(tx, { employeeProfileId, branchId });
+      await acquireCustomerReceiptCancellationLock(tx, receiptId);
 
       const receipt = await tx.customerReceipt.findFirst({
         where: {
@@ -72,34 +55,7 @@ const cancelCustomerReceipt = async (req, res) => {
         },
         include: {
           allocations: {
-            include: {
-              sale: {
-                include: {
-                  items: {
-                    include: {
-                      stockItem: {
-                        include: {
-                          product: {
-                            include: {
-                              unit: true,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                  simpleItems: {
-                    include: {
-                      product: {
-                        include: {
-                          unit: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
+            select: { id: true, saleId: true },
             orderBy: { id: 'asc' },
           },
         },
@@ -111,33 +67,36 @@ const cancelCustomerReceipt = async (req, res) => {
         throw error;
       }
 
+      if (String(receipt.code || '').startsWith('CMR-')) {
+        const error = new Error('ใบรับเงิน Customer Money ต้องยกเลิกผ่านหน้ารับเงิน Customer Money เท่านั้น');
+        error.statusCode = 409;
+        error.code = 'CUSTOMER_MONEY_RECEIPT_LEGACY_CANCEL_FORBIDDEN';
+        throw error;
+      }
+
       if (receipt.status === RECEIPT_STATUS.CANCELLED) {
         const error = new Error('รายการรับชำระนี้ถูกยกเลิกไปแล้ว');
         error.statusCode = 400;
         throw error;
       }
 
-      for (const allocation of receipt.allocations) {
-        const currentSalePaidAmount = roundMoney(allocation.sale?.paidAmount || 0);
-        const nextSalePaidAmount = roundMoney(
-          currentSalePaidAmount - roundMoney(allocation.amount)
-        );
+      const saleIds = [...new Set(
+        (receipt.allocations || [])
+          .map((allocation) => Number(allocation.saleId))
+          .filter(Number.isInteger),
+      )].sort((left, right) => left - right);
 
-        await tx.sale.update({
-          where: { id: allocation.saleId },
-          data: {
-            paidAmount: nextSalePaidAmount < 0 ? 0 : nextSalePaidAmount,
-          },
-        });
-
-        await recalculateSalePaymentState(tx, allocation.saleId);
+      // Lock every affected sale in deterministic order before deleting payment evidence.
+      // Other Payment/Settlement writers use the same sale-level advisory lock.
+      for (const saleId of saleIds) {
+        await acquireSalePaymentProjectionLock(tx, saleId);
       }
 
       await tx.customerReceiptAllocation.deleteMany({
         where: { receiptId },
       });
 
-      return tx.customerReceipt.update({
+      const cancelled = await tx.customerReceipt.update({
         where: { id: receiptId },
         data: {
           status: RECEIPT_STATUS.CANCELLED,
@@ -149,6 +108,12 @@ const cancelCustomerReceipt = async (req, res) => {
         },
         include: receiptInclude,
       });
+
+      for (const saleId of saleIds) {
+        await projectSalePaymentStatus(tx, saleId);
+      }
+
+      return cancelled;
     });
 
     return res.status(200).json({
@@ -162,4 +127,7 @@ const cancelCustomerReceipt = async (req, res) => {
   }
 };
 
-module.exports = { cancelCustomerReceipt };
+module.exports = {
+  cancelCustomerReceipt,
+  acquireCustomerReceiptCancellationLock,
+};
