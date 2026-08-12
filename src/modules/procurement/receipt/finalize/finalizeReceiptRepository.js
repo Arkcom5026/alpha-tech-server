@@ -1,6 +1,52 @@
 const { prisma } = require('../../../../../lib/prisma');
 
 const isLotRow = (row) => row?.kind === 'LOT' || row?.simpleLotId != null;
+const toNumber = (value) => Number(value?.toString?.() ?? value ?? 0);
+
+const isInventoryReceivedRow = (row) => {
+  if (isLotRow(row)) {
+    return row?.simpleLotId != null && String(row?.status || '').toUpperCase() === 'SN_RECEIVED';
+  }
+  return row?.stockItemId != null;
+};
+
+const computePoStatusFromItems = (items = []) => {
+  const rows = Array.isArray(items) ? items : [];
+  if (rows.length === 0) return 'PENDING';
+
+  let totalOrdered = 0;
+  let totalReceived = 0;
+
+  for (const item of rows) {
+    const ordered = Math.max(0, toNumber(item?.quantity));
+    totalOrdered += ordered;
+
+    let receivedForItem = 0;
+    const receiptItems = Array.isArray(item?.receipts) ? item.receipts : [];
+
+    for (const receiptItem of receiptItems) {
+      const receiptQty = Math.max(0, toNumber(receiptItem?.quantity));
+      const barcodeRows = Array.isArray(receiptItem?.barcodeReceiptItem)
+        ? receiptItem.barcodeReceiptItem
+        : [];
+      const lotRows = barcodeRows.filter(isLotRow);
+
+      if (lotRows.length > 0) {
+        if (lotRows.some(isInventoryReceivedRow)) receivedForItem += receiptQty;
+        continue;
+      }
+
+      const receivedUnits = barcodeRows.filter(isInventoryReceivedRow).length;
+      receivedForItem += Math.min(receiptQty, receivedUnits);
+    }
+
+    totalReceived += Math.min(ordered, receivedForItem);
+  }
+
+  if (totalOrdered <= 0 || totalReceived <= 0) return 'PENDING';
+  if (totalReceived < totalOrdered) return 'PARTIALLY_RECEIVED';
+  return 'COMPLETED';
+};
 
 const findReceipt = ({ id, branchId }) =>
   prisma.purchaseOrderReceipt.findFirst({
@@ -17,8 +63,8 @@ const getPendingCounts = async (receiptId, client = prisma) => {
   let pendingLOT = 0;
   for (const row of rows) {
     if (isLotRow(row)) {
-      if ((row.status || null) !== 'SN_RECEIVED') pendingLOT += 1;
-    } else if (row.stockItemId == null) {
+      if (!isInventoryReceivedRow(row)) pendingLOT += 1;
+    } else if (!isInventoryReceivedRow(row)) {
       pendingSN += 1;
     }
   }
@@ -26,31 +72,54 @@ const getPendingCounts = async (receiptId, client = prisma) => {
 };
 
 const computePoStatus = async (purchaseOrderId, client = prisma) => {
-  const rows = await client.barcodeReceiptItem.findMany({
-    where: { receiptItem: { receipt: { purchaseOrderId } } },
-    select: { kind: true, status: true, stockItemId: true, simpleLotId: true },
+  if (!purchaseOrderId) return 'PENDING';
+
+  const items = await client.purchaseOrderItem.findMany({
+    where: { purchaseOrderId },
+    select: {
+      quantity: true,
+      receipts: {
+        select: {
+          quantity: true,
+          barcodeReceiptItem: {
+            select: { kind: true, status: true, stockItemId: true, simpleLotId: true },
+          },
+        },
+      },
+    },
   });
-  if (rows.length === 0) return 'PENDING';
-  const done = rows.filter((row) => isLotRow(row) ? row.status === 'SN_RECEIVED' : row.stockItemId != null).length;
-  if (done === 0) return 'PENDING';
-  if (done < rows.length) return 'PARTIALLY_RECEIVED';
-  return 'COMPLETED';
+
+  return computePoStatusFromItems(items);
+};
+
+const syncPoStatus = async (purchaseOrderId, client = prisma) => {
+  if (!purchaseOrderId) return 'PENDING';
+  const poStatus = await computePoStatus(purchaseOrderId, client);
+  await client.purchaseOrder.update({
+    where: { id: purchaseOrderId },
+    data: { status: poStatus },
+  });
+  return poStatus;
 };
 
 const finalize = ({ id, purchaseOrderId }) =>
   prisma.$transaction(async (tx) => {
+    const poStatus = await syncPoStatus(purchaseOrderId, tx);
+
     await tx.purchaseOrderReceipt.update({
       where: { id },
       data: { statusReceipt: 'COMPLETED' },
     });
-    let poStatus = 'PENDING';
-    try {
-      poStatus = await computePoStatus(purchaseOrderId, tx);
-      await tx.purchaseOrder.update({ where: { id: purchaseOrderId }, data: { status: poStatus } });
-    } catch (error) {
-      console.warn('[finalizeReceipt] purchaseOrder.status not updated:', error?.code || error?.message);
-    }
+
     return { poStatus };
   });
 
-module.exports = { findReceipt, getPendingCounts, computePoStatus, finalize };
+module.exports = {
+  findReceipt,
+  getPendingCounts,
+  computePoStatus,
+  computePoStatusFromItems,
+  syncPoStatus,
+  finalize,
+  isInventoryReceivedRow,
+};
