@@ -38,6 +38,35 @@ const serialize = (record) => record ? ({
   lines: serializeLines(record.lines || []),
 }) : null;
 
+const getGeneratedDocumentSummary = async ({ prisma, branchId, settlementId }) => {
+  if (!prisma?.customerMoneySettlementGeneratedDocument) return null;
+  const link = await prisma.customerMoneySettlementGeneratedDocument.findUnique({
+    where: { settlementId: Number(settlementId) },
+  });
+  if (!link || Number(link.branchId) !== Number(branchId)) return null;
+  const document = await prisma.combinedBillingDocument.findFirst({
+    where: { id: link.combinedBillingId, branchId: Number(branchId) },
+    select: {
+      id: true,
+      code: true,
+      issueDate: true,
+      status: true,
+      totalAmount: true,
+      _count: { select: { documentLines: true } },
+    },
+  });
+  if (!document) return null;
+  return {
+    id: document.id,
+    code: document.code,
+    issueDate: document.issueDate,
+    status: document.status,
+    totalAmount: toNumber(document.totalAmount),
+    lineCount: document._count.documentLines,
+    generationStatus: link.status,
+  };
+};
+
 const listDeliveryCreditSettlements = async ({ prisma, user, query = {} }) => {
   const branchId = Number(user?.branchId);
   const customerId = Number(query.customerId);
@@ -64,21 +93,24 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
 
   const result = serialize(row);
   const saleIds = [...new Set((result.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
-  const sales = saleIds.length ? await prisma.sale.findMany({
-    where: { id: { in: saleIds }, branchId },
-    select: {
-      id: true,
-      code: true,
-      officialDocumentNumber: true,
-      totalAmount: true,
-      paidAmount: true,
-      statusPayment: true,
-      paid: true,
-      paidAt: true,
-      isCredit: true,
-      status: true,
-    },
-  }) : [];
+  const [sales, generatedDocument] = await Promise.all([
+    saleIds.length ? prisma.sale.findMany({
+      where: { id: { in: saleIds }, branchId },
+      select: {
+        id: true,
+        code: true,
+        officialDocumentNumber: true,
+        totalAmount: true,
+        paidAmount: true,
+        statusPayment: true,
+        paid: true,
+        paidAt: true,
+        isCredit: true,
+        status: true,
+      },
+    }) : [],
+    getGeneratedDocumentSummary({ prisma, branchId, settlementId }),
+  ]);
 
   result.salePaymentStates = sales.map((sale) => ({
     saleId: sale.id,
@@ -92,6 +124,7 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
     paidAt: sale.paidAt,
     taxDocumentReady: sale.isCredit === true && sale.status !== 'CANCELLED' && sale.statusPayment === 'PAID',
   }));
+  result.generatedDocument = generatedDocument;
 
   return result;
 };
@@ -99,6 +132,7 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
 module.exports = {
   serialize,
   serializeLines,
+  getGeneratedDocumentSummary,
   listDeliveryCreditSettlements,
   getDeliveryCreditSettlement,
 };
