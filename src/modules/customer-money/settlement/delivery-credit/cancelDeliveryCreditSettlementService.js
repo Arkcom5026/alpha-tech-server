@@ -104,7 +104,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     let settlement = await getSettlement({ client: tx, id: settlementId, branchId });
     if (!settlement) throw buildError('ไม่พบเอกสารตัดยอดใบส่งของ', 404, 'SETTLEMENT_NOT_FOUND');
 
-    await acquireCustomerMoneyTransactionLock(tx, settlement.customerId);
+    await acquireCustomerMoneyTransactionLock(tx, settlement.customerId, settlement.branchId);
     await ensureEmployee(tx, branchId, employeeId);
 
     settlement = await getSettlement({ client: tx, id: settlementId, branchId });

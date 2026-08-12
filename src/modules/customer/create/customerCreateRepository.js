@@ -2,6 +2,7 @@ const { prisma } = require('../../../../lib/prisma');
 const {
   buildCustomerBranchAccessWhere,
 } = require('../policies/customerBranchAccessPolicy');
+const { validateFinancialOwnerLink } = require('../financial-group/customerFinancialGroupResolver');
 
 const includeCustomerGraph = {
   user: true,
@@ -58,6 +59,13 @@ function createCustomerProfile({
           },
         });
 
+    if (customer.financialOwnerCustomerId) {
+      await validateFinancialOwnerLink(tx, {
+        customer: { id: 0, type: customer.type, companyName: customer.companyName, taxId: customer.taxId },
+        ownerId: customer.financialOwnerCustomerId,
+        branchId,
+      });
+    }
     return tx.customerProfile.create({
       data: {
         name: customer.name,
@@ -65,6 +73,8 @@ function createCustomerProfile({
         branchId: Number(branchId),
         type: customer.type || 'INDIVIDUAL',
         companyName: customer.companyName || null,
+        departmentName: customer.type === 'INDIVIDUAL' ? null : (customer.departmentName || null),
+        financialOwnerCustomerId: customer.type === 'INDIVIDUAL' ? null : (customer.financialOwnerCustomerId || null),
         taxId: customer.taxId || null,
         addressDetail:
           typeof customer.addressDetail === 'string' ? customer.addressDetail.trim() : null,

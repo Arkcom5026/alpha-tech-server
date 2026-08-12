@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const sql = fs.readFileSync(path.join(__dirname, 'migration.sql'), 'utf8');
+assert.match(sql, /ADD COLUMN "departmentName" TEXT/);
+assert.match(sql, /ADD COLUMN "financialOwnerCustomerId" INTEGER/);
+assert.match(sql, /ON DELETE RESTRICT/);
+assert.doesNotMatch(sql, /DROP|TRUNCATE|DELETE FROM/i);
+console.log('customer financial group migration contract: ok');
