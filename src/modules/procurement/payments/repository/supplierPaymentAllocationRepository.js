@@ -14,7 +14,7 @@ const createConfirmed = async ({
   note,
   allocations,
 }, tx) => {
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28071930, ${Number(branchId)})`);
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28071930::int, ${Number(branchId)}::int)`);
   const payableIds = allocations.map((item) => Number(item.payableId));
   const payables = await tx.$queryRaw(Prisma.sql`
     SELECT *

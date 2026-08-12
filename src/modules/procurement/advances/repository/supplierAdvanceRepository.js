@@ -55,7 +55,7 @@ const list = async ({ branchId, supplierId = null, status = null, limit = 100 },
 const create = async ({
   branchId, supplierId, employeeId, paidAt, method, paymentRef, note, amount,
 }, tx) => {
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072030, ${Number(branchId)})`);
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072030::int, ${Number(branchId)}::int)`);
   const suppliers = await tx.$queryRaw(Prisma.sql`
     SELECT "id" FROM "Supplier"
     WHERE "id" = ${Number(supplierId)} AND "branchId" = ${Number(branchId)} AND "active" = true

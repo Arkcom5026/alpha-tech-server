@@ -96,7 +96,7 @@ const createAdjustment = async ({
   if (nextTotal < Number(payable.paidAmount) - 0.01 || nextTotal < 0) {
     fail('Credit adjustment exceeds unpaid payable balance', 'SUPPLIER_ADJUSTMENT_EXCEEDS_BALANCE');
   }
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072130, ${Number(branchId)})`);
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072130::int, ${Number(branchId)}::int)`);
   const countRows = await tx.$queryRaw(Prisma.sql`
     SELECT COUNT(*)::int AS count FROM "SupplierPayableAdjustment"
     WHERE "branchId" = ${Number(branchId)} AND "createdAt" >= date_trunc('month', CURRENT_TIMESTAMP)

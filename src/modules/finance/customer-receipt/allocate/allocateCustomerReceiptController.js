@@ -52,7 +52,7 @@ const findSaleOrThrow = async (tx, { saleId, branchId }) => {
 
 const acquireCustomerReceiptAllocationLock = async (tx, receiptId) => {
   if (!tx?.$queryRaw) return;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1006}, ${Number(receiptId)})`;
+  await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1006}::int, ${Number(receiptId)}::int)) AS advisory_lock`;
 };
 
 const sendError = (res, error, fallbackMessage) =>

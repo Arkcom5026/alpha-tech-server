@@ -115,7 +115,7 @@ const replaceLines = async (tx, { heldCartId, branchId, employeeId, items }) => 
 };
 
 const create = async ({ branchId, employeeId, snapshot }, tx) => {
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072230, ${Number(branchId)})`);
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28072230::int, ${Number(branchId)}::int)`);
   const month = new Date().toISOString().slice(2, 7).replace('-', '');
   const counts = await tx.$queryRaw(Prisma.sql`
     SELECT COUNT(*)::int AS count FROM "PosHeldCart"

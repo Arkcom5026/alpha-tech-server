@@ -46,7 +46,7 @@ const serializeReceipt = (receipt) => ({
 
 const createDocumentCode = async (tx, branchId, receivedAt) => {
   if (tx?.$queryRaw) {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1004}, ${Number(branchId)})`;
+    await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1004}::int, ${Number(branchId)}::int)) AS advisory_lock`;
   }
   const date = receivedAt || new Date();
   const yy = String(date.getFullYear()).slice(-2);

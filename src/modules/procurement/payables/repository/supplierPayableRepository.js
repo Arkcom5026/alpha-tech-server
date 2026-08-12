@@ -114,7 +114,7 @@ const createFromReceipts = async ({
   note,
   createdById,
 }, tx) => {
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28071830, ${Number(branchId)})`);
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(28071830::int, ${Number(branchId)}::int)`);
 
   const suppliers = await tx.$queryRaw(Prisma.sql`
     SELECT "id" FROM "Supplier"

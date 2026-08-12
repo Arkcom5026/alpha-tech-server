@@ -54,7 +54,7 @@ const acquireSettlementCommandLock = async (tx, commandKey) => {
   if (!commandKey || !tx?.$queryRaw) return;
   const digest = crypto.createHash('sha256').update(commandKey).digest();
   const lockId = digest.readInt32BE(0);
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1005}, ${lockId})`;
+  await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1005}::int, ${lockId}::int)) AS advisory_lock`;
 };
 
 const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => (
@@ -62,7 +62,7 @@ const acquireCustomerMoneySettlementLock = (tx, _branchId, customerId) => (
 );
 
 const buildCode = async (tx, branchId, settledAt = new Date()) => {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1002}, ${Number(branchId)})`;
+  await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1002}::int, ${Number(branchId)}::int)) AS advisory_lock`;
   const yy = String(settledAt.getFullYear()).slice(-2);
   const mm = String(settledAt.getMonth() + 1).padStart(2, '0');
   const dd = String(settledAt.getDate()).padStart(2, '0');

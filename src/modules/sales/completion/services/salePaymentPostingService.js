@@ -90,7 +90,7 @@ const consumeDeposit = async (tx, { item, sale, paymentId, branchId }) => {
 
 const acquireSalePaymentProjectionLock = async (tx, saleId) => {
   if (!tx?.$queryRaw) return;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${-1001}, ${Number(saleId)})`;
+  await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1001}::int, ${Number(saleId)}::int)) AS advisory_lock`;
 };
 
 const aggregateActiveSettlementAmount = async (tx, saleId) => {

@@ -14,7 +14,7 @@ const acquireCustomerMoneyTransactionLock = async (client, customerId, branchId)
     const group = await resolveFinancialCustomerGroup(client, { customerId: normalizedCustomerId, branchId });
     lockCustomerId = group.ownerId;
   }
-  await client.$queryRaw`SELECT pg_advisory_xact_lock(${CUSTOMER_MONEY_LOCK_NAMESPACE}, ${lockCustomerId})`;
+  await client.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${CUSTOMER_MONEY_LOCK_NAMESPACE}::int, ${lockCustomerId}::int)) AS advisory_lock`;
   return lockCustomerId;
 };
 
