@@ -7,20 +7,36 @@ const D = (value) => (value instanceof Prisma.Decimal ? value : new Prisma.Decim
 const number = (value) => Number(value || 0);
 const keyOf = (lineType, lineId) => `${String(lineType || '').toUpperCase()}:${Number(lineId)}`;
 
-const loadSettlementGeneratedDocument = async (tx, { branchId, settlementId }) => {
-  if (!tx?.customerMoneySettlementGeneratedDocument) return null;
-  const link = await tx.customerMoneySettlementGeneratedDocument.findUnique({
-    where: { settlementId: Number(settlementId) },
+const findSettlementGeneratedDocumentAnchor = async (tx, { branchId, settlementId }) => {
+  if (!tx?.consolidatedDeliveryLine?.findFirst) return null;
+  return tx.consolidatedDeliveryLine.findFirst({
+    where: {
+      branchId: Number(branchId),
+      sourceSnapshot: {
+        path: ['completedBySettlementId'],
+        equals: Number(settlementId),
+      },
+    },
+    select: { combinedBillingId: true, status: true },
+    orderBy: { id: 'asc' },
   });
-  if (!link || Number(link.branchId) !== Number(branchId)) return null;
+};
+
+const loadSettlementGeneratedDocument = async (tx, { branchId, settlementId }) => {
+  const anchor = await findSettlementGeneratedDocumentAnchor(tx, { branchId, settlementId });
+  if (!anchor) return null;
   const document = await tx.combinedBillingDocument.findFirst({
-    where: { id: link.combinedBillingId, branchId: Number(branchId) },
+    where: { id: anchor.combinedBillingId, branchId: Number(branchId) },
     include: {
       customer: { select: { id: true, name: true, companyName: true, departmentName: true, taxId: true } },
       documentLines: { orderBy: { id: 'asc' } },
     },
   });
-  return document ? { ...document, generationStatus: link.status } : null;
+  if (!document) return null;
+  return {
+    ...document,
+    generationStatus: anchor.status === 'CANCELLED' || document.status === 'CANCELLED' ? 'CANCELLED' : 'ACTIVE',
+  };
 };
 
 const acquireGeneratedDeliveryCodeLock = async (tx, branchId) => {
@@ -43,13 +59,6 @@ const createSettlementConsolidatedDelivery = async ({
   prepared,
   note,
 }) => {
-  if (!tx?.customerMoneySettlementGeneratedDocument) {
-    const error = new Error('Prisma Client ยังไม่มี Settlement Generated Document authority กรุณารัน prisma generate หลังใช้ migration ของวาระนี้');
-    error.code = 'SETTLEMENT_DOCUMENT_AUTHORITY_NOT_READY';
-    error.statusCode = 503;
-    throw error;
-  }
-
   const existing = await loadSettlementGeneratedDocument(tx, { branchId, settlementId });
   if (existing) return existing;
 
@@ -76,10 +85,9 @@ const createSettlementConsolidatedDelivery = async ({
     error.statusCode = 409;
     throw error;
   }
-  // The current ConsolidatedDeliveryLine schema intentionally keeps one immutable
-  // source-line identity for audit. If a previous generated document was cancelled,
-  // financial settlement may proceed again, but automatic re-issuance is skipped
-  // rather than violating that immutable key or overwriting historical evidence.
+  // ConsolidatedDeliveryLine keeps one immutable source-line identity for audit.
+  // If a previous generated document was cancelled, financial settlement may proceed
+  // again, but automatic re-issuance is skipped instead of overwriting history.
   if (priorDocumentLines.length > 0) return null;
 
   const totalAmount = prepared.reduce((sum, item) => sum.plus(D(item.snapshot.lineAmount)), D(0));
@@ -140,21 +148,13 @@ const createSettlementConsolidatedDelivery = async ({
     },
   });
 
-  await tx.customerMoneySettlementGeneratedDocument.create({
-    data: {
-      branchId: Number(branchId),
-      settlementId: Number(settlementId),
-      combinedBillingId: document.id,
-      status: 'ACTIVE',
-    },
-  });
-
   return { ...document, generationStatus: 'ACTIVE' };
 };
 
 module.exports = {
   createSettlementConsolidatedDelivery,
   loadSettlementGeneratedDocument,
+  findSettlementGeneratedDocumentAnchor,
   acquireGeneratedDeliveryCodeLock,
   isAutoConsolidationBatch,
   keyOf,
