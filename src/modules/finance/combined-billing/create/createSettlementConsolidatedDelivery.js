@@ -53,31 +53,34 @@ const createSettlementConsolidatedDelivery = async ({
   const existing = await loadSettlementGeneratedDocument(tx, { branchId, settlementId });
   if (existing) return existing;
 
-  // Auto completion is reserved for the exact business case this boundary owns:
-  // one settlement intentionally combines at least two source deliveries and every
-  // selected line becomes PAID_READY. Single-delivery or partial-payment flows keep
-  // the original delivery/manual workspace semantics instead of creating duplicates.
+  // Auto completion owns only a complete multi-delivery batch. A single source
+  // delivery or a batch that still contains partial lines keeps the original/manual
+  // document path, avoiding duplicate or prematurely-finalized delivery documents.
   if (!isAutoConsolidationBatch(prepared)) return null;
 
   const sourceKeys = prepared.map((item) => ({
     sourceLineType: item.requested.lineType,
     sourceLineId: item.requested.saleItemId,
   }));
-  const documented = await tx.consolidatedDeliveryLine.findMany({
+  const priorDocumentLines = await tx.consolidatedDeliveryLine.findMany({
     where: {
       branchId: Number(branchId),
-      status: 'DOCUMENTED',
       OR: sourceKeys,
     },
-    select: { sourceLineType: true, sourceLineId: true },
+    select: { sourceLineType: true, sourceLineId: true, status: true, combinedBillingId: true },
   });
-  const documentedKeys = new Set(documented.map((row) => keyOf(row.sourceLineType, row.sourceLineId)));
-  if (documentedKeys.size > 0) {
+  const activeDocumentLine = priorDocumentLines.find((row) => row.status === 'DOCUMENTED');
+  if (activeDocumentLine) {
     const error = new Error('มีรายการในชุดตัดยอดนี้ถูกนำไปสร้างใบส่งของรวมแล้ว กรุณาตรวจสอบเอกสารเดิม');
     error.code = 'SETTLEMENT_SOURCE_ALREADY_DOCUMENTED';
     error.statusCode = 409;
     throw error;
   }
+  // The current ConsolidatedDeliveryLine schema intentionally keeps one immutable
+  // source-line identity for audit. If a previous generated document was cancelled,
+  // financial settlement may proceed again, but automatic re-issuance is skipped
+  // rather than violating that immutable key or overwriting historical evidence.
+  if (priorDocumentLines.length > 0) return null;
 
   const totalAmount = prepared.reduce((sum, item) => sum.plus(D(item.snapshot.lineAmount)), D(0));
   await acquireGeneratedDeliveryCodeLock(tx, branchId);
