@@ -15,8 +15,9 @@ test('barcode print repository uses the canonical destructured Prisma singleton 
   assert.doesNotMatch(source, /const\s+prisma\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/prisma['"]\)/);
 });
 
-test('markReceiptPrinted performs both updates through the callback transaction client', () => {
-  assert.match(source, /prisma\.\$transaction\(async\s*\(tx\)\s*=>\s*\{/);
-  assert.match(source, /tx\.barcodeReceiptItem\.updateMany/);
-  assert.match(source, /tx\.purchaseOrderReceipt\.updateMany/);
+test('markReceiptPrinted uses root delegates and preserves the service tuple contract', () => {
+  assert.match(source, /prisma\.barcodeReceiptItem\.updateMany/);
+  assert.match(source, /prisma\.purchaseOrderReceipt\.updateMany/);
+  assert.doesNotMatch(source, /prisma\.\$transaction\(async\s*\(tx\)/);
+  assert.match(source, /return\s*\[\s*barcodeResult\s*,\s*receiptResult\s*\]/);
 });

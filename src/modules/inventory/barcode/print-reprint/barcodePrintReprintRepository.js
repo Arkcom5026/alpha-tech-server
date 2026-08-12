@@ -37,18 +37,24 @@ const findProductsByIds = (ids) =>
     select: { id: true, name: true },
   });
 
-const markReceiptPrinted = (branchId, purchaseOrderReceiptId) =>
-  prisma.$transaction(async (tx) => {
-    const barcodeResult = await tx.barcodeReceiptItem.updateMany({
-      where: { branchId, purchaseOrderReceiptId, printed: false },
-      data: { printed: true },
-    });
-    const receiptResult = await tx.purchaseOrderReceipt.updateMany({
-      where: { id: purchaseOrderReceiptId, branchId },
-      data: { printed: true },
-    });
-    return { barcodeResult, receiptResult };
+// Print confirmation is operational metadata and deliberately idempotent.
+// Use the root Prisma delegates directly instead of the stock-movement
+// transaction proxy. If the second update ever fails, retrying is safe:
+// the barcode update becomes a no-op and the receipt update is retried.
+const markReceiptPrinted = async (branchId, purchaseOrderReceiptId) => {
+  const barcodeResult = await prisma.barcodeReceiptItem.updateMany({
+    where: { branchId, purchaseOrderReceiptId, printed: false },
+    data: { printed: true },
   });
+
+  const receiptResult = await prisma.purchaseOrderReceipt.updateMany({
+    where: { id: purchaseOrderReceiptId, branchId },
+    data: { printed: true },
+  });
+
+  // Preserve the existing service contract.
+  return [barcodeResult, receiptResult];
+};
 
 const findReceiptsWaitingForPrint = (branchId) =>
   prisma.purchaseOrderReceipt.findMany({
