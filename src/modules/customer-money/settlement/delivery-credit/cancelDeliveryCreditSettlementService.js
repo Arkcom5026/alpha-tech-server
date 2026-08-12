@@ -91,6 +91,63 @@ const ensureNoTaxDocumentAuthority = async (tx, { branchId, saleIds }) => {
   }
 };
 
+const cancelGeneratedConsolidatedDelivery = async (tx, { branchId, settlementId, cancelledAt }) => {
+  if (!tx?.customerMoneySettlementGeneratedDocument) return null;
+  const link = await tx.customerMoneySettlementGeneratedDocument.findUnique({
+    where: { settlementId: Number(settlementId) },
+  });
+  if (!link || Number(link.branchId) !== Number(branchId)) return null;
+
+  const document = await tx.combinedBillingDocument.findFirst({
+    where: { id: link.combinedBillingId, branchId: Number(branchId) },
+    select: { id: true, code: true, status: true },
+  });
+  if (!document) {
+    throw buildError('ไม่พบใบส่งของรวมที่สร้างจากเอกสารตัดยอดนี้', 409, 'SETTLEMENT_GENERATED_DOCUMENT_MISSING');
+  }
+  if (document.status === 'PAID') {
+    throw buildError('ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบส่งของรวมมีสถานะทางการเงินปลายทางแล้ว', 409, 'SETTLEMENT_GENERATED_DOCUMENT_FINALIZED');
+  }
+
+  const candidates = await tx.taxCandidate.findMany({
+    where: {
+      branchId: Number(branchId),
+      sourceType: 'CONSOLIDATED_DELIVERY',
+      sourceId: String(document.id),
+    },
+    select: { id: true },
+  });
+  if (candidates.length) {
+    const taxDocument = await tx.taxDocument.findFirst({
+      where: {
+        branchId: Number(branchId),
+        candidateId: { in: candidates.map((candidate) => candidate.id) },
+        status: { notIn: ['CANCELLED', 'ARCHIVED'] },
+      },
+      select: { id: true, status: true, issuedDocumentNumber: true },
+    });
+    if (taxDocument) {
+      throw buildError('ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบส่งของรวมถูกนำไปจัดทำเอกสารภาษีแล้ว', 409, 'SETTLEMENT_GENERATED_DOCUMENT_TAX_EXISTS');
+    }
+  }
+
+  if (document.status !== 'CANCELLED') {
+    await tx.consolidatedDeliveryLine.updateMany({
+      where: { combinedBillingId: document.id, status: 'DOCUMENTED' },
+      data: { status: 'CANCELLED' },
+    });
+    await tx.combinedBillingDocument.update({
+      where: { id: document.id },
+      data: { status: 'CANCELLED' },
+    });
+  }
+  await tx.customerMoneySettlementGeneratedDocument.update({
+    where: { id: link.id },
+    data: { status: 'CANCELLED', cancelledAt },
+  });
+  return document;
+};
+
 const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }) => {
   const branchId = Number(user?.branchId);
   const employeeId = Number(user?.employeeId);
@@ -127,6 +184,9 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     await ensureNoDownstreamDocumentAuthority(tx, { branchId, saleIds });
     await ensureNoTaxDocumentAuthority(tx, { branchId, saleIds });
 
+    const cancelledAt = new Date();
+    await cancelGeneratedConsolidatedDelivery(tx, { branchId, settlementId: settlement.id, cancelledAt });
+
     const applications = [...new Map(
       (settlement.lines || [])
         .map((line) => line.application)
@@ -152,7 +212,6 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
       }
     }
 
-    const cancelledAt = new Date();
     await tx.customerMoneySettlement.update({
       where: { id: settlement.id },
       data: {
@@ -208,5 +267,6 @@ module.exports = {
   cancelDeliveryCreditSettlement,
   ensureNoDownstreamDocumentAuthority,
   ensureNoTaxDocumentAuthority,
+  cancelGeneratedConsolidatedDelivery,
   SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS,
 };
