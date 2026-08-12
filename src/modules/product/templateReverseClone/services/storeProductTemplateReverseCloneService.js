@@ -107,44 +107,6 @@ const templateMatchSelect = {
   unit: { select: { id: true, name: true } },
 }
 
-const resolveMatchingTemplateBranch = async ({ sourceBranchId, db }) => {
-  const sourceBranch = await db.branch.findUnique({
-    where: { id: Number(sourceBranchId) },
-    select: { id: true, name: true, branchCode: true, businessType: true, categoryId: true },
-  })
-  if (!sourceBranch) throw makeError('SOURCE_BRANCH_NOT_FOUND', 404)
-
-  const templateBranchCode = resolveTemplateBranchCode(sourceBranch.businessType)
-  if (!templateBranchCode) {
-    return {
-      supported: false,
-      sourceBranch,
-      templateBranch: null,
-      reason: 'TEMPLATE_BRANCH_MAPPING_NOT_CONFIGURED',
-    }
-  }
-
-  const templateBranch = await db.branch.findFirst({
-    where: { branchCode: templateBranchCode },
-    select: { id: true, name: true, branchCode: true, businessType: true, categoryId: true },
-    orderBy: { id: 'asc' },
-  })
-  if (!templateBranch) throw makeError('TEMPLATE_BRANCH_NOT_FOUND', 409)
-  if (Number(templateBranch.id) === Number(sourceBranch.id)) {
-    throw makeError('SOURCE_BRANCH_IS_TEMPLATE_BRANCH', 409)
-  }
-  if (Number(templateBranch.categoryId) !== Number(sourceBranch.categoryId)) {
-    throw makeError('SOURCE_TEMPLATE_CATEGORY_MISMATCH', 409, 'Source store and Template Store category do not match', {
-      sourceBranchId: sourceBranch.id,
-      sourceCategoryId: sourceBranch.categoryId,
-      templateBranchId: templateBranch.id,
-      templateCategoryId: templateBranch.categoryId,
-    })
-  }
-
-  return { supported: true, sourceBranch, templateBranch, reason: null }
-}
-
 const findSourceProduct = ({ sourceProductId, sourceBranchId, db }) =>
   db.product.findFirst({
     where: {
@@ -157,6 +119,80 @@ const findSourceProduct = ({ sourceProductId, sourceBranchId, db }) =>
     },
     select: sourceProductSelect,
   })
+
+const resolveMatchingTemplateBranch = async ({ sourceBranchId, sourceProduct, db }) => {
+  const sourceBranch = await db.branch.findUnique({
+    where: { id: Number(sourceBranchId) },
+    select: { id: true, name: true, branchCode: true, businessType: true, categoryId: true },
+  })
+  if (!sourceBranch) throw makeError('SOURCE_BRANCH_NOT_FOUND', 404)
+
+  const productCategoryId = Number(sourceProduct?.productType?.globalProductType?.categoryId) || null
+  if (!productCategoryId) {
+    throw makeError('SOURCE_PRODUCT_GLOBAL_CATEGORY_REQUIRED', 409, 'Source Product must have GlobalProductType category authority')
+  }
+
+  const preferredBranchCode = resolveTemplateBranchCode(sourceBranch.businessType)
+  const branchCodes = Array.from(
+    new Set([preferredBranchCode, DEFAULT_TEMPLATE_BRANCH_CODE].filter(Boolean))
+  )
+
+  let templateBranch = null
+  for (const branchCode of branchCodes) {
+    templateBranch = await db.branch.findFirst({
+      where: {
+        branchCode,
+        categoryId: productCategoryId,
+      },
+      select: { id: true, name: true, branchCode: true, businessType: true, categoryId: true },
+      orderBy: { id: 'asc' },
+    })
+    if (templateBranch) break
+  }
+
+  if (!templateBranch) {
+    templateBranch = await db.branch.findFirst({
+      where: {
+        categoryId: productCategoryId,
+        branchCode: { startsWith: 'T' },
+      },
+      select: { id: true, name: true, branchCode: true, businessType: true, categoryId: true },
+      orderBy: [{ branchCode: 'asc' }, { id: 'asc' }],
+    })
+  }
+
+  if (!templateBranch) {
+    return {
+      supported: false,
+      sourceBranch,
+      templateBranch: null,
+      productCategoryId,
+      reason: 'TEMPLATE_BRANCH_MAPPING_NOT_CONFIGURED',
+    }
+  }
+
+  if (Number(templateBranch.id) === Number(sourceBranch.id)) {
+    throw makeError('SOURCE_BRANCH_IS_TEMPLATE_BRANCH', 409)
+  }
+
+  if (Number(templateBranch.categoryId) !== productCategoryId) {
+    throw makeError('PRODUCT_TEMPLATE_CATEGORY_MISMATCH', 409, 'Product Global category and Template Store category do not match', {
+      sourceBranchId: sourceBranch.id,
+      sourceBranchCategoryId: sourceBranch.categoryId,
+      productCategoryId,
+      templateBranchId: templateBranch.id,
+      templateCategoryId: templateBranch.categoryId,
+    })
+  }
+
+  return {
+    supported: true,
+    sourceBranch,
+    templateBranch,
+    productCategoryId,
+    reason: null,
+  }
+}
 
 const findLinkedTemplateProduct = ({ templateProductId, templateBranchId, db }) => {
   if (!templateProductId) return null
@@ -192,18 +228,13 @@ const findExactTemplateProduct = async ({ sourceProduct, templateBranchId, db })
 
 const buildReverseCloneLockKey = ({ sourceProduct, templateBranchId }) => {
   const fingerprint = buildCatalogFingerprint(sourceProduct)
-  if (!fingerprint) {
-    throw makeError('SOURCE_PRODUCT_FINGERPRINT_REQUIRED', 409)
-  }
+  if (!fingerprint) throw makeError('SOURCE_PRODUCT_FINGERPRINT_REQUIRED', 409)
   return `product-template-reverse-clone:${Number(templateBranchId)}:${fingerprint}`
 }
 
 const acquireReverseCloneFingerprintLock = async ({ sourceProduct, templateBranchId, db }) => {
   const lockKey = buildReverseCloneLockKey({ sourceProduct, templateBranchId })
-  await db.$queryRawUnsafe(
-    'SELECT pg_advisory_xact_lock(hashtext($1))',
-    lockKey
-  )
+  await db.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', lockKey)
   return lockKey
 }
 
@@ -412,7 +443,18 @@ const reverseCloneStoreProductToMatchingTemplate = async ({
   if (!Number.isInteger(sourceBranch) || sourceBranch <= 0) throw makeError('SOURCE_BRANCH_ID_REQUIRED', 400)
   if (!Number.isInteger(sourceProduct) || sourceProduct <= 0) throw makeError('SOURCE_PRODUCT_ID_REQUIRED', 400)
 
-  const branchResolution = await resolveMatchingTemplateBranch({ sourceBranchId: sourceBranch, db })
+  const routingProduct = await findSourceProduct({
+    sourceProductId: sourceProduct,
+    sourceBranchId: sourceBranch,
+    db,
+  })
+  if (!routingProduct) throw makeError('SOURCE_PRODUCT_NOT_FOUND', 404)
+
+  const branchResolution = await resolveMatchingTemplateBranch({
+    sourceBranchId: sourceBranch,
+    sourceProduct: routingProduct,
+    db,
+  })
   if (!branchResolution.supported) {
     return {
       success: true,
@@ -467,6 +509,11 @@ const reverseCloneStoreProductToMatchingTemplate = async ({
       db: tx,
     })
     if (!product) throw makeError('SOURCE_PRODUCT_NOT_FOUND', 404)
+
+    const lockedCategoryId = Number(product?.productType?.globalProductType?.categoryId) || null
+    if (lockedCategoryId !== Number(branchResolution.productCategoryId)) {
+      throw makeError('SOURCE_PRODUCT_CATEGORY_CHANGED_DURING_SYNC', 409)
+    }
 
     const linkedTemplate = await findLinkedTemplateProduct({
       templateProductId: product.templateProductId,
