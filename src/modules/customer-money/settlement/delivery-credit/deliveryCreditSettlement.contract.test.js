@@ -25,27 +25,27 @@ const sharedLock = fs.readFileSync(path.join(__dirname, '../../shared/customerMo
 const receiveService = fs.readFileSync(path.join(__dirname, '../../receive/receiveCustomerMoneyService.js'), 'utf8');
 const salePaymentProjection = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/salePaymentPostingService.js'), 'utf8');
 const saleCompletionService = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/saleCompletionService.js'), 'utf8');
+const creditReceivableAuthority = fs.readFileSync(path.join(__dirname, '../../../sales/shared/creditReceivableAuthority.js'), 'utf8');
 const schema = fs.readFileSync(path.join(__dirname, '../../../../../prisma/customer/customer-money.prisma'), 'utf8');
 const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812014000_customer_money_settlement_idempotency/migration.sql'), 'utf8');
 
 test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /branchId:\s*command\.branchId/);
   assert.match(queryService, /customerId:\s*command\.customerId/);
-  assert.match(queryService, /isCredit:\s*true/);
-  assert.match(queryService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
-  assert.match(queryService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
+  assert.match(queryService, /buildActiveCreditReceivableWhere/);
+  assert.match(creditReceivableAuthority, /isCredit:\s*true/);
+  assert.match(creditReceivableAuthority, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
+  assert.match(creditReceivableAuthority, /'UNPAID', 'PARTIALLY_PAID'/);
 });
 
 test('credit completion can intentionally remain DRAFT so settlement must not exclude DRAFT by status allow-list', () => {
   assert.match(saleCompletionService, /CREDIT_SALE_STATUS = process\.env\.CREDIT_SALE_STATUS \|\| 'DRAFT'/);
-  assert.match(queryService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
-  assert.doesNotMatch(queryService, /status:\s*\{\s*in:\s*\['DELIVERED', 'FINALIZED', 'COMPLETED'\]/);
+  assert.match(queryService, /buildActiveCreditReceivableWhere/);
+  assert.doesNotMatch(creditReceivableAuthority, /status:\s*\{\s*in:/);
 });
 
 test('write validation uses the same active credit sale eligibility', () => {
-  assert.match(createService, /isCredit:\s*true/);
-  assert.match(createService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
-  assert.match(createService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
+  assert.match(createService, /buildActiveCreditReceivableWhere/);
 });
 
 test('eligible delivery credit query is read-only and derives customer money from source authority', () => {

@@ -4,9 +4,13 @@ const {
   calculateAvailableCustomerMoney,
 } = require('../../balance/customerMoneySourcePoolService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  buildActiveCreditReceivableWhere,
+  calculateOutstandingReceivable,
+} = require('../../../sales/shared/creditReceivableAuthority');
 
 const money = (value) => Number(value || 0);
-const outstanding = (sale) => Math.max(0, Number((money(sale.totalAmount) - money(sale.paidAmount)).toFixed(2)));
+const outstanding = calculateOutstandingReceivable;
 
 const mapStockLine = (item) => ({
   lineType: 'STOCK',
@@ -48,11 +52,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   const keyword = command.search;
   const sales = await prisma.sale.findMany({
     where: {
-      branchId: command.branchId,
-      customerId: { in: group.memberIds },
-      isCredit: true,
-      status: { not: 'CANCELLED' },
-      statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
+      ...buildActiveCreditReceivableWhere({ branchId: command.branchId, customerIds: group.memberIds }),
       ...(keyword ? {
         OR: [
           { code: { contains: keyword, mode: 'insensitive' } },

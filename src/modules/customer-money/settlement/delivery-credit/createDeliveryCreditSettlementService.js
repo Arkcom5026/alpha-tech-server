@@ -16,6 +16,7 @@ const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
+const { buildActiveCreditReceivableWhere } = require('../../../sales/shared/creditReceivableAuthority');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -97,11 +98,7 @@ const selectSaleIdentity = (tx, saleId, branchId, customerIds) => tx.sale.findFi
 const selectSale = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
   where: {
     id: saleId,
-    branchId,
-    customerId: { in: customerIds },
-    isCredit: true,
-    status: { not: 'CANCELLED' },
-    statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID'] },
+    ...buildActiveCreditReceivableWhere({ branchId, customerIds }),
   },
   select: {
     id: true,

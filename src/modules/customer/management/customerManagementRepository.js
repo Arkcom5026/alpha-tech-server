@@ -1,4 +1,8 @@
 const { prisma } = require('../../../../lib/prisma');
+const {
+  buildActiveCreditReceivableWhere,
+  calculateOutstandingReceivable,
+} = require('../../sales/shared/creditReceivableAuthority');
 
 const customerSelect = {
   id: true,
@@ -98,10 +102,7 @@ async function getFinancialProjection({ branchId, customers }) {
   const [sales, receipts, deposits, legacyReservations] = await Promise.all([
     prisma.sale.findMany({
       where: {
-        branchId,
-        customerId: { in: relevantIds },
-        status: { in: ['DELIVERED', 'FINALIZED', 'COMPLETED'] },
-        statusPayment: { not: 'CANCELLED' },
+        ...buildActiveCreditReceivableWhere({ branchId, customerIds: relevantIds }),
       },
       select: { customerId: true, totalAmount: true, paidAmount: true },
     }),
@@ -124,7 +125,7 @@ async function getFinancialProjection({ branchId, customers }) {
 
   const debtByCustomer = new Map();
   for (const sale of sales) {
-    const debt = Math.max(0, number(sale.totalAmount) - number(sale.paidAmount));
+    const debt = calculateOutstandingReceivable(sale);
     debtByCustomer.set(sale.customerId, number(debtByCustomer.get(sale.customerId)) + debt);
   }
   const moneyByCustomer = new Map();

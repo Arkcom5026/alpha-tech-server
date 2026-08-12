@@ -9,7 +9,8 @@ const repository = read('src/modules/customer/management/customerManagementRepos
 const service = read('src/modules/customer/management/customerManagementService.js');
 
 assert.match(repository, /getFinancialProjection/);
-assert.match(repository, /status:\s*\{ in: \['DELIVERED', 'FINALIZED', 'COMPLETED'\] \}/);
+assert.match(repository, /buildActiveCreditReceivableWhere/);
+assert.doesNotMatch(repository, /status:\s*\{ in: \['DELIVERED', 'FINALIZED', 'COMPLETED'\] \}/);
 assert.match(repository, /customerReceipt\.findMany/);
 assert.match(repository, /customerDeposit\.findMany/);
 assert.match(repository, /customerMoneySettlementLine\.findMany/);

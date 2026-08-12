@@ -1,6 +1,10 @@
 const prismaImport = require('../../../../lib/prisma');
 const prisma = prismaImport?.prisma || prismaImport;
 const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  buildActiveCreditReceivableWhere,
+  calculateOutstandingReceivable,
+} = require('../../sales/shared/creditReceivableAuthority');
 
 const money = (value) => {
   if (value == null) return 0;
@@ -154,9 +158,8 @@ const getAccountsReceivableRows = async (input) => {
 
 const buildCreditWhere = async ({ branchId, fromDate, toDate, keyword }) => {
   let where = withDateRange({
-    branchId,
+    ...buildActiveCreditReceivableWhere({ branchId }),
     customerId: { not: null },
-    statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID', 'WAITING_APPROVAL'] },
   }, fromDate, toDate);
   const ids = await findCustomerIds(keyword);
   if (keyword && ids) where.customerId = { in: ids };
@@ -179,7 +182,7 @@ const groupCredit = async (where) => {
     const totals = new Map();
     for (const row of rows || []) {
       if (!row.customerId) continue;
-      const outstanding = Math.max(0, money(row.totalAmount) - money(row.paidAmount));
+      const outstanding = calculateOutstandingReceivable(row);
       totals.set(row.customerId, (totals.get(row.customerId) || 0) + outstanding);
     }
     return Array.from(totals, ([customerId, outstanding]) => ({
@@ -195,7 +198,7 @@ const toCreditRows = async (grouped) => {
   const customerMap = await loadCustomerMap(customerIds);
   const memberRows = (grouped || []).map((row) => {
     const customer = customerMap.get(row.customerId) || null;
-    const outstandingAmount = row.__fallbackOutstanding ?? Math.max(0, money(row?._sum?.totalAmount) - money(row?._sum?.paidAmount));
+    const outstandingAmount = row.__fallbackOutstanding ?? calculateOutstandingReceivable({ totalAmount: row?._sum?.totalAmount, paidAmount: row?._sum?.paidAmount });
     const creditLimit = money(customer?.creditLimit);
     return {
       customerId: row.customerId,
@@ -247,9 +250,7 @@ const getCustomerCreditByCustomerId = async (input) => {
   if (!customer) return null;
   const group = await resolveFinancialCustomerGroup(prisma, { customerId: input.customerId, branchId: input.branchId });
   const where = withDateRange({
-    branchId: input.branchId,
-    customerId: { in: group.memberIds },
-    statusPayment: { in: ['UNPAID', 'PARTIALLY_PAID', 'WAITING_APPROVAL'] },
+    ...buildActiveCreditReceivableWhere({ branchId: input.branchId, customerIds: group.memberIds }),
   }, input.fromDate, input.toDate);
   const sales = await prisma.sale.findMany({
     where,
@@ -269,7 +270,7 @@ const getCustomerCreditByCustomerId = async (input) => {
   const rows = (sales || []).map((sale) => {
     const totalAmount = money(sale.totalAmount);
     const paidAmount = money(sale.paidAmount);
-    return { ...sale, totalAmount, paidAmount, outstandingAmount: Math.max(0, totalAmount - paidAmount) };
+    return { ...sale, totalAmount, paidAmount, outstandingAmount: calculateOutstandingReceivable({ totalAmount, paidAmount }) };
   });
   const outstandingAmount = rows.reduce((sum, row) => sum + row.outstandingAmount, 0);
   const creditLimit = money(customer.creditLimit);

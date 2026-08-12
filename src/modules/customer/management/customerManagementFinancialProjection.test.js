@@ -51,6 +51,10 @@ test('projects standalone, owner and member finance from canonical batched sourc
   assert.equal(projection.get(7).financialGroupStatus, 'STANDALONE');
   assert.equal(projection.get(7).groupAvailableCustomerMoney, 90, 'stale depositBalance_v2 must not be authority');
   assert.equal(calls.length, 5, 'query count must stay constant rather than grow per customer');
+  const saleWhere = calls.find(([name]) => name === 'sales')[1].where;
+  assert.equal(saleWhere.isCredit, true);
+  assert.deepEqual(saleWhere.status, { not: 'CANCELLED' }, 'DRAFT credit sales must remain receivable-eligible');
+  assert.deepEqual(saleWhere.statusPayment, { in: ['UNPAID', 'PARTIALLY_PAID'] });
   for (const [, args] of calls) assert.equal(args.where.branchId ?? args.where.settlement?.branchId, 2);
   assert.deepEqual(calls[0][1].where.OR, [
     { id: { in: [35, 7] } },

@@ -29,7 +29,7 @@ test('finance preserves member rows and exposes owner group totals', () => {
   assert.match(finance, /groupOutstandingAmount/);
   assert.match(finance, /groupMembers/);
   assert.match(finance, /totalFinancialGroups/);
-  assert.match(finance, /customerId: \{ in: group\.memberIds \}/);
+  assert.match(finance, /buildActiveCreditReceivableWhere\(\{ branchId: input\.branchId, customerIds: group\.memberIds \}\)/);
 });
 
 test('linked customer self-service cannot mutate legal authority fields', () => {
