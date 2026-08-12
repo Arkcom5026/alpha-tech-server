@@ -9,7 +9,7 @@ function normalizeContext(user = {}) {
   };
 }
 
-function presentCustomer(customer) {
+function presentCustomer(customer, financial = null) {
   const subdistrictCode = customer.subdistrict?.code || customer.subdistrictCode || null;
   const districtCode = customer.subdistrict?.districtCode || customer.subdistrict?.district?.code || null;
   const provinceCode = customer.subdistrict?.district?.provinceCode || customer.subdistrict?.district?.province?.code || null;
@@ -20,8 +20,6 @@ function presentCustomer(customer) {
     name: customer.name || '',
     companyName: customer.companyName || '',
     departmentName: customer.departmentName || '',
-    financialOwnerCustomerId: customer.financialOwnerCustomerId || null,
-    financialOwner: customer.financialOwner || null,
     financialMembers: customer.financialMembers || [],
     phone: customer.user?.loginId || '',
     email: customer.user?.email || '',
@@ -36,8 +34,18 @@ function presentCustomer(customer) {
     updatedAt: customer.updatedAt,
     creditLimit: customer.creditLimit,
     creditBalance: customer.creditBalance,
-    depositBalance: customer.depositBalance_v2,
-    outstandingDebt: customer.outstandingDebt_v2,
+    // Legacy fields stay compatible for standalone consumers. Group rows use the explicit contract below.
+    depositBalance: financial?.financialGroupStatus === 'STANDALONE'
+      ? financial.groupAvailableCustomerMoney
+      : customer.depositBalance_v2,
+    outstandingDebt: financial?.memberOutstandingDebt ?? customer.outstandingDebt_v2,
+    financialGroupStatus: financial?.financialGroupStatus || 'STANDALONE',
+    financialOwnerCustomerId: financial?.financialOwnerCustomerId ?? customer.financialOwnerCustomerId ?? null,
+    financialOwner: financial?.financialOwner || customer.financialOwner || null,
+    memberOutstandingDebt: financial?.memberOutstandingDebt ?? Number(customer.outstandingDebt_v2 || 0),
+    groupOutstandingDebt: financial?.groupOutstandingDebt ?? Number(customer.outstandingDebt_v2 || 0),
+    groupAvailableCustomerMoney: financial?.groupAvailableCustomerMoney ?? Number(customer.depositBalance_v2 || 0),
+    groupMemberCount: financial?.groupMemberCount || 1,
     ownershipStatus: customer.branchId === null ? 'UNASSIGNED' : 'STORE',
   };
 }
@@ -68,13 +76,16 @@ async function listCustomers({ user, scope, query, limit }) {
     query,
     limit,
   });
+  const projection = normalizedScope === 'STORE'
+    ? await repository.getFinancialProjection({ branchId: authorized.context.branchId, customers })
+    : new Map();
 
   return {
     status: 200,
     body: {
       scope: normalizedScope,
       count: customers.length,
-      results: customers.map(presentCustomer),
+      results: customers.map((customer) => presentCustomer(customer, projection.get(customer.id))),
     },
   };
 }
@@ -96,7 +107,12 @@ async function getCustomerDetail({ user, customerProfileId }) {
     return { status: 403, body: { code: 'CUSTOMER_DETAIL_BRANCH_FORBIDDEN', message: 'ไม่สามารถเปิดข้อมูลลูกค้าของร้านอื่นได้' } };
   }
 
-  return { status: 200, body: { customer: presentCustomer(customer) } };
+  const projection = await repository.getFinancialProjection({
+    branchId: authorized.context.branchId,
+    customers: [customer],
+  });
+
+  return { status: 200, body: { customer: presentCustomer(customer, projection.get(customer.id)) } };
 }
 
 async function claimLegacyCustomer({ user, customerProfileId }) {
@@ -115,4 +131,4 @@ async function claimLegacyCustomer({ user, customerProfileId }) {
   return { status: 200, body: { message: 'รับลูกค้าเข้าร้านเรียบร้อยแล้ว', customer: presentCustomer(result.customer) } };
 }
 
-module.exports = { listCustomers, getCustomerDetail, claimLegacyCustomer };
+module.exports = { presentCustomer, listCustomers, getCustomerDetail, claimLegacyCustomer };

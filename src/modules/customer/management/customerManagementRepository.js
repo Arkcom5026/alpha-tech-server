@@ -69,6 +69,84 @@ function findCustomerDetail({ customerProfileId }) {
   });
 }
 
+const number = (value) => Number(value || 0);
+
+async function getFinancialProjection({ branchId, customers }) {
+  if (!customers.length || !Number.isInteger(Number(branchId))) return new Map();
+
+  // One branch-scoped identity query resolves owners and members for both list and detail.
+  const profiles = await prisma.customerProfile.findMany({
+    where: { branchId },
+    select: { id: true, branchId: true, companyName: true, departmentName: true, financialOwnerCustomerId: true },
+  });
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const requestedIds = new Set(customers.map((customer) => customer.id));
+  const ownerIds = new Set(customers.map((customer) => customer.financialOwnerCustomerId || customer.id));
+  const relevantProfiles = profiles.filter((profile) => ownerIds.has(profile.financialOwnerCustomerId || profile.id));
+  const relevantIds = relevantProfiles.map((profile) => profile.id);
+
+  const [sales, receipts, deposits, legacyReservations] = await Promise.all([
+    prisma.sale.findMany({
+      where: {
+        branchId,
+        customerId: { in: relevantIds },
+        status: { in: ['DELIVERED', 'FINALIZED', 'COMPLETED'] },
+        statusPayment: { not: 'CANCELLED' },
+      },
+      select: { customerId: true, totalAmount: true, paidAmount: true },
+    }),
+    prisma.customerReceipt.findMany({
+      where: { branchId, customerId: { in: relevantIds }, status: 'ACTIVE', code: { startsWith: 'CMR-' }, remainingAmount: { gt: 0 } },
+      select: { customerId: true, remainingAmount: true },
+    }),
+    prisma.customerDeposit.findMany({
+      where: { branchId, customerId: { in: relevantIds }, status: 'ACTIVE' },
+      select: { customerId: true, totalAmount: true, usedAmount: true },
+    }),
+    prisma.customerMoneySettlementLine.findMany({
+      where: {
+        settlement: { branchId, customerId: { in: relevantIds }, status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
+        application: { sourceType: 'CUSTOMER_MONEY_BALANCE', status: 'APPLIED' },
+      },
+      select: { appliedAmount: true, settlement: { select: { customerId: true } } },
+    }),
+  ]);
+
+  const debtByCustomer = new Map();
+  for (const sale of sales) {
+    const debt = Math.max(0, number(sale.totalAmount) - number(sale.paidAmount));
+    debtByCustomer.set(sale.customerId, number(debtByCustomer.get(sale.customerId)) + debt);
+  }
+  const moneyByCustomer = new Map();
+  for (const receipt of receipts) moneyByCustomer.set(receipt.customerId, number(moneyByCustomer.get(receipt.customerId)) + number(receipt.remainingAmount));
+  for (const deposit of deposits) moneyByCustomer.set(deposit.customerId, number(moneyByCustomer.get(deposit.customerId)) + Math.max(0, number(deposit.totalAmount) - number(deposit.usedAmount)));
+  for (const line of legacyReservations) moneyByCustomer.set(line.settlement.customerId, number(moneyByCustomer.get(line.settlement.customerId)) - number(line.appliedAmount));
+
+  const result = new Map();
+  for (const customer of customers) {
+    if (!requestedIds.has(customer.id)) continue;
+    const ownerId = customer.financialOwnerCustomerId || customer.id;
+    const owner = profileById.get(ownerId);
+    const members = relevantProfiles.filter((profile) => (profile.financialOwnerCustomerId || profile.id) === ownerId);
+    const isOwner = !customer.financialOwnerCustomerId && members.some((member) => member.id !== customer.id);
+    const groupIds = members.map((member) => member.id);
+    result.set(customer.id, {
+      financialGroupStatus: customer.financialOwnerCustomerId ? 'MEMBER' : isOwner ? 'OWNER' : 'STANDALONE',
+      financialOwnerCustomerId: customer.financialOwnerCustomerId || null,
+      financialOwner: customer.financialOwnerCustomerId && owner ? {
+        id: owner.id,
+        companyName: owner.companyName || '',
+        departmentName: owner.departmentName || '',
+      } : null,
+      memberOutstandingDebt: number(debtByCustomer.get(customer.id)),
+      groupOutstandingDebt: groupIds.reduce((sum, id) => sum + number(debtByCustomer.get(id)), 0),
+      groupAvailableCustomerMoney: Math.max(0, groupIds.reduce((sum, id) => sum + number(moneyByCustomer.get(id)), 0)),
+      groupMemberCount: groupIds.length,
+    });
+  }
+  return result;
+}
+
 function claimLegacyCustomer({ customerProfileId, branchId }) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.customerProfile.findUnique({
@@ -103,4 +181,4 @@ function claimLegacyCustomer({ customerProfileId, branchId }) {
   });
 }
 
-module.exports = { listCustomers, findCustomerDetail, claimLegacyCustomer };
+module.exports = { listCustomers, findCustomerDetail, getFinancialProjection, claimLegacyCustomer };
