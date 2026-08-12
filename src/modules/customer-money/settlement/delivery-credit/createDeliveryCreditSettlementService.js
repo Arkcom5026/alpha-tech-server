@@ -82,6 +82,17 @@ const ensureEmployee = async (tx, branchId, employeeId) => {
   }
 };
 
+const selectSaleIdentity = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
+  where: {
+    id: saleId,
+    branchId,
+    customerId,
+    isCredit: true,
+    status: { not: 'CANCELLED' },
+  },
+  select: { id: true },
+});
+
 const selectSale = (tx, saleId, branchId, customerId) => tx.sale.findFirst({
   where: {
     id: saleId,
@@ -254,12 +265,24 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
     throw error;
   }
 
-  const saleIds = [...new Set(command.lines.map((line) => line.saleId))];
+  const saleIds = [...new Set(command.lines.map((line) => line.saleId))]
+    .sort((left, right) => left - right);
   const sales = new Map();
   for (const saleId of saleIds) {
+    const identity = await selectSaleIdentity(tx, saleId, command.branchId, command.customerId);
+    if (!identity) {
+      const error = new Error('ไม่พบใบส่งของเครดิตที่ยังใช้งานสำหรับลูกค้ารายนี้');
+      error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Customer lock is already held. The unified projection now acquires the sale lock,
+    // reconciles every payment evidence source, and keeps the sale stable until commit.
+    await projectSalePaymentStatus(tx, saleId);
     const sale = await selectSale(tx, saleId, command.branchId, command.customerId);
     if (!sale) {
-      const error = new Error('ไม่พบใบส่งของเครดิตที่ยังค้างสำหรับลูกค้ารายนี้');
+      const error = new Error('ใบส่งของเครดิตนี้ไม่มีรายการค้างที่สามารถตัดยอดได้แล้ว');
       error.code = 'DELIVERY_CREDIT_NOT_ELIGIBLE';
       error.statusCode = 409;
       throw error;
@@ -417,6 +440,7 @@ module.exports = {
   buildSettlementRequestHash,
   acquireSettlementCommandLock,
   acquireCustomerMoneySettlementLock,
+  selectSaleIdentity,
   distributeSourcesAcrossLines,
   loadSettlementCreateResult,
 };
