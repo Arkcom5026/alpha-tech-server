@@ -5,12 +5,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
+const create = fs.readFileSync(path.join(__dirname, 'create/createCustomerReceiptController.js'), 'utf8');
 const allocate = fs.readFileSync(path.join(__dirname, 'allocate/allocateCustomerReceiptController.js'), 'utf8');
 const cancel = fs.readFileSync(path.join(__dirname, 'cancel/cancelCustomerReceiptController.js'), 'utf8');
 const projection = fs.readFileSync(path.join(
   __dirname,
   '../../sales/completion/services/salePaymentPostingService.js',
 ), 'utf8');
+
+test('legacy customer receipt creation cannot associate a customer from another branch', () => {
+  assert.match(create, /where:\s*\{ id: customerId, branchId \}/);
+  assert.match(create, /ไม่พบข้อมูลลูกค้าที่ต้องการรับชำระในสาขานี้/);
+});
 
 test('CMR customer money receipts cannot enter legacy receipt allocation or cancellation routes', () => {
   assert.match(allocate, /startsWith\('CMR-'\)/);
