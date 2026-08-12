@@ -10,10 +10,15 @@ const repositoryPath = path.join(
 
 const source = fs.readFileSync(repositoryPath, 'utf8');
 
-test('markReceiptPrinted uses callback transaction client delegates', () => {
-  assert.match(source, /prisma\.\$transaction\(async\s*\(tx\)\s*=>\s*\{/);
-  assert.match(source, /tx\.barcodeReceiptItem\.updateMany/);
-  assert.match(source, /tx\.purchaseOrderReceipt\.updateMany/);
-  assert.doesNotMatch(source, /prisma\.barcodeReceiptItem\.updateMany/);
-  assert.doesNotMatch(source, /prisma\.purchaseOrderReceipt\.updateMany/);
+test('markReceiptPrinted avoids the stock-movement transaction delegate proxy', () => {
+  assert.doesNotMatch(source, /tx\.barcodeReceiptItem\.updateMany/);
+  assert.doesNotMatch(source, /tx\.purchaseOrderReceipt\.updateMany/);
+  assert.match(source, /prisma\.barcodeReceiptItem\.updateMany/);
+  assert.match(source, /prisma\.purchaseOrderReceipt\.updateMany/);
+});
+
+test('markReceiptPrinted remains idempotent and service-compatible', () => {
+  assert.match(source, /printed:\s*false/);
+  assert.match(source, /data:\s*\{\s*printed:\s*true\s*\}/);
+  assert.match(source, /return\s*\[\s*barcodeResult\s*,\s*receiptResult\s*\]/);
 });
