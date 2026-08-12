@@ -74,14 +74,24 @@ const number = (value) => Number(value || 0);
 async function getFinancialProjection({ branchId, customers }) {
   if (!customers.length || !Number.isInteger(Number(branchId))) return new Map();
 
-  // One branch-scoped identity query resolves owners and members for both list and detail.
+  const requestedCustomerIds = customers.map((customer) => customer.id);
+  const requestedOwnerIds = [...new Set(customers.map((customer) => customer.financialOwnerCustomerId || customer.id))];
+
+  // Resolve only groups represented in this page. Query count stays constant without scanning every branch customer.
   const profiles = await prisma.customerProfile.findMany({
-    where: { branchId },
+    where: {
+      branchId,
+      OR: [
+        { id: { in: requestedOwnerIds } },
+        { id: { in: requestedCustomerIds } },
+        { financialOwnerCustomerId: { in: requestedOwnerIds } },
+      ],
+    },
     select: { id: true, branchId: true, companyName: true, departmentName: true, financialOwnerCustomerId: true },
   });
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
-  const requestedIds = new Set(customers.map((customer) => customer.id));
-  const ownerIds = new Set(customers.map((customer) => customer.financialOwnerCustomerId || customer.id));
+  const requestedIds = new Set(requestedCustomerIds);
+  const ownerIds = new Set(requestedOwnerIds);
   const relevantProfiles = profiles.filter((profile) => ownerIds.has(profile.financialOwnerCustomerId || profile.id));
   const relevantIds = relevantProfiles.map((profile) => profile.id);
 
