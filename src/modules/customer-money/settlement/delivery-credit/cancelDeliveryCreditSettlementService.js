@@ -13,6 +13,9 @@ const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  findSettlementGeneratedDocumentAnchor,
+} = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 const { getSettlement } = require('./deliveryCreditSettlementRepository');
 const { getDeliveryCreditSettlement } = require('./queryDeliveryCreditSettlementService');
 
@@ -91,6 +94,56 @@ const ensureNoTaxDocumentAuthority = async (tx, { branchId, saleIds }) => {
   }
 };
 
+const cancelGeneratedConsolidatedDelivery = async (tx, { branchId, settlementId }) => {
+  const anchor = await findSettlementGeneratedDocumentAnchor(tx, { branchId, settlementId });
+  if (!anchor) return null;
+
+  const document = await tx.combinedBillingDocument.findFirst({
+    where: { id: anchor.combinedBillingId, branchId: Number(branchId) },
+    select: { id: true, code: true, status: true },
+  });
+  if (!document) {
+    throw buildError('ไม่พบใบส่งของรวมที่สร้างจากเอกสารตัดยอดนี้', 409, 'SETTLEMENT_GENERATED_DOCUMENT_MISSING');
+  }
+  if (document.status === 'PAID') {
+    throw buildError('ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบส่งของรวมมีสถานะทางการเงินปลายทางแล้ว', 409, 'SETTLEMENT_GENERATED_DOCUMENT_FINALIZED');
+  }
+
+  const candidates = await tx.taxCandidate.findMany({
+    where: {
+      branchId: Number(branchId),
+      sourceType: 'CONSOLIDATED_DELIVERY',
+      sourceId: String(document.id),
+    },
+    select: { id: true },
+  });
+  if (candidates.length) {
+    const taxDocument = await tx.taxDocument.findFirst({
+      where: {
+        branchId: Number(branchId),
+        candidateId: { in: candidates.map((candidate) => candidate.id) },
+        status: { notIn: ['CANCELLED', 'ARCHIVED'] },
+      },
+      select: { id: true, status: true, issuedDocumentNumber: true },
+    });
+    if (taxDocument) {
+      throw buildError('ไม่สามารถยกเลิกการตัดยอดได้ เนื่องจากใบส่งของรวมถูกนำไปจัดทำเอกสารภาษีแล้ว', 409, 'SETTLEMENT_GENERATED_DOCUMENT_TAX_EXISTS');
+    }
+  }
+
+  if (document.status !== 'CANCELLED') {
+    await tx.consolidatedDeliveryLine.updateMany({
+      where: { combinedBillingId: document.id, status: 'DOCUMENTED' },
+      data: { status: 'CANCELLED' },
+    });
+    await tx.combinedBillingDocument.update({
+      where: { id: document.id },
+      data: { status: 'CANCELLED' },
+    });
+  }
+  return document;
+};
+
 const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }) => {
   const branchId = Number(user?.branchId);
   const employeeId = Number(user?.employeeId);
@@ -126,6 +179,8 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     const saleIds = [...new Set((settlement.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
     await ensureNoDownstreamDocumentAuthority(tx, { branchId, saleIds });
     await ensureNoTaxDocumentAuthority(tx, { branchId, saleIds });
+
+    await cancelGeneratedConsolidatedDelivery(tx, { branchId, settlementId: settlement.id });
 
     const applications = [...new Map(
       (settlement.lines || [])
@@ -208,5 +263,6 @@ module.exports = {
   cancelDeliveryCreditSettlement,
   ensureNoDownstreamDocumentAuthority,
   ensureNoTaxDocumentAuthority,
+  cancelGeneratedConsolidatedDelivery,
   SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS,
 };
