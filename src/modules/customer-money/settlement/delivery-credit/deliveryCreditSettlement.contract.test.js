@@ -24,6 +24,7 @@ const sourcePool = fs.readFileSync(path.join(__dirname, '../../balance/customerM
 const sharedLock = fs.readFileSync(path.join(__dirname, '../../shared/customerMoneyTransactionLock.js'), 'utf8');
 const receiveService = fs.readFileSync(path.join(__dirname, '../../receive/receiveCustomerMoneyService.js'), 'utf8');
 const salePaymentProjection = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/salePaymentPostingService.js'), 'utf8');
+const saleCompletionService = fs.readFileSync(path.join(__dirname, '../../../sales/completion/services/saleCompletionService.js'), 'utf8');
 const schema = fs.readFileSync(path.join(__dirname, '../../../../../prisma/customer/customer-money.prisma'), 'utf8');
 const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812014000_customer_money_settlement_idempotency/migration.sql'), 'utf8');
 
@@ -33,6 +34,12 @@ test('eligible delivery credit query is branch and customer scoped', () => {
   assert.match(queryService, /isCredit:\s*true/);
   assert.match(queryService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
   assert.match(queryService, /statusPayment:\s*\{\s*in:\s*\['UNPAID', 'PARTIALLY_PAID'\]/);
+});
+
+test('credit completion can intentionally remain DRAFT so settlement must not exclude DRAFT by status allow-list', () => {
+  assert.match(saleCompletionService, /CREDIT_SALE_STATUS = process\.env\.CREDIT_SALE_STATUS \|\| 'DRAFT'/);
+  assert.match(queryService, /status:\s*\{\s*not:\s*'CANCELLED'\s*\}/);
+  assert.doesNotMatch(queryService, /status:\s*\{\s*in:\s*\['DELIVERED', 'FINALIZED', 'COMPLETED'\]/);
 });
 
 test('write validation uses the same active credit sale eligibility', () => {
@@ -121,6 +128,7 @@ test('settlement consumes receipt/deposit source projections instead of a free-f
   assert.match(sourcePool, /status:\s*'FULLY_ALLOCATED'/);
   assert.match(sourcePool, /usedAmount:\s*\{ increment: chunkAmount \}/);
   assert.match(sourcePool, /getLegacyBalanceReservation/);
+  assert.match(sourcePool, /getCustomerMoneySourceState/);
   assert.match(createService, /consumeCustomerMoneySources/);
   assert.match(createService, /sourceType:\s*allocation\.sourceType/);
   assert.match(createService, /sourceId:\s*allocation\.sourceId/);
@@ -134,6 +142,16 @@ test('customer money receive and settlement mutations share one per-customer tra
   assert.match(cancelService, /acquireCustomerMoneyTransactionLock/);
   assert.match(receiveService, /acquireCustomerMoneyTransactionLock/);
   assert.match(receiveService, /RECEIPT_STATUSES = new Set\(\['ACTIVE', 'FULLY_ALLOCATED', 'CANCELLED'\]\)/);
+});
+
+test('legacy source reservations cannot be cancelled or spent through adjacent customer money flows', () => {
+  assert.match(receiveService, /getCustomerMoneySourceState/);
+  assert.match(receiveService, /sourceType:\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(receiveService, /sourceState\.legacyReservedAmount\.greaterThan\(0\)/);
+  assert.match(receiveService, /CUSTOMER_MONEY_RECEIVE_LEGACY_RESERVED/);
+  assert.match(salePaymentProjection, /getCustomerMoneySourceState/);
+  assert.match(salePaymentProjection, /sourceType:\s*'CUSTOMER_DEPOSIT'/);
+  assert.match(salePaymentProjection, /DEPOSIT_CUSTOMER_MONEY_RESERVED/);
 });
 
 test('settlement write is atomic and uses the shared sale payment projection', () => {
