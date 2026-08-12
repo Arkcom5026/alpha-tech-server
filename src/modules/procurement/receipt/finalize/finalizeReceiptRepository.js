@@ -10,6 +10,38 @@ const isInventoryReceivedRow = (row) => {
   return row?.stockItemId != null;
 };
 
+const expectedIdentityCountForReceiptItem = ({ quantity, mode } = {}) => {
+  const qty = Math.max(0, toNumber(quantity));
+  if (qty <= 0) return 0;
+  return String(mode || '').toUpperCase() === 'SIMPLE' ? 1 : Math.ceil(qty);
+};
+
+const computeIdentityCoverageFromItems = (items = []) => {
+  const rows = Array.isArray(items) ? items : [];
+  let expected = 0;
+  let active = 0;
+
+  for (const item of rows) {
+    const mode = item?.product?.mode || item?.purchaseOrderItem?.product?.mode || 'STRUCTURED';
+    const requiredKind = String(mode).toUpperCase() === 'SIMPLE' ? 'LOT' : 'SN';
+    const itemExpected = expectedIdentityCountForReceiptItem({ quantity: item?.quantity, mode });
+    const barcodeRows = Array.isArray(item?.barcodeReceiptItem) ? item.barcodeReceiptItem : [];
+    const itemActive = barcodeRows.filter((row) => (
+      String(row?.status || '').toUpperCase() !== 'VOID' &&
+      String(row?.kind || '').toUpperCase() === requiredKind
+    )).length;
+
+    expected += itemExpected;
+    active += Math.min(itemExpected, itemActive);
+  }
+
+  return {
+    expected,
+    active,
+    missing: Math.max(0, expected - active),
+  };
+};
+
 const computePoStatusFromItems = (items = []) => {
   const rows = Array.isArray(items) ? items : [];
   if (rows.length === 0) return 'PENDING';
@@ -54,6 +86,20 @@ const findReceipt = ({ id, branchId }) =>
     select: { id: true, statusReceipt: true, purchaseOrderId: true },
   });
 
+const getIdentityCoverage = async (receiptId, client = prisma) => {
+  const items = await client.purchaseOrderReceiptItem.findMany({
+    where: { receiptId },
+    select: {
+      quantity: true,
+      product: { select: { mode: true } },
+      purchaseOrderItem: { select: { product: { select: { mode: true } } } },
+      barcodeReceiptItem: { select: { kind: true, status: true } },
+    },
+  });
+
+  return computeIdentityCoverageFromItems(items);
+};
+
 const getPendingCounts = async (receiptId, client = prisma) => {
   const rows = await client.barcodeReceiptItem.findMany({
     where: { receiptItem: { receiptId } },
@@ -62,6 +108,7 @@ const getPendingCounts = async (receiptId, client = prisma) => {
   let pendingSN = 0;
   let pendingLOT = 0;
   for (const row of rows) {
+    if (String(row?.status || '').toUpperCase() === 'VOID') continue;
     if (isLotRow(row)) {
       if (!isInventoryReceivedRow(row)) pendingLOT += 1;
     } else if (!isInventoryReceivedRow(row)) {
@@ -116,9 +163,12 @@ const finalize = ({ id, purchaseOrderId }) =>
 
 module.exports = {
   findReceipt,
+  getIdentityCoverage,
   getPendingCounts,
   computePoStatus,
   computePoStatusFromItems,
+  computeIdentityCoverageFromItems,
+  expectedIdentityCountForReceiptItem,
   syncPoStatus,
   finalize,
   isInventoryReceivedRow,
