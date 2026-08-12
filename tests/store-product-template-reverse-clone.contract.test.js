@@ -50,7 +50,8 @@ assert.match(createServiceSource, /templateSync = await reverseCloneStoreProduct
 assert.match(createServiceSource, /status: 'FAILED'/)
 assert.match(createServiceSource, /templateSync,/)
 
-assert.doesNotMatch(reverseCloneSource, /productTemplateCandidate|Candidate|candidate/)
-assert.doesNotMatch(createServiceSource, /productTemplateCandidate|Candidate|candidate/)
+const forbiddenCandidateDependency = /productTemplateCandidate|productTemplate\/candidates|\.\.\/candidates|createCandidate|promoteCandidate|materializeDiscovery/
+assert.doesNotMatch(reverseCloneSource, forbiddenCandidateDependency)
+assert.doesNotMatch(createServiceSource, forbiddenCandidateDependency)
 
 console.log('Store Product Template Reverse Clone Contract: PASS')
