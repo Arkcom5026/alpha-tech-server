@@ -27,7 +27,11 @@ const normalizeTaxonomyLabel = (value) =>
     .toLocaleLowerCase('th-TH')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    // Thai taxonomy labels commonly use "และ" where branch-local labels use '/', '&', or spacing.
+    // Treat the conjunction as a separator so semantically identical labels remain compatible.
+    .replace(/และ/gu, ' ')
+    // Keep Unicode combining marks (\p{M}) so Thai vowels/tones are not stripped from labels.
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 

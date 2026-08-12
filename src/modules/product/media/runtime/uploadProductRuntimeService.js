@@ -9,6 +9,12 @@ const toInt = (value) => (
     : Number(value)
 );
 
+const toBool = (value) => {
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'y'].includes(normalized);
+};
+
 const normalizeCaptions = (body = {}) => {
   if (Array.isArray(body.captions)) return body.captions;
   if (typeof body.captions === 'string') return [body.captions];
@@ -71,6 +77,51 @@ const uploadProductImagesOnly = async ({ files, body = {} }) => {
   };
 };
 
+const syncUploadedImageToTemplate = async ({
+  product,
+  normalizedFile,
+  caption,
+  isCover,
+}) => {
+  if (!product?.templateProductId || !product?.templateProduct?.active) {
+    return {
+      status: 'SKIPPED',
+      templateProductId: product?.templateProductId || null,
+      reason: 'TEMPLATE_PRODUCT_NOT_AVAILABLE',
+    };
+  }
+
+  let templateUpload = null;
+  try {
+    templateUpload = await uploadBufferToCloudinary(normalizedFile);
+    const templateImage = await repository.createProductImage({
+      productId: Number(product.templateProductId),
+      uploadResult: templateUpload,
+      caption,
+      isCover,
+    });
+
+    return {
+      status: 'SYNCED',
+      templateProductId: Number(product.templateProductId),
+      templateImageId: templateImage.id,
+      publicId: templateImage.public_id,
+    };
+  } catch (error) {
+    if (templateUpload?.public_id) {
+      try {
+        await cloudinary.uploader.destroy(templateUpload.public_id, { resource_type: 'image' });
+      } catch (_) {}
+    }
+
+    return {
+      status: 'FAILED',
+      templateProductId: Number(product.templateProductId) || null,
+      reason: error?.code || error?.message || 'TEMPLATE_IMAGE_SYNC_FAILED',
+    };
+  }
+};
+
 const uploadAndSaveProductImages = async ({ productId, file, files, body = {} }) => {
   const normalizedProductId = toInt(productId);
   const normalizedFile = file ?? (Array.isArray(files) && files[0] ? files[0] : undefined);
@@ -96,18 +147,30 @@ const uploadAndSaveProductImages = async ({ productId, file, files, body = {} })
 
   const image = await repository.createProductImage({
     productId: normalizedProductId,
-    url: uploaded.secure_url,
-    publicId: uploaded.public_id,
-    secureUrl: uploaded.secure_url,
+    uploadResult: uploaded,
     caption: captionsArray[0] || '',
     isCover: coverIndex === 0,
   });
+
+  const templateImageSync = toBool(body.syncTemplateImage)
+    ? await syncUploadedImageToTemplate({
+        product,
+        normalizedFile,
+        caption: image.caption || captionsArray[0] || '',
+        isCover: image.isCover === true,
+      })
+    : {
+        status: 'SKIPPED',
+        templateProductId: product.templateProductId || null,
+        reason: 'SYNC_NOT_REQUESTED',
+      };
 
   return {
     status: 200,
     body: {
       message: 'อัปโหลดและบันทึกภาพสำเร็จ',
       images: [image],
+      templateImageSync,
     },
   };
 };
@@ -185,6 +248,7 @@ const deleteProductImage = async ({ productId, imageId, publicId }) => {
 module.exports = {
   uploadProductImagesOnly,
   uploadAndSaveProductImages,
+  syncUploadedImageToTemplate,
   setProductCoverImage,
   deleteProductImage,
 };

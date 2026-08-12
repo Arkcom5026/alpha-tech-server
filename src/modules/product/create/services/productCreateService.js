@@ -3,6 +3,9 @@
 const { prisma } = require('../../../../../lib/prisma')
 const repo = require('../repositories/productCreateRepository')
 const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
+const {
+  reverseCloneStoreProductToMatchingTemplate,
+} = require('../../templateReverseClone/services/storeProductTemplateReverseCloneService')
 
 const toInt = repo.toInt
 const toMoneyOrNull = repo.toMoneyOrNull
@@ -192,6 +195,30 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, role, v2Rol
     return { product, branchPrice, branchProductType }
   })
 
+  let templateSync
+  try {
+    templateSync = await reverseCloneStoreProductToMatchingTemplate({
+      sourceBranchId: authority.branchId,
+      sourceProductId: result.product.id,
+      employeeId: authority.employeeId,
+      role,
+      v2Role,
+    })
+  } catch (error) {
+    templateSync = {
+      success: false,
+      status: 'FAILED',
+      reason: error?.code || 'STORE_PRODUCT_REVERSE_CLONE_FAILED',
+      message: error?.message || 'STORE_PRODUCT_REVERSE_CLONE_FAILED',
+      details: error?.details || null,
+      sourceBranchId: authority.branchId,
+      sourceProductId: result.product.id,
+      templateBranchId: null,
+      templateProductId: null,
+      created: false,
+    }
+  }
+
   return {
     success: true,
     product: {
@@ -209,6 +236,7 @@ const createLocalOperationalProduct = async ({ branchId, employeeId, role, v2Rol
       unit: result.product.unit,
     },
     branchPrice: result.branchPrice,
+    templateSync,
     runtime: {
       branchId: authority.branchId,
       ensuredProductTypeId: result.branchProductType.id,
