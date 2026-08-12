@@ -7,7 +7,7 @@ const { projectSalePaymentStatus } = require('./salePaymentPostingService');
 
 const D = (value) => new Prisma.Decimal(String(value));
 
-test('sale payment projection combines regular payments and active customer money settlements', async () => {
+test('sale payment projection combines payment, legacy receipt allocation and customer money settlement', async () => {
   let updateArgs = null;
   const tx = {
     $queryRaw: async () => [{ pg_advisory_xact_lock: null }],
@@ -16,13 +16,21 @@ test('sale payment projection combines regular payments and active customer mone
       update: async (args) => { updateArgs = args; return args; },
     },
     paymentItem: {
-      aggregate: async () => ({ _sum: { amount: D(400) } }),
+      aggregate: async () => ({ _sum: { amount: D(300) } }),
+    },
+    customerReceiptAllocation: {
+      aggregate: async (args) => {
+        assert.equal(args.where.saleId, 11);
+        assert.deepEqual(args.where.receipt, { status: { not: 'CANCELLED' } });
+        return { _sum: { amount: D(200) } };
+      },
+      findFirst: async () => ({ allocatedAt: new Date('2026-08-12T03:00:00.000Z') }),
     },
     customerMoneySettlementLine: {
       aggregate: async (args) => {
         assert.equal(args.where.saleId, 11);
         assert.deepEqual(args.where.settlement, { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' });
-        return { _sum: { appliedAmount: D(600) } };
+        return { _sum: { appliedAmount: D(500) } };
       },
     },
     payment: {
@@ -38,13 +46,13 @@ test('sale payment projection combines regular payments and active customer mone
   assert.equal(result.paid, true);
   assert.equal(result.statusPayment, 'PAID');
   assert.equal(result.paidAmount.toString(), '1000');
-  assert.equal(result.paidAt.toISOString(), '2026-08-11T03:00:00.000Z');
+  assert.equal(result.paidAt.toISOString(), '2026-08-12T03:00:00.000Z');
   assert.equal(updateArgs.data.paid, true);
   assert.equal(updateArgs.data.statusPayment, 'PAID');
   assert.equal(updateArgs.data.paidAmount.toString(), '1000');
 });
 
-test('sale payment projection remains compatible when settlement delegates are unavailable', async () => {
+test('sale payment projection remains compatible when optional allocation and settlement delegates are unavailable', async () => {
   let updateArgs = null;
   const tx = {
     sale: {
