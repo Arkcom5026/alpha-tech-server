@@ -23,6 +23,17 @@ const loadSettlementGeneratedDocument = async (tx, { branchId, settlementId }) =
   return document ? { ...document, generationStatus: link.status } : null;
 };
 
+const acquireGeneratedDeliveryCodeLock = async (tx, branchId) => {
+  if (!tx?.$queryRaw) return;
+  await tx.$queryRaw`SELECT 1::int AS "locked" FROM (SELECT pg_advisory_xact_lock(${-1006}::int, ${Number(branchId)}::int)) AS advisory_lock`;
+};
+
+const isAutoConsolidationBatch = (prepared = []) => {
+  if (!prepared.length || prepared.some((item) => item.completesLine !== true)) return false;
+  const sourceSaleIds = new Set(prepared.map((item) => Number(item?.sale?.id)).filter((id) => Number.isInteger(id) && id > 0));
+  return sourceSaleIds.size >= 2;
+};
+
 const createSettlementConsolidatedDelivery = async ({
   tx,
   branchId,
@@ -42,10 +53,13 @@ const createSettlementConsolidatedDelivery = async ({
   const existing = await loadSettlementGeneratedDocument(tx, { branchId, settlementId });
   if (existing) return existing;
 
-  const paidReady = (prepared || []).filter((item) => item.completesLine === true);
-  if (!paidReady.length) return null;
+  // Auto completion is reserved for the exact business case this boundary owns:
+  // one settlement intentionally combines at least two source deliveries and every
+  // selected line becomes PAID_READY. Single-delivery or partial-payment flows keep
+  // the original delivery/manual workspace semantics instead of creating duplicates.
+  if (!isAutoConsolidationBatch(prepared)) return null;
 
-  const sourceKeys = paidReady.map((item) => ({
+  const sourceKeys = prepared.map((item) => ({
     sourceLineType: item.requested.lineType,
     sourceLineId: item.requested.saleItemId,
   }));
@@ -58,10 +72,15 @@ const createSettlementConsolidatedDelivery = async ({
     select: { sourceLineType: true, sourceLineId: true },
   });
   const documentedKeys = new Set(documented.map((row) => keyOf(row.sourceLineType, row.sourceLineId)));
-  const ready = paidReady.filter((item) => !documentedKeys.has(keyOf(item.requested.lineType, item.requested.saleItemId)));
-  if (!ready.length) return null;
+  if (documentedKeys.size > 0) {
+    const error = new Error('มีรายการในชุดตัดยอดนี้ถูกนำไปสร้างใบส่งของรวมแล้ว กรุณาตรวจสอบเอกสารเดิม');
+    error.code = 'SETTLEMENT_SOURCE_ALREADY_DOCUMENTED';
+    error.statusCode = 409;
+    throw error;
+  }
 
-  const totalAmount = ready.reduce((sum, item) => sum.plus(D(item.snapshot.lineAmount)), D(0));
+  const totalAmount = prepared.reduce((sum, item) => sum.plus(D(item.snapshot.lineAmount)), D(0));
+  await acquireGeneratedDeliveryCodeLock(tx, branchId);
   const code = await generateCombinedBillingCode(tx, Number(branchId), new Date());
   const document = await tx.combinedBillingDocument.create({
     data: {
@@ -75,7 +94,7 @@ const createSettlementConsolidatedDelivery = async ({
       totalAmount,
       status: 'ISSUED',
       documentLines: {
-        create: ready.map((item) => {
+        create: prepared.map((item) => {
           const quantity = D(item.snapshot.quantity);
           const lineAmount = D(item.snapshot.lineAmount);
           const unitPrice = quantity.greaterThan(0) ? lineAmount.dividedBy(quantity).toDecimalPlaces(2) : lineAmount;
@@ -133,5 +152,7 @@ const createSettlementConsolidatedDelivery = async ({
 module.exports = {
   createSettlementConsolidatedDelivery,
   loadSettlementGeneratedDocument,
+  acquireGeneratedDeliveryCodeLock,
+  isAutoConsolidationBatch,
   keyOf,
 };
