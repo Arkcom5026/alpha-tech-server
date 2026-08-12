@@ -8,6 +8,7 @@ const { Prisma } = require('../../../../../lib/prisma');
 const {
   createSettlementConsolidatedDelivery,
   isAutoConsolidationBatch,
+  loadSettlementGeneratedDocument,
 } = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
 
 const read = (relative) => fs.readFileSync(path.join(__dirname, relative), 'utf8');
@@ -15,8 +16,6 @@ const createSettlement = read('createDeliveryCreditSettlementService.js');
 const cancelSettlement = read('cancelDeliveryCreditSettlementService.js');
 const querySettlement = read('queryDeliveryCreditSettlementService.js');
 const generator = read('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery.js');
-const authoritySchema = fs.readFileSync(path.join(__dirname, '../../../../../prisma/customer/customer-money-settlement-document.prisma'), 'utf8');
-const migration = fs.readFileSync(path.join(__dirname, '../../../../../prisma/migrations/20260812183000_customer_money_settlement_generated_document/migration.sql'), 'utf8');
 
 const D = (value) => new Prisma.Decimal(String(value));
 
@@ -44,13 +43,11 @@ test('settlement completion is the automatic consolidated-delivery boundary and 
   assert.match(generator, /pg_advisory_xact_lock/);
 });
 
-test('generated document authority is durable and one-to-one per settlement', () => {
-  assert.match(authoritySchema, /model CustomerMoneySettlementGeneratedDocument/);
-  assert.match(authoritySchema, /settlementId\s+Int\s+@unique/);
-  assert.match(authoritySchema, /combinedBillingId\s+Int\s+@unique/);
-  assert.match(migration, /CREATE TABLE "public"\."CustomerMoneySettlementGeneratedDocument"/);
-  assert.match(migration, /CustomerMoneySettlementGeneratedDocument_settlementId_key/);
-  assert.match(migration, /CustomerMoneySettlementGeneratedDocument_combinedBillingId_key/);
+test('generated document authority reuses immutable ConsolidatedDeliveryLine sourceSnapshot without a new schema', () => {
+  assert.match(generator, /sourceSnapshot:[\s\S]*completedBySettlementId/);
+  assert.match(generator, /path:\s*\['completedBySettlementId'\]/);
+  assert.match(generator, /findSettlementGeneratedDocumentAnchor/);
+  assert.doesNotMatch(generator, /customerMoneySettlementGeneratedDocument/);
 });
 
 test('automatic consolidation requires a complete batch spanning at least two source deliveries', () => {
@@ -73,14 +70,12 @@ test('automatic consolidation requires a complete batch spanning at least two so
 
 test('auto document reproduces the complete paid-ready batch and preserves source department/provenance', async () => {
   let createdData = null;
-  let linkData = null;
   const tx = {
     $queryRaw: async () => [{ locked: 1 }],
-    customerMoneySettlementGeneratedDocument: {
-      findUnique: async () => null,
-      create: async ({ data }) => { linkData = data; return { id: 1, ...data }; },
+    consolidatedDeliveryLine: {
+      findFirst: async () => null,
+      findMany: async () => [],
     },
-    consolidatedDeliveryLine: { findMany: async () => [] },
     combinedBillingDocument: {
       count: async () => 0,
       findFirst: async () => null,
@@ -113,14 +108,14 @@ test('auto document reproduces the complete paid-ready batch and preserves sourc
   assert.equal(createdData.documentLines.create[1].sourceSnapshot.sourceCustomerId, 127);
   assert.equal(createdData.documentLines.create[1].sourceSnapshot.previouslySettledAmount, 600);
   assert.equal(createdData.documentLines.create[1].sourceSnapshot.settlementAppliedAmount, 400);
+  assert.equal(createdData.documentLines.create[0].sourceSnapshot.completedBySettlementId, 77);
   assert.equal(Number(createdData.documentLines.create[1].documentAmount), 1000);
-  assert.deepEqual(linkData, { branchId: 2, settlementId: 77, combinedBillingId: 91, status: 'ACTIVE' });
 });
 
 test('single-delivery and partial batches do not create duplicate/incomplete combined delivery documents', async () => {
   let creates = 0;
   const tx = {
-    customerMoneySettlementGeneratedDocument: { findUnique: async () => null },
+    consolidatedDeliveryLine: { findFirst: async () => null },
     combinedBillingDocument: { create: async () => { creates += 1; } },
   };
 
@@ -149,26 +144,30 @@ test('single-delivery and partial batches do not create duplicate/incomplete com
   assert.equal(creates, 0);
 });
 
-test('idempotent replay reuses the generated document instead of creating another', async () => {
+test('idempotent replay resolves the same generated document from sourceSnapshot instead of creating another', async () => {
   let creates = 0;
   const tx = {
-    customerMoneySettlementGeneratedDocument: {
-      findUnique: async () => ({ id: 5, branchId: 2, settlementId: 77, combinedBillingId: 91, status: 'ACTIVE' }),
+    consolidatedDeliveryLine: {
+      findFirst: async () => ({ combinedBillingId: 91, status: 'DOCUMENTED' }),
     },
     combinedBillingDocument: {
-      findFirst: async () => ({ id: 91, branchId: 2, code: 'CBL-X', documentLines: [], customer: { id: 35 } }),
+      findFirst: async () => ({ id: 91, branchId: 2, code: 'CBL-X', status: 'ISSUED', documentLines: [], customer: { id: 35 } }),
       create: async () => { creates += 1; },
     },
   };
   const document = await createSettlementConsolidatedDelivery({ tx, branchId: 2, employeeId: 35, settlementId: 77, customerId: 35, prepared: [] });
   assert.equal(document.id, 91);
   assert.equal(creates, 0);
+  const replay = await loadSettlementGeneratedDocument(tx, { branchId: 2, settlementId: 77 });
+  assert.equal(replay.id, 91);
+  assert.equal(replay.generationStatus, 'ACTIVE');
 });
 
 test('settlement detail exposes generated document and cancellation reverses it unless tax authority exists', () => {
   assert.match(querySettlement, /generatedDocument/);
-  assert.match(querySettlement, /customerMoneySettlementGeneratedDocument\.findUnique/);
+  assert.match(querySettlement, /loadSettlementGeneratedDocument/);
   assert.match(cancelSettlement, /cancelGeneratedConsolidatedDelivery/);
+  assert.match(cancelSettlement, /findSettlementGeneratedDocumentAnchor/);
   assert.match(cancelSettlement, /sourceType:\s*'CONSOLIDATED_DELIVERY'/);
   assert.match(cancelSettlement, /SETTLEMENT_GENERATED_DOCUMENT_TAX_EXISTS/);
   assert.match(cancelSettlement, /combinedBillingDocument\.update/);
