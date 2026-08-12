@@ -12,13 +12,28 @@ const buildError = (message, statusCode, code) => {
   return error;
 };
 
+const getResolvedFinancialGroup = async (client, { branchId, customerId, financialGroup = null }) => {
+  const ownerId = Number(financialGroup?.ownerId);
+  const memberIds = Array.isArray(financialGroup?.memberIds)
+    ? financialGroup.memberIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+  if (Number.isInteger(ownerId) && ownerId > 0 && memberIds.length > 0 && memberIds.includes(ownerId)) {
+    return { ...financialGroup, ownerId, memberIds };
+  }
+  return resolveFinancialCustomerGroup(client, { branchId, customerId });
+};
+
 const sourceTimestamp = (value) => {
   const timestamp = new Date(value || 0).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
 };
 
-const listAvailableCustomerMoneySources = async (client, { branchId, customerId }) => {
-  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
+const listAvailableCustomerMoneySources = async (client, {
+  branchId,
+  customerId,
+  financialGroup = null,
+}) => {
+  const group = await getResolvedFinancialGroup(client, { branchId, customerId, financialGroup });
   const [receipts, deposits] = await Promise.all([
     client.customerReceipt.findMany({
       where: {
@@ -80,9 +95,13 @@ const listAvailableCustomerMoneySources = async (client, { branchId, customerId 
     });
 };
 
-const getLegacyBalanceReservation = async (client, { branchId, customerId }) => {
+const getLegacyBalanceReservation = async (client, {
+  branchId,
+  customerId,
+  financialGroup = null,
+}) => {
   if (!client?.customerMoneySettlementLine?.aggregate) return money(0);
-  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
+  const group = await getResolvedFinancialGroup(client, { branchId, customerId, financialGroup });
   const aggregate = await client.customerMoneySettlementLine.aggregate({
     where: {
       settlement: {
@@ -102,8 +121,10 @@ const getLegacyBalanceReservation = async (client, { branchId, customerId }) => 
 };
 
 const buildSpendableSourceState = async (client, context) => {
-  const sources = await listAvailableCustomerMoneySources(client, context);
-  const legacyReservedAmount = await getLegacyBalanceReservation(client, context);
+  const financialGroup = await getResolvedFinancialGroup(client, context);
+  const resolvedContext = { ...context, financialGroup };
+  const sources = await listAvailableCustomerMoneySources(client, resolvedContext);
+  const legacyReservedAmount = await getLegacyBalanceReservation(client, resolvedContext);
   let reservationRemaining = legacyReservedAmount;
 
   const sourceStates = sources.map((source) => {
@@ -121,6 +142,7 @@ const buildSpendableSourceState = async (client, context) => {
   const sourceTotal = sources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
   const availableAmount = spendableSources.reduce((sum, source) => sum.plus(source.availableAmount), money(0));
   return {
+    financialGroup,
     sources: spendableSources,
     sourceStates,
     sourceTotal,
@@ -135,8 +157,9 @@ const getCustomerMoneySourceState = async (client, {
   customerId,
   sourceType,
   sourceId,
+  financialGroup = null,
 }) => {
-  const state = await buildSpendableSourceState(client, { branchId, customerId });
+  const state = await buildSpendableSourceState(client, { branchId, customerId, financialGroup });
   const source = state.sourceStates.find((candidate) => (
     candidate.sourceType === sourceType && Number(candidate.sourceId) === Number(sourceId)
   ));
@@ -154,11 +177,16 @@ const calculateAvailableCustomerMoney = async (client, context) => {
   return state.availableAmount;
 };
 
-const consumeCustomerMoneySources = async (client, { branchId, customerId, amount }) => {
+const consumeCustomerMoneySources = async (client, {
+  branchId,
+  customerId,
+  amount,
+  financialGroup = null,
+}) => {
   const requested = money(amount);
   if (requested.lessThanOrEqualTo(0)) return [];
 
-  const state = await buildSpendableSourceState(client, { branchId, customerId });
+  const state = await buildSpendableSourceState(client, { branchId, customerId, financialGroup });
   const sources = state.sources;
   if (state.uncoveredLegacyReservation.greaterThan(0)) {
     throw buildError('ข้อมูล Customer Money เดิมไม่สมดุลกับยอดต้นทาง กรุณาตรวจสอบก่อนตัดยอด', 409, 'CUSTOMER_MONEY_SOURCE_PROJECTION_CONFLICT');
@@ -233,8 +261,13 @@ const consumeCustomerMoneySources = async (client, { branchId, customerId, amoun
   return chunks;
 };
 
-const restoreCustomerMoneySources = async (client, { branchId, customerId, applications }) => {
-  const group = await resolveFinancialCustomerGroup(client, { branchId, customerId });
+const restoreCustomerMoneySources = async (client, {
+  branchId,
+  customerId,
+  applications,
+  financialGroup = null,
+}) => {
+  const group = await getResolvedFinancialGroup(client, { branchId, customerId, financialGroup });
   for (const application of applications || []) {
     const amount = money(application.amount);
     if (amount.lessThanOrEqualTo(0)) continue;
@@ -281,6 +314,7 @@ const restoreCustomerMoneySources = async (client, { branchId, customerId, appli
 
 module.exports = {
   money,
+  getResolvedFinancialGroup,
   listAvailableCustomerMoneySources,
   getLegacyBalanceReservation,
   buildSpendableSourceState,

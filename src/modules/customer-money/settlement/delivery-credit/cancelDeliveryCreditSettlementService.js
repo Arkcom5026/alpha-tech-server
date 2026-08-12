@@ -12,8 +12,11 @@ const {
 const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
+const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 const { getSettlement } = require('./deliveryCreditSettlementRepository');
 const { getDeliveryCreditSettlement } = require('./queryDeliveryCreditSettlementService');
+
+const SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS = Object.freeze({ maxWait: 10000, timeout: 30000 });
 
 const buildError = (message, statusCode, code) => {
   const error = new Error(message);
@@ -104,7 +107,11 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
     let settlement = await getSettlement({ client: tx, id: settlementId, branchId });
     if (!settlement) throw buildError('ไม่พบเอกสารตัดยอดใบส่งของ', 404, 'SETTLEMENT_NOT_FOUND');
 
-    await acquireCustomerMoneyTransactionLock(tx, settlement.customerId, settlement.branchId);
+    const financialGroup = await resolveFinancialCustomerGroup(tx, {
+      customerId: settlement.customerId,
+      branchId: settlement.branchId,
+    });
+    await acquireCustomerMoneyTransactionLock(tx, financialGroup.ownerId);
     await ensureEmployee(tx, branchId, employeeId);
 
     settlement = await getSettlement({ client: tx, id: settlementId, branchId });
@@ -131,6 +138,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
       branchId,
       customerId: settlement.customerId,
       applications,
+      financialGroup,
     });
 
     const applicationIds = applications.map((application) => application.id);
@@ -160,7 +168,7 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
         client: tx,
         data: {
           branchId,
-          customerId: settlement.customerId,
+          customerId: financialGroup.ownerId,
           applicationId: application.id,
           eventType: 'MONEY_APPLICATION_REVERSED',
           amount: application.amount,
@@ -178,12 +186,13 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
 
     const availableAmount = await calculateAvailableCustomerMoney(tx, {
       branchId,
-      customerId: settlement.customerId,
+      customerId: financialGroup.ownerId,
+      financialGroup,
     });
     await updateCustomerMoneyBalance({
       client: tx,
       branchId,
-      customerId: settlement.customerId,
+      customerId: financialGroup.ownerId,
       availableAmount,
     });
 
@@ -192,11 +201,12 @@ const cancelDeliveryCreditSettlement = async ({ prisma, user, id, cancelReason }
       user: { ...user, branchId },
       id: settlement.id,
     });
-  });
+  }, SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS);
 };
 
 module.exports = {
   cancelDeliveryCreditSettlement,
   ensureNoDownstreamDocumentAuthority,
   ensureNoTaxDocumentAuthority,
+  SETTLEMENT_CANCELLATION_TRANSACTION_OPTIONS,
 };
