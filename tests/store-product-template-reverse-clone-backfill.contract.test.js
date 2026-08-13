@@ -22,6 +22,11 @@ assert.match(source, /--confirm-branches must exactly match --branches when usin
 assert.match(source, /Missing employee mapping for branch/)
 assert.match(source, /active: true/)
 assert.match(source, /approved: true/)
+assert.match(source, /productType: \{ is: \{ branchId: Number\(branchId\) \} \}/)
+assert.match(source, /loadUnlinkedTaxonomyAuditRows/)
+assert.match(source, /globalProductTypeId: true/)
+assert.match(source, /globalProductType: \{[\s\S]*categoryId: true/)
+assert.doesNotMatch(source, /globalProductTypeId: null/)
 
 assert.match(source, /--max-items/)
 assert.match(source, /MAX_BATCH_SIZE = 100/)
