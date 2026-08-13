@@ -1,7 +1,7 @@
 'use strict'
 
 const { prisma } = require('../../../../lib/prisma')
-const { cloudinary } = require('../../../../utils/cloudinary')
+const { cloudinary } = require('../../../../../utils/cloudinary')
 
 const buildReverseCloneImagePublicId = ({ templateProductId, sourceProductId, sourceImageId }) =>
   `products/template-reverse/${Number(templateProductId)}/source-${Number(sourceProductId)}-${Number(sourceImageId)}`
