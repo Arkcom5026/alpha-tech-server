@@ -1,54 +1,30 @@
 const express = require('express')
 const verifyToken = require('../../../../../middlewares/verifyToken')
-const {
-  createProductTemplateCandidate,
-} = require('../create/createProductTemplateCandidateController')
-const {
-  auditProductTemplateDiscovery,
-} = require('../discovery/auditProductTemplateDiscoveryController')
-const {
-  materializeProductTemplateDiscovery,
-} = require('../discovery/materializeProductTemplateDiscoveryController')
-const {
-  listCanonicalProductGroupsController,
-} = require('../query/groups/listCanonicalProductGroupsController')
-const {
-  getCanonicalProductGroupController,
-} = require('../query/groups/getCanonicalProductGroupController')
-const {
-  listProductTemplateCandidates,
-} = require('../query/list/listProductTemplateCandidatesController')
-const {
-  getProductTemplateCandidate,
-} = require('../query/detail/getProductTemplateCandidateController')
-const {
-  startProductTemplateCandidateReview,
-} = require('../review/start/startProductTemplateCandidateReviewController')
-const {
-  rejectProductTemplateCandidate,
-} = require('../review/reject/rejectProductTemplateCandidateController')
-const {
-  mergeProductTemplateCandidate,
-} = require('../promotion/merge/mergeProductTemplateCandidateController')
-const {
-  promoteProductTemplateCandidate,
-} = require('../promotion/promote/promoteProductTemplateCandidateController')
+const { createProductTemplateCandidate } = require('../create/createProductTemplateCandidateController')
+const { auditProductTemplateDiscovery } = require('../discovery/auditProductTemplateDiscoveryController')
+const { materializeProductTemplateDiscovery } = require('../discovery/materializeProductTemplateDiscoveryController')
+const { createCatalogQualityCandidate } = require('../quality/createCatalogQualityCandidateController')
+const { listCanonicalProductGroupsController } = require('../query/groups/listCanonicalProductGroupsController')
+const { getCanonicalProductGroupController } = require('../query/groups/getCanonicalProductGroupController')
+const { listProductTemplateCandidates } = require('../query/list/listProductTemplateCandidatesController')
+const { getProductTemplateCandidate } = require('../query/detail/getProductTemplateCandidateController')
+const { startProductTemplateCandidateReview } = require('../review/start/startProductTemplateCandidateReviewController')
+const { rejectProductTemplateCandidate } = require('../review/reject/rejectProductTemplateCandidateController')
+const { mergeProductTemplateCandidate } = require('../promotion/merge/mergeProductTemplateCandidateController')
+const { promoteProductTemplateCandidate } = require('../promotion/promote/promoteProductTemplateCandidateController')
 
 const router = express.Router()
-
 const requireSuperAdmin = (req, res, next) => {
   const role = String(req.user?.role || '').trim().toUpperCase()
-  if (role !== 'SUPERADMIN') {
-    return res.status(403).json({ error: 'Forbidden', code: 'SUPERADMIN_REQUIRED' })
-  }
+  if (role !== 'SUPERADMIN') return res.status(403).json({ error: 'Forbidden', code: 'SUPERADMIN_REQUIRED' })
   return next()
 }
 
 router.use(verifyToken)
 router.use(requireSuperAdmin)
-
 router.get('/discovery-audit', auditProductTemplateDiscovery)
 router.post('/discovery-materialize', materializeProductTemplateDiscovery)
+router.post('/quality', createCatalogQualityCandidate)
 router.get('/groups', listCanonicalProductGroupsController)
 router.get('/groups/:groupKey', getCanonicalProductGroupController)
 router.get('/', listProductTemplateCandidates)
