@@ -18,6 +18,6 @@ assert.match(block, /productTypeBrand\.upsert\(/)
 assert.match(block, /productTypeId_brandId/)
 assert.match(block, /update:\s*\{\}/)
 assert.doesNotMatch(block, /productTypeBrand\.create\(/)
-assert.doesNotMatch(block, /P2002/)
+assert.doesNotMatch(block, /catch\s*\(/)
 
 console.log('Product Template Forward Clone Brand Mapping Transaction Contract: PASS')
