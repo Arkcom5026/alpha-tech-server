@@ -30,6 +30,21 @@ const makeError = (code, status = 400, message = code, details = undefined) => {
   return error
 }
 
+const buildForwardCloneLockKey = ({ branchId, templateProductId }) => {
+  const brId = toInt(branchId)
+  const tplId = toInt(templateProductId)
+  if (!brId || !tplId) throw makeError('FORWARD_CLONE_LOCK_CONTEXT_REQUIRED', 400)
+  return `product-template-forward-clone:${brId}:${tplId}`
+}
+
+const acquireForwardCloneLock = async ({ branchId, templateProductId, db }) => {
+  const lockKey = buildForwardCloneLockKey({ branchId, templateProductId })
+  // PostgreSQL advisory transaction lock serializes materialization for the same
+  // Store + Template pair. Cast void to text so Prisma can deserialize the result.
+  await db.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))::text', lockKey)
+  return lockKey
+}
+
 const normalizeTaxonomyLabel = (value) =>
   String(value || '')
     .normalize('NFKC')
@@ -422,6 +437,12 @@ const cloneOperationalProductFromTemplate = async ({
       throw error
     }
 
+    await acquireForwardCloneLock({
+      branchId: brId,
+      templateProductId: tplId,
+      db: tx,
+    })
+
     // A traced Store Product is already the operational authority. Once a Template
     // has been materialized, stores may independently change ProductType/name/prices.
     // Re-selecting the same Template must resolve that exact Local Product without
@@ -543,6 +564,8 @@ const cloneOperationalProductFromTemplate = async ({
 }
 
 module.exports = {
+  buildForwardCloneLockKey,
+  acquireForwardCloneLock,
   normalizeTaxonomyLabel,
   normalizeProductTypeIdentity,
   isTaxonomyLabelCompatible,
