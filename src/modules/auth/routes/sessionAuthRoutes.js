@@ -62,7 +62,6 @@ const resolveHandler = (key) => {
 };
 
 const login = ensureFn('login');
-const register = ensureFn('register');
 const refreshSession = ensureFn('refreshSession');
 const logoutSession = ensureFn('logoutSession');
 const getMe = ensureFn('getMe');
@@ -82,8 +81,14 @@ if (typeof findUserByEmail !== 'function') {
   throw new Error(`[sessionAuthRoutes] authController.findUserByEmail must be a function (got ${typeof findUserByEmail})`);
 }
 
+const retiredGenericRegister = (req, res) => res.status(410).json({
+  success: false,
+  code: 'AUTH_REGISTER_BOUNDARY_RETIRED',
+  message: 'การลงทะเบียนแบบทั่วไปถูกยกเลิก กรุณาใช้ขั้นตอนลงทะเบียนเฉพาะประเภทบัญชี',
+});
+
 router.post('/login', login);
-router.post('/register', register);
+router.post('/register', retiredGenericRegister);
 router.post('/refresh', traceRefreshRequest, refreshSession);
 router.post('/logout', logoutSession);
 router.post('/add-sub-employee', verifyToken, addSubEmployee);

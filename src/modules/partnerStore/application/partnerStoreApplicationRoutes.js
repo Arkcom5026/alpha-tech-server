@@ -12,7 +12,6 @@ publicRouter.post('/', controller.submit)
 
 adminRouter.use(verifyToken, requireAdmin.superadmin)
 adminRouter.get('/', controller.list)
-adminRouter.post('/:id/review', controller.startReview)
 adminRouter.post('/:id/approve', controller.approve)
 adminRouter.post('/:id/reject', controller.reject)
 
