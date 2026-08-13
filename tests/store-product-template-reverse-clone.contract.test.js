@@ -59,9 +59,13 @@ assert.ok(lockedReadIndex > acquireLockIndex, 'source Product must be re-read af
 assert.ok(exactMatchIndex > lockedReadIndex, 'exact Template match must be re-checked after locked re-read')
 assert.ok(createTemplateIndex > exactMatchIndex, 'Template Product creation must happen only after locked exact-match recheck')
 
-assert.match(reverseCloneSource, /ensureTemplateProductType/)
-assert.match(reverseCloneSource, /isTaxonomyLabelCompatible/)
-assert.match(reverseCloneSource, /PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT/)
+// GlobalProductType ID/category is taxonomy authority. Child ProductType labels are allowed
+// to be more specific than their parent GlobalProductType label.
+assert.match(reverseCloneSource, /assertSourceProductTypeIntegrity/)
+assert.match(reverseCloneSource, /Number\(productType\.globalProductTypeId\) !== Number\(globalType\.id\)/)
+assert.doesNotMatch(reverseCloneSource, /isTaxonomyLabelCompatible/)
+assert.doesNotMatch(reverseCloneSource, /const existing = exactName \|\| compatible\[0\]/)
+assert.match(reverseCloneSource, /normalizeCatalogText\(candidate\.name\) === normalizeCatalogText\(sourceType\.name\)/)
 assert.match(reverseCloneSource, /ensureTemplateProductTypeBrand/)
 assert.match(reverseCloneSource, /resolveTemplateSaleBarcode/)
 assert.match(reverseCloneSource, /cloneSourceBranchPriceToTemplate/)
