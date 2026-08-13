@@ -1,6 +1,7 @@
 'use strict'
 
 const service = require('./partnerStoreApplicationService')
+const reviewService = require('./partnerStoreApplicationReviewService')
 
 const sendError = (res, error) =>
   res.status(error?.statusCode || 500).json({
@@ -21,6 +22,15 @@ exports.submit = async (req, res) => {
 exports.list = async (req, res) => {
   try {
     return res.json({ success: true, data: await service.listApplications(req.query?.status) })
+  } catch (error) {
+    return sendError(res, error)
+  }
+}
+
+exports.startReview = async (req, res) => {
+  try {
+    const data = await reviewService.startReview(Number(req.params.id), req.user?.id, req.body?.note)
+    return res.json({ success: true, data })
   } catch (error) {
     return sendError(res, error)
   }
