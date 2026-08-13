@@ -2,6 +2,14 @@ const { prisma } = require('../../../../../../lib/prisma')
 
 const CANDIDATE_LIST_SELECT = {
   id: true,
+  type: true,
+  templateBranchId: true,
+  primaryTemplateProductId: true,
+  comparisonTemplateProductId: true,
+  dedupeKey: true,
+  assessment: true,
+  resolution: true,
+  resolvedAt: true,
   sourceBranchId: true,
   sourceProductId: true,
   targetTemplateBranchId: true,
@@ -25,6 +33,16 @@ const CANDIDATE_LIST_SELECT = {
   reviewedByEmployee: { select: { id: true, name: true } },
   _count: { select: { events: true } },
 }
+
+const findTemplateBranchIdsByBusinessType = ({ businessType }) =>
+  prisma.branch.findMany({
+    where: {
+      businessType,
+      branchCode: { startsWith: 'T' },
+    },
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  })
 
 const listCandidates = ({ where, summaryWhere, skip, take, orderBy }) =>
   prisma.$transaction([
@@ -53,5 +71,6 @@ const listCandidates = ({ where, summaryWhere, skip, take, orderBy }) =>
 
 module.exports = {
   CANDIDATE_LIST_SELECT,
+  findTemplateBranchIdsByBusinessType,
   listCandidates,
 }

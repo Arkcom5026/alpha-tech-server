@@ -1,0 +1,27 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.resolve(__dirname, '..')
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
+
+const routes = read('src/modules/productTemplate/candidates/routes/productTemplateCandidateRoutes.js')
+const service = read('src/modules/productTemplate/candidates/quality/discoverCatalogQualityCandidatesService.js')
+const repository = read('src/modules/productTemplate/candidates/quality/discoverCatalogQualityCandidatesRepository.js')
+const creator = read('src/modules/productTemplate/candidates/quality/createCatalogQualityCandidateService.js')
+
+assert.match(routes, /router\.post\('\/quality\/scan-quality'/)
+assert.match(service, /QUALITY_REVIEW/)
+assert.match(service, /assessmentEvidence/)
+assert.match(service, /PRODUCT_TYPE_AUTHORITY_MISSING/)
+assert.match(service, /BRAND_MISSING/)
+assert.match(service, /UNIT_MISSING/)
+assert.match(service, /SALE_BARCODE_MISSING/)
+assert.match(service, /IMAGE_MISSING/)
+assert.match(repository, /productImages/)
+assert.match(repository, /clonedProducts/)
+assert.match(creator, /normalizeAssessmentEvidence/)
+assert.ok(!service.includes('sourceProductId'))
+assert.ok(!service.includes('PROMOTED'))
+
+console.log('product-template-catalog-quality-quality-review.contract.test.js: PASS')

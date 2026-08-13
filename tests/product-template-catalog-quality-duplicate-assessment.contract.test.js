@@ -1,0 +1,30 @@
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.resolve(__dirname, '..')
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
+
+const assessment = read('src/modules/productTemplate/candidates/quality/catalogDuplicateAssessment.js')
+const discovery = read('src/modules/productTemplate/candidates/quality/discoverCatalogDuplicateCandidatesService.js')
+
+assert.match(assessment, /extractModelTokens/)
+assert.match(assessment, /scoreDuplicatePair/)
+assert.match(assessment, /saleBarcode/)
+assert.match(assessment, /globalProductTypeId/)
+assert.match(assessment, /brand/)
+assert.match(assessment, /unit/)
+assert.match(assessment, /nameSimilarity/)
+assert.match(assessment, /STRONG/)
+assert.match(assessment, /LIKELY/)
+assert.match(assessment, /buildCandidateBuckets/)
+assert.ok(!assessment.includes('BusinessType'))
+
+assert.match(discovery, /buildCandidateBuckets/)
+assert.match(discovery, /scoreDuplicatePair/)
+assert.match(discovery, /assessment/)
+assert.match(discovery, /confidence/)
+assert.match(discovery, /signals/)
+assert.ok(!discovery.includes('for (let i = 0; i < products.length'))
+
+console.log('product-template-catalog-quality-duplicate-assessment.contract.test.js: PASS')

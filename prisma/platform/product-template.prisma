@@ -1,3 +1,9 @@
+enum ProductTemplateCandidateType {
+  POSSIBLE_DUPLICATE
+  QUALITY_REVIEW
+  ORPHAN_UNUSED
+}
+
 enum ProductTemplateCandidateStatus {
   DRAFT
   UNDER_REVIEW
@@ -5,6 +11,10 @@ enum ProductTemplateCandidateStatus {
   PROMOTED
   MERGED
   CANCELLED
+  OPEN
+  RESOLVED
+  DISMISSED
+  ARCHIVED
 }
 
 enum ProductTemplateCandidateEventType {
@@ -15,13 +25,25 @@ enum ProductTemplateCandidateEventType {
   PROMOTED
   MERGED
   CANCELLED
+  DUPLICATE_RESOLVED
+  ORPHAN_ARCHIVED
 }
 
 model ProductTemplateCandidate {
-  id                      Int                            @id @default(autoincrement())
-  sourceBranchId          Int
-  sourceProductId         Int
-  targetTemplateBranchId  Int
+  id                          Int                             @id @default(autoincrement())
+  type                        ProductTemplateCandidateType?
+  templateBranchId            Int?
+  primaryTemplateProductId    Int?
+  comparisonTemplateProductId Int?
+  dedupeKey                   String?                        @unique
+  assessment                  Json?
+  resolution                  Json?
+  resolvedAt                  DateTime?
+
+  // Legacy Store Product -> Candidate -> Template authority retained only for transition.
+  sourceBranchId          Int?
+  sourceProductId         Int?
+  targetTemplateBranchId  Int?
   targetTemplateProductId Int?
   status                  ProductTemplateCandidateStatus @default(DRAFT)
   sourceSnapshot          Json
@@ -34,14 +56,19 @@ model ProductTemplateCandidate {
   promotedAt              DateTime?
   createdAt               DateTime                       @default(now())
   updatedAt               DateTime                       @updatedAt
-  sourceBranch            Branch                         @relation("ProductTemplateCandidateSourceBranch", fields: [sourceBranchId], references: [id])
-  sourceProduct           Product                        @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
-  targetTemplateBranch    Branch                         @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
-  targetTemplateProduct   Product?                       @relation("ProductTemplateCandidateTargetProduct", fields: [targetTemplateProductId], references: [id])
-  createdByEmployee       EmployeeProfile?              @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
-  reviewedByEmployee      EmployeeProfile?              @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
-  events                  ProductTemplateCandidateEvent[]
 
+  sourceBranch          Branch?   @relation("ProductTemplateCandidateSourceBranch", fields: [sourceBranchId], references: [id])
+  sourceProduct         Product?  @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
+  targetTemplateBranch  Branch?   @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
+  targetTemplateProduct Product?  @relation("ProductTemplateCandidateTargetProduct", fields: [targetTemplateProductId], references: [id])
+  createdByEmployee     EmployeeProfile? @relation("ProductTemplateCandidateCreatedBy", fields: [createdByEmployeeId], references: [id])
+  reviewedByEmployee    EmployeeProfile? @relation("ProductTemplateCandidateReviewedBy", fields: [reviewedByEmployeeId], references: [id])
+  events                ProductTemplateCandidateEvent[]
+
+  @@index([templateBranchId, type, status])
+  @@index([primaryTemplateProductId])
+  @@index([comparisonTemplateProductId])
+  @@index([type, status, createdAt])
   @@index([sourceBranchId, sourceProductId])
   @@index([targetTemplateBranchId, status])
   @@index([status, createdAt])

@@ -1,0 +1,15 @@
+-- Historical migration tombstone.
+--
+-- The original 20260814000455_partner_store_registration_governance_v2
+-- failed before applying any migration step because its SQL file contained
+-- a UTF-8 BOM before the first CREATE statement.
+--
+-- Both failed attempts were recorded with applied_steps_count = 0 and were
+-- rolled back.
+--
+-- Its intended schema change was subsequently applied successfully by:
+-- 20260814003000_partner_store_registration_governance_v2
+--
+-- This migration intentionally performs no DDL.
+-- It exists only to restore durable Prisma migration-history authority.
+SELECT 1;
