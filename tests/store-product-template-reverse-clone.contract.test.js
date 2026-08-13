@@ -59,9 +59,22 @@ assert.ok(lockedReadIndex > acquireLockIndex, 'source Product must be re-read af
 assert.ok(exactMatchIndex > lockedReadIndex, 'exact Template match must be re-checked after locked re-read')
 assert.ok(createTemplateIndex > exactMatchIndex, 'Template Product creation must happen only after locked exact-match recheck')
 
-assert.match(reverseCloneSource, /ensureTemplateProductType/)
-assert.match(reverseCloneSource, /isTaxonomyLabelCompatible/)
-assert.match(reverseCloneSource, /PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT/)
+// ProductType reverse-clone authority: the Store ProductType identity is authoritative.
+// GlobalProductType is a parent/family routing authority, not a lexical synonym requirement.
+assert.match(reverseCloneSource, /assertSourceProductTypeIntegrity/)
+assert.match(reverseCloneSource, /GLOBAL_PRODUCT_TYPE_ID_MISMATCH/)
+assert.doesNotMatch(reverseCloneSource, /isTaxonomyLabelCompatible/)
+assert.doesNotMatch(reverseCloneSource, /PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT/)
+assert.match(reverseCloneSource, /const sourceNormalizedName = sourceType\.normalizedName/)
+assert.match(reverseCloneSource, /normalizeCatalogText\(candidate\.name\) === normalizeCatalogText\(sourceType\.name\)/)
+assert.match(reverseCloneSource, /normalizeCatalogText\(candidate\.normalizedName\) === normalizeCatalogText\(sourceNormalizedName\)/)
+assert.match(reverseCloneSource, /name: sourceType\.name/)
+assert.match(reverseCloneSource, /normalizedName: sourceNormalizedName/)
+assert.match(reverseCloneSource, /active: sourceType\.active !== false/)
+assert.match(reverseCloneSource, /branchId: Number\(templateBranchId\)/)
+assert.match(reverseCloneSource, /globalProductTypeId,/)
+assert.doesNotMatch(reverseCloneSource, /exactName \|\| compatible\[0\]/)
+
 assert.match(reverseCloneSource, /ensureTemplateProductTypeBrand/)
 assert.match(reverseCloneSource, /resolveTemplateSaleBarcode/)
 assert.match(reverseCloneSource, /cloneSourceBranchPriceToTemplate/)
