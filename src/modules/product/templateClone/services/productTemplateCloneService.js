@@ -21,6 +21,15 @@ const requireBranchId = (branchId) => {
   return id
 }
 
+const makeError = (code, status = 400, message = code, details = undefined) => {
+  const error = new Error(message)
+  error.code = code
+  error.status = status
+  error.statusCode = status
+  if (details !== undefined) error.details = details
+  return error
+}
+
 const normalizeTaxonomyLabel = (value) =>
   String(value || '')
     .normalize('NFKC')
@@ -297,6 +306,32 @@ const resolveCloneSaleBarcode = async ({ branchId, template, db }) => {
   return conflict ? null : saleBarcode
 }
 
+const assertForwardClonePriceSnapshot = ({ actor, payload = {}, effectiveDate, expiredDate }) => {
+  const authority = priceAuthorityPolicy.assertMutationAuthority({ actor, payload })
+
+  for (const field of priceAuthorityPolicy.touchedPriceFields(payload)) {
+    const value = payload[field]
+    if (value === undefined || value === null) continue
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) {
+      throw makeError('INVALID_PRICE_VALUE', 400, `ราคา ${field} ไม่ถูกต้อง`, { field, value })
+    }
+    if (numeric < 0) {
+      throw makeError('NEGATIVE_PRICE_NOT_ALLOWED', 400, `ราคา ${field} ต้องไม่ติดลบ`, { field, value })
+    }
+  }
+
+  const effective = effectiveDate ? new Date(effectiveDate) : null
+  const expired = expiredDate ? new Date(expiredDate) : null
+  if (effective && Number.isNaN(effective.getTime())) throw makeError('INVALID_PRICE_EFFECTIVE_DATE', 400)
+  if (expired && Number.isNaN(expired.getTime())) throw makeError('INVALID_PRICE_EXPIRED_DATE', 400)
+  if (effective && expired && expired < effective) {
+    throw makeError('INVALID_PRICE_DATE_RANGE', 400, 'expiredDate ต้องไม่เร็วกว่าหรือก่อน effectiveDate')
+  }
+
+  return authority
+}
+
 const cloneTemplateBranchPrice = async ({
   productId,
   branchId,
@@ -308,26 +343,22 @@ const cloneTemplateBranchPrice = async ({
 }) => {
   if (!sourcePrice) return null
 
-  const costPrice = Number(sourcePrice.costPrice)
-  const priceRetail = Number(sourcePrice.priceRetail)
-  if (!Number.isFinite(costPrice) || costPrice <= 0 || !Number.isFinite(priceRetail) || priceRetail <= 0) {
-    return null
+  const payload = {
+    costPrice: sourcePrice.costPrice,
+    priceRetail: sourcePrice.priceRetail,
+    priceWholesale: sourcePrice.priceWholesale,
+    priceTechnician: sourcePrice.priceTechnician,
+    priceOnline: sourcePrice.priceOnline,
   }
 
-  const authority = priceAuthorityPolicy.assertPricePayload({
+  const authority = assertForwardClonePriceSnapshot({
     actor: {
       branchId,
       employeeId: toInt(employeeId),
       role,
       v2Role,
     },
-    payload: {
-      costPrice: sourcePrice.costPrice,
-      priceRetail: sourcePrice.priceRetail,
-      priceWholesale: sourcePrice.priceWholesale,
-      priceTechnician: sourcePrice.priceTechnician,
-      priceOnline: sourcePrice.priceOnline,
-    },
+    payload,
     effectiveDate: sourcePrice.effectiveDate,
     expiredDate: sourcePrice.expiredDate,
   })
@@ -341,11 +372,7 @@ const cloneTemplateBranchPrice = async ({
       note: 'Cloned from Product Template',
       updatedBy: authority.employeeId,
       isActive: sourcePrice.isActive !== false,
-      costPrice: sourcePrice.costPrice,
-      priceRetail: sourcePrice.priceRetail,
-      priceWholesale: sourcePrice.priceWholesale ?? null,
-      priceTechnician: sourcePrice.priceTechnician ?? null,
-      priceOnline: sourcePrice.priceOnline ?? null,
+      ...payload,
     },
   })
 }
@@ -528,6 +555,7 @@ module.exports = {
   fetchTemplateCloneDefaults,
   ensureSelectedBrandMapping,
   resolveCloneSaleBarcode,
+  assertForwardClonePriceSnapshot,
   cloneTemplateBranchPrice,
   cloneOperationalProductFromTemplate,
 }
