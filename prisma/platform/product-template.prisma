@@ -55,10 +55,6 @@ model ProductTemplateCandidate {
   createdAt               DateTime                       @default(now())
   updatedAt               DateTime                       @updatedAt
 
-  templateBranch            Branch?  @relation("ProductTemplateCandidateTemplateBranch", fields: [templateBranchId], references: [id])
-  primaryTemplateProduct    Product? @relation("ProductTemplateCandidatePrimaryProduct", fields: [primaryTemplateProductId], references: [id])
-  comparisonTemplateProduct Product? @relation("ProductTemplateCandidateComparisonProduct", fields: [comparisonTemplateProductId], references: [id])
-
   sourceBranch          Branch?   @relation("ProductTemplateCandidateSourceBranch", fields: [sourceBranchId], references: [id])
   sourceProduct         Product?  @relation("ProductTemplateCandidateSourceProduct", fields: [sourceProductId], references: [id])
   targetTemplateBranch  Branch?   @relation("ProductTemplateCandidateTargetBranch", fields: [targetTemplateBranchId], references: [id])
