@@ -2,14 +2,22 @@ const {
   cloneOperationalProductFromTemplate,
 } = require('../services/productTemplateCloneService')
 
+const getEffectiveRole = (req) =>
+  req.employee?.v2Role ||
+  req.employee?.role ||
+  req.user?.v2Role ||
+  req.user?.role ||
+  null
+
 const createOperationalProductFromTemplate = async (req, res) => {
   try {
+    const effectiveRole = getEffectiveRole(req)
     const result = await cloneOperationalProductFromTemplate({
       branchId: req.user?.branchId,
       templateProductId: req.body?.templateProductId,
       employeeId: req.employee?.id || req.user?.employeeId || null,
-      role: req.user?.role,
-      v2Role: req.employee?.role,
+      role: effectiveRole,
+      v2Role: req.employee?.v2Role || req.user?.v2Role || null,
     })
 
     const status = result.statusCode || (result.created ? 201 : 200)
