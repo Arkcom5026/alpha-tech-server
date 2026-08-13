@@ -9,9 +9,17 @@ enum PartnerStoreApplicationStatus {
   WITHDRAWN
 }
 
+enum PartnerStoreApplicationEventType {
+  SUBMITTED
+  REVIEW_STARTED
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
 model PartnerStoreApplication {
-  id                       Int                           @id @default(autoincrement())
-  applicationCode          String                        @unique
+  id                       Int                            @id @default(autoincrement())
+  applicationCode          String                         @unique
   businessName             String
   contactName              String
   contactPhone             String
@@ -21,15 +29,33 @@ model PartnerStoreApplication {
   note                     String?
   status                   PartnerStoreApplicationStatus @default(PENDING)
   reviewNote               String?
-  provisionedBranchId      Int?                          @unique
-  provisionedOwnerUserId   Int?                          @unique
+  provisionedBranchId      Int?                           @unique
+  provisionedOwnerUserId   Int?                           @unique
   decidedAt                DateTime?
-  provisionedBranch        Branch?                       @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
-  provisionedOwnerUser     User?                         @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
-  createdAt                DateTime                      @default(now())
-  updatedAt                DateTime                      @updatedAt
+  provisionedBranch        Branch?                        @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
+  provisionedOwnerUser     User?                          @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
+  events                   PartnerStoreApplicationEvent[]
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
 
   @@index([status, createdAt])
   @@index([contactPhone, createdAt])
   @@index([requestedStorefrontSlug])
+}
+
+model PartnerStoreApplicationEvent {
+  id               Int                              @id @default(autoincrement())
+  applicationId    Int
+  eventType        PartnerStoreApplicationEventType
+  previousStatus   PartnerStoreApplicationStatus?
+  resultingStatus  PartnerStoreApplicationStatus
+  actorUserId      Int?
+  note             String?
+  metadata         Json?
+  createdAt        DateTime                         @default(now())
+  application      PartnerStoreApplication          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorUserId])
 }
