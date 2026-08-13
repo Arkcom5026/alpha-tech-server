@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const read = (p) => fs.readFileSync(path.resolve(__dirname, '..', p), 'utf8')
+const service = read('src/modules/product/templateReverseClone/services/storeProductTemplateReverseCloneImageService.js')
+const runner = read('scripts/backfill-store-product-template-images.js')
+
+assert.match(service, /buildReverseCloneImagePublicId/)
+assert.match(service, /SOURCE_TEMPLATE_LINK_REQUIRED/)
+assert.match(service, /SKIPPED_TARGET_HAS_IMAGES/)
+assert.match(service, /uploader\.upload\(sourceUrl/)
+assert.match(service, /overwrite: false/)
+assert.match(service, /productId: template\.id/)
+assert.doesNotMatch(service, /public_id:\s*sourceImage\.public_id/)
+assert.match(runner, /templateProductId: \{ not: null \}/)
+assert.match(runner, /syncStoreProductImagesToTemplate/)
+assert.match(runner, /--confirm-branches/)
+assert.match(runner, /SKIPPED_TARGET_HAS_IMAGES/)
+
+console.log('Store Product Template Reverse Clone Historical Image Backfill Contract: PASS')

@@ -1,0 +1,53 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const read = (relativePath) => fs.readFileSync(path.resolve(__dirname, '..', relativePath), 'utf8')
+
+const createService = read('src/modules/product/create/services/productCreateService.js')
+const reverseCloneService = read('src/modules/product/templateReverseClone/services/storeProductTemplateReverseCloneService.js')
+const imageService = read('src/modules/product/templateReverseClone/services/storeProductTemplateReverseCloneImageService.js')
+const productBackfill = read('scripts/backfill-store-products-to-template.js')
+const imageBackfill = read('scripts/backfill-store-product-template-images.js')
+
+// Product Create remains authoritative for local creation and reverse clone is best-effort/non-blocking.
+assert.match(createService, /const result = await prisma\.\$transaction/)
+assert.match(createService, /templateSync = await reverseCloneStoreProductToMatchingTemplate/)
+assert.match(createService, /catch \(error\)/)
+assert.match(createService, /success: true/)
+assert.match(createService, /templateSync,/)
+
+// Reverse clone must be idempotent and transaction-safe.
+assert.match(reverseCloneService, /status: 'LINKED_TEMPLATE'/)
+assert.match(reverseCloneService, /status: 'MATCHED_UNLINKED'/)
+assert.match(reverseCloneService, /status: 'REVERSE_CLONED'/)
+assert.match(reverseCloneService, /pg_advisory_xact_lock/)
+assert.match(reverseCloneService, /productType\.upsert/)
+assert.doesNotMatch(reverseCloneService, /productType\.create\([\s\S]*?P2002/)
+assert.match(reverseCloneService, /productTypeBrand\.upsert/)
+assert.match(reverseCloneService, /branchPrice\.upsert/)
+assert.match(reverseCloneService, /templateProductId: Number\(templateProductId\)/)
+
+// Historical image parity uses a separate authority and never reuses the source public_id.
+assert.match(imageService, /syncStoreProductImagesToTemplate/)
+assert.match(imageService, /products\/template-reverse\//)
+assert.match(imageService, /source-/)
+assert.match(imageService, /SKIPPED_TARGET_HAS_IMAGES/)
+assert.match(imageService, /ALREADY_SYNCED/)
+assert.match(imageService, /SYNCED/)
+assert.doesNotMatch(imageService, /public_id:\s*sourceImage\.public_id/)
+
+// Backfills default to dry-run, require explicit execute confirmation, and remain resumable.
+for (const source of [productBackfill, imageBackfill]) {
+  assert.match(source, /Boolean\(args\.execute\)/)
+  assert.match(source, /Boolean\(args\['dry-run'\]\) \|\| !execute/)
+  assert.match(source, /assertExecuteConfirmation/)
+  assert.match(source, /--confirm-branches/)
+  assert.match(source, /--max-items/)
+}
+assert.match(productBackfill, /templateProductId: null/)
+assert.match(productBackfill, /id: \{ gt: Number\(afterId\) \|\| 0 \}/)
+assert.match(productBackfill, /remainingUnlinked/)
+assert.match(productBackfill, /completed/)
+
+console.log('Store Product Template Reverse Clone Completion Contract: PASS')
