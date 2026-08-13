@@ -66,6 +66,11 @@ const buildTemplateSnapshot = (product) => ({
   localReferenceCount: product._count?.clonedProducts || 0,
 })
 
+const normalizeAssessmentEvidence = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value
+}
+
 const createCatalogQualityCandidate = async ({ user, payload = {} }) => {
   assertSuperAdmin(user)
 
@@ -164,6 +169,7 @@ const createCatalogQualityCandidate = async ({ user, payload = {} }) => {
     templateBranchId,
     primary: primarySnapshot,
     comparison: comparisonSnapshot,
+    evidence: normalizeAssessmentEvidence(payload.assessmentEvidence),
   }
   const actorEmployeeId = resolveActorEmployeeId(user)
 
@@ -195,5 +201,6 @@ module.exports = {
   isTemplateBranch,
   buildCandidateDedupeKey,
   buildTemplateSnapshot,
+  normalizeAssessmentEvidence,
   createCatalogQualityCandidate,
 }
