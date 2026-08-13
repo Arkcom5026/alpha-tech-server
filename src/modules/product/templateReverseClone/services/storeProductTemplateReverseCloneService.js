@@ -3,7 +3,6 @@
 const { BusinessType } = require('@prisma/client')
 const { prisma } = require('../../../../lib/prisma')
 const { DEFAULT_TEMPLATE_BRANCH_CODE } = require('../../../productTemplate/repositories/productTemplateRepository')
-const { isTaxonomyLabelCompatible } = require('../../templateClone/services/productTemplateCloneService')
 const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 
 const BUSINESS_TYPE_TEMPLATE_BRANCH_CODE = Object.freeze({
@@ -243,15 +242,17 @@ const acquireReverseCloneFingerprintLock = async ({ sourceProduct, templateBranc
 const assertSourceProductTypeIntegrity = (sourceProduct) => {
   const productType = sourceProduct?.productType
   const globalType = productType?.globalProductType
-  if (!productType?.id || !globalType?.id || !globalType?.name) {
+  const globalProductTypeId = Number(productType?.globalProductTypeId) || null
+
+  if (!productType?.id || !globalProductTypeId || !globalType?.id || !globalType?.categoryId) {
     throw makeError('SOURCE_PRODUCT_TYPE_AUTHORITY_MISSING', 409)
   }
-  if (!isTaxonomyLabelCompatible(productType.name, globalType.name)) {
-    throw makeError('PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT', 409, 'Source ProductType does not match GlobalProductType', {
+  if (globalProductTypeId !== Number(globalType.id)) {
+    throw makeError('GLOBAL_PRODUCT_TYPE_ID_MISMATCH', 409, 'Source ProductType global authority is inconsistent', {
       sourceProductTypeId: productType.id,
       sourceProductTypeName: productType.name,
-      globalProductTypeId: globalType.id,
-      globalProductTypeName: globalType.name,
+      globalProductTypeId,
+      resolvedGlobalProductTypeId: globalType.id,
     })
   }
 }
@@ -261,6 +262,7 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
 
   const sourceType = sourceProduct.productType
   const globalProductTypeId = Number(sourceType.globalProductTypeId)
+  const sourceNormalizedName = sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase()
   const candidates = await db.productType.findMany({
     where: {
       branchId: Number(templateBranchId),
@@ -278,23 +280,11 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
     orderBy: { id: 'asc' },
   })
 
-  const compatible = candidates.filter((candidate) =>
-    isTaxonomyLabelCompatible(candidate.name, candidate.globalProductType?.name)
-  )
-
-  if (candidates.length > 0 && compatible.length === 0) {
-    throw makeError('PRODUCT_TYPE_GLOBAL_MAPPING_CONFLICT', 409, 'Template ProductType does not match GlobalProductType', {
-      globalProductTypeId,
-      sourceProductTypeId: sourceType.id,
-      sourceProductTypeName: sourceType.name,
-      templateProductTypes: candidates.map((item) => ({ id: item.id, name: item.name })),
-    })
-  }
-
-  const exactName = compatible.find(
-    (candidate) => normalizeCatalogText(candidate.name) === normalizeCatalogText(sourceType.name)
-  )
-  const existing = exactName || compatible[0] || null
+  const existing = candidates.find(
+    (candidate) =>
+      normalizeCatalogText(candidate.name) === normalizeCatalogText(sourceType.name) ||
+      normalizeCatalogText(candidate.normalizedName) === normalizeCatalogText(sourceNormalizedName)
+  ) || null
   if (existing) return existing
 
   try {
@@ -302,7 +292,7 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
       data: {
         name: sourceType.name,
         active: sourceType.active !== false,
-        normalizedName: sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase(),
+        normalizedName: sourceNormalizedName,
         branchId: Number(templateBranchId),
         globalProductTypeId,
       },
@@ -323,7 +313,7 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
         branchId: Number(templateBranchId),
         globalProductTypeId,
         OR: [
-          { normalizedName: sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase() },
+          { normalizedName: sourceNormalizedName },
           { name: sourceType.name },
         ],
       },
