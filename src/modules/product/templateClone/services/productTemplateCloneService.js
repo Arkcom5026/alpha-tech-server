@@ -21,19 +21,46 @@ const requireBranchId = (branchId) => {
   return id
 }
 
+const makeError = (code, status = 400, message = code, details = undefined) => {
+  const error = new Error(message)
+  error.code = code
+  error.status = status
+  error.statusCode = status
+  if (details !== undefined) error.details = details
+  return error
+}
+
+const buildForwardCloneLockKey = ({ branchId, templateProductId }) => {
+  const brId = toInt(branchId)
+  const tplId = toInt(templateProductId)
+  if (!brId || !tplId) throw makeError('FORWARD_CLONE_LOCK_CONTEXT_REQUIRED', 400)
+  return `product-template-forward-clone:${brId}:${tplId}`
+}
+
+const acquireForwardCloneLock = async ({ branchId, templateProductId, db }) => {
+  const lockKey = buildForwardCloneLockKey({ branchId, templateProductId })
+  // PostgreSQL advisory transaction lock serializes materialization for the same
+  // Store + Template pair. Cast void to text so Prisma can deserialize the result.
+  await db.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))::text', lockKey)
+  return lockKey
+}
+
 const normalizeTaxonomyLabel = (value) =>
   String(value || '')
     .normalize('NFKC')
     .toLocaleLowerCase('th-TH')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
-    // Thai taxonomy labels commonly use "และ" where branch-local labels use '/', '&', or spacing.
-    // Treat the conjunction as a separator so semantically identical labels remain compatible.
     .replace(/และ/gu, ' ')
-    // Keep Unicode combining marks (\p{M}) so Thai vowels/tones are not stripped from labels.
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+
+const normalizeProductTypeIdentity = (value) =>
+  String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('th-TH')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '')
 
 const isTaxonomyLabelCompatible = (left, right) => {
   const a = normalizeTaxonomyLabel(left)
@@ -70,7 +97,7 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
   const branchGlobal = branchType?.globalProductType
   const globalName = templateGlobal?.name || branchGlobal?.name || ''
 
-  if (!templateType || !branchType || !globalName) {
+  if (!templateType || !branchType || !templateGlobal?.id || !branchGlobal?.id) {
     throw mappingConflict({
       templateType,
       branchType,
@@ -82,7 +109,9 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
 
   if (
     Number(templateType.globalProductTypeId) !== Number(globalProductTypeId) ||
-    Number(branchType.globalProductTypeId) !== Number(globalProductTypeId)
+    Number(branchType.globalProductTypeId) !== Number(globalProductTypeId) ||
+    Number(templateGlobal.id) !== Number(globalProductTypeId) ||
+    Number(branchGlobal.id) !== Number(globalProductTypeId)
   ) {
     throw mappingConflict({
       templateType,
@@ -90,26 +119,6 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
       globalProductTypeId,
       globalName,
       reason: 'GLOBAL_PRODUCT_TYPE_ID_MISMATCH',
-    })
-  }
-
-  if (!isTaxonomyLabelCompatible(templateType.name, globalName)) {
-    throw mappingConflict({
-      templateType,
-      branchType,
-      globalProductTypeId,
-      globalName,
-      reason: 'TEMPLATE_PRODUCT_TYPE_SEMANTIC_DRIFT',
-    })
-  }
-
-  if (!isTaxonomyLabelCompatible(branchType.name, globalName)) {
-    throw mappingConflict({
-      templateType,
-      branchType,
-      globalProductTypeId,
-      globalName,
-      reason: 'BRANCH_PRODUCT_TYPE_SEMANTIC_DRIFT',
     })
   }
 
@@ -133,6 +142,7 @@ const assertExistingTemplateTraceProductType = ({ existingProduct, branchType, t
 const selectTypeIntegrityFields = {
   id: true,
   name: true,
+  normalizedName: true,
   active: true,
   branchId: true,
   globalProductTypeId: true,
@@ -145,9 +155,16 @@ const selectTypeIntegrityFields = {
   },
 }
 
-const adoptBranchProductType = async ({ branchId, templateBranchId, globalProductTypeId, db }) => {
+const adoptBranchProductType = async ({
+  branchId,
+  templateBranchId,
+  templateProductTypeId,
+  globalProductTypeId,
+  db,
+}) => {
   const templateType = await db.productType.findFirst({
     where: {
+      id: Number(templateProductTypeId),
       branchId: Number(templateBranchId),
       globalProductTypeId: Number(globalProductTypeId),
     },
@@ -161,13 +178,20 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
     throw error
   }
 
-  const existing = await db.productType.findFirst({
+  const identity = normalizeProductTypeIdentity(templateType.normalizedName || templateType.name)
+  const candidates = await db.productType.findMany({
     where: {
       branchId: Number(branchId),
       globalProductTypeId: Number(globalProductTypeId),
     },
     select: selectTypeIntegrityFields,
+    orderBy: { id: 'asc' },
   })
+
+  const existing = candidates.find((candidate) => {
+    const candidateIdentity = normalizeProductTypeIdentity(candidate.normalizedName || candidate.name)
+    return identity && candidateIdentity === identity
+  }) || null
 
   if (existing) {
     assertProductTypeGlobalMappingIntegrity({
@@ -184,6 +208,7 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
         branchId: Number(branchId),
         globalProductTypeId: templateType.globalProductTypeId,
         name: templateType.name,
+        normalizedName: templateType.normalizedName || String(templateType.name || '').trim().toLocaleLowerCase('th-TH'),
         active: templateType.active !== false,
       },
       select: selectTypeIntegrityFields,
@@ -198,13 +223,17 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
   } catch (error) {
     if (error?.code !== 'P2002') throw error
 
-    const concurrent = await db.productType.findFirst({
+    const concurrentCandidates = await db.productType.findMany({
       where: {
         branchId: Number(branchId),
         globalProductTypeId: Number(globalProductTypeId),
       },
       select: selectTypeIntegrityFields,
+      orderBy: { id: 'asc' },
     })
+    const concurrent = concurrentCandidates.find((candidate) =>
+      normalizeProductTypeIdentity(candidate.normalizedName || candidate.name) === identity
+    ) || null
 
     if (concurrent) {
       assertProductTypeGlobalMappingIntegrity({
@@ -292,6 +321,32 @@ const resolveCloneSaleBarcode = async ({ branchId, template, db }) => {
   return conflict ? null : saleBarcode
 }
 
+const assertForwardClonePriceSnapshot = ({ actor, payload = {}, effectiveDate, expiredDate }) => {
+  const authority = priceAuthorityPolicy.assertMutationAuthority({ actor, payload })
+
+  for (const field of priceAuthorityPolicy.touchedPriceFields(payload)) {
+    const value = payload[field]
+    if (value === undefined || value === null) continue
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) {
+      throw makeError('INVALID_PRICE_VALUE', 400, `ราคา ${field} ไม่ถูกต้อง`, { field, value })
+    }
+    if (numeric < 0) {
+      throw makeError('NEGATIVE_PRICE_NOT_ALLOWED', 400, `ราคา ${field} ต้องไม่ติดลบ`, { field, value })
+    }
+  }
+
+  const effective = effectiveDate ? new Date(effectiveDate) : null
+  const expired = expiredDate ? new Date(expiredDate) : null
+  if (effective && Number.isNaN(effective.getTime())) throw makeError('INVALID_PRICE_EFFECTIVE_DATE', 400)
+  if (expired && Number.isNaN(expired.getTime())) throw makeError('INVALID_PRICE_EXPIRED_DATE', 400)
+  if (effective && expired && expired < effective) {
+    throw makeError('INVALID_PRICE_DATE_RANGE', 400, 'expiredDate ต้องไม่เร็วกว่าหรือก่อน effectiveDate')
+  }
+
+  return authority
+}
+
 const cloneTemplateBranchPrice = async ({
   productId,
   branchId,
@@ -303,26 +358,22 @@ const cloneTemplateBranchPrice = async ({
 }) => {
   if (!sourcePrice) return null
 
-  const costPrice = Number(sourcePrice.costPrice)
-  const priceRetail = Number(sourcePrice.priceRetail)
-  if (!Number.isFinite(costPrice) || costPrice <= 0 || !Number.isFinite(priceRetail) || priceRetail <= 0) {
-    return null
+  const payload = {
+    costPrice: sourcePrice.costPrice,
+    priceRetail: sourcePrice.priceRetail,
+    priceWholesale: sourcePrice.priceWholesale,
+    priceTechnician: sourcePrice.priceTechnician,
+    priceOnline: sourcePrice.priceOnline,
   }
 
-  const authority = priceAuthorityPolicy.assertPricePayload({
+  const authority = assertForwardClonePriceSnapshot({
     actor: {
       branchId,
       employeeId: toInt(employeeId),
       role,
       v2Role,
     },
-    payload: {
-      costPrice: sourcePrice.costPrice,
-      priceRetail: sourcePrice.priceRetail,
-      priceWholesale: sourcePrice.priceWholesale,
-      priceTechnician: sourcePrice.priceTechnician,
-      priceOnline: sourcePrice.priceOnline,
-    },
+    payload,
     effectiveDate: sourcePrice.effectiveDate,
     expiredDate: sourcePrice.expiredDate,
   })
@@ -336,11 +387,7 @@ const cloneTemplateBranchPrice = async ({
       note: 'Cloned from Product Template',
       updatedBy: authority.employeeId,
       isActive: sourcePrice.isActive !== false,
-      costPrice: sourcePrice.costPrice,
-      priceRetail: sourcePrice.priceRetail,
-      priceWholesale: sourcePrice.priceWholesale ?? null,
-      priceTechnician: sourcePrice.priceTechnician ?? null,
-      priceOnline: sourcePrice.priceOnline ?? null,
+      ...payload,
     },
   })
 }
@@ -390,34 +437,22 @@ const cloneOperationalProductFromTemplate = async ({
       throw error
     }
 
-    const globalProductTypeId = template.productType?.globalProductTypeId
-    if (!globalProductTypeId) {
-      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
-      error.statusCode = 404
-      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
-      throw error
-    }
-
-    const { templateType, branchType } = await adoptBranchProductType({
+    await acquireForwardCloneLock({
       branchId: brId,
-      templateBranchId: templateBranch.id,
-      globalProductTypeId,
+      templateProductId: tplId,
       db: tx,
     })
 
+    // A traced Store Product is already the operational authority. Once a Template
+    // has been materialized, stores may independently change ProductType/name/prices.
+    // Re-selecting the same Template must resolve that exact Local Product without
+    // re-adopting Template taxonomy or forcing local data back to Template identity.
     const existing = await findOperationalRuntimeProductByTemplateId({
       branchId: brId,
       templateProductId: tplId,
       db: tx,
     })
     if (existing) {
-      assertExistingTemplateTraceProductType({
-        existingProduct: existing,
-        branchType,
-        templateType,
-        globalProductTypeId,
-      })
-
       const mapped = toOperationalRuntimeProduct(existing, brId)
       return {
         success: true,
@@ -430,6 +465,23 @@ const cloneOperationalProductFromTemplate = async ({
         statusCode: 200,
       }
     }
+
+    const globalProductTypeId = template.productType?.globalProductTypeId
+    const templateProductTypeId = template.productType?.id
+    if (!globalProductTypeId || !templateProductTypeId) {
+      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
+      error.statusCode = 404
+      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
+      throw error
+    }
+
+    const { branchType } = await adoptBranchProductType({
+      branchId: brId,
+      templateBranchId: templateBranch.id,
+      templateProductTypeId,
+      globalProductTypeId,
+      db: tx,
+    })
 
     await ensureSelectedBrandMapping({
       productTypeId: branchType.id,
@@ -512,7 +564,10 @@ const cloneOperationalProductFromTemplate = async ({
 }
 
 module.exports = {
+  buildForwardCloneLockKey,
+  acquireForwardCloneLock,
   normalizeTaxonomyLabel,
+  normalizeProductTypeIdentity,
   isTaxonomyLabelCompatible,
   assertProductTypeGlobalMappingIntegrity,
   assertExistingTemplateTraceProductType,
@@ -520,6 +575,7 @@ module.exports = {
   fetchTemplateCloneDefaults,
   ensureSelectedBrandMapping,
   resolveCloneSaleBarcode,
+  assertForwardClonePriceSnapshot,
   cloneTemplateBranchPrice,
   cloneOperationalProductFromTemplate,
 }

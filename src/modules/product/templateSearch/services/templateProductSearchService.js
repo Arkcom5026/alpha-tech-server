@@ -13,6 +13,11 @@ const toPositiveInt = (value) => {
 }
 
 const normalizeText = (value) => String(value || '').trim()
+const normalizeProductTypeIdentity = (value) =>
+  String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('th-TH')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '')
 
 const OPTIONAL_PRICE_ERROR_CODES = new Set([
   'PRICE_VALUE_MISSING',
@@ -65,18 +70,33 @@ class TemplateProductSearchService {
       },
       select: {
         id: true,
+        name: true,
+        normalizedName: true,
         globalProductTypeId: true,
       },
     })
 
     if (sourceType?.globalProductTypeId) {
-      const templateType = await this.prisma.productType.findFirst({
+      const sourceIdentity = normalizeProductTypeIdentity(
+        sourceType.normalizedName || sourceType.name
+      )
+      const templateTypes = await this.prisma.productType.findMany({
         where: {
           branchId: templateBranch,
           globalProductTypeId: sourceType.globalProductTypeId,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          name: true,
+          normalizedName: true,
+        },
+        orderBy: { id: 'asc' },
       })
+
+      const templateType = templateTypes.find((candidate) =>
+        sourceIdentity &&
+        normalizeProductTypeIdentity(candidate.normalizedName || candidate.name) === sourceIdentity
+      ) || null
 
       return {
         requested: true,
@@ -210,5 +230,6 @@ class TemplateProductSearchService {
 }
 
 module.exports = {
+  normalizeProductTypeIdentity,
   TemplateProductSearchService,
 }
