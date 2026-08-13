@@ -7,7 +7,6 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const candidateSchema = read('prisma/platform/product-template.prisma')
 const catalogSchema = read('prisma/commerce/catalog.prisma')
-const tenantSchema = read('prisma/foundation/tenant.prisma')
 
 assert.match(candidateSchema, /enum ProductTemplateCandidateType\s*{[\s\S]*POSSIBLE_DUPLICATE[\s\S]*QUALITY_REVIEW[\s\S]*ORPHAN_UNUSED[\s\S]*}/)
 
@@ -28,17 +27,14 @@ for (const legacyField of ['sourceBranchId', 'sourceProductId', 'targetTemplateB
   assert.match(candidateSchema, new RegExp(`${legacyField}\\s+Int\\?`))
 }
 
-assert.match(candidateSchema, /@relation\("ProductTemplateCandidateTemplateBranch"/)
-assert.match(candidateSchema, /@relation\("ProductTemplateCandidatePrimaryProduct"/)
-assert.match(candidateSchema, /@relation\("ProductTemplateCandidateComparisonProduct"/)
 assert.match(candidateSchema, /@@index\(\[templateBranchId, type, status\]\)/)
 assert.match(candidateSchema, /@@index\(\[primaryTemplateProductId\]\)/)
 assert.match(candidateSchema, /@@index\(\[comparisonTemplateProductId\]\)/)
 assert.match(candidateSchema, /@@index\(\[type, status, createdAt\]\)/)
 
-assert.match(catalogSchema, /primaryProductTemplateCandidates\s+ProductTemplateCandidate\[\]\s+@relation\("ProductTemplateCandidatePrimaryProduct"\)/)
-assert.match(catalogSchema, /comparisonProductTemplateCandidates\s+ProductTemplateCandidate\[\]\s+@relation\("ProductTemplateCandidateComparisonProduct"\)/)
-assert.match(tenantSchema, /productTemplateQualityCandidates\s+ProductTemplateCandidate\[\]\s+@relation\("ProductTemplateCandidateTemplateBranch"\)/)
+// New catalog-quality references are scalar transition authority first; legacy relations remain intact.
+assert.match(candidateSchema, /sourceProduct\s+Product\?\s+@relation\("ProductTemplateCandidateSourceProduct"/)
+assert.match(candidateSchema, /targetTemplateProduct\s+Product\?\s+@relation\("ProductTemplateCandidateTargetProduct"/)
 
 // Product remains the operational/template product authority; no duplicate reference counter is introduced.
 assert.match(catalogSchema, /templateProductId\s+Int\?/)
