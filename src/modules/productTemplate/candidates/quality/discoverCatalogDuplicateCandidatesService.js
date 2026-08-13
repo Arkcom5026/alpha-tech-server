@@ -6,55 +6,19 @@ const {
   normalizeBusinessType,
 } = require('./createCatalogQualityCandidateService')
 const {
+  buildCandidateBuckets,
+  buildAssessedDuplicatePairs,
+  scoreDuplicatePair,
+} = require('./catalogDuplicateAssessment')
+const {
   assertSuperAdmin,
   createHttpError,
   toPositiveInt,
 } = require('../shared/productTemplateCandidatePolicy')
 
-const normalizeCatalogText = (value) =>
-  String(value || '')
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase('th-TH')
-    .replace(/[^\p{L}\p{N}]+/gu, '')
-
 const toBoolean = (value) => {
   const normalized = String(value ?? '').trim().toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes'
-}
-
-const buildDuplicateFingerprint = (product) => {
-  const name = normalizeCatalogText(product?.name)
-  const brand = normalizeCatalogText(product?.brand?.normalizedName || product?.brand?.name)
-  const globalProductTypeId = Number(product?.productType?.globalProductTypeId) || null
-  if (!name || !globalProductTypeId) return null
-  return `${globalProductTypeId}:${brand}:${name}`
-}
-
-const groupDuplicatePairs = (products) => {
-  const groups = new Map()
-  for (const product of products || []) {
-    const exactFingerprint = buildDuplicateFingerprint(product)
-    if (!exactFingerprint) continue
-    const current = groups.get(exactFingerprint) || []
-    current.push(product)
-    groups.set(exactFingerprint, current)
-  }
-
-  const duplicates = []
-  for (const [exactFingerprint, group] of groups.entries()) {
-    if (group.length < 2) continue
-    const sorted = [...group].sort((a, b) => a.id - b.id)
-    const primary = sorted[0]
-    for (const comparison of sorted.slice(1)) {
-      duplicates.push({
-        exactFingerprint,
-        primary,
-        comparison,
-      })
-    }
-  }
-  return duplicates
 }
 
 const discoverCatalogDuplicateCandidates = async ({ user, payload = {} }) => {
@@ -77,7 +41,8 @@ const discoverCatalogDuplicateCandidates = async ({ user, payload = {} }) => {
   }
 
   const products = await repository.findTemplateProducts({ templateBranchId })
-  const duplicatePairs = groupDuplicatePairs(products)
+  const candidateBuckets = buildCandidateBuckets(products)
+  const duplicatePairs = buildAssessedDuplicatePairs(products)
 
   const created = []
   const existing = []
@@ -91,18 +56,27 @@ const discoverCatalogDuplicateCandidates = async ({ user, payload = {} }) => {
           businessType: templateBranch.businessType,
           primaryTemplateProductId: pair.primary.id,
           comparisonTemplateProductId: pair.comparison.id,
+          assessmentEvidence: pair.assessment,
         },
       })
       const row = {
         candidateId: result.candidate?.id || null,
         primaryTemplateProductId: pair.primary.id,
         comparisonTemplateProductId: pair.comparison.id,
-        exactFingerprint: pair.exactFingerprint,
+        confidence: pair.assessment.confidence,
+        reason: pair.assessment.reason,
+        signals: pair.assessment.signals,
       }
       if (result.created) created.push(row)
       else existing.push(row)
     }
   }
+
+  const confidenceSummary = duplicatePairs.reduce((summary, pair) => {
+    const key = pair.assessment.confidence || 'UNCLASSIFIED'
+    summary[key] = (summary[key] || 0) + 1
+    return summary
+  }, {})
 
   return {
     mode: apply ? 'APPLY' : 'DRY_RUN',
@@ -114,9 +88,15 @@ const discoverCatalogDuplicateCandidates = async ({ user, payload = {} }) => {
       categoryId: templateBranch.categoryId,
     },
     scannedProductCount: products.length,
+    candidateBucketCount: candidateBuckets.size,
     duplicatePairCount: duplicatePairs.length,
+    confidenceSummary,
     duplicatePairs: duplicatePairs.map((pair) => ({
-      exactFingerprint: pair.exactFingerprint,
+      assessment: {
+        confidence: pair.assessment.confidence,
+        reason: pair.assessment.reason,
+        signals: pair.assessment.signals,
+      },
       primary: {
         id: pair.primary.id,
         name: pair.primary.name,
@@ -134,9 +114,8 @@ const discoverCatalogDuplicateCandidates = async ({ user, payload = {} }) => {
 }
 
 module.exports = {
-  normalizeCatalogText,
   toBoolean,
-  buildDuplicateFingerprint,
-  groupDuplicatePairs,
+  buildCandidateBuckets,
+  scoreDuplicatePair,
   discoverCatalogDuplicateCandidates,
 }
