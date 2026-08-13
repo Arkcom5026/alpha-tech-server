@@ -166,7 +166,6 @@ const fetchOperationalRuntimeProduct = (productId, branchId, db = prisma) => (
 
 const withDb = (db = prisma) => db
 
-
 const findOperationalRuntimeProductByTemplateId = ({
   branchId,
   templateProductId,
@@ -272,8 +271,6 @@ const findStockItemBySerialNumber = ({
     include: { product: true },
   })
 )
-
-
 
 const transaction = (callback, options = { timeout: 15000 }, db = prisma) => (
   db.$transaction(callback, options)
@@ -384,6 +381,7 @@ const findTemplateProductForClone = ({
       unitId: true,
       productType: {
         select: {
+          id: true,
           globalProductTypeId: true,
         },
       },
@@ -445,7 +443,6 @@ const findOperationalProductSaleBarcodeConflict = ({ branchId, saleBarcode, excl
     select: { id: true },
   })
 )
-
 
 module.exports = {
   withDb,
