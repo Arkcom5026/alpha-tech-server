@@ -91,7 +91,7 @@ const discoverCatalogQualityCandidates = async ({ user, payload = {} }) => {
           templateBranchId,
           businessType: templateBranch.businessType,
           primaryTemplateProductId: finding.product.id,
-          assessment: {
+          assessmentEvidence: {
             authority: 'TEMPLATE_CATALOG_QUALITY',
             type: CANDIDATE_TYPES.QUALITY_REVIEW,
             quality: finding.assessment,
