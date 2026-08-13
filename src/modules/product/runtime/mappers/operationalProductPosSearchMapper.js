@@ -21,6 +21,7 @@ const toOperationalProductPosSearchItem = (p) => {
 
   return {
     id: p.id,
+    templateProductId: p.templateProductId ?? null,
     active: typeof p.active === 'boolean' ? p.active : true,
     name: p.name,
     mode: p.mode,
