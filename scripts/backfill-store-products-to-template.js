@@ -76,7 +76,6 @@ const validateActor = async ({ branchId, employeeId, db = prisma }) => {
       id: true,
       branchId: true,
       name: true,
-      role: true,
       v2Role: true,
       active: true,
       approved: true,
@@ -151,7 +150,7 @@ const dryRunBranch = async ({ branchId, employee, db = prisma }) => ({
   ...(await loadBranchAudit({ branchId, db })),
   employeeId: employee.id,
   employeeName: employee.name,
-  actorRole: employee.v2Role || employee.role || null,
+  actorRole: employee.v2Role || null,
   mode: 'DRY_RUN',
   mutation: 'NONE',
 })
@@ -168,7 +167,7 @@ const executeBranch = async ({
   const summary = {
     branchId: Number(branchId),
     employeeId: employee.id,
-    actorRole: employee.v2Role || employee.role || null,
+    actorRole: employee.v2Role || null,
     before,
     attempted: 0,
     REVERSE_CLONED: 0,
@@ -199,8 +198,8 @@ const executeBranch = async ({
           sourceBranchId: Number(branchId),
           sourceProductId: product.id,
           employeeId: employee.id,
-          role: employee.role || employee.v2Role,
-          v2Role: employee.v2Role || employee.role,
+          role: employee.v2Role,
+          v2Role: employee.v2Role,
         })
         const status = String(result?.status || 'SKIPPED')
         if (Object.prototype.hasOwnProperty.call(summary, status)) summary[status] += 1
