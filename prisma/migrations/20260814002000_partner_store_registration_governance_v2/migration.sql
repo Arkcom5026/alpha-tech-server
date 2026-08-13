@@ -1,0 +1,1 @@
+-- Partner Store Governance v2 migration placeholder
