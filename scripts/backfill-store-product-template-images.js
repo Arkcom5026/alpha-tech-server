@@ -8,13 +8,30 @@ const { syncStoreProductImagesToTemplate } = require('../src/modules/product/tem
 const DEFAULT_BATCH_SIZE = 25
 const MAX_BATCH_SIZE = 100
 
+const parseArgs = (argv = []) => {
+  const args = {}
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (!String(token).startsWith('--')) continue
+    const key = String(token).slice(2)
+    const next = argv[i + 1]
+    if (!next || String(next).startsWith('--')) {
+      args[key] = true
+      continue
+    }
+    args[key] = next
+    i += 1
+  }
+  return args
+}
+
 const parseList = (value, label) => {
   const ids = [...new Set(String(value || '').split(',').map((v) => Number(v.trim())).filter((v) => Number.isInteger(v) && v > 0))].sort((a, b) => a - b)
   if (!ids.length) throw new Error(`Missing ${label}`)
   return ids
 }
 
-const confirmExecute = ({ execute, branches, confirmation }) => {
+const assertExecuteConfirmation = ({ execute, branches, confirmation }) => {
   if (!execute) return
   const confirmed = parseList(confirmation, '--confirm-branches')
   if (confirmed.length !== branches.length || confirmed.some((id, i) => id !== branches[i])) {
@@ -64,24 +81,17 @@ const runBranch = async ({ branchId, batchSize, maxItems = null }) => {
 }
 
 const main = async () => {
-  const argv = process.argv.slice(2)
-  const readArg = (name) => {
-    const i = argv.indexOf(`--${name}`)
-    if (i < 0) return undefined
-    const next = argv[i + 1]
-    return !next || next.startsWith('--') ? true : next
-  }
+  const args = parseArgs(process.argv.slice(2))
+  const branches = parseList(args.branches, '--branches')
+  const execute = Boolean(args.execute)
+  const dryRun = Boolean(args['dry-run']) || !execute
+  const batchSize = Number(args['batch-size'] || DEFAULT_BATCH_SIZE)
+  const maxItems = args['max-items'] == null ? null : Number(args['max-items'])
 
-  const branches = parseList(readArg('branches'), '--branches')
-  const execute = Boolean(readArg('execute'))
-  const dryRun = Boolean(readArg('dry-run')) || !execute
-  const batchSize = Number(readArg('batch-size') || DEFAULT_BATCH_SIZE)
-  const maxItems = readArg('max-items') == null ? null : Number(readArg('max-items'))
-
-  if (execute && readArg('dry-run')) throw new Error('Use either --dry-run or --execute, not both')
+  if (execute && args['dry-run']) throw new Error('Use either --dry-run or --execute, not both')
   if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > MAX_BATCH_SIZE) throw new Error(`--batch-size must be 1..${MAX_BATCH_SIZE}`)
   if (maxItems != null && (!Number.isInteger(maxItems) || maxItems <= 0)) throw new Error('--max-items must be a positive integer')
-  confirmExecute({ execute, branches, confirmation: readArg('confirm-branches') })
+  assertExecuteConfirmation({ execute, branches, confirmation: args['confirm-branches'] })
 
   const summaries = []
   for (const branchId of branches) {
@@ -99,4 +109,4 @@ if (require.main === module) {
   main().catch((error) => { console.error(error); process.exitCode = 1 }).finally(async () => prisma.$disconnect())
 }
 
-module.exports = { DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE, parseList, confirmExecute, linkedWithImagesWhere, loadBatch, runBranch, main }
+module.exports = { DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE, parseArgs, parseList, assertExecuteConfirmation, linkedWithImagesWhere, loadBatch, runBranch, main }
