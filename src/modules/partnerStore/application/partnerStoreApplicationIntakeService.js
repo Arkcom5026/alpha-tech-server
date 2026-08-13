@@ -62,7 +62,7 @@ const submitApplication = async (payload = {}) => {
       }
     }
 
-    return repository.create({
+    const application = await repository.create({
       applicationCode: `PSA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
       businessName,
       contactName,
@@ -72,6 +72,19 @@ const submitApplication = async (payload = {}) => {
       requestedStorefrontSlug: requestedStorefrontSlug || null,
       note: text(payload.note) || null,
     }, tx)
+
+    await tx.partnerStoreApplicationEvent.create({
+      data: {
+        applicationId: application.id,
+        eventType: 'SUBMITTED',
+        previousStatus: null,
+        resultingStatus: 'PENDING',
+        actorUserId: null,
+        note: application.note || null,
+      },
+    })
+
+    return application
   })
 }
 
