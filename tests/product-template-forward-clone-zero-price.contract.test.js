@@ -1,6 +1,8 @@
 'use strict'
 
 const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
 const priceAuthorityPolicy = require('../src/modules/product/pricing/policies/priceAuthorityPolicy')
 const {
   assertForwardClonePriceSnapshot,
@@ -10,7 +12,7 @@ const {
 const actor = {
   branchId: 5,
   employeeId: 162,
-  role: 'EMPLOYEE',
+  role: 'OWNER',
   v2Role: 'OWNER',
 }
 
@@ -23,6 +25,13 @@ const zeroSnapshot = {
 }
 
 const run = async () => {
+  const controllerSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/modules/product/templateClone/controllers/productTemplateCloneController.js'),
+    'utf8'
+  )
+  assert.match(controllerSource, /req\.employee\?\.v2Role\s*\|\|[\s\S]*req\.employee\?\.role/)
+  assert.match(controllerSource, /role:\s*effectiveRole/)
+
   assert.doesNotThrow(() => assertForwardClonePriceSnapshot({
     actor,
     payload: zeroSnapshot,
@@ -70,7 +79,7 @@ const run = async () => {
     productId: 4207,
     branchId: 5,
     employeeId: 162,
-    role: 'EMPLOYEE',
+    role: 'OWNER',
     v2Role: 'OWNER',
     sourcePrice,
     db,
