@@ -25,6 +25,7 @@ enum ProductTemplateCandidateEventType {
   PROMOTED
   MERGED
   CANCELLED
+  DUPLICATE_RESOLVED
 }
 
 model ProductTemplateCandidate {
