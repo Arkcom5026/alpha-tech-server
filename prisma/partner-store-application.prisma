@@ -54,7 +54,6 @@ model PartnerStoreApplicationEvent {
   metadata         Json?
   createdAt        DateTime                         @default(now())
   application      PartnerStoreApplication          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  actorUser        User?                            @relation("PartnerStoreApplicationEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([applicationId, createdAt])
   @@index([eventType, createdAt])
