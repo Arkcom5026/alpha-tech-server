@@ -9,7 +9,7 @@ const routes = read('src/modules/productTemplate/candidates/routes/productTempla
 const service = read('src/modules/productTemplate/candidates/quality/discoverCatalogDuplicateCandidatesService.js')
 const repository = read('src/modules/productTemplate/candidates/quality/discoverCatalogDuplicateCandidatesRepository.js')
 
-assert.match(routes, /router\.post\('\/quality\/discover-duplicates'/)
+assert.match(routes, /router\.post\('\/quality\/scan'/)
 assert.match(service, /POSSIBLE_DUPLICATE/)
 assert.match(service, /normalizeCatalogText/)
 assert.match(service, /buildDuplicateFingerprint/)
