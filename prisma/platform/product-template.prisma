@@ -26,6 +26,7 @@ enum ProductTemplateCandidateEventType {
   MERGED
   CANCELLED
   DUPLICATE_RESOLVED
+  ORPHAN_ARCHIVED
 }
 
 model ProductTemplateCandidate {
