@@ -363,6 +363,32 @@ const resolveTemplateSaleBarcode = async ({ sourceProduct, templateBranchId, db 
   return conflict ? null : saleBarcode
 }
 
+const assertReverseClonePriceSnapshot = ({ actor, payload = {}, effectiveDate, expiredDate }) => {
+  priceAuthorityPolicy.assertMutationAuthority({ actor, payload })
+
+  for (const field of priceAuthorityPolicy.touchedPriceFields(payload)) {
+    const value = payload[field]
+    if (value === undefined || value === null) continue
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) {
+      throw makeError('INVALID_PRICE_VALUE', 400, `ราคา ${field} ไม่ถูกต้อง`, { field, value })
+    }
+    if (numeric < 0) {
+      throw makeError('NEGATIVE_PRICE_NOT_ALLOWED', 400, `ราคา ${field} ต้องไม่ติดลบ`, { field, value })
+    }
+    // Zero is intentionally valid only on this reverse-clone snapshot path.
+    // It preserves an existing Store BranchPrice exactly; it is not a new price-entry decision.
+  }
+
+  const effective = effectiveDate ? new Date(effectiveDate) : null
+  const expired = expiredDate ? new Date(expiredDate) : null
+  if (effective && Number.isNaN(effective.getTime())) throw makeError('INVALID_PRICE_EFFECTIVE_DATE', 400)
+  if (expired && Number.isNaN(expired.getTime())) throw makeError('INVALID_PRICE_EXPIRED_DATE', 400)
+  if (effective && expired && expired < effective) {
+    throw makeError('INVALID_PRICE_DATE_RANGE', 400, 'expiredDate ต้องไม่เร็วกว่าหรือก่อน effectiveDate')
+  }
+}
+
 const cloneSourceBranchPriceToTemplate = async ({ sourceProduct, templateProductId, templateBranchId, employeeId, role, v2Role, db }) => {
   const sourcePrice = sourceProduct?.branchPrice?.[0] || null
   if (!sourcePrice) return null
@@ -375,7 +401,7 @@ const cloneSourceBranchPriceToTemplate = async ({ sourceProduct, templateProduct
     priceOnline: sourcePrice.priceOnline,
   }
 
-  priceAuthorityPolicy.assertPricePayload({
+  assertReverseClonePriceSnapshot({
     actor: {
       branchId: Number(sourceProduct?.productType?.branchId || sourceProduct?.branchId),
       employeeId: Number(employeeId),
@@ -628,5 +654,6 @@ module.exports = {
   findExactTemplateProduct,
   ensureTemplateProductType,
   ensureTemplateProductTypeBrand,
+  assertReverseClonePriceSnapshot,
   reverseCloneStoreProductToMatchingTemplate,
 }
