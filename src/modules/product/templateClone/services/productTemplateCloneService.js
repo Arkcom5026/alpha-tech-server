@@ -27,13 +27,16 @@ const normalizeTaxonomyLabel = (value) =>
     .toLocaleLowerCase('th-TH')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
-    // Thai taxonomy labels commonly use "และ" where branch-local labels use '/', '&', or spacing.
-    // Treat the conjunction as a separator so semantically identical labels remain compatible.
     .replace(/และ/gu, ' ')
-    // Keep Unicode combining marks (\p{M}) so Thai vowels/tones are not stripped from labels.
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+
+const normalizeProductTypeIdentity = (value) =>
+  String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase('th-TH')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '')
 
 const isTaxonomyLabelCompatible = (left, right) => {
   const a = normalizeTaxonomyLabel(left)
@@ -70,7 +73,7 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
   const branchGlobal = branchType?.globalProductType
   const globalName = templateGlobal?.name || branchGlobal?.name || ''
 
-  if (!templateType || !branchType || !globalName) {
+  if (!templateType || !branchType || !templateGlobal?.id || !branchGlobal?.id) {
     throw mappingConflict({
       templateType,
       branchType,
@@ -82,7 +85,9 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
 
   if (
     Number(templateType.globalProductTypeId) !== Number(globalProductTypeId) ||
-    Number(branchType.globalProductTypeId) !== Number(globalProductTypeId)
+    Number(branchType.globalProductTypeId) !== Number(globalProductTypeId) ||
+    Number(templateGlobal.id) !== Number(globalProductTypeId) ||
+    Number(branchGlobal.id) !== Number(globalProductTypeId)
   ) {
     throw mappingConflict({
       templateType,
@@ -90,26 +95,6 @@ const assertProductTypeGlobalMappingIntegrity = ({ templateType, branchType, glo
       globalProductTypeId,
       globalName,
       reason: 'GLOBAL_PRODUCT_TYPE_ID_MISMATCH',
-    })
-  }
-
-  if (!isTaxonomyLabelCompatible(templateType.name, globalName)) {
-    throw mappingConflict({
-      templateType,
-      branchType,
-      globalProductTypeId,
-      globalName,
-      reason: 'TEMPLATE_PRODUCT_TYPE_SEMANTIC_DRIFT',
-    })
-  }
-
-  if (!isTaxonomyLabelCompatible(branchType.name, globalName)) {
-    throw mappingConflict({
-      templateType,
-      branchType,
-      globalProductTypeId,
-      globalName,
-      reason: 'BRANCH_PRODUCT_TYPE_SEMANTIC_DRIFT',
     })
   }
 
@@ -133,6 +118,7 @@ const assertExistingTemplateTraceProductType = ({ existingProduct, branchType, t
 const selectTypeIntegrityFields = {
   id: true,
   name: true,
+  normalizedName: true,
   active: true,
   branchId: true,
   globalProductTypeId: true,
@@ -145,9 +131,16 @@ const selectTypeIntegrityFields = {
   },
 }
 
-const adoptBranchProductType = async ({ branchId, templateBranchId, globalProductTypeId, db }) => {
+const adoptBranchProductType = async ({
+  branchId,
+  templateBranchId,
+  templateProductTypeId,
+  globalProductTypeId,
+  db,
+}) => {
   const templateType = await db.productType.findFirst({
     where: {
+      id: Number(templateProductTypeId),
       branchId: Number(templateBranchId),
       globalProductTypeId: Number(globalProductTypeId),
     },
@@ -161,13 +154,20 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
     throw error
   }
 
-  const existing = await db.productType.findFirst({
+  const identity = normalizeProductTypeIdentity(templateType.normalizedName || templateType.name)
+  const candidates = await db.productType.findMany({
     where: {
       branchId: Number(branchId),
       globalProductTypeId: Number(globalProductTypeId),
     },
     select: selectTypeIntegrityFields,
+    orderBy: { id: 'asc' },
   })
+
+  const existing = candidates.find((candidate) => {
+    const candidateIdentity = normalizeProductTypeIdentity(candidate.normalizedName || candidate.name)
+    return identity && candidateIdentity === identity
+  }) || null
 
   if (existing) {
     assertProductTypeGlobalMappingIntegrity({
@@ -184,6 +184,7 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
         branchId: Number(branchId),
         globalProductTypeId: templateType.globalProductTypeId,
         name: templateType.name,
+        normalizedName: templateType.normalizedName || String(templateType.name || '').trim().toLocaleLowerCase('th-TH'),
         active: templateType.active !== false,
       },
       select: selectTypeIntegrityFields,
@@ -198,13 +199,17 @@ const adoptBranchProductType = async ({ branchId, templateBranchId, globalProduc
   } catch (error) {
     if (error?.code !== 'P2002') throw error
 
-    const concurrent = await db.productType.findFirst({
+    const concurrentCandidates = await db.productType.findMany({
       where: {
         branchId: Number(branchId),
         globalProductTypeId: Number(globalProductTypeId),
       },
       select: selectTypeIntegrityFields,
+      orderBy: { id: 'asc' },
     })
+    const concurrent = concurrentCandidates.find((candidate) =>
+      normalizeProductTypeIdentity(candidate.normalizedName || candidate.name) === identity
+    ) || null
 
     if (concurrent) {
       assertProductTypeGlobalMappingIntegrity({
@@ -391,7 +396,8 @@ const cloneOperationalProductFromTemplate = async ({
     }
 
     const globalProductTypeId = template.productType?.globalProductTypeId
-    if (!globalProductTypeId) {
+    const templateProductTypeId = template.productType?.id
+    if (!globalProductTypeId || !templateProductTypeId) {
       const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
       error.statusCode = 404
       error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
@@ -401,6 +407,7 @@ const cloneOperationalProductFromTemplate = async ({
     const { templateType, branchType } = await adoptBranchProductType({
       branchId: brId,
       templateBranchId: templateBranch.id,
+      templateProductTypeId,
       globalProductTypeId,
       db: tx,
     })
@@ -513,6 +520,7 @@ const cloneOperationalProductFromTemplate = async ({
 
 module.exports = {
   normalizeTaxonomyLabel,
+  normalizeProductTypeIdentity,
   isTaxonomyLabelCompatible,
   assertProductTypeGlobalMappingIntegrity,
   assertExistingTemplateTraceProductType,
