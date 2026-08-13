@@ -290,17 +290,22 @@ const ensureSelectedBrandMapping = async ({ productTypeId, brandId, db }) => {
   const selectedBrandId = toInt(brandId)
   if (!typeId || !selectedBrandId) return
 
-  try {
-    await db.productTypeBrand.create({
-      data: {
+  // Do not use create + catch(P2002) inside an interactive PostgreSQL transaction.
+  // A unique violation aborts the transaction even when Prisma's error is caught,
+  // so the next query fails with SQLSTATE 25P02. Upsert keeps the transaction healthy.
+  await db.productTypeBrand.upsert({
+    where: {
+      productTypeId_brandId: {
         productTypeId: typeId,
         brandId: selectedBrandId,
       },
-    })
-  } catch (error) {
-    if (error?.code === 'P2002') return
-    throw error
-  }
+    },
+    update: {},
+    create: {
+      productTypeId: typeId,
+      brandId: selectedBrandId,
+    },
+  })
 }
 
 const resolveCloneSaleBarcode = async ({ branchId, template, db }) => {
