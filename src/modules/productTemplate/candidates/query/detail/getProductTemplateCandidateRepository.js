@@ -2,6 +2,14 @@ const { prisma } = require('../../../../../../lib/prisma')
 
 const CANDIDATE_DETAIL_SELECT = {
   id: true,
+  type: true,
+  templateBranchId: true,
+  primaryTemplateProductId: true,
+  comparisonTemplateProductId: true,
+  dedupeKey: true,
+  assessment: true,
+  resolution: true,
+  resolvedAt: true,
   sourceBranchId: true,
   sourceProductId: true,
   targetTemplateBranchId: true,
