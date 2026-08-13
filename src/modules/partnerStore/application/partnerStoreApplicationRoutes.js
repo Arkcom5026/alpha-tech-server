@@ -16,5 +16,6 @@ adminRouter.get('/', adminController.list)
 adminRouter.post('/:id/review', adminController.startReview)
 adminRouter.post('/:id/approve', adminController.approve)
 adminRouter.post('/:id/reject', adminController.reject)
+adminRouter.post('/:id/provision', adminController.provision)
 
 module.exports = { publicRouter, adminRouter }
