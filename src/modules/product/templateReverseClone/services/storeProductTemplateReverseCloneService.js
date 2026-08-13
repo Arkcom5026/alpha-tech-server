@@ -261,6 +261,7 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
 
   const sourceType = sourceProduct.productType
   const globalProductTypeId = Number(sourceType.globalProductTypeId)
+  const normalizedName = sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase()
   const candidates = await db.productType.findMany({
     where: {
       branchId: Number(templateBranchId),
@@ -297,49 +298,35 @@ const ensureTemplateProductType = async ({ sourceProduct, templateBranchId, db }
   const existing = exactName || compatible[0] || null
   if (existing) return existing
 
-  try {
-    return await db.productType.create({
-      data: {
-        name: sourceType.name,
-        active: sourceType.active !== false,
-        normalizedName: sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase(),
+  // Use the schema's compound unique authority instead of create + catch(P2002).
+  // PostgreSQL keeps the interactive transaction healthy because upsert handles
+  // the concurrent same-type race atomically instead of aborting the transaction.
+  return db.productType.upsert({
+    where: {
+      branchId_globalProductTypeId_normalizedName: {
         branchId: Number(templateBranchId),
         globalProductTypeId,
+        normalizedName,
       },
-      select: {
-        id: true,
-        name: true,
-        normalizedName: true,
-        active: true,
-        branchId: true,
-        globalProductTypeId: true,
-        globalProductType: { select: { id: true, name: true, categoryId: true } },
-      },
-    })
-  } catch (error) {
-    if (error?.code !== 'P2002') throw error
-    const concurrent = await db.productType.findFirst({
-      where: {
-        branchId: Number(templateBranchId),
-        globalProductTypeId,
-        OR: [
-          { normalizedName: sourceType.normalizedName || String(sourceType.name || '').trim().toLowerCase() },
-          { name: sourceType.name },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        normalizedName: true,
-        active: true,
-        branchId: true,
-        globalProductTypeId: true,
-        globalProductType: { select: { id: true, name: true, categoryId: true } },
-      },
-    })
-    if (concurrent) return concurrent
-    throw error
-  }
+    },
+    update: {},
+    create: {
+      name: sourceType.name,
+      active: sourceType.active !== false,
+      normalizedName,
+      branchId: Number(templateBranchId),
+      globalProductTypeId,
+    },
+    select: {
+      id: true,
+      name: true,
+      normalizedName: true,
+      active: true,
+      branchId: true,
+      globalProductTypeId: true,
+      globalProductType: { select: { id: true, name: true, categoryId: true } },
+    },
+  })
 }
 
 const ensureTemplateProductTypeBrand = async ({ productTypeId, brandId, db }) => {
