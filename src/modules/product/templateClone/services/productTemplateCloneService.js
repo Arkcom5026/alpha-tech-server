@@ -422,36 +422,16 @@ const cloneOperationalProductFromTemplate = async ({
       throw error
     }
 
-    const globalProductTypeId = template.productType?.globalProductTypeId
-    const templateProductTypeId = template.productType?.id
-    if (!globalProductTypeId || !templateProductTypeId) {
-      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
-      error.statusCode = 404
-      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
-      throw error
-    }
-
-    const { templateType, branchType } = await adoptBranchProductType({
-      branchId: brId,
-      templateBranchId: templateBranch.id,
-      templateProductTypeId,
-      globalProductTypeId,
-      db: tx,
-    })
-
+    // A traced Store Product is already the operational authority. Once a Template
+    // has been materialized, stores may independently change ProductType/name/prices.
+    // Re-selecting the same Template must resolve that exact Local Product without
+    // re-adopting Template taxonomy or forcing local data back to Template identity.
     const existing = await findOperationalRuntimeProductByTemplateId({
       branchId: brId,
       templateProductId: tplId,
       db: tx,
     })
     if (existing) {
-      assertExistingTemplateTraceProductType({
-        existingProduct: existing,
-        branchType,
-        templateType,
-        globalProductTypeId,
-      })
-
       const mapped = toOperationalRuntimeProduct(existing, brId)
       return {
         success: true,
@@ -464,6 +444,23 @@ const cloneOperationalProductFromTemplate = async ({
         statusCode: 200,
       }
     }
+
+    const globalProductTypeId = template.productType?.globalProductTypeId
+    const templateProductTypeId = template.productType?.id
+    if (!globalProductTypeId || !templateProductTypeId) {
+      const error = new Error('TEMPLATE_PRODUCT_TYPE_NOT_FOUND')
+      error.statusCode = 404
+      error.code = 'TEMPLATE_PRODUCT_TYPE_NOT_FOUND'
+      throw error
+    }
+
+    const { branchType } = await adoptBranchProductType({
+      branchId: brId,
+      templateBranchId: templateBranch.id,
+      templateProductTypeId,
+      globalProductTypeId,
+      db: tx,
+    })
 
     await ensureSelectedBrandMapping({
       productTypeId: branchType.id,
