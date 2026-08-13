@@ -15,6 +15,7 @@ const {
 
 const baseProduct = {
   id: 21,
+  templateProductId: 9021,
   active: true,
   name: 'Simple Product',
   mode: 'SIMPLE',
@@ -65,6 +66,7 @@ const run = () => {
   assert.equal(pos.inventoryBehavior, 'NON_STOCK')
   assert.equal(pos.isReady, true)
   assert.equal(pos.lastCost, 65)
+  assert.equal(pos.templateProductId, 9021)
 
   const online = toOperationalProductOnlineSearchItem(baseProduct)
   assert.equal(online.readyPickupAtBranch, true)
