@@ -15,7 +15,8 @@ assert(source.includes('authority.expectedBranch.branchId'), 'Verifier must enfo
 assert(source.includes("status !== 'IN_PROGRESS'"), 'Verifier must require IN_PROGRESS.');
 assert(source.includes('deviceIntake'), 'Verifier must inspect DeviceIntake evidence.');
 assert(source.includes('INTAKE_CONDITION'), 'Verifier must require intake-condition photo evidence.');
-assert(source.includes('RepairJobEvent'), 'Verifier must inspect the status timeline event.');
+assert(source.includes('RepairWorkflowEvent'), 'Verifier must inspect the canonical workflow event.');
+assert(source.includes("targetStatus\" = 'REPAIRING'"), 'Verifier must require the canonical REPAIRING transition.');
 assert(
   !source.includes('.create(') && !source.includes('.update(') && !source.includes('.delete('),
   'Verifier must not contain Prisma write operations.'
