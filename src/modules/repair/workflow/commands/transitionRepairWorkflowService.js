@@ -162,8 +162,14 @@ function normalizeExceptionalNote(action, note) {
 }
 
 function currentWorkflowStatus(repairJob) {
-  const latest = repairJob.device?.passportEvents?.[0];
-  return latest?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
+  const repairOwned = repairJob.repairWorkflowEvent;
+  if (repairOwned?.targetStatus) return repairOwned.targetStatus;
+  if (repairOwned?.metadata?.workflowTargetStatus) {
+    return repairOwned.metadata.workflowTargetStatus;
+  }
+
+  const legacyPassport = repairJob.device?.passportEvents?.[0];
+  return legacyPassport?.metadata?.workflowTargetStatus || REPAIR_WORKFLOW_STATUS.RECEIVED;
 }
 
 function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = currentWorkflowStatus(repairJob)) {
@@ -177,6 +183,10 @@ function assertIntakeCompleteForEntry(repairJob, action, workflowStatus = curren
   );
 
   if (!requiresCompletedIntake) return;
+
+  // Business-neutral repair jobs may intentionally have no Device Passport/DeviceIntake.
+  // Their core intake authority is the RepairJob itself (customer + item description + symptoms).
+  if (!repairJob.deviceId && !repairJob.deviceIntake) return;
 
   const completion = evaluateIntakeCompletion(repairJob.deviceIntake);
   if (!completion.complete) {
@@ -223,9 +233,6 @@ class TransitionRepairWorkflowService {
       const repairJob = await repo.findRepairJob(repairJobId);
       if (!repairJob || repairJob.branchId !== branchId) {
         throw new RepairWorkflowCommandError('REPAIR_JOB_NOT_FOUND', 'Repair job was not found in the actor branch', { repairJobId, branchId });
-      }
-      if (!repairJob.deviceId || !repairJob.device) {
-        throw new RepairWorkflowCommandError('REPAIR_DEVICE_REQUIRED', 'Repair workflow commands require a linked device passport', { repairJobId });
       }
 
       assertRepairNotHeldByActiveClaim(repairJob, RepairWorkflowCommandError);
@@ -290,51 +297,79 @@ class TransitionRepairWorkflowService {
               : {};
 
       const updated = await repo.updateLegacyStatus(repairJobId, legacyStatus, repairUpdate);
-      const event = await repo.publishPassportEvent({
-        deviceId: repairJob.deviceId,
+      const description =
+        note ||
+        (action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB
+          ? 'ช่างรับผิดชอบใบงานแล้ว'
+          : null) ||
+        (action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+          ? repairJob.preAgreedService?.agreedScope
+          : null) ||
+        diagnosis?.customerNote ||
+        repairCompletion?.resultSummary ||
+        qc?.note ||
+        null;
+      const metadata = {
+        repairJobId,
+        commandKey,
+        action: transition.action,
+        workflowPreviousStatus: transition.previousStatus,
+        workflowTargetStatus: transition.targetStatus,
+        legacyServiceStatus: legacyStatus,
+        terminal: transition.terminal,
+        note,
+        acceptedByEmployeeId:
+          action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB ? employeeId : null,
+        preAgreedService:
+          action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
+            ? repairJob.preAgreedService
+            : null,
+        diagnosis,
+        repairCompletion,
+        qc,
+      };
+      const eventKey = `repair-workflow:${repairJobId}:${commandKey}`;
+      const correlationId = command.correlationId || `repair-job:${repairJobId}`;
+      const causationId = command.causationId || commandKey;
+      const title = `งานซ่อม ${repairJob.jobNo}: ${transition.action}`;
+
+      const workflowEvent = await repo.publishWorkflowEvent({
+        repairJobId,
         branchId,
         eventType: transition.passportEventType,
-        sourceType: 'REPAIR_JOB',
-        sourceId: String(repairJobId),
-        eventKey: `repair-workflow:${repairJobId}:${commandKey}`,
-        correlationId: command.correlationId || `repair-job:${repairJobId}`,
-        causationId: command.causationId || commandKey,
-        title: `งานซ่อม ${repairJob.jobNo}: ${transition.action}`,
-        description:
-          note ||
-          (action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB
-            ? 'ช่างรับผิดชอบใบงานแล้ว'
-            : null) ||
-          (action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
-            ? repairJob.preAgreedService?.agreedScope
-            : null) ||
-          diagnosis?.customerNote ||
-          repairCompletion?.resultSummary ||
-          qc?.note ||
-          null,
+        action: transition.action,
+        previousStatus: transition.previousStatus,
+        targetStatus: transition.targetStatus,
+        eventKey,
+        correlationId,
+        causationId,
+        title,
+        description,
         actorEmployeeId: employeeId,
         customerVisible: command.customerVisible !== false,
-        metadata: {
-          repairJobId,
-          commandKey,
-          action: transition.action,
-          workflowPreviousStatus: transition.previousStatus,
-          workflowTargetStatus: transition.targetStatus,
-          legacyServiceStatus: legacyStatus,
-          terminal: transition.terminal,
-          note,
-          acceptedByEmployeeId:
-            action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB ? employeeId : null,
-          preAgreedService:
-            action === REPAIR_WORKFLOW_ACTION.START_PRE_AGREED_SERVICE
-              ? repairJob.preAgreedService
-              : null,
-          diagnosis,
-          repairCompletion,
-          qc,
-        },
+        metadata,
         occurredAt,
       });
+
+      let passportEvent = null;
+      if (repairJob.deviceId && repairJob.device && typeof repo.publishPassportEvent === 'function') {
+        passportEvent = await repo.publishPassportEvent({
+          deviceId: repairJob.deviceId,
+          branchId,
+          eventType: transition.passportEventType,
+          sourceType: 'REPAIR_JOB',
+          sourceId: String(repairJobId),
+          eventKey,
+          correlationId,
+          causationId,
+          title,
+          description,
+          actorEmployeeId: employeeId,
+          customerVisible: command.customerVisible !== false,
+          metadata,
+          occurredAt,
+        });
+      }
 
       return {
         repairJobId,
@@ -343,7 +378,8 @@ class TransitionRepairWorkflowService {
         status: transition.targetStatus,
         legacyStatus,
         terminal: transition.terminal,
-        passportEventId: event.id,
+        workflowEventId: workflowEvent.id,
+        passportEventId: passportEvent?.id || null,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
         acceptedByEmployeeId:
           action === REPAIR_WORKFLOW_ACTION.ACCEPT_JOB ? employeeId : null,
