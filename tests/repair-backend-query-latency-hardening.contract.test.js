@@ -28,11 +28,13 @@ test('handover staff read starts independent authority reads together', () => {
   assert.match(handoverService, /findLatestPassportWorkflowEvent/);
 });
 
-test('handover workflow read prefers RepairWorkflowEvent before passport compatibility', () => {
+test('handover workflow read resolves RepairWorkflowEvent and passport in parallel and keeps the newest projection', () => {
   assert.match(handoverRepository, /FROM "RepairWorkflowEvent"/);
   assert.match(handoverRepository, /findLatestRepairOwnedWorkflowEvent/);
-  assert.match(handoverRepository, /if \(repairOwned\) return repairOwned/);
   assert.match(handoverRepository, /findLatestPassportWorkflowEvent/);
+  assert.match(handoverRepository, /const \[repairOwned, passport\] = await Promise\.all\(\[/);
+  assert.match(handoverRepository, /return newestWorkflowEvent\(repairOwned, passport\)/);
+  assert.match(handoverService, /workflowEvent = newestWorkflowEvent\(workflowEvent, passportEvent\)/);
 });
 
 test('estimate approval staff read runs authorization and latest snapshot in parallel', () => {
