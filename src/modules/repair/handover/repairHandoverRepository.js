@@ -1,4 +1,7 @@
 const prisma = require('../../../database/prisma/client');
+const {
+  findLatestRepairWorkflowEvent,
+} = require('../workflow/events/repairWorkflowEventStore');
 
 const columns = `"id", "repairJobId", "status", "method", "recipientName",
   "recipientPhone", "customerConfirmedBy", "customerConfirmedAt", "customerNote",
@@ -40,16 +43,28 @@ class RepairHandoverRepository {
   }
 
   async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
-    if (!deviceId) return null;
-    return this.prisma.devicePassportEvent.findFirst({
-      where: {
-        deviceId: Number(deviceId),
-        branchId: Number(branchId),
-        sourceType: 'REPAIR_JOB',
-        sourceId: String(repairJobId),
-      },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    const repairOwnedPromise = findLatestRepairWorkflowEvent(this.prisma, {
+      repairJobId: Number(repairJobId),
+      branchId: Number(branchId),
     });
+
+    const passportPromise = deviceId
+      ? this.prisma.devicePassportEvent.findFirst({
+          where: {
+            deviceId: Number(deviceId),
+            branchId: Number(branchId),
+            sourceType: 'REPAIR_JOB',
+            sourceId: String(repairJobId),
+          },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        })
+      : Promise.resolve(null);
+
+    const [repairOwned, passport] = await Promise.all([
+      repairOwnedPromise,
+      passportPromise,
+    ]);
+    return repairOwned || passport || null;
   }
 
   async findDelivery(repairJobId) {
