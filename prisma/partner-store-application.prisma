@@ -22,6 +22,12 @@ enum PartnerStoreActivationStatus {
   ACTIVE
 }
 
+enum PartnerStoreOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum PartnerStoreApplicationEventType {
   SUBMITTED
   REVIEW_STARTED
@@ -33,6 +39,9 @@ enum PartnerStoreApplicationEventType {
   PROVISIONING_FAILED
   ACTIVATION_INVITATION_ISSUED
   OWNER_ACTIVATED
+  OWNER_FIRST_LOGIN
+  ONBOARDING_STARTED
+  ONBOARDING_COMPLETED
 }
 
 model PartnerStoreApplication {
@@ -48,6 +57,7 @@ model PartnerStoreApplication {
   status                   PartnerStoreApplicationStatus @default(PENDING)
   provisioningStatus       PartnerStoreProvisioningStatus @default(NOT_STARTED)
   activationStatus         PartnerStoreActivationStatus  @default(NOT_STARTED)
+  onboardingStatus         PartnerStoreOnboardingStatus  @default(NOT_STARTED)
   reviewNote               String?
   provisionedBranchId      Int?                           @unique
   provisionedOwnerUserId   Int?                           @unique
@@ -56,6 +66,9 @@ model PartnerStoreApplication {
   provisionedAt            DateTime?
   provisioningFailureCode  String?
   activatedAt              DateTime?
+  firstLoginAt             DateTime?
+  onboardingStartedAt      DateTime?
+  onboardingCompletedAt    DateTime?
   provisionedBranch        Branch?                        @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
   provisionedOwnerUser     User?                          @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
   events                   PartnerStoreApplicationEvent[]
@@ -66,6 +79,7 @@ model PartnerStoreApplication {
   @@index([status, createdAt])
   @@index([provisioningStatus, createdAt])
   @@index([activationStatus, createdAt])
+  @@index([onboardingStatus, createdAt])
   @@index([contactPhone, createdAt])
   @@index([requestedStorefrontSlug])
 }
@@ -80,6 +94,8 @@ model PartnerStoreApplicationEvent {
   resultingProvisioningStatus  PartnerStoreProvisioningStatus?
   previousActivationStatus     PartnerStoreActivationStatus?
   resultingActivationStatus    PartnerStoreActivationStatus?
+  previousOnboardingStatus     PartnerStoreOnboardingStatus?
+  resultingOnboardingStatus    PartnerStoreOnboardingStatus?
   actorUserId                  Int?
   note                         String?
   metadata                     Json?
