@@ -30,6 +30,7 @@ const syntaxFiles = [
   'src/modules/repair/workflow/policies/repairWorkflowPolicy.js',
   'src/modules/repair/workflow/commands/transitionRepairWorkflowRepository.js',
   'src/modules/repair/workflow/commands/transitionRepairWorkflowService.js',
+  'src/modules/repair/workflow/events/repairWorkflowEventStore.js',
   'src/modules/repair/estimate-approval/repairEstimateApprovalService.js',
   'src/modules/repair/parts/addRepairPartService.js',
   'src/modules/repair/claim/open/openWarrantyClaimService.js',
@@ -109,14 +110,21 @@ assertContains(workflowPolicy, 'PASSPORT_EVENT_BY_ACTION', 'device passport even
 const workflowService = read('src/modules/repair/workflow/commands/transitionRepairWorkflowService.js');
 assertContains(workflowService, 'this.repository.transaction', 'repair workflow transaction authority');
 assertContains(workflowService, 'repairJob.branchId !== branchId', 'repair branch ownership guard');
-assertContains(workflowService, 'REPAIR_DEVICE_REQUIRED', 'repair device authority guard');
+assertNotContains(workflowService, 'REPAIR_DEVICE_REQUIRED', 'repair global device passport requirement');
 assertContains(workflowService, 'REPAIR_WORKFLOW_VERSION_CONFLICT', 'repair optimistic workflow guard');
 assertContains(workflowService, 'assertRepairNotHeldByActiveSubcontract', 'repair subcontract workflow hold');
 assertContains(workflowService, 'resolveRepairWorkflowTransition', 'repair transition policy authority');
+assertContains(workflowService, 'publishWorkflowEvent', 'repair-owned workflow event publication');
+assertContains(workflowService, 'if (repairJob.deviceId && repairJob.device', 'repair optional device passport projection');
 assertContains(workflowService, 'publishPassportEvent', 'repair device passport publication');
 assertContains(workflowService, "sourceType: 'REPAIR_JOB'", 'repair passport source identity');
-assertContains(workflowService, 'eventKey: `repair-workflow:${repairJobId}:${commandKey}`', 'repair workflow idempotency key');
+assertContains(workflowService, 'const eventKey = `repair-workflow:${repairJobId}:${commandKey}`', 'repair workflow idempotency key');
 assertContains(workflowService, 'workflowTargetStatus', 'repair workflow event projection');
+
+const workflowEventStore = read('src/modules/repair/workflow/events/repairWorkflowEventStore.js');
+assertContains(workflowEventStore, '"RepairWorkflowEvent"', 'repair workflow event authority');
+assertContains(workflowEventStore, '"eventKey"', 'repair workflow durable idempotency key');
+assertContains(workflowEventStore, '"targetStatus"', 'repair workflow durable status projection');
 
 const subcontractService = read('src/modules/repair/subcontract/repairSubcontractService.js');
 assertContains(subcontractService, 'allowOutsourceRepair', 'repair subcontract customer consent gate');
