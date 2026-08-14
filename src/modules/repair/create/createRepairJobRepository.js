@@ -3,6 +3,9 @@ const {
   publishDevicePassportEvent,
 } = require('../../device/passport/publish/devicePassportEventPublisher');
 const {
+  publishRepairWorkflowEvent,
+} = require('../workflow/events/repairWorkflowEventStore');
+const {
   buildCustomerBranchEvidence,
 } = require('../policies/repairCustomerBranchAccessPolicy');
 
@@ -140,6 +143,10 @@ class CreateRepairJobRepository {
 
   createDeviceIntake(data) {
     return this.prisma.deviceIntake.create({ data });
+  }
+
+  publishWorkflowEvent(event) {
+    return publishRepairWorkflowEvent(this.prisma, event);
   }
 
   publishPassportEvent(event) {
