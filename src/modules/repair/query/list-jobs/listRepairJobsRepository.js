@@ -1,31 +1,20 @@
 const prisma = require('../../../../database/prisma/client');
 
-const repairJobDetailInclude = {
-  branch: true,
+// Queue/list reads intentionally load only data consumed by mapRepairJob() and
+// projectRepairOperationalState(). Historical purchase/sale graphs and full
+// claim event histories belong to detail queries, not the operational queue.
+const repairJobListInclude = {
   customer: { include: { user: true } },
   stockItem: {
     include: {
       product: { include: { brand: true, productType: true } },
-      purchaseOrderReceiptItem: {
-        include: { receipt: { include: { supplier: true } } },
-      },
-      saleItems: {
-        include: { sale: { include: { customer: { include: { user: true } } } } },
-        orderBy: { sale: { soldAt: 'desc' } },
-      },
     },
   },
   device: true,
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
-    include: {
-      supplier: true,
-      events: {
-        include: { performedBy: true },
-        orderBy: { occurredAt: 'asc' },
-      },
-    },
+    include: { supplier: true },
     orderBy: { openedAt: 'desc' },
   },
   deviceIntake: {
@@ -67,7 +56,7 @@ class ListRepairJobsRepository {
         ...(filters.stockItemId ? { stockItemId: filters.stockItemId } : {}),
         ...(filters.customerId ? { customerId: filters.customerId } : {}),
       },
-      include: repairJobDetailInclude,
+      include: repairJobListInclude,
       orderBy: { createdAt: 'desc' },
       take: filters.limit,
       skip: filters.offset,
@@ -77,4 +66,6 @@ class ListRepairJobsRepository {
 
 module.exports = new ListRepairJobsRepository();
 module.exports.ListRepairJobsRepository = ListRepairJobsRepository;
-module.exports.repairJobDetailInclude = repairJobDetailInclude;
+module.exports.repairJobListInclude = repairJobListInclude;
+// Compatibility export for older contract tests/importers during the queue cutover.
+module.exports.repairJobDetailInclude = repairJobListInclude;
