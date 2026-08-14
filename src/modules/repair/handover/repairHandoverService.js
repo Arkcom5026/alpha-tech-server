@@ -53,15 +53,41 @@ async function confirmPublic(token, payload) {
 }
 
 async function getStaff(actor, repairJobId) {
-  const job = await repository.findJob(repairJobId, actor.branchId);
+  // Start all branch-safe reads together. RepairWorkflowEvent is the current
+  // workflow authority; Device Passport is only a legacy projection fallback.
+  const jobPromise = repository.findJob(repairJobId, actor.branchId);
+  const deliveryPromise = repository.findDelivery(repairJobId);
+  const activeSubcontractPromise = typeof repository.findActiveSubcontract === 'function'
+    ? repository.findActiveSubcontract(repairJobId)
+    : Promise.resolve(null);
+  const repairOwnedEventPromise = typeof repository.findLatestRepairOwnedWorkflowEvent === 'function'
+    ? repository.findLatestRepairOwnedWorkflowEvent(repairJobId, actor.branchId)
+    : Promise.resolve(null);
+
+  const [job, delivery, activeSubcontract, repairOwnedEvent] = await Promise.all([
+    jobPromise,
+    deliveryPromise,
+    activeSubcontractPromise,
+    repairOwnedEventPromise,
+  ]);
   if (!job) throw notFound();
-  const handover = mapHandover(await repository.findDelivery(job.id));
-  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
-    ? await repository.findActiveSubcontract(job.id)
-    : null;
+
+  let workflowEvent = repairOwnedEvent;
+  if (!workflowEvent) {
+    if (typeof repository.findLatestPassportWorkflowEvent === 'function') {
+      workflowEvent = await repository.findLatestPassportWorkflowEvent(
+        job.id,
+        job.deviceId,
+        job.branchId
+      );
+    } else {
+      workflowEvent = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
+    }
+  }
+
   return {
-    ...handover,
-    workflowStatus: await workflowStatusFor(job),
+    ...mapHandover(delivery),
+    workflowStatus: workflowEvent?.metadata?.workflowTargetStatus || 'RECEIVED',
     subcontractHold: activeSubcontract
       ? {
           repairSubcontractId: Number(activeSubcontract.id),
