@@ -21,6 +21,11 @@ const warrantyClaimDetailInclude = {
           user: true,
         },
       },
+      deviceIntake: {
+        include: {
+          snapshot: true,
+        },
+      },
     },
   },
   previousClaim: true,
