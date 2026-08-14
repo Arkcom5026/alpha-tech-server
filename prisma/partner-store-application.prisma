@@ -9,12 +9,22 @@ enum PartnerStoreApplicationStatus {
   WITHDRAWN
 }
 
+enum PartnerStoreProvisioningStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PROVISIONED
+  FAILED
+}
+
 enum PartnerStoreApplicationEventType {
   SUBMITTED
   REVIEW_STARTED
   APPROVED
   REJECTED
   WITHDRAWN
+  PROVISIONING_STARTED
+  STORE_PROVISIONED
+  PROVISIONING_FAILED
 }
 
 model PartnerStoreApplication {
@@ -28,10 +38,14 @@ model PartnerStoreApplication {
   requestedStorefrontSlug  String?
   note                     String?
   status                   PartnerStoreApplicationStatus @default(PENDING)
+  provisioningStatus       PartnerStoreProvisioningStatus @default(NOT_STARTED)
   reviewNote               String?
   provisionedBranchId      Int?                           @unique
   provisionedOwnerUserId   Int?                           @unique
   decidedAt                DateTime?
+  provisioningAttemptedAt  DateTime?
+  provisionedAt            DateTime?
+  provisioningFailureCode  String?
   provisionedBranch        Branch?                        @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
   provisionedOwnerUser     User?                          @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
   events                   PartnerStoreApplicationEvent[]
@@ -39,21 +53,24 @@ model PartnerStoreApplication {
   updatedAt                DateTime                       @updatedAt
 
   @@index([status, createdAt])
+  @@index([provisioningStatus, createdAt])
   @@index([contactPhone, createdAt])
   @@index([requestedStorefrontSlug])
 }
 
 model PartnerStoreApplicationEvent {
-  id               Int                              @id @default(autoincrement())
-  applicationId    Int
-  eventType        PartnerStoreApplicationEventType
-  previousStatus   PartnerStoreApplicationStatus?
-  resultingStatus  PartnerStoreApplicationStatus
-  actorUserId      Int?
-  note             String?
-  metadata         Json?
-  createdAt        DateTime                         @default(now())
-  application      PartnerStoreApplication          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id                           Int                              @id @default(autoincrement())
+  applicationId                Int
+  eventType                    PartnerStoreApplicationEventType
+  previousStatus               PartnerStoreApplicationStatus?
+  resultingStatus              PartnerStoreApplicationStatus
+  previousProvisioningStatus   PartnerStoreProvisioningStatus?
+  resultingProvisioningStatus  PartnerStoreProvisioningStatus?
+  actorUserId                  Int?
+  note                         String?
+  metadata                     Json?
+  createdAt                    DateTime                         @default(now())
+  application                  PartnerStoreApplication          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId, createdAt])
   @@index([eventType, createdAt])

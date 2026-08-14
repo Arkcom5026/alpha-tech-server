@@ -7,6 +7,7 @@ const publicSelect = {
   applicationCode: true,
   businessName: true,
   status: true,
+  provisioningStatus: true,
   createdAt: true,
 }
 
@@ -21,10 +22,14 @@ const adminSelect = {
   requestedStorefrontSlug: true,
   note: true,
   status: true,
+  provisioningStatus: true,
   reviewNote: true,
   provisionedBranchId: true,
   provisionedOwnerUserId: true,
   decidedAt: true,
+  provisioningAttemptedAt: true,
+  provisionedAt: true,
+  provisioningFailureCode: true,
   createdAt: true,
   updatedAt: true,
 }
