@@ -30,6 +30,7 @@ const repairJobDetailInclude = {
   },
   deviceIntake: {
     include: {
+      snapshot: true,
       consent: true,
       photos: true,
     },
