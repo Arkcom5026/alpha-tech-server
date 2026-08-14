@@ -6,11 +6,13 @@ const requireAdmin = require('../../../../middlewares/requireAdmin')
 const publicController = require('./partnerStoreApplicationPublicController')
 const adminController = require('./partnerStoreApplicationController')
 const activationController = require('./partnerStoreActivationController')
+const activationPublicRoutes = require('./partnerStoreActivationPublicRoutes')
 
 const publicRouter = express.Router()
 const adminRouter = express.Router()
 
 publicRouter.post('/', publicController.submit)
+publicRouter.use('/activation', activationPublicRoutes)
 
 adminRouter.use(verifyToken, requireAdmin.superadmin)
 adminRouter.get('/', adminController.list)
