@@ -235,6 +235,15 @@ class TransitionRepairWorkflowService {
         throw new RepairWorkflowCommandError('REPAIR_JOB_NOT_FOUND', 'Repair job was not found in the actor branch', { repairJobId, branchId });
       }
 
+      const hasRepairWorkflowAuthority = typeof repo.publishWorkflowEvent === 'function';
+      if (!hasRepairWorkflowAuthority && (!repairJob.deviceId || !repairJob.device)) {
+        throw new RepairWorkflowCommandError(
+          'REPAIR_DEVICE_REQUIRED',
+          'Repair workflow authority is unavailable for a repair without a linked device passport',
+          { repairJobId }
+        );
+      }
+
       assertRepairNotHeldByActiveClaim(repairJob, RepairWorkflowCommandError);
       const activeSubcontract = typeof repo.findActiveSubcontract === 'function'
         ? await repo.findActiveSubcontract(repairJobId)
@@ -333,23 +342,26 @@ class TransitionRepairWorkflowService {
       const causationId = command.causationId || commandKey;
       const title = `งานซ่อม ${repairJob.jobNo}: ${transition.action}`;
 
-      const workflowEvent = await repo.publishWorkflowEvent({
-        repairJobId,
-        branchId,
-        eventType: transition.passportEventType,
-        action: transition.action,
-        previousStatus: transition.previousStatus,
-        targetStatus: transition.targetStatus,
-        eventKey,
-        correlationId,
-        causationId,
-        title,
-        description,
-        actorEmployeeId: employeeId,
-        customerVisible: command.customerVisible !== false,
-        metadata,
-        occurredAt,
-      });
+      let workflowEvent = null;
+      if (hasRepairWorkflowAuthority) {
+        workflowEvent = await repo.publishWorkflowEvent({
+          repairJobId,
+          branchId,
+          eventType: transition.passportEventType,
+          action: transition.action,
+          previousStatus: transition.previousStatus,
+          targetStatus: transition.targetStatus,
+          eventKey,
+          correlationId,
+          causationId,
+          title,
+          description,
+          actorEmployeeId: employeeId,
+          customerVisible: command.customerVisible !== false,
+          metadata,
+          occurredAt,
+        });
+      }
 
       let passportEvent = null;
       if (repairJob.deviceId && repairJob.device && typeof repo.publishPassportEvent === 'function') {
@@ -371,6 +383,10 @@ class TransitionRepairWorkflowService {
         });
       }
 
+      if (!workflowEvent && passportEvent) {
+        workflowEvent = { id: passportEvent.id };
+      }
+
       return {
         repairJobId,
         commandKey,
@@ -378,7 +394,7 @@ class TransitionRepairWorkflowService {
         status: transition.targetStatus,
         legacyStatus,
         terminal: transition.terminal,
-        workflowEventId: workflowEvent.id,
+        workflowEventId: workflowEvent?.id || null,
         passportEventId: passportEvent?.id || null,
         availableActions: getAvailableRepairWorkflowActions(transition.targetStatus),
         acceptedByEmployeeId:
