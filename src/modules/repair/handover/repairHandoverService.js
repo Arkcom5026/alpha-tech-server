@@ -55,13 +55,18 @@ async function confirmPublic(token, payload) {
 async function getStaff(actor, repairJobId) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
-  const handover = mapHandover(await repository.findDelivery(job.id));
-  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
-    ? await repository.findActiveSubcontract(job.id)
-    : null;
+
+  const [delivery, activeSubcontract, workflowEvent] = await Promise.all([
+    repository.findDelivery(job.id),
+    typeof repository.findActiveSubcontract === 'function'
+      ? repository.findActiveSubcontract(job.id)
+      : Promise.resolve(null),
+    repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId),
+  ]);
+
   return {
-    ...handover,
-    workflowStatus: await workflowStatusFor(job),
+    ...mapHandover(delivery),
+    workflowStatus: workflowEvent?.metadata?.workflowTargetStatus || 'RECEIVED',
     subcontractHold: activeSubcontract
       ? {
           repairSubcontractId: Number(activeSubcontract.id),
