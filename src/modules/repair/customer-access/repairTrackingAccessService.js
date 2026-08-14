@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
+const { mapRepairAsset } = require('../mappers/repairMapper');
 const { mapApproval } = require('../estimate-approval/repairEstimateApprovalPolicy');
 const { mapHandover } = require('../handover/repairHandoverPolicy');
 const {
@@ -64,8 +65,9 @@ function mapWorkflowCustomerStatus(workflowStatus, legacyStatus) {
 }
 
 function mapPublicWorkflowEvent(event) {
-  const action = event?.metadata?.action || null;
-  const targetStatus = event?.metadata?.workflowTargetStatus || null;
+  const action = event?.action || event?.metadata?.action || null;
+  const targetStatus =
+    event?.targetStatus || event?.metadata?.workflowTargetStatus || null;
 
   const actionCopy = {
     ACCEPT_JOB: { type: 'RECEIVED', title: 'ช่างรับงานแล้ว' },
@@ -116,34 +118,33 @@ function mapPublicWorkflowEvent(event) {
   };
 }
 
-function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = null) {
-  const product = job.stockItem?.product;
-  const intakeSnapshot = job.deviceIntake?.snapshot;
-  const registeredDevice = job.device;
-  const currentStatus = mapWorkflowCustomerStatus(workflowStatus, job.status);
-  const device = {
-    displayName:
-      product?.name ||
-      [registeredDevice?.brand, registeredDevice?.model].filter(Boolean).join(' ') ||
-      [intakeSnapshot?.brand, intakeSnapshot?.model].filter(Boolean).join(' ') ||
-      job.deviceModel,
-    model: registeredDevice?.model || intakeSnapshot?.model || job.deviceModel,
-    brand: product?.brand?.name || registeredDevice?.brand || intakeSnapshot?.brand || null,
-    type: product?.productType?.name || registeredDevice?.category || null,
-    serialNumber:
-      job.stockItem?.serialNumber ||
-      registeredDevice?.serialNumber ||
-      intakeSnapshot?.serialNumber ||
-      null,
-    imei: registeredDevice?.imei || intakeSnapshot?.imei || null,
-    barcode:
-      job.stockItem?.barcode ||
-      registeredDevice?.barcode ||
-      intakeSnapshot?.barcode ||
-      null,
+function mapPublicRepairAsset(job) {
+  const asset = mapRepairAsset(job);
+  return {
+    displayName: asset.displayName,
+    model: asset.model,
+    brand: asset.brand,
+    category: asset.category,
+    serialNumber: asset.serialNumber,
+    imei: asset.imei,
+    barcode: asset.barcode,
   };
+}
 
-  const publicEvents = (registeredDevice?.passportEvents || []).map(mapPublicWorkflowEvent);
+function toPublicProjection(
+  job,
+  persistedTimelineEvents = [],
+  workflowStatus = null,
+  repairWorkflowEvents = []
+) {
+  const currentStatus = mapWorkflowCustomerStatus(workflowStatus, job.status);
+  const repairAsset = mapPublicRepairAsset(job);
+
+  const legacyPassportEvents = (job.device?.passportEvents || []).map(mapPublicWorkflowEvent);
+  const canonicalWorkflowEvents = repairWorkflowEvents.map(mapPublicWorkflowEvent);
+  const publicEvents = canonicalWorkflowEvents.length
+    ? canonicalWorkflowEvents
+    : legacyPassportEvents;
 
   const statusEvents = persistedTimelineEvents.map(mapPersistedTimelineEvent);
   const timeline = [
@@ -159,6 +160,7 @@ function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = 
 
   if (
     statusEvents.length === 0 &&
+    publicEvents.length === 0 &&
     job.updatedAt &&
     new Date(job.updatedAt).getTime() !== new Date(job.createdAt).getTime()
   ) {
@@ -171,11 +173,16 @@ function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = 
   }
 
   return {
-    contractVersion: 'repair-customer-tracking.v1',
+    contractVersion: 'repair-customer-tracking.v2',
     repair: {
       jobNo: job.jobNo,
       intakeReference: job.deviceIntake?.referenceNo || null,
-      device,
+      repairAsset,
+      // Backward-compatible public alias while v1 consumers are retired.
+      device: {
+        ...repairAsset,
+        type: repairAsset.category,
+      },
       reportedSymptoms: job.reportedSymptoms,
       status: currentStatus,
       pickupDefaults: {
@@ -268,13 +275,23 @@ async function getPublicTracking(token) {
     throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบข้อมูลงานซ่อม');
   }
 
-  const [timelineEvents, estimateApproval, workflowEvent] = await Promise.all([
-    repository.listCustomerVisibleTimelineEvents(access.repairJobId),
-    repository.getLatestEstimateApproval(access.repairJobId),
-    repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId),
-  ]);
-  const workflowStatus = workflowEvent?.metadata?.workflowTargetStatus || null;
-  const projection = toPublicProjection(job, timelineEvents, workflowStatus);
+  const [timelineEvents, estimateApproval, workflowEvent, repairWorkflowEvents] =
+    await Promise.all([
+      repository.listCustomerVisibleTimelineEvents(access.repairJobId),
+      repository.getLatestEstimateApproval(access.repairJobId),
+      repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId),
+      repository.listCustomerVisibleWorkflowEvents(job.id, job.branchId),
+    ]);
+  const workflowStatus =
+    workflowEvent?.targetStatus ||
+    workflowEvent?.metadata?.workflowTargetStatus ||
+    null;
+  const projection = toPublicProjection(
+    job,
+    timelineEvents,
+    workflowStatus,
+    repairWorkflowEvents
+  );
   projection.repair.estimateApproval = mapApproval(estimateApproval);
   await repository.touch(access.id);
   return projection;
@@ -289,5 +306,6 @@ module.exports = {
   mapCustomerStatus,
   mapWorkflowCustomerStatus,
   mapPublicWorkflowEvent,
+  mapPublicRepairAsset,
   toPublicProjection,
 };
