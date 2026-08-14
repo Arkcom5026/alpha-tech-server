@@ -1,5 +1,4 @@
 const {
-  findLatestRepairWorkflowEvent,
   findRepairWorkflowHistory,
 } = require('../../workflow/events/repairWorkflowEventStore');
 
@@ -44,14 +43,17 @@ class RepairJobDetailRepository {
     const prisma = this.getPrisma();
     const id = Number(repairJobId);
     const branch = Number(branchId);
-    const job = await prisma.repairJob.findFirst({
+
+    // These reads are all branch-scoped and independent of the RepairJob row,
+    // so start them together rather than paying one database round-trip before
+    // beginning workflow/parts/subcontract reads.
+    const jobPromise = prisma.repairJob.findFirst({
       where: {
         id,
         branchId: branch,
       },
       include: repairJobDetailInclude,
     });
-    if (!job) return null;
 
     const serializedPartMovementsPromise = prisma.stockMovement.findMany({
       where: {
@@ -99,74 +101,76 @@ class RepairJobDetailRepository {
         ).then((rows) => rows[0] || null)
       : Promise.resolve(null);
 
-    const repairOwnedLatestPromise = findLatestRepairWorkflowEvent(prisma, {
-      repairJobId: id,
-      branchId: branch,
-    });
+    // One ordered RepairWorkflowEvent read is sufficient for both latest state
+    // and history. Avoid the previous extra "latest" query.
     const repairOwnedHistoryPromise = findRepairWorkflowHistory(prisma, {
       repairJobId: id,
       branchId: branch,
       take: 50,
     });
 
-    let passportLatestPromise = Promise.resolve(null);
-    let passportDiagnosisPromise = Promise.resolve(null);
-    let passportHistoryPromise = Promise.resolve([]);
+    const [job, serializedPartMovements, activeSubcontract, repairOwnedHistory] =
+      await Promise.all([
+        jobPromise,
+        serializedPartMovementsPromise,
+        activeSubcontractPromise,
+        repairOwnedHistoryPromise,
+      ]);
 
-    if (job.deviceId) {
+    if (!job) return null;
+
+    const repairOwnedLatest = repairOwnedHistory[0] || null;
+    const repairOwnedDiagnosis = repairOwnedHistory.find(
+      (event) => event.eventType === 'DIAGNOSIS_COMPLETED'
+    ) || null;
+
+    let passportLatest = null;
+    let passportDiagnosis = null;
+    let passportHistory = [];
+
+    // Device Passport is a compatibility projection only. Do not read its
+    // history at all when Repair-owned workflow authority is already present.
+    if (!repairOwnedHistory.length && job.deviceId) {
       const eventScope = {
         deviceId: Number(job.deviceId),
         branchId: branch,
         sourceType: 'REPAIR_JOB',
         sourceId: String(id),
       };
-      passportLatestPromise = prisma.devicePassportEvent.findFirst({
-        where: eventScope,
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      });
-      passportDiagnosisPromise = prisma.devicePassportEvent.findFirst({
-        where: {
-          ...eventScope,
-          eventType: 'DIAGNOSIS_COMPLETED',
-        },
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      });
-      passportHistoryPromise = prisma.devicePassportEvent.findMany({
-        where: eventScope,
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-        take: 50,
-        select: {
-          id: true,
-          eventType: true,
-          title: true,
-          description: true,
-          occurredAt: true,
-          metadata: true,
-        },
-      });
+      const [history, diagnosis] = await Promise.all([
+        prisma.devicePassportEvent.findMany({
+          where: eventScope,
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          take: 50,
+          select: {
+            id: true,
+            eventType: true,
+            title: true,
+            description: true,
+            occurredAt: true,
+            metadata: true,
+          },
+        }),
+        prisma.devicePassportEvent.findFirst({
+          where: {
+            ...eventScope,
+            eventType: 'DIAGNOSIS_COMPLETED',
+          },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          select: {
+            id: true,
+            eventType: true,
+            title: true,
+            description: true,
+            occurredAt: true,
+            metadata: true,
+          },
+        }),
+      ]);
+      passportHistory = history;
+      passportLatest = history[0] || null;
+      passportDiagnosis = diagnosis;
     }
-
-    const [
-      repairOwnedLatest,
-      repairOwnedHistory,
-      passportLatest,
-      passportDiagnosis,
-      passportHistory,
-      serializedPartMovements,
-      activeSubcontract,
-    ] = await Promise.all([
-      repairOwnedLatestPromise,
-      repairOwnedHistoryPromise,
-      passportLatestPromise,
-      passportDiagnosisPromise,
-      passportHistoryPromise,
-      serializedPartMovementsPromise,
-      activeSubcontractPromise,
-    ]);
-
-    const repairOwnedDiagnosis = repairOwnedHistory.find(
-      (event) => event.eventType === 'DIAGNOSIS_COMPLETED'
-    ) || null;
 
     return {
       ...job,
