@@ -1,19 +1,31 @@
 const express = require('express');
 const verifyToken = require('../../../middlewares/verifyToken');
-const prisma = require('../../database/prisma/client');
 const AppError = require('../../shared/errors/AppError');
 const service = require('./communicationService');
 const { requireCommunicationCapability } = require('./communicationAccessPolicy');
 
 const router = express.Router();
 router.use(verifyToken);
-router.use(async (req, _res, next) => {
+router.use((req, _res, next) => {
   try {
+    // verifyToken already revalidates User + EmployeeProfile against the database on
+    // every request (enabled / approved / active / branch). Re-querying the same
+    // EmployeeProfile here adds an avoidable database round-trip to every
+    // communication read without adding authority.
     const employeeId = Number(req.user?.employeeId);
-    const employee = Number.isInteger(employeeId) ? await prisma.employeeProfile.findUnique({ where: { id: employeeId }, select: { branchId: true, active: true, approved: true } }) : null;
-    if (!employee?.active || !employee?.approved) throw new AppError('Communication employee context is required', 403);
-    if (req.user?.branchId && Number(req.user.branchId) !== Number(employee.branchId)) throw new AppError('Cross-branch communication access is forbidden', 403);
-    req.communicationBranchId = employee.branchId;
+    const branchId = Number(req.user?.branchId);
+    const employeeContextValid =
+      req.user?.profileType === 'employee' &&
+      Number.isInteger(employeeId) && employeeId > 0 &&
+      Number.isInteger(branchId) && branchId > 0 &&
+      req.user?.employeeActive === true &&
+      req.user?.employeeApproved === true;
+
+    if (!employeeContextValid) {
+      throw new AppError('Communication employee context is required', 403);
+    }
+
+    req.communicationBranchId = branchId;
     next();
   } catch (error) { next(error); }
 });
