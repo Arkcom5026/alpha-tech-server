@@ -1,4 +1,5 @@
 const { RepairError, RepairFailureCode } = require('../contracts/repairError');
+const { mapRepairAsset } = require('../mappers/repairMapper');
 
 function parseBoolean(value) {
   return value === true || value === 'true' || value === '1';
@@ -55,11 +56,15 @@ function evaluateIntakeCompletion(intake) {
 }
 
 function mapEvidence(intake) {
+  const repairJob = intake.repairJob
+    ? { ...intake.repairJob, deviceIntake: intake }
+    : { deviceIntake: intake };
   return {
     intakeId: intake.id,
     referenceNo: intake.referenceNo,
     receivedAt: intake.receivedAt,
     receivedBy: intake.receivedBy || null,
+    repairAsset: mapRepairAsset(repairJob),
     consent: intake.consent || null,
     photos: intake.photos || [],
     completion: evaluateIntakeCompletion(intake),

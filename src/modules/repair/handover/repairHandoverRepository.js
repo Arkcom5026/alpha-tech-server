@@ -24,10 +24,17 @@ class RepairHandoverRepository {
       },
       select: {
         id: true, jobNo: true, branchId: true, customerId: true, deviceId: true,
-        status: true, estimatedCost: true, depositPaid: true,
+        deviceModel: true, status: true, estimatedCost: true, depositPaid: true,
+        device: true,
+        stockItem: {
+          select: {
+            id: true, barcode: true, serialNumber: true,
+            product: { select: { name: true, brand: { select: { name: true } }, productType: { select: { name: true } } } },
+          },
+        },
         deviceIntake: {
           select: {
-            id: true,
+            id: true, assetDescription: true, snapshot: true,
             accessories: { select: { accessoryType: true, quantity: true, remark: true } },
           },
         },
