@@ -334,7 +334,9 @@ class TransitionRepairWorkflowService {
             ? repairJob.preAgreedService
             : null,
         diagnosis,
-        repairCompletion,
+        repairCompletion: repairCompletion
+          ? { ...repairCompletion, repairAsset: mapRepairJob(repairJob).repairAsset }
+          : null,
         qc,
       };
       const eventKey = `repair-workflow:${repairJobId}:${commandKey}`;

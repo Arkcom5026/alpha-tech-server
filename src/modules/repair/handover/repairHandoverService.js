@@ -1,6 +1,7 @@
 const repository = require('./repairHandoverRepository');
 const trackingRepository = require('../customer-access/repairTrackingAccessRepository');
 const { hashToken } = require('../customer-access/repairTrackingAccessService');
+const { mapRepairAsset } = require('../mappers/repairMapper');
 const {
   validateCustomerConfirmation,
   validateFinalization,
@@ -48,7 +49,9 @@ async function confirmPublic(token, payload) {
   const job = await repository.findJob(access.repairJobId);
   if (!job) throw notFound();
   const existing = await repository.findDelivery(job.id);
-  if (existing?.status === 'DELIVERED') return mapHandover(existing);
+  if (existing?.status === 'DELIVERED') {
+    return { ...mapHandover(existing), repairAsset: mapRepairAsset(job) };
+  }
   const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
     ? await repository.findActiveSubcontract(job.id)
     : null;
@@ -57,7 +60,7 @@ async function confirmPublic(token, payload) {
   const input = validateCustomerConfirmation(workflowStatus, payload);
   const delivery = await repository.confirmCustomer(job.id, input);
   await trackingRepository.touch(access.id);
-  return mapHandover(delivery);
+  return { ...mapHandover(delivery), repairAsset: mapRepairAsset(job) };
 }
 
 async function getStaff(actor, repairJobId) {
@@ -95,6 +98,7 @@ async function getStaff(actor, repairJobId) {
 
   return {
     ...mapHandover(delivery),
+    repairAsset: mapRepairAsset(job),
     workflowStatus: workflowEvent?.metadata?.workflowTargetStatus || 'RECEIVED',
     subcontractHold: activeSubcontract
       ? {
@@ -115,7 +119,7 @@ async function finalize(actor, repairJobId, payload) {
   if (activeSubcontract) throw subcontractHold(activeSubcontract);
   let delivery = await repository.findDelivery(job.id);
   if (delivery?.status === 'DELIVERED') {
-    return { ...mapHandover(delivery), workflowStatus: 'DELIVERED' };
+    return { ...mapHandover(delivery), repairAsset: mapRepairAsset(job), workflowStatus: 'DELIVERED' };
   }
   const workflowStatus = await workflowStatusFor(job);
   const input = validateFinalization(workflowStatus, delivery, payload);
@@ -128,14 +132,16 @@ async function finalize(actor, repairJobId, payload) {
     });
   }
 
+  const repairAsset = mapRepairAsset(job);
   const snapshot = {
-    contractVersion: 'repair-handover.v3',
+    contractVersion: 'repair-handover.v4',
     jobNo: job.jobNo, branchId: job.branchId, customerId: job.customerId,
     deviceId: job.deviceId, customerConfirmedBy: delivery.customerConfirmedBy,
     customerConfirmedAt: delivery.customerConfirmedAt,
     estimatedCost: Number(job.estimatedCost || 0),
     depositPaid: Number(job.depositPaid || 0),
     accessories: job.deviceIntake?.accessories || [],
+    repairAsset,
     workflowPreviousStatus: workflowStatus,
     workflowTargetStatus: 'DELIVERED',
     confirmationMode: input.receiverName ? 'STAFF_COUNTER' : 'CUSTOMER_PUBLIC',
@@ -147,7 +153,7 @@ async function finalize(actor, repairJobId, payload) {
     error.statusCode = 409; error.status = 409; error.code = 'REPAIR_HANDOVER_STATE_CHANGED'; error.isOperational = true;
     throw error;
   }
-  return { ...mapHandover(finalized), workflowStatus: 'DELIVERED' };
+  return { ...mapHandover(finalized), repairAsset, workflowStatus: 'DELIVERED' };
 }
 
 module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold, newestWorkflowEvent };

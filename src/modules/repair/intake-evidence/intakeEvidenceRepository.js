@@ -16,6 +16,20 @@ class IntakeEvidenceRepository {
         referenceNo: true,
         receivedAt: true,
         receivedBy: { select: { id: true, name: true } },
+        assetDescription: true,
+        snapshot: true,
+        repairJob: {
+          select: {
+            id: true, deviceModel: true,
+            device: true,
+            stockItem: {
+              select: {
+                id: true, barcode: true, serialNumber: true,
+                product: { select: { name: true, brand: { select: { name: true } }, productType: { select: { name: true } } } },
+              },
+            },
+          },
+        },
         consent: {
           select: {
             id: true,

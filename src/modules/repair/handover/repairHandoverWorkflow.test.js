@@ -46,7 +46,7 @@ test('staff counter handover creates receiver confirmation when public confirmat
   assert.match(serviceSource, /!delivery\?\.customerConfirmedAt && input\.receiverName/);
   assert.match(serviceSource, /repository\.confirmCustomer\(job\.id/);
   assert.match(serviceSource, /confirmationMode: input\.receiverName \? 'STAFF_COUNTER' : 'CUSTOMER_PUBLIC'/);
-  assert.match(serviceSource, /contractVersion: 'repair-handover\.v3'/);
+  assert.match(serviceSource, /contractVersion: 'repair-handover\.v4'/);
 });
 
 test('public handover confirmation remains supported alongside the counter path', () => {
