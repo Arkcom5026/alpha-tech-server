@@ -29,6 +29,14 @@ function subcontractHold(activeSubcontract) {
   return error;
 }
 
+function newestWorkflowEvent(left, right) {
+  if (!left) return right || null;
+  if (!right) return left;
+  const leftTime = new Date(left.occurredAt || 0).getTime();
+  const rightTime = new Date(right.occurredAt || 0).getTime();
+  return rightTime > leftTime ? right : left;
+}
+
 async function workflowStatusFor(job) {
   const event = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
   return event?.metadata?.workflowTargetStatus || 'RECEIVED';
@@ -54,7 +62,8 @@ async function confirmPublic(token, payload) {
 
 async function getStaff(actor, repairJobId) {
   // Start all branch-safe reads together. RepairWorkflowEvent is the current
-  // workflow authority; Device Passport is only a legacy projection fallback.
+  // workflow authority, while Device Passport remains a compatibility
+  // projection that can still be newer for historical paths.
   const jobPromise = repository.findJob(repairJobId, actor.branchId);
   const deliveryPromise = repository.findDelivery(repairJobId);
   const activeSubcontractPromise = typeof repository.findActiveSubcontract === 'function'
@@ -73,16 +82,15 @@ async function getStaff(actor, repairJobId) {
   if (!job) throw notFound();
 
   let workflowEvent = repairOwnedEvent;
-  if (!workflowEvent) {
-    if (typeof repository.findLatestPassportWorkflowEvent === 'function') {
-      workflowEvent = await repository.findLatestPassportWorkflowEvent(
-        job.id,
-        job.deviceId,
-        job.branchId
-      );
-    } else {
-      workflowEvent = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
-    }
+  if (job.deviceId && typeof repository.findLatestPassportWorkflowEvent === 'function') {
+    const passportEvent = await repository.findLatestPassportWorkflowEvent(
+      job.id,
+      job.deviceId,
+      job.branchId
+    );
+    workflowEvent = newestWorkflowEvent(workflowEvent, passportEvent);
+  } else if (!workflowEvent) {
+    workflowEvent = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
   }
 
   return {
@@ -142,4 +150,4 @@ async function finalize(actor, repairJobId, payload) {
   return { ...mapHandover(finalized), workflowStatus: 'DELIVERED' };
 }
 
-module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold };
+module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold, newestWorkflowEvent };
