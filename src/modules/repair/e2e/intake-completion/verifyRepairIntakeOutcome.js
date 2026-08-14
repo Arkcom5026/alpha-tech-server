@@ -102,17 +102,18 @@ async function main() {
   }
 
   const events = await prisma.$queryRaw`
-    SELECT "id", "repairJobId", "eventType", "fromStatus", "toStatus",
-           "performedByEmployeeId", "occurredAt"
-    FROM "RepairJobEvent"
+    SELECT "id", "repairJobId", "eventType", "action", "previousStatus", "targetStatus",
+           "actorEmployeeId", "occurredAt"
+    FROM "RepairWorkflowEvent"
     WHERE "repairJobId" = ${job.id}
-      AND "eventType" = 'STATUS_CHANGED'
-      AND "fromStatus" = 'RECEIVED'
-      AND "toStatus" = 'IN_PROGRESS'
+      AND "eventType" = 'REPAIR_STATUS_CHANGED'
+      AND "action" IN ('START_REPAIR', 'START_PRE_AGREED_SERVICE')
+      AND "previousStatus" = 'ACCEPTED'
+      AND "targetStatus" = 'REPAIRING'
     ORDER BY "occurredAt" DESC
     LIMIT 5
   `;
-  if (!events.length) return fail('Matching status timeline event was not found.');
+  if (!events.length) return fail('Matching canonical workflow event was not found.');
 
   console.log(JSON.stringify({
     result: 'PASS',
@@ -134,7 +135,7 @@ async function main() {
       conditionPhotoId: conditionPhoto.id,
       uploadedByEmployeeId: conditionPhoto.uploadedByEmployeeId,
     },
-    timelineEvent: events[0],
+    workflowEvent: events[0],
   }, null, 2));
 }
 
