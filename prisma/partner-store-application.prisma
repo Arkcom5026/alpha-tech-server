@@ -16,6 +16,12 @@ enum PartnerStoreProvisioningStatus {
   FAILED
 }
 
+enum PartnerStoreActivationStatus {
+  NOT_STARTED
+  INVITED
+  ACTIVE
+}
+
 enum PartnerStoreApplicationEventType {
   SUBMITTED
   REVIEW_STARTED
@@ -25,6 +31,8 @@ enum PartnerStoreApplicationEventType {
   PROVISIONING_STARTED
   STORE_PROVISIONED
   PROVISIONING_FAILED
+  ACTIVATION_INVITATION_ISSUED
+  OWNER_ACTIVATED
 }
 
 model PartnerStoreApplication {
@@ -39,6 +47,7 @@ model PartnerStoreApplication {
   note                     String?
   status                   PartnerStoreApplicationStatus @default(PENDING)
   provisioningStatus       PartnerStoreProvisioningStatus @default(NOT_STARTED)
+  activationStatus         PartnerStoreActivationStatus  @default(NOT_STARTED)
   reviewNote               String?
   provisionedBranchId      Int?                           @unique
   provisionedOwnerUserId   Int?                           @unique
@@ -46,14 +55,17 @@ model PartnerStoreApplication {
   provisioningAttemptedAt  DateTime?
   provisionedAt            DateTime?
   provisioningFailureCode  String?
+  activatedAt              DateTime?
   provisionedBranch        Branch?                        @relation("PartnerStoreApplicationProvisionedBranch", fields: [provisionedBranchId], references: [id], onDelete: Restrict)
   provisionedOwnerUser     User?                          @relation("PartnerStoreApplicationProvisionedOwner", fields: [provisionedOwnerUserId], references: [id], onDelete: Restrict)
   events                   PartnerStoreApplicationEvent[]
+  activationInvitations    PartnerStoreActivationInvitation[]
   createdAt                DateTime                       @default(now())
   updatedAt                DateTime                       @updatedAt
 
   @@index([status, createdAt])
   @@index([provisioningStatus, createdAt])
+  @@index([activationStatus, createdAt])
   @@index([contactPhone, createdAt])
   @@index([requestedStorefrontSlug])
 }
@@ -75,4 +87,19 @@ model PartnerStoreApplicationEvent {
   @@index([applicationId, createdAt])
   @@index([eventType, createdAt])
   @@index([actorUserId])
+}
+
+model PartnerStoreActivationInvitation {
+  id             Int                     @id @default(autoincrement())
+  applicationId  Int
+  tokenHash      String                  @unique
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdByUserId Int
+  createdAt      DateTime                @default(now())
+  application    PartnerStoreApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([expiresAt])
+  @@index([consumedAt])
 }
