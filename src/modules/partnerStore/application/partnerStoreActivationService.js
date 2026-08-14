@@ -39,9 +39,10 @@ const issueInvitation = async (applicationId, actorUserId) => {
       fail(409, 'PARTNER_STORE_OWNER_ALREADY_ACTIVE', 'บัญชีเจ้าของร้านถูกเปิดใช้งานแล้ว')
     }
 
+    const now = new Date()
     await tx.partnerStoreActivationInvitation.updateMany({
-      where: { applicationId: id, consumedAt: null, expiresAt: { gt: new Date() } },
-      data: { consumedAt: new Date() },
+      where: { applicationId: id, consumedAt: null, revokedAt: null, expiresAt: { gt: now } },
+      data: { revokedAt: now },
     })
 
     const created = await tx.partnerStoreActivationInvitation.create({
@@ -62,6 +63,8 @@ const issueInvitation = async (applicationId, actorUserId) => {
         resultingStatus: application.status,
         previousProvisioningStatus: application.provisioningStatus,
         resultingProvisioningStatus: application.provisioningStatus,
+        previousActivationStatus: application.activationStatus,
+        resultingActivationStatus: 'INVITED',
         actorUserId: actorId,
         metadata: { invitationId: created.id, expiresAt: created.expiresAt.toISOString() },
       },
@@ -92,7 +95,9 @@ const claimActivation = async (payload = {}) => {
       where: { tokenHash },
       include: { application: true },
     })
-    if (!invitation || invitation.consumedAt) fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_INVALID', 'ลิงก์เปิดใช้งานไม่ถูกต้องหรือถูกใช้แล้ว')
+    if (!invitation || invitation.consumedAt || invitation.revokedAt) {
+      fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_INVALID', 'ลิงก์เปิดใช้งานไม่ถูกต้อง ถูกยกเลิก หรือถูกใช้แล้ว')
+    }
     if (invitation.expiresAt <= new Date()) fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_EXPIRED', 'ลิงก์เปิดใช้งานหมดอายุแล้ว')
 
     const application = invitation.application
@@ -155,6 +160,8 @@ const claimActivation = async (payload = {}) => {
         resultingStatus: application.status,
         previousProvisioningStatus: application.provisioningStatus,
         resultingProvisioningStatus: application.provisioningStatus,
+        previousActivationStatus: application.activationStatus,
+        resultingActivationStatus: 'ACTIVE',
         actorUserId: owner.id,
         metadata: { ownerUserId: owner.id, branchId: application.provisionedBranchId },
       },
