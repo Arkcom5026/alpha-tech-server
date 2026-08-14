@@ -44,14 +44,17 @@ class RepairJobDetailRepository {
     const prisma = this.getPrisma();
     const id = Number(repairJobId);
     const branch = Number(branchId);
-    const job = await prisma.repairJob.findFirst({
+
+    // Every read in this first wave is independently branch-scoped. Starting
+    // them together removes an avoidable database round-trip from the critical
+    // Repair Detail path without weakening tenant/branch isolation.
+    const jobPromise = prisma.repairJob.findFirst({
       where: {
         id,
         branchId: branch,
       },
       include: repairJobDetailInclude,
     });
-    if (!job) return null;
 
     const serializedPartMovementsPromise = prisma.stockMovement.findMany({
       where: {
@@ -109,10 +112,29 @@ class RepairJobDetailRepository {
       take: 50,
     });
 
-    let passportLatestPromise = Promise.resolve(null);
-    let passportDiagnosisPromise = Promise.resolve(null);
-    let passportHistoryPromise = Promise.resolve([]);
+    const [
+      job,
+      repairOwnedLatest,
+      repairOwnedHistory,
+      serializedPartMovements,
+      activeSubcontract,
+    ] = await Promise.all([
+      jobPromise,
+      repairOwnedLatestPromise,
+      repairOwnedHistoryPromise,
+      serializedPartMovementsPromise,
+      activeSubcontractPromise,
+    ]);
 
+    if (!job) return null;
+
+    let passportLatest = null;
+    let passportDiagnosis = null;
+    let passportHistory = [];
+
+    // Device Passport is an optional trace projection. Only linked-device jobs
+    // pay for these reads; passport-less Repair jobs stay on Repair-owned
+    // workflow authority without an extra database wave.
     if (job.deviceId) {
       const eventScope = {
         deviceId: Number(job.deviceId),
@@ -120,49 +142,33 @@ class RepairJobDetailRepository {
         sourceType: 'REPAIR_JOB',
         sourceId: String(id),
       };
-      passportLatestPromise = prisma.devicePassportEvent.findFirst({
-        where: eventScope,
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      });
-      passportDiagnosisPromise = prisma.devicePassportEvent.findFirst({
-        where: {
-          ...eventScope,
-          eventType: 'DIAGNOSIS_COMPLETED',
-        },
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      });
-      passportHistoryPromise = prisma.devicePassportEvent.findMany({
-        where: eventScope,
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-        take: 50,
-        select: {
-          id: true,
-          eventType: true,
-          title: true,
-          description: true,
-          occurredAt: true,
-          metadata: true,
-        },
-      });
+      [passportLatest, passportDiagnosis, passportHistory] = await Promise.all([
+        prisma.devicePassportEvent.findFirst({
+          where: eventScope,
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        }),
+        prisma.devicePassportEvent.findFirst({
+          where: {
+            ...eventScope,
+            eventType: 'DIAGNOSIS_COMPLETED',
+          },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        }),
+        prisma.devicePassportEvent.findMany({
+          where: eventScope,
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          take: 50,
+          select: {
+            id: true,
+            eventType: true,
+            title: true,
+            description: true,
+            occurredAt: true,
+            metadata: true,
+          },
+        }),
+      ]);
     }
-
-    const [
-      repairOwnedLatest,
-      repairOwnedHistory,
-      passportLatest,
-      passportDiagnosis,
-      passportHistory,
-      serializedPartMovements,
-      activeSubcontract,
-    ] = await Promise.all([
-      repairOwnedLatestPromise,
-      repairOwnedHistoryPromise,
-      passportLatestPromise,
-      passportDiagnosisPromise,
-      passportHistoryPromise,
-      serializedPartMovementsPromise,
-      activeSubcontractPromise,
-    ]);
 
     const repairOwnedDiagnosis = repairOwnedHistory.find(
       (event) => event.eventType === 'DIAGNOSIS_COMPLETED'
