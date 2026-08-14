@@ -30,13 +30,15 @@ test('repair queue uses a dedicated lightweight list include', () => {
   assert.match(listSource, /const repairJobListInclude =/);
   assert.match(listSource, /include: repairJobListInclude/);
   assert.match(listSource, /snapshot: true/);
-  assert.match(listSource, /consent: true/);
-  assert.match(listSource, /photos: true/);
+  assert.match(listSource, /consent: \{ select: \{ id: true \} \}/);
+  assert.match(listSource, /photos: \{[\s\S]*select: \{ category: true \}/);
 });
 
-test('repair queue does not load purchase, sales, or claim event history graphs', () => {
+test('repair queue does not load purchase, sales, parts, or warranty claim graphs', () => {
   assert.doesNotMatch(listSource, /purchaseOrderReceiptItem/);
   assert.doesNotMatch(listSource, /saleItems/);
+  assert.doesNotMatch(listSource, /partsUsed:/);
+  assert.doesNotMatch(listSource, /warrantyClaims:/);
   assert.doesNotMatch(listSource, /performedBy: true/);
 });
 
@@ -45,6 +47,15 @@ test('repair detail keeps canonical intake snapshot without loading unrelated hi
   assert.doesNotMatch(detailSource, /purchaseOrderReceiptItem/);
   assert.doesNotMatch(detailSource, /saleItems/);
   assert.doesNotMatch(detailSource, /performedBy: true/);
+});
+
+test('repair detail starts branch-safe reads concurrently and avoids duplicate repair workflow latest query', () => {
+  assert.match(detailSource, /const jobPromise =/);
+  assert.match(detailSource, /const repairOwnedHistoryPromise =/);
+  assert.match(detailSource, /await Promise\.all\(\[/);
+  assert.doesNotMatch(detailSource, /findLatestRepairWorkflowEvent/);
+  assert.match(detailSource, /const repairOwnedLatest = repairOwnedHistory\[0\] \|\| null/);
+  assert.match(detailSource, /if \(!repairOwnedHistory\.length && job\.deviceId\)/);
 });
 
 test('repair queue and detail remain branch scoped and queue stays bounded', () => {

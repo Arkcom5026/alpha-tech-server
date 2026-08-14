@@ -29,6 +29,14 @@ function subcontractHold(activeSubcontract) {
   return error;
 }
 
+function newestWorkflowEvent(left, right) {
+  if (!left) return right || null;
+  if (!right) return left;
+  const leftTime = new Date(left.occurredAt || 0).getTime();
+  const rightTime = new Date(right.occurredAt || 0).getTime();
+  return rightTime > leftTime ? right : left;
+}
+
 async function workflowStatusFor(job) {
   const event = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
   return event?.metadata?.workflowTargetStatus || 'RECEIVED';
@@ -53,15 +61,41 @@ async function confirmPublic(token, payload) {
 }
 
 async function getStaff(actor, repairJobId) {
-  const job = await repository.findJob(repairJobId, actor.branchId);
+  // Start all branch-safe reads together. RepairWorkflowEvent is the current
+  // workflow authority, while Device Passport remains a compatibility
+  // projection that can still be newer for historical paths.
+  const jobPromise = repository.findJob(repairJobId, actor.branchId);
+  const deliveryPromise = repository.findDelivery(repairJobId);
+  const activeSubcontractPromise = typeof repository.findActiveSubcontract === 'function'
+    ? repository.findActiveSubcontract(repairJobId)
+    : Promise.resolve(null);
+  const repairOwnedEventPromise = typeof repository.findLatestRepairOwnedWorkflowEvent === 'function'
+    ? repository.findLatestRepairOwnedWorkflowEvent(repairJobId, actor.branchId)
+    : Promise.resolve(null);
+
+  const [job, delivery, activeSubcontract, repairOwnedEvent] = await Promise.all([
+    jobPromise,
+    deliveryPromise,
+    activeSubcontractPromise,
+    repairOwnedEventPromise,
+  ]);
   if (!job) throw notFound();
-  const handover = mapHandover(await repository.findDelivery(job.id));
-  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
-    ? await repository.findActiveSubcontract(job.id)
-    : null;
+
+  let workflowEvent = repairOwnedEvent;
+  if (job.deviceId && typeof repository.findLatestPassportWorkflowEvent === 'function') {
+    const passportEvent = await repository.findLatestPassportWorkflowEvent(
+      job.id,
+      job.deviceId,
+      job.branchId
+    );
+    workflowEvent = newestWorkflowEvent(workflowEvent, passportEvent);
+  } else if (!workflowEvent) {
+    workflowEvent = await repository.findLatestWorkflowEvent(job.id, job.deviceId, job.branchId);
+  }
+
   return {
-    ...handover,
-    workflowStatus: await workflowStatusFor(job),
+    ...mapHandover(delivery),
+    workflowStatus: workflowEvent?.metadata?.workflowTargetStatus || 'RECEIVED',
     subcontractHold: activeSubcontract
       ? {
           repairSubcontractId: Number(activeSubcontract.id),
@@ -116,4 +150,4 @@ async function finalize(actor, repairJobId, payload) {
   return { ...mapHandover(finalized), workflowStatus: 'DELIVERED' };
 }
 
-module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold };
+module.exports = { confirmPublic, getStaff, finalize, workflowStatusFor, subcontractHold, newestWorkflowEvent };

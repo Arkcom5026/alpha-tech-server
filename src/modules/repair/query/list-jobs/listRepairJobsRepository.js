@@ -1,8 +1,9 @@
 const prisma = require('../../../../database/prisma/client');
 
-// Queue/list reads intentionally load only data consumed by mapRepairJob() and
-// projectRepairOperationalState(). Historical purchase/sale graphs and full
-// claim event histories belong to detail queries, not the operational queue.
+// Queue/list reads intentionally load only data consumed by mapRepairJob(),
+// queue projection and projectRepairOperationalState(). Parts and warranty-claim
+// graphs belong to Detail/Claim bounded contexts and must not inflate every queue
+// refresh.
 const repairJobListInclude = {
   customer: { include: { user: true } },
   stockItem: {
@@ -12,16 +13,15 @@ const repairJobListInclude = {
   },
   device: true,
   technician: true,
-  partsUsed: { include: { product: true } },
-  warrantyClaims: {
-    include: { supplier: true },
-    orderBy: { openedAt: 'desc' },
-  },
   deviceIntake: {
-    include: {
+    select: {
+      id: true,
+      assetDescription: true,
       snapshot: true,
-      consent: true,
-      photos: true,
+      consent: { select: { id: true } },
+      photos: {
+        select: { category: true },
+      },
     },
   },
   subcontracts: {

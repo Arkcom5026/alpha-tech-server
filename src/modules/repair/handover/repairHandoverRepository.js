@@ -5,6 +5,14 @@ const columns = `"id", "repairJobId", "status", "method", "recipientName",
   "paymentConfirmed", "deviceReturned", "accessoriesReturned", "deliveredAt",
   "createdAt", "updatedAt"`;
 
+function newestWorkflowEvent(left, right) {
+  if (!left) return right || null;
+  if (!right) return left;
+  const leftTime = new Date(left.occurredAt || 0).getTime();
+  const rightTime = new Date(right.occurredAt || 0).getTime();
+  return rightTime > leftTime ? right : left;
+}
+
 class RepairHandoverRepository {
   constructor(client = prisma) { this.prisma = client; }
 
@@ -39,8 +47,22 @@ class RepairHandoverRepository {
     return rows[0] || null;
   }
 
-  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
-    if (!deviceId) return null;
+  async findLatestRepairOwnedWorkflowEvent(repairJobId, branchId) {
+    if (typeof this.prisma.$queryRawUnsafe !== 'function') return null;
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT "id", "metadata", "occurredAt"
+       FROM "RepairWorkflowEvent"
+       WHERE "repairJobId" = $1 AND "branchId" = $2
+       ORDER BY "occurredAt" DESC, "id" DESC
+       LIMIT 1`,
+      Number(repairJobId),
+      Number(branchId)
+    );
+    return rows[0] || null;
+  }
+
+  findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId) {
+    if (!deviceId) return Promise.resolve(null);
     return this.prisma.devicePassportEvent.findFirst({
       where: {
         deviceId: Number(deviceId),
@@ -49,7 +71,16 @@ class RepairHandoverRepository {
         sourceId: String(repairJobId),
       },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, metadata: true, occurredAt: true },
     });
+  }
+
+  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    const [repairOwned, passport] = await Promise.all([
+      this.findLatestRepairOwnedWorkflowEvent(repairJobId, branchId),
+      this.findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId),
+    ]);
+    return newestWorkflowEvent(repairOwned, passport);
   }
 
   async findDelivery(repairJobId) {
@@ -149,3 +180,4 @@ class RepairHandoverRepository {
 
 module.exports = new RepairHandoverRepository();
 module.exports.RepairHandoverRepository = RepairHandoverRepository;
+module.exports.newestWorkflowEvent = newestWorkflowEvent;
