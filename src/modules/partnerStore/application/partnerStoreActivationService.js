@@ -21,6 +21,18 @@ const positiveId = (value, statusCode, code, message) => {
 
 const hashToken = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex')
 
+const assertUsableInvitation = (invitation) => {
+  if (!invitation || invitation.consumedAt || invitation.revokedAt) {
+    fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_INVALID', 'ลิงก์เปิดใช้งานไม่ถูกต้อง ถูกยกเลิก หรือถูกใช้แล้ว')
+  }
+  if (invitation.expiresAt <= new Date()) fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_EXPIRED', 'ลิงก์เปิดใช้งานหมดอายุแล้ว')
+}
+
+const findIdentityConflict = (tx, email) => tx.user.findFirst({
+  where: { OR: [{ email }, { loginId: email }] },
+  select: { id: true },
+})
+
 const issueInvitation = async (applicationId, actorUserId) => {
   const id = positiveId(applicationId, 400, 'PARTNER_STORE_APPLICATION_ID_INVALID', 'รหัสใบสมัครไม่ถูกต้อง')
   const actorId = positiveId(actorUserId, 401, 'PARTNER_STORE_ACTIVATION_ACTOR_REQUIRED', 'ไม่พบผู้ดำเนินการ')
@@ -34,9 +46,13 @@ const issueInvitation = async (applicationId, actorUserId) => {
     if (application.status !== 'APPROVED' || application.provisioningStatus !== 'PROVISIONED' || !application.provisionedBranchId) {
       fail(409, 'PARTNER_STORE_ACTIVATION_REQUIRES_PROVISIONED_STORE', 'ต้องอนุมัติและสร้างร้านให้เสร็จก่อนออกคำเชิญเปิดใช้งาน')
     }
-    if (!application.contactEmail) fail(409, 'PARTNER_STORE_ACTIVATION_EMAIL_REQUIRED', 'ใบสมัครไม่มีอีเมลสำหรับบัญชีเจ้าของร้าน')
+    const email = String(application.contactEmail || '').trim().toLowerCase()
+    if (!email) fail(409, 'PARTNER_STORE_ACTIVATION_EMAIL_REQUIRED', 'ใบสมัครไม่มีอีเมลสำหรับบัญชีเจ้าของร้าน')
     if (application.activationStatus === 'ACTIVE' || application.provisionedOwnerUserId) {
       fail(409, 'PARTNER_STORE_OWNER_ALREADY_ACTIVE', 'บัญชีเจ้าของร้านถูกเปิดใช้งานแล้ว')
+    }
+    if (await findIdentityConflict(tx, email)) {
+      fail(409, 'PARTNER_STORE_OWNER_EMAIL_ALREADY_IN_USE', 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ')
     }
 
     const now = new Date()
@@ -88,6 +104,15 @@ const claimActivation = async (payload = {}) => {
   if (password.length < 8) fail(400, 'PARTNER_STORE_ACTIVATION_PASSWORD_INVALID', 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร')
 
   const tokenHash = hashToken(rawToken)
+
+  await repository.withTransaction(async (tx) => {
+    const invitation = await tx.partnerStoreActivationInvitation.findUnique({
+      where: { tokenHash },
+      select: { expiresAt: true, revokedAt: true, consumedAt: true },
+    })
+    assertUsableInvitation(invitation)
+  })
+
   const passwordHash = await bcrypt.hash(password, 10)
 
   return repository.withTransaction(async (tx) => {
@@ -95,10 +120,7 @@ const claimActivation = async (payload = {}) => {
       where: { tokenHash },
       include: { application: true },
     })
-    if (!invitation || invitation.consumedAt || invitation.revokedAt) {
-      fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_INVALID', 'ลิงก์เปิดใช้งานไม่ถูกต้อง ถูกยกเลิก หรือถูกใช้แล้ว')
-    }
-    if (invitation.expiresAt <= new Date()) fail(409, 'PARTNER_STORE_ACTIVATION_TOKEN_EXPIRED', 'ลิงก์เปิดใช้งานหมดอายุแล้ว')
+    assertUsableInvitation(invitation)
 
     const application = invitation.application
     if (application.status !== 'APPROVED' || application.provisioningStatus !== 'PROVISIONED' || !application.provisionedBranchId) {
@@ -110,8 +132,9 @@ const claimActivation = async (payload = {}) => {
 
     const email = String(application.contactEmail || '').trim().toLowerCase()
     if (!email) fail(409, 'PARTNER_STORE_ACTIVATION_EMAIL_REQUIRED', 'ใบสมัครไม่มีอีเมลสำหรับบัญชีเจ้าของร้าน')
-    const existingUser = await tx.user.findUnique({ where: { email }, select: { id: true } })
-    if (existingUser) fail(409, 'PARTNER_STORE_OWNER_EMAIL_ALREADY_IN_USE', 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ')
+    if (await findIdentityConflict(tx, email)) {
+      fail(409, 'PARTNER_STORE_OWNER_EMAIL_ALREADY_IN_USE', 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาติดต่อผู้ดูแลระบบ')
+    }
 
     const owner = await tx.user.create({
       data: {
