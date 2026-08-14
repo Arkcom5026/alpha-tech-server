@@ -5,6 +5,7 @@ const verifyToken = require('../../../../middlewares/verifyToken')
 const controller = require('../controllers/partnerStoreCapabilityController')
 const onlineVisibilityController = require('../onlineVisibility/onlineProductVisibilityController')
 const onlineProductControlController = require('../onlineProductControl/onlineProductControlController')
+const onboardingRoutes = require('../onboarding/partnerStoreOnboardingRoutes')
 
 const router = express.Router()
 
@@ -26,6 +27,7 @@ const allowEmployeeContext = (req, res, next) => {
   })
 }
 
+router.use('/onboarding', onboardingRoutes)
 router.use(verifyToken, allowEmployeeContext)
 router.get('/capability', controller.getCurrentBranchCapability)
 router.put('/capability', controller.saveCurrentBranchCapability)
