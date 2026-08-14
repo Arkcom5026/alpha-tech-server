@@ -19,6 +19,11 @@ const repairJobDetailInclude = {
     },
   },
   device: true,
+  deviceIntake: {
+    include: {
+      snapshot: true,
+    },
+  },
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
