@@ -69,7 +69,7 @@ function mapRepairAsset(job) {
       displayName: job.stockItem.product?.name || job.deviceModel || 'สินค้าในร้าน',
       brand: job.stockItem.product?.brand?.name || null,
       category: job.stockItem.product?.productType?.name || null,
-      model: job.deviceModel || null,
+      model: job.device?.model || null,
       barcode: job.stockItem.barcode || job.device?.barcode || null,
       serialNumber: job.stockItem.serialNumber || job.device?.serialNumber || null,
       imei: job.device?.imei || null,
@@ -77,14 +77,16 @@ function mapRepairAsset(job) {
   }
 
   if (job.device) {
-    const deviceName = [job.device.brand, job.device.model].filter(Boolean).join(' ');
+    const legacyDeviceName = [job.device.brand, job.device.model].filter(Boolean).join(' ');
     return {
       sourceType: 'CUSTOMER_DEVICE',
       sourceId: job.device.id,
-      displayName: deviceName || job.deviceModel || 'อุปกรณ์ของลูกค้า',
+      // RepairJob.deviceModel remains the backwards-compatible storage for the
+      // human-readable device name. Device.model is the optional technical model.
+      displayName: job.deviceModel || legacyDeviceName || 'อุปกรณ์ของลูกค้า',
       brand: job.device.brand || null,
       category: job.device.category || null,
-      model: job.device.model || job.deviceModel || null,
+      model: job.device.model || null,
       barcode: job.device.barcode || null,
       serialNumber: job.device.serialNumber || null,
       imei: job.device.imei || null,
@@ -97,7 +99,7 @@ function mapRepairAsset(job) {
     displayName: job.deviceModel || 'อุปกรณ์ที่ลูกค้านำมาซ่อม',
     brand: null,
     category: null,
-    model: job.deviceModel || null,
+    model: null,
     barcode: null,
     serialNumber: null,
     imei: null,
@@ -115,7 +117,7 @@ function mapClaimAsset(claim) {
         'สินค้าในร้าน',
       brand: claim.stockItem.product?.brand?.name || null,
       category: claim.stockItem.product?.productType?.name || null,
-      model: claim.repairJob?.deviceModel || null,
+      model: claim.device?.model || null,
       barcode: claim.stockItem.barcode || claim.device?.barcode || null,
       serialNumber:
         claim.stockItem.serialNumber || claim.device?.serialNumber || null,
@@ -124,17 +126,17 @@ function mapClaimAsset(claim) {
   }
 
   if (claim.device) {
-    const deviceName = [claim.device.brand, claim.device.model]
+    const legacyDeviceName = [claim.device.brand, claim.device.model]
       .filter(Boolean)
       .join(' ');
     return {
       sourceType: 'CUSTOMER_DEVICE',
       sourceId: claim.device.id,
       displayName:
-        deviceName || claim.repairJob?.deviceModel || 'อุปกรณ์ของลูกค้า',
+        claim.repairJob?.deviceModel || legacyDeviceName || 'อุปกรณ์ของลูกค้า',
       brand: claim.device.brand || null,
       category: claim.device.category || null,
-      model: claim.device.model || claim.repairJob?.deviceModel || null,
+      model: claim.device.model || null,
       barcode: claim.device.barcode || null,
       serialNumber: claim.device.serialNumber || null,
       imei: claim.device.imei || null,
@@ -148,7 +150,7 @@ function mapClaimAsset(claim) {
       claim.repairJob?.deviceModel || 'อุปกรณ์ในรายการเคลม',
     brand: null,
     category: null,
-    model: claim.repairJob?.deviceModel || null,
+    model: null,
     barcode: null,
     serialNumber: null,
     imei: null,
