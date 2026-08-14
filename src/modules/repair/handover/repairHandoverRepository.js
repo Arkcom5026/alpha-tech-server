@@ -40,6 +40,7 @@ class RepairHandoverRepository {
   }
 
   async findLatestRepairOwnedWorkflowEvent(repairJobId, branchId) {
+    if (typeof this.prisma.$queryRawUnsafe !== 'function') return null;
     const rows = await this.prisma.$queryRawUnsafe(
       `SELECT "id", "metadata", "occurredAt"
        FROM "RepairWorkflowEvent"
