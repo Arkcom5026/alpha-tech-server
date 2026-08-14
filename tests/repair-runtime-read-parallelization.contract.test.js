@@ -44,3 +44,21 @@ test('handover workflow keeps newest Repair-owned authority with Passport compat
   assert.match(source, /findLatestPassportWorkflowEvent/);
   assert.match(source, /newestWorkflowEvent\(repairOwned, passport\)/);
 });
+
+test('estimate staff read overlaps branch guard with latest approval lookup', () => {
+  const source = read('src/modules/repair/estimate-approval/repairEstimateApprovalService.js');
+
+  assert.match(source, /const \[job, latest\] = await Promise\.all\(/);
+  assert.match(source, /findRepairJobForStaff\(repairJobId, actor\.branchId\)/);
+  assert.match(source, /this\.repository\.findLatest\(repairJobId\)/);
+  assert.match(source, /if \(!job\)/);
+  assert.match(source, /approval: mapApproval\(latest\)/);
+});
+
+test('parallel read hardening preserves branch ownership guards', () => {
+  const handover = read('src/modules/repair/handover/repairHandoverService.js');
+  const estimate = read('src/modules/repair/estimate-approval/repairEstimateApprovalService.js');
+
+  assert.match(handover, /repository\.findJob\(repairJobId, actor\.branchId\)/);
+  assert.match(estimate, /findRepairJobForStaff\(repairJobId, actor\.branchId\)/);
+});
