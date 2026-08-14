@@ -62,6 +62,8 @@ const productTraceInclude = {
   repairJobs: {
     include: {
       customer: { include: { user: { select: { id: true, email: true, loginId: true } } } },
+      device: true,
+      deviceIntake: { include: { snapshot: true } },
       technician: { select: { id: true, name: true } },
       partsUsed: { include: { product: { include: { brand: true, unit: true } } } },
     },
