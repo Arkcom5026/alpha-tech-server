@@ -117,6 +117,10 @@ test('repair detail repository loads intake snapshot while preserving branch-sco
         return null;
       },
     },
+    stockMovement: {
+      findMany: async () => [],
+    },
+    $queryRawUnsafe: async () => [],
   };
   const repo = new RepairJobDetailRepository(fakeClient);
   const result = await repo.findById(9, 123);
