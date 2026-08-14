@@ -77,6 +77,7 @@ class RepairTrackingAccessRepository {
         branch: { select: { name: true, phone: true, address: true } },
         stockItem: {
           select: {
+            id: true,
             barcode: true,
             serialNumber: true,
             product: {
@@ -113,10 +114,13 @@ class RepairTrackingAccessRepository {
         },
         deviceIntake: {
           select: {
+            id: true,
             referenceNo: true,
+            assetDescription: true,
             receivedAt: true,
             snapshot: {
               select: {
+                id: true,
                 brand: true,
                 model: true,
                 serialNumber: true,
@@ -157,8 +161,29 @@ class RepairTrackingAccessRepository {
   }
 
   async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    const repairRows = await this.prisma.$queryRaw`
+      SELECT "metadata", "targetStatus", "occurredAt"
+      FROM "RepairWorkflowEvent"
+      WHERE "repairJobId" = ${Number(repairJobId)}
+        AND "branchId" = ${Number(branchId)}
+      ORDER BY "occurredAt" DESC, "id" DESC
+      LIMIT 1
+    `;
+    const repairEvent = repairRows[0] || null;
+    if (repairEvent) {
+      return {
+        metadata: {
+          ...(repairEvent.metadata || {}),
+          workflowTargetStatus:
+            repairEvent.targetStatus || repairEvent.metadata?.workflowTargetStatus || null,
+        },
+        occurredAt: repairEvent.occurredAt,
+        sourceType: 'REPAIR_WORKFLOW_EVENT',
+      };
+    }
+
     if (!deviceId) return null;
-    return this.prisma.devicePassportEvent.findFirst({
+    const passportEvent = await this.prisma.devicePassportEvent.findFirst({
       where: {
         deviceId: Number(deviceId),
         branchId: Number(branchId),
@@ -168,6 +193,7 @@ class RepairTrackingAccessRepository {
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       select: { metadata: true, occurredAt: true },
     });
+    return passportEvent ? { ...passportEvent, sourceType: 'DEVICE_PASSPORT_EVENT' } : null;
   }
 
   async listCustomerVisibleTimelineEvents(repairJobId) {
