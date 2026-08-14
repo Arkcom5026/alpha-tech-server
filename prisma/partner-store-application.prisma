@@ -78,6 +78,8 @@ model PartnerStoreApplicationEvent {
   resultingStatus              PartnerStoreApplicationStatus
   previousProvisioningStatus   PartnerStoreProvisioningStatus?
   resultingProvisioningStatus  PartnerStoreProvisioningStatus?
+  previousActivationStatus     PartnerStoreActivationStatus?
+  resultingActivationStatus    PartnerStoreActivationStatus?
   actorUserId                  Int?
   note                         String?
   metadata                     Json?
@@ -90,16 +92,18 @@ model PartnerStoreApplicationEvent {
 }
 
 model PartnerStoreActivationInvitation {
-  id             Int                     @id @default(autoincrement())
-  applicationId  Int
-  tokenHash      String                  @unique
-  expiresAt      DateTime
-  consumedAt     DateTime?
+  id              Int                     @id @default(autoincrement())
+  applicationId   Int
+  tokenHash       String                  @unique
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  consumedAt      DateTime?
   createdByUserId Int
-  createdAt      DateTime                @default(now())
-  application    PartnerStoreApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime                @default(now())
+  application     PartnerStoreApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId, createdAt])
   @@index([expiresAt])
+  @@index([revokedAt])
   @@index([consumedAt])
 }
