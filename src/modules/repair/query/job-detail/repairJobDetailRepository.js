@@ -3,19 +3,15 @@ const {
   findRepairWorkflowHistory,
 } = require('../../workflow/events/repairWorkflowEventStore');
 
+// Detail reads keep the relations consumed by the runtime mapper/workflow only.
+// Purchase/sale history and full claim event graphs are loaded by their own
+// bounded contexts and should not inflate every Repair Detail request.
 const repairJobDetailInclude = {
   branch: true,
   customer: { include: { user: true } },
   stockItem: {
     include: {
       product: { include: { brand: true, productType: true } },
-      purchaseOrderReceiptItem: {
-        include: { receipt: { include: { supplier: true } } },
-      },
-      saleItems: {
-        include: { sale: { include: { customer: { include: { user: true } } } } },
-        orderBy: { sale: { soldAt: 'desc' } },
-      },
     },
   },
   device: true,
@@ -27,13 +23,7 @@ const repairJobDetailInclude = {
   technician: true,
   partsUsed: { include: { product: true } },
   warrantyClaims: {
-    include: {
-      supplier: true,
-      events: {
-        include: { performedBy: true },
-        orderBy: { occurredAt: 'asc' },
-      },
-    },
+    include: { supplier: true },
     orderBy: { openedAt: 'desc' },
   },
 };
