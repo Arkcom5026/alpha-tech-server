@@ -8,6 +8,7 @@ const publicSelect = {
   businessName: true,
   status: true,
   provisioningStatus: true,
+  activationStatus: true,
   createdAt: true,
 }
 
@@ -23,6 +24,7 @@ const adminSelect = {
   note: true,
   status: true,
   provisioningStatus: true,
+  activationStatus: true,
   reviewNote: true,
   provisionedBranchId: true,
   provisionedOwnerUserId: true,
@@ -30,6 +32,7 @@ const adminSelect = {
   provisioningAttemptedAt: true,
   provisionedAt: true,
   provisioningFailureCode: true,
+  activatedAt: true,
   createdAt: true,
   updatedAt: true,
 }
