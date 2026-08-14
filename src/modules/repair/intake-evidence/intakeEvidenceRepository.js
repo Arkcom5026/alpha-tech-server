@@ -11,10 +11,37 @@ class IntakeEvidenceRepository {
         branchId: Number(branchId),
         repairJobId: Number(repairJobId),
       },
-      include: {
-        photos: { orderBy: { createdAt: 'asc' } },
-        consent: true,
+      select: {
+        id: true,
+        referenceNo: true,
+        receivedAt: true,
         receivedBy: { select: { id: true, name: true } },
+        consent: {
+          select: {
+            id: true,
+            allowDataErase: true,
+            allowFactoryReset: true,
+            allowDisassembly: true,
+            allowOutsourceRepair: true,
+            customerSignature: true,
+            signedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        photos: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            url: true,
+            storageKey: true,
+            category: true,
+            caption: true,
+            uploadedByEmployeeId: true,
+            takenAt: true,
+            createdAt: true,
+          },
+        },
       },
     });
   }
