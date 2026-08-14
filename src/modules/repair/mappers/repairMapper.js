@@ -122,53 +122,57 @@ function mapRepairAsset(job) {
 }
 
 function mapClaimAsset(claim) {
-  if (claim.stockItem) {
-    return {
-      sourceType: 'STOCK_ITEM',
-      sourceId: claim.stockItem.id,
-      displayName:
-        claim.stockItem.product?.name ||
-        claim.repairJob?.deviceModel ||
-        'สินค้าในร้าน',
-      brand: claim.stockItem.product?.brand?.name || null,
-      category: claim.stockItem.product?.productType?.name || null,
-      model: claim.device?.model || null,
-      barcode: claim.stockItem.barcode || claim.device?.barcode || null,
-      serialNumber:
-        claim.stockItem.serialNumber || claim.device?.serialNumber || null,
-      imei: claim.device?.imei || null,
-    };
-  }
+  const repairJob = claim.repairJob || null;
+  const intake = repairJob?.deviceIntake || null;
+  const snapshot = intake?.snapshot || null;
+  const stockItem = claim.stockItem || null;
+  const device = claim.device || null;
+  const legacyDeviceName = [device?.brand, device?.model].filter(Boolean).join(' ');
 
-  if (claim.device) {
-    const legacyDeviceName = [claim.device.brand, claim.device.model]
-      .filter(Boolean)
-      .join(' ');
-    return {
-      sourceType: 'CUSTOMER_DEVICE',
-      sourceId: claim.device.id,
-      displayName:
-        claim.repairJob?.deviceModel || legacyDeviceName || 'อุปกรณ์ของลูกค้า',
-      brand: claim.device.brand || null,
-      category: claim.device.category || null,
-      model: claim.device.model || null,
-      barcode: claim.device.barcode || null,
-      serialNumber: claim.device.serialNumber || null,
-      imei: claim.device.imei || null,
-    };
-  }
+  const displayName =
+    nonEmpty(intake?.assetDescription) ||
+    nonEmpty(repairJob?.deviceModel) ||
+    nonEmpty(stockItem?.product?.name) ||
+    nonEmpty(legacyDeviceName) ||
+    (repairJob ? 'อุปกรณ์ในใบงานซ่อม' : 'อุปกรณ์ในรายการเคลม');
+
+  const sourceType = snapshot
+    ? 'INTAKE_SNAPSHOT'
+    : intake
+      ? 'DEVICE_INTAKE'
+      : stockItem
+        ? 'STOCK_ITEM'
+        : device
+          ? 'CUSTOMER_DEVICE'
+          : 'DESCRIBED_DEVICE';
+
+  const sourceId = snapshot?.id ?? intake?.id ?? stockItem?.id ?? device?.id ?? null;
 
   return {
-    sourceType: 'DESCRIBED_DEVICE',
-    sourceId: null,
-    displayName:
-      claim.repairJob?.deviceModel || 'อุปกรณ์ในรายการเคลม',
-    brand: null,
-    category: null,
-    model: null,
-    barcode: null,
-    serialNumber: null,
-    imei: null,
+    sourceType,
+    sourceId,
+    displayName,
+    brand:
+      nonEmpty(snapshot?.brand) ||
+      nonEmpty(device?.brand) ||
+      nonEmpty(stockItem?.product?.brand?.name),
+    category:
+      nonEmpty(device?.category) ||
+      nonEmpty(stockItem?.product?.productType?.name),
+    model:
+      nonEmpty(snapshot?.model) ||
+      nonEmpty(device?.model),
+    barcode:
+      nonEmpty(snapshot?.barcode) ||
+      nonEmpty(stockItem?.barcode) ||
+      nonEmpty(device?.barcode),
+    serialNumber:
+      nonEmpty(snapshot?.serialNumber) ||
+      nonEmpty(stockItem?.serialNumber) ||
+      nonEmpty(device?.serialNumber),
+    imei:
+      nonEmpty(snapshot?.imei) ||
+      nonEmpty(device?.imei),
   };
 }
 
