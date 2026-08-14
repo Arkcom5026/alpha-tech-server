@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const repository = require('./repairTrackingAccessRepository');
+const { mapRepairAsset } = require('../mappers/repairMapper');
 const { mapApproval } = require('../estimate-approval/repairEstimateApprovalPolicy');
 const { mapHandover } = require('../handover/repairHandoverPolicy');
 const {
@@ -117,33 +118,9 @@ function mapPublicWorkflowEvent(event) {
 }
 
 function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = null) {
-  const product = job.stockItem?.product;
-  const intakeSnapshot = job.deviceIntake?.snapshot;
-  const registeredDevice = job.device;
   const currentStatus = mapWorkflowCustomerStatus(workflowStatus, job.status);
-  const device = {
-    displayName:
-      product?.name ||
-      [registeredDevice?.brand, registeredDevice?.model].filter(Boolean).join(' ') ||
-      [intakeSnapshot?.brand, intakeSnapshot?.model].filter(Boolean).join(' ') ||
-      job.deviceModel,
-    model: registeredDevice?.model || intakeSnapshot?.model || job.deviceModel,
-    brand: product?.brand?.name || registeredDevice?.brand || intakeSnapshot?.brand || null,
-    type: product?.productType?.name || registeredDevice?.category || null,
-    serialNumber:
-      job.stockItem?.serialNumber ||
-      registeredDevice?.serialNumber ||
-      intakeSnapshot?.serialNumber ||
-      null,
-    imei: registeredDevice?.imei || intakeSnapshot?.imei || null,
-    barcode:
-      job.stockItem?.barcode ||
-      registeredDevice?.barcode ||
-      intakeSnapshot?.barcode ||
-      null,
-  };
-
-  const publicEvents = (registeredDevice?.passportEvents || []).map(mapPublicWorkflowEvent);
+  const repairAsset = mapRepairAsset(job);
+  const publicEvents = (job.device?.passportEvents || []).map(mapPublicWorkflowEvent);
 
   const statusEvents = persistedTimelineEvents.map(mapPersistedTimelineEvent);
   const timeline = [
@@ -171,11 +148,13 @@ function toPublicProjection(job, persistedTimelineEvents = [], workflowStatus = 
   }
 
   return {
-    contractVersion: 'repair-customer-tracking.v1',
+    contractVersion: 'repair-customer-tracking.v2',
     repair: {
       jobNo: job.jobNo,
       intakeReference: job.deviceIntake?.referenceNo || null,
-      device,
+      repairAsset,
+      // Compatibility alias for already-issued links/older clients. New consumers use repairAsset only.
+      device: repairAsset,
       reportedSymptoms: job.reportedSymptoms,
       status: currentStatus,
       pickupDefaults: {
