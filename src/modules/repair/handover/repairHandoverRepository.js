@@ -39,8 +39,21 @@ class RepairHandoverRepository {
     return rows[0] || null;
   }
 
-  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
-    if (!deviceId) return null;
+  async findLatestRepairOwnedWorkflowEvent(repairJobId, branchId) {
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT "id", "metadata", "occurredAt"
+       FROM "RepairWorkflowEvent"
+       WHERE "repairJobId" = $1 AND "branchId" = $2
+       ORDER BY "occurredAt" DESC, "id" DESC
+       LIMIT 1`,
+      Number(repairJobId),
+      Number(branchId)
+    );
+    return rows[0] || null;
+  }
+
+  findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId) {
+    if (!deviceId) return Promise.resolve(null);
     return this.prisma.devicePassportEvent.findFirst({
       where: {
         deviceId: Number(deviceId),
@@ -49,7 +62,14 @@ class RepairHandoverRepository {
         sourceId: String(repairJobId),
       },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, metadata: true, occurredAt: true },
     });
+  }
+
+  async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    const repairOwned = await this.findLatestRepairOwnedWorkflowEvent(repairJobId, branchId);
+    if (repairOwned) return repairOwned;
+    return this.findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId);
   }
 
   async findDelivery(repairJobId) {
