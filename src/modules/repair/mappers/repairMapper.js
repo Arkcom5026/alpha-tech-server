@@ -61,48 +61,63 @@ function mapDeviceIdentity(device) {
   };
 }
 
-function mapRepairAsset(job) {
-  if (job.stockItem) {
-    return {
-      sourceType: 'STOCK_ITEM',
-      sourceId: job.stockItem.id,
-      displayName: job.stockItem.product?.name || job.deviceModel || 'สินค้าในร้าน',
-      brand: job.stockItem.product?.brand?.name || null,
-      category: job.stockItem.product?.productType?.name || null,
-      model: job.device?.model || null,
-      barcode: job.stockItem.barcode || job.device?.barcode || null,
-      serialNumber: job.stockItem.serialNumber || job.device?.serialNumber || null,
-      imei: job.device?.imei || null,
-    };
-  }
+function nonEmpty(value) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
 
-  if (job.device) {
-    const legacyDeviceName = [job.device.brand, job.device.model].filter(Boolean).join(' ');
-    return {
-      sourceType: 'CUSTOMER_DEVICE',
-      sourceId: job.device.id,
-      // RepairJob.deviceModel remains the backwards-compatible storage for the
-      // human-readable device name. Device.model is the optional technical model.
-      displayName: job.deviceModel || legacyDeviceName || 'อุปกรณ์ของลูกค้า',
-      brand: job.device.brand || null,
-      category: job.device.category || null,
-      model: job.device.model || null,
-      barcode: job.device.barcode || null,
-      serialNumber: job.device.serialNumber || null,
-      imei: job.device.imei || null,
-    };
-  }
+function mapRepairAsset(job) {
+  const intake = job.deviceIntake || null;
+  const snapshot = intake?.snapshot || null;
+  const device = job.device || null;
+  const stockItem = job.stockItem || null;
+  const legacyDeviceName = [device?.brand, device?.model].filter(Boolean).join(' ');
+
+  const displayName =
+    nonEmpty(intake?.assetDescription) ||
+    nonEmpty(job.deviceModel) ||
+    nonEmpty(stockItem?.product?.name) ||
+    nonEmpty(legacyDeviceName) ||
+    'อุปกรณ์ที่ลูกค้านำมาซ่อม';
+
+  const sourceType = snapshot
+    ? 'INTAKE_SNAPSHOT'
+    : intake
+      ? 'DEVICE_INTAKE'
+      : stockItem
+        ? 'STOCK_ITEM'
+        : device
+          ? 'CUSTOMER_DEVICE'
+          : 'DESCRIBED_DEVICE';
+
+  const sourceId = snapshot?.id ?? intake?.id ?? stockItem?.id ?? device?.id ?? null;
 
   return {
-    sourceType: 'DESCRIBED_DEVICE',
-    sourceId: null,
-    displayName: job.deviceModel || 'อุปกรณ์ที่ลูกค้านำมาซ่อม',
-    brand: null,
-    category: null,
-    model: null,
-    barcode: null,
-    serialNumber: null,
-    imei: null,
+    sourceType,
+    sourceId,
+    displayName,
+    brand:
+      nonEmpty(snapshot?.brand) ||
+      nonEmpty(device?.brand) ||
+      nonEmpty(stockItem?.product?.brand?.name),
+    category:
+      nonEmpty(device?.category) ||
+      nonEmpty(stockItem?.product?.productType?.name),
+    model:
+      nonEmpty(snapshot?.model) ||
+      nonEmpty(device?.model),
+    barcode:
+      nonEmpty(snapshot?.barcode) ||
+      nonEmpty(stockItem?.barcode) ||
+      nonEmpty(device?.barcode),
+    serialNumber:
+      nonEmpty(snapshot?.serialNumber) ||
+      nonEmpty(stockItem?.serialNumber) ||
+      nonEmpty(device?.serialNumber),
+    imei:
+      nonEmpty(snapshot?.imei) ||
+      nonEmpty(device?.imei),
   };
 }
 
@@ -190,7 +205,7 @@ function mapRepairJob(job) {
     deviceId: job.deviceId ?? job.device?.id ?? null,
     device: mapDeviceIdentity(job.device),
     repairAsset: mapRepairAsset(job),
-    assetDescription: job.deviceModel,
+    assetDescription: job.deviceIntake?.assetDescription || job.deviceModel,
     deviceModel: job.deviceModel,
     reportedSymptoms: job.reportedSymptoms,
     technicianNotes: job.technicianNotes,
