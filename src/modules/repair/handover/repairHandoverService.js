@@ -55,13 +55,21 @@ async function confirmPublic(token, payload) {
 async function getStaff(actor, repairJobId) {
   const job = await repository.findJob(repairJobId, actor.branchId);
   if (!job) throw notFound();
-  const handover = mapHandover(await repository.findDelivery(job.id));
-  const activeSubcontract = typeof repository.findActiveSubcontract === 'function'
-    ? await repository.findActiveSubcontract(job.id)
-    : null;
+
+  // These reads are independent once branch ownership is established. Keep
+  // them in one wave so the handover panel pays for the slowest query rather
+  // than the sum of three network/database round-trips.
+  const [delivery, activeSubcontract, workflowStatus] = await Promise.all([
+    repository.findDelivery(job.id),
+    typeof repository.findActiveSubcontract === 'function'
+      ? repository.findActiveSubcontract(job.id)
+      : Promise.resolve(null),
+    workflowStatusFor(job),
+  ]);
+
   return {
-    ...handover,
-    workflowStatus: await workflowStatusFor(job),
+    ...mapHandover(delivery),
+    workflowStatus,
     subcontractHold: activeSubcontract
       ? {
           repairSubcontractId: Number(activeSubcontract.id),
