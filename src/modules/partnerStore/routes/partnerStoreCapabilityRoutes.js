@@ -6,6 +6,7 @@ const controller = require('../controllers/partnerStoreCapabilityController')
 const onlineVisibilityController = require('../onlineVisibility/onlineProductVisibilityController')
 const onlineProductControlController = require('../onlineProductControl/onlineProductControlController')
 const onboardingRoutes = require('../onboarding/partnerStoreOnboardingRoutes')
+const operationalReadinessRoutes = require('../readiness/partnerStoreOperationalReadinessRoutes')
 
 const router = express.Router()
 
@@ -28,6 +29,7 @@ const allowEmployeeContext = (req, res, next) => {
 }
 
 router.use('/onboarding', onboardingRoutes)
+router.use('/readiness', operationalReadinessRoutes)
 router.use(verifyToken, allowEmployeeContext)
 router.get('/capability', controller.getCurrentBranchCapability)
 router.put('/capability', controller.saveCurrentBranchCapability)
