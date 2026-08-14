@@ -77,6 +77,7 @@ class RepairTrackingAccessRepository {
         branch: { select: { name: true, phone: true, address: true } },
         stockItem: {
           select: {
+            id: true,
             barcode: true,
             serialNumber: true,
             product: {
@@ -113,10 +114,13 @@ class RepairTrackingAccessRepository {
         },
         deviceIntake: {
           select: {
+            id: true,
             referenceNo: true,
+            assetDescription: true,
             receivedAt: true,
             snapshot: {
               select: {
+                id: true,
                 brand: true,
                 model: true,
                 serialNumber: true,
@@ -157,6 +161,16 @@ class RepairTrackingAccessRepository {
   }
 
   async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
+    const workflowRows = await this.prisma.$queryRaw`
+      SELECT "action", "targetStatus", "metadata", "occurredAt"
+      FROM "RepairWorkflowEvent"
+      WHERE "repairJobId" = ${Number(repairJobId)}
+        AND "branchId" = ${Number(branchId)}
+      ORDER BY "occurredAt" DESC, "id" DESC
+      LIMIT 1
+    `;
+    if (workflowRows[0]) return workflowRows[0];
+
     if (!deviceId) return null;
     return this.prisma.devicePassportEvent.findFirst({
       where: {
@@ -168,6 +182,24 @@ class RepairTrackingAccessRepository {
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       select: { metadata: true, occurredAt: true },
     });
+  }
+
+  async listCustomerVisibleWorkflowEvents(repairJobId, branchId) {
+    return this.prisma.$queryRaw`
+      SELECT
+        "eventType",
+        "action",
+        "targetStatus",
+        "title",
+        "description",
+        "occurredAt",
+        "metadata"
+      FROM "RepairWorkflowEvent"
+      WHERE "repairJobId" = ${Number(repairJobId)}
+        AND "branchId" = ${Number(branchId)}
+        AND "customerVisible" = true
+      ORDER BY "occurredAt" ASC, "id" ASC
+    `;
   }
 
   async listCustomerVisibleTimelineEvents(repairJobId) {
