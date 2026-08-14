@@ -46,6 +46,14 @@ test('job detail repository scopes id lookup by branch', async () => {
         return Promise.resolve(null);
       },
     },
+    stockMovement: {
+      findMany() {
+        return Promise.resolve([]);
+      },
+    },
+    $queryRawUnsafe() {
+      return Promise.resolve([]);
+    },
   });
 
   await repository.findById('6', '21');
@@ -80,12 +88,15 @@ test('job detail repository keeps workflow and diagnosis event scopes on the sam
         return Promise.resolve([]);
       },
     },
+    $queryRawUnsafe() {
+      return Promise.resolve([]);
+    },
   });
 
   await repository.findById(6, 21);
 
-  assert.equal(calls.length, 3);
-  assert.deepEqual(calls[0].where, {
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].history.where, {
     deviceId: 31,
     branchId: 6,
     sourceType: 'REPAIR_JOB',
@@ -97,12 +108,6 @@ test('job detail repository keeps workflow and diagnosis event scopes on the sam
     sourceType: 'REPAIR_JOB',
     sourceId: '21',
     eventType: 'DIAGNOSIS_COMPLETED',
-  });
-  assert.deepEqual(calls[2].history.where, {
-    deviceId: 31,
-    branchId: 6,
-    sourceType: 'REPAIR_JOB',
-    sourceId: '21',
   });
 });
 
