@@ -110,7 +110,8 @@ assertContains(workflowPolicy, 'PASSPORT_EVENT_BY_ACTION', 'device passport even
 const workflowService = read('src/modules/repair/workflow/commands/transitionRepairWorkflowService.js');
 assertContains(workflowService, 'this.repository.transaction', 'repair workflow transaction authority');
 assertContains(workflowService, 'repairJob.branchId !== branchId', 'repair branch ownership guard');
-assertNotContains(workflowService, 'REPAIR_DEVICE_REQUIRED', 'repair global device passport requirement');
+assertContains(workflowService, "const hasRepairWorkflowAuthority = typeof repo.publishWorkflowEvent === 'function';", 'repair-owned workflow authority availability');
+assertContains(workflowService, 'if (!hasRepairWorkflowAuthority && (!repairJob.deviceId || !repairJob.device))', 'repair legacy fail-closed fallback when workflow authority is unavailable');
 assertContains(workflowService, 'REPAIR_WORKFLOW_VERSION_CONFLICT', 'repair optimistic workflow guard');
 assertContains(workflowService, 'assertRepairNotHeldByActiveSubcontract', 'repair subcontract workflow hold');
 assertContains(workflowService, 'resolveRepairWorkflowTransition', 'repair transition policy authority');
