@@ -5,6 +5,14 @@ const columns = `"id", "repairJobId", "status", "method", "recipientName",
   "paymentConfirmed", "deviceReturned", "accessoriesReturned", "deliveredAt",
   "createdAt", "updatedAt"`;
 
+function newestWorkflowEvent(left, right) {
+  if (!left) return right || null;
+  if (!right) return left;
+  const leftTime = new Date(left.occurredAt || 0).getTime();
+  const rightTime = new Date(right.occurredAt || 0).getTime();
+  return rightTime > leftTime ? right : left;
+}
+
 class RepairHandoverRepository {
   constructor(client = prisma) { this.prisma = client; }
 
@@ -68,9 +76,11 @@ class RepairHandoverRepository {
   }
 
   async findLatestWorkflowEvent(repairJobId, deviceId, branchId) {
-    const repairOwned = await this.findLatestRepairOwnedWorkflowEvent(repairJobId, branchId);
-    if (repairOwned) return repairOwned;
-    return this.findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId);
+    const [repairOwned, passport] = await Promise.all([
+      this.findLatestRepairOwnedWorkflowEvent(repairJobId, branchId),
+      this.findLatestPassportWorkflowEvent(repairJobId, deviceId, branchId),
+    ]);
+    return newestWorkflowEvent(repairOwned, passport);
   }
 
   async findDelivery(repairJobId) {
@@ -170,3 +180,4 @@ class RepairHandoverRepository {
 
 module.exports = new RepairHandoverRepository();
 module.exports.RepairHandoverRepository = RepairHandoverRepository;
+module.exports.newestWorkflowEvent = newestWorkflowEvent;
