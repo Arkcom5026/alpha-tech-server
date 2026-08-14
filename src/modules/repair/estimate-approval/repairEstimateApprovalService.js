@@ -76,14 +76,17 @@ class RepairEstimateApprovalService {
   }
 
   async getLatestForStaff(actor, repairJobId) {
-    const job = await this.repository.findRepairJobForStaff(repairJobId, actor.branchId);
+    const [job, latest] = await Promise.all([
+      this.repository.findRepairJobForStaff(repairJobId, actor.branchId),
+      this.repository.findLatest(repairJobId),
+    ]);
     if (!job) {
       throw createHttpError(404, 'REPAIR_JOB_NOT_FOUND', 'ไม่พบงานซ่อมในสาขาของพนักงาน');
     }
     return {
       repairJobId: job.id,
       jobNo: job.jobNo,
-      approval: mapApproval(await this.repository.findLatest(job.id)),
+      approval: mapApproval(latest),
     };
   }
 
