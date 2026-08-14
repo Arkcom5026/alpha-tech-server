@@ -175,6 +175,39 @@ class CreateRepairJobService {
           });
         }
 
+        const creationMetadata = {
+          repairJobId: created.id,
+          deviceIntakeId: deviceIntake?.id || null,
+          jobNo: created.jobNo,
+          customerId: created.customerId,
+          stockItemId: created.stockItemId,
+          deviceId: created.deviceId,
+          status: created.status,
+          deviceModel: created.deviceModel,
+          preAgreedService: payload.preAgreedService || null,
+          workflowTargetStatus: 'RECEIVED',
+        };
+
+        if (typeof repo.publishWorkflowEvent === 'function') {
+          await repo.publishWorkflowEvent({
+            repairJobId: created.id,
+            branchId: created.branchId,
+            eventType: 'REPAIR_CREATED',
+            action: null,
+            previousStatus: null,
+            targetStatus: 'RECEIVED',
+            eventKey: `repair-job:${created.id}:created`,
+            correlationId: `repair-job:${created.id}`,
+            causationId: null,
+            title: `เปิดใบงานซ่อม ${created.jobNo}`,
+            description: created.reportedSymptoms,
+            actorEmployeeId: actor.employeeId || null,
+            customerVisible: true,
+            metadata: creationMetadata,
+            occurredAt: created.createdAt,
+          });
+        }
+
         if (created.deviceId && typeof repo.publishPassportEvent === 'function') {
           await repo.publishPassportEvent({
             deviceId: created.deviceId,
@@ -188,17 +221,7 @@ class CreateRepairJobService {
             description: created.reportedSymptoms,
             actorEmployeeId: actor.employeeId || null,
             customerVisible: true,
-            metadata: {
-              repairJobId: created.id,
-              deviceIntakeId: deviceIntake?.id || null,
-              jobNo: created.jobNo,
-              customerId: created.customerId,
-              stockItemId: created.stockItemId,
-              deviceId: created.deviceId,
-              status: created.status,
-              deviceModel: created.deviceModel,
-              preAgreedService: payload.preAgreedService || null,
-            },
+            metadata: creationMetadata,
             occurredAt: created.createdAt,
           });
         }
