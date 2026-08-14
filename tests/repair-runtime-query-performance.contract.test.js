@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const repositoryPath = path.join(
+const listRepositoryPath = path.join(
   __dirname,
   '..',
   'src',
@@ -13,24 +13,43 @@ const repositoryPath = path.join(
   'list-jobs',
   'listRepairJobsRepository.js'
 );
-const source = fs.readFileSync(repositoryPath, 'utf8');
+const detailRepositoryPath = path.join(
+  __dirname,
+  '..',
+  'src',
+  'modules',
+  'repair',
+  'query',
+  'job-detail',
+  'repairJobDetailRepository.js'
+);
+const listSource = fs.readFileSync(listRepositoryPath, 'utf8');
+const detailSource = fs.readFileSync(detailRepositoryPath, 'utf8');
 
 test('repair queue uses a dedicated lightweight list include', () => {
-  assert.match(source, /const repairJobListInclude =/);
-  assert.match(source, /include: repairJobListInclude/);
-  assert.match(source, /snapshot: true/);
-  assert.match(source, /consent: true/);
-  assert.match(source, /photos: true/);
+  assert.match(listSource, /const repairJobListInclude =/);
+  assert.match(listSource, /include: repairJobListInclude/);
+  assert.match(listSource, /snapshot: true/);
+  assert.match(listSource, /consent: true/);
+  assert.match(listSource, /photos: true/);
 });
 
-test('repair queue does not load purchase and sales history graphs', () => {
-  assert.doesNotMatch(source, /purchaseOrderReceiptItem/);
-  assert.doesNotMatch(source, /saleItems/);
-  assert.doesNotMatch(source, /performedBy: true/);
+test('repair queue does not load purchase, sales, or claim event history graphs', () => {
+  assert.doesNotMatch(listSource, /purchaseOrderReceiptItem/);
+  assert.doesNotMatch(listSource, /saleItems/);
+  assert.doesNotMatch(listSource, /performedBy: true/);
 });
 
-test('repair queue remains branch scoped and bounded', () => {
-  assert.match(source, /branchId: Number\(branchId\)/);
-  assert.match(source, /take: filters\.limit/);
-  assert.match(source, /skip: filters\.offset/);
+test('repair detail keeps canonical intake snapshot without loading unrelated history graphs', () => {
+  assert.match(detailSource, /snapshot: true/);
+  assert.doesNotMatch(detailSource, /purchaseOrderReceiptItem/);
+  assert.doesNotMatch(detailSource, /saleItems/);
+  assert.doesNotMatch(detailSource, /performedBy: true/);
+});
+
+test('repair queue and detail remain branch scoped and queue stays bounded', () => {
+  assert.match(listSource, /branchId: Number\(branchId\)/);
+  assert.match(listSource, /take: filters\.limit/);
+  assert.match(listSource, /skip: filters\.offset/);
+  assert.match(detailSource, /branchId: branch/);
 });
