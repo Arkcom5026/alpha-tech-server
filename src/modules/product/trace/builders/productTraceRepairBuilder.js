@@ -1,12 +1,13 @@
 const { toIsoString } = require('../utils/productTraceDate')
 const { roundMoney } = require('../utils/productTraceMoney')
+const { mapRepairAsset } = require('../../../repair/mappers/repairMapper')
 
 const buildProductTraceRepairs = (stockItem, permissions) =>
   (stockItem.repairJobs || []).map((repair) => ({
     id: repair.id,
     jobNo: repair.jobNo,
     status: repair.status,
-    deviceModel: repair.deviceModel,
+    repairAsset: mapRepairAsset({ ...repair, stockItem }),
     reportedSymptoms: repair.reportedSymptoms,
     technicianNotes: repair.technicianNotes || null,
     estimatedCost: permissions.canViewFinancials ? roundMoney(repair.estimatedCost) : null,
