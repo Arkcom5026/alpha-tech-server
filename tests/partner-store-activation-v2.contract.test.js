@@ -24,7 +24,10 @@ assert.ok(schema.includes('resultingActivationStatus'))
 
 assert.ok(migration.includes('CREATE TABLE "PartnerStoreActivationInvitation"'))
 assert.ok(migration.includes('ADD COLUMN "activationStatus"'))
-assert.ok(migration.includes('ADD COLUMN "revokedAt"'))
+assert.ok(migration.includes('"revokedAt" TIMESTAMP(3)'))
+assert.ok(migration.includes('"consumedAt" TIMESTAMP(3)'))
+assert.ok(migration.includes('ADD COLUMN "previousActivationStatus"'))
+assert.ok(migration.includes('ADD COLUMN "resultingActivationStatus"'))
 assert.ok(!migration.includes('DROP TABLE'))
 assert.ok(!migration.includes('DROP COLUMN'))
 
