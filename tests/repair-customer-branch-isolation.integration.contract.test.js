@@ -8,6 +8,7 @@ const assert = (condition, message) => {
 };
 
 const policy = read('src/modules/repair/policies/repairCustomerBranchAccessPolicy.js');
+const sharedPolicy = read('src/modules/customer/policies/customerBranchAccessPolicy.js');
 const searchRepository = read('src/modules/repair/query/intake-search/intakeSearchRepository.js');
 const createRepository = read('src/modules/repair/create/createRepairJobRepository.js');
 const createService = read('src/modules/repair/create/createRepairJobService.js');
@@ -16,16 +17,9 @@ const externalService = read('src/modules/repair/external-intake/createExternalD
 const warrantyRepository = read('src/modules/repair/query/customer-warranty-assets/customerWarrantyAssetsRepository.js');
 const warrantyService = read('src/modules/repair/query/customer-warranty-assets/customerWarrantyAssetsService.js');
 
-for (const evidence of [
-  "{ sales: { some: { branchId } } }",
-  "{ repairJobs: { some: { branchId } } }",
-  "{ deviceIntakes: { some: { branchId } } }",
-  "{ ownedDevices: { some: { branchId, status: { not: 'RETIRED' } } } }",
-]) {
-  assert(policy.includes(evidence), `Missing branch evidence: ${evidence}`);
-}
-
-assert(!policy.includes("{ sale: { some: { branchId } } }"), 'Legacy singular sale relation must not return');
+assert(policy.includes('buildCustomerBranchEvidence'), 'Repair must delegate to shared customer branch authority');
+assert(sharedPolicy.includes('return { branchId };'), 'Shared customer authority must use direct branch ownership');
+assert(!sharedPolicy.includes('sales:') && !sharedPolicy.includes('repairJobs:'), 'Historical activity must not grant branch ownership');
 
 for (const source of [searchRepository, createRepository, externalRepository, warrantyRepository]) {
   assert(source.includes('repairCustomerBranchAccessPolicy'), 'Repository must use the central branch access policy');

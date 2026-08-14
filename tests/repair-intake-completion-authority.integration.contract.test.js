@@ -29,8 +29,9 @@ assert(
   'Completion must require customer consent'
 );
 assert(
-  evidencePolicy.includes("missingRequirements.push('INTAKE_CONDITION_PHOTO')"),
-  'Completion must require an intake condition photo'
+  evidencePolicy.includes('conditionPhotoRequired: false') &&
+    !evidencePolicy.includes("missingRequirements.push('INTAKE_CONDITION_PHOTO')"),
+  'Intake condition photos must remain optional for business-neutral intake'
 );
 assert(
   evidencePolicy.includes('completion: evaluateIntakeCompletion(intake)'),
@@ -51,8 +52,8 @@ assert(
 );
 
 assert(
-  workflowService.includes('assertIntakeCompleteForDiagnosis'),
-  'Workflow service must gate the diagnosis queue boundary'
+  workflowService.includes('assertIntakeCompleteForEntry'),
+  'Workflow service must gate the repair entry boundary'
 );
 assert(
   workflowService.includes('REPAIR_WORKFLOW_ACTION.QUEUE_DIAGNOSIS'),

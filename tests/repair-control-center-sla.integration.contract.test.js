@@ -34,9 +34,9 @@ for (const exception of [
 
 assert(
   repository.includes('deviceIntake:') &&
-    repository.includes('consent: true') &&
-    repository.includes('photos: true'),
-  'Control center repository must load singular intake completion evidence'
+    repository.includes('consent: { select: { id: true } }') &&
+    repository.includes('select: { category: true }'),
+  'Control center repository must load the bounded singular intake completion projection'
 );
 assert(
   repository.includes('delivery: true'),
