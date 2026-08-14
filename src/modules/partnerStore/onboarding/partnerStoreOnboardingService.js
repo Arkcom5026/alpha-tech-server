@@ -86,29 +86,26 @@ const getOrStartOnboarding = async (userId) => {
     if (current.onboardingStatus === 'COMPLETED') return current
 
     const now = new Date()
-    const firstLogin = !current.firstLoginAt
-    const firstStart = current.onboardingStatus === 'NOT_STARTED'
-    const updated = await tx.partnerStoreApplication.update({
-      where: { id: current.id },
-      data: {
-        firstLoginAt: current.firstLoginAt || now,
-        onboardingStatus: firstStart ? 'IN_PROGRESS' : current.onboardingStatus,
-        onboardingStartedAt: current.onboardingStartedAt || now,
-      },
-      select: selectApplication,
+    const firstLoginClaim = await tx.partnerStoreApplication.updateMany({
+      where: { id: current.id, firstLoginAt: null },
+      data: { firstLoginAt: now },
+    })
+    const startClaim = await tx.partnerStoreApplication.updateMany({
+      where: { id: current.id, onboardingStatus: 'NOT_STARTED' },
+      data: { onboardingStatus: 'IN_PROGRESS', onboardingStartedAt: now },
     })
 
-    if (firstLogin) {
+    if (firstLoginClaim.count === 1) {
       await tx.partnerStoreApplicationEvent.create({
         data: {
           ...eventBase(current, id),
           eventType: 'OWNER_FIRST_LOGIN',
           previousOnboardingStatus: current.onboardingStatus,
-          resultingOnboardingStatus: firstStart ? 'IN_PROGRESS' : current.onboardingStatus,
+          resultingOnboardingStatus: startClaim.count === 1 ? 'IN_PROGRESS' : current.onboardingStatus,
         },
       })
     }
-    if (firstStart) {
+    if (startClaim.count === 1) {
       await tx.partnerStoreApplicationEvent.create({
         data: {
           ...eventBase(current, id),
@@ -118,7 +115,8 @@ const getOrStartOnboarding = async (userId) => {
         },
       })
     }
-    return updated
+
+    return findOwnerApplication(id, tx)
   })
 
   return {
@@ -145,27 +143,43 @@ const completeOnboarding = async (userId, payload = {}) => {
     }
 
     const now = new Date()
-    const updated = await tx.partnerStoreApplication.update({
-      where: { id: current.id },
+    const firstLoginClaim = await tx.partnerStoreApplication.updateMany({
+      where: { id: current.id, firstLoginAt: null },
+      data: { firstLoginAt: now },
+    })
+    if (firstLoginClaim.count === 1) {
+      await tx.partnerStoreApplicationEvent.create({
+        data: {
+          ...eventBase(current, id),
+          eventType: 'OWNER_FIRST_LOGIN',
+          previousOnboardingStatus: current.onboardingStatus,
+          resultingOnboardingStatus: current.onboardingStatus,
+        },
+      })
+    }
+
+    const completionClaim = await tx.partnerStoreApplication.updateMany({
+      where: { id: current.id, onboardingStatus: { not: 'COMPLETED' } },
       data: {
-        firstLoginAt: current.firstLoginAt || now,
         onboardingStartedAt: current.onboardingStartedAt || now,
         onboardingStatus: 'COMPLETED',
         onboardingCompletedAt: now,
       },
-      select: selectApplication,
     })
 
-    await tx.partnerStoreApplicationEvent.create({
-      data: {
-        ...eventBase(current, id),
-        eventType: 'ONBOARDING_COMPLETED',
-        previousOnboardingStatus: current.onboardingStatus,
-        resultingOnboardingStatus: 'COMPLETED',
-        metadata: { confirmStoreProfile: true, confirmOwnerContact: true },
-      },
-    })
+    if (completionClaim.count === 1) {
+      await tx.partnerStoreApplicationEvent.create({
+        data: {
+          ...eventBase(current, id),
+          eventType: 'ONBOARDING_COMPLETED',
+          previousOnboardingStatus: current.onboardingStatus,
+          resultingOnboardingStatus: 'COMPLETED',
+          metadata: { confirmStoreProfile: true, confirmOwnerContact: true },
+        },
+      })
+    }
 
+    const updated = await findOwnerApplication(id, tx)
     return { isPartnerStoreOwner: true, requiresOnboarding: false, onboardingStatus: 'COMPLETED', application: updated }
   })
 }
