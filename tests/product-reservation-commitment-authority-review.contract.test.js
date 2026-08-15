@@ -27,6 +27,12 @@ assertIncludes(migration, 'ProductReservation_actor_authority_consistent', 'Rese
 assertIncludes(repository, 'db.$transaction', 'Commitment must execute atomically');
 assertIncludes(repository, 'findExistingByIdempotency', 'Replay lookup must remain inside commitment authority');
 assertIncludes(repository, 'COMMITMENT_IDEMPOTENCY_CONFLICT', 'Mismatched replay commands must be rejected');
+const replayLookupIndex = repository.indexOf('existing: await findExistingByIdempotency');
+const sessionLockIndex = repository.indexOf('FROM "AnonymousShoppingSession"');
+const proofLockIndex = repository.indexOf('FROM "CommerceCommitmentIdentity"');
+if (replayLookupIndex < 0 || sessionLockIndex < 0 || proofLockIndex < 0 || replayLookupIndex >= sessionLockIndex || replayLookupIndex >= proofLockIndex) {
+  throw new Error('Idempotent replay must resolve before consumed session/proof state is revalidated so lost-response retries remain recoverable');
+}
 assertIncludes(repository, 'FOR UPDATE', 'Session, proof, items, and price authorities require row locks');
 assertIncludes(repository, 'bp."isActive" = TRUE', 'Current BranchPrice activation field must be revalidated');
 assertIncludes(repository, 'bp."effectiveDate"', 'Current BranchPrice effective date must be revalidated');
