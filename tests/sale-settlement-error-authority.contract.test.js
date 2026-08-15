@@ -27,12 +27,16 @@ assert(
   'Settlement evidence failure must remain a deterministic 409'
 );
 assert(
-  source.includes('totalAmount: canonicalTotalAmount'),
-  'Settlement error detail must expose canonical total amount'
+  source.includes('const projectedTotalAmount = Number(projection.totalAmount || canonicalTotalAmount);'),
+  'Settlement must derive error totals from the canonical payment projection with legacy fallback'
 );
 assert(
-  source.includes('paidAmount'),
-  'Settlement error detail must expose paid amount'
+  source.includes('totalAmount: projectedTotalAmount'),
+  'Settlement error detail must expose the projected canonical total amount'
+);
+assert(
+  source.includes('paidAmount: projectedPaidAmount'),
+  'Settlement error detail must expose projected paid amount'
 );
 assert(
   source.includes('balanceAmount'),
