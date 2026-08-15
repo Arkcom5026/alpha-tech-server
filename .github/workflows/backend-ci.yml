@@ -90,6 +90,12 @@ jobs:
           node tests/repair-customer-authority-regression.contract.test.js
           node tests/pos-sale-e2e-outcome.contract.test.js
 
+      - name: Run Sales completion receipt authority contracts
+        run: |
+          node tests/sale-settlement-error-authority.contract.test.js
+          node src/modules/sales/e2e/completion/saleCompletionFixture.contract.test.js
+          node src/modules/sales/e2e/completion/saleCompletionOutcome.contract.test.js
+
       - name: Run Tax Closing and Accounting Office contracts
         run: |
           node tests/output-vat-accounting-office-package.contract.test.js
