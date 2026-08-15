@@ -3,10 +3,12 @@ const templateProductSearchRoutes = require('./templateSearch/routes/templatePro
 const { productTraceRoutes } = require('./trace')
 const quickStockRoutes = require('./quickStock/routes/quickStockRoutes')
 const productCreateRoutes = require('./create/routes/productCreateRoutes')
+const uploadProductRoutes = require('./media/routes/uploadProductRoutes')
 
 const mountProductModule = (app) => {
   app.use('/api/products/template', templateProductSearchRoutes)
   app.use('/api/products/trace', productTraceRoutes)
+  app.use('/api/products', uploadProductRoutes)
   app.use('/api/products', productRoutes)
   app.use('/api/quick-stock', quickStockRoutes)
   app.use('/api/product-create', productCreateRoutes)
@@ -19,4 +21,5 @@ module.exports = {
   productTraceRoutes,
   quickStockRoutes,
   productCreateRoutes,
+  uploadProductRoutes,
 }
