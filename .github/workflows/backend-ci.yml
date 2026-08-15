@@ -98,6 +98,13 @@ jobs:
           node tests/tax-closing-handoff.contract.test.js
           node tests/tax-period-finalization-integrity.contract.test.js
 
+      - name: Run Public Storefront customer journey contracts
+        run: |
+          node tests/public-storefront-product-discovery.contract.test.js
+          node tests/anonymous-shopping-session-authority.contract.test.js
+          node tests/identity-at-commitment-authority-review.contract.test.js
+          node tests/product-reservation-commitment-authority-review.contract.test.js
+
       - name: Run backend tests
         run: npm test
 
