@@ -3,6 +3,7 @@
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const { prisma, Prisma } = require('../../../../lib/prisma');
+const { compactError, recordIncident } = require('../../../observability/runtimeIncidentLogger');
 const { createOperationalVerificationService } = require('./operationalVerificationService');
 
 const router = express.Router();
@@ -51,10 +52,9 @@ router.get('/health/ready', async (req, res) => {
       release: release(),
     });
   } catch (error) {
-    console.error('[INCIDENT][READINESS_DATABASE_UNAVAILABLE]', {
+    recordIncident('READINESS_DATABASE_UNAVAILABLE', {
       requestId: req.id,
-      code: error?.code || 'DATABASE_NOT_READY',
-      message: error?.message || 'Database readiness check failed',
+      error: compactError(error),
     });
 
     return res.status(503).json({
