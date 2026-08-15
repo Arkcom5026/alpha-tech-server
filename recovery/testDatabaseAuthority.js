@@ -2,6 +2,8 @@
 
 const TEST_DATABASE_PROJECT_REF = 'engqdeyzbvnmxbnpemau';
 const TEST_DATABASE_HOST = `db.${TEST_DATABASE_PROJECT_REF}.supabase.co`;
+const TEST_DATABASE_POOLER_USER = `postgres.${TEST_DATABASE_PROJECT_REF}`;
+const SESSION_POOLER_HOST_PATTERN = /^aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com$/;
 const WRITE_APPROVAL = 'ALPHATECH_TEST_DB_WRITE';
 const RESET_APPROVAL = 'ALPHATECH_TEST_DB_RESET';
 
@@ -27,6 +29,22 @@ function sameDatabase(left, right) {
     && left.user === right.user;
 }
 
+function inspectAllowedTestDatabaseTarget(target) {
+  if (!target) return { allowed: false, connectionMode: null };
+
+  const direct = target.host === TEST_DATABASE_HOST
+    && target.port === '5432'
+    && target.user === 'postgres';
+  if (direct) return { allowed: true, connectionMode: 'DIRECT' };
+
+  const sessionPooler = SESSION_POOLER_HOST_PATTERN.test(target.host)
+    && target.port === '5432'
+    && target.user === TEST_DATABASE_POOLER_USER;
+  if (sessionPooler) return { allowed: true, connectionMode: 'SESSION_POOLER' };
+
+  return { allowed: false, connectionMode: null };
+}
+
 function inspectTestDatabaseAuthority({
   targetUrl,
   env = process.env,
@@ -35,6 +53,7 @@ function inspectTestDatabaseAuthority({
 } = {}) {
   const errors = [];
   const target = parseDatabaseUrl(targetUrl);
+  let connectionMode = null;
 
   if (!target) {
     errors.push('RESTORE_DATABASE_URL must be a valid PostgreSQL connection URL.');
@@ -47,8 +66,12 @@ function inspectTestDatabaseAuthority({
       errors.push(`RESTORE_DATABASE_PROJECT_REF must equal ${TEST_DATABASE_PROJECT_REF}.`);
     }
 
-    if (target.host !== TEST_DATABASE_HOST) {
-      errors.push(`Restore target host must equal ${TEST_DATABASE_HOST}.`);
+    const targetAuthority = inspectAllowedTestDatabaseTarget(target);
+    connectionMode = targetAuthority.connectionMode;
+    if (!targetAuthority.allowed) {
+      errors.push(
+        `Restore target must be ${TEST_DATABASE_HOST}:5432 as postgres or a Supabase Session Pooler on port 5432 as ${TEST_DATABASE_POOLER_USER}.`
+      );
     }
 
     for (const variableName of ['DATABASE_URL', 'DIRECT_URL', 'PRODUCTION_DATABASE_URL']) {
@@ -71,7 +94,13 @@ function inspectTestDatabaseAuthority({
     ok: errors.length === 0,
     errors,
     target: target
-      ? { host: target.host, port: target.port, database: target.database, projectRef: TEST_DATABASE_PROJECT_REF }
+      ? {
+          host: target.host,
+          port: target.port,
+          database: target.database,
+          projectRef: TEST_DATABASE_PROJECT_REF,
+          connectionMode,
+        }
       : null,
   };
 }
@@ -86,7 +115,9 @@ function assertTestDatabaseAuthority(options) {
 
 module.exports = {
   RESET_APPROVAL,
+  SESSION_POOLER_HOST_PATTERN,
   TEST_DATABASE_HOST,
+  TEST_DATABASE_POOLER_USER,
   TEST_DATABASE_PROJECT_REF,
   WRITE_APPROVAL,
   assertTestDatabaseAuthority,
