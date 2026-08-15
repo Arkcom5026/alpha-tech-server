@@ -225,7 +225,7 @@ async function main() {
 
     await prisma.partnerStoreCapability.update({
       where: { branchId },
-      data: { pickupEnabled: false, deliveryEnabled: true, serviceAreaMode: 'DELIVERY_ONLY' },
+      data: { pickupEnabled: false, deliveryEnabled: true, serviceAreaMode: 'ADMIN_AREAS' },
     })
 
     const deliveryOnlyReadiness = await request('/api/partner-store/readiness/me', {
