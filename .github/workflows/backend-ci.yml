@@ -113,6 +113,7 @@ jobs:
 
       - name: Run Partner Store operational readiness contracts
         run: |
+          node tests/test-database-authority.contract.test.js
           node tests/partner-store-registration-authority-v2.contract.test.js
           node tests/partner-store-review-governance-v2.contract.test.js
           node tests/partner-store-provisioning-v2.contract.test.js
