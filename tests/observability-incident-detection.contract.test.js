@@ -9,6 +9,8 @@ const routes = fs.readFileSync(
   path.join(root, 'src/modules/system/operational-verification/operationalVerificationRoutes.js'),
   'utf8'
 );
+const bootstrap = fs.readFileSync(path.join(root, 'src/bootstrap/server.js'), 'utf8');
+const incidentLogger = fs.readFileSync(path.join(root, 'src/observability/runtimeIncidentLogger.js'), 'utf8');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 
 assert.match(server, /res\.setHeader\('X-Request-Id', req\.id\)/, 'server must expose request correlation id');
@@ -20,11 +22,20 @@ assert.match(routes, /SELECT 1 AS ready/, 'readiness must prove database connect
 assert.match(routes, /scope: 'process\+database'/, 'readiness scope must identify process and database authority');
 assert.match(routes, /status\(503\)/, 'dependency failure must make readiness fail closed');
 assert.match(routes, /DATABASE_NOT_READY/, 'readiness failure must expose a stable incident code');
-assert.match(routes, /\[INCIDENT\]\[READINESS_DATABASE_UNAVAILABLE\]/, 'readiness dependency failure must emit an incident signal');
+assert.match(routes, /recordIncident\('READINESS_DATABASE_UNAVAILABLE'/, 'readiness dependency failure must emit a structured incident signal');
 assert.match(routes, /requestId: req\.id/, 'health responses must carry request correlation id');
 assert.ok(
   routes.indexOf("router.get('/health/ready'") < routes.indexOf('router.use(verifyToken'),
   'platform readiness must remain public for infrastructure probes'
 );
+
+assert.match(incidentLogger, /event: 'runtime_incident'/, 'runtime incidents must use a stable structured event name');
+assert.match(incidentLogger, /occurredAt: new Date\(\)\.toISOString\(\)/, 'runtime incidents must be timestamped');
+assert.match(incidentLogger, /postgres\(\?:ql\)\?/, 'incident logging must redact database credentials');
+assert.match(incidentLogger, /Bearer\\s\+/, 'incident logging must redact bearer credentials');
+assert.match(bootstrap, /uncaughtExceptionMonitor/, 'bootstrap must observe uncaught process failures without suppressing Node default failure semantics');
+assert.match(bootstrap, /PROCESS_UNCAUGHT_EXCEPTION/, 'uncaught process failures must have a stable incident code');
+assert.match(bootstrap, /SERVER_STARTUP_FAILED/, 'startup failures must have a stable incident code');
+assert.match(bootstrap, /event: 'server_started'/, 'server lifecycle start must emit a structured event');
 
 console.log('Observability Incident Detection Contract: PASS');
