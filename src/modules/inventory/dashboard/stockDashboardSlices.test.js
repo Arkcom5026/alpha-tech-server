@@ -25,6 +25,7 @@ test('overview repository keeps every inventory source branch-scoped', async () 
     },
     stockBalance: {
       aggregate: async (query) => { received.push(query); return { _sum: {}, _count: { _all: 0 } }; },
+      findMany: async (query) => { received.push(query); return []; },
     },
     simpleLot: {
       aggregate: async (query) => { received.push(query); return { _sum: {}, _count: { _all: 0 } }; },
@@ -55,7 +56,15 @@ test('overview service preserves legacy and richer dashboard projections', async
     ],
     getStructuredValuation: async () => ({ quantity: 3, costValue: 1500, missingCostCount: 1 }),
     countSoldToday: async () => 4,
-    getSimpleSummary: async () => ({ productCount: 2, qtyOnHand: 10, qtyReserved: 3, netAvailable: 7 }),
+    getSimpleSummary: async () => ({
+      productCount: 2,
+      qtyOnHand: 10,
+      qtyReserved: 3,
+      netAvailable: 7,
+      costValue: 500,
+      missingCostProductCount: 0,
+      missingCostQuantity: 0,
+    }),
     getLotSummary: async () => ({
       activeLotCount: 1,
       qtyRemaining: 5,

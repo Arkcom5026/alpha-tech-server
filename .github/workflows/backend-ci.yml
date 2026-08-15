@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - integration/system-hardening-7-agendas
   pull_request:
     branches:
       - main
+      - integration/system-hardening-7-agendas
   workflow_dispatch:
 
 permissions:
@@ -52,11 +54,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Release safety contract
+        run: node tests/release-safety-foundation.contract.test.js
 
       - name: Generate Prisma Client
         run: npx prisma generate
@@ -88,10 +93,10 @@ jobs:
       - name: Run backend tests
         run: npm test
 
-      - name: Start backend
+      - name: Start backend without prestart schema mutation hooks
         shell: bash
         run: |
-          npm start > backend-startup.log 2>&1 &
+          node src/bootstrap/server.js > backend-startup.log 2>&1 &
           echo $! > backend.pid
 
       - name: Verify backend startup
@@ -106,10 +111,11 @@ jobs:
 
             status_code="$(curl --silent --output /dev/null \
               --write-out '%{http_code}' \
-              http://127.0.0.1:3000/__ci-startup-check || true)"
+              http://127.0.0.1:3000/api/operational-verification/health/live || true)"
 
-            if [ "$status_code" != "000" ]; then
-              echo "Backend responded with HTTP $status_code"
+            if [ "$status_code" = "200" ]; then
+              curl --fail --silent http://127.0.0.1:3000/api/operational-verification/release
+              curl --fail --silent http://127.0.0.1:3000/api/operational-verification/health/ready
               exit 0
             fi
 
