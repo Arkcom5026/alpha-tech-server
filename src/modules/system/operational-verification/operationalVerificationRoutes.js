@@ -2,6 +2,8 @@
 
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
+const { prisma, Prisma } = require('../../../../lib/prisma');
+const { compactError, recordIncident } = require('../../../observability/runtimeIncidentLogger');
 const { createOperationalVerificationService } = require('./operationalVerificationService');
 
 const router = express.Router();
@@ -18,29 +20,53 @@ const release = () => ({
   startedAt,
 });
 
+const noStore = (res) => res.setHeader('Cache-Control', 'no-store');
+
 router.get('/release', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
+  noStore(res);
   return res.json({ ok: true, release: release() });
 });
 
-router.get('/health/live', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
+router.get('/health/live', (req, res) => {
+  noStore(res);
   return res.json({
     ok: true,
     status: 'live',
     uptimeSeconds: Math.floor(process.uptime()),
+    requestId: req.id,
     release: release(),
   });
 });
 
-router.get('/health/ready', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  return res.json({
-    ok: true,
-    status: 'ready',
-    scope: 'process',
-    release: release(),
-  });
+router.get('/health/ready', async (req, res) => {
+  noStore(res);
+
+  try {
+    await prisma.$queryRaw(Prisma.sql`SELECT 1 AS ready`);
+    return res.json({
+      ok: true,
+      status: 'ready',
+      scope: 'process+database',
+      checks: { process: 'ready', database: 'ready' },
+      requestId: req.id,
+      release: release(),
+    });
+  } catch (error) {
+    recordIncident('READINESS_DATABASE_UNAVAILABLE', {
+      requestId: req.id,
+      error: compactError(error),
+    });
+
+    return res.status(503).json({
+      ok: false,
+      status: 'not_ready',
+      scope: 'process+database',
+      code: 'DATABASE_NOT_READY',
+      checks: { process: 'ready', database: 'failed' },
+      requestId: req.id,
+      release: release(),
+    });
+  }
 });
 
 const requireAdministrator = (req, res, next) => {

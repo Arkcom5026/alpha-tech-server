@@ -63,6 +63,9 @@ jobs:
       - name: Release safety contract
         run: node tests/release-safety-foundation.contract.test.js
 
+      - name: Observability incident detection contract
+        run: node tests/observability-incident-detection.contract.test.js
+
       - name: Generate Prisma Client
         run: npx prisma generate
 

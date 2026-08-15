@@ -6,6 +6,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const { compactError, recordIncident } = require('./src/observability/runtimeIncidentLogger');
 
 dotenv.config();
 const app = express();
@@ -15,11 +16,17 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.disable('etag');
 
-// Request ID (for logs / support)
+const normalizeRequestId = (value) => {
+  const candidate = String(value || '').trim();
+  if (!candidate || candidate.length > 128) return null;
+  return /^[A-Za-z0-9._:-]+$/.test(candidate) ? candidate : null;
+};
+
+// Request ID (for logs / support / client-server correlation)
 app.use((req, res, next) => {
-  req.id = crypto.randomUUID
+  req.id = normalizeRequestId(req.get('X-Request-Id')) || (crypto.randomUUID
     ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
   res.setHeader('X-Request-Id', req.id);
   next();
 });
@@ -143,6 +150,7 @@ const corsOptions = {
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'X-Request-Id',
     'X-Idempotency-Key',
     'X-Finalize-Token',
     'X-Anonymous-Session-Token',
@@ -258,12 +266,11 @@ app.use((req, res) => {
     ok: false,
     error: 'NOT_FOUND',
     message: `Route not found: ${req.method} ${req.originalUrl}`,
+    requestId: req.id,
   });
 });
 
 app.use((err, req, res, _next) => {
-  console.error('❌ Unhandled error:', err);
-
   const candidateStatusCode = Number(err?.statusCode ?? err?.status);
   const statusCode =
     Number.isInteger(candidateStatusCode) &&
@@ -272,6 +279,28 @@ app.use((err, req, res, _next) => {
       ? candidateStatusCode
       : 500;
   const code = err?.code || 'INTERNAL_SERVER_ERROR';
+
+  if (statusCode >= 500) {
+    recordIncident('HTTP_UNHANDLED_SERVER_ERROR', {
+      requestId: req.id,
+      method: req.method,
+      path: req.originalUrl || req.url,
+      statusCode,
+      code,
+      error: compactError(err),
+    });
+  } else if (process.env.HTTP_CLIENT_ERROR_LOG === 'true') {
+    console.warn(JSON.stringify({
+      level: 'warn',
+      event: 'http_client_error',
+      requestId: req.id,
+      method: req.method,
+      path: req.originalUrl || req.url,
+      statusCode,
+      code,
+      occurredAt: new Date().toISOString(),
+    }));
+  }
 
   res.status(statusCode).json({
     ok: false,
@@ -282,6 +311,5 @@ app.use((err, req, res, _next) => {
     requestId: req.id,
   });
 });
-
 
 module.exports = app;
