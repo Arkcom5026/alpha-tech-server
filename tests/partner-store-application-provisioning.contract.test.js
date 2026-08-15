@@ -10,9 +10,13 @@ const canonicalVerifier = read('scripts/verify-partner-store-application-http-e2
 const retiredVerifier = read('scripts/verify-partner-store-application-runtime.js');
 const testRuntimeWrapper = read('scripts/run-test-database-runtime.js');
 
-assert.ok(routes.includes("adminRouter.post('/:id/approve', controller.approve)"));
-assert.ok(routes.includes("adminRouter.post('/:id/provision', controller.provision)"));
+assert.ok(routes.includes("adminRouter.post('/:id/review', adminController.startReview)"));
+assert.ok(routes.includes("adminRouter.post('/:id/approve', adminController.approve)"));
+assert.ok(routes.includes("adminRouter.post('/:id/provision', adminController.provision)"));
+assert.ok(routes.includes("adminRouter.post('/:id/activation-invitations', activationController.issueInvitation)"));
+assert.ok(routes.indexOf("/:id/review") < routes.indexOf("/:id/approve"));
 assert.ok(routes.indexOf("/:id/approve") < routes.indexOf("/:id/provision"));
+assert.ok(routes.indexOf("/:id/provision") < routes.indexOf("/:id/activation-invitations"));
 
 for (const stage of [
   '/review`',
