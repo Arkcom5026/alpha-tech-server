@@ -111,6 +111,16 @@ jobs:
           node tests/identity-at-commitment-authority-review.contract.test.js
           node tests/product-reservation-commitment-authority-review.contract.test.js
 
+      - name: Run Partner Store operational readiness contracts
+        run: |
+          node tests/partner-store-registration-authority-v2.contract.test.js
+          node tests/partner-store-review-governance-v2.contract.test.js
+          node tests/partner-store-provisioning-v2.contract.test.js
+          node tests/partner-store-activation-v2.contract.test.js
+          node tests/partner-store-first-login-onboarding-v2.contract.test.js
+          node tests/partner-store-operational-readiness-v2.contract.test.js
+          node tests/partner-store-application-http-e2e.contract.test.js
+
       - name: Run backend tests
         run: npm test
 
