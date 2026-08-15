@@ -108,6 +108,7 @@ test('remaining stock movement runtimes use the authorized Prisma singleton', ()
     '../stock-item/receive/stockItemReceiveSlices.js',
     '../../procurement/receipt/commit/commitReceiptRepository.js',
     '../../procurement/receipt/simple/runtime/receiptSimpleRuntimeRepository.js',
+    '../../repair/claim/status/updateWarrantyClaimStatusRepository.js',
     '../../sales/completion/services/saleCompletionService.js',
     '../../sales/create/controllers/saleLegacyCreateController.js',
   ];
@@ -152,6 +153,7 @@ test('repository production runtime cannot add an unregistered direct stock move
     path.resolve(REPOSITORY_ROOT, 'src/modules/inventory/stock-item/receive/stockItemReceiveSlices.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/commit/commitReceiptRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/procurement/receipt/simple/runtime/receiptSimpleRuntimeRepository.js'),
+    path.resolve(REPOSITORY_ROOT, 'src/modules/repair/claim/status/updateWarrantyClaimStatusRepository.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/completion/services/saleCompletionService.js'),
     path.resolve(REPOSITORY_ROOT, 'src/modules/sales/create/controllers/saleLegacyCreateController.js'),
   ]);
