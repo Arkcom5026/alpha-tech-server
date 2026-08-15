@@ -7,14 +7,13 @@ const dotenv = require('dotenv');
 const { assertTestDatabaseAuthority } = require('../recovery/testDatabaseAuthority');
 
 const ALLOWED_SCRIPTS = new Set([
-  'scripts/verify-partner-store-application-runtime.js',
   'scripts/verify-partner-store-application-http-e2e.js',
   'scripts/provision-pos-sale-e2e-fixture.js',
 ]);
 const requestedScript = process.argv[2];
 
 if (process.argv.length !== 3 || !ALLOWED_SCRIPTS.has(requestedScript)) {
-  throw new Error(`Only these scripts may run through this Test DB runtime wrapper: ${[...ALLOWED_SCRIPTS].join(', ')}.`);
+  throw new Error(`Only canonical Test DB runtimes may run through this wrapper: ${[...ALLOWED_SCRIPTS].join(', ')}.`);
 }
 
 const envPath = path.join(process.cwd(), '.env.restore');
@@ -38,7 +37,6 @@ const child = spawn(process.execPath, [path.join(process.cwd(), requestedScript)
     ...process.env,
     DATABASE_URL: targetUrl,
     DIRECT_URL: targetUrl,
-    ALLOW_PARTNER_STORE_RUNTIME_TEST: 'true',
     ALLOW_PARTNER_STORE_HTTP_E2E_TEST: isHttpE2E ? 'true' : undefined,
     ALPHATECH_RUNTIME_ENV: 'TEST',
   },

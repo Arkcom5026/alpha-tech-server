@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - integration/system-hardening-7-agendas
   pull_request:
     branches:
       - main
-      - integration/system-hardening-7-agendas
   workflow_dispatch:
 
 permissions:
@@ -62,6 +60,9 @@ jobs:
 
       - name: Release safety contract
         run: node tests/release-safety-foundation.contract.test.js
+
+      - name: Canonical E2E authority cleanup contract
+        run: node tests/canonical-e2e-authority-cleanup.contract.test.js
 
       - name: Observability incident detection contract
         run: node tests/observability-incident-detection.contract.test.js
