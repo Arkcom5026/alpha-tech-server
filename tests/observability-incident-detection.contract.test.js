@@ -11,6 +11,7 @@ const routes = fs.readFileSync(
 );
 const bootstrap = fs.readFileSync(path.join(root, 'src/bootstrap/server.js'), 'utf8');
 const incidentLogger = fs.readFileSync(path.join(root, 'src/observability/runtimeIncidentLogger.js'), 'utf8');
+const authTrace = fs.readFileSync(path.join(root, 'middlewares/authTrace.js'), 'utf8');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 
 assert.match(server, /res\.setHeader\('X-Request-Id', req\.id\)/, 'server must expose request correlation id');
@@ -37,5 +38,9 @@ assert.match(bootstrap, /uncaughtExceptionMonitor/, 'bootstrap must observe unca
 assert.match(bootstrap, /PROCESS_UNCAUGHT_EXCEPTION/, 'uncaught process failures must have a stable incident code');
 assert.match(bootstrap, /SERVER_STARTUP_FAILED/, 'startup failures must have a stable incident code');
 assert.match(bootstrap, /event: 'server_started'/, 'server lifecycle start must emit a structured event');
+
+assert.match(authTrace, /AUTH_TRACE_ENABLED === 'true'/, 'verbose auth tracing must require an explicit runtime opt-in');
+assert.match(authTrace, /if \(!traceEnabled\(\)\) return next\(\)/, 'disabled auth tracing must bypass request instrumentation');
+assert.match(authTrace, /reqId=\$\{req\.id \|\| 'UNKNOWN'\}/, 'auth diagnostics must correlate to the canonical request id when enabled');
 
 console.log('Observability Incident Detection Contract: PASS');
