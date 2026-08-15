@@ -225,7 +225,12 @@ async function main() {
 
     await prisma.partnerStoreCapability.update({
       where: { branchId },
-      data: { pickupEnabled: false, deliveryEnabled: true, serviceAreaMode: 'ADMIN_AREAS' },
+      data: {
+        pickupEnabled: false,
+        deliveryEnabled: true,
+        deliveryFeeMode: 'FREE',
+        serviceAreaMode: 'ADMIN_AREAS',
+      },
     })
 
     const deliveryOnlyReadiness = await request('/api/partner-store/readiness/me', {
@@ -247,7 +252,12 @@ async function main() {
 
     await prisma.partnerStoreCapability.update({
       where: { branchId },
-      data: { pickupEnabled: true, deliveryEnabled: false, serviceAreaMode: 'PICKUP_ONLY' },
+      data: {
+        pickupEnabled: true,
+        deliveryEnabled: false,
+        deliveryFeeMode: null,
+        serviceAreaMode: 'PICKUP_ONLY',
+      },
     })
 
     const certified = await request('/api/partner-store/readiness/certify', {
