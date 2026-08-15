@@ -18,6 +18,8 @@ assert.equal(
 )
 assert.ok(verifier.includes("ALLOW_PARTNER_STORE_HTTP_E2E_TEST !== 'true'"))
 assert.ok(verifier.includes("ALPHATECH_RUNTIME_ENV !== 'TEST'"))
+assert.ok(verifier.includes("spawn(process.execPath, ['src/bootstrap/server.js']"))
+assert.ok(!verifier.includes("spawn(process.execPath, ['server.js']"))
 assert.ok(verifier.includes("'/api/public/partner-store-applications'"))
 assert.ok(verifier.includes('/review`'))
 assert.ok(verifier.includes('/approve`'))

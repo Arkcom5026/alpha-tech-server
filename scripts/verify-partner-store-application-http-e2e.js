@@ -112,7 +112,7 @@ async function main() {
     select: { id: true },
   })
 
-  const child = spawn(process.execPath, ['server.js'], {
+  const child = spawn(process.execPath, ['src/bootstrap/server.js'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
