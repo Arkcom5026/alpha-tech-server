@@ -187,7 +187,7 @@ async function main() {
       headers: bearer(adminToken),
       body: JSON.stringify({}),
     })
-    assert.equal(invitation.status, 200)
+    assert.equal(invitation.status, 201)
     assert.equal(invitation.body?.success, true)
     assert.ok(invitation.body?.data?.token)
 
