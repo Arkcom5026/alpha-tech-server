@@ -90,6 +90,14 @@ jobs:
           node tests/repair-customer-authority-regression.contract.test.js
           node tests/pos-sale-e2e-outcome.contract.test.js
 
+      - name: Run Tax Closing and Accounting Office contracts
+        run: |
+          node tests/output-vat-accounting-office-package.contract.test.js
+          node tests/accounting-office-closing-exceptions.contract.test.js
+          node tests/unified-tax-readiness.contract.test.js
+          node tests/tax-closing-handoff.contract.test.js
+          node tests/tax-period-finalization-integrity.contract.test.js
+
       - name: Run backend tests
         run: npm test
 

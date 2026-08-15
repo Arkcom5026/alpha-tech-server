@@ -59,6 +59,7 @@ const finalizeBundle = async (req, res, next) => {
       branchId,
       taxPeriodId: req.params.taxPeriodId,
       finalizedById: actorEmployeeId(req),
+      expectedSnapshotHash: req.body?.expectedSnapshotHash,
     });
     return res.status(data.replayed ? 200 : 201).json({ ok: true, data });
   } catch (error) {
