@@ -139,7 +139,7 @@ async function main() {
       }),
     })
 
-    assert.equal(submitted.status, 201)
+    assert.equal(submitted.status, 201, `Partner Store submit failed: ${JSON.stringify(submitted.body)}`)
     assert.equal(submitted.body?.success, true)
     assert.ok(submitted.body?.data?.id)
     const applicationId = submitted.body.data.id
