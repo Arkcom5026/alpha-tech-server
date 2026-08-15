@@ -64,8 +64,13 @@ async function request(path, options = {}) {
       ...(options.headers || {}),
     },
   })
-  return { status: response.status, body: await response.json() }
+  const text = await response.text()
+  let body = null
+  try { body = text ? JSON.parse(text) : null } catch (_) { body = { raw: text } }
+  return { status: response.status, body }
 }
+
+const bearer = (value) => ({ Authorization: `Bearer ${value}` })
 
 async function main() {
   await synchronizeIdentitySequences()
@@ -128,7 +133,6 @@ async function main() {
         contactName: 'System Test Owner',
         contactPhone: '0000000000',
         contactEmail: ownerEmail,
-        password: ownerPassword,
         businessAddress: 'SYSTEM TEST ONLY',
         requestedStorefrontSlug: `system-test-http-partner-${token}`,
         note: 'HTTP E2E verification only. Do not use for operations.',
@@ -136,75 +140,145 @@ async function main() {
     })
 
     assert.equal(submitted.status, 201)
-    assert.equal(submitted.body.success, true)
-    assert.ok(submitted.body.data?.id)
+    assert.equal(submitted.body?.success, true)
+    assert.ok(submitted.body?.data?.id)
+    const applicationId = submitted.body.data.id
 
-    const pendingApplication = await prisma.partnerStoreApplication.findUnique({
-      where: { id: submitted.body.data.id },
-      select: { provisionedOwnerUserId: true },
-    })
-    assert.ok(pendingApplication?.provisionedOwnerUserId)
+    const adminToken = jwt.sign({ id: adminUser.id }, jwtSecret, { expiresIn: '5m' })
 
-    const ownerUserId = pendingApplication.provisionedOwnerUserId
-    const reservedOwnerBeforeApproval = await prisma.user.findUnique({ where: { id: ownerUserId } })
-    assert.equal(reservedOwnerBeforeApproval.enabled, false)
-    assert.equal(reservedOwnerBeforeApproval.email, ownerEmail)
-
-    const anonymousApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
+    const anonymousApproval = await request(`/api/partner-store/applications/${applicationId}/approve`, {
       method: 'POST',
       body: JSON.stringify({ reviewNote: 'Anonymous approval must be rejected' }),
     })
     assert.equal(anonymousApproval.status, 401)
 
-    const adminToken = jwt.sign({ id: adminUser.id }, jwtSecret, { expiresIn: '5m' })
-    const approved = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
+    const review = await request(`/api/partner-store/applications/${applicationId}/review`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${adminToken}` },
+      headers: bearer(adminToken),
+      body: JSON.stringify({ note: 'System Test HTTP E2E review' }),
+    })
+    assert.equal(review.status, 200)
+    assert.equal(review.body?.success, true)
+    assert.equal(review.body?.data?.status, 'UNDER_REVIEW')
+
+    const approved = await request(`/api/partner-store/applications/${applicationId}/approve`, {
+      method: 'POST',
+      headers: bearer(adminToken),
       body: JSON.stringify({ reviewNote: 'System Test HTTP E2E approval' }),
     })
-
     assert.equal(approved.status, 200)
-    assert.equal(approved.body.success, true)
-    assert.equal(approved.body.data?.status, 'APPROVED')
-    assert.ok(approved.body.data?.provisionedBranchId)
+    assert.equal(approved.body?.success, true)
+    assert.equal(approved.body?.data?.status, 'APPROVED')
+    assert.equal(approved.body?.data?.provisionedBranchId, null)
 
-    const repeatedApproval = await request(`/api/partner-store/applications/${submitted.body.data.id}/approve`, {
+    const provisioned = await request(`/api/partner-store/applications/${applicationId}/provision`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${adminToken}` },
-      body: JSON.stringify({ reviewNote: 'Repeated approval must be rejected' }),
+      headers: bearer(adminToken),
+      body: JSON.stringify({}),
     })
-    assert.equal(repeatedApproval.status, 409)
-    assert.equal(repeatedApproval.body.code, 'PARTNER_STORE_APPLICATION_NOT_ACTIONABLE')
+    assert.equal(provisioned.status, 200)
+    assert.equal(provisioned.body?.success, true)
+    assert.equal(provisioned.body?.data?.provisioningStatus, 'PROVISIONED')
+    assert.ok(provisioned.body?.data?.provisionedBranchId)
+    const branchId = provisioned.body.data.provisionedBranchId
 
-    const [application, ownerAfterApproval, profile, capability] = await Promise.all([
-      prisma.partnerStoreApplication.findUnique({ where: { id: submitted.body.data.id } }),
-      prisma.user.findUnique({ where: { id: ownerUserId } }),
-      prisma.employeeProfile.findUnique({ where: { userId: ownerUserId } }),
-      prisma.partnerStoreCapability.findUnique({ where: { branchId: approved.body.data.provisionedBranchId } }),
-    ])
+    const invitation = await request(`/api/partner-store/applications/${applicationId}/activation-invitations`, {
+      method: 'POST',
+      headers: bearer(adminToken),
+      body: JSON.stringify({}),
+    })
+    assert.equal(invitation.status, 200)
+    assert.equal(invitation.body?.success, true)
+    assert.ok(invitation.body?.data?.token)
 
-    assert.equal(application.status, 'APPROVED')
-    assert.equal(application.provisionedOwnerUserId, ownerUserId)
-    assert.equal(ownerAfterApproval.enabled, true)
-    assert.equal(ownerAfterApproval.role, 'ADMIN')
-    assert.equal(profile.branchId, approved.body.data.provisionedBranchId)
-    assert.equal(profile.v2Role, 'OWNER')
-    assert.equal(capability.storefrontEnabled, false)
+    const claimed = await request('/api/public/partner-store-applications/activation/claim', {
+      method: 'POST',
+      body: JSON.stringify({ token: invitation.body.data.token, password: ownerPassword }),
+    })
+    assert.equal(claimed.status, 200)
+    assert.equal(claimed.body?.success, true)
+    assert.equal(claimed.body?.data?.activationStatus, 'ACTIVE')
+    assert.ok(claimed.body?.data?.ownerUserId)
+    assert.equal(claimed.body?.data?.branchId, branchId)
+    const ownerUserId = claimed.body.data.ownerUserId
+    const ownerToken = jwt.sign({ id: ownerUserId }, jwtSecret, { expiresIn: '5m' })
+
+    const onboarding = await request('/api/partner-store/onboarding/me', {
+      method: 'GET',
+      headers: bearer(ownerToken),
+    })
+    assert.equal(onboarding.status, 200)
+    assert.equal(onboarding.body?.data?.isPartnerStoreOwner, true)
+    assert.equal(onboarding.body?.data?.requiresOnboarding, true)
+
+    const completedOnboarding = await request('/api/partner-store/onboarding/complete', {
+      method: 'POST',
+      headers: bearer(ownerToken),
+      body: JSON.stringify({ confirmStoreProfile: true, confirmOwnerContact: true }),
+    })
+    assert.equal(completedOnboarding.status, 200)
+    assert.equal(completedOnboarding.body?.data?.onboardingStatus, 'COMPLETED')
+
+    const defaultCapability = await prisma.partnerStoreCapability.findUnique({ where: { branchId } })
+    assert.equal(defaultCapability.pickupEnabled, true)
+    assert.equal(defaultCapability.deliveryEnabled, false)
+
+    await prisma.partnerStoreCapability.update({
+      where: { branchId },
+      data: { pickupEnabled: false, deliveryEnabled: true, serviceAreaMode: 'DELIVERY_ONLY' },
+    })
+
+    const deliveryOnlyReadiness = await request('/api/partner-store/readiness/me', {
+      method: 'GET',
+      headers: bearer(ownerToken),
+    })
+    assert.equal(deliveryOnlyReadiness.status, 200)
+    const serviceModeCheck = deliveryOnlyReadiness.body?.data?.assessment?.checks?.find((item) => item.key === 'serviceMode')
+    assert.equal(serviceModeCheck?.ready, false)
+    assert.equal(serviceModeCheck?.details?.certificationFulfillmentAuthority, 'PICKUP')
+    assert.equal(serviceModeCheck?.details?.deliveryCertificationSupported, false)
+
+    const rejectedDeliveryOnlyCertification = await request('/api/partner-store/readiness/certify', {
+      method: 'POST',
+      headers: bearer(ownerToken),
+      body: JSON.stringify({}),
+    })
+    assert.equal(rejectedDeliveryOnlyCertification.status, 409)
+
+    await prisma.partnerStoreCapability.update({
+      where: { branchId },
+      data: { pickupEnabled: true, deliveryEnabled: false, serviceAreaMode: 'PICKUP_ONLY' },
+    })
+
+    const certified = await request('/api/partner-store/readiness/certify', {
+      method: 'POST',
+      headers: bearer(ownerToken),
+      body: JSON.stringify({}),
+    })
+    assert.equal(certified.status, 200)
+    assert.equal(certified.body?.data?.operationalReadinessStatus, 'CERTIFIED')
+    assert.equal(certified.body?.data?.assessment?.allReady, true)
+
+    const storedApplication = await prisma.partnerStoreApplication.findUnique({ where: { id: applicationId } })
+    assert.equal(storedApplication.status, 'APPROVED')
+    assert.equal(storedApplication.provisioningStatus, 'PROVISIONED')
+    assert.equal(storedApplication.activationStatus, 'ACTIVE')
+    assert.equal(storedApplication.onboardingStatus, 'COMPLETED')
+    assert.equal(storedApplication.operationalReadinessStatus, 'CERTIFIED')
+    assert.equal(storedApplication.provisionedOwnerUserId, ownerUserId)
+    assert.equal(storedApplication.provisionedBranchId, branchId)
 
     console.log(JSON.stringify({
       result: 'PASS',
-      applicationCode: application.applicationCode,
-      branchId: application.provisionedBranchId,
+      applicationCode: storedApplication.applicationCode,
+      applicationId,
+      branchId,
       ownerUserId,
-      ownerEnabledBeforeApproval: false,
-      ownerEnabledAfterApproval: true,
-      clientOwnerUserIdIgnored: true,
+      canonicalStages: ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'PROVISIONED', 'ACTIVE', 'ONBOARDING_COMPLETED', 'OPERATIONAL_CERTIFIED'],
+      deliveryOnlyCertificationRejected: true,
+      certifiedFulfillmentAuthority: 'PICKUP',
       retainedTestData: true,
-      httpRoutes: [
-        'POST /api/public/partner-store-applications',
-        'POST /api/partner-store/applications/:id/approve',
-      ],
-      accessControl: { anonymousApproval: 401, repeatedApproval: 409 },
+      accessControl: { anonymousApproval: 401 },
     }))
   } finally {
     await stopServer(child)
