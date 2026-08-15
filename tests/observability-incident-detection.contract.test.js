@@ -14,8 +14,15 @@ const incidentLogger = fs.readFileSync(path.join(root, 'src/observability/runtim
 const authTrace = fs.readFileSync(path.join(root, 'middlewares/authTrace.js'), 'utf8');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 
+assert.match(server, /normalizeRequestId/, 'server must validate inbound correlation ids');
+assert.match(server, /req\.get\('X-Request-Id'\)/, 'server must accept an inbound request correlation id');
 assert.match(server, /res\.setHeader\('X-Request-Id', req\.id\)/, 'server must expose request correlation id');
+assert.match(server, /allowedHeaders:[\s\S]*'X-Request-Id'/, 'CORS must allow clients to send request correlation id');
 assert.match(server, /exposedHeaders:[\s\S]*'X-Request-Id'/, 'CORS must expose request correlation id to clients');
+assert.match(server, /requestId: req\.id/, 'HTTP error responses must include the canonical request id');
+assert.match(server, /statusCode >= 500[\s\S]*recordIncident\('HTTP_UNHANDLED_SERVER_ERROR'/, 'only server-side HTTP failures must become incidents');
+assert.match(server, /HTTP_CLIENT_ERROR_LOG === 'true'/, 'expected 4xx logging must remain explicit opt-in noise');
+assert.doesNotMatch(server, /console\.error\('❌ Unhandled error:'/u, 'expected business rejections must not be labeled as unhandled incidents');
 
 assert.match(routes, /router\.get\('\/health\/live'/, 'liveness endpoint must remain available');
 assert.match(routes, /router\.get\('\/health\/ready', async/, 'readiness must perform an async dependency check');
