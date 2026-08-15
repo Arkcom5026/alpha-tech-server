@@ -1,11 +1,11 @@
 // middlewares/authTrace.js
-// ⚠️ TEMPORARY RUNTIME TRACING — Remove after investigation
-// No business logic changes. Only adds console.log tracing.
+// Verbose authentication tracing is diagnostics-only and must be explicitly enabled.
 
 const crypto = require('crypto');
 const TRACE_PREFIX = '[AUTH-TRACE-BE]';
 
 const now = () => new Date().toISOString().slice(11, 23);
+const traceEnabled = () => process.env.AUTH_TRACE_ENABLED === 'true';
 
 const getFingerprint = (token) => {
   if (!token) return 'NULL';
@@ -17,17 +17,21 @@ const getFingerprint = (token) => {
 };
 
 const trace = (category, ...args) => {
+  if (!traceEnabled()) return;
   console.log(`${TRACE_PREFIX} [${now()}] [${category}]`, ...args);
 };
 
-// Middleware to trace all incoming requests
 const traceRequest = (req, res, next) => {
+  if (!traceEnabled()) return next();
+
   const authHeader = req.headers?.authorization || '';
   const hasBearer = authHeader.startsWith('Bearer ');
   const token = hasBearer ? authHeader.slice(7) : null;
   const cookie = req.headers?.cookie || '';
 
-  trace('REQUEST',
+  trace(
+    'REQUEST',
+    `reqId=${req.id || 'UNKNOWN'}`,
     `${req.method}`,
     `${req.originalUrl || req.url}`,
     `Bearer=${hasBearer ? 'YES' : 'NO'}`,
@@ -35,14 +39,14 @@ const traceRequest = (req, res, next) => {
     `hasCookie=${cookie.includes('refreshToken') ? 'YES' : 'NO'}`
   );
 
-  // Store start time for response tracing
   req._traceStartTime = Date.now();
 
-  // Intercept res.end to trace response
   const originalEnd = res.end;
   res.end = function (...args) {
     const duration = Date.now() - (req._traceStartTime || Date.now());
-    trace('RESPONSE',
+    trace(
+      'RESPONSE',
+      `reqId=${req.id || 'UNKNOWN'}`,
       `${res.statusCode}`,
       `${req.method}`,
       `${req.originalUrl || req.url}`,
@@ -51,17 +55,21 @@ const traceRequest = (req, res, next) => {
     return originalEnd.apply(this, args);
   };
 
-  next();
+  return next();
 };
 
-// Trace auth/refresh endpoint specifically
 const traceRefreshRequest = (req, res, next) => {
-  const cookie = req.headers?.cookie || '';
-  const refreshTokenCookie = cookie.split(';')
-    .map(c => c.trim())
-    .find(c => c.startsWith('refreshToken='));
+  if (!traceEnabled()) return next();
 
-  trace('REFRESH',
+  const cookie = req.headers?.cookie || '';
+  const refreshTokenCookie = cookie
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith('refreshToken='));
+
+  trace(
+    'REFRESH',
+    `reqId=${req.id || 'UNKNOWN'}`,
     'INCOMING',
     `refreshCookie=${refreshTokenCookie ? 'PRESENT' : 'MISSING'}`
   );
@@ -69,8 +77,12 @@ const traceRefreshRequest = (req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     const setCookieHeader = res.getHeaders()['set-cookie'] || '';
-    const hasSetCookie = !!(setCookieHeader && (Array.isArray(setCookieHeader) ? setCookieHeader.length > 0 : String(setCookieHeader).length > 0));
-    trace('REFRESH',
+    const hasSetCookie = Boolean(
+      setCookieHeader && (Array.isArray(setCookieHeader) ? setCookieHeader.length > 0 : String(setCookieHeader).length > 0)
+    );
+    trace(
+      'REFRESH',
+      `reqId=${req.id || 'UNKNOWN'}`,
       'RESPONSE',
       `status=${res.statusCode}`,
       `hasBody=${body ? 'YES' : 'NO'}`,
@@ -79,31 +91,37 @@ const traceRefreshRequest = (req, res, next) => {
     return originalJson(body);
   };
 
-  next();
+  return next();
 };
 
-// Trace verifyToken middleware
 const traceVerifyToken = (req, res, next) => {
+  if (!traceEnabled()) return next();
+
   const authHeader = req.headers?.authorization || '';
   const hasBearer = authHeader.startsWith('Bearer ');
   const token = hasBearer ? authHeader.slice(7) : null;
 
-  trace('VERIFY_TOKEN',
+  trace(
+    'VERIFY_TOKEN',
+    `reqId=${req.id || 'UNKNOWN'}`,
     `url=${req.originalUrl || req.url}`,
     `Bearer=${hasBearer ? 'YES' : 'NO'}`,
     `token=${getFingerprint(token)}`
   );
 
-  next();
+  return next();
 };
 
-// Trace auth controller actions
 const traceAuthAction = (actionName) => (req, res, next) => {
-  trace('AUTH_ACTION', actionName,
+  if (!traceEnabled()) return next();
+  trace(
+    'AUTH_ACTION',
+    `reqId=${req.id || 'UNKNOWN'}`,
+    actionName,
     `url=${req.originalUrl || req.url}`,
     `method=${req.method}`
   );
-  next();
+  return next();
 };
 
 module.exports = {
