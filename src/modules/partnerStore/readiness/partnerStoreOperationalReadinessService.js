@@ -55,6 +55,8 @@ const createCheck = (key, label, ready, details = null) => ({ key, label, ready:
 
 const buildAssessment = ({ application, capability }) => {
   const branch = application?.provisionedBranch || null
+  const pickupReady = capability?.pickupEnabled === true
+  const deliveryConfigured = capability?.deliveryEnabled === true
   const checks = [
     createCheck(
       'lifecycle',
@@ -90,11 +92,18 @@ const buildAssessment = ({ application, capability }) => {
     ),
     createCheck(
       'serviceMode',
-      'มีช่องทางให้บริการอย่างน้อยหนึ่งแบบ',
-      Boolean(capability?.pickupEnabled || capability?.deliveryEnabled),
+      'เปิดรับที่ร้าน (Pickup) พร้อมใช้งาน',
+      pickupReady,
       {
-        pickupEnabled: Boolean(capability?.pickupEnabled),
-        deliveryEnabled: Boolean(capability?.deliveryEnabled),
+        pickupEnabled: pickupReady,
+        deliveryEnabled: deliveryConfigured,
+        certificationFulfillmentAuthority: 'PICKUP',
+        deliveryCertificationSupported: false,
+        reason: pickupReady
+          ? null
+          : deliveryConfigured
+            ? 'Delivery ถูกตั้งค่าไว้ แต่ยังไม่ใช่ fulfillment authority ที่รองรับการรับรอง E2E ในปัจจุบัน กรุณาเปิด Pickup ก่อนรับรองร้าน'
+            : 'กรุณาเปิด Pickup ก่อนรับรองร้าน',
       }
     ),
   ]
@@ -175,8 +184,9 @@ const certifyOperationalReadiness = async (userId) => {
 
     const now = new Date()
     const snapshot = {
-      version: 2,
+      version: 3,
       certifiedAt: now.toISOString(),
+      fulfillmentAuthority: 'PICKUP',
       checks: assessment.checks,
       branchId: application.provisionedBranchId,
       capabilityId: capability?.id || null,
