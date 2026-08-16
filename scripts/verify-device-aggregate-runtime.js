@@ -80,8 +80,9 @@ if (ensureDeviceIntake === 'node scripts/ensure-device-intake-foundation.js') {
 }
 
 const readonlyVerification = read('scripts/verify-runtime-foundations-readonly.js');
-assertContains(readonlyVerification, "to_regtype('public.\"DeviceCategory\"')", 'device foundation read-only enum verification');
-assertContains(readonlyVerification, "to_regclass('public.\"DeviceIntake\"')", 'device foundation read-only table verification');
+assertContains(readonlyVerification, "'DeviceCategory'", 'device foundation read-only enum identity');
+assertContains(readonlyVerification, "'DeviceIntake'", 'device foundation read-only table identity');
+assertContains(readonlyVerification, "kind === 'type' ? 'to_regtype' : 'to_regclass'", 'device foundation read-only lookup authority');
 
 const foundation = read('scripts/ensure-device-intake-foundation.js');
 assertContains(foundation, "require('dotenv').config();", 'device foundation environment loading');
