@@ -1,4 +1,18 @@
+const { performance } = require('node:perf_hooks');
+
 const { prisma } = require('../../../../../lib/prisma');
+
+const authPerfEnabled = () => process.env.AUTH_PERF_TRACE === '1';
+const measureAuthRepository = async (label, work) => {
+  const startedAt = performance.now();
+  try {
+    return await work();
+  } finally {
+    if (authPerfEnabled()) {
+      console.log(`[auth-perf] ${label} ${(performance.now() - startedAt).toFixed(1)}ms`);
+    }
+  }
+};
 
 const includeSessionProfiles = {
   customerProfiles: true,
@@ -47,17 +61,20 @@ const findPasswordResetEligibleUserByEmail = (email) => prisma.user.findUnique({
   },
 });
 
-const findSessionUserById = (id) => prisma.user.findUnique({
-  where: { id },
-  include: {
-    employeeProfile: {
-      include: {
-        branch: true,
-        position: true,
+const findSessionUserById = (id) => measureAuthRepository(
+  'session-user.lookup',
+  () => prisma.user.findUnique({
+    where: { id },
+    include: {
+      employeeProfile: {
+        include: {
+          branch: true,
+          position: true,
+        },
       },
     },
-  },
-});
+  })
+);
 
 const findUserByLoginId = (loginId) => prisma.user.findUnique({
   where: { loginId },
@@ -79,33 +96,42 @@ const createUser = (data, tx = prisma) => tx.user.create({ data });
 const createEmployeeProfile = (data, tx = prisma) => tx.employeeProfile.create({ data });
 const createCustomerProfile = (data, tx = prisma) => tx.customerProfile.create({ data });
 
-const findRefreshTokenByHash = (tokenHash) => prisma.refreshToken.findFirst({
-  where: { tokenHash },
-  include: {
-    user: {
-      include: {
-        employeeProfile: {
-          include: {
-            branch: true,
-            position: true,
+const findRefreshTokenByHash = (tokenHash) => measureAuthRepository(
+  'refresh-token.lookup',
+  () => prisma.refreshToken.findFirst({
+    where: { tokenHash },
+    include: {
+      user: {
+        include: {
+          employeeProfile: {
+            include: {
+              branch: true,
+              position: true,
+            },
           },
         },
       },
     },
-  },
-});
+  })
+);
 
 const findRefreshTokenChildren = (replacedByTokenId, tx = prisma) => tx.refreshToken.findMany({
   where: { replacedByTokenId },
   select: { id: true },
 });
 
-const createRefreshToken = (data, tx = prisma) => tx.refreshToken.create({ data });
+const createRefreshToken = (data, tx = prisma) => measureAuthRepository(
+  'refresh-token.create',
+  () => tx.refreshToken.create({ data })
+);
 
-const updateRefreshToken = ({ id, data }, tx = prisma) => tx.refreshToken.update({
-  where: { id },
-  data,
-});
+const updateRefreshToken = ({ id, data }, tx = prisma) => measureAuthRepository(
+  'refresh-token.update',
+  () => tx.refreshToken.update({
+    where: { id },
+    data,
+  })
+);
 
 const revokeRefreshTokensByIds = ({ ids, revokedAt }, tx = prisma) => tx.refreshToken.updateMany({
   where: { id: { in: ids } },
@@ -167,7 +193,10 @@ const updateUser = ({ id, data }, tx = prisma) => tx.user.update({
   data,
 });
 
-const runTransaction = (work) => prisma.$transaction(work);
+const runTransaction = (work) => measureAuthRepository(
+  'auth.transaction',
+  () => prisma.$transaction(work)
+);
 
 module.exports = {
   findUserByEmail,
