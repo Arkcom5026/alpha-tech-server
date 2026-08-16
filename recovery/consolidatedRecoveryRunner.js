@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { normalizeLatestJobRunnerReport } = require('./finalizeJobRunnerReport');
 
 require('dotenv').config();
 const RESTORE_ENV_PATH = path.join(process.cwd(), '.env.restore');
@@ -125,6 +126,28 @@ async function runWorkflowA(report, logger) {
     '--retention',
     '--no-standby-restore',
   ], logger, WORKFLOW_A_SAFE_ENV);
+
+  try {
+    const normalized = normalizeLatestJobRunnerReport({ expectedStartedAt: report.workflowA.startedAt });
+    report.workflowA.report = {
+      status: 'PASS',
+      jobId: normalized.jobId,
+      reportStatus: normalized.reportStatus,
+      exitCode: normalized.exitCode,
+      latestJsonPath: normalized.latestJsonPath,
+      latestTxtPath: normalized.latestTxtPath,
+    };
+    logger.log(`🧾 Workflow A report normalized: REPORT=${normalized.reportStatus} exitCode=${normalized.exitCode}`);
+  } catch (error) {
+    const message = redact(error.stack || error.message || String(error));
+    report.workflowA.report = { status: 'FAIL', error: message };
+    report.workflowA.finishedAt = nowIso();
+    report.workflowA.exitCode = result.exitCode;
+    report.workflowA.status = 'FAIL';
+    report.workflowA.error = `Workflow A report normalization failed: ${message}`;
+    return { ok: false, exitCode: 12, error: report.workflowA.error };
+  }
+
   report.workflowA.finishedAt = nowIso();
   report.workflowA.exitCode = result.exitCode;
   report.workflowA.status = result.ok ? 'PASS' : 'FAIL';
