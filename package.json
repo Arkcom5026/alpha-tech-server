@@ -29,7 +29,7 @@
     "test:sale-tax-document-eligibility": "node tests/sale-tax-document-eligibility.contract.test.js",
     "test:sale-delivery-note-print-projection": "node tests/sale-delivery-note-print-projection.contract.test.js",
     "test:input-tax-overview": "node tests/input-tax-overview-v1.contract.test.js && node tests/input-tax-period-authority.integration.contract.test.js",
-    "test:partner-store-capability": "node prisma/migrations/20260802103000_supplier_capability_foundation/migration.test.js",
+    "test:partner-store-capability": "node tests/partner-store-capability-foundation.contract.test.js",
     "test:supplier-capability": "node prisma/migrations/20260802103000_supplier_capability_foundation/migration.test.js",
     "test:tax-expense-tenant-isolation": "node prisma/migrations/20260802113000_tax_expense_tenant_isolation/migration.test.js",
     "test:tax-expense-runtime": "node tests/tax-expense-runtime.contract.test.js",
