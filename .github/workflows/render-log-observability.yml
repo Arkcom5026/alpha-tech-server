@@ -1,0 +1,73 @@
+name: Render Log Observability
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_minutes:
+        description: Minutes of Render logs to collect
+        required: false
+        default: "60"
+        type: string
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-log-observability
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    name: Collect Render server logs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: srv-d5vg5v3uibrs73cp1vm0
+      RENDER_LOG_LOOKBACK_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.lookback_minutes || '75' }}
+      RENDER_LOG_OUTPUT_DIR: artifacts/render-logs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require Render API credential
+        shell: bash
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "Missing repository secret: RENDER_API_KEY"
+            echo "Create a Render API key and add it under GitHub repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Collect and sanitize Render logs
+        run: node scripts/observability/collect-render-logs.mjs
+
+      - name: Publish summary to workflow run
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/render-logs/summary.txt ]; then
+            {
+              echo '## Render Log Snapshot'
+              echo '```text'
+              cat artifacts/render-logs/summary.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Render log artifact
+        if: always() && hashFiles('artifacts/render-logs/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-server-logs-${{ github.run_id }}
+          path: artifacts/render-logs/
+          retention-days: 7
+          if-no-files-found: error
