@@ -8,13 +8,13 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { Client } = require('pg');
 const { assertTestDatabaseAuthority } = require('./testDatabaseAuthority');
+const { requirePostgresTool } = require('./postgresClientTools');
 
 require('dotenv').config({ path: path.join(process.cwd(), '.env.restore') });
 
 const EXPECTED_SCHEMAS = ['public', 'legacy_tax'];
 const RESET_CONFIRMATION = 'ALPHATECH_TEST_DB_RESET';
 const targetUrl = process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL;
-const psqlPath = process.env.PSQL_PATH || path.join(process.env.POSTGRES_CLIENT_BIN || '', 'psql.exe');
 
 function fail(message) { console.error(`RECOVERY_BUNDLE_RESTORE_FAILED: ${message}`); process.exit(1); }
 function checksum(filePath) { return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex'); }
@@ -44,7 +44,7 @@ function parseArgs(argv) {
   return result;
 }
 
-function runPsql(sqlPath) {
+function runPsql(psqlPath, sqlPath) {
   return new Promise((resolve, reject) => {
     const child = spawn(psqlPath, ['--set', 'ON_ERROR_STOP=1', '--file', sqlPath], { cwd: process.cwd(), env: connectionEnvironment(targetUrl), shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
@@ -59,7 +59,14 @@ async function main() {
   if (!args.yes) fail('Explicit --yes or RESTORE_DATABASE_RESET_CONFIRMATION is required before resetting the Test database.');
   if (!args.manifestPath) fail('Usage: node recovery/restoreRecoveryBundle.js --manifest <bundle.manifest.json> --yes, or set RESTORE_BUNDLE_MANIFEST.');
   if (!targetUrl) fail('RESTORE_DATABASE_URL or RECOVERY_DATABASE_URL is required.');
-  if (!psqlPath || !fs.existsSync(psqlPath)) fail('PSQL_PATH or POSTGRES_CLIENT_BIN must point to PostgreSQL 17 psql.exe.');
+
+  let psql;
+  try {
+    psql = requirePostgresTool('psql', { explicitPath: process.env.PSQL_PATH });
+  } catch (error) {
+    fail(error.message || String(error));
+  }
+
   assertTestDatabaseAuthority({ targetUrl, requiresWriteApproval: true, requiresResetApproval: true });
 
   const manifestPath = path.resolve(args.manifestPath);
@@ -80,7 +87,7 @@ async function main() {
     await client.end().catch(() => undefined);
   }
 
-  await runPsql(sqlPath);
+  await runPsql(psql.path, sqlPath);
 
   const verifyClient = new Client(clientConfig(targetUrl));
   try {
@@ -97,7 +104,7 @@ async function main() {
     await verifyClient.end().catch(() => undefined);
   }
 
-  console.log(JSON.stringify({ result: 'PASS', restoredSchemas: EXPECTED_SCHEMAS, databaseModified: true, verifiedTables: Object.keys(manifest.tableCounts || {}).length }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', restoredSchemas: EXPECTED_SCHEMAS, databaseModified: true, psqlMajor: psql.major, verifiedTables: Object.keys(manifest.tableCounts || {}).length }, null, 2));
 }
 
 main().catch((error) => fail(error.message || String(error)));
