@@ -43,10 +43,13 @@ Windows Task Scheduler
 7. The source bundle capture is read-only and uses one PostgreSQL exported snapshot for row counts and `pg_dump`.
 8. No scheduler should call `captureRecoveryBundle.js`, `restoreRecoveryBundle.js`, `qbrs.js`, or `qbv.js` directly.
 9. Restore/reset is never enabled merely because the Windows scheduler runs. It always requires explicit environment approvals.
+10. The Windows scheduled entrypoint forcibly sets `RECOVERY_RETENTION_APPLY=false` and `RECOVERY_R2_RETENTION_APPLY=false`. Scheduled retention therefore remains dry-run/analysis only even if a stale machine-level environment variable requested deletion. Destructive retention requires a separate explicitly approved manual execution.
 
 ## Default scheduled behavior
 
-The default behavior is intentionally unchanged in risk level. Without `RECOVERY_STANDBY_SYNC_ENABLED=true`, the scheduled task performs Workflow A only and records Workflow B as `SKIPPED`.
+Without `RECOVERY_STANDBY_SYNC_ENABLED=true`, the scheduled task performs Workflow A only and records Workflow B as `SKIPPED`.
+
+The scheduled entrypoint also forces both local and R2 retention apply modes off. Backup, verification, upload, and retention analysis can continue, but automatic scheduled deletion is not permitted.
 
 ## Reports
 
@@ -68,5 +71,7 @@ Do not enable standby sync on the scheduled task until local verification confir
 - JavaScript syntax PASS
 - one manual Workflow A-only run PASS
 - one explicitly approved manual standby-sync drill against the authorized Recovery/Test target PASS
+
+For the Workflow A-only rollout test, ensure `RECOVERY_RETENTION_APPLY=false` and `RECOVERY_R2_RETENTION_APPLY=false`, matching the scheduled-entrypoint safety policy.
 
 Production DB must remain source/read-only during standby capture. The only destructive reset target is the explicitly authorized Recovery/Test database.
