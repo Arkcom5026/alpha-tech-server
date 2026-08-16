@@ -11,12 +11,14 @@ function read(relativePath) {
 const consolidated = read('recovery/consolidatedRecoveryRunner.js');
 const finalizer = read('recovery/finalizeJobRunnerReport.js');
 
-// The canonical consolidated entrypoint must normalize Workflow A reports only
-// after jobRunner exits, using the finalized job manifest as authority.
+// The canonical Recovery workflow must normalize the internal backup pipeline
+// report only after jobRunner exits, using the finalized job manifest.
 assert.ok(consolidated.includes("require('./finalizeJobRunnerReport')"));
 assert.ok(consolidated.includes('normalizeLatestJobRunnerReport'));
-assert.ok(consolidated.includes('Workflow A report normalized'));
-assert.ok(consolidated.includes('report.workflowA.report'));
+assert.ok(consolidated.includes('Backup pipeline report normalized'));
+assert.ok(consolidated.includes('step.report'));
+assert.ok(!consolidated.includes('workflowA'));
+assert.ok(!consolidated.includes('workflowB'));
 
 // The finalizer must read the finalized job manifest and reject stale or
 // incomplete metadata rather than inventing a successful report.
@@ -24,7 +26,6 @@ assert.ok(finalizer.includes("path.join(JOB_DIR, 'job.latest.json')"));
 assert.ok(finalizer.includes('Number.isInteger(job.exitCode)'));
 assert.ok(finalizer.includes('job.workflow.steps.REPORT.status'));
 assert.ok(finalizer.includes('job.startedAt'));
-assert.ok(finalizer.includes('older than the current Workflow A execution'));
 
 // Finalized JSON/TXT reports must contain the real final exit code and final
 // REPORT state from job.latest.json.
@@ -40,4 +41,4 @@ assert.ok(!finalizer.includes('DROP SCHEMA'));
 assert.ok(!finalizer.includes('spawn('));
 assert.ok(!finalizer.includes('exec('));
 
-console.log('recovery job runner report finalization contract: PASS');
+console.log('recovery backup pipeline report finalization contract: PASS');
