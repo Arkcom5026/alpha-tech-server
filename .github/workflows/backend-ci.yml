@@ -76,6 +76,9 @@ jobs:
       - name: Observability incident detection contract
         run: node tests/observability-incident-detection.contract.test.js
 
+      - name: Render log observability bridge contract
+        run: node tests/render-log-observability-bridge.contract.test.js
+
       - name: Generate Prisma Client
         run: npx prisma generate
 
