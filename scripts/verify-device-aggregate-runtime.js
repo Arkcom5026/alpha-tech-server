@@ -25,6 +25,7 @@ const assertNotContains = (source, value, label) => {
 
 const syntaxFiles = [
   'scripts/ensure-device-intake-foundation.js',
+  'scripts/verify-runtime-foundations-readonly.js',
   'src/modules/repair/routes/repairRoutes.js',
   'src/modules/repair/external-intake/createExternalDeviceIntakeController.js',
   'src/modules/repair/external-intake/createExternalDeviceIntakeService.js',
@@ -57,15 +58,30 @@ assertContains(schema, '@@unique([branchId, barcode])', 'branch-scoped device ba
 assertContains(schema, 'deviceId', 'repair and claim device identity field');
 
 const packageJson = JSON.parse(read('package.json'));
-const prestart = packageJson.scripts?.prestart || '';
+const start = packageJson.scripts?.start || '';
+const explicitRuntimeFoundationEnsure = packageJson.scripts?.['db:ensure-runtime-foundations'] || '';
 const ensureDeviceIntake = packageJson.scripts?.['db:ensure-device-intake'];
 
-assertContains(prestart, 'npm run db:ensure-device-intake', 'device foundation prestart authority');
+assertNotContains(start, 'npm run db:ensure-device-intake', 'device foundation startup mutation hook');
+assertContains(
+  start,
+  'node scripts/verify-runtime-foundations-readonly.js',
+  'device foundation read-only startup authority'
+);
+assertContains(
+  explicitRuntimeFoundationEnsure,
+  'npm run db:ensure-device-intake',
+  'device foundation explicit maintenance authority'
+);
 if (ensureDeviceIntake === 'node scripts/ensure-device-intake-foundation.js') {
   pass('device foundation command');
 } else {
   fail('device foundation command is missing');
 }
+
+const readonlyVerification = read('scripts/verify-runtime-foundations-readonly.js');
+assertContains(readonlyVerification, "to_regtype('public.\"DeviceCategory\"')", 'device foundation read-only enum verification');
+assertContains(readonlyVerification, "to_regclass('public.\"DeviceIntake\"')", 'device foundation read-only table verification');
 
 const foundation = read('scripts/ensure-device-intake-foundation.js');
 assertContains(foundation, "require('dotenv').config();", 'device foundation environment loading');
