@@ -5,8 +5,8 @@
     "schema": "prisma"
   },
   "scripts": {
-    "prestart": "npm run db:ensure-device-intake && npm run db:ensure-input-tax-links && npm run db:ensure-supplier-payables && npm run db:ensure-supplier-payment-allocations && npm run db:ensure-supplier-advances && npm run db:ensure-supplier-disputes && npm run db:ensure-pos-held-carts",
-    "start": "node src/bootstrap/server.js",
+    "start": "node scripts/verify-runtime-foundations-readonly.js && node src/bootstrap/server.js",
+    "db:ensure-runtime-foundations": "npm run db:ensure-device-intake && npm run db:ensure-input-tax-links && npm run db:ensure-supplier-payables && npm run db:ensure-supplier-payment-allocations && npm run db:ensure-supplier-advances && npm run db:ensure-supplier-disputes && npm run db:ensure-pos-held-carts",
     "db:ensure-device-intake": "node scripts/ensure-device-intake-foundation.js",
     "db:ensure-input-tax-links": "node scripts/ensure-flexible-input-tax-receipt-links.js",
     "db:ensure-supplier-payables": "node scripts/ensure-supplier-payable-foundation.js",
