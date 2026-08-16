@@ -61,6 +61,9 @@ jobs:
       - name: Release safety contract
         run: node tests/release-safety-foundation.contract.test.js
 
+      - name: Startup critical path contract
+        run: node tests/startup-critical-path.contract.test.js
+
       - name: Canonical E2E authority cleanup contract
         run: node tests/canonical-e2e-authority-cleanup.contract.test.js
 
