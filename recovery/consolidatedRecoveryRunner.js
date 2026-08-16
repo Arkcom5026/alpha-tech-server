@@ -14,11 +14,19 @@
 //     -> jobRunner.js --backup-workflow --upload --retention
 //     -> standby sync SKIPPED unless RECOVERY_STANDBY_SYNC_ENABLED=true
 
-require('dotenv').config();
-
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+
+require('dotenv').config();
+const RESTORE_ENV_PATH = path.join(process.cwd(), '.env.restore');
+const RECOVERY_ENV_PATH = path.join(process.cwd(), '.env.recovery');
+if (fs.existsSync(RESTORE_ENV_PATH)) {
+  require('dotenv').config({ path: RESTORE_ENV_PATH, override: false });
+}
+if (fs.existsSync(RECOVERY_ENV_PATH)) {
+  require('dotenv').config({ path: RECOVERY_ENV_PATH, override: false });
+}
 
 const ROOT_DIR = process.cwd();
 const RECOVERY_DIR = path.join(ROOT_DIR, 'recovery');
