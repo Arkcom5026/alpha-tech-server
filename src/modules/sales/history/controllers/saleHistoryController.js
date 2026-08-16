@@ -9,6 +9,27 @@ const {
   toNum,
 } = require('../../shared/saleLegacyProjection');
 
+const SALE_PRINTABLE_SELECT = {
+  id: true,
+  code: true,
+  officialDocumentNumber: true,
+  createdAt: true,
+  soldAt: true,
+  totalAmount: true,
+  paidAmount: true,
+  paid: true,
+  status: true,
+  isCredit: true,
+  customer: {
+    select: {
+      name: true,
+      companyName: true,
+      user: { select: { loginId: true } },
+    },
+  },
+  employee: { select: { name: true } },
+};
+
 const getAllSales = async (req, res) => {
   try {
     const branchId = Number(req.user?.branchId);
@@ -222,42 +243,42 @@ const searchPrintableSales = async (req, res) => {
       where,
       orderBy: { createdAt: 'desc' },
       take,
-      include: SALE_DOCUMENT_INCLUDE,
+      select: SALE_PRINTABLE_SELECT,
     });
 
     const saleIds = sales.map((s) => s.id);
 
-    const issuedTaxCandidates = saleIds.length
-      ? await prisma.taxCandidate.findMany({
-          where: {
-            branchId,
-            sourceType: 'SALE',
-            sourceId: { in: saleIds.map(String) },
-            document: {
-              is: {
-                documentType: 'OUTPUT_TAX_INVOICE',
-                status: 'REGISTERED',
-                issuedDocumentNumber: { not: null },
+    const [issuedTaxCandidates, payments] = saleIds.length
+      ? await Promise.all([
+          prisma.taxCandidate.findMany({
+            where: {
+              branchId,
+              sourceType: 'SALE',
+              sourceId: { in: saleIds.map(String) },
+              document: {
+                is: {
+                  documentType: 'OUTPUT_TAX_INVOICE',
+                  status: 'REGISTERED',
+                  issuedDocumentNumber: { not: null },
+                },
               },
             },
-          },
-          select: {
-            sourceId: true,
-            document: { select: { id: true, taxInvoiceKind: true, issuedDocumentNumber: true } },
-          },
-        })
-      : [];
+            select: {
+              sourceId: true,
+              document: { select: { id: true, taxInvoiceKind: true, issuedDocumentNumber: true } },
+            },
+          }),
+          prisma.payment.findMany({
+            where: { saleId: { in: saleIds }, isCancelled: false },
+            orderBy: { receivedAt: 'desc' },
+            select: { id: true, code: true, saleId: true, receivedAt: true, items: { select: { amount: true } } },
+          }),
+        ])
+      : [[], []];
+
     const issuedTaxBySaleId = new Map(
       issuedTaxCandidates.map((candidate) => [String(candidate.sourceId), candidate.document]),
     );
-
-    const payments = saleIds.length
-      ? await prisma.payment.findMany({
-          where: { saleId: { in: saleIds }, isCancelled: false },
-          orderBy: { receivedAt: 'desc' },
-          select: { id: true, code: true, saleId: true, receivedAt: true, items: { select: { amount: true } } },
-        })
-      : [];
 
     const paymentAgg = new Map();
     for (const p of payments) {
