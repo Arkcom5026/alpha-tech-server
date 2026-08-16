@@ -10,11 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { Client } = require('pg');
+const { requirePostgresTool } = require('./postgresClientTools');
 
 const SCHEMAS = ['public', 'legacy_tax'];
 const sourceUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 const outputDir = process.env.BACKUP_OUTPUT_DIR || path.join(process.cwd(), 'backups');
-const pgDumpPath = process.env.PG_DUMP_PATH || path.join(process.env.POSTGRES_CLIENT_BIN || '', 'pg_dump.exe');
 
 function fail(message) { console.error(`RECOVERY_BUNDLE_CAPTURE_FAILED: ${message}`); process.exit(1); }
 function checksum(filePath) { return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex'); }
@@ -31,7 +31,7 @@ function clientConfig(value) {
   return { connectionString: url.toString(), ssl: String(value).includes('supabase') ? { rejectUnauthorized: false } : false };
 }
 
-function runDump(args, env) {
+function runDump(pgDumpPath, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(pgDumpPath, args, { cwd: process.cwd(), env, shell: false, stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
@@ -43,7 +43,13 @@ function runDump(args, env) {
 
 async function main() {
   if (!sourceUrl) fail('DIRECT_URL or DATABASE_URL is required.');
-  if (!pgDumpPath || !fs.existsSync(pgDumpPath)) fail('PG_DUMP_PATH or POSTGRES_CLIENT_BIN must point to PostgreSQL 17 pg_dump.exe.');
+
+  let pgDump;
+  try {
+    pgDump = requirePostgresTool('pg_dump', { explicitPath: process.env.PG_DUMP_PATH });
+  } catch (error) {
+    fail(error.message || String(error));
+  }
 
   fs.mkdirSync(outputDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -65,7 +71,7 @@ async function main() {
       tableCounts[`${table.table_schema}.${table.table_name}`] = Number(result.rows[0].count);
     }
 
-    await runDump([
+    await runDump(pgDump.path, [
       '--schema=public', '--schema=legacy_tax', `--snapshot=${snapshot}`,
       '--no-owner', '--no-privileges', '--quote-all-identifiers', '--file', sqlPath,
     ], connectionEnvironment(sourceUrl));
@@ -76,11 +82,12 @@ async function main() {
       createdAt: new Date().toISOString(),
       databaseModified: false,
       schemas: SCHEMAS,
+      postgresClient: { pgDumpMajor: pgDump.major, pgDumpVersion: pgDump.versionText },
       files: { sqlFileName: path.basename(sqlPath), sqlFilePath: sqlPath, sha256: checksum(sqlPath) },
       tableCounts,
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({ result: 'PASS', databaseModified: false, sqlPath, manifestPath, sha256: manifest.files.sha256, checkedTables: Object.keys(tableCounts).length }, null, 2));
+    console.log(JSON.stringify({ result: 'PASS', databaseModified: false, pgDumpMajor: pgDump.major, sqlPath, manifestPath, sha256: manifest.files.sha256, checkedTables: Object.keys(tableCounts).length }, null, 2));
   } finally {
     await client.query('ROLLBACK').catch(() => undefined);
     await client.end().catch(() => undefined);
