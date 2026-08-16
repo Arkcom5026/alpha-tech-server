@@ -67,6 +67,9 @@ jobs:
       - name: Auth initial bootstrap performance contract
         run: node tests/auth-initial-bootstrap-performance.contract.test.js
 
+      - name: Sales printable performance contract
+        run: node tests/sales-printable-performance.contract.test.js
+
       - name: Canonical E2E authority cleanup contract
         run: node tests/canonical-e2e-authority-cleanup.contract.test.js
 
