@@ -5,13 +5,15 @@ require('dotenv').config()
 const { Client } = require('pg')
 
 const requiredFoundations = [
-  ['device_intake', 'RepairTrackingAccess'],
-  ['input_tax_receipt_links', 'InputTaxDocumentReceiptLink'],
-  ['supplier_payables', 'SupplierPayable'],
-  ['supplier_payment_allocations', 'SupplierPaymentAllocation'],
-  ['supplier_advances', 'SupplierAdvance'],
-  ['supplier_disputes', 'SupplierPayableDispute'],
-  ['pos_held_carts', 'PosHeldCart'],
+  ['device_category_enum', 'type', 'DeviceCategory'],
+  ['device_intake_table', 'relation', 'DeviceIntake'],
+  ['device_tracking_access', 'relation', 'RepairTrackingAccess'],
+  ['input_tax_receipt_links', 'relation', 'InputTaxDocumentReceiptLink'],
+  ['supplier_payables', 'relation', 'SupplierPayable'],
+  ['supplier_payment_allocations', 'relation', 'SupplierPaymentAllocation'],
+  ['supplier_advances', 'relation', 'SupplierAdvance'],
+  ['supplier_disputes', 'relation', 'SupplierPayableDispute'],
+  ['pos_held_carts', 'relation', 'PosHeldCart'],
 ]
 
 const buildClient = () => {
@@ -30,13 +32,18 @@ const buildClient = () => {
   })
 }
 
+const projectionFor = ([key, kind, name]) => {
+  const lookup = kind === 'type' ? 'to_regtype' : 'to_regclass'
+  return `${lookup}('public."${name}"') IS NOT NULL AS "${key}"`
+}
+
 async function main() {
   const client = buildClient()
   await client.connect()
 
   try {
     const projections = requiredFoundations
-      .map(([key, relation]) => `to_regclass('public."${relation}"') IS NOT NULL AS "${key}"`)
+      .map(projectionFor)
       .join(',\n      ')
 
     const result = await client.query(`
@@ -47,7 +54,7 @@ async function main() {
     const state = result.rows[0] || {}
     const missing = requiredFoundations
       .filter(([key]) => state[key] !== true)
-      .map(([key, relation]) => `${key} (${relation})`)
+      .map(([key, kind, name]) => `${key} (${kind}:${name})`)
 
     if (missing.length > 0) {
       throw new Error(
