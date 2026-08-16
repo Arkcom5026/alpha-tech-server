@@ -91,6 +91,7 @@ function applyRetentionForDir({ label, dir, days, pattern, apply }) {
   const files = listFilesRecursive(dir).filter((file) => pattern.test(file.fileName));
 
   const candidates = files.filter((file) => file.mtimeMs < cutoffMs);
+  const wouldDelete = [];
   const deleted = [];
   const kept = [];
   const failed = [];
@@ -103,7 +104,7 @@ function applyRetentionForDir({ label, dir, days, pattern, apply }) {
 
   for (const file of candidates) {
     if (!apply) {
-      deleted.push({ ...file, dryRun: true });
+      wouldDelete.push({ ...file, dryRun: true });
       continue;
     }
 
@@ -122,6 +123,7 @@ function applyRetentionForDir({ label, dir, days, pattern, apply }) {
     cutoffAt: new Date(cutoffMs).toISOString(),
     scannedFiles: files.length,
     deleteCandidates: candidates.length,
+    wouldDeleteFiles: wouldDelete,
     deletedFiles: deleted,
     keptFiles: kept.length,
     failedFiles: failed,
@@ -148,7 +150,8 @@ function renderTextReport(report) {
     lines.push(`Retention days   : ${target.days}`);
     lines.push(`Scanned files    : ${target.scannedFiles}`);
     lines.push(`Delete candidates: ${target.deleteCandidates}`);
-    lines.push(`Deleted/Dry-run  : ${target.deletedFiles.length}`);
+    lines.push(`Would delete     : ${target.wouldDeleteFiles.length}`);
+    lines.push(`Deleted          : ${target.deletedFiles.length}`);
     lines.push(`Remaining        : ${target.keptFiles}`);
     lines.push(`Failed           : ${target.failedFiles.length}`);
     lines.push('');
@@ -193,6 +196,7 @@ async function main() {
     log(`Retention   : ${target.days} day(s)`);
     log(`Scanned     : ${target.scannedFiles}`);
     log(`Candidates  : ${target.deleteCandidates}`);
+    log(`Would delete: ${target.wouldDeleteFiles.length}`);
     log(`Deleted     : ${target.deletedFiles.length}`);
     log(`Remaining   : ${target.keptFiles}`);
     log(`Failed      : ${target.failedFiles.length}`);
