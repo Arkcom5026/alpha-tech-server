@@ -2,7 +2,7 @@
 setlocal
 cd /d D:\alpha-tech\server
 
-REM Scheduled recovery authority: Workflow A always runs, Workflow B refreshes the approved Recovery/Test DB.
+REM Scheduled Recovery workflow authority: run the complete backup + Recovery DB refresh chain.
 REM Database URLs remain outside Git and are loaded by the Node recovery tooling from local env files.
 set "RECOVERY_STANDBY_SYNC_ENABLED=true"
 set "RECOVERY_DRILL_APPROVAL=ALPHATECH_RECOVERY_DRILL"
