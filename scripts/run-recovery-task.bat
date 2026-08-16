@@ -1,4 +1,4 @@
 @echo off
 cd /d D:\alpha-tech\server
-node recovery\jobRunner.js --backup-workflow --upload --retention
+node recovery\consolidatedRecoveryRunner.js
 exit /b %ERRORLEVEL%
