@@ -9,10 +9,11 @@
 //   post-backup stage owned by this same scheduled execution. It is disabled by
 //   default and remains behind explicit destructive-write approvals.
 //
-// Default scheduled behavior is intentionally unchanged:
-//   node recovery/consolidatedRecoveryRunner.js
-//     -> jobRunner.js --backup-workflow --upload --retention
-//     -> standby sync SKIPPED unless RECOVERY_STANDBY_SYNC_ENABLED=true
+// Safety rule:
+//   Workflow A invoked by this consolidated authority always runs local and R2
+//   retention in dry-run mode. This guarantee lives here (not only in a .bat)
+//   so direct Node, PowerShell, Task Scheduler, or wrapper invocation behaves
+//   identically even when machine-level apply variables are true.
 
 const fs = require('fs');
 const path = require('path');
@@ -38,6 +39,10 @@ const RUNNER_VERSION = 'ALPHATECH-CONSOLIDATED-RECOVERY-RUNNER-V1';
 const STANDBY_SYNC_ENABLED = String(process.env.RECOVERY_STANDBY_SYNC_ENABLED || 'false').toLowerCase() === 'true';
 const DRILL_APPROVAL = 'ALPHATECH_RECOVERY_DRILL';
 const RESET_CONFIRMATION = 'ALPHATECH_TEST_DB_RESET';
+const WORKFLOW_A_SAFE_ENV = Object.freeze({
+  RECOVERY_RETENTION_APPLY: 'false',
+  RECOVERY_R2_RETENTION_APPLY: 'false',
+});
 
 function nowIso() { return new Date().toISOString(); }
 function safeId(value) { return value.replace(/[:.]/g, '-'); }
@@ -60,11 +65,12 @@ function createLogger(runId) {
   return { log, logFile };
 }
 
-function run(command, args, logger) {
+function run(command, args, logger, envOverrides = {}) {
   return new Promise((resolve) => {
     logger.log(`▶️ Run: ${command} ${args.join(' ')}`);
     const child = spawn(command, args, {
       cwd: ROOT_DIR,
+      env: { ...process.env, ...envOverrides },
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -111,13 +117,14 @@ function latestRecoveryBundleManifest({ afterMs = 0 } = {}) {
 async function runWorkflowA(report, logger) {
   report.workflowA.status = 'RUNNING';
   report.workflowA.startedAt = nowIso();
+  report.workflowA.retentionMode = 'DRY_RUN_ENFORCED';
   const result = await run(process.execPath, [
     'recovery/jobRunner.js',
     '--backup-workflow',
     '--upload',
     '--retention',
     '--no-standby-restore',
-  ], logger);
+  ], logger, WORKFLOW_A_SAFE_ENV);
   report.workflowA.finishedAt = nowIso();
   report.workflowA.exitCode = result.exitCode;
   report.workflowA.status = result.ok ? 'PASS' : 'FAIL';
