@@ -20,8 +20,13 @@ assert.match(collector, /\/services\/\$\{encodeURIComponent\(serviceId\)\}/, 'co
 assert.match(collector, /\/logs\?\$\{params\.toString\(\)\}/, 'collector must fetch Render logs through the canonical logs endpoint');
 assert.match(collector, /Authorization:\s*`Bearer \$\{apiKey\}`/, 'collector must authenticate via bearer API key');
 assert.match(collector, /\[REDACTED\]/, 'collector must redact sensitive values before artifact publication');
-assert.match(collector, /Printable requests containing _ts/, 'summary must surface printable cache-bust regressions');
-assert.match(collector, /Duplicate candidates <=10s/, 'summary must surface duplicate request candidates');
+assert.match(collector, /const completedRequests = normalized\.filter/, 'request metrics must be based on completed HTTP access logs');
+assert.match(collector, /Number\.isInteger\(item\.status\)/, 'completed request authority must require an HTTP status');
+assert.match(collector, /extractRequestId/, 'collector must extract request IDs for correlation');
+assert.match(collector, /printableWithCacheBustTs = printable\.filter/, 'printable _ts counts must be scoped to completed printable requests');
+assert.match(collector, /Rapid-repeat candidates <=10s/, 'summary must surface rapid-repeat review candidates');
+assert.match(collector, /does not prove an accidental duplicate request/, 'summary must not present rapid repeats as proven duplicates');
+assert.doesNotMatch(collector, /Duplicate candidates <=10s/, 'legacy duplicate wording must not remain authoritative');
 assert.match(collector, /Slow requests >=500ms/, 'summary must surface slow request candidates');
 assert.match(collector, /render-logs\.json/, 'collector must publish raw sanitized log evidence');
 assert.match(collector, /summary\.json/, 'collector must publish machine-readable summary evidence');
