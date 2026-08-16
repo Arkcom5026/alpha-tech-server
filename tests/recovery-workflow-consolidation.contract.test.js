@@ -21,6 +21,13 @@ assert.ok(!scheduledBat.includes('jobRunner.js'));
 assert.ok(!scheduledBat.includes('captureRecoveryBundle.js'));
 assert.ok(!scheduledBat.includes('restoreRecoveryBundle.js'));
 
+// Scheduled retention is always analysis/dry-run only. Destructive local or R2
+// retention must never be inherited accidentally from a machine-level env var.
+assert.ok(scheduledBat.includes('RECOVERY_RETENTION_APPLY=false'));
+assert.ok(scheduledBat.includes('RECOVERY_R2_RETENTION_APPLY=false'));
+assert.ok(!scheduledBat.includes('RECOVERY_RETENTION_APPLY=true'));
+assert.ok(!scheduledBat.includes('RECOVERY_R2_RETENTION_APPLY=true'));
+
 // Workflow A remains the mandatory first stage and keeps the existing backup,
 // verification, upload, and retention authority in jobRunner.js.
 assert.ok(consolidated.includes("'recovery/jobRunner.js'"));
