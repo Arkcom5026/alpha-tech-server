@@ -36,6 +36,8 @@ const valueOf = (entry, ...keys) => {
   return null;
 };
 
+const messageOf = (entry) => String(firstValue(entry?.message, entry?.text, entry?.log, '') || '');
+
 const sanitizeText = (value) => {
   if (typeof value !== 'string') return value;
   return value
@@ -63,8 +65,7 @@ const parseDurationMs = (entry) => {
     valueOf(entry, 'durationMs', 'duration_ms', 'responseTimeMS', 'responseTimeMs'),
   ));
   if (Number.isFinite(direct) && direct >= 0) return direct;
-  const message = String(firstValue(entry?.message, entry?.text, entry?.log, '') || '');
-  const matches = [...message.matchAll(/(?:responseTimeMS[=:\s]+|\s-\s)(\d+(?:\.\d+)?)\s*ms\b/gi)];
+  const matches = [...messageOf(entry).matchAll(/(?:responseTimeMS[=:\s]+|\s-\s)(\d+(?:\.\d+)?)\s*ms\b/gi)];
   if (!matches.length) return null;
   const candidate = Number(matches[matches.length - 1][1]);
   return Number.isFinite(candidate) ? candidate : null;
@@ -86,27 +87,42 @@ const normalizeTimestamp = (entry) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
+const extractTarget = (entry) => {
+  const direct = valueOf(entry, 'url', 'requestUrl', 'request_url', 'target');
+  if (direct) return String(direct);
+  const match = messageOf(entry).match(/\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\S+)/i);
+  return match?.[1] || null;
+};
+
 const extractPath = (entry) => {
   const direct = valueOf(entry, 'path', 'requestPath', 'request_path');
   if (direct) return String(direct).split('?')[0];
-  const message = String(firstValue(entry?.message, entry?.text, entry?.log, '') || '');
-  const match = message.match(/\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+([^\s?]+)(?:\?[^\s]*)?/i);
-  return match?.[1] || null;
+  const target = extractTarget(entry);
+  return target ? String(target).split('?')[0] : null;
 };
 
 const extractMethod = (entry) => {
   const direct = valueOf(entry, 'method');
   if (direct) return String(direct).toUpperCase();
-  const message = String(firstValue(entry?.message, entry?.text, entry?.log, '') || '');
-  return message.match(/\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/i)?.[1]?.toUpperCase() || null;
+  return messageOf(entry).match(/\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/i)?.[1]?.toUpperCase() || null;
 };
 
 const extractStatus = (entry) => {
   const direct = Number(valueOf(entry, 'statusCode', 'status_code', 'status'));
   if (Number.isInteger(direct) && direct >= 100 && direct <= 599) return direct;
-  const message = String(firstValue(entry?.message, entry?.text, entry?.log, '') || '');
-  const match = message.match(/\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\S+\s+(\d{3})\b/i);
+  const match = messageOf(entry).match(/\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\S+\s+(\d{3})\b/i);
   return match ? Number(match[1]) : null;
+};
+
+const extractRequestId = (entry) => {
+  const direct = valueOf(entry, 'reqId', 'requestId', 'request_id');
+  if (direct) return String(direct);
+  const message = messageOf(entry);
+  return firstValue(
+    message.match(/\breqId=([A-Za-z0-9-]+)/i)?.[1],
+    message.match(/\breqId\s*:\s*['"]?([A-Za-z0-9-]+)/i)?.[1],
+    message.match(/\brequestId=([A-Za-z0-9-]+)/i)?.[1],
+  ) || null;
 };
 
 const end = new Date();
@@ -151,34 +167,53 @@ const normalized = sanitizedLogs.map((entry, index) => ({
   index,
   timestamp: normalizeTimestamp(entry),
   method: extractMethod(entry),
+  target: extractTarget(entry),
   path: extractPath(entry),
   status: extractStatus(entry),
+  requestId: extractRequestId(entry),
   durationMs: parseDurationMs(entry),
   level: valueOf(entry, 'level'),
   type: valueOf(entry, 'type'),
   entry,
 }));
 
-const requests = normalized.filter((item) => item.method || item.status || item.path);
-const errors4xx = requests.filter((item) => item.status >= 400 && item.status < 500);
-const errors5xx = requests.filter((item) => item.status >= 500 && item.status < 600);
-const slow = requests.filter((item) => Number.isFinite(item.durationMs) && item.durationMs >= 500);
-const printable = requests.filter((item) => item.path === '/api/sales/printable' || item.path === '/api/sales/printable-sales');
+const requestLikeLogs = normalized.filter((item) => item.method || item.status || item.path);
+const completedRequests = normalized.filter(
+  (item) => item.method && item.path && Number.isInteger(item.status),
+);
+const errors4xx = completedRequests.filter((item) => item.status >= 400 && item.status < 500);
+const errors5xx = completedRequests.filter((item) => item.status >= 500 && item.status < 600);
+const slow = completedRequests.filter((item) => Number.isFinite(item.durationMs) && item.durationMs >= 500);
+const printable = completedRequests.filter(
+  (item) => item.path === '/api/sales/printable' || item.path === '/api/sales/printable-sales',
+);
+const printableWithCacheBustTs = printable.filter((item) => /[?&]_ts=/.test(item.target || ''));
 
-const duplicateCandidates = [];
+const rapidRepeatCandidates = [];
 const byKey = new Map();
-for (const item of requests) {
+for (const item of completedRequests) {
   if (!item.timestamp || !item.path) continue;
-  const key = `${item.method || 'UNKNOWN'} ${item.path}`;
+  const key = `${item.method} ${item.path}`;
   const previous = byKey.get(key);
   const currentMs = Date.parse(item.timestamp);
   if (previous) {
     const gapMs = currentMs - previous.timeMs;
     if (gapMs >= 0 && gapMs <= 10_000) {
-      duplicateCandidates.push({ key, first: previous.timestamp, second: item.timestamp, gapMs });
+      rapidRepeatCandidates.push({
+        key,
+        first: previous.timestamp,
+        second: item.timestamp,
+        gapMs,
+        firstRequestId: previous.requestId,
+        secondRequestId: item.requestId,
+      });
     }
   }
-  byKey.set(key, { timeMs: currentMs, timestamp: item.timestamp });
+  byKey.set(key, {
+    timeMs: currentMs,
+    timestamp: item.timestamp,
+    requestId: item.requestId,
+  });
 }
 
 const countBy = (items, selector) => {
@@ -205,17 +240,28 @@ const summary = {
   window: snapshot.window,
   service: snapshot.service,
   totalLogs: sanitizedLogs.length,
-  requestLikeLogs: requests.length,
+  requestLikeLogs: requestLikeLogs.length,
+  completedRequests: completedRequests.length,
   http4xx: errors4xx.length,
   http5xx: errors5xx.length,
   slowRequests500ms: slow.length,
   printableRequests: printable.length,
-  printableWithCacheBustTs: sanitizedLogs.filter((entry) => /\/api\/sales\/printable[^\n]*[?&]_ts=/i.test(JSON.stringify(entry))).length,
-  duplicateCandidates10s: duplicateCandidates.length,
-  topPaths: countBy(requests, (item) => item.path).map(([pathName, count]) => ({ path: pathName, count })),
-  topStatuses: countBy(requests, (item) => item.status ? String(item.status) : null).map(([status, count]) => ({ status: Number(status), count })),
-  slowest: slow.sort((a, b) => b.durationMs - a.durationMs).slice(0, 20).map(({ timestamp, method, path: requestPath, status, durationMs }) => ({ timestamp, method, path: requestPath, status, durationMs })),
-  duplicateCandidates: duplicateCandidates.slice(0, 50),
+  printableWithCacheBustTs: printableWithCacheBustTs.length,
+  rapidRepeatCandidates10s: rapidRepeatCandidates.length,
+  topPaths: countBy(completedRequests, (item) => item.path).map(([pathName, count]) => ({ path: pathName, count })),
+  topStatuses: countBy(completedRequests, (item) => String(item.status)).map(([status, count]) => ({ status: Number(status), count })),
+  slowest: slow
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 20)
+    .map(({ timestamp, method, path: requestPath, status, durationMs, requestId }) => ({
+      timestamp,
+      method,
+      path: requestPath,
+      status,
+      durationMs,
+      requestId,
+    })),
+  rapidRepeatCandidates: rapidRepeatCandidates.slice(0, 50),
 };
 
 const summaryText = [
@@ -225,21 +271,23 @@ const summaryText = [
   `Service: ${summary.service.name || 'unknown'} (${serviceId})`,
   `Total logs: ${summary.totalLogs}`,
   `Request-like logs: ${summary.requestLikeLogs}`,
+  `Completed HTTP requests: ${summary.completedRequests}`,
   `HTTP 4xx: ${summary.http4xx}`,
   `HTTP 5xx: ${summary.http5xx}`,
   `Slow requests >=500ms: ${summary.slowRequests500ms}`,
   `Printable requests: ${summary.printableRequests}`,
   `Printable requests containing _ts: ${summary.printableWithCacheBustTs}`,
-  `Duplicate candidates <=10s: ${summary.duplicateCandidates10s}`,
+  `Rapid-repeat candidates <=10s: ${summary.rapidRepeatCandidates10s}`,
+  'Rapid repeats are a review signal only; repeated method/path does not prove an accidental duplicate request.',
   '',
   'Top paths:',
   ...summary.topPaths.map((item) => `- ${item.count} ${item.path}`),
   '',
   'Slowest requests:',
-  ...summary.slowest.map((item) => `- ${item.durationMs}ms ${item.status || '-'} ${item.method || '-'} ${item.path || '-'}`),
+  ...summary.slowest.map((item) => `- ${item.durationMs}ms ${item.status || '-'} ${item.method || '-'} ${item.path || '-'} reqId=${item.requestId || '-'}`),
   '',
-  'Duplicate candidates:',
-  ...summary.duplicateCandidates.map((item) => `- ${item.key} gap=${item.gapMs}ms ${item.first} -> ${item.second}`),
+  'Rapid-repeat candidates:',
+  ...summary.rapidRepeatCandidates.map((item) => `- ${item.key} gap=${item.gapMs}ms reqIds=${item.firstRequestId || '-'} -> ${item.secondRequestId || '-'} ${item.first} -> ${item.second}`),
 ].join('\n');
 
 await mkdir(outputDir, { recursive: true });
