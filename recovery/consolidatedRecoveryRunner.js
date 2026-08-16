@@ -1,19 +1,21 @@
 'use strict';
 
-// AlphaTech consolidated Recovery workflow.
+// AlphaTech canonical Recovery workflow.
 //
-// Authority model:
-//   Workflow A remains mandatory and canonical for health/backup/verify/upload/
-//   retention through recovery/jobRunner.js.
-//   Workflow B (PostgreSQL Production -> Recovery/Standby clone) is an optional
-//   post-backup stage owned by this same scheduled execution. It is disabled by
-//   default and remains behind explicit destructive-write approvals.
+// One scheduled execution owns the complete recovery chain:
+//   BACKUP_PIPELINE -> RECOVERY_CAPTURE -> RECOVERY_RESTORE -> FINAL_REPORT
 //
-// Safety rule:
-//   Workflow A invoked by this consolidated authority always runs local and R2
-//   retention in dry-run mode. This guarantee lives here (not only in a .bat)
-//   so direct Node, PowerShell, Task Scheduler, or wrapper invocation behaves
-//   identically even when machine-level apply variables are true.
+// recovery/jobRunner.js remains an internal backup/verify/upload/retention
+// component. It is not a separately scheduled workflow. Recovery capture and
+// restore are subsequent steps of this same canonical workflow.
+//
+// Safety rules:
+//   - scheduled/local/R2 retention is forced to dry-run by this authority;
+//   - Production capture remains read-only;
+//   - Recovery restore requires explicit Test/Recovery approvals and the
+//     independent Test Database Authority fence in restoreRecoveryBundle.js;
+//   - direct invocation is safe-by-default because Recovery DB sync is disabled
+//     unless RECOVERY_STANDBY_SYNC_ENABLED=true.
 
 const fs = require('fs');
 const path = require('path');
@@ -36,13 +38,20 @@ const REPORT_DIR = path.join(RECOVERY_DIR, 'reports');
 const LOG_DIR = path.join(RECOVERY_DIR, 'logs');
 const BACKUPS_DIR = process.env.BACKUP_OUTPUT_DIR || path.join(ROOT_DIR, 'backups');
 
-const RUNNER_VERSION = 'ALPHATECH-CONSOLIDATED-RECOVERY-RUNNER-V1';
-const STANDBY_SYNC_ENABLED = String(process.env.RECOVERY_STANDBY_SYNC_ENABLED || 'false').toLowerCase() === 'true';
+const RUNNER_VERSION = 'ALPHATECH-RECOVERY-WORKFLOW-V2';
+const RECOVERY_SYNC_ENABLED = String(process.env.RECOVERY_STANDBY_SYNC_ENABLED || 'false').toLowerCase() === 'true';
 const DRILL_APPROVAL = 'ALPHATECH_RECOVERY_DRILL';
 const RESET_CONFIRMATION = 'ALPHATECH_TEST_DB_RESET';
-const WORKFLOW_A_SAFE_ENV = Object.freeze({
+const BACKUP_SAFE_ENV = Object.freeze({
   RECOVERY_RETENTION_APPLY: 'false',
   RECOVERY_R2_RETENTION_APPLY: 'false',
+});
+
+const STEP = Object.freeze({
+  BACKUP_PIPELINE: 'BACKUP_PIPELINE',
+  RECOVERY_CAPTURE: 'RECOVERY_CAPTURE',
+  RECOVERY_RESTORE: 'RECOVERY_RESTORE',
+  FINAL_REPORT: 'FINAL_REPORT',
 });
 
 function nowIso() { return new Date().toISOString(); }
@@ -53,6 +62,35 @@ function redact(value) {
   return String(value || '')
     .replace(/(postgres(?:ql)?:\/\/[^:\s]+:)[^@\s]+@/gi, '$1***@')
     .replace(/(DATABASE_URL|DIRECT_URL|RESTORE_DATABASE_URL|RECOVERY_DATABASE_URL|S3_SECRET_ACCESS_KEY|R2_SECRET_ACCESS_KEY)\s*[=:]\s*[^\s]+/gi, '$1=[HIDDEN]');
+}
+
+function initialStep(name) {
+  return { name, status: 'PENDING', startedAt: null, finishedAt: null, exitCode: null, error: null };
+}
+
+function startStep(report, name) {
+  const step = report.workflow.steps[name];
+  step.status = 'RUNNING';
+  step.startedAt = nowIso();
+  return step;
+}
+
+function finishStep(report, name, { ok, exitCode = ok ? 0 : 1, error = null, details = {} }) {
+  const step = report.workflow.steps[name];
+  step.finishedAt = nowIso();
+  step.exitCode = exitCode;
+  step.status = ok ? 'PASS' : 'FAIL';
+  step.error = error;
+  Object.assign(step, details);
+  return step;
+}
+
+function skipStep(report, name, reason) {
+  const step = report.workflow.steps[name];
+  step.status = 'SKIPPED';
+  step.finishedAt = nowIso();
+  step.reason = reason;
+  return step;
 }
 
 function createLogger(runId) {
@@ -91,15 +129,15 @@ function run(command, args, logger, envOverrides = {}) {
   });
 }
 
-function requireStandbyApprovals() {
+function requireRecoverySyncApprovals() {
   if (process.env.RECOVERY_DRILL_APPROVAL !== DRILL_APPROVAL) {
-    throw new Error(`RECOVERY_DRILL_APPROVAL must equal ${DRILL_APPROVAL} before standby sync.`);
+    throw new Error(`RECOVERY_DRILL_APPROVAL must equal ${DRILL_APPROVAL} before Recovery DB sync.`);
   }
   if (process.env.RESTORE_DATABASE_RESET_CONFIRMATION !== RESET_CONFIRMATION) {
-    throw new Error(`RESTORE_DATABASE_RESET_CONFIRMATION must equal ${RESET_CONFIRMATION} before standby sync.`);
+    throw new Error(`RESTORE_DATABASE_RESET_CONFIRMATION must equal ${RESET_CONFIRMATION} before Recovery DB sync.`);
   }
   if (!String(process.env.RESTORE_DATABASE_URL || process.env.RECOVERY_DATABASE_URL || '').trim()) {
-    throw new Error('RESTORE_DATABASE_URL or RECOVERY_DATABASE_URL is required before standby sync.');
+    throw new Error('RESTORE_DATABASE_URL or RECOVERY_DATABASE_URL is required before Recovery DB sync.');
   }
 }
 
@@ -115,21 +153,21 @@ function latestRecoveryBundleManifest({ afterMs = 0 } = {}) {
     .sort((a, b) => b.mtimeMs - a.mtimeMs)[0] || null;
 }
 
-async function runWorkflowA(report, logger) {
-  report.workflowA.status = 'RUNNING';
-  report.workflowA.startedAt = nowIso();
-  report.workflowA.retentionMode = 'DRY_RUN_ENFORCED';
+async function runBackupPipeline(report, logger) {
+  const step = startStep(report, STEP.BACKUP_PIPELINE);
+  step.retentionMode = 'DRY_RUN_ENFORCED';
+
   const result = await run(process.execPath, [
     'recovery/jobRunner.js',
     '--backup-workflow',
     '--upload',
     '--retention',
     '--no-standby-restore',
-  ], logger, WORKFLOW_A_SAFE_ENV);
+  ], logger, BACKUP_SAFE_ENV);
 
   try {
-    const normalized = normalizeLatestJobRunnerReport({ expectedStartedAt: report.workflowA.startedAt });
-    report.workflowA.report = {
+    const normalized = normalizeLatestJobRunnerReport({ expectedStartedAt: step.startedAt });
+    step.report = {
       status: 'PASS',
       jobId: normalized.jobId,
       reportStatus: normalized.reportStatus,
@@ -137,73 +175,85 @@ async function runWorkflowA(report, logger) {
       latestJsonPath: normalized.latestJsonPath,
       latestTxtPath: normalized.latestTxtPath,
     };
-    logger.log(`🧾 Workflow A report normalized: REPORT=${normalized.reportStatus} exitCode=${normalized.exitCode}`);
+    logger.log(`🧾 Backup pipeline report normalized: REPORT=${normalized.reportStatus} exitCode=${normalized.exitCode}`);
   } catch (error) {
     const message = redact(error.stack || error.message || String(error));
-    report.workflowA.report = { status: 'FAIL', error: message };
-    report.workflowA.finishedAt = nowIso();
-    report.workflowA.exitCode = result.exitCode;
-    report.workflowA.status = 'FAIL';
-    report.workflowA.error = `Workflow A report normalization failed: ${message}`;
-    return { ok: false, exitCode: 12, error: report.workflowA.error };
+    step.report = { status: 'FAIL', error: message };
+    finishStep(report, STEP.BACKUP_PIPELINE, {
+      ok: false,
+      exitCode: 12,
+      error: `Backup pipeline report normalization failed: ${message}`,
+    });
+    return { ok: false, exitCode: 12, error: step.error };
   }
 
-  report.workflowA.finishedAt = nowIso();
-  report.workflowA.exitCode = result.exitCode;
-  report.workflowA.status = result.ok ? 'PASS' : 'FAIL';
-  report.workflowA.error = result.error || null;
+  finishStep(report, STEP.BACKUP_PIPELINE, {
+    ok: result.ok,
+    exitCode: result.exitCode,
+    error: result.error || null,
+  });
   return result;
 }
 
-async function runWorkflowB(report, logger) {
-  if (!STANDBY_SYNC_ENABLED) {
-    report.workflowB.status = 'SKIPPED';
-    report.workflowB.reason = 'RECOVERY_STANDBY_SYNC_ENABLED is not true';
-    logger.log('⏭️ Standby sync skipped: RECOVERY_STANDBY_SYNC_ENABLED is not true.');
+async function runRecoveryCapture(report, logger) {
+  if (!RECOVERY_SYNC_ENABLED) {
+    skipStep(report, STEP.RECOVERY_CAPTURE, 'RECOVERY_STANDBY_SYNC_ENABLED is not true');
+    skipStep(report, STEP.RECOVERY_RESTORE, 'Recovery capture is disabled');
+    logger.log('⏭️ Recovery DB sync skipped: RECOVERY_STANDBY_SYNC_ENABLED is not true.');
     return { ok: true, skipped: true, exitCode: 0 };
   }
 
-  requireStandbyApprovals();
-  report.workflowB.status = 'RUNNING';
-  report.workflowB.startedAt = nowIso();
-
+  requireRecoverySyncApprovals();
+  startStep(report, STEP.RECOVERY_CAPTURE);
   const captureStartedMs = Date.now();
-  const capture = await run(process.execPath, ['recovery/captureRecoveryBundle.js'], logger);
-  report.workflowB.capture = {
-    status: capture.ok ? 'PASS' : 'FAIL',
-    exitCode: capture.exitCode,
-    error: capture.error || null,
-  };
-  if (!capture.ok) {
-    report.workflowB.status = 'FAIL';
-    report.workflowB.finishedAt = nowIso();
-    report.workflowB.error = 'Recovery bundle capture failed';
-    return capture;
+  const result = await run(process.execPath, ['recovery/captureRecoveryBundle.js'], logger);
+
+  if (!result.ok) {
+    finishStep(report, STEP.RECOVERY_CAPTURE, {
+      ok: false,
+      exitCode: result.exitCode,
+      error: result.error || 'Recovery bundle capture failed',
+    });
+    skipStep(report, STEP.RECOVERY_RESTORE, 'Recovery capture failed');
+    return result;
   }
 
   const latest = latestRecoveryBundleManifest({ afterMs: captureStartedMs - 5000 });
   if (!latest) {
-    report.workflowB.status = 'FAIL';
-    report.workflowB.finishedAt = nowIso();
-    report.workflowB.error = 'New recovery bundle manifest not found after capture';
-    return { ok: false, exitCode: 31, error: report.workflowB.error };
+    finishStep(report, STEP.RECOVERY_CAPTURE, {
+      ok: false,
+      exitCode: 31,
+      error: 'New recovery bundle manifest not found after capture',
+    });
+    skipStep(report, STEP.RECOVERY_RESTORE, 'Recovery bundle manifest missing');
+    return { ok: false, exitCode: 31, error: report.workflow.steps[STEP.RECOVERY_CAPTURE].error };
   }
 
-  report.workflowB.manifestPath = latest.filePath;
-  const restore = await run(process.execPath, [
+  finishStep(report, STEP.RECOVERY_CAPTURE, {
+    ok: true,
+    exitCode: 0,
+    details: { manifestPath: latest.filePath },
+  });
+  return { ok: true, exitCode: 0, manifestPath: latest.filePath };
+}
+
+async function runRecoveryRestore(report, logger, manifestPath) {
+  if (!RECOVERY_SYNC_ENABLED) return { ok: true, skipped: true, exitCode: 0 };
+
+  startStep(report, STEP.RECOVERY_RESTORE);
+  const result = await run(process.execPath, [
     'recovery/restoreRecoveryBundle.js',
-    '--manifest', latest.filePath,
+    '--manifest', manifestPath,
     '--yes',
   ], logger);
-  report.workflowB.restore = {
-    status: restore.ok ? 'PASS' : 'FAIL',
-    exitCode: restore.exitCode,
-    error: restore.error || null,
-  };
-  report.workflowB.finishedAt = nowIso();
-  report.workflowB.status = restore.ok ? 'PASS' : 'FAIL';
-  report.workflowB.error = restore.error || null;
-  return restore;
+
+  finishStep(report, STEP.RECOVERY_RESTORE, {
+    ok: result.ok,
+    exitCode: result.exitCode,
+    error: result.error || null,
+    details: { manifestPath },
+  });
+  return result;
 }
 
 async function main() {
@@ -218,42 +268,65 @@ async function main() {
     startedAt,
     finishedAt: null,
     ok: false,
-    standbySyncEnabled: STANDBY_SYNC_ENABLED,
-    workflowA: { status: 'PENDING' },
-    workflowB: { status: 'PENDING' },
+    recoverySyncEnabled: RECOVERY_SYNC_ENABLED,
+    workflow: {
+      status: 'RUNNING',
+      steps: {
+        [STEP.BACKUP_PIPELINE]: initialStep(STEP.BACKUP_PIPELINE),
+        [STEP.RECOVERY_CAPTURE]: initialStep(STEP.RECOVERY_CAPTURE),
+        [STEP.RECOVERY_RESTORE]: initialStep(STEP.RECOVERY_RESTORE),
+        [STEP.FINAL_REPORT]: initialStep(STEP.FINAL_REPORT),
+      },
+    },
   };
 
   let exitCode = 0;
   try {
     logger.log('============================================================');
-    logger.log(`🧭 AlphaTech Consolidated Recovery ${RUNNER_VERSION}`);
+    logger.log(`🧭 AlphaTech Recovery Workflow ${RUNNER_VERSION}`);
     logger.log('============================================================');
 
-    const workflowA = await runWorkflowA(report, logger);
-    if (!workflowA.ok) {
+    const backup = await runBackupPipeline(report, logger);
+    if (!backup.ok) {
+      skipStep(report, STEP.RECOVERY_CAPTURE, 'Backup pipeline failed');
+      skipStep(report, STEP.RECOVERY_RESTORE, 'Backup pipeline failed');
       exitCode = 10;
       return;
     }
 
-    const workflowB = await runWorkflowB(report, logger);
-    if (!workflowB.ok) {
+    const capture = await runRecoveryCapture(report, logger);
+    if (!capture.ok) {
       exitCode = 20;
       return;
+    }
+
+    if (!capture.skipped) {
+      const restore = await runRecoveryRestore(report, logger, capture.manifestPath);
+      if (!restore.ok) {
+        exitCode = 30;
+        return;
+      }
     }
   } catch (error) {
     exitCode = 1;
     report.error = redact(error.stack || error.message || String(error));
-    logger.log(`❌ Consolidated recovery failed: ${report.error}`);
+    logger.log(`❌ Recovery workflow failed: ${report.error}`);
   } finally {
+    const finalStep = startStep(report, STEP.FINAL_REPORT);
     report.finishedAt = nowIso();
     report.exitCode = exitCode;
     report.ok = exitCode === 0;
+    report.workflow.status = report.ok ? 'SUCCESS' : 'FAILED';
+    finalStep.finishedAt = nowIso();
+    finalStep.exitCode = 0;
+    finalStep.status = 'PASS';
+
     const jsonPath = path.join(REPORT_DIR, `consolidated-workflow-${runId}.json`);
     const latestPath = path.join(REPORT_DIR, 'consolidated-workflow.latest.json');
     writeJson(jsonPath, report);
     writeJson(latestPath, report);
-    logger.log(`🧾 Consolidated report: ${jsonPath}`);
-    logger.log(`${report.ok ? '✅' : '❌'} Consolidated result: ${report.ok ? 'PASS' : 'FAIL'} exitCode=${exitCode}`);
+    logger.log(`🧾 Recovery workflow report: ${jsonPath}`);
+    logger.log(`${report.ok ? '✅' : '❌'} Recovery workflow result: ${report.ok ? 'PASS' : 'FAIL'} exitCode=${exitCode}`);
     process.exitCode = exitCode;
   }
 }
