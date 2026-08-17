@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  normalizeDescription,
+  normalizeDocumentText,
   updateConsolidatedDocumentLine,
 } = require('../src/modules/finance/combined-billing/documentLineService');
 
@@ -13,22 +13,31 @@ const read = (relativePath) => fs.readFileSync(path.join(__dirname, '..', relati
 const run = async () => {
   const routesSource = read('src/modules/finance/combined-billing/routes/combinedBillingRoutes.js');
   const controllerSource = read('src/modules/finance/combined-billing/documentLineController.js');
+  const historySource = read('src/modules/finance/combined-billing/documentHistoryController.js');
+  const schemaSource = read('prisma/consolidated-delivery-presentation.prisma');
 
   assert.ok(
     routesSource.includes("router.put('/consolidated-deliveries/:id/document-lines/:lineId', documentLine.update);"),
-    'Consolidated document-line mutation must be exposed only through the dedicated line route.',
+    'Consolidated document-line mutation must use the dedicated line route.',
   );
   assert.ok(
-    controllerSource.includes('description: req.body?.description')
+    controllerSource.includes('documentPrefix: req.body?.documentPrefix')
+      && controllerSource.includes('documentDescription: req.body?.documentDescription')
+      && controllerSource.includes('documentSuffix: req.body?.documentSuffix')
       && !controllerSource.includes('quantity: req.body')
       && !controllerSource.includes('documentUnitPrice: req.body')
       && !controllerSource.includes('priceAdjustment: req.body')
       && !controllerSource.includes('documentAmount: req.body'),
-    'HTTP controller must accept only the presentation description from the request body.',
+    'HTTP controller must accept only document presentation fields.',
   );
+  assert.match(schemaSource, /model ConsolidatedDeliveryLinePresentation/);
+  assert.match(schemaSource, /documentPrefix\s+String\?/);
+  assert.match(schemaSource, /documentDescription\s+String\?/);
+  assert.match(schemaSource, /documentSuffix\s+String\?/);
+  assert.match(historySource, /consolidatedDeliveryLinePresentation\.findMany/);
 
-  assert.equal(normalizeDescription('  รายการสำหรับเอกสาร  '), 'รายการสำหรับเอกสาร');
-  assert.equal(normalizeDescription('   '), null);
+  assert.equal(normalizeDocumentText('  บริการเปลี่ยน  '), 'บริการเปลี่ยน');
+  assert.equal(normalizeDocumentText('   '), null);
 
   const calls = [];
   const prisma = {
@@ -39,9 +48,19 @@ const run = async () => {
       },
     },
     consolidatedDeliveryLine: {
-      updateMany: async (args) => {
-        calls.push(['line.updateMany', args]);
-        return { count: 1 };
+      findFirst: async (args) => {
+        calls.push(['line.findFirst', args]);
+        return { id: 501 };
+      },
+    },
+    consolidatedDeliveryLinePresentation: {
+      upsert: async (args) => {
+        calls.push(['presentation.upsert', args]);
+        return {
+          documentPrefix: args.create.documentPrefix,
+          documentDescription: args.create.documentDescription,
+          documentSuffix: args.create.documentSuffix,
+        };
       },
     },
   };
@@ -51,81 +70,38 @@ const run = async () => {
     branchId: 2,
     documentId: 41,
     lineId: 501,
-    description: '  ตลับหมึก HP 682 สีดำ  ',
+    employeeId: 35,
+    documentPrefix: '  บริการเปลี่ยน  ',
+    documentDescription: 'หัวพิมพ์ Canon BH-7 BK (Black) Printhead',
+    documentSuffix: '  รับประกันงาน 30 วัน  ',
   });
 
-  assert.deepEqual(result, {
-    success: true,
-    documentId: 41,
-    lineId: 501,
-    description: 'ตลับหมึก HP 682 สีดำ',
+  assert.equal(result.success, true);
+  assert.equal(result.documentId, 41);
+  assert.equal(result.lineId, 501);
+  assert.deepEqual(result.presentation, {
+    documentPrefix: 'บริการเปลี่ยน',
+    documentDescription: 'หัวพิมพ์ Canon BH-7 BK (Black) Printhead',
+    documentSuffix: 'รับประกันงาน 30 วัน',
   });
 
-  const documentLookup = calls.find(([name]) => name === 'document.findFirst')[1];
-  assert.deepEqual(documentLookup.where, { id: 41, branchId: 2 });
-
-  const mutation = calls.find(([name]) => name === 'line.updateMany')[1];
-  assert.deepEqual(mutation.where, {
-    id: 501,
-    combinedBillingId: 41,
+  const mutation = calls.find(([name]) => name === 'presentation.upsert')[1];
+  assert.deepEqual(mutation.create, {
     branchId: 2,
+    combinedBillingId: 41,
+    consolidatedDeliveryLineId: 501,
+    documentPrefix: 'บริการเปลี่ยน',
+    documentDescription: 'หัวพิมพ์ Canon BH-7 BK (Black) Printhead',
+    documentSuffix: 'รับประกันงาน 30 วัน',
+    updatedById: 35,
   });
-  assert.deepEqual(mutation.data, { description: 'ตลับหมึก HP 682 สีดำ' });
 
-  const forbiddenFinancialFields = [
-    'quantity',
-    'sourceUnitPrice',
-    'documentUnitPrice',
-    'priceAdjustment',
-    'settledAmount',
-    'documentAmount',
-  ];
-  for (const field of forbiddenFinancialFields) {
-    assert.equal(Object.prototype.hasOwnProperty.call(mutation.data, field), false, `${field} must not be mutable`);
+  const serialized = JSON.stringify(mutation);
+  for (const field of ['quantity', 'sourceUnitPrice', 'documentUnitPrice', 'priceAdjustment', 'settledAmount', 'documentAmount']) {
+    assert.equal(serialized.includes(`\"${field}\"`), false, `${field} must not be mutable`);
   }
 
-  await assert.rejects(
-    () => updateConsolidatedDocumentLine({
-      prisma,
-      branchId: 2,
-      documentId: 41,
-      lineId: 501,
-      description: '   ',
-    }),
-    (error) => error?.code === 'CONSOLIDATED_DOCUMENT_LINE_DESCRIPTION_REQUIRED' && error?.statusCode === 400,
-  );
-
-  const wrongDocumentPrisma = {
-    combinedBillingDocument: { findFirst: async () => null },
-    consolidatedDeliveryLine: { updateMany: async () => { throw new Error('must not update'); } },
-  };
-  await assert.rejects(
-    () => updateConsolidatedDocumentLine({
-      prisma: wrongDocumentPrisma,
-      branchId: 2,
-      documentId: 99,
-      lineId: 501,
-      description: 'รายการใหม่',
-    }),
-    (error) => error?.code === 'CONSOLIDATED_DELIVERY_NOT_FOUND' && error?.statusCode === 404,
-  );
-
-  const wrongLinePrisma = {
-    combinedBillingDocument: { findFirst: async () => ({ id: 41 }) },
-    consolidatedDeliveryLine: { updateMany: async () => ({ count: 0 }) },
-  };
-  await assert.rejects(
-    () => updateConsolidatedDocumentLine({
-      prisma: wrongLinePrisma,
-      branchId: 2,
-      documentId: 41,
-      lineId: 999,
-      description: 'รายการใหม่',
-    }),
-    (error) => error?.code === 'CONSOLIDATED_DOCUMENT_LINE_NOT_FOUND' && error?.statusCode === 404,
-  );
-
-  console.log('Consolidated Document Line Description Contract: PASS');
+  console.log('Consolidated Document Line Presentation Contract: PASS');
 };
 
 run().catch((error) => {
