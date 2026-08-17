@@ -27,36 +27,17 @@ const printable = async (req, res, next) => { try {
     include: { customer: { include: customerInclude }, employee: true, branch: true, documentLines: { orderBy: { id: 'asc' } } },
   });
   if (!document) throw Object.assign(new Error('Consolidated delivery not found'), { statusCode: 404, code: 'CONSOLIDATED_DELIVERY_NOT_FOUND' });
-  const presentations = await prisma.consolidatedDeliveryLinePresentation.findMany({
-    where: { branchId, combinedBillingId: id },
-    select: {
-      consolidatedDeliveryLineId: true,
-      documentPrefix: true,
-      documentDescription: true,
-      documentSuffix: true,
-    },
-  });
-  const presentationByLineId = new Map(
-    presentations.map((presentation) => [presentation.consolidatedDeliveryLineId, presentation]),
-  );
   res.json({
     document: { id: document.id, title: 'ใบส่งของรวม', number: document.code, issuedAt: document.issueDate, note: document.note, totalAmount: document.totalAmount },
     customer: document.customer,
     branch: document.branch,
     createdBy: document.employee,
-    lines: document.documentLines.map((line) => {
-      const presentation = presentationByLineId.get(line.id) || null;
-      return {
-        id: line.id, sourceDocumentNo: line.sourceDocumentNo, sourceSaleCode: line.sourceSaleCode,
-        description: line.description,
-        documentPrefix: presentation?.documentPrefix || null,
-        documentDescription: presentation?.documentDescription || null,
-        documentSuffix: presentation?.documentSuffix || null,
-        quantity: line.quantity, sourceUnitPrice: line.sourceUnitPrice,
-        documentUnitPrice: line.documentUnitPrice, priceAdjustment: line.priceAdjustment,
-        adjustmentReason: line.adjustmentReason, lineAmount: line.documentAmount,
-      };
-    }),
+    lines: document.documentLines.map((line) => ({
+      id: line.id, sourceDocumentNo: line.sourceDocumentNo, sourceSaleCode: line.sourceSaleCode,
+      description: line.description, quantity: line.quantity, sourceUnitPrice: line.sourceUnitPrice,
+      documentUnitPrice: line.documentUnitPrice, priceAdjustment: line.priceAdjustment,
+      adjustmentReason: line.adjustmentReason, lineAmount: line.documentAmount,
+    })),
   });
 } catch (error) { next(error); } };
 module.exports = { list, detail, printable, enrich };
