@@ -121,6 +121,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     calculateAvailableCustomerMoney(prisma, {
       branchId: command.branchId,
       customerId: command.customerId,
+      financialGroup: group,
     }),
   ]);
 
