@@ -8,10 +8,18 @@ const {
   toInt,
 } = require('../repositories/quickReceiveDropdownRepository')
 
+const DEFAULT_INITIAL_DROPDOWN_CACHE_TTL_MS = 15_000
+
 const toBool = (value) => {
   if (typeof value === 'boolean') return value
   const v = String(value || '').trim().toLowerCase()
   return ['1', 'true', 'yes', 'y'].includes(v)
+}
+
+const readInitialDropdownCacheTtlMs = () => {
+  const configured = Number.parseInt(process.env.QUICK_STOCK_INITIAL_DROPDOWN_CACHE_TTL_MS || '', 10)
+  if (!Number.isFinite(configured) || configured < 0) return DEFAULT_INITIAL_DROPDOWN_CACHE_TTL_MS
+  return configured
 }
 
 const nowMs = () => Number(process.hrtime.bigint()) / 1e6
@@ -33,12 +41,65 @@ class QuickReceiveDropdownService {
       throw new Error('[QuickReceiveDropdownService] prisma or repository is required')
     }
     this.repository = repository || new QuickReceiveDropdownRepository(prisma)
+    this.initialDropdownCache = new Map()
+    this.initialDropdownInFlight = new Map()
+  }
+
+  invalidateInitialDropdownCache() {
+    this.initialDropdownCache.clear()
+    this.initialDropdownInFlight.clear()
   }
 
   async getDropdowns(params = {}) {
     const productTypeId = toInt(params.productTypeId)
     const includeInactive = toBool(params.includeInactive)
     const traceEnabled = process.env.QUICK_STOCK_PERF_TRACE === '1'
+
+    // Product-type-specific reads include brands and remain live. The initial
+    // payload is comparatively static and is safe to reuse for a short bounded
+    // TTL. This removes repeated remote DB round-trips when operators revisit
+    // Quick Stock while keeping catalog freshness bounded and configurable.
+    if (!productTypeId) {
+      const ttlMs = readInitialDropdownCacheTtlMs()
+      const cacheKey = includeInactive ? 'initial:inactive' : 'initial:active'
+      const now = Date.now()
+      const cached = this.initialDropdownCache.get(cacheKey)
+
+      if (ttlMs > 0 && cached && cached.expiresAt > now) {
+        if (traceEnabled) console.info('[quick-stock-perf] initial-dropdown-cache=hit')
+        return cached.value
+      }
+
+      const inFlight = this.initialDropdownInFlight.get(cacheKey)
+      if (inFlight) {
+        if (traceEnabled) console.info('[quick-stock-perf] initial-dropdown-cache=coalesced')
+        return inFlight
+      }
+
+      const request = this.loadDropdownsFresh({ productTypeId: null, includeInactive, traceEnabled })
+        .then((value) => {
+          if (ttlMs > 0) {
+            this.initialDropdownCache.set(cacheKey, {
+              value,
+              expiresAt: Date.now() + ttlMs,
+            })
+          }
+          return value
+        })
+        .finally(() => {
+          if (this.initialDropdownInFlight.get(cacheKey) === request) {
+            this.initialDropdownInFlight.delete(cacheKey)
+          }
+        })
+
+      this.initialDropdownInFlight.set(cacheKey, request)
+      return request
+    }
+
+    return this.loadDropdownsFresh({ productTypeId, includeInactive, traceEnabled })
+  }
+
+  async loadDropdownsFresh({ productTypeId, includeInactive, traceEnabled }) {
     const totalStartedAt = nowMs()
 
     // These reads are independent for the initial Quick Stock payload. Start them
@@ -123,5 +184,7 @@ class QuickReceiveDropdownService {
 }
 
 module.exports = {
+  DEFAULT_INITIAL_DROPDOWN_CACHE_TTL_MS,
+  readInitialDropdownCacheTtlMs,
   QuickReceiveDropdownService,
 }
