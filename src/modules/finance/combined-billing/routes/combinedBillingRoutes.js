@@ -9,12 +9,14 @@ const {
 const {
   createCombinedBillingDocument,
 } = require('../create/createCombinedBillingDocumentController');
+const { unifiedDocumentHistory } = require('../unifiedDocumentHistoryController');
 
 const router = express.Router();
 const documentWorkspace = require('../documentWorkspaceController');
 const documentHistory = require('../documentHistoryController');
 router.use(verifyToken);
 
+router.get('/unified-document-history', unifiedDocumentHistory);
 router.get('/document-workspace', documentWorkspace.list);
 router.post('/document-workspace/confirm', documentWorkspace.confirm);
 router.get('/consolidated-deliveries', documentHistory.list);
