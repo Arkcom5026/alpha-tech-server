@@ -1,12 +1,32 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   normalizeDescription,
   updateConsolidatedDocumentLine,
 } = require('../src/modules/finance/combined-billing/documentLineService');
 
+const read = (relativePath) => fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
+
 const run = async () => {
+  const routesSource = read('src/modules/finance/combined-billing/routes/combinedBillingRoutes.js');
+  const controllerSource = read('src/modules/finance/combined-billing/documentLineController.js');
+
+  assert.ok(
+    routesSource.includes("router.put('/consolidated-deliveries/:id/document-lines/:lineId', documentLine.update);"),
+    'Consolidated document-line mutation must be exposed only through the dedicated line route.',
+  );
+  assert.ok(
+    controllerSource.includes('description: req.body?.description')
+      && !controllerSource.includes('quantity: req.body')
+      && !controllerSource.includes('documentUnitPrice: req.body')
+      && !controllerSource.includes('priceAdjustment: req.body')
+      && !controllerSource.includes('documentAmount: req.body'),
+    'HTTP controller must accept only the presentation description from the request body.',
+  );
+
   assert.equal(normalizeDescription('  รายการสำหรับเอกสาร  '), 'รายการสำหรับเอกสาร');
   assert.equal(normalizeDescription('   '), null);
 
