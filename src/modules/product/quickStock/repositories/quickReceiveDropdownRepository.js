@@ -5,6 +5,7 @@
 const { performance } = require('node:perf_hooks')
 
 const TEMPLATE_BRANCH_CODE = 'T01'
+const DEFAULT_TEMPLATE_BRANCH_CACHE_TTL_MS = 60_000
 
 const normalizeName = (value) =>
   String(value || '')
@@ -16,6 +17,12 @@ const toInt = (value) => {
   if (value === undefined || value === null || value === '') return null
   const n = Number.parseInt(value, 10)
   return Number.isFinite(n) ? n : null
+}
+
+const readTemplateBranchCacheTtlMs = () => {
+  const configured = Number.parseInt(process.env.QUICK_STOCK_TEMPLATE_BRANCH_CACHE_TTL_MS || '', 10)
+  if (!Number.isFinite(configured) || configured < 0) return DEFAULT_TEMPLATE_BRANCH_CACHE_TTL_MS
+  return configured
 }
 
 const isPerfTraceEnabled = () => process.env.QUICK_STOCK_PERF_TRACE === '1'
@@ -46,7 +53,6 @@ const dedupeProductTypes = (items = []) => {
       return
     }
 
-    // Prefer active row, then lower id as stable canonical dropdown value.
     if (!existing.active && item.active) {
       byKey.set(key, item)
       return
@@ -66,17 +72,39 @@ const dedupeProductTypes = (items = []) => {
 
 class QuickReceiveDropdownRepository {
   constructor(prisma) {
-    if (!prisma) {
-      throw new Error('[QuickReceiveDropdownRepository] prisma is required')
-    }
+    if (!prisma) throw new Error('[QuickReceiveDropdownRepository] prisma is required')
     this.prisma = prisma
+    this.templateBranchCache = new Map()
+  }
+
+  invalidateTemplateBranchCache(branchCode) {
+    if (branchCode) {
+      this.templateBranchCache.delete(String(branchCode))
+      return
+    }
+    this.templateBranchCache.clear()
   }
 
   async findTemplateBranchByCode(branchCode = TEMPLATE_BRANCH_CODE) {
-    return this.prisma.branch.findFirst({
+    const cacheKey = String(branchCode)
+    const ttlMs = readTemplateBranchCacheTtlMs()
+    const now = Date.now()
+    const cached = this.templateBranchCache.get(cacheKey)
+
+    if (ttlMs > 0 && cached && cached.expiresAt > now) return cached.value
+
+    const branch = await this.prisma.branch.findFirst({
       where: { branchCode },
       select: { id: true, name: true, branchCode: true },
     })
+
+    if (ttlMs > 0 && branch?.id) {
+      this.templateBranchCache.set(cacheKey, { value: branch, expiresAt: now + ttlMs })
+    } else {
+      this.templateBranchCache.delete(cacheKey)
+    }
+
+    return branch
   }
 
   async findProductTypeById(productTypeId) {
@@ -86,20 +114,11 @@ class QuickReceiveDropdownRepository {
     return this.prisma.productType.findUnique({
       where: { id: ptId },
       include: {
-        globalProductType: {
-          select: { id: true, name: true, categoryId: true },
-        },
+        globalProductType: { select: { id: true, name: true, categoryId: true } },
         productTypeBrands: {
           select: {
             brandId: true,
-            brand: {
-              select: {
-                id: true,
-                name: true,
-                normalizedName: true,
-                active: true,
-              },
-            },
+            brand: { select: { id: true, name: true, normalizedName: true, active: true } },
           },
         },
       },
@@ -138,21 +157,10 @@ class QuickReceiveDropdownRepository {
 
     const dedupeStartedAt = performance.now()
     const dedupedProductTypes = dedupeProductTypes(productTypes)
-    logPerf(
-      'template-product-type-dedupe-sort',
-      dedupeStartedAt,
-      `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`
-    )
-    logPerf(
-      'template-product-types-total',
-      totalStartedAt,
-      `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`
-    )
+    logPerf('template-product-type-dedupe-sort', dedupeStartedAt, `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`)
+    logPerf('template-product-types-total', totalStartedAt, `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`)
 
-    return {
-      templateBranch,
-      productTypes: dedupedProductTypes,
-    }
+    return { templateBranch, productTypes: dedupedProductTypes }
   }
 
   async listBrandsForProductType({ productTypeId, includeInactive = false } = {}) {
@@ -160,12 +168,8 @@ class QuickReceiveDropdownRepository {
     if (!sourceProductType?.id) return []
 
     const globalProductTypeId = toInt(sourceProductType.globalProductTypeId)
-
     const productTypeWhere = globalProductTypeId
-      ? {
-          globalProductTypeId,
-          ...(includeInactive ? {} : { active: true }),
-        }
+      ? { globalProductTypeId, ...(includeInactive ? {} : { active: true }) }
       : {
           OR: [
             { id: sourceProductType.id },
@@ -189,14 +193,7 @@ class QuickReceiveDropdownRepository {
         brand: includeInactive ? {} : { active: true },
       },
       select: {
-        brand: {
-          select: {
-            id: true,
-            name: true,
-            normalizedName: true,
-            active: true,
-          },
-        },
+        brand: { select: { id: true, name: true, normalizedName: true, active: true } },
       },
       orderBy: { brand: { name: 'asc' } },
     })
@@ -206,9 +203,7 @@ class QuickReceiveDropdownRepository {
       if (item.brand?.id) byId.set(item.brand.id, item.brand)
     })
 
-    return Array.from(byId.values()).sort((a, b) =>
-      String(a.name || '').localeCompare(String(b.name || ''), 'th')
-    )
+    return Array.from(byId.values()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'))
   }
 
   async listUnits() {
@@ -221,8 +216,10 @@ class QuickReceiveDropdownRepository {
 
 module.exports = {
   TEMPLATE_BRANCH_CODE,
+  DEFAULT_TEMPLATE_BRANCH_CACHE_TTL_MS,
   normalizeName,
   toInt,
+  readTemplateBranchCacheTtlMs,
   dedupeProductTypes,
   QuickReceiveDropdownRepository,
 }
