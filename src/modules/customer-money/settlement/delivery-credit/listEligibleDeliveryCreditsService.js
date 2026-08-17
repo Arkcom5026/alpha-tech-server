@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  calculateAvailableCustomerMoney,
+  buildSpendableSourceState,
 } = require('../../balance/customerMoneySourcePoolService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 const {
@@ -36,13 +36,21 @@ const mapSimpleLine = (item) => ({
 
 const lineKey = (saleId, lineType, saleItemId) => `${saleId}:${lineType}:${saleItemId}`;
 
+const projectCustomer = (customer) => ({
+  id: customer.id,
+  name: customer.name,
+  companyName: customer.companyName,
+  departmentName: customer.departmentName,
+  taxId: customer.taxId,
+});
+
 const listEligibleDeliveryCredits = async ({ prisma, command }) => {
-  const group = await resolveFinancialCustomerGroup(prisma, { customerId: command.customerId, branchId: command.branchId });
-  const customer = await prisma.customerProfile.findFirst({
-    where: { id: command.customerId, branchId: command.branchId },
-    select: { id: true, name: true, companyName: true, departmentName: true, taxId: true },
+  const group = await resolveFinancialCustomerGroup(prisma, {
+    customerId: command.customerId,
+    branchId: command.branchId,
   });
-  if (!customer) {
+  const selectedCustomer = group.selectedCustomer;
+  if (!selectedCustomer || Number(selectedCustomer.id) !== Number(command.customerId)) {
     const error = new Error('ไม่พบลูกค้าในสาขานี้');
     error.code = 'CUSTOMER_NOT_FOUND';
     error.statusCode = 404;
@@ -50,7 +58,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   }
 
   const keyword = command.search;
-  const sales = await prisma.sale.findMany({
+  const salesPromise = prisma.sale.findMany({
     where: {
       ...buildActiveCreditReceivableWhere({ branchId: command.branchId, customerIds: group.memberIds }),
       ...(keyword ? {
@@ -99,39 +107,63 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     take: command.take,
   });
 
+  const balancePromise = prisma.customerMoneyBalance.findUnique({
+    where: { branchId_customerId: { branchId: command.branchId, customerId: group.ownerId } },
+    select: { id: true, availableAmount: true, updatedAt: true },
+  });
+
+  const sourceStatePromise = buildSpendableSourceState(prisma, {
+    branchId: command.branchId,
+    customerId: command.customerId,
+    financialGroup: group,
+  });
+
+  const [sales, balance, sourceState] = await Promise.all([
+    salesPromise,
+    balancePromise,
+    sourceStatePromise,
+  ]);
+
   const saleIds = sales.map((sale) => sale.id);
   const priorLines = saleIds.length ? await prisma.customerMoneySettlementLine.findMany({
     where: {
       saleId: { in: saleIds },
-      settlement: { status: 'ACTIVE', settlementType: 'DELIVERY_CREDIT' },
+      settlement: {
+        branchId: command.branchId,
+        customerId: group.ownerId,
+        status: 'ACTIVE',
+        settlementType: 'DELIVERY_CREDIT',
+      },
     },
     select: { saleId: true, saleItemType: true, saleItemId: true, appliedAmount: true },
   }) : [];
+
   const appliedByLine = priorLines.reduce((map, line) => {
     const key = lineKey(line.saleId, line.saleItemType, line.saleItemId);
     map.set(key, (map.get(key) || 0) + money(line.appliedAmount));
     return map;
   }, new Map());
 
-  const [balance, availableAmount] = await Promise.all([
-    prisma.customerMoneyBalance.findUnique({
-      where: { branchId_customerId: { branchId: command.branchId, customerId: group.ownerId } },
-      select: { id: true, availableAmount: true, updatedAt: true },
-    }),
-    calculateAvailableCustomerMoney(prisma, {
-      branchId: command.branchId,
-      customerId: command.customerId,
-    }),
-  ]);
+  const availableAmount = money(sourceState.availableAmount);
+  const projectedAmount = money(balance?.availableAmount);
 
   return {
-    customer: { ...customer, financialOwner: group.owner, members: group.members },
+    customer: {
+      ...projectCustomer(selectedCustomer),
+      financialOwner: group.owner,
+      members: group.members,
+    },
     balance: {
       id: balance?.id || null,
-      availableAmount: money(availableAmount),
+      availableAmount,
       updatedAt: balance?.updatedAt || null,
-      projectedAmount: money(balance?.availableAmount),
-      projectionMatchesSource: balance ? money(balance.availableAmount) === money(availableAmount) : money(availableAmount) === 0,
+      projectedAmount,
+      projectionMatchesSource: balance ? projectedAmount === availableAmount : availableAmount === 0,
+      sourceTotal: money(sourceState.sourceTotal),
+      legacyReservedAmount: money(sourceState.legacyReservedAmount),
+      uncoveredLegacyReservation: money(sourceState.uncoveredLegacyReservation),
+      sourceCount: sourceState.sourceStates.length,
+      spendableSourceCount: sourceState.sources.length,
     },
     sales: sales.map((sale) => {
       const lines = [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)]
@@ -163,4 +195,4 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
   };
 };
 
-module.exports = { listEligibleDeliveryCredits, outstanding, lineKey };
+module.exports = { listEligibleDeliveryCredits, outstanding, lineKey, projectCustomer };
