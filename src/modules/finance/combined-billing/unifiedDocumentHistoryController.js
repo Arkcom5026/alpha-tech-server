@@ -186,12 +186,20 @@ const unifiedDocumentHistory = async (req, res, next) => {
     });
     const consumedSaleIds = consumedSourceRows.map((row) => row.sourceSaleId);
 
+    // Once any source line enters a non-cancelled consolidated document, the
+    // original Sale remains auditable but leaves both active Delivery Note and
+    // Bill print lifecycles. Printing the source separately would duplicate a
+    // commercial document after consolidation.
+    const consumedSourceExclusion = consumedSaleIds.length
+      ? { id: { notIn: consumedSaleIds } }
+      : {};
+
     const saleWhere = {
       branchId,
       status: { not: 'CANCELLED' },
+      ...consumedSourceExclusion,
       ...(purpose === 'DELIVERY_NOTE' ? {
         officialDocumentNumber: { not: null },
-        ...(consumedSaleIds.length ? { id: { notIn: consumedSaleIds } } : {}),
       } : {}),
       ...buildSaleKeywordWhere(keyword),
       ...buildDateWhere(dateQuery, 'createdAt'),

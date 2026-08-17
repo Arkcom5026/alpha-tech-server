@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  calculateAvailableCustomerMoney,
+  buildSpendableSourceState,
 } = require('../../balance/customerMoneySourcePoolService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
 const {
@@ -113,16 +113,23 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
     return map;
   }, new Map());
 
-  const [balance, availableAmount] = await Promise.all([
+  const [balance, sourceState] = await Promise.all([
     prisma.customerMoneyBalance.findUnique({
       where: { branchId_customerId: { branchId: command.branchId, customerId: group.ownerId } },
       select: { id: true, availableAmount: true, updatedAt: true },
     }),
-    calculateAvailableCustomerMoney(prisma, {
+    buildSpendableSourceState(prisma, {
       branchId: command.branchId,
       customerId: command.customerId,
+      financialGroup: group,
     }),
   ]);
+
+  const availableAmount = sourceState.availableAmount;
+  const sourceStates = sourceState.sourceStates || [];
+  const sourceCustomerIds = [...new Set(sourceStates
+    .map((source) => Number(source?.snapshot?.customerId))
+    .filter((id) => Number.isInteger(id) && id > 0))];
 
   return {
     customer: { ...customer, financialOwner: group.owner, members: group.members },
@@ -132,6 +139,14 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
       updatedAt: balance?.updatedAt || null,
       projectedAmount: money(balance?.availableAmount),
       projectionMatchesSource: balance ? money(balance.availableAmount) === money(availableAmount) : money(availableAmount) === 0,
+      sourceCount: sourceStates.length,
+      spendableSourceCount: (sourceState.sources || []).length,
+      sourceTotal: money(sourceState.sourceTotal),
+      legacyReservedAmount: money(sourceState.legacyReservedAmount),
+      uncoveredLegacyReservation: money(sourceState.uncoveredLegacyReservation),
+      financialOwnerId: group.ownerId,
+      financialMemberIds: group.memberIds,
+      sourceCustomerIds,
     },
     sales: sales.map((sale) => {
       const lines = [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)]

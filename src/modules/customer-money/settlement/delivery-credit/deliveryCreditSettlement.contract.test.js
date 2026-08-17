@@ -50,11 +50,23 @@ test('write validation uses the same active credit sale eligibility', () => {
 
 test('eligible delivery credit query is read-only and derives customer money from source authority', () => {
   assert.match(queryService, /prisma\.sale\.findMany/);
-  assert.match(queryService, /calculateAvailableCustomerMoney/);
+  assert.match(queryService, /buildSpendableSourceState/);
+  assert.match(queryService, /financialGroup:\s*group/);
   assert.doesNotMatch(queryService, /\.create\(|\.update\(|\.delete\(/);
   assert.match(queryService, /lineType:\s*'STOCK'/);
   assert.match(queryService, /lineType:\s*'SIMPLE'/);
   assert.match(queryService, /outstandingAmount/);
+});
+
+test('eligible delivery credit exposes the exact source-state diagnostics used by settlement authority', () => {
+  assert.match(queryService, /sourceCount:\s*sourceStates\.length/);
+  assert.match(queryService, /spendableSourceCount/);
+  assert.match(queryService, /sourceTotal:\s*money\(sourceState\.sourceTotal\)/);
+  assert.match(queryService, /legacyReservedAmount:\s*money\(sourceState\.legacyReservedAmount\)/);
+  assert.match(queryService, /uncoveredLegacyReservation:\s*money\(sourceState\.uncoveredLegacyReservation\)/);
+  assert.match(queryService, /financialOwnerId:\s*group\.ownerId/);
+  assert.match(queryService, /financialMemberIds:\s*group\.memberIds/);
+  assert.match(queryService, /sourceCustomerIds/);
 });
 
 test('settlement command supports multi-sale item-level partial application', () => {

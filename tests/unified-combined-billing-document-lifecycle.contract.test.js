@@ -19,10 +19,11 @@ assert.match(history, /BRANCH_CONTEXT_REQUIRED/, 'unified history must reject re
 assert.match(history, /new Set\(\['BILL', 'DELIVERY_NOTE'\]\)/, 'history bridge must distinguish Bill and Delivery Note purposes');
 assert.match(history, /saleRows = saleRows\.filter\(\(row\) => row\.isFullyPaid\)/, 'Bill history must preserve the legacy onlyPaid=fully-paid Sale semantics');
 
-assert.match(history, /prisma\.consolidatedDeliveryLine\.findMany/, 'Delivery Note reprint eligibility must consult consolidated source-line authority');
+assert.match(history, /prisma\.consolidatedDeliveryLine\.findMany/, 'active print eligibility must consult consolidated source-line authority');
 assert.match(history, /status:\s*'DOCUMENTED'/, 'documented source lines must leave the original active print lifecycle');
-assert.match(history, /combinedBilling:\s*\{\s*is:\s*\{\s*status:\s*\{\s*not:\s*'CANCELLED'/s, 'cancelled consolidations must not suppress source Delivery Notes');
-assert.match(history, /id:\s*\{\s*notIn:\s*consumedSaleIds\s*\}/, 'a source Sale with any documented line must be excluded from active Delivery Note history');
+assert.match(history, /combinedBilling:\s*\{\s*is:\s*\{\s*status:\s*\{\s*not:\s*'CANCELLED'/s, 'cancelled consolidations must not suppress source documents');
+assert.match(history, /const consumedSourceExclusion = consumedSaleIds\.length[\s\S]*?id:\s*\{\s*notIn:\s*consumedSaleIds\s*\}/, 'a source Sale with any documented line must be excluded from active print history');
+assert.match(history, /const saleWhere = \{[\s\S]*?\.\.\.consumedSourceExclusion,[\s\S]*?purpose === 'DELIVERY_NOTE'/, 'source suppression must apply before purpose-specific Delivery Note filtering so Bill and Delivery Note share the rule');
 
 assert.match(history, /documentSourceType:\s*SALE_SOURCE_TYPE/, 'normal Sale rows must preserve SALE source identity');
 assert.match(history, /documentSourceType:\s*CONSOLIDATED_SOURCE_TYPE/, 'consolidated rows must expose consolidated source identity');
