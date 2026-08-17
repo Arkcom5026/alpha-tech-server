@@ -26,9 +26,24 @@ class QuickReceiveDropdownService {
     const productTypeId = toInt(params.productTypeId)
     const includeInactive = toBool(params.includeInactive)
 
-    const { templateBranch, productTypes } = await this.repository.listTemplateProductTypes({
+    // These reads are independent for the initial Quick Stock payload. Start them
+    // together so network/database latency is paid once instead of serially.
+    const templateProductTypesPromise = this.repository.listTemplateProductTypes({
       includeInactive,
     })
+    const unitsPromise = this.repository.listUnits()
+    const brandsPromise = productTypeId
+      ? this.repository.listBrandsForProductType({
+          productTypeId,
+          includeInactive,
+        })
+      : Promise.resolve([])
+
+    const [{ templateBranch, productTypes }, units, brands] = await Promise.all([
+      templateProductTypesPromise,
+      unitsPromise,
+      brandsPromise,
+    ])
 
     if (!templateBranch?.id) {
       const error = new Error('ไม่พบ Template Branch สำหรับ QuickStock Dropdown')
@@ -36,15 +51,6 @@ class QuickReceiveDropdownService {
       error.code = 'TEMPLATE_BRANCH_NOT_FOUND'
       throw error
     }
-
-    const brands = productTypeId
-      ? await this.repository.listBrandsForProductType({
-          productTypeId,
-          includeInactive,
-        })
-      : []
-
-    const units = await this.repository.listUnits()
 
     return {
       success: true,
