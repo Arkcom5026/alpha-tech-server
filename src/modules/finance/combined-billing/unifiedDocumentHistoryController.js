@@ -287,7 +287,7 @@ const unifiedDocumentHistory = async (req, res, next) => {
     }));
 
     if (purpose === 'BILL' || boolQuery(req.query?.onlyPaid)) {
-      saleRows = saleRows.filter((row) => row.paidAmount > 0);
+      saleRows = saleRows.filter((row) => row.isFullyPaid);
     }
 
     const combinedRows = combinedDocuments.map((document) => projectCombinedRow({
