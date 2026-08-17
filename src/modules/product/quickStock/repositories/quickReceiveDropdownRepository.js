@@ -18,12 +18,12 @@ const toInt = (value) => {
   return Number.isFinite(n) ? n : null
 }
 
-const isPerfLoggingEnabled = () => process.env.QUICK_STOCK_PERF_LOG === '1'
+const isPerfTraceEnabled = () => process.env.QUICK_STOCK_PERF_TRACE === '1'
 const formatDuration = (startedAt) => `${(performance.now() - startedAt).toFixed(3)}ms`
 const logPerf = (label, startedAt, details = '') => {
-  if (!isPerfLoggingEnabled()) return
+  if (!isPerfTraceEnabled()) return
   const suffix = details ? ` ${details}` : ''
-  console.log(`[quick-stock-perf] ${label}=${formatDuration(startedAt)}${suffix}`)
+  console.info(`[quick-stock-perf] ${label}=${formatDuration(startedAt)}${suffix}`)
 }
 
 const getProductTypeDedupeKey = (item = {}) => {
