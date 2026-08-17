@@ -1,6 +1,19 @@
 'use strict';
 
 const settlementInclude = {
+  branch: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      phone: true,
+      taxId: true,
+      branchCode: true,
+      isHeadOffice: true,
+      slug: true,
+      documentHeaderConfig: true,
+    },
+  },
   customer: {
     select: { id: true, name: true, companyName: true, departmentName: true, taxId: true },
   },
