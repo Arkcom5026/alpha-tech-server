@@ -1,0 +1,15 @@
+model ConsolidatedDeliveryLinePresentation {
+  id                         Int      @id @default(autoincrement())
+  branchId                   Int
+  combinedBillingId          Int
+  consolidatedDeliveryLineId Int
+  documentPrefix             String?
+  documentDescription        String?
+  documentSuffix             String?
+  updatedById                Int?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@unique([branchId, consolidatedDeliveryLineId])
+  @@index([branchId, combinedBillingId])
+}
