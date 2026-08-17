@@ -18,6 +18,9 @@ assert.match(migration, /ADD COLUMN IF NOT EXISTS "documentHeaderConfig" JSONB/,
 assert.match(service, /normalizeDocumentHeaderConfig/, 'branch runtime must normalize document header configuration');
 assert.match(service, /INVALID_DOCUMENT_HEADER_CONFIG/, 'invalid document header payloads must be rejected');
 assert.match(service, /documents\[key\] = normalizeHeaderProfile\(profile\)/, 'document-specific overrides must be normalized');
+assert.match(service, /DOCUMENT_HEADER_LOGO_SIZES = new Set\(\['sm', 'md', 'lg', 'xl'\]\)/, 'logo size presets must be server-authorized');
+assert.match(service, /'logoSize'/, 'logo size must be included in the persisted header profile keys');
+assert.match(service, /key === 'logoSize'/, 'logo size must be normalized independently of arbitrary strings');
 
 assert.match(controller, /DOCUMENT_HEADER_BRANCH_SCOPE_DENIED/, 'document header mutation must enforce branch scope');
 assert.match(controller, /actorBranchId !== targetBranchId/, 'non-superadmin actors must only mutate their own branch header');
