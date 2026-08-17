@@ -3,8 +3,11 @@ const featurePresets = require('../../../../constants/branchFeaturePresets');
 const repository = require('./branchRuntimeRepository');
 
 const DOCUMENT_HEADER_ALIGNMENTS = new Set(['left', 'center', 'right']);
-const DOCUMENT_HEADER_LOGO_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
 const DOCUMENT_HEADER_NAME_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
+const DOCUMENT_HEADER_LOGO_SIZE_MIN = 24;
+const DOCUMENT_HEADER_LOGO_SIZE_MAX = 120;
+const DOCUMENT_HEADER_LOGO_SIZE_DEFAULT = 56;
+const LEGACY_DOCUMENT_HEADER_LOGO_SIZES = Object.freeze({ sm: 40, md: 56, lg: 72, xl: 88 });
 const DOCUMENT_HEADER_KEYS = new Set([
   'showLogo',
   'logoUrl',
@@ -33,6 +36,13 @@ const toInt = (value) => {
 const getStr = (value) => (value === null || value === undefined ? '' : String(value).trim());
 const compact = (object) => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
 
+const normalizeLogoSize = (value) => {
+  const legacy = LEGACY_DOCUMENT_HEADER_LOGO_SIZES[getStr(value).toLowerCase()];
+  const parsed = legacy ?? Number(value);
+  if (!Number.isFinite(parsed)) return DOCUMENT_HEADER_LOGO_SIZE_DEFAULT;
+  return Math.min(DOCUMENT_HEADER_LOGO_SIZE_MAX, Math.max(DOCUMENT_HEADER_LOGO_SIZE_MIN, Math.round(parsed)));
+};
+
 const normalizeHeaderProfile = (source) => {
   if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
 
@@ -53,8 +63,7 @@ const normalizeHeaderProfile = (source) => {
     }
 
     if (key === 'logoSize') {
-      const normalized = getStr(value).toLowerCase();
-      if (DOCUMENT_HEADER_LOGO_SIZES.has(normalized)) output[key] = normalized;
+      output[key] = normalizeLogoSize(value);
       continue;
     }
 
