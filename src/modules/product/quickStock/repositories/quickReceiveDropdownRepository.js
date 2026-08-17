@@ -2,6 +2,8 @@
 // Repository for QuickStock dropdown workflow only.
 // Pattern borrowed from Product Create, but intentionally isolated from Product Create code.
 
+const { performance } = require('node:perf_hooks')
+
 const TEMPLATE_BRANCH_CODE = 'T01'
 
 const normalizeName = (value) =>
@@ -14,6 +16,14 @@ const toInt = (value) => {
   if (value === undefined || value === null || value === '') return null
   const n = Number.parseInt(value, 10)
   return Number.isFinite(n) ? n : null
+}
+
+const isPerfLoggingEnabled = () => process.env.QUICK_STOCK_PERF_LOG === '1'
+const formatDuration = (startedAt) => `${(performance.now() - startedAt).toFixed(3)}ms`
+const logPerf = (label, startedAt, details = '') => {
+  if (!isPerfLoggingEnabled()) return
+  const suffix = details ? ` ${details}` : ''
+  console.log(`[quick-stock-perf] ${label}=${formatDuration(startedAt)}${suffix}`)
 }
 
 const getProductTypeDedupeKey = (item = {}) => {
@@ -97,9 +107,17 @@ class QuickReceiveDropdownRepository {
   }
 
   async listTemplateProductTypes({ includeInactive = false } = {}) {
+    const totalStartedAt = performance.now()
+    const branchStartedAt = performance.now()
     const templateBranch = await this.findTemplateBranchByCode(TEMPLATE_BRANCH_CODE)
-    if (!templateBranch?.id) return { templateBranch: null, productTypes: [] }
+    logPerf('template-branch-lookup', branchStartedAt, `found=${Boolean(templateBranch?.id)}`)
 
+    if (!templateBranch?.id) {
+      logPerf('template-product-types-total', totalStartedAt, 'rows=0 deduped=0')
+      return { templateBranch: null, productTypes: [] }
+    }
+
+    const queryStartedAt = performance.now()
     const productTypes = await this.prisma.productType.findMany({
       where: {
         branchId: templateBranch.id,
@@ -116,10 +134,24 @@ class QuickReceiveDropdownRepository {
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
     })
+    logPerf('template-product-type-query', queryStartedAt, `rows=${productTypes.length}`)
+
+    const dedupeStartedAt = performance.now()
+    const dedupedProductTypes = dedupeProductTypes(productTypes)
+    logPerf(
+      'template-product-type-dedupe-sort',
+      dedupeStartedAt,
+      `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`
+    )
+    logPerf(
+      'template-product-types-total',
+      totalStartedAt,
+      `rows=${productTypes.length} deduped=${dedupedProductTypes.length}`
+    )
 
     return {
       templateBranch,
-      productTypes: dedupeProductTypes(productTypes),
+      productTypes: dedupedProductTypes,
     }
   }
 
