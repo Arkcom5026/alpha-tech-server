@@ -18,9 +18,13 @@ assert.match(migration, /ADD COLUMN IF NOT EXISTS "documentHeaderConfig" JSONB/,
 assert.match(service, /normalizeDocumentHeaderConfig/, 'branch runtime must normalize document header configuration');
 assert.match(service, /INVALID_DOCUMENT_HEADER_CONFIG/, 'invalid document header payloads must be rejected');
 assert.match(service, /documents\[key\] = normalizeHeaderProfile\(profile\)/, 'document-specific overrides must be normalized');
-assert.match(service, /DOCUMENT_HEADER_LOGO_SIZES = new Set\(\['sm', 'md', 'lg', 'xl'\]\)/, 'logo size presets must be server-authorized');
+assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_MIN = 24/, 'custom logo size must have a safe lower bound');
+assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_MAX = 120/, 'custom logo size must have a safe upper bound');
+assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_DEFAULT = 56/, 'custom logo size must preserve the standard 56px default');
+assert.match(service, /LEGACY_DOCUMENT_HEADER_LOGO_SIZES/, 'legacy preset values must remain backward compatible');
+assert.match(service, /sm: 40, md: 56, lg: 72, xl: 88/, 'legacy presets must map to their original pixel sizes');
+assert.match(service, /Math\.min\(DOCUMENT_HEADER_LOGO_SIZE_MAX, Math\.max\(DOCUMENT_HEADER_LOGO_SIZE_MIN/, 'server must clamp custom logo sizes to the safe range');
 assert.match(service, /'logoSize'/, 'logo size must be included in the persisted header profile keys');
-assert.match(service, /key === 'logoSize'/, 'logo size must be normalized independently of arbitrary strings');
 
 assert.match(controller, /DOCUMENT_HEADER_BRANCH_SCOPE_DENIED/, 'document header mutation must enforce branch scope');
 assert.match(controller, /actorBranchId !== targetBranchId/, 'non-superadmin actors must only mutate their own branch header');
