@@ -9,6 +9,7 @@ model Branch {
   subdistrictCode                 String?
   businessType                    BusinessType                     @default(GENERAL)
   features                        Json?
+  documentHeaderConfig            Json?
   branchCode                      String?                          @db.VarChar(5)
   isHeadOffice                    Boolean                          @default(false)
   taxId                           String?                          @db.VarChar(13)
