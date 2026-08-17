@@ -3,12 +3,13 @@ const featurePresets = require('../../../../constants/branchFeaturePresets');
 const repository = require('./branchRuntimeRepository');
 
 const DOCUMENT_HEADER_ALIGNMENTS = new Set(['left', 'center', 'right']);
-const DOCUMENT_HEADER_LOGO_SIZES = new Set(['sm', 'md', 'lg']);
+const DOCUMENT_HEADER_LOGO_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
 const DOCUMENT_HEADER_NAME_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
 const DOCUMENT_HEADER_KEYS = new Set([
   'showLogo',
   'logoUrl',
   'logoPosition',
+  'logoSize',
   'textAlign',
   'showStoreName',
   'storeName',
@@ -48,6 +49,12 @@ const normalizeHeaderProfile = (source) => {
     if (key === 'logoPosition' || key === 'textAlign') {
       const normalized = getStr(value).toLowerCase();
       if (DOCUMENT_HEADER_ALIGNMENTS.has(normalized)) output[key] = normalized;
+      continue;
+    }
+
+    if (key === 'logoSize') {
+      const normalized = getStr(value).toLowerCase();
+      if (DOCUMENT_HEADER_LOGO_SIZES.has(normalized)) output[key] = normalized;
       continue;
     }
 
