@@ -4,12 +4,12 @@ const {
   QuickReceiveDropdownRepository,
 } = require('./quickReceiveDropdownRepository')
 
-const originalPerfFlag = process.env.QUICK_STOCK_PERF_LOG
-const originalConsoleLog = console.log
+const originalPerfFlag = process.env.QUICK_STOCK_PERF_TRACE
+const originalConsoleInfo = console.info
 
 const logs = []
-process.env.QUICK_STOCK_PERF_LOG = '1'
-console.log = (...args) => logs.push(args.join(' '))
+process.env.QUICK_STOCK_PERF_TRACE = '1'
+console.info = (...args) => logs.push(args.join(' '))
 
 const prisma = {
   branch: {
@@ -39,6 +39,12 @@ const prisma = {
   },
 }
 
+const restore = () => {
+  console.info = originalConsoleInfo
+  if (originalPerfFlag === undefined) delete process.env.QUICK_STOCK_PERF_TRACE
+  else process.env.QUICK_STOCK_PERF_TRACE = originalPerfFlag
+}
+
 ;(async () => {
   try {
     const repository = new QuickReceiveDropdownRepository(prisma)
@@ -64,16 +70,12 @@ const prisma = {
       )
     )
   } finally {
-    console.log = originalConsoleLog
-    if (originalPerfFlag === undefined) delete process.env.QUICK_STOCK_PERF_LOG
-    else process.env.QUICK_STOCK_PERF_LOG = originalPerfFlag
+    restore()
   }
 
   console.log('✅ QuickReceiveDropdownRepository performance breakdown contract passed')
 })().catch((error) => {
-  console.log = originalConsoleLog
-  if (originalPerfFlag === undefined) delete process.env.QUICK_STOCK_PERF_LOG
-  else process.env.QUICK_STOCK_PERF_LOG = originalPerfFlag
+  restore()
   console.error(error)
   process.exitCode = 1
 })
