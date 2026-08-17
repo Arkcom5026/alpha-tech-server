@@ -17,6 +17,7 @@ assert.match(routes, /router\.get\('\/unified-document-history',\s*unifiedDocume
 assert.match(history, /const branchId = positive\(req\.user\?\.branchId\)/, 'unified history must derive tenant authority from the authenticated branch');
 assert.match(history, /BRANCH_CONTEXT_REQUIRED/, 'unified history must reject requests without branch authority');
 assert.match(history, /new Set\(\['BILL', 'DELIVERY_NOTE'\]\)/, 'history bridge must distinguish Bill and Delivery Note purposes');
+assert.match(history, /saleRows = saleRows\.filter\(\(row\) => row\.isFullyPaid\)/, 'Bill history must preserve the legacy onlyPaid=fully-paid Sale semantics');
 
 assert.match(history, /prisma\.consolidatedDeliveryLine\.findMany/, 'Delivery Note reprint eligibility must consult consolidated source-line authority');
 assert.match(history, /status:\s*'DOCUMENTED'/, 'documented source lines must leave the original active print lifecycle');
