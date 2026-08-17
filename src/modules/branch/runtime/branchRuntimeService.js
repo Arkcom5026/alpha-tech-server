@@ -2,6 +2,27 @@ const { Prisma } = require('@prisma/client');
 const featurePresets = require('../../../../constants/branchFeaturePresets');
 const repository = require('./branchRuntimeRepository');
 
+const DOCUMENT_HEADER_ALIGNMENTS = new Set(['left', 'center', 'right']);
+const DOCUMENT_HEADER_LOGO_SIZES = new Set(['sm', 'md', 'lg']);
+const DOCUMENT_HEADER_NAME_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
+const DOCUMENT_HEADER_KEYS = new Set([
+  'showLogo',
+  'logoUrl',
+  'logoPosition',
+  'textAlign',
+  'showStoreName',
+  'storeName',
+  'storeNameSize',
+  'showAddress',
+  'address',
+  'showPhone',
+  'phone',
+  'showTaxId',
+  'taxId',
+  'showBranchLabel',
+  'headerNote',
+]);
+
 const toInt = (value) => {
   if (value === undefined || value === null || value === '') return undefined;
   const parsed = Number(value);
@@ -10,6 +31,59 @@ const toInt = (value) => {
 
 const getStr = (value) => (value === null || value === undefined ? '' : String(value).trim());
 const compact = (object) => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
+
+const normalizeHeaderProfile = (source) => {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+
+  const output = {};
+  for (const key of DOCUMENT_HEADER_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const value = source[key];
+
+    if (key.startsWith('show')) {
+      if (typeof value === 'boolean') output[key] = value;
+      continue;
+    }
+
+    if (key === 'logoPosition' || key === 'textAlign') {
+      const normalized = getStr(value).toLowerCase();
+      if (DOCUMENT_HEADER_ALIGNMENTS.has(normalized)) output[key] = normalized;
+      continue;
+    }
+
+    if (key === 'storeNameSize') {
+      const normalized = getStr(value).toLowerCase();
+      if (DOCUMENT_HEADER_NAME_SIZES.has(normalized)) output[key] = normalized;
+      continue;
+    }
+
+    const maxLength = key === 'logoUrl' ? 2048 : key === 'headerNote' ? 500 : 300;
+    output[key] = getStr(value).slice(0, maxLength);
+  }
+
+  return output;
+};
+
+const normalizeDocumentHeaderConfig = (value) => {
+  if (value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const documents = {};
+  const rawDocuments = value.documents;
+  if (rawDocuments && typeof rawDocuments === 'object' && !Array.isArray(rawDocuments)) {
+    for (const [rawKey, profile] of Object.entries(rawDocuments)) {
+      const key = getStr(rawKey).toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 64);
+      if (!key) continue;
+      documents[key] = normalizeHeaderProfile(profile);
+    }
+  }
+
+  return {
+    version: 1,
+    default: normalizeHeaderProfile(value.default),
+    documents,
+  };
+};
 
 const normalizeBody = (body = {}) => ({
   name: getStr(body.name),
@@ -23,6 +97,7 @@ const normalizeBody = (body = {}) => ({
     getStr(body.subdistrict),
   businessType: getStr(body.businessType).toUpperCase() || undefined,
   features: body.features && typeof body.features === 'object' ? body.features : undefined,
+  documentHeaderConfig: normalizeDocumentHeaderConfig(body.documentHeaderConfig),
   RBACEnabled: typeof body.RBACEnabled === 'boolean' ? body.RBACEnabled : undefined,
   testMode: body.testMode === true,
 });
@@ -80,6 +155,9 @@ const createBranch = async (body = {}) => {
   if (isTestBranch && !normalized.slug?.startsWith(TEST_BRANCH_SLUG_PREFIX)) {
     throw makeError(400, 'INVALID_TEST_BRANCH_SLUG', 'ร้านทดสอบต้องใช้ slug ที่ขึ้นต้นด้วย system-test-');
   }
+  if (Object.prototype.hasOwnProperty.call(body, 'documentHeaderConfig') && normalized.documentHeaderConfig === undefined) {
+    throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบหัวเอกสารไม่ถูกต้อง');
+  }
 
   if (normalized.businessType && !normalized.features && featurePresets[normalized.businessType]) {
     normalized.features = featurePresets[normalized.businessType];
@@ -94,6 +172,7 @@ const createBranch = async (body = {}) => {
       RBACEnabled: normalized.RBACEnabled,
       businessType: normalized.businessType,
       features: normalized.features,
+      documentHeaderConfig: normalized.documentHeaderConfig,
       subdistrict: normalized.subdistrictCode ? { connect: { code: normalized.subdistrictCode } } : undefined,
     }));
 
@@ -139,6 +218,14 @@ const updateBranch = async (rawId, body = {}) => {
   if (has('RBACEnabled')) data.RBACEnabled = normalized.RBACEnabled;
   if (has('businessType')) data.businessType = normalized.businessType;
   if (has('features')) data.features = normalized.features !== undefined ? normalized.features : Prisma.JsonNull;
+  if (has('documentHeaderConfig')) {
+    if (normalized.documentHeaderConfig === undefined) {
+      throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบหัวเอกสารไม่ถูกต้อง');
+    }
+    data.documentHeaderConfig = normalized.documentHeaderConfig === null
+      ? Prisma.JsonNull
+      : normalized.documentHeaderConfig;
+  }
   if (has('subdistrictCode', 'subdistrict_id', 'subdistrictId', 'subdistrict')) {
     data.subdistrict = normalized.subdistrictCode
       ? { connect: { code: normalized.subdistrictCode } }

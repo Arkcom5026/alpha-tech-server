@@ -29,6 +29,7 @@ const receiptSelect = {
       branchCode: true,
       isHeadOffice: true,
       slug: true,
+      documentHeaderConfig: true,
     },
   },
   customer: {

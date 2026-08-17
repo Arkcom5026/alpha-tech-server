@@ -44,7 +44,21 @@ const createBranch = async (req, res) => {
 
 const updateBranch = async (req, res) => {
   try {
-    return res.json(await service.updateBranch(req.params?.id, req.body || {}));
+    const body = req.body || {};
+    const targetBranchId = Number(req.params?.id || 0);
+    const actorBranchId = Number(req.user?.branchId || 0);
+    const isSuperAdmin = req.user?.isSuperAdmin === true || req.user?.role === 'SUPERADMIN';
+    const changesDocumentHeader = Object.prototype.hasOwnProperty.call(body, 'documentHeaderConfig');
+
+    if (changesDocumentHeader && !isSuperAdmin && (!actorBranchId || actorBranchId !== targetBranchId)) {
+      return res.status(403).json({
+        error: 'DOCUMENT_HEADER_BRANCH_SCOPE_DENIED',
+        code: 'DOCUMENT_HEADER_BRANCH_SCOPE_DENIED',
+        message: 'ไม่สามารถแก้ไขรูปแบบหัวเอกสารของร้านอื่นได้',
+      });
+    }
+
+    return res.json(await service.updateBranch(req.params?.id, body));
   } catch (error) {
     return sendError(res, error, 'ไม่สามารถอัปเดตสาขาได้');
   }
