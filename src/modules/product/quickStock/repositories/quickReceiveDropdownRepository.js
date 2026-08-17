@@ -108,34 +108,40 @@ class QuickReceiveDropdownRepository {
 
   async listTemplateProductTypes({ includeInactive = false } = {}) {
     const totalStartedAt = performance.now()
-    const branchStartedAt = performance.now()
-    const templateBranch = await this.findTemplateBranchByCode(TEMPLATE_BRANCH_CODE)
-    logPerf('template-branch-lookup', branchStartedAt, `found=${Boolean(templateBranch?.id)}`)
+    const queryStartedAt = performance.now()
+    const branchWithProductTypes = await this.prisma.branch.findFirst({
+      where: { branchCode: TEMPLATE_BRANCH_CODE },
+      select: {
+        id: true,
+        name: true,
+        branchCode: true,
+        productTypes: {
+          where: includeInactive ? {} : { active: true },
+          select: {
+            id: true,
+            name: true,
+            active: true,
+            branchId: true,
+            normalizedName: true,
+            globalProductTypeId: true,
+            globalProductType: { select: { id: true, name: true, categoryId: true } },
+          },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        },
+      },
+    })
+    logPerf(
+      'template-branch-product-types-query',
+      queryStartedAt,
+      `found=${Boolean(branchWithProductTypes?.id)} rows=${branchWithProductTypes?.productTypes?.length || 0}`
+    )
 
-    if (!templateBranch?.id) {
+    if (!branchWithProductTypes?.id) {
       logPerf('template-product-types-total', totalStartedAt, 'rows=0 deduped=0')
       return { templateBranch: null, productTypes: [] }
     }
 
-    const queryStartedAt = performance.now()
-    const productTypes = await this.prisma.productType.findMany({
-      where: {
-        branchId: templateBranch.id,
-        ...(includeInactive ? {} : { active: true }),
-      },
-      select: {
-        id: true,
-        name: true,
-        active: true,
-        branchId: true,
-        normalizedName: true,
-        globalProductTypeId: true,
-        globalProductType: { select: { id: true, name: true, categoryId: true } },
-      },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
-    })
-    logPerf('template-product-type-query', queryStartedAt, `rows=${productTypes.length}`)
-
+    const { productTypes = [], ...templateBranch } = branchWithProductTypes
     const dedupeStartedAt = performance.now()
     const dedupedProductTypes = dedupeProductTypes(productTypes)
     logPerf(
