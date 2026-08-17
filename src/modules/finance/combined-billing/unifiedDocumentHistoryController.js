@@ -179,7 +179,7 @@ const unifiedDocumentHistory = async (req, res, next) => {
       where: {
         branchId,
         status: 'DOCUMENTED',
-        combinedBilling: { status: { not: 'CANCELLED' } },
+        combinedBilling: { is: { status: { not: 'CANCELLED' } } },
       },
       select: { sourceSaleId: true },
       distinct: ['sourceSaleId'],
