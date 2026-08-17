@@ -10,7 +10,10 @@ const update = async (req, res, next) => {
       branchId: req.user?.branchId,
       documentId: req.params?.id,
       lineId: req.params?.lineId,
-      description: req.body?.description,
+      employeeId: req.user?.employeeId,
+      documentPrefix: req.body?.documentPrefix,
+      documentDescription: req.body?.documentDescription,
+      documentSuffix: req.body?.documentSuffix,
     });
     return res.json(result);
   } catch (error) {
