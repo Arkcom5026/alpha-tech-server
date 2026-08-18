@@ -24,7 +24,7 @@ if (service.includes('const grandTotal = money(taxable + vatAmount);')) {
 for (const token of [
   'schemaVersion: 2',
   'vatInclusive: true',
-  'taxableBase: number(quotation.grandTotal) - number(quotation.vatAmount)',
+  'taxableBase: money(number(quotation.grandTotal) - number(quotation.vatAmount))',
 ]) {
   if (!snapshot.includes(token)) throw new Error(`VAT-inclusive issued snapshot contract missing: ${token}`);
 }
