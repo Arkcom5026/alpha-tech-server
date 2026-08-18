@@ -2,6 +2,7 @@ const { validateSaleCompletionRequest } = require('../validators/saleCompletionV
 const { completeSale } = require('../services/saleCompletionService');
 const saleCustomerAccessService = require('../services/saleCustomerAccessService');
 const { publishSaleTaxCandidate } = require('../services/publishSaleTaxCandidateService');
+const { ensureSaleQuotationReference } = require('../../lineage/saleQuotationReferenceService');
 
 const completeSaleController = async (req, res) => {
   try {
@@ -18,6 +19,12 @@ const completeSaleController = async (req, res) => {
       customerFirstAssociationToken: command.sale.customerFirstAssociationToken,
     });
     const result = await completeSale({ command, branchId, employeeId });
+    const quotationReference = await ensureSaleQuotationReference({
+      saleId: result.saleId,
+      quotationId: command.sale.sourceQuotationId,
+      branchId,
+      employeeId,
+    });
     const taxIntake = await publishSaleTaxCandidate({
       sale: result.sale,
       branchId,
@@ -25,10 +32,11 @@ const completeSaleController = async (req, res) => {
     });
     return res.status(result.idempotency.replayed ? 200 : 201).json({
       ...result,
+      quotationReference,
       taxIntake,
     });
   } catch (error) {
-    const status = Number(error?.status) || 500;
+    const status = Number(error?.status || error?.statusCode) || 500;
     if (status >= 500) console.error('[sales.complete] failed', { code: error?.code, message: error?.message });
     return res.status(status).json({
       code: error?.code || 'SALE_COMPLETION_FAILED',
