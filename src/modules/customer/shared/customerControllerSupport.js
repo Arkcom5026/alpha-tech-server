@@ -7,7 +7,7 @@ const omitUndefined = (object) =>
 const normalizePhone = (raw = '') =>
   String(raw).replace(/\D/g, '').replace(/^66/, '0').slice(-10);
 
-const isValidPhone = (value = '') => /^\d{10}$/.test(value);
+const isValidPhone = (value = '') => /^\d{9,10}$/.test(value);
 
 const buildCustomerAddress = (profile) => {
   const parts = [];
