@@ -74,7 +74,7 @@ async function createCustomer(input = {}, actor = {}) {
   const normalizedPhone = normalizePhone(phone);
 
   if (!name || !isValidPhone(normalizedPhone)) {
-    throw buildError(400, { error: 'ต้องระบุชื่อและเบอร์โทร (10 หลัก)' });
+    throw buildError(400, { error: 'ต้องระบุชื่อและเบอร์โทร 9 หรือ 10 หลัก' });
   }
 
   const existingUser = await repository.findUserByPhone(normalizedPhone);
