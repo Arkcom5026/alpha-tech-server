@@ -16,6 +16,7 @@ const schema = read('prisma/commerce/quotation.prisma');
 const migration = read('prisma/migrations/20260819004500_quotation_revision_authority/migration.sql');
 const service = read('src/modules/quotation/quotationService.js');
 const routes = read('src/modules/quotation/http/quotationRoutes.js');
+const revisionGuard = read('src/modules/quotation/quotationRevisionGuard.js');
 const issuedSnapshot = read('src/modules/quotation/quotationIssuedSnapshot.js');
 
 for (const token of [
@@ -58,6 +59,14 @@ for (const token of [
 
 includes(routes, "router.get('/:quotationId/revisions'", 'Revision history route is required');
 includes(routes, "router.post('/:quotationId/revisions'", 'Revision creation route is required');
+includes(routes, 'ensureLatestRevision', 'Lifecycle routes must apply latest-revision authority');
+includes(routes, 'latestOnly', 'Superseded revisions must be blocked from lifecycle mutation');
+
+for (const token of [
+  'const ensureLatestRevision = async',
+  'revisedTo: { select: { id: true, revisionNumber: true } }',
+  "'QUOTATION_REVISION_SUPERSEDED'",
+]) includes(revisionGuard, token, `Superseded revision guard missing: ${token}`);
 
 for (const token of [
   'schemaVersion: 3',
