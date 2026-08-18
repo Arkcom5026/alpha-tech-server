@@ -18,6 +18,7 @@ const service = read('src/modules/quotation/quotationService.js');
 const contract = read('src/modules/quotation/quotationContract.js');
 const routes = read('src/modules/quotation/http/quotationRoutes.js');
 const salesRoutes = read('src/modules/sales/routes/saleRoutes.js');
+const createSection = service.slice(service.indexOf('const create = async'), service.indexOf('const list = async'));
 
 includes(schema, 'model Quotation {', 'Quotation must be a first-class document aggregate');
 includes(schema, 'items                  QuotationItem[]', 'Quotation must own zero-to-many document lines');
@@ -34,9 +35,9 @@ includes(migration, 'CREATE TABLE "QuotationItem"', 'Canonical migration must cr
 includes(migration, '"customerId" INTEGER,', 'Migration must permit customer-less draft creation');
 includes(migration, '"sourceProductId" INTEGER,', 'Migration must permit manual lines with no product');
 
-includes(service, 'Empty draft created', 'Create authority must explicitly support an empty document draft');
-includes(service, 'customerId = contract.optionalPositiveInt', 'Customer selection must be optional at creation');
-excludes(service, 'items.length', 'Draft creation must not require any item count');
+includes(createSection, 'Empty draft created', 'Create authority must explicitly support an empty document draft');
+includes(createSection, 'customerId = contract.optionalPositiveInt', 'Customer selection must be optional at creation');
+excludes(createSection, 'items.length', 'Draft creation must not require any item count');
 excludes(service, 'sourceProductId: contract.positiveInt', 'Product selection must never be required for quotation lines');
 includes(service, "ensureDraft(quotation)", 'Document editing must be restricted to draft authority');
 includes(service, 'documentHeaderSnapshot', 'Issuing must snapshot document header authority');
