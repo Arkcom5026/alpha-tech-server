@@ -7,7 +7,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const includes = (source, token) => { if (!source.includes(token)) throw new Error(`Missing lineage contract: ${token}`); };
 
 const schema = read('prisma/commerce/sale-quotation-reference.prisma');
-const migration = read('prisma/migrations/20260819013500_sale_quotation_reference_authority/migration.sql');
+const migration = read('prisma/migrations/20260819012000_sale_quotation_reference_authority/migration.sql');
 const contract = read('src/modules/sales/completion/contracts/saleCompletionContract.js');
 const controller = read('src/modules/sales/completion/controllers/saleCompletionController.js');
 const authority = read('src/modules/sales/lineage/saleQuotationReferenceService.js');
