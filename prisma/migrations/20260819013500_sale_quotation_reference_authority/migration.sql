@@ -11,8 +11,8 @@ CREATE TABLE "SaleQuotationReference" (
   CONSTRAINT "SaleQuotationReference_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "SaleQuotationReference_saleId_quotationId_key"
-  ON "SaleQuotationReference"("saleId", "quotationId");
+CREATE UNIQUE INDEX "SaleQuotationReference_saleId_key"
+  ON "SaleQuotationReference"("saleId");
 CREATE INDEX "SaleQuotationReference_branchId_saleId_idx"
   ON "SaleQuotationReference"("branchId", "saleId");
 CREATE INDEX "SaleQuotationReference_branchId_quotationId_idx"
