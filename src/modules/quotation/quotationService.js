@@ -78,9 +78,21 @@ const hydrateBranchDocumentAddress = (branch) => {
   };
 };
 
+const revisionSelect = Object.freeze({
+  id: true,
+  code: true,
+  revisionNumber: true,
+  status: true,
+  issuedAt: true,
+  acceptedAt: true,
+  createdAt: true,
+});
+
 const quotationInclude = Object.freeze({
   items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
   events: { orderBy: { createdAt: 'desc' }, take: 30 },
+  revisedFrom: { select: revisionSelect },
+  revisedTo: { select: revisionSelect },
 });
 
 const ensureQuotation = async ({ quotationId, branchId }, tx = prisma) => {
@@ -143,6 +155,7 @@ const create = async (input) => {
         customerId,
         createdById: authority.employeeId,
         updatedById: authority.employeeId,
+        revisionNumber: 0,
         ...customerFields(snapshot),
       },
     });
@@ -185,9 +198,13 @@ const list = async (input) => {
         ],
       } : {}),
     },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: [{ updatedAt: 'desc' }, { revisionNumber: 'desc' }],
     take: Math.min(100, Math.max(1, Number(input.limit || 50))),
-    include: { items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } },
+    include: {
+      items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+      revisedFrom: { select: revisionSelect },
+      revisedTo: { select: revisionSelect },
+    },
   });
 };
 
@@ -195,6 +212,20 @@ const detail = async (input) => ensureQuotation({
   quotationId: input.quotationId,
   branchId: contract.positiveInt(input.branchId, 'branchId'),
 });
+
+const revisionHistory = async (input) => {
+  const branchId = contract.positiveInt(input.branchId, 'branchId');
+  const quotation = await ensureQuotation({ quotationId: input.quotationId, branchId });
+  const rootId = quotation.revisionRootId || quotation.id;
+  return prisma.quotation.findMany({
+    where: {
+      branchId,
+      OR: [{ id: rootId }, { revisionRootId: rootId }],
+    },
+    orderBy: { revisionNumber: 'asc' },
+    select: revisionSelect,
+  });
+};
 
 const updateDraft = async (input) => {
   const authority = actor(input);
@@ -290,6 +321,106 @@ const removeLine = async (input) => {
       data: { quotationId: quotation.id, eventType: 'LINE_REMOVED', previousStatus: quotation.status, resultingStatus: quotation.status, actorId: authority.employeeId, note: existing.title },
     });
     return recalculate({ quotationId: quotation.id, branchId: authority.branchId }, tx);
+  });
+};
+
+const createRevision = async (input) => {
+  const authority = actor(input);
+  return prisma.$transaction(async (tx) => {
+    await ensureActorAuthority(authority, tx);
+    const source = await ensureQuotation({ quotationId: input.quotationId, branchId: authority.branchId }, tx);
+    if (!['ISSUED', 'ACCEPTED'].includes(source.status)) {
+      contract.fail('Only issued or accepted quotations can create a revision', 'QUOTATION_REVISION_SOURCE_INVALID', 409);
+    }
+    if (!source.issuedSnapshot || typeof source.issuedSnapshot !== 'object') {
+      contract.fail('Issued quotation snapshot is required to create a revision', 'QUOTATION_ISSUED_SNAPSHOT_REQUIRED', 409);
+    }
+    if (source.revisedTo) {
+      contract.fail('This quotation revision already has a successor', 'QUOTATION_REVISION_ALREADY_EXISTS', 409);
+    }
+
+    const snapshot = source.issuedSnapshot;
+    const customer = snapshot.customer && typeof snapshot.customer === 'object' ? snapshot.customer : {};
+    const totals = snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {};
+    const nextRevisionNumber = Number(source.revisionNumber || 0) + 1;
+    const revisionRootId = source.revisionRootId || source.id;
+
+    const revision = await tx.quotation.create({
+      data: {
+        code: source.code,
+        branchId: authority.branchId,
+        customerId: customer.customerId || source.customerId || null,
+        createdById: authority.employeeId,
+        updatedById: authority.employeeId,
+        revisionNumber: nextRevisionNumber,
+        revisionRootId,
+        revisedFromId: source.id,
+        status: 'DRAFT',
+        subject: snapshot.subject || null,
+        introduction: snapshot.introduction || null,
+        closingNote: snapshot.closingNote || null,
+        notes: snapshot.notes || null,
+        paymentTerms: snapshot.paymentTerms || null,
+        customerName: customer.name || null,
+        customerCompany: customer.company || null,
+        customerDepartment: customer.department || null,
+        customerContactName: customer.contactName || null,
+        customerPhone: customer.phone || null,
+        customerTaxId: customer.taxId || null,
+        customerAddress: customer.address || null,
+        validUntil: snapshot.validUntil ? new Date(snapshot.validUntil) : null,
+        billDiscount: 0,
+        vatEnabled: totals.vatEnabled !== false,
+        vatRate: money(totals.vatRate || source.vatRate || 7),
+      },
+    });
+
+    const items = Array.isArray(snapshot.items) ? snapshot.items : [];
+    if (items.length) {
+      await tx.quotationItem.createMany({
+        data: items.map((item, index) => {
+          const quantity = Number(item.quantity || 1);
+          const unitPrice = money(item.unitPrice || 0);
+          const lineSubtotal = money(quantity * unitPrice);
+          return {
+            quotationId: revision.id,
+            sourceType: item.sourceType === 'PRODUCT_ASSISTED' ? 'PRODUCT_ASSISTED' : 'MANUAL',
+            sourceProductId: item.sourceProductId || null,
+            title: item.title || 'รายการ',
+            description: item.description || null,
+            quantity,
+            unitName: item.unitName || null,
+            unitPrice,
+            discountAmount: 0,
+            lineSubtotal,
+            lineTotal: lineSubtotal,
+            sortOrder: Number.isInteger(Number(item.sortOrder)) ? Number(item.sortOrder) : index,
+          };
+        }),
+      });
+    }
+
+    await tx.quotationEvent.create({
+      data: {
+        quotationId: source.id,
+        eventType: 'REVISION_CREATED',
+        previousStatus: source.status,
+        resultingStatus: source.status,
+        actorId: authority.employeeId,
+        note: `Created Rev.${nextRevisionNumber}`,
+      },
+    });
+    await tx.quotationEvent.create({
+      data: {
+        quotationId: revision.id,
+        eventType: 'REVISION_CREATED',
+        resultingStatus: 'DRAFT',
+        actorId: authority.employeeId,
+        note: `Revision of ${source.code} Rev.${source.revisionNumber || 0}`,
+      },
+    });
+
+    return recalculate({ quotationId: revision.id, branchId: authority.branchId }, tx);
   });
 };
 
@@ -405,11 +536,13 @@ module.exports = Object.freeze({
   addLine,
   cancel,
   create,
+  createRevision,
   detail,
   issue,
   list,
   reject,
   removeLine,
+  revisionHistory,
   updateDraft,
   updateLine,
 });

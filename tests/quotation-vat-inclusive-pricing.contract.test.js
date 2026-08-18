@@ -30,7 +30,7 @@ if (exampleVat !== 65.42) throw new Error(`Expected VAT extracted from 1,000.00 
 if (exampleTaxableBase !== 934.58) throw new Error(`Expected pre-VAT value to be 934.58, received ${exampleTaxableBase}`);
 
 for (const token of [
-  'schemaVersion: 2',
+  'schemaVersion: 3',
   'vatInclusive: true',
   'taxableBase: money(number(quotation.grandTotal) - number(quotation.vatAmount))',
 ]) {

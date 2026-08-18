@@ -22,10 +22,13 @@ if (service.includes("const issue = transition({ action: 'issue'")) throw new Er
 
 const issuedAt = new Date('2026-08-18T16:30:00.000Z');
 const quotation = {
-  id: 1,
-  code: 'QT-6908-00001',
+  id: 11,
+  code: 'QT-6908-00011',
   branchId: 2,
   version: 7,
+  revisionNumber: 2,
+  revisionRootId: 7,
+  revisedFromId: 9,
   issueDate: issuedAt,
   validUntil: new Date('2026-08-31T16:59:59.000Z'),
   subject: 'เสนอราคาอุปกรณ์',
@@ -58,7 +61,10 @@ const snapshot = buildIssuedSnapshot({ quotation, customerSnapshot, documentHead
 
 if (snapshot.status !== 'ISSUED') throw new Error('Issued snapshot status must be ISSUED');
 if (snapshot.version !== 8) throw new Error('Issued snapshot must record the issued document version');
-if (snapshot.schemaVersion !== 2 || snapshot.totals.vatInclusive !== true) throw new Error('Issued snapshot must identify VAT-inclusive pricing semantics');
+if (snapshot.schemaVersion !== 3 || snapshot.totals.vatInclusive !== true) throw new Error('Issued snapshot must identify revision-aware VAT-inclusive semantics');
+if (snapshot.revisionNumber !== 2 || snapshot.revisionRootId !== 7 || snapshot.revisedFromId !== 9) {
+  throw new Error('Issued snapshot must freeze the exact quotation revision identity');
+}
 if (snapshot.items.length !== 1 || snapshot.items[0].unitPrice !== 5500) throw new Error('Issued snapshot must freeze commercial line values');
 if (snapshot.totals.grandTotal !== 5500 || snapshot.totals.vatAmount !== 359.81 || snapshot.totals.taxableBase !== 5140.19) {
   throw new Error('Issued snapshot must freeze VAT-inclusive totals and extracted VAT');

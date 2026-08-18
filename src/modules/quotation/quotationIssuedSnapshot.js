@@ -5,10 +5,13 @@ const money = (value) => Math.round((number(value) + Number.EPSILON) * 100) / 10
 const iso = (value) => value ? new Date(value).toISOString() : null;
 
 const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapshot, issuedAt }) => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   quotationId: quotation.id,
   code: quotation.code,
   branchId: quotation.branchId,
+  revisionNumber: Number(quotation.revisionNumber || 0),
+  revisionRootId: quotation.revisionRootId || quotation.id,
+  revisedFromId: quotation.revisedFromId || null,
   status: 'ISSUED',
   version: Number(quotation.version || 0) + 1,
   issuedAt: iso(issuedAt),
