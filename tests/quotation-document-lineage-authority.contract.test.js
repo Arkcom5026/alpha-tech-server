@@ -15,8 +15,8 @@ const delivery = read('src/modules/sales/documents/print/projectSaleDeliveryNote
 const tax = read('src/modules/tax/sources/sale/registerSaleTaxCandidateService.js');
 const quotationRoutes = read('src/modules/quotation/http/quotationRoutes.js');
 
-for (const token of ['model SaleQuotationReference', 'saleId', 'quotationId', 'quotationCode', 'quotationRevision', '@@unique([saleId, quotationId])']) includes(schema, token);
-for (const token of ['CREATE TABLE "SaleQuotationReference"', 'SaleQuotationReference_saleId_fkey', 'SaleQuotationReference_quotationId_fkey']) includes(migration, token);
+for (const token of ['model SaleQuotationReference', 'saleId            Int      @unique', 'quotationId', 'quotationCode', 'quotationRevision']) includes(schema, token);
+for (const token of ['CREATE TABLE "SaleQuotationReference"', 'SaleQuotationReference_saleId_key', 'SaleQuotationReference_saleId_fkey', 'SaleQuotationReference_quotationId_fkey']) includes(migration, token);
 for (const token of [
   'const sourceQuotationId = sale.sourceQuotationId == null',
   "positiveInteger(sale.sourceQuotationId, 'sourceQuotationId')",
@@ -27,7 +27,13 @@ for (const token of [
   "quotation.status !== 'ACCEPTED'",
   'SALE_QUOTATION_REFERENCE_SUPERSEDED',
   'revisedFromId: quotation.id',
+  'SALE_QUOTATION_REFERENCE_CONFLICT',
 ]) includes(authority, token);
+includes(controller, 'await resolveAcceptedQuotationReference({');
+includes(controller, 'const result = await completeSale');
+if (controller.indexOf('await resolveAcceptedQuotationReference({') > controller.indexOf('const result = await completeSale')) {
+  throw new Error('Quotation authority must be validated before the sale is committed');
+}
 includes(controller, 'quotationReference = await ensureSaleQuotationReference');
 includes(delivery, 'sourceQuotation: quotationReference ?');
 includes(tax, 'sourceQuotation: quotationReference ?');
