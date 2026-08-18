@@ -31,24 +31,32 @@ const loadCustomerSnapshot = async ({ customerId, branchId }, tx = prisma) => {
       departmentName: true,
       taxId: true,
       addressDetail: true,
+      subdistrictCode: true,
       paymentTerms: true,
       user: { select: { loginId: true, email: true } },
-      subdistrict: {
-        select: {
-          nameTh: true,
-          postcode: true,
-          district: {
-            select: {
-              nameTh: true,
-              province: { select: { nameTh: true } },
-            },
-          },
-        },
-      },
     },
   });
   if (!customer) contract.fail('Customer does not belong to this branch', 'QUOTATION_CUSTOMER_SCOPE_FAILED', 404);
-  return customer;
+
+  const subdistrict = customer.subdistrictCode
+    ? await tx.subdistrict.findUnique({
+      where: { code: customer.subdistrictCode },
+      select: {
+        code: true,
+        nameTh: true,
+        postcode: true,
+        district: {
+          select: {
+            code: true,
+            nameTh: true,
+            province: { select: { code: true, nameTh: true } },
+          },
+        },
+      },
+    })
+    : null;
+
+  return { ...customer, subdistrict };
 };
 
 const quotationInclude = Object.freeze({
