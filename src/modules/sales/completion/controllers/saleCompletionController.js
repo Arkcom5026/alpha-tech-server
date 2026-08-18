@@ -25,6 +25,7 @@ const completeSaleController = async (req, res) => {
       await resolveAcceptedQuotationReference({
         quotationId: command.sale.sourceQuotationId,
         branchId,
+        customerId: command.sale.customerId,
       });
     }
 
