@@ -12,6 +12,20 @@ const context = (req) => ({
   employeeId: Number(req.user?.employeeId || req.user?.employeeProfileId || 0),
 });
 
+const requireEmployeeContext = (req, res, next) => {
+  const authority = context(req);
+  if (!authority.branchId || !authority.employeeId) {
+    return res.status(403).json({
+      ok: false,
+      code: 'QUOTATION_EMPLOYEE_AUTHORITY_REQUIRED',
+      message: 'Quotation workspace is available to authorized store employees only',
+    });
+  }
+  return next();
+};
+
+router.use(requireEmployeeContext);
+
 const handle = (operation, status = 200) => async (req, res, next) => {
   try {
     const data = await operation(req);
