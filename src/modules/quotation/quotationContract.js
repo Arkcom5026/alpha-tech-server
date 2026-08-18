@@ -65,7 +65,9 @@ const draftPatch = (input = {}) => ({
   customerAddress: text(input.customerAddress, 3000),
   issueDate: date(input.issueDate, 'issueDate'),
   validUntil: date(input.validUntil, 'validUntil'),
-  billDiscount: money(input.billDiscount, 'billDiscount'),
+  // Quotation uses the offered unit price as the final commercial price.
+  // Discount fields remain in the schema only for backward compatibility.
+  billDiscount: 0,
   vatEnabled: bool(input.vatEnabled, true),
   vatRate: money(input.vatRate ?? 7, 'vatRate'),
 });
@@ -82,7 +84,7 @@ const linePayload = (input = {}) => {
     quantity: quantity(input.quantity),
     unitName: text(input.unitName, 100),
     unitPrice: money(input.unitPrice, 'unitPrice'),
-    discountAmount: money(input.discountAmount, 'discountAmount'),
+    discountAmount: 0,
     sortOrder: Number.isInteger(Number(input.sortOrder)) ? Number(input.sortOrder) : 0,
   };
 };
