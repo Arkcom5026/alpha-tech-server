@@ -36,8 +36,8 @@ const money = (value, name, { min = 0 } = {}) => {
 
 const quantity = (value) => {
   const parsed = Number(value ?? 1);
-  if (!Number.isFinite(parsed) || parsed <= 0) fail('quantity must be greater than zero');
-  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+  if (!Number.isInteger(parsed) || parsed <= 0) fail('quantity must be a positive integer');
+  return parsed;
 };
 
 const bool = (value, fallback = false) => value === undefined ? fallback : Boolean(value);
