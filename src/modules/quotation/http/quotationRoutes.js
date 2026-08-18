@@ -3,6 +3,7 @@
 const express = require('express');
 const service = require('../quotationService');
 const { ensureLatestRevision } = require('../quotationRevisionGuard');
+const { getQuotationDocumentLineage } = require('../../sales/lineage/saleQuotationReferenceService');
 
 const router = express.Router();
 
@@ -44,6 +45,7 @@ router.get('/', handle((req) => service.list({ ...req.query, ...context(req) }))
 router.post('/', handle((req) => service.create({ ...req.body, ...context(req) }), 201));
 router.get('/:quotationId', handle((req) => service.detail({ quotationId: req.params.quotationId, ...context(req) })));
 router.get('/:quotationId/revisions', handle((req) => service.revisionHistory({ quotationId: req.params.quotationId, ...context(req) })));
+router.get('/:quotationId/lineage', handle((req) => getQuotationDocumentLineage({ quotationId: req.params.quotationId, branchId: context(req).branchId })));
 router.post('/:quotationId/revisions', handle((req) => service.createRevision({ ...req.body, quotationId: req.params.quotationId, ...context(req) }), 201));
 router.put('/:quotationId', handle((req) => service.updateDraft({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
 router.post('/:quotationId/items', handle((req) => service.addLine({ ...req.body, quotationId: req.params.quotationId, ...context(req) }), 201));
