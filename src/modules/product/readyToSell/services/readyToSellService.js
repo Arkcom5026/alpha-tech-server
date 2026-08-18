@@ -64,7 +64,10 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
       })
       const productIds = grouped.map((group) => group.productId)
       const products = await db.product.findMany({
-        where: { id: { in: productIds } },
+        where: {
+          id: { in: productIds },
+          branchPrice: { some: { branchId: brId, isActive: true } },
+        },
         select: {
           id: true,
           name: true,
@@ -80,27 +83,29 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
         },
       })
       const productMap = new Map(products.map((product) => [product.id, product]))
-      const structuredBarcodeRows = productIds.length ? await db.stockItem.findMany({
-        where: { branchId: brId, status: 'IN_STOCK', productId: { in: productIds } },
+      const sellableProductIds = products.map((product) => product.id)
+      const structuredBarcodeRows = sellableProductIds.length ? await db.stockItem.findMany({
+        where: { branchId: brId, status: 'IN_STOCK', productId: { in: sellableProductIds } },
         select: { productId: true, barcode: true, receivedAt: true, createdAt: true },
         orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
       }) : []
       const structuredPreviewMap = new Map()
       for (const row of structuredBarcodeRows) if (!structuredPreviewMap.has(row.productId)) structuredPreviewMap.set(row.productId, row)
-      structuredItems = grouped.map((group) => {
+      structuredItems = grouped.flatMap((group) => {
         const product = productMap.get(group.productId)
+        if (!product) return []
         const preview = structuredPreviewMap.get(group.productId)
         const qty = Number(group._count._all ?? 0)
         const previewBarcode = normStr(preview?.barcode)
-        return {
-          kind: 'STRUCTURED', productId: group.productId, productName: product?.name ?? null,
-          brandId: product?.brandId ?? product?.brand?.id ?? null, brandName: product?.brand?.name ?? null,
-          unitId: product?.unitId ?? product?.unit?.id ?? null, unitName: product?.unit?.name ?? null,
-          unit: product?.unit ? { id: product.unit.id, name: product.unit.name } : null,
+        return [{
+          kind: 'STRUCTURED', productId: group.productId, productName: product.name ?? null,
+          brandId: product.brandId ?? product.brand?.id ?? null, brandName: product.brand?.name ?? null,
+          unitId: product.unitId ?? product.unit?.id ?? null, unitName: product.unit?.name ?? null,
+          unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
           qty, receivedAt: group._max.receivedAt ?? null,
           displayCode: qty <= 1 ? previewBarcode || '-' : 'หลายบาร์โค้ด', hasDetails: true,
-          prices: resolvePrices(product?.branchPrice?.[0], { branchId: brId, productId: group.productId }),
-        }
+          prices: resolvePrices(product.branchPrice?.[0], { branchId: brId, productId: group.productId }),
+        }]
       })
     } catch (error) {
       if (error?.code?.startsWith('PRICE_') || error?.code === 'ACTIVE_BRANCH_PRICE_NOT_FOUND') throw error
