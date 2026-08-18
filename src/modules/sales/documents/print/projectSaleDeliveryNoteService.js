@@ -4,6 +4,7 @@ const { prisma } = require('../../../../../lib/prisma');
 const {
   ResolvePrintDocumentPurposeService,
 } = require('../../../document-purpose/resolve/resolvePrintDocumentPurposeService');
+const { getSaleQuotationReference } = require('../../lineage/saleQuotationReferenceService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -112,6 +113,10 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     branchId: normalizedBranchId,
     code: 'DELIVERY_NOTE',
   });
+  const quotationReference = await getSaleQuotationReference({
+    saleId: normalizedSaleId,
+    branchId: normalizedBranchId,
+  });
 
   const lines = [
     ...sale.items.map((item) => mapLine({
@@ -143,6 +148,12 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       vatRate: amount(sale.vatRate),
       paymentStatus: sale.statusPayment,
       isCredit: sale.isCredit === true,
+      sourceQuotation: quotationReference ? {
+        quotationId: quotationReference.quotationId,
+        code: quotationReference.quotationCode,
+        revisionNumber: quotationReference.quotationRevision,
+        issuedAt: quotationReference.quotationIssuedAt,
+      } : null,
     },
     issuer: sale.branch,
     recipient: {
