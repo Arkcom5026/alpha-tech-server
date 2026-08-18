@@ -1,4 +1,7 @@
 const repository = require('./customerManagementRepository');
+const {
+  projectQuotationWorkflowPolicy,
+} = require('../policies/customerQuotationWorkflowPolicy');
 
 const allowedRoles = new Set(['SUPERADMIN', 'ADMIN', 'EMPLOYEE']);
 
@@ -25,6 +28,7 @@ function presentCustomer(customer, financial = null) {
     email: customer.user?.email || '',
     taxId: customer.taxId || '',
     type: customer.type || 'INDIVIDUAL',
+    ...projectQuotationWorkflowPolicy(customer),
     addressDetail: customer.addressDetail || '',
     provinceCode,
     districtCode,
@@ -34,7 +38,6 @@ function presentCustomer(customer, financial = null) {
     updatedAt: customer.updatedAt,
     creditLimit: customer.creditLimit,
     creditBalance: customer.creditBalance,
-    // Legacy fields stay compatible for standalone consumers. Group rows use the explicit contract below.
     depositBalance: financial?.financialGroupStatus === 'STANDALONE'
       ? financial.groupAvailableCustomerMoney
       : customer.depositBalance_v2,
