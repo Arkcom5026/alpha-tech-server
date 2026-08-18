@@ -1,11 +1,9 @@
 'use strict';
 
 const express = require('express');
-const verifyToken = require('../../../../middlewares/verifyToken');
 const service = require('../quotationService');
 
 const router = express.Router();
-router.use(verifyToken);
 
 const context = (req) => ({
   branchId: Number(req.user?.branchId || req.user?.employeeBranchId || 0),
