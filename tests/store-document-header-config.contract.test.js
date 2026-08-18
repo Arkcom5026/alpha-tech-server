@@ -19,7 +19,7 @@ assert.match(service, /normalizeDocumentHeaderConfig/, 'branch runtime must norm
 assert.match(service, /INVALID_DOCUMENT_HEADER_CONFIG/, 'invalid document header payloads must be rejected');
 assert.match(service, /documents\[key\] = normalizeHeaderProfile\(profile\)/, 'document-specific overrides must be normalized');
 assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_MIN = 24/, 'custom logo size must have a safe lower bound');
-assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_MAX = 120/, 'custom logo size must have a safe upper bound');
+assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_MAX = 180/, 'custom logo size must allow larger logos up to 180px');
 assert.match(service, /DOCUMENT_HEADER_LOGO_SIZE_DEFAULT = 56/, 'custom logo size must preserve the standard 56px default');
 assert.match(service, /LEGACY_DOCUMENT_HEADER_LOGO_SIZES/, 'legacy preset values must remain backward compatible');
 assert.match(service, /sm: 40, md: 56, lg: 72, xl: 88/, 'legacy presets must map to their original pixel sizes');
