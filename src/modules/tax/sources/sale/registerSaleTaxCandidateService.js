@@ -4,6 +4,7 @@ const { prisma } = require('../../../../../lib/prisma');
 const { registerTaxCandidate } = require('../../intake/registerTaxCandidateService');
 const { assertSaleTaxDocumentEligibility } = require('./saleTaxDocumentEligibilityPolicy');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
+const { getSaleQuotationReference } = require('../../../sales/lineage/saleQuotationReferenceService');
 
 const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) => {
   const normalizedBranchId = Number(branchId);
@@ -83,6 +84,10 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
         },
       })
     : sale.customer;
+  const quotationReference = await getSaleQuotationReference({
+    saleId: normalizedSaleId,
+    branchId: normalizedBranchId,
+  });
 
   const gross = Number(sale.totalAmount || 0);
   const taxAmount = Number(sale.vat || 0);
@@ -130,6 +135,12 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
     snapshot: {
       saleId: sale.id,
       saleCode: sale.code,
+      sourceQuotation: quotationReference ? {
+        quotationId: quotationReference.quotationId,
+        code: quotationReference.quotationCode,
+        revisionNumber: quotationReference.quotationRevision,
+        issuedAt: quotationReference.quotationIssuedAt,
+      } : null,
       customerId: sale.customerId,
       financialOwnerCustomerId: group?.ownerId || sale.customerId,
       sourceDepartmentName: sale.customer?.departmentName || null,
