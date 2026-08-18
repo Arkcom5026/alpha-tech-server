@@ -1,0 +1,115 @@
+enum QuotationStatus {
+  DRAFT
+  ISSUED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  CONVERTED
+}
+
+enum QuotationLineSource {
+  MANUAL
+  PRODUCT_ASSISTED
+}
+
+enum QuotationEventType {
+  CREATED
+  UPDATED
+  LINE_ADDED
+  LINE_UPDATED
+  LINE_REMOVED
+  ISSUED
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  CONVERTED
+}
+
+model Quotation {
+  id                     Int              @id @default(autoincrement())
+  code                   String           @unique
+  branchId               Int
+  customerId             Int?
+  createdById            Int
+  updatedById            Int
+  status                 QuotationStatus  @default(DRAFT)
+  version                Int              @default(1)
+  issueDate              DateTime?
+  validUntil             DateTime?
+  subject                String?
+  introduction           String?
+  closingNote            String?
+  notes                  String?
+  paymentTerms           String?
+  customerName           String?
+  customerCompany        String?
+  customerDepartment     String?
+  customerContactName    String?
+  customerPhone          String?
+  customerTaxId          String?
+  customerAddress        String?
+  customerSnapshot       Json?
+  documentHeaderSnapshot Json?
+  subtotal               Decimal          @default(0) @db.Decimal(12, 2)
+  lineDiscountTotal      Decimal          @default(0) @db.Decimal(12, 2)
+  billDiscount           Decimal          @default(0) @db.Decimal(12, 2)
+  vatEnabled             Boolean          @default(true)
+  vatRate                Decimal          @default(7) @db.Decimal(5, 2)
+  vatAmount              Decimal          @default(0) @db.Decimal(12, 2)
+  grandTotal             Decimal          @default(0) @db.Decimal(12, 2)
+  issuedAt               DateTime?
+  acceptedAt             DateTime?
+  rejectedAt             DateTime?
+  cancelledAt            DateTime?
+  convertedAt            DateTime?
+  convertedSaleId        Int?             @unique
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  items                  QuotationItem[]
+  events                 QuotationEvent[]
+
+  @@index([branchId, status, updatedAt])
+  @@index([branchId, customerId, updatedAt])
+  @@index([branchId, code])
+}
+
+model QuotationItem {
+  id              Int                 @id @default(autoincrement())
+  quotationId     Int
+  sourceType      QuotationLineSource @default(MANUAL)
+  sourceProductId Int?
+  title           String
+  description     String?
+  quantity        Decimal             @default(1) @db.Decimal(12, 2)
+  unitName        String?
+  unitPrice       Decimal             @default(0) @db.Decimal(12, 2)
+  discountAmount  Decimal             @default(0) @db.Decimal(12, 2)
+  lineSubtotal    Decimal             @default(0) @db.Decimal(12, 2)
+  lineTotal       Decimal             @default(0) @db.Decimal(12, 2)
+  sortOrder       Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  quotation       Quotation           @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId, sortOrder])
+  @@index([sourceProductId])
+}
+
+model QuotationEvent {
+  id              Int                @id @default(autoincrement())
+  quotationId     Int
+  eventType       QuotationEventType
+  previousStatus  QuotationStatus?
+  resultingStatus QuotationStatus
+  actorId         Int
+  note            String?
+  createdAt       DateTime           @default(now())
+
+  quotation       Quotation          @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId, createdAt])
+  @@index([actorId, createdAt])
+}
