@@ -50,6 +50,13 @@ const resolveSellablePrices = (branchPrice, context) => {
   }
 }
 
+const formatStructuredDisplayCode = (previewBarcode, qty) => {
+  const barcode = normStr(previewBarcode)
+  if (!barcode) return '-'
+  const count = Math.max(0, Number(qty || 0))
+  return count > 1 ? `${barcode} +${count - 1}` : barcode
+}
+
 const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', mode = 'ALL', page = 1, pageSize = 25, db = prisma } = {}) => {
   const brId = requireBranchId(branchId)
   const keyword = normStr(q || search || searchText)
@@ -113,14 +120,13 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
         const { product, prices } = entry
         const preview = structuredPreviewMap.get(group.productId)
         const qty = Number(group._count._all ?? 0)
-        const previewBarcode = normStr(preview?.barcode)
         return [{
           kind: 'STRUCTURED', productId: group.productId, productName: product.name ?? null,
           brandId: product.brandId ?? product.brand?.id ?? null, brandName: product.brand?.name ?? null,
           unitId: product.unitId ?? product.unit?.id ?? null, unitName: product.unit?.name ?? null,
           unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
           qty, receivedAt: group._max.receivedAt ?? null,
-          displayCode: qty <= 1 ? previewBarcode || '-' : 'หลายบาร์โค้ด', hasDetails: true,
+          displayCode: formatStructuredDisplayCode(preview?.barcode, qty), hasDetails: true,
           prices,
         }]
       })
@@ -211,4 +217,4 @@ const getReadyToSellStructuredDetails = async ({ branchId, productId, q = '', db
   return { items: projected, total: projected.length }
 }
 
-module.exports = { getReadyToSell, getReadyToSellStructuredDetails, resolvePrices }
+module.exports = { getReadyToSell, getReadyToSellStructuredDetails, resolvePrices, formatStructuredDisplayCode }

@@ -1,7 +1,7 @@
 'use strict'
 
 const assert = require('assert')
-const { getReadyToSell } = require('../src/modules/product/readyToSell/services/readyToSellService')
+const { getReadyToSell, formatStructuredDisplayCode } = require('../src/modules/product/readyToSell/services/readyToSellService')
 
 const activePrice = {
   priceRetail: 150,
@@ -9,6 +9,11 @@ const activePrice = {
   priceTechnician: 130,
   priceOnline: 145,
 }
+
+assert.strictEqual(formatStructuredDisplayCode('SELLABLE-10', 1), 'SELLABLE-10')
+assert.strictEqual(formatStructuredDisplayCode('SELLABLE-10', 2), 'SELLABLE-10 +1')
+assert.strictEqual(formatStructuredDisplayCode('SELLABLE-10', 17), 'SELLABLE-10 +16')
+assert.strictEqual(formatStructuredDisplayCode('', 17), '-')
 
 const calls = []
 const db = {
@@ -75,7 +80,7 @@ const db = {
   assert.strictEqual(result.total, 1)
   assert.strictEqual(result.items.length, 1)
   assert.strictEqual(result.items[0].productId, 10)
-  assert.strictEqual(result.items[0].displayCode, 'หลายบาร์โค้ด')
+  assert.strictEqual(result.items[0].displayCode, 'SELLABLE-10 +1')
   assert.deepStrictEqual(result.items[0].prices, {
     retail: { price: 150, priceType: 'retail', field: 'priceRetail' },
     wholesale: { price: 140, priceType: 'wholesale', field: 'priceWholesale' },
