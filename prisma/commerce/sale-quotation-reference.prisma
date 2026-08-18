@@ -1,7 +1,7 @@
 model SaleQuotationReference {
   id                Int      @id @default(autoincrement())
   branchId          Int
-  saleId            Int
+  saleId            Int      @unique
   quotationId       Int
   quotationCode     String
   quotationRevision Int      @default(0)
@@ -9,7 +9,6 @@ model SaleQuotationReference {
   linkedById        Int
   createdAt         DateTime @default(now())
 
-  @@unique([saleId, quotationId])
   @@index([branchId, saleId])
   @@index([branchId, quotationId])
   @@index([branchId, quotationCode, quotationRevision])
