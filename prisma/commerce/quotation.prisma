@@ -51,6 +51,7 @@ model Quotation {
   customerAddress        String?
   customerSnapshot       Json?
   documentHeaderSnapshot Json?
+  issuedSnapshot         Json?
   subtotal               Decimal          @default(0) @db.Decimal(12, 2)
   lineDiscountTotal      Decimal          @default(0) @db.Decimal(12, 2)
   billDiscount           Decimal          @default(0) @db.Decimal(12, 2)
