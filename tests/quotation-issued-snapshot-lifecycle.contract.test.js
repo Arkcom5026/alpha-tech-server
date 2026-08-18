@@ -36,8 +36,8 @@ const quotation = {
   subtotal: 5500,
   vatEnabled: true,
   vatRate: 7,
-  vatAmount: 385,
-  grandTotal: 5885,
+  vatAmount: 359.81,
+  grandTotal: 5500,
   items: [{
     id: 10,
     sourceType: 'PRODUCT_ASSISTED',
@@ -58,8 +58,11 @@ const snapshot = buildIssuedSnapshot({ quotation, customerSnapshot, documentHead
 
 if (snapshot.status !== 'ISSUED') throw new Error('Issued snapshot status must be ISSUED');
 if (snapshot.version !== 8) throw new Error('Issued snapshot must record the issued document version');
+if (snapshot.schemaVersion !== 2 || snapshot.totals.vatInclusive !== true) throw new Error('Issued snapshot must identify VAT-inclusive pricing semantics');
 if (snapshot.items.length !== 1 || snapshot.items[0].unitPrice !== 5500) throw new Error('Issued snapshot must freeze commercial line values');
-if (snapshot.totals.grandTotal !== 5885 || snapshot.totals.vatAmount !== 385) throw new Error('Issued snapshot must freeze totals and VAT');
+if (snapshot.totals.grandTotal !== 5500 || snapshot.totals.vatAmount !== 359.81 || snapshot.totals.taxableBase !== 5140.19) {
+  throw new Error('Issued snapshot must freeze VAT-inclusive totals and extracted VAT');
+}
 if (snapshot.customer.address !== customerSnapshot.address) throw new Error('Issued snapshot must freeze customer presentation');
 if (snapshot.documentHeader.name !== documentHeaderSnapshot.name) throw new Error('Issued snapshot must freeze document header presentation');
 
