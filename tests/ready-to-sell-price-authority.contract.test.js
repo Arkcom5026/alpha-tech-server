@@ -12,7 +12,12 @@ const validPrice = {
 
 assert.deepStrictEqual(
   service.resolvePrices(validPrice, { branchId: 2, productId: 10 }),
-  { retail: 150, wholesale: 140, technician: 130, online: 145 },
+  {
+    retail: { price: 150, priceType: 'retail', field: 'priceRetail' },
+    wholesale: { price: 140, priceType: 'wholesale', field: 'priceWholesale' },
+    technician: { price: 130, priceType: 'technician', field: 'priceTechnician' },
+    online: { price: 145, priceType: 'online', field: 'priceOnline' },
+  },
 )
 
 assert.throws(
