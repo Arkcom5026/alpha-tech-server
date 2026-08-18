@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { prisma } = require('../../../lib/prisma');
 const contract = require('./quotationContract');
+const { customerFields } = require('./quotationCustomerSnapshot');
 
 const money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
@@ -32,25 +33,22 @@ const loadCustomerSnapshot = async ({ customerId, branchId }, tx = prisma) => {
       addressDetail: true,
       paymentTerms: true,
       user: { select: { loginId: true, email: true } },
+      subdistrict: {
+        select: {
+          nameTh: true,
+          postcode: true,
+          district: {
+            select: {
+              nameTh: true,
+              province: { select: { nameTh: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!customer) contract.fail('Customer does not belong to this branch', 'QUOTATION_CUSTOMER_SCOPE_FAILED', 404);
   return customer;
-};
-
-const customerFields = (snapshot) => {
-  if (!snapshot) return {};
-  return {
-    customerName: snapshot.name || null,
-    customerCompany: snapshot.companyName || null,
-    customerDepartment: snapshot.departmentName || null,
-    customerContactName: snapshot.name || null,
-    customerPhone: snapshot.user?.loginId || null,
-    customerTaxId: snapshot.taxId || null,
-    customerAddress: snapshot.addressDetail || null,
-    paymentTerms: snapshot.paymentTerms ? `${snapshot.paymentTerms} วัน` : null,
-    customerSnapshot: snapshot,
-  };
 };
 
 const quotationInclude = Object.freeze({
@@ -167,9 +165,7 @@ const updateDraft = async (input) => {
     ensureDraft(quotation);
     const patch = contract.draftPatch(input);
     const snapshot = await loadCustomerSnapshot({ customerId: patch.customerId, branchId: authority.branchId }, tx);
-    const selectedCustomerFields = snapshot && Number(patch.customerId) !== Number(quotation.customerId)
-      ? customerFields(snapshot)
-      : {};
+    const selectedCustomerFields = snapshot ? customerFields(snapshot) : {};
     await tx.quotation.update({
       where: { id: quotation.id },
       data: {
