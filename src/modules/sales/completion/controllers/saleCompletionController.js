@@ -2,7 +2,10 @@ const { validateSaleCompletionRequest } = require('../validators/saleCompletionV
 const { completeSale } = require('../services/saleCompletionService');
 const saleCustomerAccessService = require('../services/saleCustomerAccessService');
 const { publishSaleTaxCandidate } = require('../services/publishSaleTaxCandidateService');
-const { ensureSaleQuotationReference } = require('../../lineage/saleQuotationReferenceService');
+const {
+  ensureSaleQuotationReference,
+  resolveAcceptedQuotationReference,
+} = require('../../lineage/saleQuotationReferenceService');
 
 const completeSaleController = async (req, res) => {
   try {
@@ -18,6 +21,13 @@ const completeSaleController = async (req, res) => {
       employeeId,
       customerFirstAssociationToken: command.sale.customerFirstAssociationToken,
     });
+    if (command.sale.sourceQuotationId) {
+      await resolveAcceptedQuotationReference({
+        quotationId: command.sale.sourceQuotationId,
+        branchId,
+      });
+    }
+
     const result = await completeSale({ command, branchId, employeeId });
     const quotationReference = await ensureSaleQuotationReference({
       saleId: result.saleId,
