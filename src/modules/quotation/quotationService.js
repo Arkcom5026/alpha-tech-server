@@ -60,6 +60,24 @@ const loadCustomerSnapshot = async ({ customerId, branchId }, tx = prisma) => {
   return { ...customer, subdistrict };
 };
 
+const hydrateBranchDocumentAddress = (branch) => {
+  if (!branch) return null;
+  const subdistrict = branch.subdistrict || null;
+  const district = subdistrict?.district || null;
+  const province = district?.province || null;
+  const fullAddress = [
+    subdistrict?.nameTh ? `ตำบล${subdistrict.nameTh}` : null,
+    district?.nameTh ? `อำเภอ${district.nameTh}` : null,
+    province?.nameTh ? `จังหวัด${province.nameTh}` : null,
+    subdistrict?.postcode || null,
+  ].filter(Boolean).join(' ').trim();
+
+  return {
+    ...branch,
+    fullAddress: fullAddress || branch.address || null,
+  };
+};
+
 const quotationInclude = Object.freeze({
   items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
   events: { orderBy: { createdAt: 'desc' }, take: 30 },
@@ -287,9 +305,30 @@ const issue = async (input) => {
     const issueDate = quotation.issueDate || issuedAt;
     const branch = await tx.branch.findUnique({
       where: { id: authority.branchId },
-      select: { id: true, name: true, address: true, phone: true, taxId: true, isHeadOffice: true, branchCode: true, documentHeaderConfig: true },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        phone: true,
+        taxId: true,
+        isHeadOffice: true,
+        branchCode: true,
+        documentHeaderConfig: true,
+        subdistrict: {
+          select: {
+            nameTh: true,
+            postcode: true,
+            district: {
+              select: {
+                nameTh: true,
+                province: { select: { nameTh: true } },
+              },
+            },
+          },
+        },
+      },
     });
-    const documentHeaderSnapshot = branch || null;
+    const documentHeaderSnapshot = hydrateBranchDocumentAddress(branch);
     const customerSnapshot = {
       ...(quotation.customerSnapshot && typeof quotation.customerSnapshot === 'object' ? quotation.customerSnapshot : {}),
       customerId: quotation.customerId,
