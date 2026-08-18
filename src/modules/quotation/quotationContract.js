@@ -66,6 +66,7 @@ const draftPatch = (input = {}) => ({
   issueDate: date(input.issueDate, 'issueDate'),
   validUntil: date(input.validUntil, 'validUntil'),
   // Quotation uses the offered unit price as the final commercial price.
+  // Offered prices are VAT-inclusive; VAT is extracted for presentation and never added on top.
   // Discount fields remain in the schema only for backward compatibility.
   billDiscount: 0,
   vatEnabled: bool(input.vatEnabled, true),

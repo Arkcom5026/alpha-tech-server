@@ -116,10 +116,12 @@ const recalculate = async ({ quotationId, branchId }, tx) => {
   const lineDiscountTotal = money(items.reduce((sum, item) => sum + Number(item.discountAmount || 0), 0));
   const afterLineDiscount = Math.max(0, money(subtotal - lineDiscountTotal));
   const billDiscount = Math.min(afterLineDiscount, money(quotation.billDiscount));
-  const taxable = Math.max(0, money(afterLineDiscount - billDiscount));
+  const grossTotal = Math.max(0, money(afterLineDiscount - billDiscount));
   const vatRate = money(quotation.vatRate);
-  const vatAmount = quotation.vatEnabled ? money(taxable * vatRate / 100) : 0;
-  const grandTotal = money(taxable + vatAmount);
+  const vatAmount = quotation.vatEnabled && vatRate > 0
+    ? money(grossTotal * vatRate / (100 + vatRate))
+    : 0;
+  const grandTotal = grossTotal;
   return tx.quotation.update({
     where: { id: quotationId },
     data: { subtotal, lineDiscountTotal, billDiscount, vatAmount, grandTotal },
