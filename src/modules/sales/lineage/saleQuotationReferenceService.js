@@ -19,9 +19,10 @@ const positiveInt = (value, field) => {
   return number;
 };
 
-const resolveAcceptedQuotationReference = async ({ quotationId, branchId }, tx = prisma) => {
+const resolveAcceptedQuotationReference = async ({ quotationId, branchId, customerId }, tx = prisma) => {
   const normalizedQuotationId = positiveInt(quotationId, 'quotationId');
   const normalizedBranchId = positiveInt(branchId, 'branchId');
+  const normalizedCustomerId = positiveInt(customerId, 'customerId');
   const quotation = await tx.quotation.findFirst({
     where: { id: normalizedQuotationId, branchId: normalizedBranchId },
     select: {
@@ -29,6 +30,7 @@ const resolveAcceptedQuotationReference = async ({ quotationId, branchId }, tx =
       code: true,
       revisionNumber: true,
       status: true,
+      customerId: true,
       issuedAt: true,
       issuedSnapshot: true,
       revisedFromId: true,
@@ -37,6 +39,13 @@ const resolveAcceptedQuotationReference = async ({ quotationId, branchId }, tx =
 
   if (!quotation) {
     fail(404, 'SALE_QUOTATION_REFERENCE_NOT_FOUND', 'Quotation revision was not found in this branch');
+  }
+  if (quotation.customerId !== normalizedCustomerId) {
+    fail(409, 'SALE_QUOTATION_REFERENCE_CUSTOMER_MISMATCH', 'Quotation revision belongs to a different customer', {
+      quotationId: quotation.id,
+      quotationCustomerId: quotation.customerId,
+      saleCustomerId: normalizedCustomerId,
+    });
   }
   if (quotation.status !== 'ACCEPTED') {
     fail(409, 'SALE_QUOTATION_REFERENCE_NOT_ACCEPTED', 'Only an accepted quotation revision may be referenced by a sale', {
@@ -75,13 +84,14 @@ const ensureSaleQuotationReference = async ({ saleId, quotationId, branchId, emp
 
   const sale = await prisma.sale.findFirst({
     where: { id: normalizedSaleId, branchId: normalizedBranchId },
-    select: { id: true, branchId: true },
+    select: { id: true, branchId: true, customerId: true },
   });
   if (!sale) fail(404, 'SALE_QUOTATION_REFERENCE_SALE_NOT_FOUND', 'Sale was not found in this branch');
 
   const reference = await resolveAcceptedQuotationReference({
     quotationId,
     branchId: normalizedBranchId,
+    customerId: sale.customerId,
   });
 
   const existing = await prisma.saleQuotationReference.findFirst({
