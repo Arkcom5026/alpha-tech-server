@@ -208,7 +208,14 @@ class QuickStockRepository {
         productId: pId,
         branchId: brId,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        costPrice: true,
+        priceRetail: true,
+        priceWholesale: true,
+        priceTechnician: true,
+        priceOnline: true,
+      },
     })
   }
 
