@@ -9,9 +9,11 @@ const { searchSaleItemsController } = require('../item-search/controllers/saleIt
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 const posHeldCartRoutes = require('../held-cart/routes/posHeldCartRoutes');
+const quotationRoutes = require('../../quotation/http/quotationRoutes');
 
 const router = express.Router();
 router.use(verifyToken);
+router.use('/quotations', quotationRoutes);
 router.use('/held-carts', posHeldCartRoutes);
 router.get('/items/search', searchSaleItemsController);
 router.post('/complete', completeSaleController);
