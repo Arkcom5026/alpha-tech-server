@@ -14,14 +14,17 @@ const sample = {
   departmentName: 'พัสดุ',
   taxId: '0123456789012',
   addressDetail: '700 หมู่ 2',
+  subdistrictCode: '600302',
   paymentTerms: 30,
   user: { loginId: '0864467104', email: 'customer@example.com' },
   subdistrict: {
+    code: '600302',
     nameTh: 'ตาขีด',
     postcode: '60180',
     district: {
+      code: '6003',
       nameTh: 'บรรพตพิสัย',
-      province: { nameTh: 'นครสวรรค์' },
+      province: { code: '60', nameTh: 'นครสวรรค์' },
     },
   },
 };
@@ -38,10 +41,11 @@ if (fields.customerTaxId !== '0123456789012') throw new Error('Quotation snapsho
 if (!fields.customerSnapshot?.subdistrict?.district?.province?.nameTh) throw new Error('Quotation snapshot must retain geographic source fields');
 
 for (const token of [
-  'subdistrict:',
-  'postcode: true',
-  'district:',
-  'province: { select: { nameTh: true } }',
+  'subdistrictCode: true',
+  'await tx.subdistrict.findUnique',
+  "where: { code: customer.subdistrictCode }",
+  'province: { select: { code: true, nameTh: true } }',
+  'return { ...customer, subdistrict };',
   'const selectedCustomerFields = snapshot ? customerFields(snapshot) : {};',
 ]) {
   if (!service.includes(token)) throw new Error(`Quotation customer snapshot authority missing: ${token}`);
