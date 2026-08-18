@@ -30,6 +30,7 @@ model CustomerProfile {
   creditLimit               Decimal?                   @default(0) @db.Decimal(12, 2)
   paymentTerms              Int?
   type                      CustomerType               @default(INDIVIDUAL)
+  quotationWorkflowOverride Boolean?
   companyName               String?
   departmentName            String?
   financialOwnerCustomerId  Int?
