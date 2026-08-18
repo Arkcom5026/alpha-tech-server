@@ -45,9 +45,11 @@ includes(service, 'customerSnapshot', 'Issuing must snapshot recipient presentat
 includes(contract, "sourceType: sourceProductId ? 'PRODUCT_ASSISTED' : 'MANUAL'", 'Line source must derive from optional product assistance');
 includes(routes, 'QUOTATION_EMPLOYEE_AUTHORITY_REQUIRED', 'Quotation workspace must reject non-employee authenticated contexts');
 includes(routes, 'router.use(requireEmployeeContext);', 'Employee authority must guard all quotation routes');
+excludes(routes, "require('../../../../middlewares/verifyToken')", 'Quotation child router must inherit authenticated sales authority instead of verifying the same request twice');
 includes(routes, "router.post('/',", 'Empty quotation creation endpoint is required');
 includes(routes, "router.post('/:quotationId/items'", 'Manual/document line authoring endpoint is required');
 includes(routes, "router.post('/:quotationId/issue'", 'Quotation issue lifecycle endpoint is required');
+includes(salesRoutes, 'router.use(verifyToken);', 'Sales parent router must own authentication');
 includes(salesRoutes, "router.use('/quotations', quotationRoutes);", 'Quotation API must be mounted under authenticated sales authority');
 
 console.log('Quotation Document-First E2E contract: PASS');
