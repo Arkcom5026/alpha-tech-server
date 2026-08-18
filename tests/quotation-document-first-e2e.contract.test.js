@@ -46,6 +46,8 @@ includes(contract, "sourceType: sourceProductId ? 'PRODUCT_ASSISTED' : 'MANUAL'"
 includes(contract, 'billDiscount: 0,', 'Quotation draft authority must not preserve bill-discount semantics');
 includes(contract, 'discountAmount: 0,', 'Quotation line authority must use the offered unit price as the final price');
 includes(contract, 'Quotation uses the offered unit price as the final commercial price.', 'Adjusted-price-only semantics must be explicit in the quotation contract');
+includes(contract, 'Number.isInteger(parsed)', 'Quotation quantity authority must reject fractional quantities');
+includes(contract, 'quantity must be a positive integer', 'Quotation quantity validation must require positive whole numbers');
 includes(routes, 'QUOTATION_EMPLOYEE_AUTHORITY_REQUIRED', 'Quotation workspace must reject non-employee authenticated contexts');
 includes(routes, 'router.use(requireEmployeeContext);', 'Employee authority must guard all quotation routes');
 excludes(routes, "require('../../../../middlewares/verifyToken')", 'Quotation child router must inherit authenticated sales authority instead of verifying the same request twice');
