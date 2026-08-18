@@ -170,11 +170,12 @@ const reconcileLegacyLinkedState = async (tx, application, actorUserId) => {
         resultingProvisioningStatus: needsProvisioningReconciliation ? 'PROVISIONED' : application.provisioningStatus,
         previousActivationStatus: application.activationStatus,
         resultingActivationStatus: 'ACTIVE',
-        actorUserId: application.provisionedOwnerUserId,
+        actorUserId,
         metadata: {
           ownerUserId: application.provisionedOwnerUserId,
           branchId: branch.id,
           reconciledLegacyState: true,
+          reconciliationActorUserId: actorUserId,
         },
       },
     })
