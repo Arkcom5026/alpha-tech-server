@@ -60,6 +60,76 @@ const markFailed = async (applicationId, actorUserId, sourceStatus, error) => {
   })
 }
 
+const reconcileLegacyProvisionedState = async (tx, application, actorUserId) => {
+  if (!application.provisionedBranchId || application.provisioningStatus === 'PROVISIONED') return null
+
+  const branch = await tx.branch.findUnique({
+    where: { id: application.provisionedBranchId },
+    select: { id: true },
+  })
+  if (!branch) {
+    fail(409, 'PARTNER_STORE_PROVISIONED_BRANCH_MISSING', 'Provisioned branch is missing')
+  }
+
+  const existingCapability = await tx.partnerStoreCapability.findUnique({
+    where: { branchId: branch.id },
+    select: { id: true },
+  })
+  if (!existingCapability) {
+    await tx.partnerStoreCapability.create({
+      data: {
+        branchId: branch.id,
+        displayName: application.businessName,
+        contactPhone: application.contactPhone,
+        storefrontEnabled: false,
+        pickupEnabled: true,
+        deliveryEnabled: false,
+        serviceAreaMode: 'PICKUP_ONLY',
+      },
+    })
+  }
+
+  const reconciledAt = new Date()
+  const changed = await tx.partnerStoreApplication.updateMany({
+    where: {
+      id: application.id,
+      status: 'APPROVED',
+      provisionedBranchId: branch.id,
+      provisioningStatus: { in: ['NOT_STARTED', 'FAILED', 'IN_PROGRESS'] },
+    },
+    data: {
+      provisioningStatus: 'PROVISIONED',
+      provisionedAt: application.provisionedAt || reconciledAt,
+      provisioningFailureCode: null,
+    },
+  })
+
+  if (changed.count !== 1) {
+    const latest = await repository.findById(application.id, tx)
+    if (latest?.provisioningStatus === 'PROVISIONED' && latest.provisionedBranchId === branch.id) return latest
+    fail(409, 'PARTNER_STORE_PROVISIONING_STATE_CHANGED', 'Provisioning state changed')
+  }
+
+  await tx.partnerStoreApplicationEvent.create({
+    data: {
+      applicationId: application.id,
+      eventType: 'STORE_PROVISIONED',
+      previousStatus: application.status,
+      resultingStatus: application.status,
+      previousProvisioningStatus: application.provisioningStatus,
+      resultingProvisioningStatus: 'PROVISIONED',
+      actorUserId,
+      metadata: {
+        branchId: branch.id,
+        reconciledLegacyState: true,
+        capabilityCreated: !existingCapability,
+      },
+    },
+  })
+
+  return tx.partnerStoreApplication.findUnique({ where: { id: application.id }, select: resultSelect })
+}
+
 const provision = async (applicationId, actorUserId) => {
   const id = positiveId(applicationId, 400, 'PARTNER_STORE_APPLICATION_ID_INVALID')
   const actorId = positiveId(actorUserId, 401, 'PARTNER_STORE_PROVISIONING_ACTOR_REQUIRED')
@@ -71,6 +141,10 @@ const provision = async (applicationId, actorUserId) => {
       if (!application) fail(404, 'PARTNER_STORE_APPLICATION_NOT_FOUND', 'Application not found')
       if (application.status !== 'APPROVED') fail(409, 'PARTNER_STORE_PROVISIONING_REQUIRES_APPROVAL', 'Approval required')
       if (application.provisioningStatus === 'PROVISIONED') return application
+
+      const reconciled = await reconcileLegacyProvisionedState(tx, application, actorId)
+      if (reconciled) return reconciled
+
       if (application.provisioningStatus === 'IN_PROGRESS') fail(409, 'PARTNER_STORE_PROVISIONING_IN_PROGRESS', 'Provisioning in progress')
 
       sourceStatus = application.provisioningStatus
