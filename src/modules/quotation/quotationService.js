@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { prisma } = require('../../../lib/prisma');
 const contract = require('./quotationContract');
 const { customerFields } = require('./quotationCustomerSnapshot');
+const { buildIssuedSnapshot } = require('./quotationIssuedSnapshot');
 
 const money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
@@ -76,6 +77,16 @@ const ensureQuotation = async ({ quotationId, branchId }, tx = prisma) => {
 const ensureDraft = (quotation) => {
   if (quotation.status !== 'DRAFT') {
     contract.fail('Only draft quotations can be edited', 'QUOTATION_NOT_EDITABLE', 409);
+  }
+};
+
+const ensureIssuable = (quotation) => {
+  ensureDraft(quotation);
+  if (!(quotation.customerCompany || quotation.customerName)) {
+    contract.fail('Quotation recipient is required before issue', 'QUOTATION_ISSUE_CUSTOMER_REQUIRED', 409);
+  }
+  if (!quotation.items?.length) {
+    contract.fail('Quotation must contain at least one line before issue', 'QUOTATION_ISSUE_LINE_REQUIRED', 409);
   }
 };
 
@@ -262,29 +273,80 @@ const removeLine = async (input) => {
   });
 };
 
+const issue = async (input) => {
+  const authority = actor(input);
+  return prisma.$transaction(async (tx) => {
+    await ensureActorAuthority(authority, tx);
+    let quotation = await ensureQuotation({ quotationId: input.quotationId, branchId: authority.branchId }, tx);
+    ensureIssuable(quotation);
+
+    quotation = await recalculate({ quotationId: quotation.id, branchId: authority.branchId }, tx);
+    ensureIssuable(quotation);
+
+    const issuedAt = new Date();
+    const issueDate = quotation.issueDate || issuedAt;
+    const branch = await tx.branch.findUnique({
+      where: { id: authority.branchId },
+      select: { id: true, name: true, address: true, phone: true, taxId: true, isHeadOffice: true, branchCode: true, documentHeaderConfig: true },
+    });
+    const documentHeaderSnapshot = branch || null;
+    const customerSnapshot = {
+      ...(quotation.customerSnapshot && typeof quotation.customerSnapshot === 'object' ? quotation.customerSnapshot : {}),
+      customerId: quotation.customerId,
+      name: quotation.customerName,
+      company: quotation.customerCompany,
+      department: quotation.customerDepartment,
+      contactName: quotation.customerContactName,
+      phone: quotation.customerPhone,
+      taxId: quotation.customerTaxId,
+      address: quotation.customerAddress,
+    };
+    const issuedSnapshot = buildIssuedSnapshot({
+      quotation: { ...quotation, issueDate },
+      documentHeaderSnapshot,
+      customerSnapshot,
+      issuedAt,
+    });
+
+    const updated = await tx.quotation.update({
+      where: { id: quotation.id },
+      data: {
+        status: 'ISSUED',
+        issueDate,
+        issuedAt,
+        updatedById: authority.employeeId,
+        version: { increment: 1 },
+        documentHeaderSnapshot,
+        customerSnapshot,
+        issuedSnapshot,
+      },
+      include: quotationInclude,
+    });
+    await tx.quotationEvent.create({
+      data: {
+        quotationId: quotation.id,
+        eventType: 'ISSUED',
+        previousStatus: quotation.status,
+        resultingStatus: 'ISSUED',
+        actorId: authority.employeeId,
+        note: contract.text(input.note, 1000),
+      },
+    });
+    return updated;
+  });
+};
+
 const transition = ({ action, from, to, eventType, timestampField }) => async (input) => {
   const authority = actor(input);
   return prisma.$transaction(async (tx) => {
     await ensureActorAuthority(authority, tx);
     const quotation = await ensureQuotation({ quotationId: input.quotationId, branchId: authority.branchId }, tx);
     if (!from.includes(quotation.status)) contract.fail(`Cannot ${action} quotation from ${quotation.status}`, 'QUOTATION_TRANSITION_REJECTED', 409);
+    if (!quotation.issuedSnapshot && quotation.status !== 'DRAFT') {
+      contract.fail('Issued quotation snapshot is missing', 'QUOTATION_ISSUED_SNAPSHOT_REQUIRED', 409);
+    }
     const data = { status: to, updatedById: authority.employeeId, version: { increment: 1 } };
     if (timestampField) data[timestampField] = new Date();
-    if (to === 'ISSUED') {
-      data.issueDate = quotation.issueDate || new Date();
-      const branch = await tx.branch.findUnique({ where: { id: authority.branchId }, select: { id: true, name: true, address: true, phone: true, taxId: true, isHeadOffice: true, branchCode: true, documentHeaderConfig: true } });
-      data.documentHeaderSnapshot = branch || null;
-      data.customerSnapshot = {
-        customerId: quotation.customerId,
-        name: quotation.customerName,
-        company: quotation.customerCompany,
-        department: quotation.customerDepartment,
-        contactName: quotation.customerContactName,
-        phone: quotation.customerPhone,
-        taxId: quotation.customerTaxId,
-        address: quotation.customerAddress,
-      };
-    }
     const updated = await tx.quotation.update({ where: { id: quotation.id }, data, include: quotationInclude });
     await tx.quotationEvent.create({
       data: { quotationId: quotation.id, eventType, previousStatus: quotation.status, resultingStatus: to, actorId: authority.employeeId, note: contract.text(input.note, 1000) },
@@ -293,7 +355,6 @@ const transition = ({ action, from, to, eventType, timestampField }) => async (i
   });
 };
 
-const issue = transition({ action: 'issue', from: ['DRAFT'], to: 'ISSUED', eventType: 'ISSUED', timestampField: 'issuedAt' });
 const accept = transition({ action: 'accept', from: ['ISSUED'], to: 'ACCEPTED', eventType: 'ACCEPTED', timestampField: 'acceptedAt' });
 const reject = transition({ action: 'reject', from: ['ISSUED'], to: 'REJECTED', eventType: 'REJECTED', timestampField: 'rejectedAt' });
 const cancel = transition({ action: 'cancel', from: ['DRAFT', 'ISSUED', 'ACCEPTED'], to: 'CANCELLED', eventType: 'CANCELLED', timestampField: 'cancelledAt' });
