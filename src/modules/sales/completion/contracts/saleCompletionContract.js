@@ -160,6 +160,9 @@ const parseCompleteSaleCommand = (body = {}) => {
   const sourceHeldCartId = sale.sourceHeldCartId == null
     ? null
     : positiveInteger(sale.sourceHeldCartId, 'sourceHeldCartId');
+  const sourceQuotationId = sale.sourceQuotationId == null || sale.sourceQuotationId === ''
+    ? null
+    : positiveInteger(sale.sourceQuotationId, 'sourceQuotationId');
   if (mode === 'CREDIT' && !customerId) {
     throw new SalesError(400, 'CREDIT_CUSTOMER_REQUIRED', 'Credit sale requires a customer');
   }
@@ -199,6 +202,7 @@ const parseCompleteSaleCommand = (body = {}) => {
       customerId,
       customerFirstAssociationToken,
       sourceHeldCartId,
+      sourceQuotationId,
       totalBeforeDiscount,
       totalPriceAdjustment,
       totalDiscount,
