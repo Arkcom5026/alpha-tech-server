@@ -14,12 +14,14 @@ const { unifiedDocumentHistory } = require('../unifiedDocumentHistoryController'
 const router = express.Router();
 const documentWorkspace = require('../documentWorkspaceController');
 const documentHistory = require('../documentHistoryController');
+const documentLine = require('../documentLineController');
 router.use(verifyToken);
 
 router.get('/unified-document-history', unifiedDocumentHistory);
 router.get('/document-workspace', documentWorkspace.list);
 router.post('/document-workspace/confirm', documentWorkspace.confirm);
 router.get('/consolidated-deliveries', documentHistory.list);
+router.put('/consolidated-deliveries/:id/document-lines/:lineId', documentLine.update);
 router.get('/consolidated-deliveries/:id/printable', documentHistory.printable);
 router.get('/consolidated-deliveries/:id', documentHistory.detail);
 
