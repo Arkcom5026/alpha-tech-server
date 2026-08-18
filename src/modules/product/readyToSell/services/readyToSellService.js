@@ -38,6 +38,18 @@ const resolvePrices = (branchPrice, { branchId, productId } = {}) => {
   }
 }
 
+const isPriceAuthorityError = (error) => error?.code === 'ACTIVE_BRANCH_PRICE_NOT_FOUND'
+  || error?.code?.startsWith('PRICE_')
+
+const resolveSellablePrices = (branchPrice, context) => {
+  try {
+    return resolvePrices(branchPrice, context)
+  } catch (error) {
+    if (isPriceAuthorityError(error)) return null
+    throw error
+  }
+}
+
 const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', mode = 'ALL', page = 1, pageSize = 25, db = prisma } = {}) => {
   const brId = requireBranchId(branchId)
   const keyword = normStr(q || search || searchText)
@@ -82,8 +94,12 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
           },
         },
       })
-      const productMap = new Map(products.map((product) => [product.id, product]))
-      const sellableProductIds = products.map((product) => product.id)
+      const sellableProducts = products.flatMap((product) => {
+        const prices = resolveSellablePrices(product.branchPrice?.[0], { branchId: brId, productId: product.id })
+        return prices ? [{ product, prices }] : []
+      })
+      const productMap = new Map(sellableProducts.map(({ product, prices }) => [product.id, { product, prices }]))
+      const sellableProductIds = sellableProducts.map(({ product }) => product.id)
       const structuredBarcodeRows = sellableProductIds.length ? await db.stockItem.findMany({
         where: { branchId: brId, status: 'IN_STOCK', productId: { in: sellableProductIds } },
         select: { productId: true, barcode: true, receivedAt: true, createdAt: true },
@@ -92,8 +108,9 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
       const structuredPreviewMap = new Map()
       for (const row of structuredBarcodeRows) if (!structuredPreviewMap.has(row.productId)) structuredPreviewMap.set(row.productId, row)
       structuredItems = grouped.flatMap((group) => {
-        const product = productMap.get(group.productId)
-        if (!product) return []
+        const entry = productMap.get(group.productId)
+        if (!entry) return []
+        const { product, prices } = entry
         const preview = structuredPreviewMap.get(group.productId)
         const qty = Number(group._count._all ?? 0)
         const previewBarcode = normStr(preview?.barcode)
@@ -104,11 +121,11 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
           unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
           qty, receivedAt: group._max.receivedAt ?? null,
           displayCode: qty <= 1 ? previewBarcode || '-' : 'หลายบาร์โค้ด', hasDetails: true,
-          prices: resolvePrices(product.branchPrice?.[0], { branchId: brId, productId: group.productId }),
+          prices,
         }]
       })
     } catch (error) {
-      if (error?.code?.startsWith('PRICE_') || error?.code === 'ACTIVE_BRANCH_PRICE_NOT_FOUND') throw error
+      if (isPriceAuthorityError(error)) throw error
       console.error('❌ structured ready-to-sell summary failed:', error)
       structuredItems = []
     }
@@ -137,6 +154,8 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
       const available = Math.max(0, Number(balance?.quantity || 0) - Number(balance?.reserved || 0))
       const nonStock = product.inventoryBehavior === 'NON_STOCK'
       if (!nonStock && available <= 0) return []
+      const prices = resolveSellablePrices(product.branchPrice?.[0], { branchId: brId, productId: product.id })
+      if (!prices) return []
       return [{
         kind: nonStock ? 'NON_STOCK' : 'SIMPLE', productId: product.id, productName: product.name,
         inventoryBehavior: product.inventoryBehavior, saleBarcode: product.saleBarcode, displayCode: product.saleBarcode || '-',
@@ -144,7 +163,7 @@ const getReadyToSell = async ({ branchId, q = '', search = '', searchText = '', 
         unitId: product.unitId ?? product.unit?.id ?? null, unitName: product.unit?.name ?? null,
         unit: product.unit ? { id: product.unit.id, name: product.unit.name } : null,
         qty: nonStock ? null : available, receivedAt: balance?.updatedAt ?? null, status: 'IN_STOCK', hasDetails: false,
-        prices: resolvePrices(product.branchPrice?.[0], { branchId: brId, productId: product.id }),
+        prices,
       }]
     })
   }
