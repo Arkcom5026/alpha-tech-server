@@ -17,12 +17,17 @@ const quotationRoutes = read('src/modules/quotation/http/quotationRoutes.js');
 
 for (const token of ['model SaleQuotationReference', 'saleId', 'quotationId', 'quotationCode', 'quotationRevision', '@@unique([saleId, quotationId])']) includes(schema, token);
 for (const token of ['CREATE TABLE "SaleQuotationReference"', 'SaleQuotationReference_saleId_fkey', 'SaleQuotationReference_quotationId_fkey']) includes(migration, token);
-includes(contract, "sourceQuotationId: options.sourceQuotationId");
-includes(contract, "positiveInteger(sale.sourceQuotationId, 'sourceQuotationId')");
-for (const token of ['ensureSaleQuotationReference', "quotation.status !== 'ACCEPTED'", 'SALE_QUOTATION_REFERENCE_SUPERSEDED', 'source.revisedFromId']) {
-  if (token === 'source.revisedFromId') continue;
-  includes(authority, token);
-}
+for (const token of [
+  'const sourceQuotationId = sale.sourceQuotationId == null',
+  "positiveInteger(sale.sourceQuotationId, 'sourceQuotationId')",
+  'sourceQuotationId,',
+]) includes(contract, token);
+for (const token of [
+  'ensureSaleQuotationReference',
+  "quotation.status !== 'ACCEPTED'",
+  'SALE_QUOTATION_REFERENCE_SUPERSEDED',
+  'revisedFromId: quotation.id',
+]) includes(authority, token);
 includes(controller, 'quotationReference = await ensureSaleQuotationReference');
 includes(delivery, 'sourceQuotation: quotationReference ?');
 includes(tax, 'sourceQuotation: quotationReference ?');
