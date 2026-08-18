@@ -19,6 +19,7 @@ enum QuotationEventType {
   LINE_ADDED
   LINE_UPDATED
   LINE_REMOVED
+  REVISION_CREATED
   ISSUED
   ACCEPTED
   REJECTED
@@ -28,13 +29,16 @@ enum QuotationEventType {
 
 model Quotation {
   id                     Int              @id @default(autoincrement())
-  code                   String           @unique
+  code                   String
   branchId               Int
   customerId             Int?
   createdById            Int
   updatedById            Int
   status                 QuotationStatus  @default(DRAFT)
   version                Int              @default(1)
+  revisionNumber         Int              @default(0)
+  revisionRootId         Int?
+  revisedFromId          Int?             @unique
   issueDate              DateTime?
   validUntil             DateTime?
   subject                String?
@@ -70,10 +74,16 @@ model Quotation {
 
   items                  QuotationItem[]
   events                 QuotationEvent[]
+  revisionRoot           Quotation?       @relation("QuotationRevisionRoot", fields: [revisionRootId], references: [id], onDelete: Restrict)
+  revisions              Quotation[]      @relation("QuotationRevisionRoot")
+  revisedFrom            Quotation?       @relation("QuotationRevisionChain", fields: [revisedFromId], references: [id], onDelete: Restrict)
+  revisedTo              Quotation?       @relation("QuotationRevisionChain")
 
+  @@unique([branchId, code, revisionNumber])
   @@index([branchId, status, updatedAt])
   @@index([branchId, customerId, updatedAt])
   @@index([branchId, code])
+  @@index([revisionRootId, revisionNumber])
 }
 
 model QuotationItem {
