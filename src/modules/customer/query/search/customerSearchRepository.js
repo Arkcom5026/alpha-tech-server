@@ -11,6 +11,7 @@ const customerSelect = {
   financialOwnerCustomerId: true,
   taxId: true,
   type: true,
+  quotationWorkflowOverride: true,
   addressDetail: true,
   creditLimit: true,
   creditBalance: true,

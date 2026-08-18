@@ -6,6 +6,9 @@ const {
   buildCustomerAddress,
 } = require('../shared/customerControllerSupport');
 const {
+  projectQuotationWorkflowPolicy,
+} = require('../policies/customerQuotationWorkflowPolicy');
+const {
   issueCustomerFirstAssociationToken,
 } = require('../policies/customerFirstAssociationTokenPolicy');
 
@@ -24,6 +27,7 @@ function presentCustomer(customer, { includeCredit = true, firstAssociationToken
     phone: customer.user?.loginId || null,
     email: '',
     type: customer.type,
+    ...projectQuotationWorkflowPolicy(customer),
     companyName: customer.companyName,
     departmentName: customer.departmentName,
     financialOwnerCustomerId: customer.financialOwnerCustomerId,
@@ -62,6 +66,7 @@ async function createCustomer(input = {}, actor = {}) {
     name,
     phone,
     type,
+    quotationWorkflowOverride,
     companyName,
     departmentName,
     financialOwnerCustomerId,
@@ -71,6 +76,9 @@ async function createCustomer(input = {}, actor = {}) {
     postalCode,
     postcode,
   } = input;
+  if (![undefined, null, true, false].includes(quotationWorkflowOverride)) {
+    throw buildError(400, { code: 'INVALID_QUOTATION_WORKFLOW_OVERRIDE', message: 'นโยบายใบเสนอราคาไม่ถูกต้อง' });
+  }
   const normalizedPhone = normalizePhone(phone);
 
   if (!name || !isValidPhone(normalizedPhone)) {
@@ -119,6 +127,7 @@ async function createCustomer(input = {}, actor = {}) {
     customer: {
       name,
       type,
+      quotationWorkflowOverride: quotationWorkflowOverride ?? null,
       companyName,
       departmentName: type === 'INDIVIDUAL' ? null : (departmentName || null),
       financialOwnerCustomerId: type === 'INDIVIDUAL' ? null : (financialOwnerCustomerId || null),

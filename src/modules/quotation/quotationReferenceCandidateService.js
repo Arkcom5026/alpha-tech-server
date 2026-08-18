@@ -2,12 +2,28 @@
 
 const { prisma } = require('../../../lib/prisma');
 const contract = require('./quotationContract');
+const {
+  projectQuotationWorkflowPolicy,
+} = require('../customer/policies/customerQuotationWorkflowPolicy');
 
 const listAcceptedReferenceCandidates = async ({ branchId, customerId }) => {
   const normalizedBranchId = contract.positiveInt(branchId, 'branchId');
   const normalizedCustomerId = contract.positiveInt(customerId, 'customerId');
 
-  return prisma.quotation.findMany({
+  const customer = await prisma.customerProfile.findFirst({
+    where: { id: normalizedCustomerId, branchId: normalizedBranchId },
+    select: { id: true, type: true, quotationWorkflowOverride: true },
+  });
+  if (!customer) {
+    contract.fail('Customer does not belong to this branch', 'QUOTATION_REFERENCE_CUSTOMER_SCOPE_FAILED', 404);
+  }
+
+  const workflow = projectQuotationWorkflowPolicy(customer);
+  if (!workflow.quotationWorkflowEnabled) {
+    return { ...workflow, candidates: [] };
+  }
+
+  const candidates = await prisma.quotation.findMany({
     where: {
       branchId: normalizedBranchId,
       customerId: normalizedCustomerId,
@@ -27,6 +43,8 @@ const listAcceptedReferenceCandidates = async ({ branchId, customerId }) => {
       grandTotal: true,
     },
   });
+
+  return { ...workflow, candidates };
 };
 
 module.exports = Object.freeze({ listAcceptedReferenceCandidates });

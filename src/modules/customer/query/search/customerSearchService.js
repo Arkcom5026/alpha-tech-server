@@ -1,5 +1,8 @@
 const repository = require('./customerSearchRepository');
 const { buildCustomerAddress } = require('../../shared/customerControllerSupport');
+const {
+  projectQuotationWorkflowPolicy,
+} = require('../../policies/customerQuotationWorkflowPolicy');
 
 const normalizeQuery = (value) => String(value || '').trim();
 const compactDigits = (value) => value.replace(/\D/g, '');
@@ -11,6 +14,7 @@ const presentCustomer = (customer) => ({
   phone: customer.user?.loginId || '',
   email: customer.user?.email || '',
   type: customer.type || 'INDIVIDUAL',
+  ...projectQuotationWorkflowPolicy(customer),
   companyName: customer.companyName || '',
   departmentName: customer.departmentName || '',
   financialOwnerCustomerId: customer.financialOwnerCustomerId || null,

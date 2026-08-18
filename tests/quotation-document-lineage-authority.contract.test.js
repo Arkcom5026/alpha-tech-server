@@ -34,10 +34,16 @@ for (const token of [
 ]) includes(authority, token);
 for (const token of [
   'listAcceptedReferenceCandidates',
+  'projectQuotationWorkflowPolicy(customer)',
+  'if (!workflow.quotationWorkflowEnabled)',
+  'return { ...workflow, candidates: [] };',
   'customerId: normalizedCustomerId',
   "status: 'ACCEPTED'",
   'revisedTo: { is: null }',
 ]) includes(candidates, token);
+if (candidates.indexOf('if (!workflow.quotationWorkflowEnabled)') > candidates.indexOf('prisma.quotation.findMany')) {
+  throw new Error('Quotation discovery must skip quotation query when customer workflow is disabled');
+}
 includes(controller, 'await resolveAcceptedQuotationReference({');
 includes(controller, 'customerId: command.sale.customerId');
 includes(controller, 'const result = await completeSale');

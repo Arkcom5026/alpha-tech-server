@@ -4,6 +4,9 @@ const {
   isValidPhone,
   buildCustomerAddress,
 } = require('../../shared/customerControllerSupport');
+const {
+  projectQuotationWorkflowPolicy,
+} = require('../../policies/customerQuotationWorkflowPolicy');
 const repository = require('./customerStaffUpdateRepository');
 
 const allowedRoles = new Set(['SUPERADMIN', 'ADMIN', 'EMPLOYEE']);
@@ -20,6 +23,10 @@ function validateCustomerType(type) {
   return typeof type === 'undefined' || allowedTypes.has(type);
 }
 
+function validateQuotationWorkflowOverride(value) {
+  return typeof value === 'undefined' || value === null || value === true || value === false;
+}
+
 function presentCustomer(customer) {
   const subdistrictCode = customer.subdistrict?.code || null;
   const districtCode =
@@ -33,6 +40,7 @@ function presentCustomer(customer) {
     id: customer.id,
     name: customer.name,
     type: customer.type,
+    ...projectQuotationWorkflowPolicy(customer),
     companyName: customer.companyName,
     departmentName: customer.departmentName,
     financialOwnerCustomerId: customer.financialOwnerCustomerId,
@@ -71,9 +79,23 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
     throw serviceError(400, { message: 'รหัสลูกค้าไม่ถูกต้อง' }, 'INVALID_CUSTOMER_ID');
   }
 
-  const { name, phone, type, companyName, departmentName, financialOwnerCustomerId, taxId, subdistrictCode, addressDetail } = body;
+  const {
+    name,
+    phone,
+    type,
+    quotationWorkflowOverride,
+    companyName,
+    departmentName,
+    financialOwnerCustomerId,
+    taxId,
+    subdistrictCode,
+    addressDetail,
+  } = body;
   if (!validateCustomerType(type)) {
     throw serviceError(400, { message: 'ประเภทลูกค้าไม่ถูกต้อง' }, 'INVALID_CUSTOMER_TYPE');
+  }
+  if (!validateQuotationWorkflowOverride(quotationWorkflowOverride)) {
+    throw serviceError(400, { message: 'นโยบายใบเสนอราคาไม่ถูกต้อง' }, 'INVALID_QUOTATION_WORKFLOW_OVERRIDE');
   }
 
   const existing = await repository.findCustomerById(id);
@@ -103,6 +125,7 @@ async function updateCustomerStaff({ userContext = {}, customerId, body = {} }) 
     Object.entries({
       name: sanitize(name),
       type,
+      quotationWorkflowOverride,
       companyName: sanitize(companyName),
       departmentName: sanitize(departmentName),
       financialOwnerCustomerId,

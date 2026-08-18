@@ -14,6 +14,7 @@ const customerSelect = {
   financialOwnerCustomerId: true,
   taxId: true,
   type: true,
+  quotationWorkflowOverride: true,
   createdAt: true,
   updatedAt: true,
   creditLimit: true,
@@ -170,26 +171,29 @@ function claimLegacyCustomer({ customerProfileId, branchId }) {
       return { outcome: 'ALREADY_ASSIGNED', branchId: existing.branchId };
     }
 
-    const duplicate = await tx.customerProfile.findFirst({
-      where: { branchId, userId: existing.userId },
+    const alreadyExists = await tx.customerProfile.findFirst({
+      where: { userId: existing.userId, branchId },
       select: { id: true },
     });
-    if (duplicate) {
-      return { outcome: 'STORE_PROFILE_EXISTS', customerProfileId: duplicate.id };
-    }
+    if (alreadyExists) return { outcome: 'STORE_PROFILE_EXISTS', customerProfileId: alreadyExists.id };
 
-    const changed = await tx.customerProfile.updateMany({
+    const claimed = await tx.customerProfile.updateMany({
       where: { id: customerProfileId, branchId: null },
       data: { branchId },
     });
-    if (changed.count !== 1) return { outcome: 'CLAIM_CONFLICT' };
+    if (claimed.count !== 1) return { outcome: 'CLAIM_CONFLICT' };
 
     const customer = await tx.customerProfile.findUnique({
       where: { id: customerProfileId },
-      select: customerSelect,
+      include: customerDetailInclude,
     });
     return { outcome: 'CLAIMED', customer };
   });
 }
 
-module.exports = { listCustomers, findCustomerDetail, getFinancialProjection, claimLegacyCustomer };
+module.exports = {
+  listCustomers,
+  findCustomerDetail,
+  claimLegacyCustomer,
+  getFinancialProjection,
+};

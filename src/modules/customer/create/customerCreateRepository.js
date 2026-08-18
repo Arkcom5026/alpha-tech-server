@@ -72,6 +72,7 @@ function createCustomerProfile({
         userId: user.id,
         branchId: Number(branchId),
         type: customer.type || 'INDIVIDUAL',
+        quotationWorkflowOverride: customer.quotationWorkflowOverride ?? null,
         companyName: customer.companyName || null,
         departmentName: customer.type === 'INDIVIDUAL' ? null : (customer.departmentName || null),
         financialOwnerCustomerId: customer.type === 'INDIVIDUAL' ? null : (customer.financialOwnerCustomerId || null),
