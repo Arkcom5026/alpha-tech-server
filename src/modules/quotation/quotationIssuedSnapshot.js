@@ -1,6 +1,7 @@
 'use strict';
 
 const number = (value) => Number(value || 0);
+const money = (value) => Math.round((number(value) + Number.EPSILON) * 100) / 100;
 const iso = (value) => value ? new Date(value).toISOString() : null;
 
 const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapshot, issuedAt }) => ({
@@ -21,15 +22,15 @@ const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapsh
   documentHeader: documentHeaderSnapshot || null,
   customer: customerSnapshot || null,
   totals: {
-    subtotal: number(quotation.subtotal),
+    subtotal: money(quotation.subtotal),
     lineDiscountTotal: 0,
     billDiscount: 0,
     vatInclusive: true,
     vatEnabled: quotation.vatEnabled !== false,
     vatRate: number(quotation.vatRate),
-    taxableBase: number(quotation.grandTotal) - number(quotation.vatAmount),
-    vatAmount: number(quotation.vatAmount),
-    grandTotal: number(quotation.grandTotal),
+    taxableBase: money(number(quotation.grandTotal) - number(quotation.vatAmount)),
+    vatAmount: money(quotation.vatAmount),
+    grandTotal: money(quotation.grandTotal),
   },
   items: (quotation.items || []).map((item) => ({
     id: item.id,
@@ -39,10 +40,10 @@ const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapsh
     description: item.description || null,
     quantity: number(item.quantity),
     unitName: item.unitName || null,
-    unitPrice: number(item.unitPrice),
+    unitPrice: money(item.unitPrice),
     discountAmount: 0,
-    lineSubtotal: number(item.lineSubtotal),
-    lineTotal: number(item.lineTotal),
+    lineSubtotal: money(item.lineSubtotal),
+    lineTotal: money(item.lineTotal),
     sortOrder: Number(item.sortOrder || 0),
   })),
 });
