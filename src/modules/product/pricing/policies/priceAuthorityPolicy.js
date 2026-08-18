@@ -95,6 +95,7 @@ module.exports = Object.freeze({
   ROLE_MATRIX,
   assertActor,
   assertMutationAuthority,
+  assertPriceValue,
   assertPricePayload,
   touchedPriceFields,
 })

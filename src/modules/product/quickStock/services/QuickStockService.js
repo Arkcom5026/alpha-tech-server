@@ -5,7 +5,36 @@ const { PrismaClient } = require('@prisma/client')
 const priceAuthorityPolicy = require('../../pricing/policies/priceAuthorityPolicy')
 const { decideOperationalProductMode } = require('../../runtime/policies/operationalProductModePolicy')
 const { assertProductCanReceive } = require('../../../inventory/policies/productInventoryMutationPolicy')
-const { QuickStockRepository, toInt, toNumber } = require('../repositories/quickStockRepository')
+const { QuickStockRepository, toInt } = require('../repositories/quickStockRepository')
+
+const EXISTING_INTAKE_BRANCH_PRICE_FIELDS = Object.freeze([
+  'priceRetail',
+  'priceWholesale',
+  'priceTechnician',
+  'priceOnline',
+])
+
+const toComparablePrice = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+const buildChangedBranchPricePayload = ({ currentPrice, requestedPayload = {} }) => {
+  const changed = {}
+
+  for (const field of EXISTING_INTAKE_BRANCH_PRICE_FIELDS) {
+    if (requestedPayload[field] === undefined) continue
+
+    const requested = toComparablePrice(requestedPayload[field])
+    const current = toComparablePrice(currentPrice?.[field])
+    if (requested === null || current === null || Math.abs(requested - current) > 0.0001) {
+      changed[field] = requestedPayload[field]
+    }
+  }
+
+  return changed
+}
 
 class QuickStockService {
   constructor(prisma, repository = null) {
@@ -117,8 +146,18 @@ class QuickStockService {
     if (!branchId) throw Object.assign(new Error('ไม่พบรหัสสาขาสำหรับทำรายการรับสินค้า'), { statusCode: 401, code: 'BRANCH_ID_MISSING' })
     if (!productId) throw Object.assign(new Error('ไม่พบรหัสสินค้า'), { statusCode: 400, code: 'PRODUCT_ID_MISSING' })
 
-    const runtimePricePayload = { costPrice: data?.costPrice, priceRetail: data?.priceRetail, priceWholesale: data?.priceWholesale, priceTechnician: data?.priceTechnician, priceOnline: data?.priceOnline }
-    const authority = priceAuthorityPolicy.assertPricePayload({ actor: { branchId, employeeId: empId, role: actor.role, v2Role: actor.v2Role }, payload: runtimePricePayload })
+    const actorContext = { branchId, employeeId: empId, role: actor.role, v2Role: actor.v2Role }
+    const authority = priceAuthorityPolicy.assertActor(actorContext)
+    const receiveCost = data?.costPrice
+    priceAuthorityPolicy.assertPriceValue('costPrice', receiveCost)
+
+    const requestedBranchPricePayload = {
+      priceRetail: data?.priceRetail,
+      priceWholesale: data?.priceWholesale,
+      priceTechnician: data?.priceTechnician,
+      priceOnline: data?.priceOnline,
+    }
+
     const rawItems = Array.isArray(data?.barcodes) ? data.barcodes : Array.isArray(data?.items) ? data.items : []
     const normalizedItems = rawItems.map((item) => typeof item === 'string' ? { barcode: item.trim(), serialNumber: null } : { barcode: String(item?.barcode || item?.code || '').trim(), serialNumber: item?.serialNumber || item?.sn || null }).filter((item) => item.barcode)
     if (!normalizedItems.length) throw Object.assign(new Error('ยังไม่มีรายการบาร์โค้ดสำหรับรับเข้า'), { statusCode: 400, code: 'BARCODE_QUEUE_EMPTY' })
@@ -126,12 +165,50 @@ class QuickStockService {
     return this.prisma.$transaction(async (tx) => {
       const product = await this.repository.findProductForReceive({ db: tx, productId, branchId: authority.branchId })
       if (!product) throw Object.assign(new Error('ไม่พบสินค้าภายในสาขาปัจจุบัน'), { statusCode: 404, code: 'PRODUCT_NOT_FOUND_IN_BRANCH' })
-      await this.repository.upsertBranchPrice({ db: tx, productId, branchId: authority.branchId, employeeId: authority.employeeId, payload: runtimePricePayload })
+
+      const currentBranchPrice = await this.repository.findBranchPrice({ db: tx, productId, branchId: authority.branchId })
+      const changedBranchPricePayload = buildChangedBranchPricePayload({
+        currentPrice: currentBranchPrice,
+        requestedPayload: requestedBranchPricePayload,
+      })
+      const changedBranchPriceFields = Object.keys(changedBranchPricePayload)
+
+      if (changedBranchPriceFields.length > 0) {
+        priceAuthorityPolicy.assertPricePayload({
+          actor: actorContext,
+          payload: changedBranchPricePayload,
+        })
+
+        if (currentBranchPrice?.id) {
+          await this.repository.updateBranchPrice({
+            db: tx,
+            branchPriceId: currentBranchPrice.id,
+            data: {
+              ...changedBranchPricePayload,
+              updatedBy: authority.employeeId,
+              isActive: true,
+            },
+          })
+        } else {
+          await this.repository.createBranchPrice({
+            db: tx,
+            data: {
+              productId,
+              branchId: authority.branchId,
+              costPrice: Number(receiveCost),
+              ...requestedBranchPricePayload,
+              updatedBy: authority.employeeId,
+              isActive: true,
+            },
+          })
+        }
+      }
+
       const now = new Date()
-      const rows = normalizedItems.map((item) => ({ barcode: item.barcode, serialNumber: item.serialNumber ? String(item.serialNumber).trim() : null, costPrice: Number(runtimePricePayload.costPrice), productId, branchId: authority.branchId, status: 'IN_STOCK', scannedByEmployeeId: authority.employeeId, receivedAt: now, scannedAt: now }))
+      const rows = normalizedItems.map((item) => ({ barcode: item.barcode, serialNumber: item.serialNumber ? String(item.serialNumber).trim() : null, costPrice: Number(receiveCost), productId, branchId: authority.branchId, status: 'IN_STOCK', scannedByEmployeeId: authority.employeeId, receivedAt: now, scannedAt: now }))
       await this.repository.createStockItems({ db: tx, data: rows })
       await this.repository.createStockMovements({ db: tx, data: rows.map((row) => ({ productId, branchId: authority.branchId, qty: 1, type: 'RECEIVE', note: `รับเข้าด่วน: ${row.serialNumber || row.barcode}`, createdAt: now })) })
-      await this.repository.upsertStockBalance({ db: tx, productId, branchId: authority.branchId, quantity: rows.length, lastReceivedCost: Number(runtimePricePayload.costPrice), avgCost: Number(runtimePricePayload.costPrice) })
+      await this.repository.upsertStockBalance({ db: tx, productId, branchId: authority.branchId, quantity: rows.length, lastReceivedCost: Number(receiveCost), avgCost: Number(receiveCost) })
       return { success: true, productId, productName: product.name, qty: rows.length }
     }, { timeout: 20000 })
   }
