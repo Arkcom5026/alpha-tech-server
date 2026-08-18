@@ -2,6 +2,7 @@
 
 const express = require('express');
 const service = require('../quotationService');
+const { ensureLatestRevision } = require('../quotationRevisionGuard');
 
 const router = express.Router();
 
@@ -33,6 +34,12 @@ const handle = (operation, status = 200) => async (req, res, next) => {
   }
 };
 
+const latestOnly = (operation) => async (req) => {
+  const authority = context(req);
+  await ensureLatestRevision({ quotationId: req.params.quotationId, branchId: authority.branchId });
+  return operation(req, authority);
+};
+
 router.get('/', handle((req) => service.list({ ...req.query, ...context(req) })));
 router.post('/', handle((req) => service.create({ ...req.body, ...context(req) }), 201));
 router.get('/:quotationId', handle((req) => service.detail({ quotationId: req.params.quotationId, ...context(req) })));
@@ -43,8 +50,8 @@ router.post('/:quotationId/items', handle((req) => service.addLine({ ...req.body
 router.put('/:quotationId/items/:lineId', handle((req) => service.updateLine({ ...req.body, quotationId: req.params.quotationId, lineId: req.params.lineId, ...context(req) })));
 router.delete('/:quotationId/items/:lineId', handle((req) => service.removeLine({ quotationId: req.params.quotationId, lineId: req.params.lineId, ...context(req) })));
 router.post('/:quotationId/issue', handle((req) => service.issue({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
-router.post('/:quotationId/accept', handle((req) => service.accept({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
-router.post('/:quotationId/reject', handle((req) => service.reject({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
-router.post('/:quotationId/cancel', handle((req) => service.cancel({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
+router.post('/:quotationId/accept', handle(latestOnly((req, authority) => service.accept({ ...req.body, quotationId: req.params.quotationId, ...authority }))));
+router.post('/:quotationId/reject', handle(latestOnly((req, authority) => service.reject({ ...req.body, quotationId: req.params.quotationId, ...authority }))));
+router.post('/:quotationId/cancel', handle(latestOnly((req, authority) => service.cancel({ ...req.body, quotationId: req.params.quotationId, ...authority }))));
 
 module.exports = router;
