@@ -4,7 +4,7 @@ const number = (value) => Number(value || 0);
 const iso = (value) => value ? new Date(value).toISOString() : null;
 
 const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapshot, issuedAt }) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   quotationId: quotation.id,
   code: quotation.code,
   branchId: quotation.branchId,
@@ -24,8 +24,10 @@ const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapsh
     subtotal: number(quotation.subtotal),
     lineDiscountTotal: 0,
     billDiscount: 0,
+    vatInclusive: true,
     vatEnabled: quotation.vatEnabled !== false,
     vatRate: number(quotation.vatRate),
+    taxableBase: number(quotation.grandTotal) - number(quotation.vatAmount),
     vatAmount: number(quotation.vatAmount),
     grandTotal: number(quotation.grandTotal),
   },
