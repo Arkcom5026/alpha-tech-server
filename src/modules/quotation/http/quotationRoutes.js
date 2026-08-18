@@ -36,6 +36,8 @@ const handle = (operation, status = 200) => async (req, res, next) => {
 router.get('/', handle((req) => service.list({ ...req.query, ...context(req) })));
 router.post('/', handle((req) => service.create({ ...req.body, ...context(req) }), 201));
 router.get('/:quotationId', handle((req) => service.detail({ quotationId: req.params.quotationId, ...context(req) })));
+router.get('/:quotationId/revisions', handle((req) => service.revisionHistory({ quotationId: req.params.quotationId, ...context(req) })));
+router.post('/:quotationId/revisions', handle((req) => service.createRevision({ ...req.body, quotationId: req.params.quotationId, ...context(req) }), 201));
 router.put('/:quotationId', handle((req) => service.updateDraft({ ...req.body, quotationId: req.params.quotationId, ...context(req) })));
 router.post('/:quotationId/items', handle((req) => service.addLine({ ...req.body, quotationId: req.params.quotationId, ...context(req) }), 201));
 router.put('/:quotationId/items/:lineId', handle((req) => service.updateLine({ ...req.body, quotationId: req.params.quotationId, lineId: req.params.lineId, ...context(req) })));
