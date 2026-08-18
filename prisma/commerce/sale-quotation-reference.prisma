@@ -1,0 +1,16 @@
+model SaleQuotationReference {
+  id                Int      @id @default(autoincrement())
+  branchId          Int
+  saleId            Int
+  quotationId       Int
+  quotationCode     String
+  quotationRevision Int      @default(0)
+  quotationIssuedAt DateTime?
+  linkedById        Int
+  createdAt         DateTime @default(now())
+
+  @@unique([saleId, quotationId])
+  @@index([branchId, saleId])
+  @@index([branchId, quotationId])
+  @@index([branchId, quotationCode, quotationRevision])
+}
