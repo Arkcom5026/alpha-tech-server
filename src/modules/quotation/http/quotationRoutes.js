@@ -3,6 +3,7 @@
 const express = require('express');
 const service = require('../quotationService');
 const { ensureLatestRevision } = require('../quotationRevisionGuard');
+const { listAcceptedReferenceCandidates } = require('../quotationReferenceCandidateService');
 const { getQuotationDocumentLineage } = require('../../sales/lineage/saleQuotationReferenceService');
 
 const router = express.Router();
@@ -42,6 +43,10 @@ const latestOnly = (operation) => async (req) => {
 };
 
 router.get('/', handle((req) => service.list({ ...req.query, ...context(req) })));
+router.get('/reference-candidates', handle((req) => listAcceptedReferenceCandidates({
+  branchId: context(req).branchId,
+  customerId: req.query.customerId,
+})));
 router.post('/', handle((req) => service.create({ ...req.body, ...context(req) }), 201));
 router.get('/:quotationId', handle((req) => service.detail({ quotationId: req.params.quotationId, ...context(req) })));
 router.get('/:quotationId/revisions', handle((req) => service.revisionHistory({ quotationId: req.params.quotationId, ...context(req) })));

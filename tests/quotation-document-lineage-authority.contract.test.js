@@ -11,6 +11,7 @@ const migration = read('prisma/migrations/20260819012000_sale_quotation_referenc
 const contract = read('src/modules/sales/completion/contracts/saleCompletionContract.js');
 const controller = read('src/modules/sales/completion/controllers/saleCompletionController.js');
 const authority = read('src/modules/sales/lineage/saleQuotationReferenceService.js');
+const candidates = read('src/modules/quotation/quotationReferenceCandidateService.js');
 const delivery = read('src/modules/sales/documents/print/projectSaleDeliveryNoteService.js');
 const tax = read('src/modules/tax/sources/sale/registerSaleTaxCandidateService.js');
 const quotationRoutes = read('src/modules/quotation/http/quotationRoutes.js');
@@ -26,10 +27,19 @@ for (const token of [
   'ensureSaleQuotationReference',
   "quotation.status !== 'ACCEPTED'",
   'SALE_QUOTATION_REFERENCE_SUPERSEDED',
+  'SALE_QUOTATION_REFERENCE_CUSTOMER_MISMATCH',
   'revisedFromId: quotation.id',
   'SALE_QUOTATION_REFERENCE_CONFLICT',
+  'customerId: sale.customerId',
 ]) includes(authority, token);
+for (const token of [
+  'listAcceptedReferenceCandidates',
+  'customerId: normalizedCustomerId',
+  "status: 'ACCEPTED'",
+  'revisedTo: { is: null }',
+]) includes(candidates, token);
 includes(controller, 'await resolveAcceptedQuotationReference({');
+includes(controller, 'customerId: command.sale.customerId');
 includes(controller, 'const result = await completeSale');
 if (controller.indexOf('await resolveAcceptedQuotationReference({') > controller.indexOf('const result = await completeSale')) {
   throw new Error('Quotation authority must be validated before the sale is committed');
@@ -37,6 +47,7 @@ if (controller.indexOf('await resolveAcceptedQuotationReference({') > controller
 includes(controller, 'quotationReference = await ensureSaleQuotationReference');
 includes(delivery, 'sourceQuotation: quotationReference ?');
 includes(tax, 'sourceQuotation: quotationReference ?');
+includes(quotationRoutes, "router.get('/reference-candidates'");
 includes(quotationRoutes, "router.get('/:quotationId/lineage'");
 
 if (authority.includes('quotation.items') || authority.includes('QuotationItem')) {
