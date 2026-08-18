@@ -18,6 +18,7 @@ const db = {
       return [
         { productId: 10, _count: { _all: 2 }, _max: { receivedAt: new Date('2026-08-18T08:00:00.000Z') } },
         { productId: 20, _count: { _all: 1 }, _max: { receivedAt: new Date('2026-08-18T07:00:00.000Z') } },
+        { productId: 30, _count: { _all: 1 }, _max: { receivedAt: new Date('2026-08-18T06:00:00.000Z') } },
       ]
     },
     findMany: async (args) => {
@@ -33,21 +34,33 @@ const db = {
       calls.push(['product.findMany', args])
 
       if (args.where?.id?.in) {
-        assert.deepStrictEqual(args.where.id.in, [10, 20])
+        assert.deepStrictEqual(args.where.id.in, [10, 20, 30])
         assert.deepStrictEqual(args.where.branchPrice, {
           some: { branchId: 14, isActive: true },
         })
 
         // Product 20 has stock, but no active branch price. Prisma would exclude it.
-        return [{
-          id: 10,
-          name: 'Sellable product',
-          brandId: null,
-          brand: null,
-          unitId: null,
-          unit: null,
-          branchPrice: [activePrice],
-        }]
+        // Product 30 has an active row, but wholesale price is ineffective (0).
+        return [
+          {
+            id: 10,
+            name: 'Sellable product',
+            brandId: null,
+            brand: null,
+            unitId: null,
+            unit: null,
+            branchPrice: [activePrice],
+          },
+          {
+            id: 30,
+            name: 'Ineffective wholesale price',
+            brandId: null,
+            brand: null,
+            unitId: null,
+            unit: null,
+            branchPrice: [{ ...activePrice, priceWholesale: 0 }],
+          },
+        ]
       }
 
       // SIMPLE lookup for mode ALL.
