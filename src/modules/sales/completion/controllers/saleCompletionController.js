@@ -3,6 +3,9 @@ const { completeSale } = require('../services/saleCompletionService');
 const saleCustomerAccessService = require('../services/saleCustomerAccessService');
 const { publishSaleTaxCandidate } = require('../services/publishSaleTaxCandidateService');
 const {
+  ensureSaleDeliveryNotePresentationSnapshot,
+} = require('../../documents/presentation/ensureSaleDeliveryNotePresentationSnapshotService');
+const {
   ensureSaleQuotationReference,
   resolveAcceptedQuotationReference,
 } = require('../../lineage/saleQuotationReferenceService');
@@ -30,6 +33,9 @@ const completeSaleController = async (req, res) => {
     }
 
     const result = await completeSale({ command, branchId, employeeId });
+    const deliveryNotePresentationRecord = command.sale.deliveryNoteMode === 'PRINT'
+      ? await ensureSaleDeliveryNotePresentationSnapshot({ branchId, saleId: result.saleId })
+      : null;
     const quotationReference = await ensureSaleQuotationReference({
       saleId: result.saleId,
       quotationId: command.sale.sourceQuotationId,
@@ -45,6 +51,7 @@ const completeSaleController = async (req, res) => {
       ...result,
       quotationReference,
       taxIntake,
+      deliveryNotePresentation: deliveryNotePresentationRecord?.snapshot || null,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode) || 500;
