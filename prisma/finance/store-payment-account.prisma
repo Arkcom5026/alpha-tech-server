@@ -1,0 +1,22 @@
+model StorePaymentAccount {
+  id            Int      @id @default(autoincrement())
+  branchId      Int
+  code          String   @db.VarChar(64)
+  displayName   String   @db.VarChar(160)
+  bankName      String   @db.VarChar(160)
+  accountName   String   @db.VarChar(200)
+  accountNumber String   @db.VarChar(80)
+  accountType   String?  @db.VarChar(80)
+  promptPayId   String?  @db.VarChar(80)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, code])
+  @@unique([branchId, id])
+  @@index([branchId, isActive, sortOrder])
+  @@index([branchId, accountNumber])
+}
