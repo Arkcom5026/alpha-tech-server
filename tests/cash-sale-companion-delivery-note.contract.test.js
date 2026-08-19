@@ -18,11 +18,14 @@ assert.match(
   /officialDocumentNumber: command\.sale\.deliveryNoteMode === 'PRINT' \? `DN-\$\{code\}` : null/,
 );
 assert.match(legacyCreate, /isCreditSale \|\| String\(deliveryNoteMode \|\| ''\)\.toUpperCase\(\) === 'PRINT'/);
-assert.match(printable, /const eligible = Boolean\(sale\.officialDocumentNumber\)/);
+assert.match(printable, /!sale\.officialDocumentNumber/);
+assert.match(printable, /sale\.status === 'CANCELLED'/);
 assert.match(history, /onlyWithDeliveryNote/);
 assert.match(history, /officialDocumentNumber: \{ not: null \}/);
 
-// Consolidation remains credit-only, so a cash companion delivery cannot be selected again.
+// Wave 1 keeps existing consolidation selection semantics while issuance/history
+// authority is repaired. Cash companion consolidation is widened separately only
+// after paid-line readiness is reconciled with the credit settlement authority.
 assert.match(workspace, /where: \{ branchId, customerId, isCredit: true/);
 
 // The completion service keeps the existing single sale stock movement authority.
