@@ -44,7 +44,11 @@ assert(settlementPresentationSource.includes("DELIVERY_CREDIT_SETTLEMENT_PURPOSE
 assert(settlementPresentationSource.includes('freezeFinanceOperationalPresentation'));
 assert(settlementCreateSource.includes('freezeDeliveryCreditSettlementPresentation'));
 assert(settlementCreateSource.includes('presentationSnapshots: serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'));
-assert(settlementCreateSource.indexOf('freezeDeliveryCreditSettlementPresentation({ tx, settlement: fresh })') < settlementCreateSource.indexOf('return {'), 'settlement presentation must freeze before the creation transaction returns');
+assert(
+  settlementCreateSource.indexOf('freezeDeliveryCreditSettlementPresentation({ tx, settlement: fresh })')
+    < settlementCreateSource.indexOf('presentationSnapshots: serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'),
+  'settlement presentation must freeze before the creation transaction serializes and returns the snapshot authority',
+);
 assert(settlementQuerySource.includes('freezeDeliveryCreditSettlementPresentation({ tx: prisma, settlement: row })'));
 assert(settlementQuerySource.includes('result.presentationSnapshots = serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'));
 assert(!consolidatedDeliverySource.includes('freezeDeliveryCreditSettlementPresentation'), 'Combined Billing creation must not own Delivery Credit Settlement presentation snapshots.');
