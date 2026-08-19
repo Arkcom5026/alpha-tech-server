@@ -15,6 +15,9 @@ const {
 } = require('../shared/customerReceiptContext');
 const { receiptInclude } = require('../shared/customerReceiptIncludes');
 const { buildReceiptResponse } = require('../shared/customerReceiptResponse');
+const {
+  ensureCustomerReceiptPresentationSnapshot,
+} = require('../presentation/customerReceiptPresentationSnapshotService');
 
 const buildReceiptCode = async (tx, branchId) => {
   const now = new Date();
@@ -85,7 +88,7 @@ const createCustomerReceipt = async (req, res) => {
       });
     }
 
-    const createdReceipt = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await ensureEmployeeBelongsToBranchOrThrow(tx, {
         employeeProfileId,
         branchId,
@@ -104,7 +107,7 @@ const createCustomerReceipt = async (req, res) => {
 
       const code = await buildReceiptCode(tx, branchId);
 
-      return tx.customerReceipt.create({
+      const receipt = await tx.customerReceipt.create({
         data: {
           code,
           branchId,
@@ -121,12 +124,21 @@ const createCustomerReceipt = async (req, res) => {
         },
         include: receiptInclude,
       });
+      const presentationRecord = await ensureCustomerReceiptPresentationSnapshot({
+        tx,
+        branchId,
+        receipt,
+      });
+      return { receipt, presentationRecord };
     });
 
     return res.status(201).json({
       success: true,
       message: 'สร้างรายการรับชำระเรียบร้อยแล้ว',
-      data: buildReceiptResponse(createdReceipt),
+      data: {
+        ...buildReceiptResponse(result.receipt),
+        presentationSnapshot: result.presentationRecord.snapshot,
+      },
     });
   } catch (error) {
     console.error('❌ [createCustomerReceipt] error:', error);
