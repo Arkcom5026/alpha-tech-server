@@ -3,6 +3,10 @@ const {
   toInt,
   projectSaleReturnDetail,
 } = require('../../shared/saleReturnProjection');
+const {
+  freezeRefundReceiptPresentation,
+  serializeRefundReceiptPresentationSnapshots,
+} = require('../../presentation/refundReceiptPresentationSnapshot');
 
 const getSaleReturnById = async (req, res) => {
   try {
@@ -32,7 +36,14 @@ const getSaleReturnById = async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบข้อมูลใบคืนสินค้า' });
     }
 
-    return res.status(200).json(projectSaleReturnDetail(saleReturn));
+    const presentationSnapshots = await freezeRefundReceiptPresentation({
+      tx: prisma,
+      saleReturn,
+    });
+    return res.status(200).json({
+      ...projectSaleReturnDetail(saleReturn),
+      presentationSnapshots: serializeRefundReceiptPresentationSnapshots(presentationSnapshots),
+    });
   } catch (error) {
     console.error('❌ [getSaleReturnById] error:', error);
     return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการโหลดข้อมูลใบคืนสินค้า' });
