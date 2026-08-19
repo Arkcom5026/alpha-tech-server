@@ -107,11 +107,34 @@ const assertEligibleSaleSource = async ({ document, branchId }, tx) => {
   if (!candidate || candidate.sourceType !== 'SALE') {
     fail('TAX_OUTPUT_ISSUANCE_SOURCE_UNSUPPORTED', 'Only a paid sale or consolidated delivery candidate can issue an output tax invoice', 409);
   }
+  const saleId = Number(candidate.sourceId);
   const sale = await tx.sale.findFirst({
-    where: { id: Number(candidate.sourceId), branchId: Number(branchId) },
+    where: { id: saleId, branchId: Number(branchId) },
     select: { id: true, status: true, statusPayment: true },
   });
   if (!sale) fail('TAX_SOURCE_SALE_NOT_FOUND', 'Sale not found', 404);
+
+  // Once any Sale line becomes part of a live consolidated Delivery Note,
+  // future tax issuance authority moves away from the original Sale candidate.
+  // Already-issued Sale tax documents replay before this guard, preserving
+  // immutable legal history while preventing a second issuance path.
+  const consolidatedSource = await tx.consolidatedDeliveryLine.findFirst({
+    where: {
+      branchId: Number(branchId),
+      sourceSaleId: saleId,
+      status: 'DOCUMENTED',
+      combinedBilling: { is: { status: { not: 'CANCELLED' } } },
+    },
+    select: { combinedBillingId: true },
+  });
+  if (consolidatedSource) {
+    fail(
+      'TAX_SOURCE_SALE_ALREADY_CONSOLIDATED',
+      'Sale tax issuance moved to the consolidated delivery document after consolidation',
+      409,
+    );
+  }
+
   assertSaleTaxDocumentEligibility(sale);
 };
 
