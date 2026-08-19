@@ -6,11 +6,13 @@ on:
     paths:
       - 'src/modules/document-presentation/**'
       - 'src/modules/customer-money/receive/**'
+      - 'src/modules/customer-money/settlement/delivery-credit/**'
       - 'src/modules/finance/store-payment-account/**'
       - 'src/modules/finance/customer-receipt/presentation/**'
       - 'src/modules/finance/customer-receipt/create/createCustomerReceiptController.js'
       - 'src/modules/finance/customer-receipt/query/detail/getCustomerReceiptByIdController.js'
       - 'src/modules/finance/combined-billing/presentation/**'
+      - 'src/modules/finance/combined-billing/create/createSettlementConsolidatedDelivery.js'
       - 'src/modules/finance/combined-billing/routes/combinedBillingRoutes.js'
       - 'src/modules/branch/runtime/branchRuntimeService.js'
       - 'src/modules/finance/routes/financeRuntimeRoutes.js'
