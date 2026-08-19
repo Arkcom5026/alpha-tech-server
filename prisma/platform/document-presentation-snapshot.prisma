@@ -1,0 +1,17 @@
+model DocumentPresentationSnapshot {
+  id               Int      @id @default(autoincrement())
+  branchId         Int
+  sourceType       String   @db.VarChar(64)
+  sourceId         String   @db.VarChar(128)
+  documentPurpose  String   @db.VarChar(64)
+  rendererFamily   String   @db.VarChar(32)
+  snapshot         Json
+  snapshotHash     String   @db.VarChar(64)
+  issuedAt         DateTime
+  createdAt        DateTime @default(now())
+  branch           Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, sourceType, sourceId, documentPurpose, rendererFamily])
+  @@index([branchId, documentPurpose, issuedAt])
+  @@index([sourceType, sourceId])
+}
