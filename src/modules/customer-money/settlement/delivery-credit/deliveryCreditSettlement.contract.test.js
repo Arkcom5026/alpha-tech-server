@@ -158,7 +158,8 @@ test('customer money receive and settlement mutations share one per-customer tra
 
 test('legacy source reservations cannot be cancelled or spent through adjacent customer money flows', () => {
   assert.match(receiveService, /getCustomerMoneySourceState/);
-  assert.match(receiveService, /sourceType:\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(receiveService, /CUSTOMER_MONEY_RECEIPT_SOURCE\s*=\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(receiveService, /sourceType:\s*CUSTOMER_MONEY_RECEIPT_SOURCE/);
   assert.match(receiveService, /sourceState\.legacyReservedAmount\.greaterThan\(0\)/);
   assert.match(receiveService, /CUSTOMER_MONEY_RECEIVE_LEGACY_RESERVED/);
   assert.match(salePaymentProjection, /getCustomerMoneySourceState/);
