@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/modules/document-presentation/**'
+      - 'src/modules/customer-money/receive/**'
       - 'src/modules/finance/store-payment-account/**'
       - 'src/modules/finance/customer-receipt/presentation/**'
       - 'src/modules/finance/customer-receipt/create/createCustomerReceiptController.js'
