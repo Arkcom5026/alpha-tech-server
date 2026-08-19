@@ -9,6 +9,7 @@ const updatePurchaseOrderController = require('../update/updatePurchaseOrderSlic
 const deletePurchaseOrderController = require('../delete/deletePurchaseOrderSlice');
 const getPurchaseOrderController = require('../query/detail/getPurchaseOrderSlice');
 const updatePurchaseOrderStatusController = require('../status/updatePurchaseOrderStatusSlice');
+const { getPurchaseOrderPresentation } = require('../presentation/getPurchaseOrderPresentationController');
 
 const listEligiblePurchaseOrdersController = require('../../receipt/query/eligible-purchase-orders/listEligiblePurchaseOrdersController');
 const getReceiptPurchaseOrderController = require('../../receipt/query/purchase-order-detail/getReceiptPurchaseOrderController');
@@ -24,6 +25,7 @@ router.post('/with-advance', createPurchaseOrderWithAdvanceController.handle);
 
 router.get('/eligible-for-receipt', listEligiblePurchaseOrdersController.handle);
 router.get('/:id/detail-for-receipt', getReceiptPurchaseOrderController.handle);
+router.get('/:id/presentation', getPurchaseOrderPresentation);
 router.put('/:id', updatePurchaseOrderController.handle);
 router.delete('/:id', deletePurchaseOrderController.handle);
 router.get('/:id', getPurchaseOrderController.handle);
