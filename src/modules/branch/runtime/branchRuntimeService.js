@@ -1,6 +1,13 @@
 const { Prisma } = require('@prisma/client');
 const featurePresets = require('../../../../constants/branchFeaturePresets');
 const repository = require('./branchRuntimeRepository');
+const {
+  collectPaymentAccountIds,
+  normalizeDocumentPresentationConfig,
+} = require('../../document-presentation/presentationConfig');
+const {
+  assertStorePaymentAccountsOwnedByBranch,
+} = require('../../finance/store-payment-account/storePaymentAccountService');
 
 const DOCUMENT_HEADER_ALIGNMENTS = new Set(['left', 'center', 'right']);
 const DOCUMENT_HEADER_NAME_SIZES = new Set(['sm', 'md', 'lg', 'xl']);
@@ -83,6 +90,10 @@ const normalizeHeaderProfile = (source) => {
 const normalizeDocumentHeaderConfig = (value) => {
   if (value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  if (Number(value.version) === 2) {
+    return normalizeDocumentPresentationConfig(value);
+  }
 
   const documents = {};
   const rawDocuments = value.documents;
@@ -172,7 +183,14 @@ const createBranch = async (body = {}) => {
     throw makeError(400, 'INVALID_TEST_BRANCH_SLUG', 'ร้านทดสอบต้องใช้ slug ที่ขึ้นต้นด้วย system-test-');
   }
   if (Object.prototype.hasOwnProperty.call(body, 'documentHeaderConfig') && normalized.documentHeaderConfig === undefined) {
-    throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบหัวเอกสารไม่ถูกต้อง');
+    throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบเอกสารไม่ถูกต้อง');
+  }
+  if (normalized.documentHeaderConfig?.version === 2 && collectPaymentAccountIds(normalized.documentHeaderConfig).length) {
+    throw makeError(
+      400,
+      'STORE_PAYMENT_ACCOUNT_SELECTION_REQUIRES_EXISTING_BRANCH',
+      'ต้องสร้างร้านก่อนจึงจะเลือกบัญชีรับชำระสำหรับเอกสารได้',
+    );
   }
 
   if (normalized.businessType && !normalized.features && featurePresets[normalized.businessType]) {
@@ -236,7 +254,13 @@ const updateBranch = async (rawId, body = {}) => {
   if (has('features')) data.features = normalized.features !== undefined ? normalized.features : Prisma.JsonNull;
   if (has('documentHeaderConfig')) {
     if (normalized.documentHeaderConfig === undefined) {
-      throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบหัวเอกสารไม่ถูกต้อง');
+      throw makeError(400, 'INVALID_DOCUMENT_HEADER_CONFIG', 'รูปแบบเอกสารไม่ถูกต้อง');
+    }
+    if (normalized.documentHeaderConfig?.version === 2) {
+      await assertStorePaymentAccountsOwnedByBranch(
+        id,
+        collectPaymentAccountIds(normalized.documentHeaderConfig),
+      );
     }
     data.documentHeaderConfig = normalized.documentHeaderConfig === null
       ? Prisma.JsonNull
