@@ -10,8 +10,10 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const capability = require('../src/modules/document-presentation/presentationCapabilityRegistry');
 const serviceSource = read('src/modules/document-presentation/financeOperationalPresentationSnapshotService.js');
 const receiveSource = read('src/modules/customer-money/receive/receiveCustomerMoneyService.js');
-const settlementCreateSource = read('src/modules/finance/combined-billing/create/createSettlementConsolidatedDelivery.js');
+const settlementPresentationSource = read('src/modules/customer-money/settlement/delivery-credit/deliveryCreditSettlementPresentationSnapshot.js');
+const settlementCreateSource = read('src/modules/customer-money/settlement/delivery-credit/createDeliveryCreditSettlementService.js');
 const settlementQuerySource = read('src/modules/customer-money/settlement/delivery-credit/queryDeliveryCreditSettlementService.js');
+const consolidatedDeliverySource = read('src/modules/finance/combined-billing/create/createSettlementConsolidatedDelivery.js');
 
 for (const code of ['CUSTOMER_MONEY_RECEIPT', 'DELIVERY_CREDIT_SETTLEMENT', 'REFUND_RECEIPT']) {
   const profile = capability.getDocumentPresentationCapability(code);
@@ -37,12 +39,14 @@ assert(receiveSource.includes('presentationSnapshots: serializePresentationSnaps
 assert(receiveSource.includes('freezeCustomerMoneyReceiptPresentation({ tx: prisma, receipt })'));
 assert(receiveSource.indexOf('freezeCustomerMoneyReceiptPresentation({ tx, receipt })') < receiveSource.indexOf('await createLedger({'), 'presentation must freeze inside the receive transaction before completion returns');
 
+assert(settlementPresentationSource.includes("DELIVERY_CREDIT_SETTLEMENT_SOURCE = 'DELIVERY_CREDIT_SETTLEMENT'"));
+assert(settlementPresentationSource.includes("DELIVERY_CREDIT_SETTLEMENT_PURPOSE = 'DELIVERY_CREDIT_SETTLEMENT'"));
+assert(settlementPresentationSource.includes('freezeFinanceOperationalPresentation'));
 assert(settlementCreateSource.includes('freezeDeliveryCreditSettlementPresentation'));
-assert(settlementCreateSource.includes("sourceType: 'DELIVERY_CREDIT_SETTLEMENT'"));
-assert(settlementCreateSource.includes("documentPurpose: 'DELIVERY_CREDIT_SETTLEMENT'"));
-assert(settlementCreateSource.includes('await freezeDeliveryCreditSettlementPresentation(tx, { branchId, settlementId })'));
-assert(settlementCreateSource.indexOf('await freezeDeliveryCreditSettlementPresentation(tx, { branchId, settlementId })') < settlementCreateSource.indexOf('if (!isAutoConsolidationBatch(prepared)) return null'), 'settlement presentation must freeze even when no consolidated delivery is generated');
-assert(settlementQuerySource.includes('freezeDeliveryCreditSettlementPresentation({ prisma, row })'));
-assert(settlementQuerySource.includes('presentationSnapshots: serializePresentationSnapshots') || settlementQuerySource.includes('result.presentationSnapshots = serializePresentationSnapshots'));
+assert(settlementCreateSource.includes('presentationSnapshots: serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'));
+assert(settlementCreateSource.indexOf('freezeDeliveryCreditSettlementPresentation({ tx, settlement: fresh })') < settlementCreateSource.indexOf('return {'), 'settlement presentation must freeze before the creation transaction returns');
+assert(settlementQuerySource.includes('freezeDeliveryCreditSettlementPresentation({ tx: prisma, settlement: row })'));
+assert(settlementQuerySource.includes('result.presentationSnapshots = serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'));
+assert(!consolidatedDeliverySource.includes('freezeDeliveryCreditSettlementPresentation'), 'Combined Billing creation must not own Delivery Credit Settlement presentation snapshots.');
 
 console.log('Finance Operational Document Presentation Wave 5 Contract: PASS');
