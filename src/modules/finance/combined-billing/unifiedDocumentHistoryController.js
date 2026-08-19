@@ -57,7 +57,7 @@ const buildCombinedKeywordWhere = (keyword) => {
       { code: { contains: value, mode: 'insensitive' } },
       { note: { contains: value, mode: 'insensitive' } },
       { customer: { is: { name: { contains: value, mode: 'insensitive' } } } },
-      { customer: { is: { companyName: { contains: value, mode: 'insensitive' } } } },
+      { customer: { is: { companyName: { contains: value, mode: 'insensitive' } } },
     ],
   };
 };
@@ -186,29 +186,21 @@ const unifiedDocumentHistory = async (req, res, next) => {
     });
     const consumedSaleIds = consumedSourceRows.map((row) => row.sourceSaleId);
 
-    // Once any source line enters a non-cancelled consolidated document, the
-    // original Sale remains auditable but leaves both active Delivery Note and
-    // Bill print lifecycles. Printing the source separately would duplicate a
-    // commercial document after consolidation.
+    // Once a source Delivery Note enters a non-cancelled consolidated document,
+    // the original stays auditable but leaves the active print history.
     const consumedSourceExclusion = consumedSaleIds.length
       ? { id: { notIn: consumedSaleIds } }
       : {};
 
     const saleWhere = {
       branchId,
+      status: { not: 'CANCELLED' },
       ...consumedSourceExclusion,
-      ...(purpose === 'DELIVERY_NOTE'
-        ? {
-            // Discovery and opening must share the same eligibility authority.
-            // projectSaleDeliveryNote requires a completed sale plus an issued
-            // official document number, so history must never advertise a row
-            // that the canonical print projection will reject with 409.
-            status: 'COMPLETED',
-            officialDocumentNumber: { not: null },
-          }
-        : {
-            status: { not: 'CANCELLED' },
-          }),
+      ...(purpose === 'DELIVERY_NOTE' ? {
+        // Delivery Note eligibility follows issuance identity, not Sale payment
+        // completion. Credit sales may validly remain DRAFT while already issued.
+        officialDocumentNumber: { not: null },
+      } : {}),
       ...buildSaleKeywordWhere(keyword),
       ...buildDateWhere(dateQuery, 'createdAt'),
     };
