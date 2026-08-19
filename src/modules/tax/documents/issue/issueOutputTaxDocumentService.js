@@ -4,6 +4,9 @@ const { prisma, Prisma } = require('../../../../../lib/prisma');
 const documentRepository = require('../repository/taxDocumentRepository');
 const { assertSaleTaxDocumentEligibility } = require('../../sources/sale/saleTaxDocumentEligibilityPolicy');
 const outputVatRecordService = require('../../outputVat/outputVatRecordService');
+const {
+  ensureStatutoryTaxPresentationSnapshot,
+} = require('../presentation/statutoryTaxPresentationService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -135,13 +138,18 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
       if (document.taxInvoiceKind !== kind) {
         fail('TAX_DOCUMENT_ALREADY_ISSUED', 'Tax document was already issued with a different invoice kind', 409);
       }
+      const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot({
+        tx,
+        branchId: normalizedBranchId,
+        taxDocument: document,
+      });
       const outputVat = await outputVatRecordService.recordIssuedDocument({
         tx,
         branchId: normalizedBranchId,
         document,
         ledgerType: 'OUTPUT_VAT',
       });
-      return Object.freeze({ replayed: true, document, outputVatRecord: outputVat.record });
+      return Object.freeze({ replayed: true, document, outputVatRecord: outputVat.record, presentationSnapshot });
     }
     if (document.status !== 'DRAFT' || document.documentType !== 'OUTPUT_TAX_INVOICE') {
       fail('TAX_DOCUMENT_ISSUANCE_FORBIDDEN', 'Only a draft output tax document may be issued', 409);
@@ -204,6 +212,14 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
       },
     }, tx);
 
+    // Freeze presentation in the same issuance transaction as the legal
+    // TaxDocument authority, so later store setting changes cannot rewrite history.
+    const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot({
+      tx,
+      branchId: normalizedBranchId,
+      taxDocument: issued,
+    });
+
     const outputVat = await outputVatRecordService.recordIssuedDocument({
       tx,
       branchId: normalizedBranchId,
@@ -211,7 +227,7 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
       ledgerType: 'OUTPUT_VAT',
     });
 
-    return Object.freeze({ replayed: false, document: issued, outputVatRecord: outputVat.record });
+    return Object.freeze({ replayed: false, document: issued, outputVatRecord: outputVat.record, presentationSnapshot });
   });
 };
 
