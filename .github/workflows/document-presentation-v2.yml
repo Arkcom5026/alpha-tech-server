@@ -21,6 +21,8 @@ on:
       - 'src/modules/sales/documents/print/projectSaleDeliveryNoteService.js'
       - 'src/modules/procurement/purchase-order/presentation/**'
       - 'src/modules/procurement/purchase-order/routes/purchaseOrderRoutes.js'
+      - 'src/modules/tax/documents/presentation/**'
+      - 'src/modules/tax/documents/creditNote/print/projectOutputTaxCreditNotePrintableDocumentService.js'
       - 'prisma/finance/store-payment-account.prisma'
       - 'prisma/platform/document-presentation-snapshot.prisma'
       - 'prisma/foundation/tenant.prisma'
@@ -32,6 +34,7 @@ on:
       - 'tests/customer-receipt-document-presentation-wave2.contract.test.js'
       - 'tests/purchase-order-document-presentation-wave3.contract.test.js'
       - 'tests/combined-billing-document-presentation-wave3.contract.test.js'
+      - 'tests/statutory-document-presentation-wave4.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -68,3 +71,5 @@ jobs:
         run: node tests/purchase-order-document-presentation-wave3.contract.test.js
       - name: Run Combined Billing Document Presentation Wave 3 contract
         run: node tests/combined-billing-document-presentation-wave3.contract.test.js
+      - name: Run Statutory Document Presentation Wave 4 contract
+        run: node tests/statutory-document-presentation-wave4.contract.test.js
