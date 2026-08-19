@@ -21,6 +21,10 @@ const {
   createSettlementConsolidatedDelivery,
   loadSettlementGeneratedDocument,
 } = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
+const {
+  freezeDeliveryCreditSettlementPresentation,
+  serializeDeliveryCreditSettlementPresentationSnapshots,
+} = require('./deliveryCreditSettlementPresentationSnapshot');
 
 const money = (value) => new Prisma.Decimal(String(value ?? 0));
 const asNumber = (value) => Number(value || 0);
@@ -215,11 +219,13 @@ const loadSettlementCreateResult = async (tx, settlementId, {
     error.statusCode = 409;
     throw error;
   }
+  const presentationSnapshots = await freezeDeliveryCreditSettlementPresentation({ tx, settlement: fresh });
   return {
     ...fresh,
     totalAmount: asNumber(fresh.totalAmount),
     customerMoneyBalance: asNumber(availableAmount),
     generatedDocument,
+    presentationSnapshots: serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots),
     idempotentReplay,
   };
 };
