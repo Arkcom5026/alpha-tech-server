@@ -10,8 +10,27 @@ const {
 
 const D = (value) => new Prisma.Decimal(String(value));
 
+const presentationBranch = {
+  id: 2,
+  name: 'Branch A',
+  address: 'Bangkok',
+  phone: '020000000',
+  taxId: '0100000000000',
+  branchCode: '00000',
+  isHeadOffice: true,
+  slug: 'branch-a',
+  documentHeaderConfig: null,
+};
+
+const presentationSnapshotRepository = () => ({
+  findUnique: async () => null,
+  upsert: async ({ create }) => ({ id: 1, ...create }),
+});
+
 test('receive customer money writes receipt, ledger and combined balance in one transaction client', async () => {
   const tx = {
+    branch: { findFirst: async () => presentationBranch },
+    documentPresentationSnapshot: presentationSnapshotRepository(),
     customerProfile: { findFirst: async () => ({ id: 11 }) },
     employeeProfile: { findFirst: async () => ({ id: 22 }) },
     customerReceipt: {
@@ -66,6 +85,7 @@ test('receive customer money writes receipt, ledger and combined balance in one 
   assert.equal(calls.ledger.data.referenceId, 77);
   assert.equal(Number(calls.balance.availableAmount), 160);
   assert.equal(result.receipt.id, 77);
+  assert.ok(result.receipt.presentationSnapshots);
   assert.equal(result.balance.availableAmount, 160);
 });
 
