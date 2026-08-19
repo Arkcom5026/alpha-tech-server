@@ -32,15 +32,18 @@ test('duplicate source-line submission is a business conflict before Prisma writ
   assert.match(controller, /status\(409\)/);
 });
 
-test('consolidated delivery uses one output-tax authority without duplicating issued source tax', () => {
+test('consolidated delivery owns tax authority only when source credit sales have no issued tax invoice', () => {
   const service = read('src/modules/finance/combined-billing/documentWorkspaceService.js');
   const contract = read('src/modules/tax/candidates/contracts/taxCandidateContract.js');
   const issue = read('src/modules/tax/documents/issue/issueOutputTaxDocumentService.js');
+  assert.match(service, /officialDocumentNumber: \{ not: null \}/);
+  assert.match(service, /isCredit: true/);
+  assert.match(service, /DOCUMENT_WORKSPACE_SOURCE_TAX_ALREADY_ISSUED/);
+  assert.match(service, /sourceType: 'SALE'/);
+  assert.match(service, /status: 'REGISTERED'/);
   assert.match(service, /registerConsolidatedTaxCandidate/);
-  assert.match(service, /taxDocumentRepository\.create/);
+  assert.match(service, /taxAuthorityMode: 'CONSOLIDATED_TAX_DRAFT'/);
   assert.match(service, /sourceType: 'CONSOLIDATED_DELIVERY'/);
-  assert.match(service, /SOURCE_TAX_PRESERVED/);
-  assert.match(service, /DOCUMENT_WORKSPACE_MIXED_TAX_AUTHORITY/);
   assert.match(contract, /'CONSOLIDATED_DELIVERY'/);
   assert.match(issue, /candidate\?\.sourceType === 'CONSOLIDATED_DELIVERY'/);
   assert.match(issue, /TAX_SOURCE_SALE_ALREADY_CONSOLIDATED/);

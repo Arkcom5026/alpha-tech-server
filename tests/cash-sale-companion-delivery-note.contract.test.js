@@ -23,17 +23,15 @@ assert.match(printable, /sale\.status === 'CANCELLED'/);
 assert.match(history, /onlyWithDeliveryNote/);
 assert.match(history, /officialDocumentNumber: \{ not: null \}/);
 
-// Any issued Delivery Note may enter workspace discovery. Credit readiness keeps
-// settlement-line authority; CASH readiness is derived from the canonical Sale
-// payment projection and never fabricates customer-credit settlement rows.
-assert.doesNotMatch(workspace, /customerId: \{ in: group\.memberIds \}, isCredit: true/);
+// Cash companion/on-demand Delivery Notes remain printable and discoverable in
+// Delivery Note history, but consolidation authority is CREDIT-only.
+assert.match(workspace, /customerId: \{ in: group\.memberIds \}/);
+assert.match(workspace, /isCredit: true/);
 assert.match(workspace, /officialDocumentNumber: \{ not: null \}/);
-assert.match(workspace, /isCashSaleFullyPaid/);
-assert.match(workspace, /statusPayment/);
-assert.match(workspace, /paidAmount/);
-assert.match(workspace, /paymentAuthority: sale\.isCredit \? 'DELIVERY_CREDIT_SETTLEMENT' : 'SALE_PAYMENT'/);
-assert.match(workspace, /DOCUMENT_WORKSPACE_CASH_SALE_NOT_PAID/);
-assert.match(workspace, /DOCUMENT_WORKSPACE_CASH_PRICE_ADJUSTMENT_FORBIDDEN/);
+assert.doesNotMatch(workspace, /isCashSaleFullyPaid/);
+assert.doesNotMatch(workspace, /SALE_PAYMENT/);
+assert.doesNotMatch(workspace, /DOCUMENT_WORKSPACE_CASH_SALE_NOT_PAID/);
+assert.doesNotMatch(workspace, /DOCUMENT_WORKSPACE_CASH_PRICE_ADJUSTMENT_FORBIDDEN/);
 
 // The completion service keeps the existing single sale stock movement authority.
 assert.strictEqual((completion.match(/stockMovement\.createMany/g) || []).length, 1);
