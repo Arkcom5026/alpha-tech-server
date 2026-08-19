@@ -12,6 +12,9 @@ const {
   issueCustomerFirstAssociationToken,
 } = require('../policies/customerFirstAssociationTokenPolicy');
 
+const allowedTypes = new Set(['INDIVIDUAL', 'ORGANIZATION', 'GOVERNMENT']);
+const legalEntityTypes = new Set(['ORGANIZATION', 'GOVERNMENT']);
+
 function presentCustomer(customer, { includeCredit = true, firstAssociationToken = null } = {}) {
   const subdistrictCode = customer.subdistrict?.code || null;
   const districtCode =
@@ -55,6 +58,8 @@ function buildError(statusCode, payload) {
   return error;
 }
 
+const cleanText = (value) => (typeof value === 'string' ? value.trim() : '');
+
 async function createCustomer(input = {}, actor = {}) {
   const branchId = Number(actor.branchId);
   const employeeId = Number(actor.employeeId);
@@ -79,10 +84,32 @@ async function createCustomer(input = {}, actor = {}) {
   if (![undefined, null, true, false].includes(quotationWorkflowOverride)) {
     throw buildError(400, { code: 'INVALID_QUOTATION_WORKFLOW_OVERRIDE', message: 'นโยบายใบเสนอราคาไม่ถูกต้อง' });
   }
-  const normalizedPhone = normalizePhone(phone);
 
-  if (!name || !isValidPhone(normalizedPhone)) {
-    throw buildError(400, { error: 'ต้องระบุชื่อและเบอร์โทร 9 หรือ 10 หลัก' });
+  const normalizedType = type || 'INDIVIDUAL';
+  if (!allowedTypes.has(normalizedType)) {
+    throw buildError(400, { code: 'INVALID_CUSTOMER_TYPE', message: 'ประเภทลูกค้าไม่ถูกต้อง' });
+  }
+
+  const normalizedName = cleanText(name);
+  const normalizedCompanyName = cleanText(companyName);
+  const isLegalEntity = legalEntityTypes.has(normalizedType);
+  if (isLegalEntity) {
+    if (!normalizedCompanyName) {
+      throw buildError(400, {
+        code: 'CUSTOMER_COMPANY_NAME_REQUIRED',
+        message: 'กรุณาระบุชื่อบริษัทหรือหน่วยงาน',
+      });
+    }
+  } else if (!normalizedName) {
+    throw buildError(400, {
+      code: 'CUSTOMER_NAME_REQUIRED',
+      message: 'กรุณาระบุชื่อลูกค้า',
+    });
+  }
+
+  const normalizedPhone = normalizePhone(phone);
+  if (!isValidPhone(normalizedPhone)) {
+    throw buildError(400, { error: 'ต้องระบุเบอร์โทร 9 หรือ 10 หลัก' });
   }
 
   const existingUser = await repository.findUserByPhone(normalizedPhone);
@@ -125,13 +152,13 @@ async function createCustomer(input = {}, actor = {}) {
     hashedPassword,
     branchId,
     customer: {
-      name,
-      type,
+      name: normalizedName || null,
+      type: normalizedType,
       quotationWorkflowOverride: quotationWorkflowOverride ?? null,
-      companyName,
-      departmentName: type === 'INDIVIDUAL' ? null : (departmentName || null),
-      financialOwnerCustomerId: type === 'INDIVIDUAL' ? null : (financialOwnerCustomerId || null),
-      taxId,
+      companyName: isLegalEntity ? normalizedCompanyName : null,
+      departmentName: isLegalEntity ? (cleanText(departmentName) || null) : null,
+      financialOwnerCustomerId: isLegalEntity ? (financialOwnerCustomerId || null) : null,
+      taxId: cleanText(taxId) || null,
       subdistrictCode,
       addressDetail,
     },
