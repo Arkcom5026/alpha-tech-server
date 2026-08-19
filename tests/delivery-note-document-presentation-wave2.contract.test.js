@@ -9,6 +9,8 @@ const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relative
 const schema = read('prisma/platform/document-presentation-snapshot.prisma');
 const migration = read('prisma/migrations/20260819145500_document_presentation_snapshot_ledger/migration.sql');
 const snapshotService = read('src/modules/document-presentation/persistentPresentationSnapshotService.js');
+const ensureService = read('src/modules/sales/documents/presentation/ensureSaleDeliveryNotePresentationSnapshotService.js');
+const completionController = read('src/modules/sales/completion/controllers/saleCompletionController.js');
 const projection = read('src/modules/sales/documents/print/projectSaleDeliveryNoteService.js');
 const routes = read('src/modules/sales/routes/saleRoutes.js');
 
@@ -26,6 +28,14 @@ assert.match(snapshotService, /createPresentationSnapshotEnvelope/);
 assert.match(snapshotService, /documentPresentationSnapshot\.findUnique/);
 assert.match(snapshotService, /documentPresentationSnapshot\.upsert/);
 assert.match(snapshotService, /update:\s*\{\}/, 'existing snapshots must not be mutated during idempotent upsert');
+
+assert.match(ensureService, /ensureSaleDeliveryNotePresentationSnapshot/);
+assert.match(ensureService, /documentPurpose:\s*'DELIVERY_NOTE'/);
+assert.match(ensureService, /rendererFamily:\s*'A4'/);
+assert.match(ensureService, /officialDocumentNumber/);
+assert.match(completionController, /command\.sale\.deliveryNoteMode === 'PRINT'/);
+assert.match(completionController, /ensureSaleDeliveryNotePresentationSnapshot\(\{ branchId, saleId: result\.saleId \}\)/);
+assert.match(completionController, /deliveryNotePresentation:\s*deliveryNotePresentationRecord\?\.snapshot \|\| null/);
 
 assert.match(routes, /router\.get\('\/:id\/delivery-note', getSaleDeliveryNote\)/);
 assert.match(projection, /documentHeaderConfig:\s*true/);
