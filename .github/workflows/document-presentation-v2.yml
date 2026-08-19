@@ -6,6 +6,9 @@ on:
     paths:
       - 'src/modules/document-presentation/**'
       - 'src/modules/finance/store-payment-account/**'
+      - 'src/modules/finance/customer-receipt/presentation/**'
+      - 'src/modules/finance/customer-receipt/create/createCustomerReceiptController.js'
+      - 'src/modules/finance/customer-receipt/query/detail/getCustomerReceiptByIdController.js'
       - 'src/modules/branch/runtime/branchRuntimeService.js'
       - 'src/modules/finance/routes/financeRuntimeRoutes.js'
       - 'src/modules/quotation/quotationIssuedSnapshot.js'
@@ -22,6 +25,7 @@ on:
       - 'tests/document-presentation-v2-foundation.contract.test.js'
       - 'tests/quotation-document-presentation-wave1.contract.test.js'
       - 'tests/delivery-note-document-presentation-wave2.contract.test.js'
+      - 'tests/customer-receipt-document-presentation-wave2.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -52,3 +56,5 @@ jobs:
         run: node tests/quotation-document-presentation-wave1.contract.test.js
       - name: Run Delivery Note Document Presentation Wave 2 contract
         run: node tests/delivery-note-document-presentation-wave2.contract.test.js
+      - name: Run Customer Receipt Document Presentation Wave 2 contract
+        run: node tests/customer-receipt-document-presentation-wave2.contract.test.js
