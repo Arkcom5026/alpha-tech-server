@@ -5,6 +5,7 @@ const { prisma } = require('../../../lib/prisma');
 const contract = require('./quotationContract');
 const { customerFields } = require('./quotationCustomerSnapshot');
 const { buildIssuedSnapshot } = require('./quotationIssuedSnapshot');
+const { buildQuotationPresentationSnapshot } = require('./quotationPresentationSnapshot');
 
 const money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
@@ -473,10 +474,21 @@ const issue = async (input) => {
       taxId: quotation.customerTaxId,
       address: quotation.customerAddress,
     };
+    const {
+      presentationSnapshot,
+      paymentAccountSnapshots,
+    } = await buildQuotationPresentationSnapshot({
+      tx,
+      branch: documentHeaderSnapshot,
+      quotation: { ...quotation, issueDate },
+      issuedAt,
+    });
     const issuedSnapshot = buildIssuedSnapshot({
       quotation: { ...quotation, issueDate },
       documentHeaderSnapshot,
       customerSnapshot,
+      presentationSnapshot,
+      paymentAccountSnapshots,
       issuedAt,
     });
 
