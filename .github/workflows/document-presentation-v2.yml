@@ -11,11 +11,15 @@ on:
       - 'src/modules/quotation/quotationIssuedSnapshot.js'
       - 'src/modules/quotation/quotationPresentationSnapshot.js'
       - 'src/modules/quotation/quotationService.js'
+      - 'src/modules/sales/documents/print/projectSaleDeliveryNoteService.js'
       - 'prisma/finance/store-payment-account.prisma'
+      - 'prisma/platform/document-presentation-snapshot.prisma'
       - 'prisma/foundation/tenant.prisma'
       - 'prisma/migrations/*store_payment_account*/**'
+      - 'prisma/migrations/*document_presentation_snapshot*/**'
       - 'tests/document-presentation-v2-foundation.contract.test.js'
       - 'tests/quotation-document-presentation-wave1.contract.test.js'
+      - 'tests/delivery-note-document-presentation-wave2.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -44,3 +48,5 @@ jobs:
         run: node tests/document-presentation-v2-foundation.contract.test.js
       - name: Run Quotation Document Presentation Wave 1 contract
         run: node tests/quotation-document-presentation-wave1.contract.test.js
+      - name: Run Delivery Note Document Presentation Wave 2 contract
+        run: node tests/delivery-note-document-presentation-wave2.contract.test.js
