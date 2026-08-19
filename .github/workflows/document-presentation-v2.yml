@@ -22,6 +22,8 @@ on:
       - 'src/modules/procurement/purchase-order/presentation/**'
       - 'src/modules/procurement/purchase-order/routes/purchaseOrderRoutes.js'
       - 'src/modules/tax/documents/presentation/**'
+      - 'src/modules/tax/documents/issue/issueOutputTaxDocumentService.js'
+      - 'src/modules/tax/documents/creditNote/create/issueOutputTaxCreditNoteService.js'
       - 'src/modules/tax/documents/creditNote/print/projectOutputTaxCreditNotePrintableDocumentService.js'
       - 'src/modules/tax/http/taxIntakeRoutes.js'
       - 'prisma/finance/store-payment-account.prisma'
