@@ -1,6 +1,7 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
+const { resolveDocumentPresentation } = require('../../../document-presentation/presentationConfig');
 const { getOrCreatePresentationSnapshot } = require('../../../document-presentation/persistentPresentationSnapshotService');
 
 const positiveInt = (value) => {
@@ -28,13 +29,30 @@ const getCombinedBillingPresentation = async (req, res, next) => {
     });
     if (!document) return res.status(404).json({ code: 'COMBINED_BILLING_NOT_FOUND', message: 'Combined billing document not found' });
 
+    const storeConfig = document.branch?.documentHeaderConfig || null;
+    if (document.status === 'DRAFT') {
+      const presentation = resolveDocumentPresentation({
+        storeConfig,
+        documentPurpose: 'COMBINED_BILLING',
+      });
+      return res.status(200).json({
+        ok: true,
+        data: {
+          persisted: false,
+          snapshotId: null,
+          snapshotHash: null,
+          presentationSnapshot: { presentation },
+        },
+      });
+    }
+
     const record = await getOrCreatePresentationSnapshot({
       branchId,
       sourceType: 'COMBINED_BILLING',
       sourceId: document.id,
       documentPurpose: 'COMBINED_BILLING',
       rendererFamily: 'A4',
-      storeConfig: document.branch?.documentHeaderConfig || null,
+      storeConfig,
       issuedAt: document.issueDate || document.createdAt,
       businessSnapshot: {
         combinedBillingId: document.id,
@@ -46,6 +64,7 @@ const getCombinedBillingPresentation = async (req, res, next) => {
     return res.status(200).json({
       ok: true,
       data: {
+        persisted: true,
         snapshotId: record.id,
         snapshotHash: record.snapshotHash,
         presentationSnapshot: record.snapshot,
