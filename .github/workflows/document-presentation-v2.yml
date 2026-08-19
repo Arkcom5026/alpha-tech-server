@@ -17,6 +17,8 @@ on:
       - 'src/modules/sales/completion/controllers/saleCompletionController.js'
       - 'src/modules/sales/documents/presentation/**'
       - 'src/modules/sales/documents/print/projectSaleDeliveryNoteService.js'
+      - 'src/modules/procurement/purchase-order/presentation/**'
+      - 'src/modules/procurement/purchase-order/routes/purchaseOrderRoutes.js'
       - 'prisma/finance/store-payment-account.prisma'
       - 'prisma/platform/document-presentation-snapshot.prisma'
       - 'prisma/foundation/tenant.prisma'
@@ -26,6 +28,7 @@ on:
       - 'tests/quotation-document-presentation-wave1.contract.test.js'
       - 'tests/delivery-note-document-presentation-wave2.contract.test.js'
       - 'tests/customer-receipt-document-presentation-wave2.contract.test.js'
+      - 'tests/purchase-order-document-presentation-wave3.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -58,3 +61,5 @@ jobs:
         run: node tests/delivery-note-document-presentation-wave2.contract.test.js
       - name: Run Customer Receipt Document Presentation Wave 2 contract
         run: node tests/customer-receipt-document-presentation-wave2.contract.test.js
+      - name: Run Purchase Order Document Presentation Wave 3 contract
+        run: node tests/purchase-order-document-presentation-wave3.contract.test.js
