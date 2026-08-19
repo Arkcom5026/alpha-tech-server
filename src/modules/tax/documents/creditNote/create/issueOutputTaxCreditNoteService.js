@@ -3,6 +3,9 @@
 const { prisma, Prisma } = require('../../../../../lib/prisma');
 const { assertOutputTaxCreditNoteEligibility } = require('../saleReturnCreditNoteEligibilityPolicy');
 const outputVatRecordService = require('../../../outputVat/outputVatRecordService');
+const {
+  ensureStatutoryTaxPresentationSnapshot,
+} = require('../../presentation/statutoryTaxPresentationService');
 
 const fail = (code, message, statusCode = 409) => {
   const error = new Error(message);
@@ -95,13 +98,18 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
       where: { originalTaxDocumentId: normalizedDocumentId, branchId: normalizedBranchId },
     });
     if (existing) {
+      const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot({
+        tx,
+        branchId: normalizedBranchId,
+        taxDocument: existing,
+      });
       const outputVat = await outputVatRecordService.recordIssuedDocument({
         tx,
         branchId: normalizedBranchId,
         document: existing,
         ledgerType: 'OUTPUT_VAT_ADJUSTMENT',
       });
-      return Object.freeze({ replayed: true, document: existing, outputVatRecord: outputVat.record });
+      return Object.freeze({ replayed: true, document: existing, outputVatRecord: outputVat.record, presentationSnapshot });
     }
 
     const candidate = original.candidateId
@@ -187,6 +195,13 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
       },
     });
 
+    // Credit-note presentation is frozen atomically with its legal issuance.
+    const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot({
+      tx,
+      branchId: normalizedBranchId,
+      taxDocument: document,
+    });
+
     const outputVat = await outputVatRecordService.recordIssuedDocument({
       tx,
       branchId: normalizedBranchId,
@@ -194,7 +209,7 @@ const issueOutputTaxCreditNote = async ({ branchId, taxDocumentId, saleReturnId,
       ledgerType: 'OUTPUT_VAT_ADJUSTMENT',
     });
 
-    return Object.freeze({ replayed: false, document, outputVatRecord: outputVat.record });
+    return Object.freeze({ replayed: false, document, outputVatRecord: outputVat.record, presentationSnapshot });
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     timeout: 30000,
