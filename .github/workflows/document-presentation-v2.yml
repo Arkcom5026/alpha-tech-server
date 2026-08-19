@@ -23,6 +23,7 @@ on:
       - 'src/modules/procurement/purchase-order/routes/purchaseOrderRoutes.js'
       - 'src/modules/tax/documents/presentation/**'
       - 'src/modules/tax/documents/creditNote/print/projectOutputTaxCreditNotePrintableDocumentService.js'
+      - 'src/modules/tax/http/taxIntakeRoutes.js'
       - 'prisma/finance/store-payment-account.prisma'
       - 'prisma/platform/document-presentation-snapshot.prisma'
       - 'prisma/foundation/tenant.prisma'
