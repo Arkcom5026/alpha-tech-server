@@ -13,10 +13,14 @@ assert.match(routes, /router\.get\('\/:id', getCombinedBillingById\)/);
 assert.match(controller, /const branchId = positiveInt\(req\.user\?\.branchId\)/);
 assert.match(controller, /where:\s*\{ id: documentId, branchId \}/);
 assert.match(controller, /documentHeaderConfig:\s*true/);
+assert.match(controller, /document\.status === 'DRAFT'/);
+assert.match(controller, /resolveDocumentPresentation/);
+assert.match(controller, /persisted:\s*false/);
 assert.match(controller, /getOrCreatePresentationSnapshot/);
 assert.match(controller, /sourceType:\s*'COMBINED_BILLING'/);
 assert.match(controller, /documentPurpose:\s*'COMBINED_BILLING'/);
 assert.match(controller, /rendererFamily:\s*'A4'/);
+assert.match(controller, /persisted:\s*true/);
 assert.match(controller, /presentationSnapshot:\s*record\.snapshot/);
 
 console.log('combined-billing-document-presentation-wave3.contract.test.js: PASS');
