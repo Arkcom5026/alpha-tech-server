@@ -23,6 +23,7 @@ const {
 } = require('../repositories/saleReturnRepository');
 const { mapSaleReturnResult } = require('../mappers/saleReturnMapper');
 const { generateSaleReturnCode } = require('../utils/saleReturnCode');
+const { freezeRefundReceiptPresentation } = require('../presentation/refundReceiptPresentationSnapshot');
 
 const loadSaleReturnEligibility = async ({ saleId, branchId, client }) => {
   const sale = await findSaleForReturn({ saleId, branchId, client });
@@ -105,6 +106,8 @@ const completeSaleReturn = async ({ command, branchId, employeeId, actorRole }) 
         projection,
         occurredAt,
       });
+
+      await freezeRefundReceiptPresentation({ tx, saleReturn });
 
       for (const item of projection.evaluatedItems) {
         if (item.kind === 'SIMPLE') {
