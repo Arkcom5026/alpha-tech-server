@@ -1,0 +1,40 @@
+name: Document Presentation V2 Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/modules/document-presentation/**'
+      - 'src/modules/finance/store-payment-account/**'
+      - 'src/modules/branch/runtime/branchRuntimeService.js'
+      - 'src/modules/finance/routes/financeRuntimeRoutes.js'
+      - 'prisma/finance/store-payment-account.prisma'
+      - 'prisma/foundation/tenant.prisma'
+      - 'prisma/migrations/*store_payment_account*/**'
+      - 'tests/document-presentation-v2-foundation.contract.test.js'
+      - '.github/workflows/document-presentation-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alpha_tech_contract
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/alpha_tech_contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Run Document Presentation V2 foundation contract
+        run: node tests/document-presentation-v2-foundation.contract.test.js
