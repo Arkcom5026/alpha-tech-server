@@ -9,7 +9,10 @@ const DOCUMENT_TYPE_ALIASES = Object.freeze({
 const normalizeDocumentCode = (value) => String(value || '')
   .trim()
   .toUpperCase()
+  .replace(/[\s-]+/g, '_')
   .replace(/[^A-Z0-9_]/g, '')
+  .replace(/_+/g, '_')
+  .replace(/^_+|_+$/g, '')
   .slice(0, 100);
 
 const toCanonicalDocumentCode = (value) => {
