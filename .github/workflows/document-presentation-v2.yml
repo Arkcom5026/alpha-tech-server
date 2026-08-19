@@ -11,6 +11,8 @@ on:
       - 'src/modules/quotation/quotationIssuedSnapshot.js'
       - 'src/modules/quotation/quotationPresentationSnapshot.js'
       - 'src/modules/quotation/quotationService.js'
+      - 'src/modules/sales/completion/controllers/saleCompletionController.js'
+      - 'src/modules/sales/documents/presentation/**'
       - 'src/modules/sales/documents/print/projectSaleDeliveryNoteService.js'
       - 'prisma/finance/store-payment-account.prisma'
       - 'prisma/platform/document-presentation-snapshot.prisma'
