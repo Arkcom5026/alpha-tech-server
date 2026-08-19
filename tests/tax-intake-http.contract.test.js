@@ -30,6 +30,7 @@ assert.deepStrictEqual(routeContracts, [
   { path: '/documents', methods: ['get'] },
   { path: '/documents/:taxDocumentId', methods: ['get'] },
   { path: '/documents/:taxDocumentId/printable', methods: ['get'] },
+  { path: '/documents/:taxDocumentId/presentation', methods: ['get'] },
   { path: '/documents/:taxDocumentId/issue', methods: ['post'] },
   { path: '/documents/:taxDocumentId/credit-note', methods: ['post'] },
   { path: '/credit-notes/from-sale-return/:saleReturnId', methods: ['post'] },
