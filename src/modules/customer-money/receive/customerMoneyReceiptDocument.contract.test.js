@@ -24,7 +24,8 @@ test('serialized receipt exposes enriched parties without changing receive seman
   assert.match(serviceSource, /receivedBy:\s*receipt\.createdByEmployeeProfile/);
   assert.match(serviceSource, /cancelledBy:\s*receipt\.cancelledByEmployeeProfile/);
   assert.match(serviceSource, /eventType:\s*'MONEY_RECEIVED'/);
-  assert.match(serviceSource, /referenceType:\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(serviceSource, /CUSTOMER_MONEY_RECEIPT_SOURCE\s*=\s*'CUSTOMER_MONEY_RECEIPT'/);
+  assert.match(serviceSource, /referenceType:\s*CUSTOMER_MONEY_RECEIPT_SOURCE/);
 });
 
 test('receipt history remains branch-scoped and CMR-only while supporting operational filters', () => {
