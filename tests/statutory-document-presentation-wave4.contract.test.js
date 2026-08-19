@@ -9,6 +9,8 @@ const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relative
 const service = read('src/modules/tax/documents/presentation/statutoryTaxPresentationService.js');
 const controller = read('src/modules/tax/documents/presentation/getStatutoryTaxPresentationController.js');
 const routes = read('src/modules/tax/http/taxIntakeRoutes.js');
+const invoiceIssue = read('src/modules/tax/documents/issue/issueOutputTaxDocumentService.js');
+const creditNoteIssue = read('src/modules/tax/documents/creditNote/create/issueOutputTaxCreditNoteService.js');
 const creditNote = read('src/modules/tax/documents/creditNote/print/projectOutputTaxCreditNotePrintableDocumentService.js');
 const capability = read('src/modules/document-presentation/presentationCapabilityRegistry.js');
 
@@ -34,6 +36,16 @@ assert.match(controller, /issuerSnapshot:\s*true/);
 assert.match(controller, /recipientSnapshot:\s*true/);
 assert.match(controller, /ensureStatutoryTaxPresentationSnapshot/);
 assert.match(controller, /presentationSnapshot:\s*record\.snapshot/);
+
+assert.match(invoiceIssue, /ensureStatutoryTaxPresentationSnapshot/);
+assert.match(invoiceIssue, /const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot\(\{\s*tx,/);
+assert.match(invoiceIssue, /taxDocument:\s*issued/);
+assert.match(invoiceIssue, /replayed:\s*false, document: issued, outputVatRecord: outputVat\.record, presentationSnapshot/);
+
+assert.match(creditNoteIssue, /ensureStatutoryTaxPresentationSnapshot/);
+assert.match(creditNoteIssue, /const presentationSnapshot = await ensureStatutoryTaxPresentationSnapshot\(\{\s*tx,/);
+assert.match(creditNoteIssue, /taxDocument:\s*document/);
+assert.match(creditNoteIssue, /replayed:\s*false, document, outputVatRecord: outputVat\.record, presentationSnapshot/);
 
 assert.match(creditNote, /ensureStatutoryTaxPresentationSnapshot/);
 assert.match(creditNote, /presentationSnapshot:\s*presentationRecord\.snapshot/);
