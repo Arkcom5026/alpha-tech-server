@@ -1,5 +1,6 @@
 'use strict';
 
+const { Prisma } = require('@prisma/client');
 const repository = require('./storePaymentAccountRepository');
 
 const text = (value, max) => String(value ?? '').trim().slice(0, max);
@@ -8,7 +9,10 @@ const positiveInt = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-const makeError = (statusCode, code, message) => Object.assign(new Error(message), { statusCode, code });
+const makeError = (statusCode, code, message, details) => Object.assign(
+  new Error(message),
+  { statusCode, code, ...(details === undefined ? {} : { details }) },
+);
 
 const normalizeInput = (body = {}) => {
   const code = text(body.code, 64).toUpperCase().replace(/[^A-Z0-9_-]/g, '');
@@ -27,11 +31,18 @@ const normalizeInput = (body = {}) => {
 };
 
 const validateRequired = (input) => {
-  if (!input.code) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_CODE_REQUIRED', 'กรุณารหัสบัญชีรับชำระ');
+  if (!input.code) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_CODE_REQUIRED', 'กรุณาระบุรหัสบัญชีรับชำระ');
   if (!input.displayName) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_NAME_REQUIRED', 'กรุณาระบุชื่อที่ใช้แสดงบัญชี');
   if (!input.bankName) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_BANK_REQUIRED', 'กรุณาระบุธนาคาร');
   if (!input.accountName) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_HOLDER_REQUIRED', 'กรุณาระบุชื่อบัญชี');
   if (!input.accountNumber) throw makeError(400, 'STORE_PAYMENT_ACCOUNT_NUMBER_REQUIRED', 'กรุณาระบุเลขบัญชี');
+};
+
+const translateMutationError = (error) => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    throw makeError(409, 'STORE_PAYMENT_ACCOUNT_DUPLICATE', 'รหัสบัญชีรับชำระนี้มีอยู่แล้วในร้าน');
+  }
+  throw error;
 };
 
 const listStorePaymentAccounts = async (branchIdRaw, options) => {
@@ -55,21 +66,41 @@ const createStorePaymentAccount = async (branchIdRaw, body) => {
   if (!branchId) throw makeError(403, 'BRANCH_CONTEXT_REQUIRED', 'ไม่พบสาขาสำหรับบัญชีรับชำระ');
   const input = normalizeInput(body);
   validateRequired(input);
-  return repository.create({ branchId, ...input });
+  try {
+    return await repository.create({ branchId, ...input });
+  } catch (error) {
+    return translateMutationError(error);
+  }
 };
 
 const updateStorePaymentAccount = async (branchIdRaw, idRaw, body) => {
   const existing = await getStorePaymentAccount(branchIdRaw, idRaw);
   const input = normalizeInput({ ...existing, ...body });
   validateRequired(input);
-  return repository.updateByBranchAndId(existing.branchId, existing.id, input);
+  try {
+    return await repository.updateByBranchAndId(existing.branchId, existing.id, input);
+  } catch (error) {
+    return translateMutationError(error);
+  }
 };
 
 const assertStorePaymentAccountsOwnedByBranch = async (branchIdRaw, accountIds = []) => {
   const branchId = positiveInt(branchIdRaw);
   if (!branchId) throw makeError(403, 'BRANCH_CONTEXT_REQUIRED', 'ไม่พบสาขาสำหรับบัญชีรับชำระ');
   const ids = [...new Set((Array.isArray(accountIds) ? accountIds : []).map(positiveInt).filter(Boolean))];
-  for (const id of ids) await getStorePaymentAccount(branchId, id);
+  if (!ids.length) return ids;
+
+  const rows = await repository.findManyByBranchAndIds(branchId, ids);
+  const foundIds = new Set(rows.map((row) => row.id));
+  const missingIds = ids.filter((id) => !foundIds.has(id));
+  if (missingIds.length) {
+    throw makeError(
+      400,
+      'STORE_PAYMENT_ACCOUNT_SELECTION_INVALID',
+      'มีบัญชีรับชำระที่ไม่อยู่ภายใต้ร้านนี้',
+      { accountIds: missingIds },
+    );
+  }
   return ids;
 };
 
