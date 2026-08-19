@@ -1,7 +1,11 @@
 'use strict';
 
 const { toCanonicalDocumentCode } = require('./canonicalDocumentIdentity');
-const { BLOCK_TYPES } = require('./presentationCapabilityRegistry');
+const {
+  BLOCK_TYPES,
+  canStoreConfigureBlock,
+  getDocumentPresentationCapability,
+} = require('./presentationCapabilityRegistry');
 
 const ALIGNMENTS = new Set(['left', 'center', 'right']);
 const TYPOGRAPHY_TOKENS = new Set(['xs', 'sm', 'md', 'lg', 'xl']);
@@ -177,6 +181,42 @@ const mergeObjects = (...sources) => {
   return output;
 };
 
+const applyCapabilityPolicy = (documentPurpose, layer) => {
+  const code = toCanonicalDocumentCode(documentPurpose);
+  if (!code || !isObject(layer)) return layer || {};
+  const capability = getDocumentPresentationCapability(code);
+  if (!capability) return layer;
+
+  const blocks = {};
+  for (const [blockType, block] of Object.entries(layer.blocks || {})) {
+    if (canStoreConfigureBlock(code, blockType)) blocks[blockType] = block;
+  }
+
+  const blockOrder = Array.isArray(layer.layout?.blockOrder)
+    ? layer.layout.blockOrder.filter((blockType) => canStoreConfigureBlock(code, blockType))
+    : layer.layout?.blockOrder;
+
+  return compact({
+    ...layer,
+    blocks,
+    layout: layer.layout ? { ...layer.layout, blockOrder } : undefined,
+    paymentAccountSelection: canStoreConfigureBlock(code, 'PAYMENT_ACCOUNT')
+      ? layer.paymentAccountSelection
+      : undefined,
+  });
+};
+
+const collectPaymentAccountIds = (config) => {
+  const normalized = normalizeDocumentPresentationConfig(config);
+  if (!normalized || normalized.version !== 2) return [];
+  const ids = [];
+  ids.push(...(normalized.shared?.paymentAccountSelection?.accountIds || []));
+  for (const layer of Object.values(normalized.documents || {})) {
+    ids.push(...(layer?.paymentAccountSelection?.accountIds || []));
+  }
+  return [...new Set(ids)].sort((a, b) => a - b);
+};
+
 const resolveDocumentPresentation = ({ systemDefault, storeConfig, documentPurpose, perDocumentOverride, issuedSnapshot } = {}) => {
   if (isObject(issuedSnapshot?.presentation)) return structuredClone(issuedSnapshot.presentation);
   if (isObject(issuedSnapshot) && Number(issuedSnapshot.version) === 2) return structuredClone(issuedSnapshot);
@@ -185,17 +225,18 @@ const resolveDocumentPresentation = ({ systemDefault, storeConfig, documentPurpo
   const store = normalizeDocumentPresentationConfig(storeConfig) || { version: 2, shared: {}, documents: {} };
   const code = toCanonicalDocumentCode(documentPurpose);
   const override = normalizeLayer(perDocumentOverride);
+  const merged = mergeObjects(
+    system.shared,
+    code ? system.documents?.[code] : null,
+    store.shared,
+    code ? store.documents?.[code] : null,
+    override,
+  );
 
   return {
     version: 2,
     documentPurpose: code,
-    resolved: mergeObjects(
-      system.shared,
-      code ? system.documents?.[code] : null,
-      store.shared,
-      code ? store.documents?.[code] : null,
-      override,
-    ),
+    resolved: applyCapabilityPolicy(code, merged),
   };
 };
 
@@ -206,7 +247,9 @@ module.exports = {
   SPACING_TOKENS,
   TYPOGRAPHY_TOKENS,
   WIDTH_VARIANTS,
+  applyCapabilityPolicy,
   bridgeV1DocumentHeaderConfig,
+  collectPaymentAccountIds,
   mergeObjects,
   normalizeDocumentPresentationConfig,
   normalizeHeader,
