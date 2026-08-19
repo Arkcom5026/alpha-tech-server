@@ -11,6 +11,9 @@ const inputTaxDecisionRoutes = require('../inputDocuments/decisions/inputTaxDeci
 const taxIssuerProfileRoutes = require('../issuerProfile/routes/taxIssuerProfileRoutes');
 const salesTaxFilingRoutes = require('../outputDocuments/filing/salesTaxFilingRoutes');
 const taxPublicationRetryRoutes = require('../publicationRetry/taxPublicationRetryRoutes');
+const {
+  getStatutoryTaxPresentation,
+} = require('../documents/presentation/getStatutoryTaxPresentationController');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -30,6 +33,7 @@ router.get('/candidates', controller.listCandidates);
 router.get('/documents', controller.listDocuments);
 router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
 router.get('/documents/:taxDocumentId/printable', controller.getPrintableOutputTaxDocument);
+router.get('/documents/:taxDocumentId/presentation', getStatutoryTaxPresentation);
 router.post('/documents/:taxDocumentId/issue', controller.issueOutputTaxDocument);
 router.post('/documents/:taxDocumentId/credit-note', controller.issueOutputTaxCreditNote);
 router.post('/credit-notes/from-sale-return/:saleReturnId', controller.issueOutputTaxCreditNoteForSaleReturn);
