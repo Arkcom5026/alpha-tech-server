@@ -38,6 +38,7 @@ assert.match(completionController, /ensureSaleDeliveryNotePresentationSnapshot\(
 assert.match(completionController, /deliveryNotePresentation:\s*deliveryNotePresentationRecord\?\.snapshot \|\| null/);
 
 assert.match(routes, /router\.get\('\/:id\/delivery-note', getSaleDeliveryNote\)/);
+assert.match(routes, /router\.post\('\/:id\/delivery-note', issueSaleDeliveryNoteController\)/);
 assert.match(projection, /documentHeaderConfig:\s*true/);
 assert.match(projection, /getOrCreatePresentationSnapshot/);
 assert.match(projection, /sourceType:\s*'SALE'/);
@@ -46,6 +47,6 @@ assert.match(projection, /rendererFamily:\s*'A4'/);
 assert.match(projection, /issuedAt:\s*sale\.soldAt/);
 assert.match(projection, /presentationSnapshot:\s*presentationRecord\.snapshot/);
 assert.match(projection, /officialDocumentNumber/);
-assert.match(projection, /DELIVERY_NOTE_NOT_REQUIRED/);
+assert.match(projection, /DELIVERY_NOTE_NOT_ISSUED/);
 
 console.log('delivery-note-document-presentation-wave2.contract.test.js: PASS');

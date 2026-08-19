@@ -12,29 +12,39 @@ const printProjection = read('src/modules/sales/documents/print/projectSaleDeliv
 
 assert.match(
   printProjection,
+  /sale\.status === 'CANCELLED'/,
+  'canonical Sale delivery-note projection must reject cancelled sales',
+);
+assert.doesNotMatch(
+  printProjection,
   /sale\.status !== 'COMPLETED'/,
-  'canonical Sale delivery-note projection must remain fail-closed for non-completed sales',
+  'valid credit delivery notes must not depend on COMPLETED Sale status',
 );
 assert.match(
   printProjection,
-  /Boolean\(sale\.officialDocumentNumber\)/,
-  'canonical Sale delivery-note projection must require an issued official document number',
+  /!sale\.officialDocumentNumber/,
+  'canonical Sale delivery-note projection must require an issued document number',
+);
+assert.match(
+  printProjection,
+  /DELIVERY_NOTE_ALREADY_CONSOLIDATED/,
+  'a consolidated source delivery note must leave active print authority',
 );
 
 assert.match(
   history,
-  /purpose === 'DELIVERY_NOTE'[\s\S]*?status:\s*'COMPLETED'[\s\S]*?officialDocumentNumber:\s*\{\s*not:\s*null\s*\}/,
-  'Delivery Note discovery must advertise only Sales that satisfy the canonical printable eligibility',
+  /status:\s*\{\s*not:\s*'CANCELLED'\s*\}[\s\S]*?purpose === 'DELIVERY_NOTE'[\s\S]*?officialDocumentNumber:\s*\{\s*not:\s*null\s*\}/,
+  'Delivery Note discovery must include issued non-cancelled Sales, including valid credit DRAFT sales',
+);
+assert.doesNotMatch(
+  history,
+  /purpose === 'DELIVERY_NOTE'[\s\S]{0,250}?status:\s*'COMPLETED'/,
+  'Delivery Note discovery must not collapse credit lifecycle into COMPLETED-only semantics',
 );
 assert.match(
   history,
-  /purpose === 'DELIVERY_NOTE'[\s\S]*?:\s*\{[\s\S]*?status:\s*\{\s*not:\s*'CANCELLED'\s*\}/,
-  'Bill discovery must preserve the broader non-cancelled Sale lifecycle instead of inheriting Delivery Note completion semantics',
-);
-assert.match(
-  history,
-  /projectSaleDeliveryNote requires a completed sale plus an issued[\s\S]*official document number/,
-  'the shared eligibility boundary should stay explicit beside the discovery query',
+  /consumedSourceExclusion/,
+  'active Delivery Note history must suppress source Sales already represented by consolidated delivery',
 );
 
 console.log('Delivery Note history/print eligibility authority contract: PASS');

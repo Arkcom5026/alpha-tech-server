@@ -14,9 +14,12 @@ const controller = read('src/modules/sales/documents/controllers/saleDeliveryNot
 const routes = read('src/modules/sales/routes/saleRoutes.js');
 
 assert.match(service, /where: \{ id: normalizedSaleId, branchId: normalizedBranchId \}/);
-assert.match(service, /sale\.status !== 'COMPLETED'/);
-assert.match(service, /Boolean\(sale\.officialDocumentNumber\)/);
-assert.match(service, /DELIVERY_NOTE_NOT_REQUIRED/);
+assert.match(service, /sale\.status === 'CANCELLED'/);
+assert.doesNotMatch(service, /sale\.status !== 'COMPLETED'/);
+assert.match(service, /!sale\.officialDocumentNumber/);
+assert.match(service, /DELIVERY_NOTE_NOT_ISSUED/);
+assert.match(service, /prisma\.consolidatedDeliveryLine\.findFirst/);
+assert.match(service, /DELIVERY_NOTE_ALREADY_CONSOLIDATED/);
 assert.match(service, /documentNumber: sale\.officialDocumentNumber/);
 assert.match(service, /ResolvePrintDocumentPurposeService/);
 assert.match(service, /code: 'DELIVERY_NOTE'/);

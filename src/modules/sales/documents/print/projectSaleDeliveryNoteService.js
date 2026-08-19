@@ -100,15 +100,37 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
   });
 
   if (!sale) fail('SALE_NOT_FOUND', 'Sale not found', 404);
-  if (sale.status !== 'COMPLETED') {
-    fail('DELIVERY_NOTE_SALE_NOT_COMPLETED', 'Only a completed sale may have a delivery note', 409);
+  if (sale.status === 'CANCELLED') {
+    fail('DELIVERY_NOTE_SALE_CANCELLED', 'A cancelled sale cannot be printed as a delivery note', 409);
   }
 
-  const eligible = Boolean(sale.officialDocumentNumber);
-  if (!eligible) {
+  // Delivery Note authority is issuance-based, not payment/sale-completion based.
+  // CREDIT sales are intentionally allowed to remain DRAFT while their receivable
+  // and stock mutation are already authoritative. The deterministic document
+  // number is the signal that this Sale was issued a Delivery Note.
+  if (!sale.officialDocumentNumber) {
     fail(
-      'DELIVERY_NOTE_NOT_REQUIRED',
-      'This sale was not issued with a delivery note',
+      'DELIVERY_NOTE_NOT_ISSUED',
+      'This sale has not been issued a delivery note',
+      409,
+    );
+  }
+
+  // Once any source line is absorbed into a non-cancelled consolidated delivery,
+  // the original remains audit history but is no longer an active printable source.
+  const consolidatedSource = await prisma.consolidatedDeliveryLine.findFirst({
+    where: {
+      branchId: normalizedBranchId,
+      sourceSaleId: normalizedSaleId,
+      status: 'DOCUMENTED',
+      combinedBilling: { is: { status: { not: 'CANCELLED' } } },
+    },
+    select: { combinedBillingId: true },
+  });
+  if (consolidatedSource) {
+    fail(
+      'DELIVERY_NOTE_ALREADY_CONSOLIDATED',
+      'This delivery note has already been consolidated and is no longer printable as an active source',
       409,
     );
   }
