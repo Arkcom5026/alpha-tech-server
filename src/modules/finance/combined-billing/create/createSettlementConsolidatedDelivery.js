@@ -1,7 +1,6 @@
 'use strict';
 
 const { Prisma } = require('../../../../../lib/prisma');
-const { freezeFinanceOperationalPresentation } = require('../../../document-presentation/financeOperationalPresentationSnapshotService');
 const { generateCombinedBillingCode } = require('./createCombinedBillingDocumentRepository');
 
 const D = (value) => (value instanceof Prisma.Decimal ? value : new Prisma.Decimal(String(value ?? 0)));
@@ -51,47 +50,6 @@ const isAutoConsolidationBatch = (prepared = []) => {
   return sourceSaleIds.size >= 2;
 };
 
-const freezeDeliveryCreditSettlementPresentation = async (tx, { branchId, settlementId }) => {
-  const settlement = await tx.customerMoneySettlement.findFirst({
-    where: {
-      id: Number(settlementId),
-      branchId: Number(branchId),
-      settlementType: 'DELIVERY_CREDIT',
-    },
-    select: {
-      id: true,
-      code: true,
-      settledAt: true,
-      status: true,
-      totalAmount: true,
-    },
-  });
-  if (!settlement) {
-    const error = new Error('ไม่พบเอกสารตัดยอดสำหรับสร้าง presentation snapshot');
-    error.code = 'SETTLEMENT_NOT_FOUND';
-    error.statusCode = 404;
-    throw error;
-  }
-
-  return freezeFinanceOperationalPresentation({
-    tx,
-    branchId: settlement.branchId || Number(branchId),
-    sourceType: 'DELIVERY_CREDIT_SETTLEMENT',
-    sourceId: settlement.id,
-    documentPurpose: 'DELIVERY_CREDIT_SETTLEMENT',
-    issuedAt: settlement.settledAt || new Date(),
-    businessSnapshot: {
-      settlement: {
-        id: settlement.id,
-        code: settlement.code,
-        status: settlement.status,
-        totalAmount: number(settlement.totalAmount),
-        settledAt: settlement.settledAt || null,
-      },
-    },
-  });
-};
-
 const createSettlementConsolidatedDelivery = async ({
   tx,
   branchId,
@@ -101,8 +59,6 @@ const createSettlementConsolidatedDelivery = async ({
   prepared,
   note,
 }) => {
-  await freezeDeliveryCreditSettlementPresentation(tx, { branchId, settlementId });
-
   const existing = await loadSettlementGeneratedDocument(tx, { branchId, settlementId });
   if (existing) return existing;
 
@@ -201,6 +157,5 @@ module.exports = {
   findSettlementGeneratedDocumentAnchor,
   acquireGeneratedDeliveryCodeLock,
   isAutoConsolidationBatch,
-  freezeDeliveryCreditSettlementPresentation,
   keyOf,
 };
