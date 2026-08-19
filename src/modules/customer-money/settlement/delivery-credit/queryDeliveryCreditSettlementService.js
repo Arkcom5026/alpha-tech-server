@@ -4,8 +4,14 @@ const { getSettlement, listSettlements } = require('./deliveryCreditSettlementRe
 const {
   loadSettlementGeneratedDocument,
 } = require('../../../finance/combined-billing/create/createSettlementConsolidatedDelivery');
+const {
+  freezeFinanceOperationalPresentation,
+} = require('../../../document-presentation/financeOperationalPresentationSnapshotService');
 
 const toNumber = (value) => Number(value || 0);
+const serializePresentationSnapshots = (snapshots = {}) => Object.fromEntries(
+  Object.entries(snapshots).map(([rendererFamily, record]) => [rendererFamily, record?.snapshot || null]),
+);
 
 const serializeApplication = (application) => application ? ({
   ...application,
@@ -55,6 +61,24 @@ const getGeneratedDocumentSummary = async ({ prisma, branchId, settlementId }) =
   };
 };
 
+const freezeDeliveryCreditSettlementPresentation = ({ prisma, row }) => freezeFinanceOperationalPresentation({
+  tx: prisma,
+  branchId: row.branchId,
+  sourceType: 'DELIVERY_CREDIT_SETTLEMENT',
+  sourceId: row.id,
+  documentPurpose: 'DELIVERY_CREDIT_SETTLEMENT',
+  issuedAt: row.settledAt || row.createdAt || new Date(),
+  businessSnapshot: {
+    settlement: {
+      id: row.id,
+      code: row.code,
+      status: row.status,
+      totalAmount: toNumber(row.totalAmount),
+      settledAt: row.settledAt || null,
+    },
+  },
+});
+
 const listDeliveryCreditSettlements = async ({ prisma, user, query = {} }) => {
   const branchId = Number(user?.branchId);
   const customerId = Number(query.customerId);
@@ -81,7 +105,7 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
 
   const result = serialize(row);
   const saleIds = [...new Set((result.lines || []).map((line) => Number(line.saleId)).filter(Number.isInteger))];
-  const [sales, generatedDocument] = await Promise.all([
+  const [sales, generatedDocument, presentationSnapshots] = await Promise.all([
     saleIds.length ? prisma.sale.findMany({
       where: { id: { in: saleIds }, branchId },
       select: {
@@ -98,6 +122,7 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
       },
     }) : [],
     getGeneratedDocumentSummary({ prisma, branchId, settlementId }),
+    freezeDeliveryCreditSettlementPresentation({ prisma, row }),
   ]);
 
   result.salePaymentStates = sales.map((sale) => ({
@@ -113,6 +138,7 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
     taxDocumentReady: sale.isCredit === true && sale.status !== 'CANCELLED' && sale.statusPayment === 'PAID',
   }));
   result.generatedDocument = generatedDocument;
+  result.presentationSnapshots = serializePresentationSnapshots(presentationSnapshots);
 
   return result;
 };
@@ -120,7 +146,9 @@ const getDeliveryCreditSettlement = async ({ prisma, user, id }) => {
 module.exports = {
   serialize,
   serializeLines,
+  serializePresentationSnapshots,
   getGeneratedDocumentSummary,
+  freezeDeliveryCreditSettlementPresentation,
   listDeliveryCreditSettlements,
   getDeliveryCreditSettlement,
 };
