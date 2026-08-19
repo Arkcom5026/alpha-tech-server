@@ -14,6 +14,7 @@ const {
 } = require('../src/modules/document-presentation/presentationCapabilityRegistry');
 const {
   bridgeV1DocumentHeaderConfig,
+  collectPaymentAccountIds,
   normalizeDocumentPresentationConfig,
   resolveDocumentPresentation,
 } = require('../src/modules/document-presentation/presentationConfig');
@@ -44,6 +45,7 @@ const normalized = normalizeDocumentPresentationConfig({
   shared: {
     typography: { body: 'lg', bad: 'gigantic' },
     blocks: { CUSTOM_FOOTER: { visible: true, content: 'ขอบคุณ', typography: 'sm' } },
+    paymentAccountSelection: { accountIds: [2, 3, 3] },
   },
   documents: {
     QUOTATION: {
@@ -53,6 +55,7 @@ const normalized = normalizeDocumentPresentationConfig({
 });
 assert.deepEqual(normalized.shared.typography, { body: 'lg' });
 assert.deepEqual(normalized.documents.QUOTATION.paymentAccountSelection.accountIds, [1, 2]);
+assert.deepEqual(collectPaymentAccountIds(normalized), [1, 2, 3]);
 
 const resolved = resolveDocumentPresentation({
   systemDefault: { version: 2, shared: { typography: { body: 'sm' } } },
@@ -63,6 +66,24 @@ const resolved = resolveDocumentPresentation({
 assert.equal(resolved.documentPurpose, 'QUOTATION');
 assert.equal(resolved.resolved.typography.body, 'xl');
 assert.equal(resolved.resolved.blocks.CUSTOM_FOOTER.content, 'ขอบคุณ');
+assert.deepEqual(resolved.resolved.paymentAccountSelection.accountIds, [1, 2]);
+
+const statutory = resolveDocumentPresentation({
+  storeConfig: {
+    version: 2,
+    shared: {
+      blocks: {
+        TOTALS: { visible: false, content: 'forbidden override' },
+        CUSTOM_FOOTER: { visible: true, content: 'allowed footer' },
+      },
+      paymentAccountSelection: { accountIds: [1] },
+    },
+  },
+  documentPurpose: 'FULL_TAX_INVOICE',
+});
+assert.equal(statutory.resolved.blocks.TOTALS, undefined);
+assert.equal(statutory.resolved.blocks.CUSTOM_FOOTER.content, 'allowed footer');
+assert.equal(statutory.resolved.paymentAccountSelection, undefined);
 
 const snapshot = createPresentationSnapshotEnvelope({
   businessSnapshot: { documentNo: 'Q-001' },
@@ -113,5 +134,25 @@ const migration = fs.readFileSync(
 assert.match(migration, /CREATE TABLE "StorePaymentAccount"/);
 assert.match(migration, /ON DELETE RESTRICT/);
 assert.doesNotMatch(migration, /^\s*(?:DROP|TRUNCATE|DELETE|UPDATE)\b/im);
+
+const branchRuntimeSource = fs.readFileSync(
+  path.join(root, 'src/modules/branch/runtime/branchRuntimeService.js'),
+  'utf8',
+);
+assert.match(branchRuntimeSource, /Number\(value\.version\) === 2/);
+assert.match(branchRuntimeSource, /assertStorePaymentAccountsOwnedByBranch/);
+assert.match(branchRuntimeSource, /collectPaymentAccountIds/);
+
+const financeRoutesSource = fs.readFileSync(
+  path.join(root, 'src/modules/finance/routes/financeRuntimeRoutes.js'),
+  'utf8',
+);
+assert.match(financeRoutesSource, /store-payment-accounts/);
+const accountRoutesSource = fs.readFileSync(
+  path.join(root, 'src/modules/finance/store-payment-account/storePaymentAccountRoutes.js'),
+  'utf8',
+);
+assert.match(accountRoutesSource, /router\.post\('\/', requireAdmin/);
+assert.match(accountRoutesSource, /router\.patch\('\/:id', requireAdmin/);
 
 console.log('Document Presentation V2 Wave 0 foundation contract: PASS');
