@@ -4,8 +4,15 @@ const number = (value) => Number(value || 0);
 const money = (value) => Math.round((number(value) + Number.EPSILON) * 100) / 100;
 const iso = (value) => value ? new Date(value).toISOString() : null;
 
-const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapshot, issuedAt }) => ({
-  schemaVersion: 3,
+const buildIssuedSnapshot = ({
+  quotation,
+  documentHeaderSnapshot,
+  customerSnapshot,
+  presentationSnapshot,
+  paymentAccountSnapshots = [],
+  issuedAt,
+}) => ({
+  schemaVersion: 4,
   quotationId: quotation.id,
   code: quotation.code,
   branchId: quotation.branchId,
@@ -23,6 +30,8 @@ const buildIssuedSnapshot = ({ quotation, documentHeaderSnapshot, customerSnapsh
   notes: quotation.notes || null,
   paymentTerms: quotation.paymentTerms || null,
   documentHeader: documentHeaderSnapshot || null,
+  presentation: presentationSnapshot || null,
+  paymentAccounts: Array.isArray(paymentAccountSnapshots) ? paymentAccountSnapshots : [],
   customer: customerSnapshot || null,
   totals: {
     subtotal: money(quotation.subtotal),
