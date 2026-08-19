@@ -9,10 +9,19 @@ class GetCustomersWithPendingSalesRepository {
     return this.prisma.sale.findMany({
       where: {
         branchId,
-        isCredit: true,
         status: { not: 'CANCELLED' },
-        statusPayment: { in: ['PARTIALLY_PAID', 'PAID'] },
+        officialDocumentNumber: { not: null },
         customerId: { not: null },
+        OR: [
+          {
+            isCredit: true,
+            statusPayment: { in: ['PARTIALLY_PAID', 'PAID'] },
+          },
+          {
+            isCredit: false,
+            statusPayment: 'PAID',
+          },
+        ],
         customer: keyword
           ? {
               OR: [
