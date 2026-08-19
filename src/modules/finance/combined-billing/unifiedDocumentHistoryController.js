@@ -238,7 +238,7 @@ const unifiedDocumentHistory = async (req, res, next) => {
         orderBy: [{ issueDate: 'desc' }, { id: 'desc' }],
         take: limit,
         include: {
-          customer: { select: { name: true, companyName: true, user: { select: { loginId: true } } },
+          customer: { select: { name: true, companyName: true, user: { select: { loginId: true } } } },
           employee: { select: { name: true } },
         },
       }),
