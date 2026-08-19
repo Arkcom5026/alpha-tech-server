@@ -1,6 +1,9 @@
 'use strict';
 
 const { prisma } = require('../../../../../lib/prisma');
+const {
+  ensureStatutoryTaxPresentationSnapshot,
+} = require('../../presentation/statutoryTaxPresentationService');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -161,6 +164,11 @@ const projectOutputTaxCreditNotePrintableDocument = async ({ branchId, taxDocume
     })),
   ];
 
+  const presentationRecord = await ensureStatutoryTaxPresentationSnapshot({
+    branchId: normalizedBranchId,
+    taxDocument: document,
+  });
+
   return Object.freeze({
     document: {
       id: document.id,
@@ -176,6 +184,7 @@ const projectOutputTaxCreditNotePrintableDocument = async ({ branchId, taxDocume
     },
     issuer: document.issuerSnapshot,
     recipient: document.recipientSnapshot || null,
+    presentationSnapshot: presentationRecord.snapshot,
     originalInvoice: {
       id: original.id,
       kind: original.taxInvoiceKind,
