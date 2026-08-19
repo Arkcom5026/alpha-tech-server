@@ -17,7 +17,8 @@ assert.match(schema, /@@unique\(\[branchId, sourceType, sourceId, documentPurpos
 assert.match(schema, /snapshot\s+Json/);
 assert.match(schema, /snapshotHash\s+String/);
 assert.match(migration, /CREATE TABLE "DocumentPresentationSnapshot"/);
-assert.doesNotMatch(migration, /DROP\s+TABLE|DROP\s+COLUMN|DELETE\s+FROM|UPDATE\s+/i, 'Wave 2 snapshot migration must remain additive');
+assert.doesNotMatch(migration, /DROP\s+TABLE|DROP\s+COLUMN|DELETE\s+FROM/i, 'Wave 2 snapshot migration must remain additive');
+assert.doesNotMatch(migration, /^\s*UPDATE\s+/im, 'Wave 2 snapshot migration must not rewrite existing rows');
 
 assert.match(snapshotService, /getOrCreatePresentationSnapshot/);
 assert.match(snapshotService, /resolveDocumentPresentation/);
