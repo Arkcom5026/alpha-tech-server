@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { buildIssuedSnapshot } = require('../src/modules/quotation/quotationIssuedSnapshot');
 const {
   buildQuotationPresentationSnapshot,
@@ -98,5 +100,25 @@ const issued = buildIssuedSnapshot({
 assert.equal(issued.schemaVersion, 4);
 assert.equal(issued.presentation.snapshotHash.length, 64);
 assert.deepEqual(issued.paymentAccounts.map((account) => account.id), [3, 7]);
+
+const quotationServiceSource = fs.readFileSync(
+  path.join(__dirname, '../src/modules/quotation/quotationService.js'),
+  'utf8',
+);
+assert.match(
+  quotationServiceSource,
+  /buildQuotationPresentationSnapshot/,
+  'quotation issue authority must compose presentation inside the service transaction',
+);
+assert.match(
+  quotationServiceSource,
+  /await buildQuotationPresentationSnapshot\(\{[\s\S]*?tx,[\s\S]*?branch: documentHeaderSnapshot,[\s\S]*?issuedAt,[\s\S]*?\}\)/,
+  'quotation issue must resolve presentation and payment account facts using the same transaction',
+);
+assert.match(
+  quotationServiceSource,
+  /buildIssuedSnapshot\(\{[\s\S]*?presentationSnapshot,[\s\S]*?paymentAccountSnapshots,[\s\S]*?issuedAt,[\s\S]*?\}\)/,
+  'issued quotation snapshot must persist presentation and selected payment-account facts together',
+);
 
 console.log('Quotation Document Presentation Wave 1 contract: PASS');
