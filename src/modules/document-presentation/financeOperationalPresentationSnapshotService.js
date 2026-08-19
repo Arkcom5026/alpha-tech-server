@@ -21,9 +21,36 @@ const freezeFinanceOperationalPresentation = async ({
 
   const branch = await tx.branch.findFirst({
     where: { id: Number(branchId) },
-    select: { id: true, documentHeaderConfig: true },
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      phone: true,
+      taxId: true,
+      branchCode: true,
+      isHeadOffice: true,
+      slug: true,
+      documentHeaderConfig: true,
+    },
   });
   if (!branch) throw new Error('BRANCH_NOT_FOUND');
+
+  const storeIdentity = {
+    id: branch.id,
+    name: branch.name || null,
+    address: branch.address || null,
+    phone: branch.phone || null,
+    taxId: branch.taxId || null,
+    branchCode: branch.branchCode || null,
+    isHeadOffice: Boolean(branch.isHeadOffice),
+    slug: branch.slug || null,
+  };
+  const frozenBusinessSnapshot = {
+    ...(businessSnapshot && typeof businessSnapshot === 'object' && !Array.isArray(businessSnapshot)
+      ? businessSnapshot
+      : {}),
+    storeIdentity,
+  };
 
   const rendererFamilies = capability.rendererFamilies.filter((family) => (
     family === RENDERER_FAMILIES.A4 || family === RENDERER_FAMILIES.THERMAL_80MM
@@ -40,7 +67,7 @@ const freezeFinanceOperationalPresentation = async ({
       rendererFamily,
       storeConfig: branch.documentHeaderConfig,
       issuedAt,
-      businessSnapshot,
+      businessSnapshot: frozenBusinessSnapshot,
     });
   }
   return snapshots;
