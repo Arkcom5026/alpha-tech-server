@@ -8,10 +8,14 @@ on:
       - 'src/modules/finance/store-payment-account/**'
       - 'src/modules/branch/runtime/branchRuntimeService.js'
       - 'src/modules/finance/routes/financeRuntimeRoutes.js'
+      - 'src/modules/quotation/quotationIssuedSnapshot.js'
+      - 'src/modules/quotation/quotationPresentationSnapshot.js'
+      - 'src/modules/quotation/quotationService.js'
       - 'prisma/finance/store-payment-account.prisma'
       - 'prisma/foundation/tenant.prisma'
       - 'prisma/migrations/*store_payment_account*/**'
       - 'tests/document-presentation-v2-foundation.contract.test.js'
+      - 'tests/quotation-document-presentation-wave1.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -38,3 +42,5 @@ jobs:
         run: npx prisma generate
       - name: Run Document Presentation V2 foundation contract
         run: node tests/document-presentation-v2-foundation.contract.test.js
+      - name: Run Quotation Document Presentation Wave 1 contract
+        run: node tests/quotation-document-presentation-wave1.contract.test.js
