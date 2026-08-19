@@ -28,8 +28,14 @@ router.get('/consolidated-deliveries/:id', documentHistory.detail);
 
 router.get('/combinable-sales', getCombinableSales);
 router.post('/create', createCombinedBillingDocument);
+router.get('/with-pending-sales', getCustomersWithPendingSales);
+
+// Canonical routes under the server mount `/api/combined-billing`.
+router.get('/:id/presentation', getCombinedBillingPresentation);
+router.get('/:id', getCombinedBillingById);
+
+// Backward-compatible aliases for callers that historically repeated the module prefix.
 router.get('/combined-billing/:id/presentation', getCombinedBillingPresentation);
 router.get('/combined-billing/:id', getCombinedBillingById);
-router.get('/with-pending-sales', getCustomersWithPendingSales);
 
 module.exports = router;
