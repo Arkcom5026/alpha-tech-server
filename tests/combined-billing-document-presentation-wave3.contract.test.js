@@ -8,7 +8,8 @@ const read = (relativePath) => fs.readFileSync(path.join(process.cwd(), relative
 const controller = read('src/modules/finance/combined-billing/presentation/getCombinedBillingPresentationController.js');
 const routes = read('src/modules/finance/combined-billing/routes/combinedBillingRoutes.js');
 
-assert.match(routes, /router\.get\('\/combined-billing\/:id\/presentation', getCombinedBillingPresentation\)/);
+assert.match(routes, /router\.get\('\/:id\/presentation', getCombinedBillingPresentation\)/);
+assert.match(routes, /router\.get\('\/:id', getCombinedBillingById\)/);
 assert.match(controller, /const branchId = positiveInt\(req\.user\?\.branchId\)/);
 assert.match(controller, /where:\s*\{ id: documentId, branchId \}/);
 assert.match(controller, /documentHeaderConfig:\s*true/);
