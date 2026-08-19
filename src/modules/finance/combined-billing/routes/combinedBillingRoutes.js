@@ -9,6 +9,7 @@ const {
 const {
   createCombinedBillingDocument,
 } = require('../create/createCombinedBillingDocumentController');
+const { getCombinedBillingPresentation } = require('../presentation/getCombinedBillingPresentationController');
 const { unifiedDocumentHistory } = require('../unifiedDocumentHistoryController');
 
 const router = express.Router();
@@ -27,6 +28,7 @@ router.get('/consolidated-deliveries/:id', documentHistory.detail);
 
 router.get('/combinable-sales', getCombinableSales);
 router.post('/create', createCombinedBillingDocument);
+router.get('/combined-billing/:id/presentation', getCombinedBillingPresentation);
 router.get('/combined-billing/:id', getCombinedBillingById);
 router.get('/with-pending-sales', getCustomersWithPendingSales);
 
