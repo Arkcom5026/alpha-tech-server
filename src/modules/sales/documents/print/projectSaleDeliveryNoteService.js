@@ -4,6 +4,9 @@ const { prisma } = require('../../../../../lib/prisma');
 const {
   ResolvePrintDocumentPurposeService,
 } = require('../../../document-purpose/resolve/resolvePrintDocumentPurposeService');
+const {
+  getOrCreatePresentationSnapshot,
+} = require('../../../document-presentation/persistentPresentationSnapshotService');
 const { getSaleQuotationReference } = require('../../lineage/saleQuotationReferenceService');
 
 const fail = (code, message, statusCode = 400) => {
@@ -64,6 +67,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
           taxId: true,
           branchCode: true,
           isHeadOffice: true,
+          documentHeaderConfig: true,
         },
       },
       items: {
@@ -117,6 +121,20 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     saleId: normalizedSaleId,
     branchId: normalizedBranchId,
   });
+  const presentationRecord = await getOrCreatePresentationSnapshot({
+    branchId: normalizedBranchId,
+    sourceType: 'SALE',
+    sourceId: String(sale.id),
+    documentPurpose: purpose.code,
+    rendererFamily: 'A4',
+    storeConfig: sale.branch.documentHeaderConfig,
+    issuedAt: sale.soldAt,
+    businessSnapshot: {
+      saleId: sale.id,
+      saleCode: sale.code,
+      documentNumber: sale.officialDocumentNumber,
+    },
+  });
 
   const lines = [
     ...sale.items.map((item) => mapLine({
@@ -155,7 +173,15 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
         issuedAt: quotationReference.quotationIssuedAt,
       } : null,
     },
-    issuer: sale.branch,
+    issuer: {
+      id: sale.branch.id,
+      name: sale.branch.name,
+      address: sale.branch.address,
+      phone: sale.branch.phone,
+      taxId: sale.branch.taxId,
+      branchCode: sale.branch.branchCode,
+      isHeadOffice: sale.branch.isHeadOffice,
+    },
     recipient: {
       name: sale.customer?.companyName || sale.customer?.name || null,
       departmentName: sale.customer?.departmentName || null,
@@ -165,6 +191,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
     note: sale.note || null,
     lines,
+    presentationSnapshot: presentationRecord.snapshot,
   });
 };
 
