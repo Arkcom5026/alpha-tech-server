@@ -14,6 +14,9 @@ const settlementPresentationSource = read('src/modules/customer-money/settlement
 const settlementCreateSource = read('src/modules/customer-money/settlement/delivery-credit/createDeliveryCreditSettlementService.js');
 const settlementQuerySource = read('src/modules/customer-money/settlement/delivery-credit/queryDeliveryCreditSettlementService.js');
 const consolidatedDeliverySource = read('src/modules/finance/combined-billing/create/createSettlementConsolidatedDelivery.js');
+const refundPresentationSource = read('src/modules/sales/return/presentation/refundReceiptPresentationSnapshot.js');
+const saleReturnServiceSource = read('src/modules/sales/return/services/saleReturnService.js');
+const saleReturnDetailSource = read('src/modules/sales/return/query/detail/getSaleReturnByIdController.js');
 
 for (const code of ['CUSTOMER_MONEY_RECEIPT', 'DELIVERY_CREDIT_SETTLEMENT', 'REFUND_RECEIPT']) {
   const profile = capability.getDocumentPresentationCapability(code);
@@ -52,5 +55,17 @@ assert(
 assert(settlementQuerySource.includes('freezeDeliveryCreditSettlementPresentation({ tx: prisma, settlement: row })'));
 assert(settlementQuerySource.includes('result.presentationSnapshots = serializeDeliveryCreditSettlementPresentationSnapshots(presentationSnapshots)'));
 assert(!consolidatedDeliverySource.includes('freezeDeliveryCreditSettlementPresentation'), 'Combined Billing creation must not own Delivery Credit Settlement presentation snapshots.');
+
+assert(refundPresentationSource.includes("REFUND_RECEIPT_SOURCE = 'REFUND_RECEIPT'"));
+assert(refundPresentationSource.includes("REFUND_RECEIPT_PURPOSE = 'REFUND_RECEIPT'"));
+assert(refundPresentationSource.includes('freezeFinanceOperationalPresentation'));
+assert(saleReturnServiceSource.includes('await freezeRefundReceiptPresentation({ tx, saleReturn })'));
+assert(
+  saleReturnServiceSource.indexOf('await freezeRefundReceiptPresentation({ tx, saleReturn })')
+    < saleReturnServiceSource.indexOf('await createRefundEvidence({'),
+  'refund receipt presentation must freeze inside the sale-return transaction before refund evidence completion',
+);
+assert(saleReturnDetailSource.includes('freezeRefundReceiptPresentation'));
+assert(saleReturnDetailSource.includes('presentationSnapshots: serializeRefundReceiptPresentationSnapshots(presentationSnapshots)'));
 
 console.log('Finance Operational Document Presentation Wave 5 Contract: PASS');
