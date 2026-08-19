@@ -21,7 +21,7 @@ const { createPresentationSnapshotEnvelope } = require('../src/modules/document-
 const { normalizeInput } = require('../src/modules/finance/store-payment-account/storePaymentAccountService');
 
 assert.equal(toCanonicalDocumentCode('receipt'), 'SALE_RECEIPT');
-assert.equal(toCanonicalDocumentCode('short-tax-receipt'), 'SHORT_TAX_RECEIPT');
+assert.equal(toCanonicalDocumentCode('short-tax-receipt'), 'SHORT_TAX_INVOICE');
 assert.ok(aliasesForCanonicalDocumentCode('SALE_RECEIPT').includes('RECEIPT'));
 
 assert.equal(getDocumentPresentationCapability('QUOTATION').className, 'COMMERCIAL');
@@ -81,6 +81,13 @@ const sameSnapshot = createPresentationSnapshotEnvelope({
   issuedAt: '2026-08-19T05:00:00.000Z',
 });
 assert.equal(snapshot.snapshotHash, sameSnapshot.snapshotHash);
+
+const issuedResolution = resolveDocumentPresentation({
+  storeConfig: { version: 2, shared: { typography: { body: 'xs' } } },
+  documentPurpose: 'QUOTATION',
+  issuedSnapshot: { presentation: resolved },
+});
+assert.deepEqual(issuedResolution, resolved);
 
 const account = normalizeInput({
   code: ' transfer-main ',
