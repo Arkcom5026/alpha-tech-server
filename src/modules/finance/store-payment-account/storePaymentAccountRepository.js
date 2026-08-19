@@ -14,6 +14,11 @@ const findByBranchAndId = (branchId, id) => prisma.storePaymentAccount.findFirst
   where: { branchId, id },
 });
 
+const findManyByBranchAndIds = (branchId, ids) => prisma.storePaymentAccount.findMany({
+  where: { branchId, id: { in: ids } },
+  select: { id: true, branchId: true, isActive: true },
+});
+
 const create = (data) => prisma.storePaymentAccount.create({ data });
 
 const updateByBranchAndId = (branchId, id, data) => prisma.storePaymentAccount.update({
@@ -24,6 +29,7 @@ const updateByBranchAndId = (branchId, id, data) => prisma.storePaymentAccount.u
 module.exports = {
   create,
   findByBranchAndId,
+  findManyByBranchAndIds,
   listByBranch,
   updateByBranchAndId,
 };
