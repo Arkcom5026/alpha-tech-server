@@ -3,6 +3,9 @@ const { ensureBranchContext } = require('../../shared/customerReceiptContext');
 const { toInt } = require('../../shared/customerReceiptValue');
 const { receiptInclude } = require('../../shared/customerReceiptIncludes');
 const { buildReceiptResponse } = require('../../shared/customerReceiptResponse');
+const {
+  ensureCustomerReceiptPresentationSnapshot,
+} = require('../../presentation/customerReceiptPresentationSnapshotService');
 
 const sendError = (res, error, fallbackMessage) =>
   res.status(error?.statusCode || 500).json({
@@ -31,9 +34,17 @@ const getCustomerReceiptById = async (req, res) => {
       throw error;
     }
 
+    const presentationRecord = await ensureCustomerReceiptPresentationSnapshot({
+      branchId,
+      receipt,
+    });
+
     return res.status(200).json({
       success: true,
-      data: buildReceiptResponse(receipt),
+      data: {
+        ...buildReceiptResponse(receipt),
+        presentationSnapshot: presentationRecord.snapshot,
+      },
     });
   } catch (error) {
     console.error('❌ [getCustomerReceiptById] error:', error);
