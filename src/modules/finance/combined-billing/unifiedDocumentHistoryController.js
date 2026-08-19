@@ -196,11 +196,19 @@ const unifiedDocumentHistory = async (req, res, next) => {
 
     const saleWhere = {
       branchId,
-      status: { not: 'CANCELLED' },
       ...consumedSourceExclusion,
-      ...(purpose === 'DELIVERY_NOTE' ? {
-        officialDocumentNumber: { not: null },
-      } : {}),
+      ...(purpose === 'DELIVERY_NOTE'
+        ? {
+            // Discovery and opening must share the same eligibility authority.
+            // projectSaleDeliveryNote requires a completed sale plus an issued
+            // official document number, so history must never advertise a row
+            // that the canonical print projection will reject with 409.
+            status: 'COMPLETED',
+            officialDocumentNumber: { not: null },
+          }
+        : {
+            status: { not: 'CANCELLED' },
+          }),
       ...buildSaleKeywordWhere(keyword),
       ...buildDateWhere(dateQuery, 'createdAt'),
     };
