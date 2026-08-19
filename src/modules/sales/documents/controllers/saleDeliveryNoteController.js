@@ -1,11 +1,17 @@
 'use strict';
 
+const { issueSaleDeliveryNote } = require('../issue/issueSaleDeliveryNoteService');
 const { projectSaleDeliveryNote } = require('../print/projectSaleDeliveryNoteService');
+
+const authenticatedBranchId = (req) => {
+  const branchId = Number(req.user?.branchId);
+  return Number.isInteger(branchId) && branchId > 0 ? branchId : null;
+};
 
 const getSaleDeliveryNote = async (req, res, next) => {
   try {
-    const branchId = Number(req.user?.branchId);
-    if (!Number.isInteger(branchId) || branchId <= 0) {
+    const branchId = authenticatedBranchId(req);
+    if (!branchId) {
       return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch is required' });
     }
 
@@ -20,4 +26,22 @@ const getSaleDeliveryNote = async (req, res, next) => {
   }
 };
 
-module.exports = Object.freeze({ getSaleDeliveryNote });
+const issueSaleDeliveryNoteController = async (req, res, next) => {
+  try {
+    const branchId = authenticatedBranchId(req);
+    if (!branchId) {
+      return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch is required' });
+    }
+
+    const result = await issueSaleDeliveryNote({
+      branchId,
+      saleId: req.params.id,
+    });
+
+    return res.status(result.replayed ? 200 : 201).json({ ok: true, data: result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+module.exports = Object.freeze({ getSaleDeliveryNote, issueSaleDeliveryNoteController });
