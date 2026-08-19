@@ -10,6 +10,12 @@ const {
 const {
   acquireCustomerMoneyTransactionLock,
 } = require('../shared/customerMoneyTransactionLock');
+const {
+  freezeFinanceOperationalPresentation,
+} = require('../../document-presentation/financeOperationalPresentationSnapshotService');
+
+const CUSTOMER_MONEY_RECEIPT_SOURCE = 'CUSTOMER_MONEY_RECEIPT';
+const CUSTOMER_MONEY_RECEIPT_PURPOSE = 'CUSTOMER_MONEY_RECEIPT';
 
 const buildError = (message, statusCode, code) => {
   const error = new Error(message);
@@ -17,6 +23,10 @@ const buildError = (message, statusCode, code) => {
   error.code = code;
   return error;
 };
+
+const serializePresentationSnapshots = (snapshots = {}) => Object.fromEntries(
+  Object.entries(snapshots).map(([rendererFamily, record]) => [rendererFamily, record?.snapshot || null]),
+);
 
 const serializeReceipt = (receipt) => ({
   id: receipt.id,
@@ -84,6 +94,15 @@ const ensureEmployeeInBranch = async (tx, { employeeId, branchId }) => {
   return employee;
 };
 
+const freezeCustomerMoneyReceiptPresentation = ({ tx, receipt }) => freezeFinanceOperationalPresentation({
+  tx,
+  branchId: receipt.branchId,
+  sourceType: CUSTOMER_MONEY_RECEIPT_SOURCE,
+  sourceId: receipt.id,
+  documentPurpose: CUSTOMER_MONEY_RECEIPT_PURPOSE,
+  issuedAt: receipt.receivedAt || receipt.createdAt || new Date(),
+});
+
 const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, updateBalance, input, user }) => {
   if (!prisma?.$transaction) throw new TypeError('Prisma transaction client is required');
   const command = validateReceiveCustomerMoneyInput(input, user);
@@ -115,12 +134,14 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
       },
     });
 
+    const presentationSnapshots = await freezeCustomerMoneyReceiptPresentation({ tx, receipt });
+
     await createLedger({
       client: tx,
       data: {
         branchId: command.branchId, customerId: command.customerId, applicationId: null,
         eventType: 'MONEY_RECEIVED', amount, direction: 'CREDIT',
-        referenceType: 'CUSTOMER_MONEY_RECEIPT', referenceId: receipt.id,
+        referenceType: CUSTOMER_MONEY_RECEIPT_SOURCE, referenceId: receipt.id,
         createdById: command.createdById,
       },
     });
@@ -134,7 +155,10 @@ const receiveCustomerMoney = async ({ prisma, receiptRepository, createLedger, u
     });
 
     return {
-      receipt: serializeReceipt(receipt),
+      receipt: {
+        ...serializeReceipt(receipt),
+        presentationSnapshots: serializePresentationSnapshots(presentationSnapshots),
+      },
       balance: { customerId: balance.customerId, availableAmount: Number(balance.availableAmount) },
     };
   });
@@ -183,14 +207,18 @@ const getCustomerMoneyReceive = async ({ prisma, getRepository, user, id }) => {
   const receipt = await getRepository({ client: prisma, id: receiptId, branchId });
   if (!receipt) throw buildError('ไม่พบเอกสารรับเงิน', 404, 'DOCUMENT_NOT_FOUND');
 
-  const availableBalance = await calculateAvailableCustomerMoney(prisma, {
-    branchId,
-    customerId: receipt.customerId,
-  });
+  const [availableBalance, presentationSnapshots] = await Promise.all([
+    calculateAvailableCustomerMoney(prisma, {
+      branchId,
+      customerId: receipt.customerId,
+    }),
+    freezeCustomerMoneyReceiptPresentation({ tx: prisma, receipt }),
+  ]);
 
   return {
     ...serializeReceipt(receipt),
     availableBalance: Number(availableBalance),
+    presentationSnapshots: serializePresentationSnapshots(presentationSnapshots),
   };
 };
 
@@ -238,7 +266,7 @@ const cancelCustomerMoneyReceive = async ({
     const sourceState = await getCustomerMoneySourceState(tx, {
       branchId,
       customerId: receipt.customerId,
-      sourceType: 'CUSTOMER_MONEY_RECEIPT',
+      sourceType: CUSTOMER_MONEY_RECEIPT_SOURCE,
       sourceId: receiptId,
     });
     if (
@@ -272,7 +300,7 @@ const cancelCustomerMoneyReceive = async ({
         eventType: 'MONEY_RECEIVE_CANCELLED',
         amount: totalAmount,
         direction: 'DEBIT',
-        referenceType: 'CUSTOMER_MONEY_RECEIPT',
+        referenceType: CUSTOMER_MONEY_RECEIPT_SOURCE,
         referenceId: receiptId,
         createdById: employeeId,
       },
