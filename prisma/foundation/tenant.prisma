@@ -30,6 +30,7 @@ model Branch {
   documentPurposeDefinitions      DocumentPurposeDefinition[]
   printDeviceProfiles             PrintDeviceProfile[]
   documentPurposePrintRoutes      DocumentPurposePrintRoute[]
+  documentPresentationSnapshots   DocumentPresentationSnapshot[]
   customerContactChannels         CustomerContactChannel[]
   communicationProfiles           CommunicationProfile[]
   repairCommunicationActivities   RepairCommunicationActivity[]
