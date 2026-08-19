@@ -10,7 +10,7 @@ const controller = read('src/modules/procurement/purchase-order/presentation/get
 const routes = read('src/modules/procurement/purchase-order/routes/purchaseOrderRoutes.js');
 
 assert.match(routes, /router\.get\('\/:id\/presentation', getPurchaseOrderPresentation\)/);
-assert.match(controller, /branchId:\s*positiveInt\(req\.user\?\.branchId\)/);
+assert.match(controller, /const branchId = positiveInt\(req\.user\?\.branchId\)/);
 assert.match(controller, /where:\s*\{ id: purchaseOrderId, branchId \}/);
 assert.match(controller, /documentHeaderConfig:\s*true/);
 assert.match(controller, /getOrCreatePresentationSnapshot/);
