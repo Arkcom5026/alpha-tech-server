@@ -19,11 +19,30 @@ const command = {
   lines: [{ saleId: 11, saleItemId: 101, lineType: 'STOCK', amount: 100 }],
 };
 
+const presentationBranch = {
+  id: command.branchId,
+  name: 'Branch A',
+  address: 'Bangkok',
+  phone: '020000000',
+  taxId: '0100000000000',
+  branchCode: '00000',
+  isHeadOffice: true,
+  slug: 'branch-a',
+  documentHeaderConfig: null,
+};
+
+const presentationSnapshotRepository = () => ({
+  findUnique: async () => null,
+  upsert: async ({ create }) => ({ id: 1, ...create }),
+});
+
 test('same idempotency key and same request replays the existing settlement without creating another one', async () => {
   const requestHash = buildSettlementRequestHash(command);
   let createCount = 0;
   const tx = {
     $queryRaw: async () => [],
+    branch: { findFirst: async () => presentationBranch },
+    documentPresentationSnapshot: presentationSnapshotRepository(),
     customerMoneySettlementCommand: {
       findUnique: async () => ({
         customerId: command.customerId,
@@ -59,6 +78,7 @@ test('same idempotency key and same request replays the existing settlement with
   assert.equal(result.id, 55);
   assert.equal(result.idempotentReplay, true);
   assert.equal(result.customerMoneyBalance, 0);
+  assert.ok(result.presentationSnapshots);
   assert.equal(createCount, 0);
 });
 
