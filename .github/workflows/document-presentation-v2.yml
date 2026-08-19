@@ -38,6 +38,7 @@ on:
       - 'tests/purchase-order-document-presentation-wave3.contract.test.js'
       - 'tests/combined-billing-document-presentation-wave3.contract.test.js'
       - 'tests/statutory-document-presentation-wave4.contract.test.js'
+      - 'tests/finance-operational-document-presentation-wave5.contract.test.js'
       - '.github/workflows/document-presentation-v2.yml'
   workflow_dispatch:
 
@@ -76,3 +77,5 @@ jobs:
         run: node tests/combined-billing-document-presentation-wave3.contract.test.js
       - name: Run Statutory Document Presentation Wave 4 contract
         run: node tests/statutory-document-presentation-wave4.contract.test.js
+      - name: Run Finance Operational Document Presentation Wave 5 contract
+        run: node tests/finance-operational-document-presentation-wave5.contract.test.js
