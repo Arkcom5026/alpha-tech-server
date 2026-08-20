@@ -8,6 +8,7 @@ const {
 const branches = [
   { id: 1, name: 'Branch One' },
   { id: 2, name: 'Branch Two' },
+  { id: 3, name: 'Branch Three Missing Only' },
 ]
 
 const systemRow = (branchId, code, overrides = {}) => ({
@@ -59,6 +60,7 @@ const allCodes = [
     },
     async findByNormalizedCodes(branchId) {
       if (branchId === 1) return allCodes.map((code) => systemRow(branchId, code))
+      if (branchId === 3) return []
       return [
         systemRow(branchId, 'SALE_RECEIPT', { isSystem: false }),
         systemRow(branchId, 'DELIVERY_NOTE', { displayName: 'DRIFT' }),
@@ -70,7 +72,7 @@ const allCodes = [
 
   assert.strictEqual(report.mode, 'READ_ONLY')
   assert.strictEqual(report.catalogSize, 4)
-  assert.strictEqual(report.branchCount, 2)
+  assert.strictEqual(report.branchCount, 3)
   assert.strictEqual(report.ready, false)
 
   assert.deepStrictEqual(report.branches[0].existing, allCodes)
@@ -84,8 +86,13 @@ const allCodes = [
   assert.strictEqual(report.branches[1].drift[0].reason, 'SYSTEM_DEFINITION_DRIFT')
   assert.strictEqual(report.branches[1].ready, false)
 
+  assert.deepStrictEqual(report.branches[2].missing, allCodes)
+  assert.deepStrictEqual(report.branches[2].conflicts, [])
+  assert.deepStrictEqual(report.branches[2].drift, [])
+  assert.strictEqual(report.branches[2].ready, false)
+
   assert.deepStrictEqual(report.totals, {
-    missing: 2,
+    missing: 6,
     existing: 4,
     conflicts: 1,
     drift: 1,
