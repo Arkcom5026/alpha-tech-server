@@ -7,6 +7,9 @@ const {
   lockSaleDocumentPreparation,
   replaceSaleDocumentPreparationLines,
 } = require('./documentPreparationService');
+const {
+  registerDocumentPreparationTaxCandidates,
+} = require('../../tax/sources/document-preparation/registerDocumentPreparationTaxCandidatesService');
 
 const respondError = (res, error) => {
   const status = Number(error?.statusCode) || 500;
@@ -73,9 +76,23 @@ const lockSaleDocumentPreparationController = async (req, res) => {
   }
 };
 
+const registerSaleDocumentPreparationTaxCandidatesController = async (req, res) => {
+  try {
+    const result = await registerDocumentPreparationTaxCandidates({
+      branchId: req.user?.branchId,
+      saleId: req.params.id,
+      actorEmployeeId: req.user?.employeeId,
+    });
+    return res.json(result);
+  } catch (error) {
+    return respondError(res, error);
+  }
+};
+
 module.exports = Object.freeze({
   createSaleDocumentPreparationController,
   getSaleDocumentPreparationController,
   lockSaleDocumentPreparationController,
+  registerSaleDocumentPreparationTaxCandidatesController,
   replaceSaleDocumentPreparationLinesController,
 });
