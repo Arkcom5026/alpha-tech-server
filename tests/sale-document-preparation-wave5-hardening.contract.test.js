@@ -7,6 +7,9 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
+const preparationService = read(
+  'src', 'modules', 'sales', 'document-preparation', 'documentPreparationService.js',
+);
 const saleRegistration = read(
   'src', 'modules', 'tax', 'sources', 'sale', 'registerSaleTaxCandidateService.js',
 );
@@ -19,6 +22,12 @@ const issuance = read(
 const outputVat = read(
   'src', 'modules', 'tax', 'outputVat', 'outputVatRecordService.js',
 );
+
+assert.match(preparationService, /preparation\.status === 'LOCKED' && preparation\.finalSnapshot/);
+assert.match(preparationService, /const snapshotLines = Array\.isArray\(snapshot\.lines\)/);
+assert.match(preparationService, /lines: snapshotLines/);
+assert.match(preparationService, /snapshot\.totals\?\.inBudgetTotal/);
+assert.match(preparationService, /snapshot\.taxProjection/);
 
 assert.match(saleRegistration, /TAX_SOURCE_SALE_PREPARATION_AUTHORITY_ACTIVE/);
 assert.match(saleRegistration, /sourceType: 'DOCUMENT_PREPARATION'/);
