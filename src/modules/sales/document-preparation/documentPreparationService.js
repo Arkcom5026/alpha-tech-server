@@ -1,8 +1,7 @@
 'use strict';
 
 const {
-  buildDocumentPreparationProjection,
-  roundMoney,
+  buildPreparationTaxProjection,
 } = require('./documentPreparationPolicy');
 
 const fail = (code, message, statusCode = 400) => {
@@ -11,6 +10,8 @@ const fail = (code, message, statusCode = 400) => {
   error.statusCode = statusCode;
   throw error;
 };
+
+const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
 const positiveInt = (value, code, field) => {
   const parsed = Number(value);
@@ -118,17 +119,18 @@ const findPreparation = (prisma, { branchId, saleId }) => prisma.saleDocumentPre
 
 const presentPreparation = (preparation) => {
   if (!preparation) return null;
-  const projection = buildDocumentPreparationProjection({
+  const lines = Array.isArray(preparation.lines) ? preparation.lines : [];
+  const projection = buildPreparationTaxProjection({
     sourceTotal: Number(preparation.sourceTotal || 0),
-    documentTotal: Number(preparation.documentTotal || 0),
+    lines,
   });
   return Object.freeze({
     ...preparation,
     sourceTotal: projection.sourceTotal,
-    documentTotal: projection.inBudgetTotal,
-    inBudgetTotal: projection.inBudgetTotal,
+    documentTotal: projection.documentTotal,
+    inBudgetTotal: projection.documentTotal,
     outOfBudgetTotal: projection.outOfBudgetTotal,
-    taxProjection: projection.taxProjection,
+    taxProjection: projection.projections,
   });
 };
 
@@ -202,7 +204,6 @@ const replaceSaleDocumentPreparationLines = async ({ prisma, branchId, saleId, a
     ? null
     : positiveInt(actorEmployeeId, 'DOCUMENT_PREPARATION_ACTOR_INVALID', 'actorEmployeeId');
   const normalizedLines = normalizeManualLines(lines);
-  const documentTotal = roundMoney(normalizedLines.reduce((sum, line) => sum + line.amount, 0));
 
   return prisma.$transaction(async (tx) => {
     const preparation = await findPreparation(tx, {
@@ -214,9 +215,9 @@ const replaceSaleDocumentPreparationLines = async ({ prisma, branchId, saleId, a
       fail('DOCUMENT_PREPARATION_IMMUTABLE', 'Only a DRAFT preparation can be edited', 409);
     }
 
-    buildDocumentPreparationProjection({
+    const projection = buildPreparationTaxProjection({
       sourceTotal: Number(preparation.sourceTotal || 0),
-      documentTotal,
+      lines: normalizedLines,
     });
 
     await tx.saleDocumentPreparationLine.deleteMany({
@@ -238,7 +239,7 @@ const replaceSaleDocumentPreparationLines = async ({ prisma, branchId, saleId, a
     await tx.saleDocumentPreparation.update({
       where: { id: preparation.id },
       data: {
-        documentTotal,
+        documentTotal: projection.documentTotal,
         updatedById: normalizedActorId,
       },
     });
