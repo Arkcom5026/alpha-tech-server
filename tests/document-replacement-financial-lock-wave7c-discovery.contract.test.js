@@ -21,6 +21,8 @@ assert.match(script, /OutputVatRecord/);
 assert.match(script, /SaleDocumentReplacement/);
 assert.match(script, /deliveryNoteActive/);
 assert.match(script, /recommended/);
+assert.match(script, /JOIN\s+"CombinedBillingDocument"\s+cb/i);
+assert.doesNotMatch(script, /JOIN\s+"CombinedBilling"\s+cb/i);
 
 const queryCalls = [...script.matchAll(/client\.query\((['"`])([\s\S]*?)\1/g)].map((match) => match[2]);
 for (const sql of queryCalls) {
