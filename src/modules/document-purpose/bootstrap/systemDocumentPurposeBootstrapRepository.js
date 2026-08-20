@@ -5,6 +5,22 @@ const { prisma, Prisma } = require('../../../lib/prisma')
 const isKnownRequestError = (error, code) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === code
 
+const branchSelection = {
+  id: true,
+  name: true,
+  branchCode: true,
+  slug: true,
+  categoryId: true,
+  features: true,
+  provisionedPartnerStoreApplications: {
+    select: {
+      id: true,
+      provisioningStatus: true,
+      operationalReadinessStatus: true,
+    },
+  },
+}
+
 class SystemDocumentPurposeBootstrapRepository {
   constructor(client = prisma) {
     this.prisma = client
@@ -12,14 +28,7 @@ class SystemDocumentPurposeBootstrapRepository {
 
   listBranches() {
     return this.prisma.branch.findMany({
-      select: {
-        id: true,
-        name: true,
-        branchCode: true,
-        slug: true,
-        categoryId: true,
-        features: true,
-      },
+      select: branchSelection,
       orderBy: { id: 'asc' },
     })
   }
@@ -27,14 +36,7 @@ class SystemDocumentPurposeBootstrapRepository {
   findBranchesByIds(branchIds) {
     return this.prisma.branch.findMany({
       where: { id: { in: branchIds.map(Number) } },
-      select: {
-        id: true,
-        name: true,
-        branchCode: true,
-        slug: true,
-        categoryId: true,
-        features: true,
-      },
+      select: branchSelection,
       orderBy: { id: 'asc' },
     })
   }
@@ -91,5 +93,6 @@ class SystemDocumentPurposeBootstrapRepository {
 
 module.exports = {
   SystemDocumentPurposeBootstrapRepository,
+  branchSelection,
   isKnownRequestError,
 }
