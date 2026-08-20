@@ -43,6 +43,7 @@ class SystemDocumentPurposeReadinessService {
     for (const expected of catalog) {
       const current = existingByCode.get(expected.normalizedCode)
       if (!current) {
+        result.ready = false
         result.missing.push(expected.code)
         continue
       }
