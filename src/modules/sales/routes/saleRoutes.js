@@ -14,6 +14,7 @@ const {
 const {
   createSaleDocumentReplacementController,
   getSaleDocumentReplacementController,
+  lockSaleDocumentReplacementController,
   replaceSaleDocumentReplacementLinesController,
 } = require('../document-replacement/documentReplacementController');
 const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = require('../history/controllers/saleHistoryController');
@@ -44,6 +45,7 @@ router.post('/:id/document-preparation/tax-candidates', registerSaleDocumentPrep
 router.post('/:id/document-replacement', createSaleDocumentReplacementController);
 router.get('/:id/document-replacement', getSaleDocumentReplacementController);
 router.put('/:id/document-replacement/lines', replaceSaleDocumentReplacementLinesController);
+router.post('/:id/document-replacement/lock', lockSaleDocumentReplacementController);
 router.put('/:id/document-lines', updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
