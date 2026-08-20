@@ -4,6 +4,7 @@ const { prisma } = require('../../../../lib/prisma');
 const {
   createSaleDocumentPreparation,
   getSaleDocumentPreparation,
+  lockSaleDocumentPreparation,
   replaceSaleDocumentPreparationLines,
 } = require('./documentPreparationService');
 
@@ -58,8 +59,23 @@ const replaceSaleDocumentPreparationLinesController = async (req, res) => {
   }
 };
 
+const lockSaleDocumentPreparationController = async (req, res) => {
+  try {
+    const result = await lockSaleDocumentPreparation({
+      prisma,
+      branchId: req.user?.branchId,
+      saleId: req.params.id,
+      actorEmployeeId: req.user?.employeeId,
+    });
+    return res.json(result);
+  } catch (error) {
+    return respondError(res, error);
+  }
+};
+
 module.exports = Object.freeze({
   createSaleDocumentPreparationController,
   getSaleDocumentPreparationController,
+  lockSaleDocumentPreparationController,
   replaceSaleDocumentPreparationLinesController,
 });
