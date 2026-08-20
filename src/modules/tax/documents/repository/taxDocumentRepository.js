@@ -100,6 +100,28 @@ const updateStatus = async ({ branchId, taxDocumentId, expectedStatus, targetSta
   return rows[0] ? mapRow(rows[0]) : null;
 };
 
+const refreshDraftRecipientIdentity = async ({
+  branchId,
+  taxDocumentId,
+  snapshot,
+  counterpartyTaxId,
+}, tx = prisma) => {
+  const rows = await tx.$queryRaw(Prisma.sql`
+    UPDATE "TaxDocument"
+    SET
+      "snapshot" = ${JSON.stringify(snapshot || {})}::jsonb,
+      "counterpartyTaxId" = ${counterpartyTaxId || null},
+      "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${Number(taxDocumentId)}
+      AND "branchId" = ${Number(branchId)}
+      AND "status" = 'DRAFT'
+      AND "documentType" = 'OUTPUT_TAX_INVOICE'
+      AND "issuerProfileId" IS NULL
+    RETURNING *
+  `);
+  return rows[0] ? mapRow(rows[0]) : null;
+};
+
 const issueOutputTaxDocument = async ({
   branchId,
   taxDocumentId,
@@ -210,6 +232,7 @@ module.exports = Object.freeze({
   findDetailById,
   create,
   updateStatus,
+  refreshDraftRecipientIdentity,
   issueOutputTaxDocument,
   appendLifecycleEvent,
   list,

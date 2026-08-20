@@ -6,6 +6,7 @@ const taxPeriodRepository = require('../periods/taxPeriodRepository');
 const periodProjectionRepository = require('./taxIntakePeriodProjectionRepository');
 const { projectOutputTaxPrintableDocument } = require('../documents/print/projectOutputTaxPrintableDocumentService');
 const { issueOutputTaxDocument } = require('../documents/issue/issueOutputTaxDocumentService');
+const { refreshDraftRecipient } = require('../documents/recipient/refreshDraftRecipientService');
 const {
   issueOutputTaxCreditNote,
   issueOutputTaxCreditNoteForSaleReturn,
@@ -108,6 +109,7 @@ module.exports = Object.freeze({
   listCandidates,
   projectOutputTaxPrintableDocument,
   listDocuments,
+  refreshDraftRecipient,
   registerSaleTaxCandidate,
   registerTaxCandidate,
   resolveTaxPeriodScope,
