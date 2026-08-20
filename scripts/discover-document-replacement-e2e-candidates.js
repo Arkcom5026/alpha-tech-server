@@ -50,7 +50,7 @@ async function main() {
         NOT EXISTS (
           SELECT 1
           FROM "ConsolidatedDeliveryLine" cdl
-          JOIN "CombinedBilling" cb ON cb."id" = cdl."combinedBillingId"
+          JOIN "CombinedBillingDocument" cb ON cb."id" = cdl."combinedBillingId"
           WHERE cdl."branchId" = s."branchId"
             AND cdl."sourceSaleId" = s."id"
             AND cdl."status" = 'DOCUMENTED'
