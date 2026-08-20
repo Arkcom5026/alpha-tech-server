@@ -114,6 +114,42 @@ const buildPreparationTaxProjection = ({ sourceTotal, lines = [] } = {}) => {
   });
 };
 
+const allocatePreparationVat = ({ sourceTotal, sourceTaxAmount, inBudgetTotal, outOfBudgetTotal }) => {
+  const sourceCents = toCents(sourceTotal, 'sourceTotal');
+  const sourceTaxCents = toCents(sourceTaxAmount, 'sourceTaxAmount');
+  const inBudgetCents = toCents(inBudgetTotal, 'inBudgetTotal');
+  const outOfBudgetCents = toCents(outOfBudgetTotal, 'outOfBudgetTotal');
+
+  if (inBudgetCents + outOfBudgetCents !== sourceCents) {
+    fail('DOCUMENT_PREPARATION_VAT_ALLOCATION_TOTAL_MISMATCH', 'VAT allocation totals must reconcile to source total', 409);
+  }
+  if (sourceTaxCents > sourceCents) {
+    fail('DOCUMENT_PREPARATION_SOURCE_VAT_INVALID', 'Source VAT cannot exceed source total', 409);
+  }
+
+  const inTaxCents = outOfBudgetCents === 0
+    ? sourceTaxCents
+    : Math.round(sourceTaxCents * (inBudgetCents / sourceCents));
+  const outTaxCents = sourceTaxCents - inTaxCents;
+
+  const buildPortion = (portion, totalCents, taxCents) => Object.freeze({
+    portion,
+    subtotalAmount: fromCents(totalCents - taxCents),
+    taxAmount: fromCents(taxCents),
+    totalAmount: fromCents(totalCents),
+  });
+
+  return Object.freeze({
+    sourceTaxAmount: fromCents(sourceTaxCents),
+    portions: Object.freeze([
+      buildPortion(TAX_PORTIONS.IN_BUDGET, inBudgetCents, inTaxCents),
+      ...(outOfBudgetCents > 0
+        ? [buildPortion(TAX_PORTIONS.OUT_OF_BUDGET, outOfBudgetCents, outTaxCents)]
+        : []),
+    ]),
+  });
+};
+
 const buildLockedPreparationSnapshot = ({
   preparationId,
   sourceSale,
@@ -157,6 +193,13 @@ const buildLockedPreparationSnapshot = ({
       })
     : null;
 
+  const vatAllocation = allocatePreparationVat({
+    sourceTotal: projection.sourceTotal,
+    sourceTaxAmount: Number(sourceSale?.vat || 0),
+    inBudgetTotal: projection.documentTotal,
+    outOfBudgetTotal: projection.outOfBudgetTotal,
+  });
+
   return Object.freeze({
     schemaVersion: 1,
     preparationId: Number(preparationId),
@@ -166,6 +209,8 @@ const buildLockedPreparationSnapshot = ({
       saleCode: sourceSale?.code || null,
       deliveryNoteNumber: sourceSale?.officialDocumentNumber || null,
       totalAmount: projection.sourceTotal,
+      taxAmount: vatAllocation.sourceTaxAmount,
+      vatRate: Number(sourceSale?.vatRate || 0),
     }),
     agency: agencyContext && typeof agencyContext === 'object'
       ? Object.freeze({ ...agencyContext })
@@ -177,6 +222,7 @@ const buildLockedPreparationSnapshot = ({
       outOfBudgetTotal: projection.outOfBudgetTotal,
     }),
     taxProjection: projection.projections,
+    vatAllocation: vatAllocation.portions,
     outOfBudgetService,
     lockedAt: normalizedLockedAt.toISOString(),
     lockedById: lockedById == null ? null : Number(lockedById),
@@ -189,6 +235,7 @@ module.exports = Object.freeze({
   TAX_INVOICE_KINDS,
   OUT_OF_BUDGET_LINE_TYPE,
   OUT_OF_BUDGET_SERVICE_DESCRIPTION,
+  allocatePreparationVat,
   calculateDocumentTotal,
   buildPreparationTaxProjection,
   buildLockedPreparationSnapshot,
