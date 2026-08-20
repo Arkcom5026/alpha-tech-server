@@ -93,6 +93,8 @@ const selectSourceSale = (prisma, { branchId, saleId }) => prisma.sale.findFirst
     status: true,
     officialDocumentNumber: true,
     totalAmount: true,
+    vat: true,
+    vatRate: true,
     customer: {
       select: {
         id: true,
