@@ -72,6 +72,34 @@ const registerSaleTaxCandidate = async ({ branchId, saleId, actorEmployeeId }) =
   }
 
   assertSaleTaxDocumentEligibility(sale);
+
+  const preparation = await prisma.saleDocumentPreparation.findUnique({
+    where: {
+      branchId_sourceType_sourceId: {
+        branchId: normalizedBranchId,
+        sourceType: 'SALE',
+        sourceId: String(normalizedSaleId),
+      },
+    },
+    select: { id: true, status: true },
+  });
+  if (preparation?.status === 'LOCKED') {
+    const preparationCandidate = await prisma.taxCandidate.findFirst({
+      where: {
+        branchId: normalizedBranchId,
+        sourceType: 'DOCUMENT_PREPARATION',
+        sourceId: { startsWith: `${preparation.id}:` },
+      },
+      select: { id: true },
+    });
+    if (preparationCandidate) {
+      throw Object.assign(
+        new Error('Sale tax authority moved to document preparation after tax projection'),
+        { code: 'TAX_SOURCE_SALE_PREPARATION_AUTHORITY_ACTIVE', statusCode: 409 },
+      );
+    }
+  }
+
   const group = sale.customerId
     ? await resolveFinancialCustomerGroup(prisma, { customerId: sale.customerId, branchId: normalizedBranchId })
     : null;

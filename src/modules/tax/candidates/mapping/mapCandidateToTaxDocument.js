@@ -4,6 +4,7 @@ const { buildTaxDocumentIdentity } = require('../../documents/contracts/taxDocum
 
 const SOURCE_TO_DOCUMENT_TYPE = Object.freeze({
   SALE: 'OUTPUT_TAX_INVOICE',
+  DOCUMENT_PREPARATION: 'OUTPUT_TAX_INVOICE',
   CUSTOMER_RECEIPT: 'RECEIPT',
   PURCHASE_RECEIPT: 'INPUT_TAX_INVOICE',
   SALE_RETURN: 'CREDIT_NOTE',

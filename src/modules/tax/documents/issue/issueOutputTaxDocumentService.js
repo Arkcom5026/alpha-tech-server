@@ -94,18 +94,87 @@ const allocateSequence = async ({ profile, taxInvoiceKind }, tx) => {
   });
 };
 
+const assertNoPreparationTaxAuthorityForSaleIds = async ({ branchId, saleIds }, tx) => {
+  const normalizedSaleIds = [...new Set((saleIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!normalizedSaleIds.length) return;
+
+  const preparations = await tx.saleDocumentPreparation.findMany({
+    where: {
+      branchId: Number(branchId),
+      sourceType: 'SALE',
+      sourceId: { in: normalizedSaleIds.map(String) },
+      status: 'LOCKED',
+    },
+    select: { id: true, sourceId: true },
+  });
+  if (!preparations.length) return;
+
+  const activeCandidate = await tx.taxCandidate.findFirst({
+    where: {
+      branchId: Number(branchId),
+      sourceType: 'DOCUMENT_PREPARATION',
+      OR: preparations.map((preparation) => ({ sourceId: { startsWith: `${preparation.id}:` } })),
+    },
+    select: { sourceId: true },
+  });
+  if (activeCandidate) {
+    fail(
+      'TAX_SOURCE_PREPARATION_AUTHORITY_ACTIVE',
+      'Tax authority for one or more source sales has moved to document preparation',
+      409,
+    );
+  }
+};
+
+const assertDocumentPreparationSource = async ({ candidate, branchId }, tx) => {
+  const [preparationIdText, portion] = String(candidate.sourceId || '').split(':');
+  const preparationId = Number(preparationIdText);
+  if (!Number.isInteger(preparationId) || preparationId <= 0 || !['IN_BUDGET', 'OUT_OF_BUDGET'].includes(portion)) {
+    fail('TAX_DOCUMENT_PREPARATION_SOURCE_INVALID', 'Document preparation tax source identity is invalid', 409);
+  }
+
+  const preparation = await tx.saleDocumentPreparation.findFirst({
+    where: { id: preparationId, branchId: Number(branchId), status: 'LOCKED' },
+    select: { id: true, sourceId: true, finalSnapshot: true },
+  });
+  if (!preparation || !preparation.finalSnapshot) {
+    fail('TAX_DOCUMENT_PREPARATION_SOURCE_NOT_READY', 'Locked document preparation source is not ready', 409);
+  }
+
+  if (Number(candidate.snapshot?.preparationId) !== preparationId || candidate.snapshot?.portion !== portion) {
+    fail('TAX_DOCUMENT_PREPARATION_SNAPSHOT_MISMATCH', 'Tax candidate does not match locked preparation snapshot', 409);
+  }
+  if (Number(preparation.finalSnapshot?.source?.saleId) !== Number(preparation.sourceId)) {
+    fail('TAX_DOCUMENT_PREPARATION_SOURCE_MISMATCH', 'Locked preparation source sale does not match persistence authority', 409);
+  }
+};
+
 const assertEligibleSaleSource = async ({ document, branchId }, tx) => {
   const candidate = document.candidate;
+  if (candidate?.sourceType === 'DOCUMENT_PREPARATION') {
+    await assertDocumentPreparationSource({ candidate, branchId }, tx);
+    return;
+  }
   if (candidate?.sourceType === 'CONSOLIDATED_DELIVERY') {
     const source = await tx.combinedBillingDocument.findFirst({
       where: { id: Number(candidate.sourceId), branchId: Number(branchId), status: 'ISSUED' },
-      select: { id: true, documentLines: { where: { status: 'DOCUMENTED' }, select: { id: true } } },
+      select: {
+        id: true,
+        documentLines: {
+          where: { status: 'DOCUMENTED' },
+          select: { id: true, sourceSaleId: true },
+        },
+      },
     });
     if (!source || !source.documentLines.length) fail('TAX_SOURCE_CONSOLIDATED_DELIVERY_NOT_FOUND', 'Consolidated delivery source is not ready', 404);
+    await assertNoPreparationTaxAuthorityForSaleIds({
+      branchId,
+      saleIds: source.documentLines.map((line) => line.sourceSaleId),
+    }, tx);
     return;
   }
   if (!candidate || candidate.sourceType !== 'SALE') {
-    fail('TAX_OUTPUT_ISSUANCE_SOURCE_UNSUPPORTED', 'Only a paid sale or consolidated delivery candidate can issue an output tax invoice', 409);
+    fail('TAX_OUTPUT_ISSUANCE_SOURCE_UNSUPPORTED', 'Only a paid sale, locked document preparation, or consolidated delivery candidate can issue an output tax invoice', 409);
   }
   const saleId = Number(candidate.sourceId);
   const sale = await tx.sale.findFirst({
@@ -113,6 +182,8 @@ const assertEligibleSaleSource = async ({ document, branchId }, tx) => {
     select: { id: true, status: true, statusPayment: true },
   });
   if (!sale) fail('TAX_SOURCE_SALE_NOT_FOUND', 'Sale not found', 404);
+
+  await assertNoPreparationTaxAuthorityForSaleIds({ branchId, saleIds: [saleId] }, tx);
 
   // Once any Sale line becomes part of a live consolidated Delivery Note,
   // future tax issuance authority moves away from the original Sale candidate.
@@ -176,6 +247,17 @@ const issueOutputTaxDocument = async ({ branchId, taxDocumentId, taxInvoiceKind,
     }
     if (document.status !== 'DRAFT' || document.documentType !== 'OUTPUT_TAX_INVOICE') {
       fail('TAX_DOCUMENT_ISSUANCE_FORBIDDEN', 'Only a draft output tax document may be issued', 409);
+    }
+
+    if (document.candidate?.sourceType === 'DOCUMENT_PREPARATION') {
+      const requiredKind = String(document.snapshot?.requiredTaxInvoiceKind || '').toUpperCase();
+      if (!requiredKind || requiredKind !== kind) {
+        fail(
+          'TAX_DOCUMENT_PREPARATION_KIND_MISMATCH',
+          `This document preparation portion must issue as ${requiredKind || 'its projected tax invoice kind'}`,
+          409,
+        );
+      }
     }
 
     if (kind === 'FULL') {
