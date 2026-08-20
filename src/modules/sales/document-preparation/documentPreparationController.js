@@ -1,6 +1,6 @@
 'use strict';
 
-const { prisma } = require('../../../lib/prisma');
+const { prisma } = require('../../../../lib/prisma');
 const {
   createSaleDocumentPreparation,
   getSaleDocumentPreparation,
