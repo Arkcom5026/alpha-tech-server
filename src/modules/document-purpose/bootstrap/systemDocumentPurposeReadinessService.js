@@ -17,6 +17,24 @@ const expectedProjection = (purpose) => ({
   metadata: purpose.metadata ?? null,
 })
 
+const classifyReadinessScope = (branch) => {
+  if (branch?.features && typeof branch.features === 'object' && branch.features.template === true) {
+    return Object.freeze({ included: false, reason: 'TEMPLATE_BRANCH' })
+  }
+
+  const partnerApplications = Array.isArray(branch?.provisionedPartnerStoreApplications)
+    ? branch.provisionedPartnerStoreApplications
+    : []
+  if (partnerApplications.length > 0) {
+    const provisioned = partnerApplications.some((application) => application?.provisioningStatus === 'PROVISIONED')
+    if (!provisioned) {
+      return Object.freeze({ included: false, reason: 'PARTNER_STORE_NOT_PROVISIONED' })
+    }
+  }
+
+  return Object.freeze({ included: true, reason: null })
+}
+
 class SystemDocumentPurposeReadinessService {
   constructor(repository = new SystemDocumentPurposeBootstrapRepository()) {
     this.repository = repository
@@ -75,9 +93,24 @@ class SystemDocumentPurposeReadinessService {
   }
 
   async execute() {
-    const branches = await this.repository.listBranches()
-    const results = []
+    const discoveredBranches = await this.repository.listBranches()
+    const branches = []
+    const excludedBranches = []
 
+    for (const branch of discoveredBranches) {
+      const scope = classifyReadinessScope(branch)
+      if (!scope.included) {
+        excludedBranches.push({
+          branchId: branch.id,
+          branchName: branch.name ?? null,
+          reason: scope.reason,
+        })
+        continue
+      }
+      branches.push(branch)
+    }
+
+    const results = []
     for (const branch of branches) {
       results.push(await this.inspectBranch(branch))
     }
@@ -85,7 +118,10 @@ class SystemDocumentPurposeReadinessService {
     return {
       mode: 'READ_ONLY',
       catalogSize: SYSTEM_DOCUMENT_PURPOSES.length,
+      discoveredBranchCount: discoveredBranches.length,
       branchCount: branches.length,
+      excludedBranchCount: excludedBranches.length,
+      excludedBranches,
       ready: results.every((result) => result.ready),
       branches: results,
       totals: results.reduce(
@@ -103,5 +139,6 @@ class SystemDocumentPurposeReadinessService {
 
 module.exports = {
   SystemDocumentPurposeReadinessService,
+  classifyReadinessScope,
   expectedProjection,
 }
