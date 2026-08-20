@@ -70,6 +70,9 @@ class SystemDocumentPurposeBootstrapRepository {
   }
 
   transaction(work) {
+    if (typeof this.prisma.$transaction !== 'function') {
+      return work(this)
+    }
     return this.prisma.$transaction((tx) => work(new SystemDocumentPurposeBootstrapRepository(tx)))
   }
 

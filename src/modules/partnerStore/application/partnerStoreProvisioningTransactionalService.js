@@ -1,6 +1,9 @@
 'use strict'
 
 const repository = require('./partnerStoreApplicationRepository')
+const {
+  ensurePartnerStoreDocumentPurposeReadiness,
+} = require('./partnerStoreDocumentPurposeReadiness')
 
 const fail = (statusCode, code, message) => {
   const error = new Error(message)
@@ -66,10 +69,6 @@ const markFailed = async (applicationId, actorUserId, sourceStatus, error) => {
 const reconcileLegacyLinkedState = async (tx, application, actorUserId) => {
   if (!application.provisionedBranchId) return null
 
-  const needsProvisioningReconciliation = application.provisioningStatus !== 'PROVISIONED'
-  const needsActivationReconciliation = Boolean(application.provisionedOwnerUserId) && application.activationStatus !== 'ACTIVE'
-  if (!needsProvisioningReconciliation && !needsActivationReconciliation) return null
-
   const branch = await tx.branch.findUnique({
     where: { id: application.provisionedBranchId },
     select: { id: true },
@@ -77,6 +76,16 @@ const reconcileLegacyLinkedState = async (tx, application, actorUserId) => {
   if (!branch) {
     fail(409, 'PARTNER_STORE_PROVISIONED_BRANCH_MISSING', 'Provisioned branch is missing')
   }
+
+  await ensurePartnerStoreDocumentPurposeReadiness({
+    tx,
+    branchId: branch.id,
+    actorEmployeeId: null,
+  })
+
+  const needsProvisioningReconciliation = application.provisioningStatus !== 'PROVISIONED'
+  const needsActivationReconciliation = Boolean(application.provisionedOwnerUserId) && application.activationStatus !== 'ACTIVE'
+  if (!needsProvisioningReconciliation && !needsActivationReconciliation) return null
 
   const existingCapability = await tx.partnerStoreCapability.findUnique({
     where: { branchId: branch.id },
@@ -261,6 +270,12 @@ const provision = async (applicationId, actorUserId) => {
           deliveryEnabled: false,
           serviceAreaMode: 'PICKUP_ONLY',
         },
+      })
+
+      await ensurePartnerStoreDocumentPurposeReadiness({
+        tx,
+        branchId: branch.id,
+        actorEmployeeId: null,
       })
 
       await tx.partnerStoreApplication.update({
