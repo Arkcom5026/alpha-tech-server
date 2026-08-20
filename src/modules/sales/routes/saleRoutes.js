@@ -7,6 +7,7 @@ const { getSaleDeliveryNote, issueSaleDeliveryNoteController } = require('../doc
 const {
   createSaleDocumentPreparationController,
   getSaleDocumentPreparationController,
+  lockSaleDocumentPreparationController,
   replaceSaleDocumentPreparationLinesController,
 } = require('../document-preparation/documentPreparationController');
 const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = require('../history/controllers/saleHistoryController');
@@ -32,6 +33,7 @@ router.get('/printable-sales', searchPrintableSales);
 router.post('/:id/document-preparation', createSaleDocumentPreparationController);
 router.get('/:id/document-preparation', getSaleDocumentPreparationController);
 router.put('/:id/document-preparation/lines', replaceSaleDocumentPreparationLinesController);
+router.post('/:id/document-preparation/lock', lockSaleDocumentPreparationController);
 router.put('/:id/document-lines', updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
