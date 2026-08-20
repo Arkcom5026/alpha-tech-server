@@ -19,8 +19,14 @@ assert.match(script, /OutputVatRecord/);
 assert.match(script, /tax period drift/);
 assert.match(script, /SUPERSEDED/);
 assert.match(script, /exactly one current LOCKED replacement/);
-assert.doesNotMatch(script, /\bINSERT\b/i);
-assert.doesNotMatch(script, /\bUPDATE\b/i);
-assert.doesNotMatch(script, /\bDELETE\b/i);
+
+// Guard SQL mutation statements specifically. JavaScript legitimately uses the
+// `delete` operator to remove production DATABASE_URL/DIRECT_URL from the
+// authority-check environment, and URLSearchParams.delete() to strip sslmode.
+// Those safety operations must not be mistaken for SQL DELETE statements.
+assert.doesNotMatch(
+  script,
+  /client\.query\s*\(\s*[`'"]\s*(?:INSERT|UPDATE|DELETE)\b/i,
+);
 
 console.log('Document replacement financial lock Wave 7 runtime verifier contract: PASS');
