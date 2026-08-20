@@ -17,6 +17,7 @@ const TAX_INVOICE_KINDS = Object.freeze({
 });
 
 const OUT_OF_BUDGET_LINE_TYPE = 'SERVICE_ONLY';
+const OUT_OF_BUDGET_SERVICE_DESCRIPTION = 'ค่าบริการ';
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -113,11 +114,82 @@ const buildPreparationTaxProjection = ({ sourceTotal, lines = [] } = {}) => {
   });
 };
 
+const buildLockedPreparationSnapshot = ({
+  preparationId,
+  sourceSale,
+  sourceTotal,
+  agencyContext,
+  lines = [],
+  lockedAt,
+  lockedById,
+} = {}) => {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    fail('DOCUMENT_PREPARATION_LINES_REQUIRED_FOR_LOCK', 'At least one prepared document line is required before lock', 409);
+  }
+
+  const projection = buildPreparationTaxProjection({ sourceTotal, lines });
+  if (projection.documentTotal <= 0) {
+    fail('DOCUMENT_PREPARATION_TOTAL_REQUIRED_FOR_LOCK', 'Prepared document total must be greater than zero before lock', 409);
+  }
+
+  const normalizedLockedAt = new Date(lockedAt || Date.now());
+  if (Number.isNaN(normalizedLockedAt.getTime())) {
+    fail('DOCUMENT_PREPARATION_LOCK_TIME_INVALID', 'lockedAt is invalid');
+  }
+
+  const snapshotLines = lines.map((line, index) => Object.freeze({
+    description: String(line?.description || '').trim(),
+    quantity: Number(line?.quantity || 0),
+    unitName: String(line?.unitName || '').trim() || null,
+    unitPrice: fromCents(toCents(line?.unitPrice || 0, `lines[${index}].unitPrice`)),
+    amount: fromCents(toCents(line?.amount || 0, `lines[${index}].amount`)),
+    sortOrder: Number.isInteger(Number(line?.sortOrder)) ? Number(line.sortOrder) : index,
+  }));
+
+  const outOfBudgetService = projection.outOfBudgetTotal > 0
+    ? Object.freeze({
+        description: OUT_OF_BUDGET_SERVICE_DESCRIPTION,
+        quantity: 1,
+        unitName: 'รายการ',
+        unitPrice: projection.outOfBudgetTotal,
+        amount: projection.outOfBudgetTotal,
+        lineType: OUT_OF_BUDGET_LINE_TYPE,
+      })
+    : null;
+
+  return Object.freeze({
+    schemaVersion: 1,
+    preparationId: Number(preparationId),
+    source: Object.freeze({
+      type: 'SALE',
+      saleId: Number(sourceSale?.id || 0),
+      saleCode: sourceSale?.code || null,
+      deliveryNoteNumber: sourceSale?.officialDocumentNumber || null,
+      totalAmount: projection.sourceTotal,
+    }),
+    agency: agencyContext && typeof agencyContext === 'object'
+      ? Object.freeze({ ...agencyContext })
+      : null,
+    lines: Object.freeze(snapshotLines),
+    totals: Object.freeze({
+      sourceTotal: projection.sourceTotal,
+      inBudgetTotal: projection.documentTotal,
+      outOfBudgetTotal: projection.outOfBudgetTotal,
+    }),
+    taxProjection: projection.projections,
+    outOfBudgetService,
+    lockedAt: normalizedLockedAt.toISOString(),
+    lockedById: lockedById == null ? null : Number(lockedById),
+  });
+};
+
 module.exports = Object.freeze({
   PREPARATION_STATUSES,
   TAX_PORTIONS,
   TAX_INVOICE_KINDS,
   OUT_OF_BUDGET_LINE_TYPE,
+  OUT_OF_BUDGET_SERVICE_DESCRIPTION,
   calculateDocumentTotal,
   buildPreparationTaxProjection,
+  buildLockedPreparationSnapshot,
 });
