@@ -9,6 +9,14 @@ const branches = [
   { id: 1, name: 'Branch One' },
   { id: 2, name: 'Branch Two' },
   { id: 3, name: 'Branch Three Missing Only' },
+  { id: 4, name: 'Template Branch', features: { template: true } },
+  {
+    id: 5,
+    name: 'Partner Store Not Provisioned',
+    provisionedPartnerStoreApplications: [
+      { id: 50, provisioningStatus: 'NOT_STARTED', operationalReadinessStatus: 'NOT_READY' },
+    ],
+  },
 ]
 
 const systemRow = (branchId, code, overrides = {}) => ({
@@ -54,11 +62,13 @@ const allCodes = [
 ]
 
 ;(async () => {
+  const inspectedBranchIds = []
   const repository = {
     async listBranches() {
       return branches
     },
     async findByNormalizedCodes(branchId) {
+      inspectedBranchIds.push(branchId)
       if (branchId === 1) return allCodes.map((code) => systemRow(branchId, code))
       if (branchId === 3) return []
       return [
@@ -72,7 +82,14 @@ const allCodes = [
 
   assert.strictEqual(report.mode, 'READ_ONLY')
   assert.strictEqual(report.catalogSize, 4)
+  assert.strictEqual(report.discoveredBranchCount, 5)
   assert.strictEqual(report.branchCount, 3)
+  assert.strictEqual(report.excludedBranchCount, 2)
+  assert.deepStrictEqual(report.excludedBranches, [
+    { branchId: 4, branchName: 'Template Branch', reason: 'TEMPLATE_BRANCH' },
+    { branchId: 5, branchName: 'Partner Store Not Provisioned', reason: 'PARTNER_STORE_NOT_PROVISIONED' },
+  ])
+  assert.deepStrictEqual(inspectedBranchIds, [1, 2, 3])
   assert.strictEqual(report.ready, false)
 
   assert.deepStrictEqual(report.branches[0].existing, allCodes)
