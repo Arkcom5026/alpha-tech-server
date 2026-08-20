@@ -17,6 +17,13 @@ const branches = [
       { id: 50, provisioningStatus: 'NOT_STARTED', operationalReadinessStatus: 'NOT_READY' },
     ],
   },
+  {
+    id: 6,
+    name: 'Provisioned Partner Store',
+    provisionedPartnerStoreApplications: [
+      { id: 60, provisioningStatus: 'PROVISIONED', operationalReadinessStatus: 'NOT_READY' },
+    ],
+  },
 ]
 
 const systemRow = (branchId, code, overrides = {}) => ({
@@ -69,7 +76,7 @@ const allCodes = [
     },
     async findByNormalizedCodes(branchId) {
       inspectedBranchIds.push(branchId)
-      if (branchId === 1) return allCodes.map((code) => systemRow(branchId, code))
+      if (branchId === 1 || branchId === 6) return allCodes.map((code) => systemRow(branchId, code))
       if (branchId === 3) return []
       return [
         systemRow(branchId, 'SALE_RECEIPT', { isSystem: false }),
@@ -82,14 +89,14 @@ const allCodes = [
 
   assert.strictEqual(report.mode, 'READ_ONLY')
   assert.strictEqual(report.catalogSize, 4)
-  assert.strictEqual(report.discoveredBranchCount, 5)
-  assert.strictEqual(report.branchCount, 3)
+  assert.strictEqual(report.discoveredBranchCount, 6)
+  assert.strictEqual(report.branchCount, 4)
   assert.strictEqual(report.excludedBranchCount, 2)
   assert.deepStrictEqual(report.excludedBranches, [
     { branchId: 4, branchName: 'Template Branch', reason: 'TEMPLATE_BRANCH' },
     { branchId: 5, branchName: 'Partner Store Not Provisioned', reason: 'PARTNER_STORE_NOT_PROVISIONED' },
   ])
-  assert.deepStrictEqual(inspectedBranchIds, [1, 2, 3])
+  assert.deepStrictEqual(inspectedBranchIds, [1, 2, 3, 6])
   assert.strictEqual(report.ready, false)
 
   assert.deepStrictEqual(report.branches[0].existing, allCodes)
@@ -108,9 +115,12 @@ const allCodes = [
   assert.deepStrictEqual(report.branches[2].drift, [])
   assert.strictEqual(report.branches[2].ready, false)
 
+  assert.deepStrictEqual(report.branches[3].existing, allCodes)
+  assert.strictEqual(report.branches[3].ready, true)
+
   assert.deepStrictEqual(report.totals, {
     missing: 6,
-    existing: 4,
+    existing: 8,
     conflicts: 1,
     drift: 1,
   })
