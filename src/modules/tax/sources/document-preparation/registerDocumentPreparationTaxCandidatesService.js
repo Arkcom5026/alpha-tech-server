@@ -188,8 +188,8 @@ const registerDocumentPreparationTaxCandidates = async ({ branchId, saleId, acto
         document: {
           is: {
             documentType: 'OUTPUT_TAX_INVOICE',
-            status: 'REGISTERED',
             issuedDocumentNumber: { not: null },
+            issuerProfileId: { not: null },
           },
         },
       },
