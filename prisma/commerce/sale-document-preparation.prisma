@@ -15,6 +15,7 @@ model SaleDocumentPreparation {
   createdAt      DateTime                      @default(now())
   updatedAt      DateTime                      @updatedAt
   lines          SaleDocumentPreparationLine[]
+  replacements   SaleDocumentReplacement[]
 
   @@unique([branchId, sourceType, sourceId], map: "SaleDocumentPreparation_branch_source_key")
   @@index([branchId, status, updatedAt])
@@ -35,4 +36,53 @@ model SaleDocumentPreparationLine {
   preparation    SaleDocumentPreparation @relation(fields: [preparationId], references: [id], onDelete: Cascade)
 
   @@index([preparationId, sortOrder])
+}
+
+model SaleDocumentReplacement {
+  id                    Int                       @id @default(autoincrement())
+  branchId              Int
+  preparationId         Int
+  replacementNumber     Int
+  replacesReplacementId Int?
+  status                String                    @default("DRAFT")
+  draftKey              String?                   @unique
+  currentKey            String?                   @unique
+  reason                String
+  financialLock         Json
+  finalSnapshot         Json?
+  createdById           Int?
+  updatedById           Int?
+  lockedById            Int?
+  lockedAt              DateTime?
+  supersededAt          DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  preparation           SaleDocumentPreparation   @relation(fields: [preparationId], references: [id], onDelete: Restrict)
+  replacesReplacement   SaleDocumentReplacement?  @relation("SaleDocumentReplacementLineage", fields: [replacesReplacementId], references: [id], onDelete: Restrict)
+  replacedBy            SaleDocumentReplacement[] @relation("SaleDocumentReplacementLineage")
+  lines                 SaleDocumentReplacementLine[]
+
+  @@unique([preparationId, replacementNumber], map: "SaleDocumentReplacement_preparation_number_key")
+  @@index([branchId, preparationId, status])
+  @@index([preparationId, currentKey])
+  @@index([replacesReplacementId])
+}
+
+model SaleDocumentReplacementLine {
+  id             Int                     @id @default(autoincrement())
+  replacementId  Int
+  portion        String
+  description    String
+  quantity       Decimal                 @db.Decimal(12, 3)
+  unitName       String?
+  unitPrice      Decimal                 @db.Decimal(14, 2)
+  amount         Decimal                 @db.Decimal(14, 2)
+  lineType       String
+  sortOrder      Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  replacement    SaleDocumentReplacement @relation(fields: [replacementId], references: [id], onDelete: Cascade)
+
+  @@index([replacementId, portion, sortOrder])
 }

@@ -8,6 +8,9 @@ const {
   getOrCreatePresentationSnapshot,
 } = require('../../../document-presentation/persistentPresentationSnapshotService');
 const { getSaleQuotationReference } = require('../../lineage/saleQuotationReferenceService');
+const {
+  loadCurrentReplacementPrintProjection,
+} = require('../../document-replacement/documentReplacementPrintProjection');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -104,10 +107,6 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     fail('DELIVERY_NOTE_SALE_CANCELLED', 'A cancelled sale cannot be printed as a delivery note', 409);
   }
 
-  // Delivery Note authority is issuance-based, not payment/sale-completion based.
-  // CREDIT sales are intentionally allowed to remain DRAFT while their receivable
-  // and stock mutation are already authoritative. The deterministic document
-  // number is the signal that this Sale was issued a Delivery Note.
   if (!sale.officialDocumentNumber) {
     fail(
       'DELIVERY_NOTE_NOT_ISSUED',
@@ -116,8 +115,6 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     );
   }
 
-  // Once any source line is absorbed into a non-cancelled consolidated delivery,
-  // the original remains audit history but is no longer an active printable source.
   const consolidatedSource = await prisma.consolidatedDeliveryLine.findFirst({
     where: {
       branchId: normalizedBranchId,
@@ -134,6 +131,25 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       409,
     );
   }
+
+  const preparation = await prisma.saleDocumentPreparation.findUnique({
+    where: {
+      branchId_sourceType_sourceId: {
+        branchId: normalizedBranchId,
+        sourceType: 'SALE',
+        sourceId: String(normalizedSaleId),
+      },
+    },
+    select: { id: true, status: true },
+  });
+
+  const currentReplacement = preparation?.status === 'LOCKED'
+    ? await loadCurrentReplacementPrintProjection({
+        prisma,
+        branchId: normalizedBranchId,
+        preparationId: preparation.id,
+      })
+    : null;
 
   const purpose = await new ResolvePrintDocumentPurposeService().execute({
     branchId: normalizedBranchId,
@@ -158,7 +174,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
   });
 
-  const lines = [
+  const sourceLines = [
     ...sale.items.map((item) => mapLine({
       ...item,
       quantity: 1,
@@ -172,6 +188,10 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       productName: item.product.name,
     })),
   ];
+
+  const lines = currentReplacement?.lines?.length
+    ? currentReplacement.lines
+    : sourceLines;
 
   return Object.freeze({
     document: {
@@ -194,6 +214,13 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
         revisionNumber: quotationReference.quotationRevision,
         issuedAt: quotationReference.quotationIssuedAt,
       } : null,
+      replacement: currentReplacement ? {
+        replacementId: currentReplacement.replacementId,
+        replacementNumber: currentReplacement.replacementNumber,
+        replacesReplacementId: currentReplacement.replacesReplacementId,
+        reason: currentReplacement.reason,
+        lockedAt: currentReplacement.lockedAt,
+      } : null,
     },
     issuer: {
       id: sale.branch.id,
@@ -213,6 +240,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
     note: sale.note || null,
     lines,
+    replacementProjection: currentReplacement,
     presentationSnapshot: presentationRecord.snapshot,
   });
 };
