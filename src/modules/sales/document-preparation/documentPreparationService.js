@@ -122,6 +122,21 @@ const findPreparation = (prisma, { branchId, saleId }) => prisma.saleDocumentPre
 
 const presentPreparation = (preparation) => {
   if (!preparation) return null;
+
+  if (preparation.status === 'LOCKED' && preparation.finalSnapshot) {
+    const snapshot = preparation.finalSnapshot;
+    const snapshotLines = Array.isArray(snapshot.lines) ? snapshot.lines : [];
+    return Object.freeze({
+      ...preparation,
+      lines: snapshotLines,
+      sourceTotal: Number(snapshot.totals?.sourceTotal || snapshot.source?.totalAmount || preparation.sourceTotal || 0),
+      documentTotal: Number(snapshot.totals?.inBudgetTotal || 0),
+      inBudgetTotal: Number(snapshot.totals?.inBudgetTotal || 0),
+      outOfBudgetTotal: Number(snapshot.totals?.outOfBudgetTotal || 0),
+      taxProjection: Array.isArray(snapshot.taxProjection) ? snapshot.taxProjection : [],
+    });
+  }
+
   const lines = Array.isArray(preparation.lines) ? preparation.lines : [];
   const projection = buildPreparationTaxProjection({
     sourceTotal: Number(preparation.sourceTotal || 0),
