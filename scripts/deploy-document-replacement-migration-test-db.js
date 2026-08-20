@@ -20,7 +20,8 @@ const authority = assertTestDatabaseAuthority({
   requiresWriteApproval: true,
 });
 
-const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['prisma', 'migrate', 'deploy'], {
+const prismaCli = require.resolve('prisma/build/index.js');
+const child = spawn(process.execPath, [prismaCli, 'migrate', 'deploy'], {
   cwd: process.cwd(),
   env: {
     ...process.env,
@@ -29,6 +30,7 @@ const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['prisma',
     ALPHATECH_RUNTIME_ENV: 'TEST',
   },
   stdio: 'inherit',
+  windowsHide: true,
 });
 
 child.on('error', (error) => {
