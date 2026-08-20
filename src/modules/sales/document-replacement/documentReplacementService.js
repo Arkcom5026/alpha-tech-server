@@ -59,14 +59,18 @@ const findLockedPreparation = (prisma, { branchId, saleId }) => prisma.saleDocum
   },
 });
 
+const replacementInclude = Object.freeze({
+  lines: { orderBy: [{ portion: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] },
+});
+
 const findReplacementByDraftKey = (prisma, draftKey) => prisma.saleDocumentReplacement.findUnique({
   where: { draftKey },
-  include: { lines: { orderBy: [{ portion: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] } },
+  include: replacementInclude,
 });
 
 const findCurrentReplacement = (prisma, currentKey) => prisma.saleDocumentReplacement.findUnique({
   where: { currentKey },
-  include: { lines: { orderBy: [{ portion: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] } },
+  include: replacementInclude,
 });
 
 const loadPreparationTaxDocuments = async (prisma, { branchId, preparationId }) => prisma.taxDocument.findMany({
@@ -110,6 +114,16 @@ const seedLinesFromAuthority = ({ preparation, currentReplacement }) => {
 
 const presentReplacement = (replacement) => {
   if (!replacement) return null;
+  if (replacement.status === 'LOCKED' && replacement.finalSnapshot) {
+    const snapshotLines = Array.isArray(replacement.finalSnapshot.lines) ? replacement.finalSnapshot.lines : [];
+    const { inBudgetLines, outOfBudgetLines } = splitLines(snapshotLines);
+    return Object.freeze({
+      ...replacement,
+      lines: snapshotLines,
+      inBudgetLines,
+      outOfBudgetLines,
+    });
+  }
   const lines = Array.isArray(replacement.lines) ? replacement.lines : [];
   const { inBudgetLines, outOfBudgetLines } = splitLines(lines);
   return Object.freeze({
@@ -117,6 +131,48 @@ const presentReplacement = (replacement) => {
     lines,
     inBudgetLines,
     outOfBudgetLines,
+  });
+};
+
+const buildReplacementFinalSnapshot = ({ replacement, saleId, lockedAt, lockedById }) => {
+  const lines = Array.isArray(replacement?.lines) ? replacement.lines : [];
+  const { inBudgetLines, outOfBudgetLines } = splitLines(lines);
+  const financialCheck = assertReplacementFinancialLock({
+    financialLock: replacement.financialLock,
+    inBudgetLines,
+    outOfBudgetLines,
+  });
+
+  const snapshotLines = lines.map((line, index) => Object.freeze({
+    portion: line.portion,
+    description: String(line.description || '').trim(),
+    quantity: Number(line.quantity || 0),
+    unitName: String(line.unitName || '').trim() || null,
+    unitPrice: Number(Number(line.unitPrice || 0).toFixed(2)),
+    amount: Number(Number(line.amount || 0).toFixed(2)),
+    lineType: line.lineType,
+    sortOrder: Number.isInteger(Number(line.sortOrder)) ? Number(line.sortOrder) : index,
+  }));
+
+  return Object.freeze({
+    schemaVersion: 1,
+    replacementId: Number(replacement.id),
+    preparationId: Number(replacement.preparationId),
+    replacementNumber: Number(replacement.replacementNumber),
+    replacesReplacementId: replacement.replacesReplacementId == null ? null : Number(replacement.replacesReplacementId),
+    sourceSaleId: Number(saleId),
+    reason: replacement.reason,
+    financialLock: replacement.financialLock,
+    totals: Object.freeze({
+      sourceTotal: financialCheck.sourceTotal,
+      sourceTaxAmount: financialCheck.sourceTaxAmount,
+      inBudgetTotal: financialCheck.inBudgetTotal,
+      outOfBudgetTotal: financialCheck.outOfBudgetTotal,
+      total: financialCheck.total,
+    }),
+    lines: Object.freeze(snapshotLines),
+    lockedAt: new Date(lockedAt).toISOString(),
+    lockedById: lockedById == null ? null : Number(lockedById),
   });
 };
 
@@ -200,7 +256,7 @@ const createSaleDocumentReplacement = async ({ prisma, branchId, saleId, actorEm
             })),
           },
         },
-        include: { lines: { orderBy: [{ portion: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] } },
+        include: replacementInclude,
       });
       return Object.freeze({ replayed: false, replacement: presentReplacement(created) });
     } catch (error) {
@@ -259,11 +315,98 @@ const replaceSaleDocumentReplacementLines = async ({ prisma, branchId, saleId, a
   });
 };
 
+const lockSaleDocumentReplacement = async ({ prisma, branchId, saleId, actorEmployeeId }) => {
+  const normalizedBranchId = positiveInt(branchId, 'DOCUMENT_REPLACEMENT_BRANCH_REQUIRED', 'branchId');
+  const normalizedSaleId = positiveInt(saleId, 'DOCUMENT_REPLACEMENT_SALE_REQUIRED', 'saleId');
+  const normalizedActorId = actorEmployeeId == null ? null : positiveInt(actorEmployeeId, 'DOCUMENT_REPLACEMENT_ACTOR_INVALID', 'actorEmployeeId');
+
+  return prisma.$transaction(async (tx) => {
+    const preparation = await findLockedPreparation(tx, { branchId: normalizedBranchId, saleId: normalizedSaleId });
+    if (!preparation) fail('DOCUMENT_REPLACEMENT_PREPARATION_NOT_FOUND', 'Document preparation not found', 404);
+    if (preparation.status !== 'LOCKED' || !preparation.finalSnapshot) {
+      fail('DOCUMENT_REPLACEMENT_PREPARATION_NOT_LOCKED', 'Replacement requires a locked preparation snapshot', 409);
+    }
+
+    const draftKey = draftKeyFor(normalizedBranchId, preparation.id);
+    const currentKey = currentKeyFor(normalizedBranchId, preparation.id);
+    const draft = await findReplacementByDraftKey(tx, draftKey);
+    if (!draft) {
+      const current = await findCurrentReplacement(tx, currentKey);
+      if (current?.status === 'LOCKED') {
+        return Object.freeze({ replayed: true, replacement: presentReplacement(current), finalSnapshot: current.finalSnapshot || null });
+      }
+      fail('DOCUMENT_REPLACEMENT_DRAFT_NOT_FOUND', 'Replacement draft not found', 404);
+    }
+    if (draft.status !== 'DRAFT') fail('DOCUMENT_REPLACEMENT_LOCK_FORBIDDEN', 'Only a DRAFT replacement can be locked', 409);
+
+    const lockedAt = new Date();
+    const finalSnapshot = buildReplacementFinalSnapshot({
+      replacement: draft,
+      saleId: normalizedSaleId,
+      lockedAt,
+      lockedById: normalizedActorId,
+    });
+
+    const priorCurrent = await findCurrentReplacement(tx, currentKey);
+    if (draft.replacesReplacementId != null && priorCurrent?.id !== draft.replacesReplacementId) {
+      fail('DOCUMENT_REPLACEMENT_LINEAGE_CONFLICT', 'Current replacement changed while this draft was being prepared', 409);
+    }
+    if (draft.replacesReplacementId == null && priorCurrent) {
+      fail('DOCUMENT_REPLACEMENT_LINEAGE_CONFLICT', 'A current replacement already exists for this preparation', 409);
+    }
+
+    if (priorCurrent) {
+      const superseded = await tx.saleDocumentReplacement.updateMany({
+        where: { id: priorCurrent.id, status: 'LOCKED', currentKey },
+        data: {
+          status: 'SUPERSEDED',
+          currentKey: null,
+          supersededAt: lockedAt,
+          updatedById: normalizedActorId,
+        },
+      });
+      if (superseded.count !== 1) {
+        fail('DOCUMENT_REPLACEMENT_SUPERSEDE_CONFLICT', 'Current replacement changed during supersede', 409);
+      }
+    }
+
+    const changed = await tx.saleDocumentReplacement.updateMany({
+      where: { id: draft.id, status: 'DRAFT', draftKey, currentKey: null },
+      data: {
+        status: 'LOCKED',
+        draftKey: null,
+        currentKey,
+        finalSnapshot,
+        lockedById: normalizedActorId,
+        lockedAt,
+        updatedById: normalizedActorId,
+      },
+    });
+    if (changed.count !== 1) {
+      fail('DOCUMENT_REPLACEMENT_LOCK_CONFLICT', 'Replacement changed during lock', 409);
+    }
+
+    const locked = await findCurrentReplacement(tx, currentKey);
+    if (!locked || locked.id !== draft.id) {
+      fail('DOCUMENT_REPLACEMENT_CURRENT_AUTHORITY_FAILED', 'Locked replacement did not become current authority', 409);
+    }
+
+    return Object.freeze({
+      replayed: false,
+      replacement: presentReplacement(locked),
+      finalSnapshot,
+      supersededReplacementId: priorCurrent?.id || null,
+    });
+  });
+};
+
 module.exports = Object.freeze({
+  buildReplacementFinalSnapshot,
   createSaleDocumentReplacement,
   currentKeyFor,
   draftKeyFor,
   getSaleDocumentReplacement,
+  lockSaleDocumentReplacement,
   replaceSaleDocumentReplacementLines,
   seedLinesFromAuthority,
 });
