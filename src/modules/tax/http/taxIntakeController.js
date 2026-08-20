@@ -82,6 +82,11 @@ const getPrintableOutputTaxDocument = handle((req) => service.projectOutputTaxPr
   taxDocumentId: req.params.taxDocumentId,
 }));
 
+const refreshDraftRecipient = handle((req) => service.refreshDraftRecipient({
+  branchId: resolveBranchId(req, req.body),
+  taxDocumentId: req.params.taxDocumentId,
+  actorEmployeeId: actorEmployeeId(req),
+}));
 
 const issueOutputTaxDocument = handle((req) => service.issueOutputTaxDocument({
   branchId: resolveBranchId(req, req.body),
@@ -90,7 +95,6 @@ const issueOutputTaxDocument = handle((req) => service.issueOutputTaxDocument({
   recipient: req.body?.recipient,
   actorEmployeeId: actorEmployeeId(req),
 }));
-
 
 const issueOutputTaxCreditNote = handle((req) => service.issueOutputTaxCreditNote({
   branchId: resolveBranchId(req, req.body),
@@ -116,6 +120,7 @@ const transitionDocument = handle((req) => service.transitionTaxDocument({
 module.exports = Object.freeze({
   getDocumentDetail,
   getPrintableOutputTaxDocument,
+  refreshDraftRecipient,
   issueOutputTaxDocument,
   issueOutputTaxCreditNote,
   issueOutputTaxCreditNoteForSaleReturn,
