@@ -97,7 +97,8 @@ assert.ok(!/customerMoney|payment\.(create|update|delete)/i.test(registrationSou
 
 assert.match(issueSource, /candidate\?\.sourceType === 'DOCUMENT_PREPARATION'/);
 assert.match(issueSource, /TAX_DOCUMENT_PREPARATION_KIND_MISMATCH/);
-assert.match(issueSource, /TAX_SOURCE_SALE_PREPARATION_AUTHORITY_ACTIVE/);
+assert.match(issueSource, /TAX_SOURCE_PREPARATION_AUTHORITY_ACTIVE/);
+assert.match(issueSource, /const assertNoPreparationTaxAuthorityForSaleIds/);
 assert.match(issueSource, /sourceId: \{ startsWith: `\$\{preparation\.id\}:` \}/);
 assert.match(routesSource, /document-preparation\/tax-candidates/);
 assert.match(policySource, /sourceTaxAmount/);
