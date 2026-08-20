@@ -1,0 +1,38 @@
+model SaleDocumentPreparation {
+  id             Int                           @id @default(autoincrement())
+  branchId       Int
+  sourceType     String                        @default("SALE")
+  sourceId       String
+  status         String                        @default("DRAFT")
+  sourceTotal    Decimal                       @db.Decimal(14, 2)
+  documentTotal  Decimal                       @default(0) @db.Decimal(14, 2)
+  agencyContext  Json?
+  finalSnapshot  Json?
+  createdById    Int?
+  updatedById    Int?
+  lockedById     Int?
+  lockedAt       DateTime?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  lines          SaleDocumentPreparationLine[]
+
+  @@unique([branchId, sourceType, sourceId], map: "SaleDocumentPreparation_branch_source_key")
+  @@index([branchId, status, updatedAt])
+  @@index([branchId, sourceType, sourceId])
+}
+
+model SaleDocumentPreparationLine {
+  id             Int                     @id @default(autoincrement())
+  preparationId  Int
+  description    String
+  quantity       Decimal                 @db.Decimal(12, 3)
+  unitName       String?
+  unitPrice      Decimal                 @db.Decimal(14, 2)
+  amount         Decimal                 @db.Decimal(14, 2)
+  sortOrder      Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  preparation    SaleDocumentPreparation @relation(fields: [preparationId], references: [id], onDelete: Cascade)
+
+  @@index([preparationId, sortOrder])
+}
