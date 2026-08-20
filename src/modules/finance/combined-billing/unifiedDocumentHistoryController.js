@@ -10,6 +10,9 @@ const {
 const PURPOSES = new Set(['BILL', 'DELIVERY_NOTE']);
 const CONSOLIDATED_SOURCE_TYPE = 'CONSOLIDATED_DELIVERY';
 const SALE_SOURCE_TYPE = 'SALE';
+const TAX_DOCUMENT_SOURCE_TYPE = 'TAX_DOCUMENT';
+const OUTPUT_TAX_FULL_SOURCE_KIND = 'OUTPUT_TAX_FULL';
+const OUTPUT_TAX_SHORT_SOURCE_KIND = 'OUTPUT_TAX_SHORT';
 
 const positive = (value) => {
   const parsed = Number(value);
@@ -62,6 +65,16 @@ const buildCombinedKeywordWhere = (keyword) => {
   };
 };
 
+const normalizeTaxKind = (document) => String(
+  document?.taxInvoiceKind || document?.snapshot?.requiredTaxInvoiceKind || '',
+).trim().toUpperCase();
+
+const taxSourceKind = (document) => (
+  normalizeTaxKind(document) === 'SHORT'
+    ? OUTPUT_TAX_SHORT_SOURCE_KIND
+    : OUTPUT_TAX_FULL_SOURCE_KIND
+);
+
 const projectSaleRow = ({ sale, payment, taxDocument }) => {
   const totalAmount = round2(toNum(sale.totalAmount));
   const storedPaid = sale.paidAmount == null ? null : toNum(sale.paidAmount);
@@ -71,6 +84,7 @@ const projectSaleRow = ({ sale, payment, taxDocument }) => {
 
   return {
     id: sale.id,
+    rowKind: 'SALE_RECEIPT',
     code: sale.code,
     officialDocumentNumber: sale.officialDocumentNumber || null,
     createdAt: sale.createdAt,
@@ -103,6 +117,7 @@ const projectCombinedRow = ({ document, taxDocument }) => {
   const totalAmount = round2(toNum(document.totalAmount));
   return {
     id: `combined-${document.id}`,
+    rowKind: 'CONSOLIDATED_BILLING',
     code: document.code,
     officialDocumentNumber: document.code,
     createdAt: document.createdAt || document.issueDate,
@@ -131,6 +146,59 @@ const projectCombinedRow = ({ document, taxDocument }) => {
   };
 };
 
+const projectTaxDocumentRow = (document) => {
+  const snapshot = document?.snapshot && typeof document.snapshot === 'object'
+    ? document.snapshot
+    : {};
+  const recipient = snapshot?.recipient && typeof snapshot.recipient === 'object'
+    ? snapshot.recipient
+    : {};
+  const issued = String(document?.status || '').toUpperCase() === 'REGISTERED'
+    && Boolean(document?.issuedDocumentNumber);
+  const kind = normalizeTaxKind(document);
+  const totalAmount = round2(toNum(document?.totalAmount));
+  const counterpartyName = snapshot?.counterpartyName || recipient?.legalName || '-';
+  const sourceDocumentNo = document?.candidate?.sourceDocumentNo || document?.documentNumber || null;
+
+  return {
+    id: `tax-${document.id}`,
+    rowKind: taxSourceKind(document),
+    code: issued ? document.issuedDocumentNumber : (sourceDocumentNo || document.documentNumber || `Tax #${document.id}`),
+    draftDocumentNumber: document.documentNumber || sourceDocumentNo || null,
+    issuedTaxDocumentNumber: document.issuedDocumentNumber || null,
+    createdAt: document.issuedAt || document.occurredAt || document.createdAt,
+    soldAt: document.occurredAt || document.createdAt,
+    totalAmount,
+    grossAmount: totalAmount,
+    paidAmount: totalAmount,
+    balanceAmount: 0,
+    changeAmount: 0,
+    paid: issued,
+    hasPayment: issued,
+    isFullyPaid: issued,
+    isPartiallyPaid: false,
+    customerName: counterpartyName,
+    companyName: counterpartyName,
+    customerPhone: '',
+    status: document.status,
+    documentStatus: document.status,
+    documentType: document.documentType,
+    taxInvoiceKind: kind || null,
+    taxDocumentId: document.id,
+    sourceDocumentNo,
+    sourceType: document?.candidate?.sourceType || null,
+    sourceId: document?.candidate?.sourceId || null,
+    sourceSaleId: positive(snapshot?.sourceSaleId),
+    sourceSaleCode: snapshot?.sourceSaleCode || null,
+    sourceDeliveryNoteNumber: snapshot?.sourceDeliveryNoteNumber || null,
+    counterpartyTaxId: document.counterpartyTaxId || snapshot?.counterpartyTaxId || recipient?.taxId || null,
+    documentSourceType: TAX_DOCUMENT_SOURCE_TYPE,
+    documentSourceId: document.id,
+    canManageTaxDocument: !issued,
+    canPrintTaxDocument: issued,
+  };
+};
+
 const aggregatePayments = (payments) => {
   const bySaleId = new Map();
   for (const payment of payments) {
@@ -151,6 +219,22 @@ const aggregatePayments = (payments) => {
     bySaleId.set(payment.saleId, current);
   }
   return bySaleId;
+};
+
+const taxRowMatchesKeyword = (row, keyword) => {
+  const value = String(keyword || '').trim().toLowerCase();
+  if (!value) return true;
+  return [
+    row.code,
+    row.draftDocumentNumber,
+    row.issuedTaxDocumentNumber,
+    row.sourceDocumentNo,
+    row.sourceSaleCode,
+    row.sourceDeliveryNoteNumber,
+    row.customerName,
+    row.counterpartyTaxId,
+    row.sourceId,
+  ].some((candidate) => String(candidate || '').toLowerCase().includes(value));
 };
 
 const unifiedDocumentHistory = async (req, res, next) => {
@@ -186,8 +270,6 @@ const unifiedDocumentHistory = async (req, res, next) => {
     });
     const consumedSaleIds = consumedSourceRows.map((row) => row.sourceSaleId);
 
-    // Once a source Delivery Note enters a non-cancelled consolidated document,
-    // the original stays auditable but leaves the active print history.
     const consumedSourceExclusion = consumedSaleIds.length
       ? { id: { notIn: consumedSaleIds } }
       : {};
@@ -197,8 +279,6 @@ const unifiedDocumentHistory = async (req, res, next) => {
       status: { not: 'CANCELLED' },
       ...consumedSourceExclusion,
       ...(purpose === 'DELIVERY_NOTE' ? {
-        // Delivery Note eligibility follows issuance identity, not Sale payment
-        // completion. Credit sales may validly remain DRAFT while already issued.
         officialDocumentNumber: { not: null },
       } : {}),
       ...buildSaleKeywordWhere(keyword),
@@ -213,7 +293,15 @@ const unifiedDocumentHistory = async (req, res, next) => {
       ...buildDateWhere(dateQuery, 'issueDate'),
     };
 
-    const [sales, combinedDocuments] = await Promise.all([
+    const taxWhere = purpose === 'BILL'
+      ? {
+          branchId,
+          documentType: 'OUTPUT_TAX_INVOICE',
+          ...buildDateWhere(dateQuery, 'occurredAt'),
+        }
+      : null;
+
+    const [sales, combinedDocuments, taxDocuments] = await Promise.all([
       prisma.sale.findMany({
         where: saleWhere,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -242,6 +330,36 @@ const unifiedDocumentHistory = async (req, res, next) => {
           employee: { select: { name: true } },
         },
       }),
+      taxWhere
+        ? prisma.taxDocument.findMany({
+            where: taxWhere,
+            orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+            take: Math.min(Math.max(limit * 3, 100), 500),
+            select: {
+              id: true,
+              documentType: true,
+              documentNumber: true,
+              counterpartyTaxId: true,
+              status: true,
+              issuedAt: true,
+              occurredAt: true,
+              createdAt: true,
+              subtotalAmount: true,
+              taxAmount: true,
+              totalAmount: true,
+              snapshot: true,
+              taxInvoiceKind: true,
+              issuedDocumentNumber: true,
+              candidate: {
+                select: {
+                  sourceType: true,
+                  sourceId: true,
+                  sourceDocumentNo: true,
+                },
+              },
+            },
+          })
+        : [],
     ]);
 
     const saleIds = sales.map((sale) => sale.id);
@@ -303,7 +421,11 @@ const unifiedDocumentHistory = async (req, res, next) => {
       taxDocument: combinedTaxBySourceId.get(String(document.id)) || null,
     }));
 
-    const rows = [...saleRows, ...combinedRows]
+    const taxRows = purpose === 'BILL'
+      ? taxDocuments.map(projectTaxDocumentRow).filter((row) => taxRowMatchesKeyword(row, keyword))
+      : [];
+
+    const rows = [...saleRows, ...combinedRows, ...taxRows]
       .sort((left, right) => new Date(right.createdAt || right.soldAt || 0) - new Date(left.createdAt || left.soldAt || 0))
       .slice(0, limit);
 
@@ -317,8 +439,13 @@ module.exports = {
   unifiedDocumentHistory,
   projectSaleRow,
   projectCombinedRow,
+  projectTaxDocumentRow,
+  taxRowMatchesKeyword,
   aggregatePayments,
   PURPOSES,
   CONSOLIDATED_SOURCE_TYPE,
   SALE_SOURCE_TYPE,
+  TAX_DOCUMENT_SOURCE_TYPE,
+  OUTPUT_TAX_FULL_SOURCE_KIND,
+  OUTPUT_TAX_SHORT_SOURCE_KIND,
 };
