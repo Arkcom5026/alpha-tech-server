@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const finite = (value) => Number.isFinite(Number(value));
 
 export const percentile = (values, quantile) => {
@@ -26,7 +28,8 @@ const average = (values) => {
 };
 
 const endpointKey = (item) => `${item.method} ${item.path}`;
-const exactTargetKey = (item) => `${item.method} ${item.target || item.path}`;
+const fingerprint = (value) => createHash('sha256').update(String(value || '')).digest('hex').slice(0, 12);
+const exactTargetKey = (item) => `${item.method} ${item.path} target=${fingerprint(item.target || item.path)}`;
 
 const buildEndpointMetrics = (requests) => {
   const groups = new Map();
@@ -76,10 +79,12 @@ const buildExactRepeatMetrics = (requests, thresholdMs = 2000) => {
   const candidates = [];
   for (const item of requests) {
     if (!item?.timestamp || !item?.method || !item?.path) continue;
+    const targetIdentity = item.target || item.path;
     const key = exactTargetKey(item);
+    const previousKey = `${item.method} ${targetIdentity}`;
     const currentMs = Date.parse(item.timestamp);
     if (!Number.isFinite(currentMs)) continue;
-    const previous = previousByTarget.get(key);
+    const previous = previousByTarget.get(previousKey);
     if (previous) {
       const gapMs = currentMs - previous.timeMs;
       if (gapMs >= 0 && gapMs <= thresholdMs) {
@@ -93,7 +98,7 @@ const buildExactRepeatMetrics = (requests, thresholdMs = 2000) => {
         });
       }
     }
-    previousByTarget.set(key, {
+    previousByTarget.set(previousKey, {
       timeMs: currentMs,
       timestamp: item.timestamp,
       requestId: item.requestId,
