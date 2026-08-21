@@ -88,13 +88,30 @@ const refreshDraftRecipient = handle((req) => service.refreshDraftRecipient({
   actorEmployeeId: actorEmployeeId(req),
 }));
 
-const issueOutputTaxDocument = handle((req) => service.issueOutputTaxDocument({
-  branchId: resolveBranchId(req, req.body),
-  taxDocumentId: req.params.taxDocumentId,
-  taxInvoiceKind: req.body?.taxInvoiceKind,
-  recipient: req.body?.recipient,
-  actorEmployeeId: actorEmployeeId(req),
-}));
+const issueOutputTaxDocument = async (req, res, next) => {
+  let branchId = null;
+  try {
+    branchId = resolveBranchId(req, req.body);
+    const result = await service.issueOutputTaxDocument({
+      branchId,
+      taxDocumentId: req.params.taxDocumentId,
+      taxInvoiceKind: req.body?.taxInvoiceKind,
+      recipient: req.body?.recipient,
+      actorEmployeeId: actorEmployeeId(req),
+    });
+    return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || error?.status) || 500;
+    console.warn('[tax.issue] rejected', {
+      code: error?.code || 'TAX_ISSUE_FAILED',
+      statusCode,
+      branchId: Number(branchId) || Number(req.user?.branchId) || null,
+      taxDocumentId: Number(req.params?.taxDocumentId) || null,
+      taxInvoiceKind: String(req.body?.taxInvoiceKind || '').trim().toUpperCase() || null,
+    });
+    return next(error);
+  }
+};
 
 const issueOutputTaxCreditNote = handle((req) => service.issueOutputTaxCreditNote({
   branchId: resolveBranchId(req, req.body),

@@ -4,7 +4,7 @@ const generationService = require('../generation/generateMissingBarcodesService'
 async function getBarcodesByReceiptId({ receiptId, branchId, kind, onlyUnscanned, onlyUnactivated, includeFallback }) {
   const anyExisting = await repository.findAnyBarcode(receiptId, branchId);
   if (!anyExisting) {
-    await generationService.generateMissingBarcodes({
+    await generationService.executeGenerateMissingBarcodes({
       receiptId,
       branchId,
       dryRun: false,
