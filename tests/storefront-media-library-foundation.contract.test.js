@@ -50,7 +50,13 @@ const run = async () => {
     },
   };
 
-  const service = createStorefrontMediaService({ cloudinaryClient: fakeCloudinary });
+  const repository = {
+    async findExperienceUsageByBranchId(branchId) {
+      assert.strictEqual(branchId, 13);
+      return { contentConfiguration: null, publishedContentConfiguration: null };
+    },
+  };
+  const service = createStorefrontMediaService({ cloudinaryClient: fakeCloudinary, repository });
   const result = await service.list({
     branchId: 13,
     purpose: 'store_hero',
@@ -72,6 +78,8 @@ const run = async () => {
   assert.strictEqual(result.assets[0].purpose, 'STORE_HERO');
   assert.strictEqual(result.assets[0].publicId, 'stores/branch-13/hero/hero-1');
   assert.strictEqual(result.assets[0].createdAt, '2026-08-06T10:00:00Z');
+  assert.strictEqual(result.assets[0].usage.state, 'UNUSED');
+  assert.strictEqual(result.assets[0].deletable, false);
   assert.strictEqual(result.nextCursor, 'cursor-2');
 
   await assert.rejects(
@@ -91,6 +99,7 @@ const run = async () => {
         },
       },
     },
+    repository,
   });
   await assert.rejects(
     () => failingService.list({ branchId: 13 }),
