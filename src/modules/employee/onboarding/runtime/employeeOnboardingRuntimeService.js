@@ -5,6 +5,7 @@ const repository = require('./employeeOnboardingRuntimeRepository');
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
 const normalizeUpper = (value) => normalize(value).toUpperCase();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const toPositiveInt = (value) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -53,6 +54,13 @@ const addSubEmployee = async (req, res) => {
       return res.status(400).json({
         code: 'EMPLOYEE_ONBOARDING_FIELDS_REQUIRED',
         message: 'กรุณากรอกชื่อ อีเมล รหัสผ่าน บทบาทในร้าน และตำแหน่งงานให้ครบถ้วน',
+      });
+    }
+
+    if (!EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_EMAIL_INVALID',
+        message: 'กรุณากรอกอีเมลสำหรับเข้าสู่ระบบให้ถูกต้อง',
       });
     }
 
@@ -145,6 +153,14 @@ const addSubEmployee = async (req, res) => {
       },
     });
   } catch (error) {
+    if (repository.isUniqueConstraintError?.(error)) {
+      return res.status(409).json({
+        ok: false,
+        code: 'EMPLOYEE_EMAIL_ALREADY_EXISTS',
+        message: 'อีเมลนี้ถูกลงทะเบียนใช้งานในระบบแล้ว',
+      });
+    }
+
     console.error('❌ employee onboarding error:', error);
     return res.status(500).json({
       ok: false,
