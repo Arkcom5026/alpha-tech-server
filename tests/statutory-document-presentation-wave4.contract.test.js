@@ -27,7 +27,7 @@ assert.match(service, /recipientSnapshot:\s*taxDocument\.recipientSnapshot \|\| 
 assert.match(service, /status !== 'REGISTERED'/);
 assert.match(service, /documentHeaderConfig:\s*true/);
 
-assert.match(routes, /router\.get\('\/documents\/:taxDocumentId\/presentation', getStatutoryTaxPresentation\)/);
+assert.match(routes, /router\.get\('\/documents\/:taxDocumentId\/presentation', allowOutputTaxRead, getStatutoryTaxPresentation\)/);
 assert.match(controller, /authenticatedBranchId = positiveInt\(req\.user\?\.branchId\)/);
 assert.match(controller, /requestedBranchId && requestedBranchId !== authenticatedBranchId/);
 assert.match(controller, /status\(403\).*TAX_BRANCH_FORBIDDEN/);
