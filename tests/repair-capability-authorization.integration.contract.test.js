@@ -10,6 +10,9 @@ const assert = (condition, message) => {
 const authorization = read(
   'src/modules/repair/middlewares/repairAuthorization.js'
 );
+const positionAuthority = read(
+  'src/modules/employee/authorization/employeePositionAuthority.js'
+);
 const routes = read('src/modules/repair/routes/repairRoutes.js');
 
 const requiredCapabilities = [
@@ -25,14 +28,25 @@ const requiredCapabilities = [
 
 for (const capability of requiredCapabilities) {
   assert(
-    authorization.includes(`'${capability}'`),
+    authorization.includes(`'${capability}'`) || positionAuthority.includes(`'${capability}'`),
     `Missing Repair capability: ${capability}`
   );
 }
 
 assert(
-  authorization.includes('repairCapabilities: resolveRepairCapabilities(v2Role)'),
-  'Employee context must publish resolved Repair capabilities'
+  authorization.includes("require('../../employee/authorization/employeePositionAuthority')") &&
+    authorization.includes('resolveActorCapabilities(actor)'),
+  'Repair runtime must resolve authority through the centralized Position authority boundary'
+);
+assert(
+  authorization.includes('capabilities: true') &&
+    authorization.includes('positionCapabilities') &&
+    authorization.includes('repairCapabilities: repairAuthority.capabilities'),
+  'Employee context must refresh Position capabilities and publish filtered Repair capabilities'
+);
+assert(
+  authorization.includes("positionAuthorityMode: repairAuthority.mode"),
+  'Repair runtime must expose whether authority came from Position or compatibility fallback'
 );
 assert(
   authorization.includes('missingCapabilities'),
@@ -42,14 +56,19 @@ assert(
   authorization.includes('TECHNICIAN: Object.freeze([') &&
     authorization.includes('REPAIR_CAPABILITY.WORKFLOW') &&
     authorization.includes('REPAIR_CAPABILITY.PARTS'),
-  'Technician profile must receive workflow and parts capabilities'
+  'Legacy technician compatibility matrix must remain available during migration'
 );
 assert(
   authorization.includes('CASHIER: Object.freeze([') &&
     authorization.includes('REPAIR_CAPABILITY.INTAKE') &&
     authorization.includes('REPAIR_CAPABILITY.ESTIMATE') &&
     authorization.includes('REPAIR_CAPABILITY.CLAIM'),
-  'Cashier profile must receive intake, estimate, and claim capabilities'
+  'Legacy cashier compatibility matrix must remain available during migration'
+);
+assert(
+  positionAuthority.includes("REPAIR_WORKFLOW: 'repair.workflow'") &&
+    positionAuthority.includes("REPAIR_PARTS: 'repair.parts'"),
+  'Repair capabilities must be first-class Position capabilities'
 );
 
 assert(
