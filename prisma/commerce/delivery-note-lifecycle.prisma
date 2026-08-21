@@ -1,0 +1,87 @@
+enum DeliveryNoteDocumentState {
+  CURRENT
+  SUPERSEDED
+  CONSOLIDATED
+  CANCELLED
+}
+
+enum DeliveryNoteRevisionKind {
+  ORIGINAL
+  RETURN_ADJUSTMENT
+}
+
+enum DeliveryNoteSourceLineType {
+  STOCK
+  SIMPLE
+}
+
+model DeliveryNoteDocument {
+  id                 Int                       @id @default(autoincrement())
+  branchId           Int
+  saleId             Int
+  documentNumber     String                    @unique
+  revisionNumber     Int
+  revisionKind       DeliveryNoteRevisionKind
+  state              DeliveryNoteDocumentState @default(CURRENT)
+  replacesDocumentId Int?                      @unique
+  currentKey         String?                   @unique
+  grossAmount        Decimal                   @db.Decimal(12, 2)
+  returnedAmount     Decimal                   @default(0) @db.Decimal(12, 2)
+  activeAmount       Decimal                   @db.Decimal(12, 2)
+  issuedAt           DateTime                  @default(now())
+  supersededAt       DateTime?
+  consolidatedAt     DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdById        Int
+  snapshot           Json
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  replacesDocument   DeliveryNoteDocument?              @relation("DeliveryNoteRevisionChain", fields: [replacesDocumentId], references: [id], onDelete: Restrict)
+  successorDocument  DeliveryNoteDocument?               @relation("DeliveryNoteRevisionChain")
+  lines              DeliveryNoteDocumentLine[]
+  returnSources      DeliveryNoteDocumentReturnSource[]
+
+  @@unique([branchId, saleId, revisionNumber])
+  @@index([branchId, saleId, state])
+  @@index([branchId, issuedAt])
+  @@index([saleId, revisionNumber])
+}
+
+model DeliveryNoteDocumentLine {
+  id                     Int                        @id @default(autoincrement())
+  deliveryNoteDocumentId Int
+  sourceLineType         DeliveryNoteSourceLineType
+  sourceLineId           Int
+  description            String
+  originalQuantity       Decimal                    @db.Decimal(12, 2)
+  returnedQuantity       Decimal                    @default(0) @db.Decimal(12, 2)
+  activeQuantity         Decimal                    @db.Decimal(12, 2)
+  unitAmount             Decimal                    @db.Decimal(12, 2)
+  originalAmount         Decimal                    @db.Decimal(12, 2)
+  returnedAmount         Decimal                    @default(0) @db.Decimal(12, 2)
+  activeAmount           Decimal                    @db.Decimal(12, 2)
+  sortOrder              Int                        @default(0)
+  snapshot               Json?
+  createdAt              DateTime                   @default(now())
+
+  deliveryNoteDocument DeliveryNoteDocument @relation(fields: [deliveryNoteDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryNoteDocumentId, sourceLineType, sourceLineId])
+  @@index([sourceLineType, sourceLineId])
+}
+
+model DeliveryNoteDocumentReturnSource {
+  id                     Int      @id @default(autoincrement())
+  deliveryNoteDocumentId Int
+  saleReturnId           Int
+  returnedAt             DateTime
+  snapshot               Json?
+  createdAt              DateTime @default(now())
+
+  deliveryNoteDocument DeliveryNoteDocument @relation(fields: [deliveryNoteDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryNoteDocumentId, saleReturnId])
+  @@index([saleReturnId])
+}
