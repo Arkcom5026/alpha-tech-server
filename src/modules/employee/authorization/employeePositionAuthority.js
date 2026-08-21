@@ -31,6 +31,10 @@ const POSITION_CAPABILITIES = Object.freeze({
   SALES_COMPLETE: 'sales.complete',
   SALES_RETURN: 'sales.return',
   SALES_RETURN_DEDUCTION_APPROVE: 'sales.return.deduction-approve',
+  SALES_PAYMENT_READ: 'sales.payment.read',
+  SALES_PAYMENT_MANAGE: 'sales.payment.manage',
+  SALES_PAYMENT_CANCEL: 'sales.payment.cancel',
+  SALES_SETTLEMENT_CLOSE: 'sales.settlement.close',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -71,6 +75,10 @@ const SALES_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.SALES_CORE,
   POSITION_CAPABILITIES.SALES_COMPLETE,
   POSITION_CAPABILITIES.SALES_RETURN,
+  POSITION_CAPABILITIES.SALES_PAYMENT_READ,
+  POSITION_CAPABILITIES.SALES_PAYMENT_MANAGE,
+  POSITION_CAPABILITIES.SALES_PAYMENT_CANCEL,
+  POSITION_CAPABILITIES.SALES_SETTLEMENT_CLOSE,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();

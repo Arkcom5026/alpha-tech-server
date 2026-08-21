@@ -21,6 +21,7 @@ const { getAllSales, getAllSalesReturn, getSaleById, searchPrintableSales } = re
 const { searchSaleItemsController } = require('../item-search/controllers/saleItemSearchController');
 const { getSaleQuotationReferenceController } = require('../lineage/saleQuotationReferenceController');
 const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementController');
+const { requireSaleSettlementClose } = require('../settlement/shared/saleSettlementAuthorization');
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 const posHeldCartRoutes = require('../held-cart/routes/posHeldCartRoutes');
 const quotationRoutes = require('../../quotation/http/quotationRoutes');
@@ -62,6 +63,6 @@ router.get('/:id/delivery-note', getSaleDeliveryNote);
 router.get('/:id/quotation-reference', getSaleQuotationReferenceController);
 router.put('/:id/document-descriptions', updateSaleDocumentLinesController);
 router.get('/:id', allowSalesCore, getSaleById);
-router.post('/:id/mark-paid', markSaleAsPaid);
+router.post('/:id/mark-paid', requireSaleSettlementClose, markSaleAsPaid);
 
 module.exports = router;
