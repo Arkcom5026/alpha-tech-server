@@ -12,6 +12,7 @@ const EMPLOYEE_MANAGE = POSITION_CAPABILITIES.EMPLOYEE_MANAGE
 const REPAIR_INTAKE = POSITION_CAPABILITIES.REPAIR_INTAKE
 const REPAIR_WORKFLOW = POSITION_CAPABILITIES.REPAIR_WORKFLOW
 const REPAIR_PARTS = POSITION_CAPABILITIES.REPAIR_PARTS
+const REPAIR_CUSTOMER_OVERRIDE = POSITION_CAPABILITIES.REPAIR_CUSTOMER_OVERRIDE
 
 {
   const legacyManager = resolveActorCapabilities({
@@ -56,9 +57,19 @@ assert.equal(
   'legacy CASHIER must not gain repair workflow authority',
 )
 assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, REPAIR_CUSTOMER_OVERRIDE),
+  false,
+  'legacy CASHIER must not gain customer ownership override authority',
+)
+assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [REPAIR_WORKFLOW] }, REPAIR_WORKFLOW),
   true,
   'migrated position must be able to grant repair workflow independent of v2Role',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [REPAIR_CUSTOMER_OVERRIDE] }, REPAIR_CUSTOMER_OVERRIDE),
+  true,
+  'migrated position must be able to grant customer ownership override independent of v2Role',
 )
 assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: null }, REPAIR_WORKFLOW),
