@@ -1,4 +1,4 @@
-const { prisma } = require('../../../../../lib/prisma');
+const { prisma, Prisma } = require('../../../../../lib/prisma');
 
 const findUserByEmail = (email) => prisma.user.findUnique({
   where: { email },
@@ -28,6 +28,9 @@ const createCustomerProfile = (data, tx = prisma) => tx.customerProfile.create({
 
 const runTransaction = (work) => prisma.$transaction(work);
 
+const isUniqueConstraintError = (error) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
 module.exports = {
   findUserByEmail,
   findPositionForBranch,
@@ -35,4 +38,5 @@ module.exports = {
   createEmployeeProfile,
   createCustomerProfile,
   runTransaction,
+  isUniqueConstraintError,
 };
