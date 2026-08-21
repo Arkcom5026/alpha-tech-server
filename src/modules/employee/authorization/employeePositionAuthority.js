@@ -20,6 +20,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   INVENTORY_QUICK_RECEIPT_FINALIZE: 'inventory.quick-receipt.finalize',
   PROCUREMENT_RECEIPT: 'procurement.receipt',
   PROCUREMENT_RECEIPT_FINALIZE: 'procurement.receipt.finalize',
+  PROCUREMENT_PURCHASE_ORDER: 'procurement.purchase-order',
+  PROCUREMENT_PURCHASE_ORDER_CONTROL: 'procurement.purchase-order.control',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -49,6 +51,8 @@ const INVENTORY_CAPABILITIES = Object.freeze([
 const PROCUREMENT_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.PROCUREMENT_RECEIPT,
   POSITION_CAPABILITIES.PROCUREMENT_RECEIPT_FINALIZE,
+  POSITION_CAPABILITIES.PROCUREMENT_PURCHASE_ORDER,
+  POSITION_CAPABILITIES.PROCUREMENT_PURCHASE_ORDER_CONTROL,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
