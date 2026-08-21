@@ -5,6 +5,7 @@ const repository = require('./employeeOnboardingRuntimeRepository');
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
 const normalizeUpper = (value) => normalize(value).toUpperCase();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const toPositiveInt = (value) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -56,10 +57,17 @@ const addSubEmployee = async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (!EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_EMAIL_INVALID',
+        message: 'กรุณากรอกอีเมลสำหรับเข้าสู่ระบบให้ถูกต้อง',
+      });
+    }
+
+    if (password.length < 8) {
       return res.status(400).json({
         code: 'EMPLOYEE_PASSWORD_TOO_SHORT',
-        message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
+        message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 8 ตัวอักษร',
       });
     }
 
@@ -72,7 +80,7 @@ const addSubEmployee = async (req, res) => {
 
     const [existingUser, position] = await Promise.all([
       repository.findUserByEmail(email),
-      repository.findPositionById(positionId),
+      repository.findPositionForBranch({ id: positionId, branchId }),
     ]);
 
     if (existingUser) {
@@ -85,7 +93,7 @@ const addSubEmployee = async (req, res) => {
     if (!position) {
       return res.status(400).json({
         code: 'EMPLOYEE_POSITION_NOT_FOUND',
-        message: 'ไม่พบตำแหน่งงานที่เลือก กรุณาโหลดรายการตำแหน่งใหม่',
+        message: 'ไม่พบตำแหน่งงานที่ใช้งานได้ในสาขาปัจจุบัน กรุณาโหลดรายการตำแหน่งใหม่',
       });
     }
 
@@ -145,6 +153,14 @@ const addSubEmployee = async (req, res) => {
       },
     });
   } catch (error) {
+    if (repository.isUniqueConstraintError?.(error)) {
+      return res.status(409).json({
+        ok: false,
+        code: 'EMPLOYEE_EMAIL_ALREADY_EXISTS',
+        message: 'อีเมลนี้ถูกลงทะเบียนใช้งานในระบบแล้ว',
+      });
+    }
+
     console.error('❌ employee onboarding error:', error);
     return res.status(500).json({
       ok: false,
