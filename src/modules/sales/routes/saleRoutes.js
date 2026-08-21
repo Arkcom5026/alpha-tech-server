@@ -5,6 +5,10 @@ const { createSale } = require('../create/controllers/saleLegacyCreateController
 const { updateSaleDocumentLinesController } = require('../documents/controllers/saleDocumentController');
 const { getSaleDeliveryNote, issueSaleDeliveryNoteController } = require('../documents/controllers/saleDeliveryNoteController');
 const {
+  SALES_DOCUMENT_CAPABILITY,
+  allowSalesDocumentCapabilities,
+} = require('../documents/shared/salesDocumentAuthorization');
+const {
   createSaleDocumentPreparationController,
   getSaleDocumentPreparationController,
   lockSaleDocumentPreparationController,
@@ -36,6 +40,24 @@ const allowSalesCompletion = allowSalesCapabilities(
   SALES_CAPABILITY.CORE,
   SALES_CAPABILITY.COMPLETE,
 );
+const allowDocumentPreparation = allowSalesDocumentCapabilities(
+  SALES_DOCUMENT_CAPABILITY.PREPARE,
+);
+const allowDocumentPreparationLock = allowSalesDocumentCapabilities(
+  SALES_DOCUMENT_CAPABILITY.PREPARE,
+  SALES_DOCUMENT_CAPABILITY.LOCK,
+);
+const allowDocumentTaxPublish = allowSalesDocumentCapabilities(
+  SALES_DOCUMENT_CAPABILITY.PREPARE,
+  SALES_DOCUMENT_CAPABILITY.TAX_PUBLISH,
+);
+const allowDocumentReplacement = allowSalesDocumentCapabilities(
+  SALES_DOCUMENT_CAPABILITY.REPLACE,
+);
+const allowDocumentReplacementLock = allowSalesDocumentCapabilities(
+  SALES_DOCUMENT_CAPABILITY.REPLACE,
+  SALES_DOCUMENT_CAPABILITY.LOCK,
+);
 
 router.use(verifyToken);
 router.use('/quotations', quotationRoutes);
@@ -48,20 +70,20 @@ router.get('/', allowSalesCore, getAllSales);
 router.get('/return', allowSalesCore, getAllSalesReturn);
 router.get('/printable', allowSalesCore, searchPrintableSales);
 router.get('/printable-sales', allowSalesCore, searchPrintableSales);
-router.post('/:id/document-preparation', createSaleDocumentPreparationController);
-router.get('/:id/document-preparation', getSaleDocumentPreparationController);
-router.put('/:id/document-preparation/lines', replaceSaleDocumentPreparationLinesController);
-router.post('/:id/document-preparation/lock', lockSaleDocumentPreparationController);
-router.post('/:id/document-preparation/tax-candidates', registerSaleDocumentPreparationTaxCandidatesController);
-router.post('/:id/document-replacement', createSaleDocumentReplacementController);
-router.get('/:id/document-replacement', getSaleDocumentReplacementController);
-router.put('/:id/document-replacement/lines', replaceSaleDocumentReplacementLinesController);
-router.post('/:id/document-replacement/lock', lockSaleDocumentReplacementController);
-router.put('/:id/document-lines', updateSaleDocumentLinesController);
+router.post('/:id/document-preparation', allowDocumentPreparation, createSaleDocumentPreparationController);
+router.get('/:id/document-preparation', allowDocumentPreparation, getSaleDocumentPreparationController);
+router.put('/:id/document-preparation/lines', allowDocumentPreparation, replaceSaleDocumentPreparationLinesController);
+router.post('/:id/document-preparation/lock', allowDocumentPreparationLock, lockSaleDocumentPreparationController);
+router.post('/:id/document-preparation/tax-candidates', allowDocumentTaxPublish, registerSaleDocumentPreparationTaxCandidatesController);
+router.post('/:id/document-replacement', allowDocumentReplacement, createSaleDocumentReplacementController);
+router.get('/:id/document-replacement', allowDocumentReplacement, getSaleDocumentReplacementController);
+router.put('/:id/document-replacement/lines', allowDocumentReplacement, replaceSaleDocumentReplacementLinesController);
+router.post('/:id/document-replacement/lock', allowDocumentReplacementLock, lockSaleDocumentReplacementController);
+router.put('/:id/document-lines', allowDocumentPreparation, updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
 router.get('/:id/quotation-reference', getSaleQuotationReferenceController);
-router.put('/:id/document-descriptions', updateSaleDocumentLinesController);
+router.put('/:id/document-descriptions', allowDocumentPreparation, updateSaleDocumentLinesController);
 router.get('/:id', allowSalesCore, getSaleById);
 router.post('/:id/mark-paid', requireSaleSettlementClose, markSaleAsPaid);
 
