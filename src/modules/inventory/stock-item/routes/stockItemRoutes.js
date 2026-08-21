@@ -10,12 +10,18 @@ const querySlices = require('../query/stockItemQuerySlices')
 const {
   normalizeStockItemReceivePayload,
 } = require('../receive/normalizeStockItemReceivePayload')
+const {
+  STOCK_ITEM_CAPABILITY,
+  allowStockItemCapabilities,
+} = require('../shared/stockItemAuthorization')
 
 const router = express.Router()
 
 router.use(verifyToken)
 
-router.post('/', receiptSlices.addStockItemFromReceipt)
+const allowInventoryReceive = allowStockItemCapabilities(STOCK_ITEM_CAPABILITY.RECEIVE)
+
+router.post('/', allowInventoryReceive, receiptSlices.addStockItemFromReceipt)
 router.patch('/mark-sold', lifecycleSlices.markStockItemsAsSold)
 router.get('/by-receipt/:receiptId', receiptSlices.getStockItemsByReceipt)
 router.get('/search', querySlices.searchStockItem)
@@ -23,9 +29,9 @@ router.get('/available', querySlices.getAvailableStockItemsByProduct)
 router.delete('/:id', lifecycleSlices.deleteStockItem)
 router.patch('/:id/status', lifecycleSlices.updateStockItemStatus)
 router.post('/by-receipt-ids', receiptSlices.getStockItemsByReceiptIds)
-router.post('/receive-sn', normalizeStockItemReceivePayload, receiveSlices.receiveStockItem)
-router.post('/receive', normalizeStockItemReceivePayload, receiveSlices.receiveStockItem)
-router.post('/receive-all-no-sn', receiveSlices.receiveAllPendingNoSN)
-router.patch('/update-sn/:barcode', querySlices.updateSerialNumber)
+router.post('/receive-sn', allowInventoryReceive, normalizeStockItemReceivePayload, receiveSlices.receiveStockItem)
+router.post('/receive', allowInventoryReceive, normalizeStockItemReceivePayload, receiveSlices.receiveStockItem)
+router.post('/receive-all-no-sn', allowInventoryReceive, receiveSlices.receiveAllPendingNoSN)
+router.patch('/update-sn/:barcode', allowInventoryReceive, querySlices.updateSerialNumber)
 
 module.exports = router

@@ -18,6 +18,7 @@ const INVENTORY_ADJUST = POSITION_CAPABILITIES.INVENTORY_ADJUST
 const INVENTORY_TRANSFER = POSITION_CAPABILITIES.INVENTORY_TRANSFER
 const INVENTORY_AUDIT = POSITION_CAPABILITIES.INVENTORY_AUDIT
 const INVENTORY_AUDIT_FINALIZE = POSITION_CAPABILITIES.INVENTORY_AUDIT_FINALIZE
+const INVENTORY_RECEIVE = POSITION_CAPABILITIES.INVENTORY_RECEIVE
 
 {
   const legacyManager = resolveActorCapabilities({
@@ -74,6 +75,11 @@ assert.equal(
   'an explicitly migrated position must override legacy MANAGER stock audit finalization authority',
 )
 assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'MANAGER', positionCapabilities: [] }, INVENTORY_RECEIVE),
+  false,
+  'an explicitly migrated position must override legacy MANAGER inventory receive authority',
+)
+assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [EMPLOYEE_MANAGE] }, EMPLOYEE_MANAGE),
   true,
   'position capability must override legacy CASHIER compatibility role',
@@ -114,6 +120,11 @@ assert.equal(
   'legacy CASHIER must preserve existing stock audit finalization during migration',
 )
 assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, INVENTORY_RECEIVE),
+  true,
+  'legacy CASHIER must preserve existing inventory receive access during migration',
+)
+assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [REPAIR_WORKFLOW] }, REPAIR_WORKFLOW),
   true,
   'migrated position must be able to grant repair workflow independent of v2Role',
@@ -149,6 +160,16 @@ assert.equal(
   'migrated position can hold finalization capability independently while route guard still requires audit access',
 )
 assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [INVENTORY_RECEIVE] }, INVENTORY_RECEIVE),
+  true,
+  'migrated position must be able to grant inventory receive independent of v2Role',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [INVENTORY_AUDIT] }, INVENTORY_RECEIVE),
+  false,
+  'stock audit capability must not implicitly grant inventory receive authority',
+)
+assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: null }, REPAIR_WORKFLOW),
   true,
   'legacy technician compatibility must keep repair workflow while residual callers are retired',
@@ -162,6 +183,11 @@ assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: null }, INVENTORY_AUDIT),
   true,
   'legacy technician compatibility preserves existing stock audit access',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: null }, INVENTORY_RECEIVE),
+  true,
+  'legacy technician compatibility preserves existing inventory receive access',
 )
 assert.equal(
   hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, REPAIR_WORKFLOW),
@@ -182,6 +208,11 @@ assert.equal(
   hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, INVENTORY_AUDIT_FINALIZE),
   true,
   'platform ADMIN keeps stock audit finalization authority during position migration',
+)
+assert.equal(
+  hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, INVENTORY_RECEIVE),
+  true,
+  'platform ADMIN keeps inventory receive authority during position migration',
 )
 assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, EMPLOYEE_MANAGE),
