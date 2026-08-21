@@ -144,6 +144,37 @@ const ensureOriginalMaterialized = async (tx, { sale, createdById }) => {
   return createDocumentFromAuthority(tx, original);
 };
 
+const loadUnconsumedCompletedReturns = async (tx, { branchId, saleId }) => {
+  const consumed = await tx.deliveryNoteDocumentReturnSource.findMany({
+    where: {
+      deliveryNoteDocument: {
+        is: { branchId, saleId },
+      },
+    },
+    select: { saleReturnId: true },
+  });
+  const consumedIds = [...new Set(consumed.map((row) => Number(row.saleReturnId)).filter(Number.isInteger))];
+
+  return tx.saleReturn.findMany({
+    where: {
+      branchId,
+      saleId,
+      status: 'COMPLETED',
+      ...(consumedIds.length ? { id: { notIn: consumedIds } } : {}),
+    },
+    orderBy: [{ returnedAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      returnedAt: true,
+      completedAt: true,
+    },
+  });
+};
+
+const isPrismaRevisionWriteConflict = (error) => error?.code === 'P2034' || error?.code === 'P2002';
+
 const createReturnAdjustedDeliveryNoteRevision = async ({
   prisma,
   branchId,
@@ -156,111 +187,95 @@ const createReturnAdjustedDeliveryNoteRevision = async ({
   const normalizedSaleId = normalizePositiveInt(saleId, 'DELIVERY_NOTE_SALE_REQUIRED', 'saleId');
   const normalizedEmployeeId = normalizePositiveInt(employeeId, 'DELIVERY_NOTE_EMPLOYEE_REQUIRED', 'employeeId');
 
-  return prisma.$transaction(async (tx) => {
-    const sale = await loadRevisionSale(tx, {
-      branchId: normalizedBranchId,
-      saleId: normalizedSaleId,
-    });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const sale = await loadRevisionSale(tx, {
+        branchId: normalizedBranchId,
+        saleId: normalizedSaleId,
+      });
 
-    const [activeConsolidation, issuedTaxAuthority] = await Promise.all([
-      tx.consolidatedDeliveryLine.findFirst({
-        where: {
+      const [activeConsolidation, issuedTaxAuthority] = await Promise.all([
+        tx.consolidatedDeliveryLine.findFirst({
+          where: {
+            branchId: normalizedBranchId,
+            sourceSaleId: normalizedSaleId,
+            status: 'DOCUMENTED',
+            combinedBilling: { is: { status: { not: 'CANCELLED' } } },
+          },
+          select: { combinedBillingId: true },
+        }),
+        findIssuedTaxAuthority(tx, {
           branchId: normalizedBranchId,
-          sourceSaleId: normalizedSaleId,
-          status: 'DOCUMENTED',
-          combinedBilling: { is: { status: { not: 'CANCELLED' } } },
-        },
-        select: { combinedBillingId: true },
-      }),
-      findIssuedTaxAuthority(tx, {
+          saleId: normalizedSaleId,
+        }),
+      ]);
+
+      if (activeConsolidation) {
+        fail(
+          'DELIVERY_NOTE_REVISION_SOURCE_CONSOLIDATED',
+          `Source Delivery Note is already represented by consolidated document ${activeConsolidation.combinedBillingId}`,
+        );
+      }
+      if (issuedTaxAuthority) {
+        fail(
+          'DELIVERY_NOTE_REVISION_TAX_ALREADY_ISSUED',
+          `Tax authority already exists (${issuedTaxAuthority.document?.issuedDocumentNumber || issuedTaxAuthority.document?.id})`,
+        );
+      }
+
+      const predecessor = await ensureOriginalMaterialized(tx, {
+        sale,
+        createdById: normalizedEmployeeId,
+      });
+
+      // Provenance is one-time consumption, not timestamp inference. A completed
+      // Sale Return already linked to any revision in this sale lineage cannot
+      // be reused as evidence for a later revision.
+      const returnSources = await loadUnconsumedCompletedReturns(tx, {
         branchId: normalizedBranchId,
         saleId: normalizedSaleId,
-      }),
-    ]);
+      });
 
-    if (activeConsolidation) {
+      const nextRevisionNumber = Number(predecessor.revisionNumber) + 1;
+      const resolvedDocumentNumber = documentNumber || deriveDeliveryNoteRevisionNumber({
+        originalDocumentNumber: sale.officialDocumentNumber,
+        revisionNumber: nextRevisionNumber,
+      });
+
+      const command = buildReturnAdjustedRevision({
+        sale,
+        predecessor,
+        documentNumber: resolvedDocumentNumber,
+        createdById: normalizedEmployeeId,
+        returnSources,
+      });
+
+      await tx.deliveryNoteDocument.update({
+        where: { id: predecessor.id },
+        data: command.predecessorUpdate,
+      });
+
+      return createDocumentFromAuthority(tx, command.revision);
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 30000,
+    });
+  } catch (error) {
+    if (isPrismaRevisionWriteConflict(error)) {
       fail(
-        'DELIVERY_NOTE_REVISION_SOURCE_CONSOLIDATED',
-        `Source Delivery Note is already represented by consolidated document ${activeConsolidation.combinedBillingId}`,
+        'DELIVERY_NOTE_REVISION_WRITE_CONFLICT',
+        'Delivery Note revision changed concurrently; reload the current revision and try again',
+        409,
       );
     }
-    if (issuedTaxAuthority) {
-      fail(
-        'DELIVERY_NOTE_REVISION_TAX_ALREADY_ISSUED',
-        `Tax authority already exists (${issuedTaxAuthority.document?.issuedDocumentNumber || issuedTaxAuthority.document?.id})`,
-      );
-    }
-
-    const predecessor = await ensureOriginalMaterialized(tx, {
-      sale,
-      createdById: normalizedEmployeeId,
-    });
-
-    const completedReturns = await tx.saleReturn.findMany({
-      where: {
-        branchId: normalizedBranchId,
-        saleId: normalizedSaleId,
-        status: 'COMPLETED',
-        returnedAt: { gt: predecessor.issuedAt },
-      },
-      orderBy: [{ returnedAt: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-        code: true,
-        status: true,
-        returnedAt: true,
-        completedAt: true,
-      },
-    });
-
-    const returnSources = completedReturns.length
-      ? completedReturns
-      : predecessor.revisionNumber === 1
-        ? await tx.saleReturn.findMany({
-            where: {
-              branchId: normalizedBranchId,
-              saleId: normalizedSaleId,
-              status: 'COMPLETED',
-            },
-            orderBy: [{ returnedAt: 'asc' }, { id: 'asc' }],
-            select: {
-              id: true,
-              code: true,
-              status: true,
-              returnedAt: true,
-              completedAt: true,
-            },
-          })
-        : [];
-
-    const nextRevisionNumber = Number(predecessor.revisionNumber) + 1;
-    const resolvedDocumentNumber = documentNumber || deriveDeliveryNoteRevisionNumber({
-      originalDocumentNumber: sale.officialDocumentNumber,
-      revisionNumber: nextRevisionNumber,
-    });
-
-    const command = buildReturnAdjustedRevision({
-      sale,
-      predecessor,
-      documentNumber: resolvedDocumentNumber,
-      createdById: normalizedEmployeeId,
-      returnSources,
-    });
-
-    await tx.deliveryNoteDocument.update({
-      where: { id: predecessor.id },
-      data: command.predecessorUpdate,
-    });
-
-    return createDocumentFromAuthority(tx, command.revision);
-  }, {
-    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    timeout: 30000,
-  });
+    throw error;
+  }
 };
 
 module.exports = Object.freeze({
   loadRevisionSale,
   ensureOriginalMaterialized,
+  loadUnconsumedCompletedReturns,
+  isPrismaRevisionWriteConflict,
   createReturnAdjustedDeliveryNoteRevision,
 });
