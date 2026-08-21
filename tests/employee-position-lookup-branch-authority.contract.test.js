@@ -26,7 +26,7 @@ delete require.cache[servicePath]
 const service = require(servicePath)
 
 async function main() {
-  await assert.rejects(
+  assert.throws(
     () => service.listPositions({ branchId: null }),
     (error) => error.code === 'EMPLOYEE_POSITION_LOOKUP_BRANCH_REQUIRED'
       && error.statusCode === 403,
