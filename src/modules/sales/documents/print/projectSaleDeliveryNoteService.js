@@ -40,7 +40,7 @@ const mapLine = ({ id, quantity, basePrice, discount, price, description, produc
   barcode,
 });
 
-const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
+const projectSaleDeliveryNote = async ({ branchId, saleId, historicalRead = false }) => {
   const normalizedBranchId = positiveInt(branchId, 'SALE_BRANCH_REQUIRED', 'branchId');
   const normalizedSaleId = positiveInt(saleId, 'SALE_ID_REQUIRED', 'saleId');
 
@@ -129,7 +129,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
     select: { combinedBillingId: true },
   });
-  if (consolidatedSource) {
+  if (consolidatedSource && historicalRead !== true) {
     fail(
       'DELIVERY_NOTE_ALREADY_CONSOLIDATED',
       'This delivery note has already been consolidated and is no longer printable as an active source',
@@ -259,6 +259,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     deliveryNoteLifecycle: lifecycle,
     replacementProjection: currentReplacement,
     presentationSnapshot: presentationRecord.snapshot,
+    historicalRead: historicalRead === true,
   });
 };
 

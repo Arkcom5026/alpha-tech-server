@@ -3,6 +3,7 @@
 const { prisma } = require('../../../../../lib/prisma');
 const { issueSaleDeliveryNote } = require('../issue/issueSaleDeliveryNoteService');
 const { projectCurrentSaleDeliveryNote } = require('../print/projectCurrentSaleDeliveryNoteService');
+const { projectHistoricalSaleDeliveryNoteRevision } = require('../print/projectHistoricalSaleDeliveryNoteRevisionService');
 const {
   listDeliveryNoteRevisionHistory,
   getDeliveryNoteRevisionById,
@@ -66,6 +67,23 @@ const getSaleDeliveryNoteRevision = async (req, res, next) => {
   }
 };
 
+const getSaleDeliveryNoteRevisionPrint = async (req, res, next) => {
+  try {
+    const branchId = authenticatedBranchId(req);
+    if (!branchId) {
+      return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch is required' });
+    }
+    const result = await projectHistoricalSaleDeliveryNoteRevision({
+      branchId,
+      saleId: req.params.id,
+      revisionId: req.params.revisionId,
+    });
+    return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const issueSaleDeliveryNoteController = async (req, res, next) => {
   try {
     const branchId = authenticatedBranchId(req);
@@ -88,5 +106,6 @@ module.exports = Object.freeze({
   getSaleDeliveryNote,
   getSaleDeliveryNoteRevisions,
   getSaleDeliveryNoteRevision,
+  getSaleDeliveryNoteRevisionPrint,
   issueSaleDeliveryNoteController,
 });
