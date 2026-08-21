@@ -62,7 +62,7 @@ test('sales routes gate core work and completion without swallowing adjacent aut
 
   assert.match(routeSource, /router\.use\('\/quotations', quotationRoutes\)/);
   assert.match(routeSource, /router\.use\('\/returns', saleReturnRoutes\)/);
-  assert.match(routeSource, /router\.post\('\/:id\/mark-paid', markSaleAsPaid\)/);
+  assert.match(routeSource, /router\.post\('\/:id\/mark-paid', requireSaleSettlementClose, markSaleAsPaid\)/);
   assert.doesNotMatch(routeSource, /router\.use\('\/quotations', allowSalesCore/);
   assert.doesNotMatch(routeSource, /router\.use\('\/returns', allowSalesCore/);
   assert.doesNotMatch(routeSource, /router\.post\('\/:id\/mark-paid', allowSalesCore/);
