@@ -5,17 +5,9 @@ const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 const resolveBranchId = (req, source) => {
   const requestedBranchId = Number(source?.branchId);
   const accountRole = normalizeRole(req.user?.role);
-  const employeeRole = normalizeRole(req.user?.employeeRole || req.user?.position);
   const authorityBranchId = Number(
     req.user?.branchId || req.user?.employeeBranchId || req.user?.currentBranchId || 0,
   );
-
-  if (!['SUPERADMIN', 'ADMIN'].includes(accountRole) && !['OWNER', 'MANAGER'].includes(employeeRole)) {
-    const error = new Error('Tax Period administration requires OWNER or MANAGER authority');
-    error.code = 'TAX_PERIOD_ADMINISTRATIVE_ACCESS_FORBIDDEN';
-    error.statusCode = 403;
-    throw error;
-  }
 
   if (
     !['SUPERADMIN', 'ADMIN'].includes(accountRole) &&

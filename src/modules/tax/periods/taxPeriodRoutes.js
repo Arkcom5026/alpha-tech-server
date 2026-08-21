@@ -1,6 +1,10 @@
 const express = require('express');
 const verifyToken = require('../../../../middlewares/verifyToken');
 const controller = require('./taxPeriodController');
+const {
+  TAX_PERIOD_CAPABILITY,
+  allowTaxPeriodCapabilities,
+} = require('./taxPeriodAuthorization');
 const accountingOfficeController = require('../accountingOffice/accountingOfficePackageController');
 const taxClosingHandoffController = require('../handoff/taxClosingHandoffController');
 const vatSettlementController = require('../settlement/vatSettlementController');
@@ -11,9 +15,16 @@ const unifiedTaxReadinessController = require('../readiness/unifiedTaxReadinessC
 const router = express.Router();
 router.use(verifyToken);
 
-router.get('/periods', controller.listPeriods);
-router.get('/periods/summary', controller.getPeriodSummary);
-router.get('/periods/:taxPeriodId', controller.getPeriodDetail);
+const allowTaxPeriodRead = allowTaxPeriodCapabilities(TAX_PERIOD_CAPABILITY.READ);
+const allowTaxPeriodManage = allowTaxPeriodCapabilities(TAX_PERIOD_CAPABILITY.MANAGE);
+const allowTaxPeriodReopen = allowTaxPeriodCapabilities(
+  TAX_PERIOD_CAPABILITY.MANAGE,
+  TAX_PERIOD_CAPABILITY.REOPEN,
+);
+
+router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
+router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
+router.get('/periods/:taxPeriodId', allowTaxPeriodRead, controller.getPeriodDetail);
 router.get('/accounting-office/packages/:taxPeriodId', accountingOfficeController.getPackage);
 router.get('/tax-closing-handoff/:taxPeriodId', taxClosingHandoffController.getBundle);
 router.post('/tax-closing-handoff/:taxPeriodId/finalize', taxClosingHandoffController.finalizeBundle);
@@ -26,10 +37,10 @@ router.post('/withholding-tax/items/:taxExpenseItemId/treatment', withholdingTax
 router.post('/withholding-tax/:taxPeriodId/certificates/issue', withholdingTaxController.issueCertificate);
 router.post('/withholding-tax/:taxPeriodId/filings/:formType/prepare', withholdingTaxController.prepareFiling);
 router.post('/withholding-tax/:taxPeriodId/filings/:formType/submit', withholdingTaxController.submitFiling);
-router.post('/periods/ensure', controller.ensureMonthlyPeriod);
-router.post('/periods/:taxPeriodId/close', controller.closePeriod);
-router.post('/periods/:taxPeriodId/lock', controller.lockPeriod);
-router.post('/periods/:taxPeriodId/submit', controller.submitPeriod);
-router.post('/periods/:taxPeriodId/reopen', controller.reopenPeriod);
+router.post('/periods/ensure', allowTaxPeriodManage, controller.ensureMonthlyPeriod);
+router.post('/periods/:taxPeriodId/close', allowTaxPeriodManage, controller.closePeriod);
+router.post('/periods/:taxPeriodId/lock', allowTaxPeriodManage, controller.lockPeriod);
+router.post('/periods/:taxPeriodId/submit', allowTaxPeriodManage, controller.submitPeriod);
+router.post('/periods/:taxPeriodId/reopen', allowTaxPeriodReopen, controller.reopenPeriod);
 
 module.exports = router;
