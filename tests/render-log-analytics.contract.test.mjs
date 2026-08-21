@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHttpAnalytics, percentile } from '../scripts/observability/render-log-analytics.mjs';
+import {
+  buildHttpAnalytics,
+  normalizeRoutePath,
+  percentile,
+  sampleMaturity,
+} from '../scripts/observability/render-log-analytics.mjs';
 
 test('percentile uses deterministic nearest-rank semantics', () => {
   assert.equal(percentile([], 0.95), null);
@@ -27,6 +32,8 @@ test('HTTP analytics reports latency, error, conflict and response-size baseline
   assert.equal(analytics.conflictRate, 0.25);
   assert.equal(analytics.avgResponseBytes, 2500);
   assert.equal(analytics.p95ResponseBytes, 4000);
+  assert.equal(analytics.lowSampleCaution, true);
+  assert.equal(analytics.sampleMaturity, 'LOW');
 
   const endpoint = analytics.endpoints.find((item) => item.key === 'GET /api/a');
   assert.equal(endpoint.count, 3);
@@ -34,6 +41,7 @@ test('HTTP analytics reports latency, error, conflict and response-size baseline
   assert.equal(endpoint.p95Ms, 900);
   assert.equal(endpoint.errorRate, 0.333333);
   assert.equal(endpoint.conflictRate, 0.333333);
+  assert.equal(endpoint.sampleMaturity, 'LOW');
 });
 
 test('duplicate signal requires the same exact target while keeping target values out of summaries', () => {
@@ -63,4 +71,39 @@ test('request burst metric captures requests sharing a one-second bucket', () =>
   const analytics = buildHttpAnalytics(requests);
   assert.equal(analytics.requestBurst.maxRequestsPerBucket, 6);
   assert.equal(analytics.requestBurst.burstBucketCount, 1);
+});
+
+test('route normalization groups dynamic ids without hiding stable route names', () => {
+  assert.equal(normalizeRoutePath('/api/repairs/jobs/12/handover'), '/api/repairs/jobs/:id/handover');
+  assert.equal(normalizeRoutePath('/api/tax/documents/172/issue'), '/api/tax/documents/:id/issue');
+  assert.equal(normalizeRoutePath('/api/request/45dc904f-7cfb-46ec-86a2-1c5b601dbbbd'), '/api/request/:uuid');
+  assert.equal(normalizeRoutePath('/api/products/ready-to-sell'), '/api/products/ready-to-sell');
+});
+
+test('sample maturity avoids treating sparse production traffic as a stable baseline', () => {
+  assert.equal(sampleMaturity(0), 'LOW');
+  assert.equal(sampleMaturity(4), 'LOW');
+  assert.equal(sampleMaturity(5), 'EMERGING');
+  assert.equal(sampleMaturity(19), 'EMERGING');
+  assert.equal(sampleMaturity(20), 'ESTABLISHED');
+});
+
+test('traffic quality aggregates dynamic route families and recognizes recovery retries', () => {
+  const requests = [
+    { timestamp: '2026-08-21T03:00:00.000Z', method: 'POST', path: '/api/tax/documents/172/issue', target: '/api/tax/documents/172/issue', status: 409, durationMs: 80, requestId: 'r1' },
+    { timestamp: '2026-08-21T03:00:01.000Z', method: 'POST', path: '/api/tax/documents/172/issue', target: '/api/tax/documents/172/issue', status: 200, durationMs: 90, requestId: 'r2' },
+    { timestamp: '2026-08-21T03:00:05.000Z', method: 'POST', path: '/api/tax/documents/173/issue', target: '/api/tax/documents/173/issue', status: 409, durationMs: 85, requestId: 'r3' },
+  ];
+
+  const analytics = buildHttpAnalytics(requests);
+  const family = analytics.trafficQuality.routeFamilies.find((item) => item.key === 'POST /api/tax/documents/:id/issue');
+
+  assert.equal(family.count, 3);
+  assert.equal(family.sampleMaturity, 'LOW');
+  assert.equal(family.exactRepeatCandidates2s, 1);
+  assert.equal(family.retryAfterErrorCandidates10s, 1);
+  assert.equal(family.retryRecoveryCount10s, 1);
+  assert.equal(analytics.retryAfterErrorCandidates10s, 1);
+  assert.equal(analytics.retryRecoveryCount10s, 1);
+  assert.equal(analytics.retryAfterErrorCandidates[0].key.includes('/172/'), false);
 });
