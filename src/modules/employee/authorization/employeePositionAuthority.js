@@ -44,6 +44,11 @@ const POSITION_CAPABILITIES = Object.freeze({
   TAX_OUTPUT_ISSUE: 'tax.output.issue',
   TAX_OUTPUT_CREDIT_NOTE: 'tax.output.credit-note',
   TAX_OUTPUT_LIFECYCLE: 'tax.output.lifecycle',
+  TAX_INPUT_READ: 'tax.input.read',
+  TAX_INPUT_REVIEW: 'tax.input.review',
+  TAX_INPUT_FILING: 'tax.input.filing',
+  TAX_INPUT_AUDIT: 'tax.input.audit',
+  TAX_INPUT_PERIOD_CONTROL: 'tax.input.period-control',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -102,6 +107,14 @@ const OUTPUT_TAX_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.TAX_OUTPUT_LIFECYCLE,
 ]);
 
+const INPUT_TAX_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.TAX_INPUT_READ,
+  POSITION_CAPABILITIES.TAX_INPUT_REVIEW,
+  POSITION_CAPABILITIES.TAX_INPUT_FILING,
+  POSITION_CAPABILITIES.TAX_INPUT_AUDIT,
+  POSITION_CAPABILITIES.TAX_INPUT_PERIOD_CONTROL,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -122,6 +135,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...PROCUREMENT_CAPABILITIES,
       ...SALES_CAPABILITIES,
       ...OUTPUT_TAX_CAPABILITIES,
+      ...INPUT_TAX_CAPABILITIES,
       POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
@@ -213,6 +227,7 @@ module.exports = {
   PROCUREMENT_CAPABILITIES,
   SALES_CAPABILITIES,
   OUTPUT_TAX_CAPABILITIES,
+  INPUT_TAX_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
