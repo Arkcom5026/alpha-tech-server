@@ -112,9 +112,8 @@ const createPosition = async ({ branchId, body = {} }) => {
   const normalizedBranchId = ensureBranchId(branchId);
   const name = normalizeText(body.name);
   const description = normalizeDescription(body.description);
-  const capabilities = Object.prototype.hasOwnProperty.call(body, 'capabilities')
-    ? normalizeCapabilitiesInput(body.capabilities)
-    : null;
+  const hasCapabilities = Object.prototype.hasOwnProperty.call(body, 'capabilities');
+  const capabilities = hasCapabilities ? normalizeCapabilitiesInput(body.capabilities) : undefined;
   if (typeof name !== 'string' || name.length < 2) {
     throw createError(400, { error: 'ชื่อตำแหน่งต้องยาวอย่างน้อย 2 ตัวอักษร' });
   }
@@ -127,7 +126,7 @@ const createPosition = async ({ branchId, body = {} }) => {
       await repository.createPosition({
         name,
         description,
-        capabilities,
+        ...(hasCapabilities ? { capabilities } : {}),
         branchId: normalizedBranchId,
         isActive: true,
       }),
