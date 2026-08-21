@@ -29,6 +29,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   PROCUREMENT_SUPPLIER_PAYMENT_VOID: 'procurement.supplier-payment.void',
   SALES_CORE: 'sales.core',
   SALES_COMPLETE: 'sales.complete',
+  SALES_RETURN: 'sales.return',
+  SALES_RETURN_DEDUCTION_APPROVE: 'sales.return.deduction-approve',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -68,6 +70,7 @@ const PROCUREMENT_CAPABILITIES = Object.freeze([
 const SALES_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.SALES_CORE,
   POSITION_CAPABILITIES.SALES_COMPLETE,
+  POSITION_CAPABILITIES.SALES_RETURN,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
@@ -89,6 +92,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...INVENTORY_CAPABILITIES,
       ...PROCUREMENT_CAPABILITIES,
       ...SALES_CAPABILITIES,
+      POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
         ? [POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_VOID]
