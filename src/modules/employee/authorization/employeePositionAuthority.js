@@ -27,6 +27,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   PROCUREMENT_SUPPLIER_PAYMENT_READ: 'procurement.supplier-payment.read',
   PROCUREMENT_SUPPLIER_PAYMENT_MANAGE: 'procurement.supplier-payment.manage',
   PROCUREMENT_SUPPLIER_PAYMENT_VOID: 'procurement.supplier-payment.void',
+  SALES_CORE: 'sales.core',
+  SALES_COMPLETE: 'sales.complete',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -63,6 +65,11 @@ const PROCUREMENT_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_READ,
 ]);
 
+const SALES_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.SALES_CORE,
+  POSITION_CAPABILITIES.SALES_COMPLETE,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -81,6 +88,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...REPAIR_CAPABILITIES,
       ...INVENTORY_CAPABILITIES,
       ...PROCUREMENT_CAPABILITIES,
+      ...SALES_CAPABILITIES,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
         ? [POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_VOID]
@@ -103,6 +111,7 @@ const legacyCapabilitiesForRole = (role) => {
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT_FINALIZE,
       ...PROCUREMENT_CAPABILITIES,
+      ...SALES_CAPABILITIES,
     ];
   }
 
@@ -119,6 +128,7 @@ const legacyCapabilitiesForRole = (role) => {
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT_FINALIZE,
       ...PROCUREMENT_CAPABILITIES,
+      ...SALES_CAPABILITIES,
     ];
   }
 
@@ -167,6 +177,7 @@ module.exports = {
   REPAIR_CAPABILITIES,
   INVENTORY_CAPABILITIES,
   PROCUREMENT_CAPABILITIES,
+  SALES_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
