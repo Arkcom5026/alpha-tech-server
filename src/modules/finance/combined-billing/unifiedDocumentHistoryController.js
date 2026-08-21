@@ -10,6 +10,9 @@ const {
   calculateReturnedReceivableAmount,
   calculateNetReceivableTotal,
 } = require('../../sales/shared/creditReceivableAuthority');
+const {
+  mergeDeliveryNoteLifecycleIntoHistoryRow,
+} = require('../../sales/delivery-note/lifecycle/projectDeliveryNoteHistoryLifecycle');
 
 const PURPOSES = new Set(['BILL', 'DELIVERY_NOTE']);
 const CONSOLIDATED_SOURCE_TYPE = 'CONSOLIDATED_DELIVERY';
@@ -275,10 +278,16 @@ const unifiedDocumentHistory = async (req, res, next) => {
         status: 'DOCUMENTED',
         combinedBilling: { is: { status: { not: 'CANCELLED' } } },
       },
-      select: { sourceSaleId: true },
+      select: { sourceSaleId: true, combinedBillingId: true },
       distinct: ['sourceSaleId'],
     });
     const consumedSaleIds = consumedSourceRows.map((row) => row.sourceSaleId);
+    const activeConsolidationBySaleId = new Map(
+      consumedSourceRows.map((row) => [
+        Number(row.sourceSaleId),
+        { combinedBillingId: Number(row.combinedBillingId) },
+      ]),
+    );
 
     const consumedSourceExclusion = consumedSaleIds.length
       ? { id: { notIn: consumedSaleIds } }
@@ -287,7 +296,7 @@ const unifiedDocumentHistory = async (req, res, next) => {
     const saleWhere = {
       branchId,
       status: { not: 'CANCELLED' },
-      ...consumedSourceExclusion,
+      ...(purpose === 'DELIVERY_NOTE' ? {} : consumedSourceExclusion),
       ...(purpose === 'DELIVERY_NOTE' ? {
         officialDocumentNumber: { not: null },
       } : {}),
@@ -327,8 +336,8 @@ const unifiedDocumentHistory = async (req, res, next) => {
           paid: true,
           status: true,
           isCredit: true,
-          items: { select: { price: true, returnedQuantity: true } },
-          simpleItems: { select: { quantity: true, price: true, returnedQuantity: true } },
+          items: { select: { id: true, price: true, returnedQuantity: true } },
+          simpleItems: { select: { id: true, quantity: true, price: true, returnedQuantity: true } },
           customer: { select: { name: true, companyName: true, user: { select: { loginId: true } } } },
           employee: { select: { name: true } },
         },
@@ -376,7 +385,7 @@ const unifiedDocumentHistory = async (req, res, next) => {
 
     const saleIds = sales.map((sale) => sale.id);
     const combinedIds = combinedDocuments.map((document) => String(document.id));
-    const [payments, saleTaxCandidates, combinedTaxCandidates] = await Promise.all([
+    const [payments, saleTaxCandidates, combinedTaxCandidates, preparations] = await Promise.all([
       saleIds.length
         ? prisma.payment.findMany({
             where: { saleId: { in: saleIds }, isCancelled: false },
@@ -412,17 +421,73 @@ const unifiedDocumentHistory = async (req, res, next) => {
             select: { sourceId: true, document: { select: { id: true, taxInvoiceKind: true, issuedDocumentNumber: true } } },
           })
         : [],
+      purpose === 'DELIVERY_NOTE' && saleIds.length
+        ? prisma.saleDocumentPreparation.findMany({
+            where: {
+              branchId,
+              sourceType: SALE_SOURCE_TYPE,
+              sourceId: { in: saleIds.map(String) },
+            },
+            select: { id: true, sourceId: true },
+          })
+        : [],
     ]);
+
+    const preparedTaxCandidates = purpose === 'DELIVERY_NOTE' && preparations.length
+      ? await prisma.taxCandidate.findMany({
+          where: {
+            branchId,
+            sourceType: 'DOCUMENT_PREPARATION',
+            OR: preparations.map((preparation) => ({
+              sourceId: { startsWith: `${Number(preparation.id)}:` },
+            })),
+            document: {
+              is: {
+                documentType: 'OUTPUT_TAX_INVOICE',
+                status: 'REGISTERED',
+                issuedDocumentNumber: { not: null },
+              },
+            },
+          },
+          select: {
+            sourceId: true,
+            document: { select: { id: true, taxInvoiceKind: true, issuedDocumentNumber: true } },
+          },
+        })
+      : [];
 
     const paymentBySaleId = aggregatePayments(payments);
     const saleTaxBySourceId = new Map(saleTaxCandidates.map((candidate) => [String(candidate.sourceId), candidate.document]));
     const combinedTaxBySourceId = new Map(combinedTaxCandidates.map((candidate) => [String(candidate.sourceId), candidate.document]));
+    const saleIdByPreparationId = new Map(
+      preparations.map((preparation) => [String(preparation.id), Number(preparation.sourceId)]),
+    );
+    const preparedTaxBySaleId = new Map();
+    for (const candidate of preparedTaxCandidates) {
+      const preparationId = String(candidate.sourceId || '').split(':')[0];
+      const saleId = saleIdByPreparationId.get(preparationId);
+      if (saleId && !preparedTaxBySaleId.has(saleId)) {
+        preparedTaxBySaleId.set(saleId, candidate.document);
+      }
+    }
 
-    let saleRows = sales.map((sale) => projectSaleRow({
-      sale,
-      payment: paymentBySaleId.get(sale.id) || null,
-      taxDocument: saleTaxBySourceId.get(String(sale.id)) || null,
-    }));
+    let saleRows = sales.map((sale) => {
+      const payment = paymentBySaleId.get(sale.id) || null;
+      const taxDocument = saleTaxBySourceId.get(String(sale.id))
+        || preparedTaxBySaleId.get(sale.id)
+        || null;
+      const row = projectSaleRow({ sale, payment, taxDocument });
+
+      if (purpose !== 'DELIVERY_NOTE') return row;
+
+      return mergeDeliveryNoteLifecycleIntoHistoryRow({
+        row,
+        sale,
+        payment,
+        taxDocument,
+        activeConsolidation: activeConsolidationBySaleId.get(sale.id) || null,
+      });
+    });
 
     if (purpose === 'BILL' || boolQuery(req.query?.onlyPaid)) {
       saleRows = saleRows.filter((row) => row.isFullyPaid);
