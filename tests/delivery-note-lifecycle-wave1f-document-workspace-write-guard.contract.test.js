@@ -13,6 +13,10 @@ const service = fs.readFileSync(
   path.join(root, 'src/modules/finance/combined-billing/documentWorkspaceService.js'),
   'utf8',
 );
+const authoritySource = fs.readFileSync(
+  path.join(root, 'src/modules/finance/combined-billing/documentWorkspaceWriteAuthority.js'),
+  'utf8',
+);
 
 const sale = {
   id: 1046,
@@ -76,7 +80,7 @@ assert.equal(selection.documentAmount, 320);
 
 assert.match(service, /projectWorkspaceWriteSource/);
 assert.match(service, /assertWorkspaceWriteSelection/);
-assert.match(service, /DOCUMENT_WORKSPACE_SOURCE_RETURNED/);
+assert.match(authoritySource, /DOCUMENT_WORKSPACE_SOURCE_RETURNED/);
 assert.match(service, /quantity: authority\.quantity/);
 assert.match(service, /sourceAmount: authority\.sourceAmount/);
 assert.doesNotMatch(service, /stockMovement|inventory|stockItem\.update|sale\.update/);
