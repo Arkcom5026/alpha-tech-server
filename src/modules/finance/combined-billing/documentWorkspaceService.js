@@ -7,6 +7,10 @@ const { mapCandidateToTaxDocumentDraft } = require('../../tax/candidates/mapping
 const candidateRepository = require('../../tax/candidates/repository/taxCandidateRepository');
 const taxDocumentRepository = require('../../tax/documents/repository/taxDocumentRepository');
 const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  projectWorkspaceReadLine,
+  summarizeWorkspaceLines,
+} = require('./documentWorkspaceReadProjection');
 
 const money = (value) => Number(Number(value || 0).toFixed(2));
 const keyOf = (type, id) => `${type}:${id}`;
@@ -64,8 +68,8 @@ const listDocumentWorkspace = async ({ branchId, customerId }) => {
     },
     select: {
       id: true, customerId: true, code: true, officialDocumentNumber: true, soldAt: true,
-      items: { select: { id: true, price: true, documentDescription: true, stockItem: { select: { product: { select: { name: true } } } } } },
-      simpleItems: { select: { id: true, quantity: true, price: true, documentDescription: true, product: { select: { name: true } } } },
+      items: { select: { id: true, price: true, returnedQuantity: true, documentDescription: true, stockItem: { select: { product: { select: { name: true } } } } } },
+      simpleItems: { select: { id: true, quantity: true, price: true, returnedQuantity: true, documentDescription: true, product: { select: { name: true } } } },
     },
     orderBy: [{ soldAt: 'asc' }, { id: 'asc' }],
   });
@@ -79,12 +83,32 @@ const listDocumentWorkspace = async ({ branchId, customerId }) => {
   const consumed = new Map(documented.map((row) => [keyOf(row.sourceLineType, row.sourceLineId), row.combinedBillingId]));
   return sales.map((sale) => {
     const lines = [
-      ...sale.items.map((item) => lineProjection(sale, 'STOCK', item, paid.get(`${sale.id}:${keyOf('STOCK', item.id)}`) || 0)),
-      ...sale.simpleItems.map((item) => lineProjection(sale, 'SIMPLE', item, paid.get(`${sale.id}:${keyOf('SIMPLE', item.id)}`) || 0)),
-    ].map((line) => consumed.has(keyOf(line.lineType, line.lineId)) ? { ...line, status: 'DOCUMENTED', combinedBillingId: consumed.get(keyOf(line.lineType, line.lineId)) } : line);
-    const counts = lines.reduce((acc, line) => ({ ...acc, [line.status]: (acc[line.status] || 0) + 1 }), {});
-    const documentStatus = lines.length && lines.every((line) => line.status === 'DOCUMENTED') ? 'CLOSED' : lines.some((line) => line.status === 'DOCUMENTED') ? 'PARTIALLY_DOCUMENTED' : 'OPEN';
-    return { id: sale.id, customerId: sale.customerId, code: sale.code, documentNo: sale.officialDocumentNumber, soldAt: sale.soldAt, documentStatus, counts, lines };
+      ...sale.items.map((item) => projectWorkspaceReadLine({ sale, type: 'STOCK', item, settledAmount: paid.get(`${sale.id}:${keyOf('STOCK', item.id)}`) || 0 })),
+      ...sale.simpleItems.map((item) => projectWorkspaceReadLine({ sale, type: 'SIMPLE', item, settledAmount: paid.get(`${sale.id}:${keyOf('SIMPLE', item.id)}`) || 0 })),
+    ].map((line) => consumed.has(keyOf(line.lineType, line.lineId))
+      ? {
+          ...line,
+          status: 'DOCUMENTED',
+          selectableForConsolidation: false,
+          combinedBillingId: consumed.get(keyOf(line.lineType, line.lineId)),
+        }
+      : line);
+    const summary = summarizeWorkspaceLines(lines);
+    return {
+      id: sale.id,
+      customerId: sale.customerId,
+      code: sale.code,
+      documentNo: sale.officialDocumentNumber,
+      soldAt: sale.soldAt,
+      documentStatus: summary.documentStatus,
+      counts: summary.counts,
+      hasReturn: summary.hasReturn,
+      originalAmount: summary.originalAmount,
+      returnedAmount: summary.returnedAmount,
+      activeAmount: summary.activeAmount,
+      selectableForConsolidation: lines.some((line) => line.selectableForConsolidation === true),
+      lines,
+    };
   });
 };
 
