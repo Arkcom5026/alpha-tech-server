@@ -60,6 +60,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   TAX_ACCOUNTING_OFFICE_READ: 'tax.accounting-office.read',
   TAX_READINESS_READ: 'tax.readiness.read',
   TAX_VAT_SETTLEMENT_READ: 'tax.vat-settlement.read',
+  TAX_VAT_CARRY_FORWARD_READ: 'tax.vat-carry-forward.read',
+  TAX_VAT_CARRY_FORWARD_CONFIRM: 'tax.vat-carry-forward.confirm',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -155,6 +157,11 @@ const TAX_VAT_SETTLEMENT_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.TAX_VAT_SETTLEMENT_READ,
 ]);
 
+const TAX_VAT_CARRY_FORWARD_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.TAX_VAT_CARRY_FORWARD_READ,
+  POSITION_CAPABILITIES.TAX_VAT_CARRY_FORWARD_CONFIRM,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -182,6 +189,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...TAX_ACCOUNTING_OFFICE_CAPABILITIES,
       ...TAX_READINESS_CAPABILITIES,
       ...TAX_VAT_SETTLEMENT_CAPABILITIES,
+      ...TAX_VAT_CARRY_FORWARD_CAPABILITIES,
       POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
@@ -282,6 +290,7 @@ module.exports = {
   TAX_ACCOUNTING_OFFICE_CAPABILITIES,
   TAX_READINESS_CAPABILITIES,
   TAX_VAT_SETTLEMENT_CAPABILITIES,
+  TAX_VAT_CARRY_FORWARD_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
