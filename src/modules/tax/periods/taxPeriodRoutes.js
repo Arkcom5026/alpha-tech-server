@@ -7,6 +7,10 @@ const {
 } = require('./taxPeriodAuthorization');
 const accountingOfficeController = require('../accountingOffice/accountingOfficePackageController');
 const taxClosingHandoffController = require('../handoff/taxClosingHandoffController');
+const {
+  TAX_CLOSING_HANDOFF_CAPABILITY,
+  allowTaxClosingHandoffCapabilities,
+} = require('../handoff/taxClosingHandoffAuthorization');
 const vatSettlementController = require('../settlement/vatSettlementController');
 const vatCarryForwardController = require('../settlement/vatCarryForwardController');
 const withholdingTaxController = require('../withholdingTax/withholdingTaxController');
@@ -21,13 +25,20 @@ const allowTaxPeriodReopen = allowTaxPeriodCapabilities(
   TAX_PERIOD_CAPABILITY.MANAGE,
   TAX_PERIOD_CAPABILITY.REOPEN,
 );
+const allowTaxClosingHandoffRead = allowTaxClosingHandoffCapabilities(
+  TAX_CLOSING_HANDOFF_CAPABILITY.READ,
+);
+const allowTaxClosingHandoffFinalize = allowTaxClosingHandoffCapabilities(
+  TAX_CLOSING_HANDOFF_CAPABILITY.READ,
+  TAX_CLOSING_HANDOFF_CAPABILITY.FINALIZE,
+);
 
 router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
 router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
 router.get('/periods/:taxPeriodId', allowTaxPeriodRead, controller.getPeriodDetail);
 router.get('/accounting-office/packages/:taxPeriodId', accountingOfficeController.getPackage);
-router.get('/tax-closing-handoff/:taxPeriodId', taxClosingHandoffController.getBundle);
-router.post('/tax-closing-handoff/:taxPeriodId/finalize', taxClosingHandoffController.finalizeBundle);
+router.get('/tax-closing-handoff/:taxPeriodId', allowTaxClosingHandoffRead, taxClosingHandoffController.getBundle);
+router.post('/tax-closing-handoff/:taxPeriodId/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController.finalizeBundle);
 router.get('/tax-readiness/:taxPeriodId', unifiedTaxReadinessController.getWorkspace);
 router.get('/vat-settlement/:taxPeriodId', vatSettlementController.getPreparation);
 router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
