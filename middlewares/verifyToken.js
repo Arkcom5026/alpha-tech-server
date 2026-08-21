@@ -156,7 +156,7 @@ const verifyToken = async (req, res, next) => {
       employeeId,
       branchId: employeeProfile?.branchId || null,
       positionId: employeeProfile?.positionId || null,
-      positionCapabilities,
+      positionCapabilities: positionCapabilities,
       positionAuthorityMode: positionCapabilities === null ? 'V2_ROLE_COMPAT' : 'POSITION',
       employeeApproved: employeeProfile?.approved ?? null,
       employeeActive: employeeProfile?.active ?? null,
