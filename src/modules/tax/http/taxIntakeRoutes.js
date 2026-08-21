@@ -43,7 +43,7 @@ router.get('/candidates', allowOutputTaxRead, controller.listCandidates);
 router.get('/documents', allowOutputTaxRead, controller.listDocuments);
 router.get('/documents/:taxDocumentId', allowOutputTaxRead, controller.getDocumentDetail);
 router.get('/documents/:taxDocumentId/printable', allowOutputTaxRead, controller.getPrintableOutputTaxDocument);
-router.get('/documents/:taxDocumentId/presentation', getStatutoryTaxPresentation);
+router.get('/documents/:taxDocumentId/presentation', allowOutputTaxRead, getStatutoryTaxPresentation);
 router.post('/documents/:taxDocumentId/recipient/refresh', allowOutputTaxPrepare, controller.refreshDraftRecipient);
 router.post('/documents/:taxDocumentId/issue', allowOutputTaxIssue, controller.issueOutputTaxDocument);
 router.post('/documents/:taxDocumentId/credit-note', allowOutputTaxCreditNote, controller.issueOutputTaxCreditNote);
