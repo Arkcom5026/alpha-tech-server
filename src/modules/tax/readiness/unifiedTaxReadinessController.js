@@ -8,18 +8,10 @@ const requireBranchAuthority = (req) => {
   const requestedBranchId = Number(req.query?.branchId);
   const authorityBranchId = Number(req.user?.branchId || req.user?.employeeBranchId || req.user?.currentBranchId || 0);
   const accountRole = normalizeRole(req.user?.role);
-  const employeeRole = normalizeRole(req.user?.employeeRole || req.user?.position);
   if (!Number.isInteger(requestedBranchId) || requestedBranchId <= 0) {
     const error = new Error('branchId must be a positive integer');
     error.code = 'TAX_READINESS_BRANCH_REQUIRED';
     error.statusCode = 400;
-    throw error;
-  }
-  const elevated = ['SUPERADMIN', 'ADMIN'].includes(accountRole) || ['OWNER', 'MANAGER'].includes(employeeRole);
-  if (!elevated) {
-    const error = new Error('Tax readiness workspace requires administrative authority');
-    error.code = 'TAX_READINESS_ACCESS_FORBIDDEN';
-    error.statusCode = 403;
     throw error;
   }
   if (!['SUPERADMIN', 'ADMIN'].includes(accountRole) && authorityBranchId > 0 && authorityBranchId !== requestedBranchId) {
