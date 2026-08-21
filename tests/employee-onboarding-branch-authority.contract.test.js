@@ -35,6 +35,7 @@ const repositoryStub = {
     }
   },
   createCustomerProfile: async () => ({ id: 701 }),
+  isUniqueConstraintError: () => false,
 }
 
 Module._load = function patchedLoad(request, parent, isMain) {
@@ -80,6 +81,18 @@ async function main() {
     }, res)
     assert.equal(res.result.statusCode, 403)
     assert.equal(res.result.payload.code, 'EMPLOYEE_ONBOARDING_FORBIDDEN')
+  }
+
+  {
+    positionLookup = null
+    const res = makeResponse()
+    await service.addSubEmployee({
+      user: { role: 'ADMIN', branchId: 2 },
+      body: { ...validBody, email: 'invalid-email' },
+    }, res)
+    assert.equal(res.result.statusCode, 400)
+    assert.equal(res.result.payload.code, 'EMPLOYEE_EMAIL_INVALID')
+    assert.equal(positionLookup, null)
   }
 
   {
