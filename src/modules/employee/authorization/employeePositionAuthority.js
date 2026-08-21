@@ -9,6 +9,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   REPAIR_HANDOVER: 'repair.handover',
   REPAIR_CUSTOMER_ACCESS: 'repair.customer-access',
   REPAIR_CUSTOMER_OVERRIDE: 'repair.customer-override',
+  INVENTORY_ADJUST: 'inventory.adjust',
+  INVENTORY_TRANSFER: 'inventory.transfer',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -21,6 +23,11 @@ const REPAIR_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.REPAIR_HANDOVER,
   POSITION_CAPABILITIES.REPAIR_CUSTOMER_ACCESS,
   POSITION_CAPABILITIES.REPAIR_CUSTOMER_OVERRIDE,
+]);
+
+const INVENTORY_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.INVENTORY_ADJUST,
+  POSITION_CAPABILITIES.INVENTORY_TRANSFER,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
@@ -36,7 +43,11 @@ const legacyCapabilitiesForRole = (role) => {
   const normalized = normalizeUpper(role);
 
   if (normalized === 'OWNER' || normalized === 'MANAGER') {
-    return [POSITION_CAPABILITIES.EMPLOYEE_MANAGE, ...REPAIR_CAPABILITIES];
+    return [
+      POSITION_CAPABILITIES.EMPLOYEE_MANAGE,
+      ...REPAIR_CAPABILITIES,
+      ...INVENTORY_CAPABILITIES,
+    ];
   }
 
   if (normalized === 'CASHIER') {
@@ -100,6 +111,7 @@ const hasCapability = (actor, capability) => {
 module.exports = {
   POSITION_CAPABILITIES,
   REPAIR_CAPABILITIES,
+  INVENTORY_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,

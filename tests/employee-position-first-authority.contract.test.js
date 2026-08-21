@@ -4,6 +4,7 @@ const assert = require('assert')
 const {
   POSITION_CAPABILITIES,
   REPAIR_CAPABILITIES,
+  INVENTORY_CAPABILITIES,
   resolveActorCapabilities,
   hasCapability,
 } = require('../src/modules/employee/authorization/employeePositionAuthority')
@@ -13,6 +14,8 @@ const REPAIR_INTAKE = POSITION_CAPABILITIES.REPAIR_INTAKE
 const REPAIR_WORKFLOW = POSITION_CAPABILITIES.REPAIR_WORKFLOW
 const REPAIR_PARTS = POSITION_CAPABILITIES.REPAIR_PARTS
 const REPAIR_CUSTOMER_OVERRIDE = POSITION_CAPABILITIES.REPAIR_CUSTOMER_OVERRIDE
+const INVENTORY_ADJUST = POSITION_CAPABILITIES.INVENTORY_ADJUST
+const INVENTORY_TRANSFER = POSITION_CAPABILITIES.INVENTORY_TRANSFER
 
 {
   const legacyManager = resolveActorCapabilities({
@@ -23,6 +26,13 @@ const REPAIR_CUSTOMER_OVERRIDE = POSITION_CAPABILITIES.REPAIR_CUSTOMER_OVERRIDE
   assert.equal(legacyManager.mode, 'V2_ROLE_COMPAT')
   assert.equal(legacyManager.capabilities.includes(EMPLOYEE_MANAGE), true)
   for (const capability of REPAIR_CAPABILITIES) {
+    assert.equal(
+      legacyManager.capabilities.includes(capability),
+      true,
+      `legacy MANAGER must preserve ${capability} during migration`,
+    )
+  }
+  for (const capability of INVENTORY_CAPABILITIES) {
     assert.equal(
       legacyManager.capabilities.includes(capability),
       true,
@@ -40,6 +50,16 @@ assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'MANAGER', positionCapabilities: [] }, REPAIR_WORKFLOW),
   false,
   'an explicitly migrated position must override legacy MANAGER repair authority',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'MANAGER', positionCapabilities: [] }, INVENTORY_ADJUST),
+  false,
+  'an explicitly migrated position must override legacy MANAGER inventory adjustment authority',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'MANAGER', positionCapabilities: [] }, INVENTORY_TRANSFER),
+  false,
+  'an explicitly migrated position must override legacy MANAGER inventory transfer authority',
 )
 assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [EMPLOYEE_MANAGE] }, EMPLOYEE_MANAGE),
@@ -62,6 +82,16 @@ assert.equal(
   'legacy CASHIER must not gain customer ownership override authority',
 )
 assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, INVENTORY_ADJUST),
+  false,
+  'legacy CASHIER must not gain inventory adjustment authority',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, INVENTORY_TRANSFER),
+  false,
+  'legacy CASHIER must not gain inventory transfer authority',
+)
+assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [REPAIR_WORKFLOW] }, REPAIR_WORKFLOW),
   true,
   'migrated position must be able to grant repair workflow independent of v2Role',
@@ -70,6 +100,16 @@ assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [REPAIR_CUSTOMER_OVERRIDE] }, REPAIR_CUSTOMER_OVERRIDE),
   true,
   'migrated position must be able to grant customer ownership override independent of v2Role',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [INVENTORY_ADJUST] }, INVENTORY_ADJUST),
+  true,
+  'migrated position must be able to grant inventory adjustment independent of v2Role',
+)
+assert.equal(
+  hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: [INVENTORY_TRANSFER] }, INVENTORY_TRANSFER),
+  true,
+  'migrated position must be able to grant inventory transfer independent of v2Role',
 )
 assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: null }, REPAIR_WORKFLOW),
@@ -85,6 +125,16 @@ assert.equal(
   hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, REPAIR_WORKFLOW),
   true,
   'platform ADMIN authority remains intact during position migration',
+)
+assert.equal(
+  hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, INVENTORY_ADJUST),
+  true,
+  'platform ADMIN keeps inventory adjustment authority during position migration',
+)
+assert.equal(
+  hasCapability({ role: 'ADMIN', employeeRole: 'CASHIER', positionCapabilities: [] }, INVENTORY_TRANSFER),
+  true,
+  'platform ADMIN keeps inventory transfer authority during position migration',
 )
 assert.equal(
   hasCapability({ role: 'EMPLOYEE', employeeRole: 'CASHIER', positionCapabilities: null }, EMPLOYEE_MANAGE),
