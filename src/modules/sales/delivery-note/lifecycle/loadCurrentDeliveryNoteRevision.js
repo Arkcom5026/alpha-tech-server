@@ -22,24 +22,46 @@ const mapPersistedRevisionLineToPrint = (line) => Object.freeze({
   snapshot: line.snapshot || null,
 });
 
+const CURRENT_REVISION_INCLUDE = Object.freeze({
+  lines: { orderBy: { sortOrder: 'asc' } },
+  returnSources: { orderBy: [{ returnedAt: 'asc' }, { id: 'asc' }] },
+  replacesDocument: {
+    select: {
+      id: true,
+      documentNumber: true,
+      revisionNumber: true,
+      state: true,
+    },
+  },
+});
+
 const loadCurrentDeliveryNoteRevision = async ({ prisma, branchId, saleId }) => {
   if (!prisma?.deliveryNoteDocument) return null;
-  const key = currentKeyOf({ branchId, saleId });
-  const current = await prisma.deliveryNoteDocument.findUnique({
+  const normalizedBranchId = Number(branchId);
+  const normalizedSaleId = Number(saleId);
+  const key = currentKeyOf({ branchId: normalizedBranchId, saleId: normalizedSaleId });
+
+  let current = await prisma.deliveryNoteDocument.findUnique({
     where: { currentKey: key },
-    include: {
-      lines: { orderBy: { sortOrder: 'asc' } },
-      returnSources: { orderBy: [{ returnedAt: 'asc' }, { id: 'asc' }] },
-      replacesDocument: {
-        select: {
-          id: true,
-          documentNumber: true,
-          revisionNumber: true,
-          state: true,
-        },
-      },
-    },
+    include: CURRENT_REVISION_INCLUDE,
   });
+
+  // Wave 2B originally materialized currentKey from the Sale object before the
+  // key helper accepted Sale.id. Existing rows may therefore carry a malformed
+  // key such as "<branch>:NaN" even though branchId/saleId/state are correct.
+  // Keep reads immutable and recover those rows by canonical persisted identity.
+  if (!current) {
+    current = await prisma.deliveryNoteDocument.findFirst({
+      where: {
+        branchId: normalizedBranchId,
+        saleId: normalizedSaleId,
+        state: 'CURRENT',
+      },
+      orderBy: { revisionNumber: 'desc' },
+      include: CURRENT_REVISION_INCLUDE,
+    });
+  }
+
   if (!current) return null;
 
   return Object.freeze({

@@ -120,13 +120,33 @@ const createDocumentFromAuthority = async (tx, authority) => tx.deliveryNoteDocu
   },
 });
 
+const CURRENT_DOCUMENT_INCLUDE = Object.freeze({
+  lines: { orderBy: { sortOrder: 'asc' } },
+  returnSources: true,
+});
+
 const ensureOriginalMaterialized = async (tx, { sale, createdById }) => {
   const key = currentKeyOf(sale);
   const current = await tx.deliveryNoteDocument.findUnique({
     where: { currentKey: key },
-    include: { lines: { orderBy: { sortOrder: 'asc' } }, returnSources: true },
+    include: CURRENT_DOCUMENT_INCLUDE,
   });
   if (current) return current;
+
+  // Compatibility for rows created before currentKeyOf accepted Sale.id. Those
+  // rows can have a malformed currentKey while their persisted branch/sale/state
+  // identity remains authoritative. Reuse the existing current revision rather
+  // than materializing a duplicate original or blocking a later R3/R4 revision.
+  const legacyCurrent = await tx.deliveryNoteDocument.findFirst({
+    where: {
+      branchId: Number(sale.branchId),
+      saleId: Number(sale.id),
+      state: 'CURRENT',
+    },
+    orderBy: { revisionNumber: 'desc' },
+    include: CURRENT_DOCUMENT_INCLUDE,
+  });
+  if (legacyCurrent) return legacyCurrent;
 
   const latest = await tx.deliveryNoteDocument.findFirst({
     where: { branchId: sale.branchId, saleId: sale.id },
@@ -228,9 +248,6 @@ const createReturnAdjustedDeliveryNoteRevision = async ({
         createdById: normalizedEmployeeId,
       });
 
-      // Provenance is one-time consumption, not timestamp inference. A completed
-      // Sale Return already linked to any revision in this sale lineage cannot
-      // be reused as evidence for a later revision.
       const returnSources = await loadUnconsumedCompletedReturns(tx, {
         branchId: normalizedBranchId,
         saleId: normalizedSaleId,
