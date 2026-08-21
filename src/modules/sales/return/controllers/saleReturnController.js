@@ -10,7 +10,13 @@ const {
 const buildActorContext = (req) => ({
   branchId: Number(req.user?.branchId),
   employeeId: Number(req.user?.employeeId),
-  actorRole: String(req.user?.role || ''),
+  role: String(req.user?.role || ''),
+  employeeRole: req.user?.employeeRole || req.user?.v2Role || null,
+  v2Role: req.user?.v2Role || req.user?.employeeRole || null,
+  positionCapabilities: Array.isArray(req.user?.positionCapabilities)
+    ? req.user.positionCapabilities
+    : null,
+  isSuperAdmin: Boolean(req.user?.isSuperAdmin),
 });
 
 const sendError = (res, error) => {
@@ -48,7 +54,7 @@ const completeSaleReturnController = async (req, res) => {
       );
     }
     const command = validateSaleReturnCommand(req.body);
-    const result = await completeSaleReturn({ command, ...actor });
+    const result = await completeSaleReturn({ command, actor });
     return res.status(result.idempotency?.replayed ? 200 : 201).json(result);
   } catch (error) {
     return sendError(res, error);
