@@ -69,6 +69,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   TAX_WITHHOLDING_FILING_SUBMIT: 'tax.withholding.filing.submit',
   TAX_ISSUER_PROFILE_READ: 'tax.issuer-profile.read',
   TAX_ISSUER_PROFILE_MANAGE: 'tax.issuer-profile.manage',
+  TAX_PUBLICATION_RETRY_READ: 'tax.publication-retry.read',
+  TAX_PUBLICATION_RETRY_EXECUTE: 'tax.publication-retry.execute',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -182,6 +184,11 @@ const TAX_ISSUER_PROFILE_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.TAX_ISSUER_PROFILE_MANAGE,
 ]);
 
+const TAX_PUBLICATION_RETRY_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.TAX_PUBLICATION_RETRY_READ,
+  POSITION_CAPABILITIES.TAX_PUBLICATION_RETRY_EXECUTE,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -212,6 +219,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...TAX_VAT_CARRY_FORWARD_CAPABILITIES,
       ...TAX_WITHHOLDING_CAPABILITIES,
       ...TAX_ISSUER_PROFILE_CAPABILITIES,
+      ...TAX_PUBLICATION_RETRY_CAPABILITIES,
       POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
@@ -315,6 +323,7 @@ module.exports = {
   TAX_VAT_CARRY_FORWARD_CAPABILITIES,
   TAX_WITHHOLDING_CAPABILITIES,
   TAX_ISSUER_PROFILE_CAPABILITIES,
+  TAX_PUBLICATION_RETRY_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
