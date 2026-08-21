@@ -5,6 +5,10 @@ const router = express.Router()
 const quickStockController = require('../controllers/quickStockController')
 const quickReceiveDropdownController = require('../controllers/quickReceiveDropdownController')
 const quickReceiptSessionController = require('../controllers/quickReceiptSessionController')
+const {
+  QUICK_STOCK_CAPABILITY,
+  allowQuickStockCapabilities,
+} = require('../shared/quickStockAuthorization')
 
 const handleQuickEnroll = quickStockController?.handleQuickEnroll
   ? quickStockController.handleQuickEnroll.bind(quickStockController)
@@ -42,12 +46,15 @@ const allowQuickStockForEmployeeContext = (req, res, next) => {
 
 router.use(verifyToken, allowQuickStockForEmployeeContext)
 
+const allowQuickStockMutation = allowQuickStockCapabilities(QUICK_STOCK_CAPABILITY.MUTATE)
+
 router.get('/dropdowns', handleQuickReceiveDropdowns)
-router.post('/quick-enroll', handleQuickEnroll)
-router.post('/all-in-one', handleQuickStockInAllInOne)
-router.post('/existing', handleQuickStockExistingReceive)
+router.post('/quick-enroll', allowQuickStockMutation, handleQuickEnroll)
+router.post('/all-in-one', allowQuickStockMutation, handleQuickStockInAllInOne)
+router.post('/existing', allowQuickStockMutation, handleQuickStockExistingReceive)
 
 // Quick Receipt Session: one delivery note, many product types, resumable or one-shot.
+// Its authority remains separate and is intentionally not migrated in Wave 2F.
 router.get('/receipts', quickReceiptSessionController.list)
 router.post('/receipts', quickReceiptSessionController.create)
 router.post('/receipts/complete', quickReceiptSessionController.complete)
