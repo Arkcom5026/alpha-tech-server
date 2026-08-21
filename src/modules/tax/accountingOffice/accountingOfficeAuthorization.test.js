@@ -43,8 +43,9 @@ test('accounting office route is position-gated while controller retains branch 
   assert.doesNotMatch(controller, /ACCOUNTING_OFFICE_ACCESS_FORBIDDEN/);
   assert.match(controller, /ACCOUNTING_OFFICE_BRANCH_FORBIDDEN/);
 
-  // Adjacent tax administration surfaces remain outside Wave 2V.
-  assert.match(routes, /router\.get\('\/tax-readiness\/:taxPeriodId', unifiedTaxReadinessController\.getWorkspace\)/);
+  // Adjacent tax administration surfaces remain outside Wave 2V unless a later
+  // Position-authority wave has explicitly claimed them.
+  assert.match(routes, /router\.get\('\/tax-readiness\/:taxPeriodId', allowTaxReadinessRead, unifiedTaxReadinessController\.getWorkspace\)/);
   assert.match(routes, /router\.get\('\/vat-settlement\/:taxPeriodId', vatSettlementController\.getPreparation\)/);
   assert.match(routes, /router\.get\('\/vat-carry-forward\/:taxPeriodId', vatCarryForwardController\.getAuthority\)/);
   assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', withholdingTaxController\.getWorkspace\)/);
