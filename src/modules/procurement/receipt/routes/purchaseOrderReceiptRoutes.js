@@ -16,21 +16,31 @@ const printReceiptController = require('../barcode/print/printReceiptController'
 const updateReceiptItemController = require('../item/update/updateReceiptItemController');
 const finalizeReceiptController = require('../finalize/finalizeReceiptController');
 const commitReceiptController = require('../commit/commitReceiptController');
+const {
+  PURCHASE_RECEIPT_CAPABILITY,
+  allowPurchaseReceiptCapabilities,
+} = require('../shared/purchaseReceiptAuthorization');
 
 const verifyToken = require('../../../../../middlewares/verifyToken');
 router.use(verifyToken);
 
-router.post('/', createPurchaseReceiptController.handle);
-router.get('/', listPurchaseReceiptsController.handle);
-router.get('/ready-to-pay', listReceiptsReadyToPayController.handle);
-router.get('/with-barcode-status', listReceiptBarcodeSummariesController.handle);
-router.get('/summaries', listReceiptBarcodeSummariesController.handle);
-router.get('/receipt-barcode-summaries', listReceiptBarcodeSummariesController.handle);
-router.post('/quick-receipts', createQuickReceiptController.handle);
-router.get('/:id', getPurchaseReceiptController.handle);
-router.get('/:receiptId/items', listReceiptItemsController.handle);
+const allowReceiptAccess = allowPurchaseReceiptCapabilities(PURCHASE_RECEIPT_CAPABILITY.ACCESS);
+const allowReceiptFinalize = allowPurchaseReceiptCapabilities(
+  PURCHASE_RECEIPT_CAPABILITY.ACCESS,
+  PURCHASE_RECEIPT_CAPABILITY.FINALIZE,
+);
 
-router.patch('/:receiptId/items/:itemId', (req, res) => {
+router.post('/', allowReceiptAccess, createPurchaseReceiptController.handle);
+router.get('/', allowReceiptAccess, listPurchaseReceiptsController.handle);
+router.get('/ready-to-pay', allowReceiptAccess, listReceiptsReadyToPayController.handle);
+router.get('/with-barcode-status', allowReceiptAccess, listReceiptBarcodeSummariesController.handle);
+router.get('/summaries', allowReceiptAccess, listReceiptBarcodeSummariesController.handle);
+router.get('/receipt-barcode-summaries', allowReceiptAccess, listReceiptBarcodeSummariesController.handle);
+router.post('/quick-receipts', allowReceiptAccess, createQuickReceiptController.handle);
+router.get('/:id', allowReceiptAccess, getPurchaseReceiptController.handle);
+router.get('/:receiptId/items', allowReceiptAccess, listReceiptItemsController.handle);
+
+router.patch('/:receiptId/items/:itemId', allowReceiptAccess, (req, res) => {
   req.body = {
     ...(req.body || {}),
     receiptId: Number(req.params.receiptId),
@@ -39,13 +49,13 @@ router.patch('/:receiptId/items/:itemId', (req, res) => {
   return updateReceiptItemController.handle(req, res);
 });
 
-router.put('/:id', updatePurchaseReceiptNoteController.handle);
-router.delete('/:id', deletePurchaseReceiptController.handle);
-router.post('/:id/finalize', finalizeReceiptController.handle);
-router.patch('/:id/finalize', finalizeReceiptController.handle);
-router.patch('/:id/printed', markReceiptPrintedController.handle);
-router.post('/:id/generate-barcodes', generateReceiptBarcodesController.handle);
-router.post('/:id/print', printReceiptController.handle);
-router.post('/:id/commit', commitReceiptController.handle);
+router.put('/:id', allowReceiptAccess, updatePurchaseReceiptNoteController.handle);
+router.delete('/:id', allowReceiptFinalize, deletePurchaseReceiptController.handle);
+router.post('/:id/finalize', allowReceiptFinalize, finalizeReceiptController.handle);
+router.patch('/:id/finalize', allowReceiptFinalize, finalizeReceiptController.handle);
+router.patch('/:id/printed', allowReceiptAccess, markReceiptPrintedController.handle);
+router.post('/:id/generate-barcodes', allowReceiptAccess, generateReceiptBarcodesController.handle);
+router.post('/:id/print', allowReceiptAccess, printReceiptController.handle);
+router.post('/:id/commit', allowReceiptFinalize, commitReceiptController.handle);
 
 module.exports = router;
