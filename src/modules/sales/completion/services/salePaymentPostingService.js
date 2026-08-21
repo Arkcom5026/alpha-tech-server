@@ -11,6 +11,9 @@ const {
 const {
   acquireCustomerMoneyTransactionLock,
 } = require('../../../customer-money/shared/customerMoneyTransactionLock');
+const {
+  calculateNetReceivableTotal,
+} = require('../../shared/creditReceivableAuthority');
 
 const D = (value) => new Prisma.Decimal(Number(value || 0).toFixed(2));
 const n = (value) => Number(value || 0);
@@ -176,7 +179,15 @@ const findLatestActiveDepositSaleApplication = async (tx, saleId) => {
 const projectSalePaymentStatus = async (tx, saleId) => {
   await acquireSalePaymentProjectionLock(tx, saleId);
 
-  const sale = await tx.sale.findUnique({ where: { id: saleId }, select: { totalAmount: true, status: true } });
+  const sale = await tx.sale.findUnique({
+    where: { id: saleId },
+    select: {
+      totalAmount: true,
+      status: true,
+      items: { select: { price: true, returnedQuantity: true } },
+      simpleItems: { select: { quantity: true, price: true, returnedQuantity: true } },
+    },
+  });
   if (!sale) throw new SalesError(404, 'SALE_NOT_FOUND', 'Sale not found');
 
   const [paymentAggregate, receiptAllocationAggregate, depositApplicationAggregate, settlementAggregate] = await Promise.all([
@@ -194,7 +205,7 @@ const projectSalePaymentStatus = async (tx, saleId) => {
     .plus(D(depositApplicationAggregate._sum.amount || 0))
     .plus(D(settlementAggregate._sum.appliedAmount || 0));
   const paidNumber = n(paidAmount);
-  const total = n(sale.totalAmount);
+  const total = calculateNetReceivableTotal(sale);
   const paid = paidNumber + 0.001 >= total;
   const statusPayment = paid ? 'PAID' : paidNumber > 0 ? 'PARTIALLY_PAID' : 'UNPAID';
 
@@ -228,7 +239,7 @@ const projectSalePaymentStatus = async (tx, saleId) => {
     where: { id: saleId },
     data: { paid, paidAt, paidAmount, statusPayment },
   });
-  return { paid, paidAt, paidAmount, statusPayment, totalAmount: sale.totalAmount };
+  return { paid, paidAt, paidAmount, statusPayment, totalAmount: total };
 };
 
 const postPaymentEvidence = async (tx, { sale, branchId, employeeId, payment, code }) => {
