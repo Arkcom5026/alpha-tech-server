@@ -7,6 +7,7 @@ const {
   getSaleDeliveryNote,
   getSaleDeliveryNoteRevisions,
   getSaleDeliveryNoteRevision,
+  getSaleDeliveryNoteRevisionPrint,
   issueSaleDeliveryNoteController,
 } = require('../documents/controllers/saleDeliveryNoteController');
 const {
@@ -64,6 +65,7 @@ router.post('/:id/document-replacement/lock', lockSaleDocumentReplacementControl
 router.put('/:id/document-lines', updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
 router.get('/:id/delivery-note/revisions', getSaleDeliveryNoteRevisions);
+router.get('/:id/delivery-note/revisions/:revisionId/print', getSaleDeliveryNoteRevisionPrint);
 router.get('/:id/delivery-note/revisions/:revisionId', getSaleDeliveryNoteRevision);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
 router.get('/:id/quotation-reference', getSaleQuotationReferenceController);
