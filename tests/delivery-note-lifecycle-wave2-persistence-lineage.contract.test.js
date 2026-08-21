@@ -41,6 +41,6 @@ assert.match(design, /return-adjusted document created as revision 2/i);
 assert.match(design, /historical gross 1,810/i);
 assert.match(design, /active 1,170/i);
 assert.match(design, /SaleDocumentReplacement/);
-assert.match(design, /must never create a Sale, StockMovement, payment, receivable, or tax event/i);
+assert.match(design, /must never create a Sale, StockMovement, payment, receivable, refund, or tax event/i);
 
 console.log('Delivery Note lifecycle Wave 2 persistence lineage contract: PASS');
