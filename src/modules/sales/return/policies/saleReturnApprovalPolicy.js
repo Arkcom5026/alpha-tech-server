@@ -1,18 +1,19 @@
 const { SaleReturnError } = require('../contracts/saleReturnError');
 const { SaleReturnFailureCode } = require('../contracts/saleReturnFailureCode');
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../../employee/authorization/employeePositionAuthority');
 
-const DEDUCTED_REFUND_ROLES = new Set(['OWNER', 'MANAGER', 'ADMIN', 'SUPER_ADMIN']);
-
-const assertCanApproveDeductedRefund = ({ deductedAmount, actorRole, employeeRole }) => {
+const assertCanApproveDeductedRefund = ({ deductedAmount, actor }) => {
   if (!deductedAmount.gt(0)) return;
-  const roles = [actorRole, employeeRole].map((role) => String(role || '').toUpperCase());
-  if (!roles.some((role) => DEDUCTED_REFUND_ROLES.has(role))) {
+  if (!hasCapability(actor, POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE)) {
     throw new SaleReturnError(
       403,
       SaleReturnFailureCode.DEDUCTION_APPROVAL_REQUIRED,
-      'OWNER, MANAGER or ADMIN approval is required for a deducted refund'
+      'Deducted refund approval permission is required'
     );
   }
 };
 
-module.exports = { assertCanApproveDeductedRefund, DEDUCTED_REFUND_ROLES };
+module.exports = { assertCanApproveDeductedRefund };
