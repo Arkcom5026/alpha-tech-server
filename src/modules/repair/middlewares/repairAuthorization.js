@@ -16,6 +16,7 @@ const REPAIR_CAPABILITY = Object.freeze({
   CLAIM: 'repair.claim',
   HANDOVER: 'repair.handover',
   CUSTOMER_ACCESS: 'repair.customer-access',
+  CUSTOMER_OVERRIDE: 'repair.customer-override',
 });
 
 const ALL_REPAIR_CAPABILITIES = Object.freeze(Object.values(REPAIR_CAPABILITY));
