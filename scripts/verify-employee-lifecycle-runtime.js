@@ -14,6 +14,7 @@ const syntaxFiles = [
   'src/modules/auth/session/runtime/sessionAuthRuntimeController.js',
   'src/modules/auth/session/runtime/sessionAuthRuntimeService.js',
   'src/modules/auth/session/runtime/sessionAuthRuntimeRepository.js',
+  'src/modules/employee/authorization/employeePositionAuthority.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js',
   'src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js',
@@ -162,7 +163,8 @@ assertContains(verifyToken, "'EMPLOYEE_NOT_APPROVED'", 'verifyToken approval gua
 assertContains(verifyToken, "'EMPLOYEE_INACTIVE'", 'verifyToken active guard');
 assertContains(verifyToken, 'employeeId,', 'verifyToken canonical employeeId projection');
 assertContains(verifyToken, 'branchId: employeeProfile?.branchId || null', 'verifyToken DB branch projection');
-assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole projection');
+assertContains(verifyToken, 'employeeRole:', 'verifyToken employeeRole compatibility projection');
+assertContains(verifyToken, 'positionCapabilities:', 'verifyToken position capability projection');
 
 const server = read('server.js');
 const employeeModuleRoute = read('src/modules/employee/routes/employeeRoutes.js');
@@ -216,14 +218,17 @@ assertContains(productTypeBrandRoute, "require('../runtime/brandRuntimeControlle
 assertContains(productProfileRoute, "code: 'PRODUCT_PROFILE_REMOVED'", 'product profile retirement boundary');
 assertNotContains(productProfileRoute, 'productProfileController', 'product profile redundant controller reference');
 
+const employeePositionAuthority = read('src/modules/employee/authorization/employeePositionAuthority.js');
 const employeeOnboardingController = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeController.js');
 const employeeOnboardingService = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeService.js');
 const employeeOnboardingRepository = read('src/modules/employee/onboarding/runtime/employeeOnboardingRuntimeRepository.js');
 assertContains(employeeOnboardingController, "require('./employeeOnboardingRuntimeService')", 'employee onboarding controller service boundary');
 assertContains(employeeOnboardingController, 'addSubEmployee: service.addSubEmployee', 'employee onboarding controller handler export');
 assertContains(employeeOnboardingService, 'canCreateEmployee', 'employee onboarding authority guard');
-assertContains(employeeOnboardingService, "employeeRole === 'OWNER'", 'employee onboarding OWNER authority');
-assertContains(employeeOnboardingService, "employeeRole === 'MANAGER'", 'employee onboarding MANAGER authority');
+assertContains(employeeOnboardingService, 'POSITION_CAPABILITIES.EMPLOYEE_MANAGE', 'employee onboarding position capability authority');
+assertContains(employeeOnboardingService, 'hasCapability(actor, POSITION_CAPABILITIES.EMPLOYEE_MANAGE)', 'employee onboarding centralized capability guard');
+assertContains(employeePositionAuthority, "mode: 'V2_ROLE_COMPAT'", 'employee onboarding v2Role compatibility fallback');
+assertContains(employeePositionAuthority, "normalized === 'OWNER' || normalized === 'MANAGER'", 'employee onboarding legacy role compatibility');
 assertContains(employeeOnboardingService, "code: 'EMPLOYEE_ONBOARDING_FORBIDDEN'", 'employee onboarding forbidden response');
 assertContains(employeeOnboardingService, 'positionId,', 'employee onboarding position assignment');
 assertContains(employeeOnboardingService, 'approved: true', 'owner-created employee auto approval');
