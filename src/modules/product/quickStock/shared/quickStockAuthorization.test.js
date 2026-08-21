@@ -62,7 +62,7 @@ test('platform admin keeps quick stock mutation authority', () => {
   assert.equal(result.nextError, undefined);
 });
 
-test('one-shot quick stock mutations are gated while dropdowns and Quick Receipt remain separate', () => {
+test('one-shot quick stock mutations stay on their own guard while Quick Receipt uses its separate authority', () => {
   const routes = fs.readFileSync(
     path.join(__dirname, '../routes/quickStockRoutes.js'),
     'utf8',
@@ -72,6 +72,6 @@ test('one-shot quick stock mutations are gated while dropdowns and Quick Receipt
   assert.match(routes, /router\.post\('\/all-in-one', allowQuickStockMutation, handleQuickStockInAllInOne\)/);
   assert.match(routes, /router\.post\('\/existing', allowQuickStockMutation, handleQuickStockExistingReceive\)/);
   assert.match(routes, /router\.get\('\/dropdowns', handleQuickReceiveDropdowns\)/);
-  assert.match(routes, /router\.post\('\/receipts', quickReceiptSessionController\.create\)/);
-  assert.match(routes, /router\.post\('\/receipts\/:id\/finalize', quickReceiptSessionController\.finalize\)/);
+  assert.match(routes, /router\.post\('\/receipts', allowQuickReceiptAccess, quickReceiptSessionController\.create\)/);
+  assert.match(routes, /router\.post\('\/receipts\/:id\/finalize', allowQuickReceiptFinalize, quickReceiptSessionController\.finalize\)/);
 });
