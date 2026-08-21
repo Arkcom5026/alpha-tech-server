@@ -18,7 +18,10 @@ assert.match(service, /nextRevisionNumber = Number\(predecessor\.revisionNumber\
 assert.match(service, /originalDocumentNumber: sale\.officialDocumentNumber/);
 assert.match(service, /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/);
 assert.match(controller, /createReturnAdjustedDeliveryNoteRevision/);
-assert.match(controller, /employeeId: req\.user\?\.employeeId/);
+assert.match(controller, /const authenticatedEmployeeId = \(req\) =>/);
+assert.match(controller, /const employeeId = Number\(req\.user\?\.employeeId\)/);
+assert.match(controller, /const employeeId = authenticatedEmployeeId\(req\)/);
+assert.match(controller, /employeeId,/);
 assert.match(controller, /Numbering is server-owned/);
 assert.doesNotMatch(controller, /req\.body.*documentNumber/);
 assert.match(routes, /router\.post\('\/:id\/delivery-note\/revisions', allowSalesCore, createSaleDeliveryNoteRevision\)/);
