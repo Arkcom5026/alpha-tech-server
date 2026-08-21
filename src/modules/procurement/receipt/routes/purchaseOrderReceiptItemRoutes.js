@@ -6,17 +6,23 @@ const updateReceiptItemController = require('../item/update/updateReceiptItemCon
 const deleteReceiptItemController = require('../item/delete/deleteReceiptItemController');
 const listReceiptItemsController = require('../query/items/listReceiptItemsController');
 const listPurchaseOrderItemsController = require('../query/po-items/listPurchaseOrderItemsController');
+const {
+  PURCHASE_RECEIPT_CAPABILITY,
+  allowPurchaseReceiptCapabilities,
+} = require('../shared/purchaseReceiptAuthorization');
 const verifyToken = require('../../../../../middlewares/verifyToken');
 
 router.use(verifyToken);
 
-router.post('/', addReceiptItemController.handle);
-router.put('/update', updateReceiptItemController.handle);
-router.patch('/update', updateReceiptItemController.handle);
-router.get('/by-receipt/:receiptId', listReceiptItemsController.handle);
-router.delete('/:id', deleteReceiptItemController.handle);
+const allowReceiptAccess = allowPurchaseReceiptCapabilities(PURCHASE_RECEIPT_CAPABILITY.ACCESS);
 
-router.get('/:id/po-items', listPurchaseOrderItemsController.handle);
-router.get('/po/:poId/items', listPurchaseOrderItemsController.handle);
+router.post('/', allowReceiptAccess, addReceiptItemController.handle);
+router.put('/update', allowReceiptAccess, updateReceiptItemController.handle);
+router.patch('/update', allowReceiptAccess, updateReceiptItemController.handle);
+router.get('/by-receipt/:receiptId', allowReceiptAccess, listReceiptItemsController.handle);
+router.delete('/:id', allowReceiptAccess, deleteReceiptItemController.handle);
+
+router.get('/:id/po-items', allowReceiptAccess, listPurchaseOrderItemsController.handle);
+router.get('/po/:poId/items', allowReceiptAccess, listPurchaseOrderItemsController.handle);
 
 module.exports = router;
