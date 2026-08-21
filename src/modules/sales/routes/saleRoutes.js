@@ -3,7 +3,12 @@ const verifyToken = require('../../../../middlewares/verifyToken');
 const { completeSaleController } = require('../completion/controllers/saleCompletionController');
 const { createSale } = require('../create/controllers/saleLegacyCreateController');
 const { updateSaleDocumentLinesController } = require('../documents/controllers/saleDocumentController');
-const { getSaleDeliveryNote, issueSaleDeliveryNoteController } = require('../documents/controllers/saleDeliveryNoteController');
+const {
+  getSaleDeliveryNote,
+  getSaleDeliveryNoteRevisions,
+  getSaleDeliveryNoteRevision,
+  issueSaleDeliveryNoteController,
+} = require('../documents/controllers/saleDeliveryNoteController');
 const {
   createSaleDocumentPreparationController,
   getSaleDocumentPreparationController,
@@ -58,6 +63,8 @@ router.put('/:id/document-replacement/lines', replaceSaleDocumentReplacementLine
 router.post('/:id/document-replacement/lock', lockSaleDocumentReplacementController);
 router.put('/:id/document-lines', updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
+router.get('/:id/delivery-note/revisions', getSaleDeliveryNoteRevisions);
+router.get('/:id/delivery-note/revisions/:revisionId', getSaleDeliveryNoteRevision);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
 router.get('/:id/quotation-reference', getSaleQuotationReferenceController);
 router.put('/:id/document-descriptions', updateSaleDocumentLinesController);
