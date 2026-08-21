@@ -7,17 +7,9 @@ const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 const resolveBranchId = (req, source) => {
   const requestedBranchId = Number(source?.branchId);
   const accountRole = normalizeRole(req.user?.role);
-  const employeeRole = normalizeRole(req.user?.employeeRole || req.user?.position);
   const authorityBranchId = Number(
     req.user?.branchId || req.user?.employeeBranchId || req.user?.currentBranchId || 0,
   );
-
-  if (!['SUPERADMIN', 'ADMIN'].includes(accountRole) && !['OWNER', 'MANAGER'].includes(employeeRole)) {
-    throw Object.assign(new Error('Tax intake requires OWNER or MANAGER authority'), {
-      code: 'TAX_INTAKE_ACCESS_FORBIDDEN',
-      statusCode: 403,
-    });
-  }
 
   if (
     !['SUPERADMIN', 'ADMIN'].includes(accountRole) &&
