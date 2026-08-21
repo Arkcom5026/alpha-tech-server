@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../employee/authorization/employeePositionAuthority');
+
 const InputTaxCapability = Object.freeze({
   VIEW: 'VIEW',
   REVIEW: 'REVIEW',
@@ -17,6 +22,20 @@ const InputTaxCapability = Object.freeze({
 const ACCOUNT_AUTHORITY_ROLES = new Set(['SUPERADMIN', 'ADMIN']);
 const EMPLOYEE_AUTHORITY_ROLES = new Set(['OWNER', 'MANAGER']);
 const KNOWN_CAPABILITIES = new Set(Object.values(InputTaxCapability));
+
+const POSITION_CAPABILITY_BY_INPUT_TAX_CAPABILITY = Object.freeze({
+  [InputTaxCapability.VIEW]: POSITION_CAPABILITIES.TAX_INPUT_READ,
+  [InputTaxCapability.EXPORT]: POSITION_CAPABILITIES.TAX_INPUT_READ,
+  [InputTaxCapability.REVIEW]: POSITION_CAPABILITIES.TAX_INPUT_REVIEW,
+  [InputTaxCapability.DECIDE_DUPLICATE]: POSITION_CAPABILITIES.TAX_INPUT_REVIEW,
+  [InputTaxCapability.DECIDE_REPLACEMENT]: POSITION_CAPABILITIES.TAX_INPUT_REVIEW,
+  [InputTaxCapability.RESOLVE_INVESTIGATION]: POSITION_CAPABILITIES.TAX_INPUT_REVIEW,
+  [InputTaxCapability.SELECT_FOR_FILING]: POSITION_CAPABILITIES.TAX_INPUT_FILING,
+  [InputTaxCapability.REMOVE_FROM_FILING]: POSITION_CAPABILITIES.TAX_INPUT_FILING,
+  [InputTaxCapability.FILE]: POSITION_CAPABILITIES.TAX_INPUT_FILING,
+  [InputTaxCapability.GENERATE_AUDIT_PACKAGE]: POSITION_CAPABILITIES.TAX_INPUT_AUDIT,
+  [InputTaxCapability.REOPEN_PERIOD]: POSITION_CAPABILITIES.TAX_INPUT_PERIOD_CONTROL,
+});
 
 const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 
@@ -48,11 +67,13 @@ const assertInputTaxAuthority = ({
   const accountRole = normalizeRole(user?.role);
   const employeeRole = normalizeRole(user?.employeeRole || user?.position);
   const isAccountAuthority = ACCOUNT_AUTHORITY_ROLES.has(accountRole);
-  const isEmployeeAuthority = EMPLOYEE_AUTHORITY_ROLES.has(employeeRole);
+  const requiredPositionCapability = POSITION_CAPABILITY_BY_INPUT_TAX_CAPABILITY[capability];
+  const isEmployeeAuthority = hasCapability(user, requiredPositionCapability);
 
   if (!isAccountAuthority && !isEmployeeAuthority) {
     throw createError(accessForbiddenCode, 'Input tax capability is not permitted for this actor', 403, {
       capability,
+      requiredPositionCapability,
       accountRole: accountRole || null,
       employeeRole: employeeRole || null,
     });
@@ -79,6 +100,7 @@ const assertInputTaxAuthority = ({
   return Object.freeze({
     branchId,
     capability,
+    requiredPositionCapability,
     accountRole,
     employeeRole,
     actorEmployeeId,
@@ -90,6 +112,7 @@ module.exports = Object.freeze({
   ACCOUNT_AUTHORITY_ROLES,
   EMPLOYEE_AUTHORITY_ROLES,
   InputTaxCapability,
+  POSITION_CAPABILITY_BY_INPUT_TAX_CAPABILITY,
   assertInputTaxAuthority,
   normalizeRole,
 });
