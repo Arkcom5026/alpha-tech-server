@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { compareHttpAnalytics } from './render-log-regression.mjs';
+import { classifyRegressionAlert, formatAlertSummary } from './render-log-alerting.mjs';
 
 const outputDir = path.resolve(process.env.RENDER_LOG_OUTPUT_DIR || 'artifacts/render-logs');
 const currentSummaryPath = path.resolve(process.env.RENDER_LOG_CURRENT_SUMMARY || path.join(outputDir, 'summary.json'));
@@ -38,6 +39,7 @@ const result = {
   } : null,
   comparison,
 };
+result.alerting = classifyRegressionAlert(result);
 
 const pct = (value) => value === null || value === undefined ? '-' : `${(Number(value) * 100).toFixed(1)}%`;
 const describeSignal = (item) => {
@@ -52,10 +54,14 @@ const text = [
   `Current sample maturity: ${result.current.sampleMaturity} (${result.current.requestCount} requests)`,
   `Previous baseline: ${result.previous ? `${result.previous.sampleMaturity || '-'} (${result.previous.requestCount ?? '-'} requests)` : 'not available'}`,
   '',
+  'Threshold / Alerting:',
+  ...formatAlertSummary(result.alerting),
+  '',
   'Guardrail:',
   '- LOW-sample snapshots never become degradation findings.',
   '- A metric must exceed both relative and absolute noise thresholds before it is classified as changed.',
-  '- Findings are evidence signals for review; they do not automatically block deployment in Wave 1.',
+  '- WARNING and CRITICAL are review priorities only; they do not automatically block deployment in Wave 1.',
+  '- CRITICAL is reserved for severe mature-sample 5xx or p95 latency regressions.',
   '',
   `Degraded signals: ${comparison.degradedSignals.length}`,
   ...comparison.degradedSignals.map(describeSignal),
