@@ -8,6 +8,7 @@ const POSITION_CAPABILITIES = Object.freeze({
   REPAIR_CLAIM: 'repair.claim',
   REPAIR_HANDOVER: 'repair.handover',
   REPAIR_CUSTOMER_ACCESS: 'repair.customer-access',
+  REPAIR_CUSTOMER_OVERRIDE: 'repair.customer-override',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -19,6 +20,7 @@ const REPAIR_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.REPAIR_CLAIM,
   POSITION_CAPABILITIES.REPAIR_HANDOVER,
   POSITION_CAPABILITIES.REPAIR_CUSTOMER_ACCESS,
+  POSITION_CAPABILITIES.REPAIR_CUSTOMER_OVERRIDE,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
