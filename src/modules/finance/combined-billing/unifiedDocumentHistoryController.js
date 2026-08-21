@@ -6,6 +6,10 @@ const {
   toLocalRange,
   toNum,
 } = require('../../sales/shared/saleLegacyProjection');
+const {
+  calculateReturnedReceivableAmount,
+  calculateNetReceivableTotal,
+} = require('../../sales/shared/creditReceivableAuthority');
 
 const PURPOSES = new Set(['BILL', 'DELIVERY_NOTE']);
 const CONSOLIDATED_SOURCE_TYPE = 'CONSOLIDATED_DELIVERY';
@@ -77,10 +81,12 @@ const taxSourceKind = (document) => (
 
 const projectSaleRow = ({ sale, payment, taxDocument }) => {
   const totalAmount = round2(toNum(sale.totalAmount));
+  const returnedAmount = round2(calculateReturnedReceivableAmount(sale));
+  const billableAmount = round2(calculateNetReceivableTotal(sale));
   const storedPaid = sale.paidAmount == null ? null : toNum(sale.paidAmount);
   const paidAmount = round2(Math.max(storedPaid == null ? 0 : storedPaid, payment?.paidAmount || 0));
-  const balanceAmount = round2(Math.max(0, totalAmount - paidAmount));
-  const isFullyPaid = totalAmount > 0 && paidAmount >= totalAmount;
+  const balanceAmount = round2(Math.max(0, billableAmount - paidAmount));
+  const isFullyPaid = billableAmount > 0 && paidAmount >= billableAmount;
 
   return {
     id: sale.id,
@@ -90,12 +96,16 @@ const projectSaleRow = ({ sale, payment, taxDocument }) => {
     createdAt: sale.createdAt,
     soldAt: sale.soldAt || null,
     totalAmount,
+    grossTotalAmount: totalAmount,
+    returnedAmount,
+    billableAmount,
+    hasReturn: returnedAmount > 0,
     paidAmount,
     balanceAmount,
     paid: Boolean(sale.paid || isFullyPaid),
     hasPayment: paidAmount > 0,
     isFullyPaid,
-    isPartiallyPaid: paidAmount > 0 && paidAmount < totalAmount,
+    isPartiallyPaid: paidAmount > 0 && paidAmount < billableAmount,
     lastPaidAt: payment?.lastPaidAt || null,
     customerName: sale.customer?.name || '-',
     companyName: sale.customer?.companyName || '-',
@@ -317,6 +327,8 @@ const unifiedDocumentHistory = async (req, res, next) => {
           paid: true,
           status: true,
           isCredit: true,
+          items: { select: { price: true, returnedQuantity: true } },
+          simpleItems: { select: { quantity: true, price: true, returnedQuantity: true } },
           customer: { select: { name: true, companyName: true, user: { select: { loginId: true } } } },
           employee: { select: { name: true } },
         },

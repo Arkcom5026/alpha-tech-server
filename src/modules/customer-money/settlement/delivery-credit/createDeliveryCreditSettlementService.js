@@ -16,7 +16,10 @@ const {
   projectSalePaymentStatus,
 } = require('../../../sales/completion/services/salePaymentPostingService');
 const { resolveFinancialCustomerGroup } = require('../../../customer/financial-group/customerFinancialGroupResolver');
-const { buildActiveCreditReceivableWhere } = require('../../../sales/shared/creditReceivableAuthority');
+const {
+  buildActiveCreditReceivableWhere,
+  calculateOutstandingReceivable,
+} = require('../../../sales/shared/creditReceivableAuthority');
 const {
   createSettlementConsolidatedDelivery,
   loadSettlementGeneratedDocument,
@@ -130,6 +133,7 @@ const selectSale = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
         basePrice: true,
         discount: true,
         price: true,
+        returnedQuantity: true,
         documentDescription: true,
         stockItem: { select: { product: { select: { name: true } } } },
       },
@@ -138,6 +142,7 @@ const selectSale = (tx, saleId, branchId, customerIds) => tx.sale.findFirst({
       select: {
         id: true,
         quantity: true,
+        returnedQuantity: true,
         basePrice: true,
         discount: true,
         price: true,
@@ -158,11 +163,28 @@ const lineSnapshot = (sale, requested) => {
     error.statusCode = 404;
     throw error;
   }
+
+  const originalQuantity = requested.lineType === 'STOCK'
+    ? 1
+    : Math.max(0, asNumber(source.quantity));
+  const returnedQuantity = Math.min(
+    originalQuantity,
+    Math.max(0, asNumber(source.returnedQuantity)),
+  );
+  const quantity = Math.max(0, originalQuantity - returnedQuantity);
+  const originalLineAmount = asNumber(source.price);
+  const lineAmount = originalQuantity > 0
+    ? Number((originalLineAmount * (quantity / originalQuantity)).toFixed(2))
+    : 0;
+
   return {
     description: source.documentDescription || source.stockItem?.product?.name || source.product?.name || 'สินค้า',
-    quantity: requested.lineType === 'STOCK' ? money(1) : money(source.quantity),
+    quantity: money(quantity),
+    originalQuantity: money(originalQuantity),
+    returnedQuantity: money(returnedQuantity),
     unitAmount: money(source.basePrice),
-    lineAmount: money(source.price),
+    originalLineAmount: money(originalLineAmount),
+    lineAmount: money(lineAmount),
   };
 };
 
@@ -331,7 +353,10 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
       _sum: { appliedAmount: true },
     });
     const alreadyAppliedAmount = money(alreadyApplied._sum.appliedAmount);
-    const remainingLine = snapshot.lineAmount.minus(alreadyAppliedAmount);
+    const remainingLine = Prisma.Decimal.max(
+      money(0),
+      snapshot.lineAmount.minus(alreadyAppliedAmount),
+    );
     if (money(requested.amount).greaterThan(remainingLine)) {
       const error = new Error('ยอดที่เลือกมากกว่ายอดคงเหลือของรายการสินค้า');
       error.code = 'SETTLEMENT_LINE_EXCEEDS_REMAINING';
@@ -354,7 +379,7 @@ const createDeliveryCreditSettlement = async ({ prisma, command }) => prisma.$tr
   }
   for (const [saleId, amount] of perSale.entries()) {
     const sale = sales.get(saleId);
-    const outstanding = money(sale.totalAmount).minus(money(sale.paidAmount));
+    const outstanding = money(calculateOutstandingReceivable(sale));
     if (amount.greaterThan(outstanding)) {
       const error = new Error('ยอดตัดชำระมากกว่ายอดค้างของใบส่งของ');
       error.code = 'SETTLEMENT_EXCEEDS_SALE_OUTSTANDING';
