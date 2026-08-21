@@ -3,12 +3,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const {
-  legacyCapabilitiesForRole,
-} = require('../src/modules/employee/authorization/employeePositionAuthority');
+const { legacyCapabilitiesForRole } = require('../src/modules/employee/authorization/employeePositionAuthority');
 
 const expected = legacyCapabilitiesForRole('TECHNICIAN');
-
 for (const capability of [
   'repair.read',
   'repair.workflow',
@@ -21,16 +18,14 @@ for (const capability of [
 ]) {
   assert(expected.includes(capability), `TECHNICIAN compatibility set must preserve ${capability}`);
 }
-
 assert(!expected.includes('employee.manage'));
 assert(!expected.includes('inventory.adjust'));
 assert(!expected.includes('inventory.transfer'));
 
-const script = fs.readFileSync(
-  path.join(__dirname, '..', 'scripts', 'repair-position-capabilities.js'),
-  'utf8',
-);
-
+const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'repair-position-capabilities.js'), 'utf8');
+assert(script.includes("['inspect', 'apply'].includes(mode)"));
+assert(script.includes("if (mode === 'apply')"));
+assert(script.includes("READ_ONLY_INSPECTION"));
 assert(script.includes("ALLOW_MAIN_DATABASE_POSITION_CAPABILITY_REPAIR !== 'YES'"));
 assert(script.includes('CONFIRM_POSITION_CAPABILITY_REPAIR_SCOPE'));
 assert(script.includes("profile !== 'TECHNICIAN'"));
