@@ -4,12 +4,13 @@ const { prisma } = require('../../../../../lib/prisma');
 const { getDeliveryNoteRevisionById } = require('../../delivery-note/lifecycle/deliveryNoteRevisionHistoryService');
 const { projectSaleDeliveryNote } = require('./projectSaleDeliveryNoteService');
 
-const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, revisionId }) => {
-  const [revision, legacyProjection] = await Promise.all([
-    getDeliveryNoteRevisionById({ prisma, branchId, saleId, revisionId }),
-    projectSaleDeliveryNote({ branchId, saleId, historicalRead: true }),
-  ]);
-
+const composeHistoricalRevisionPrintProjection = ({ revision, legacyProjection }) => {
+  const lifecycleActions = Object.freeze({
+    canCreateAdjustedRevision: false,
+    canConsolidate: false,
+    canInvoice: false,
+    canPrintHistorical: true,
+  });
   const document = Object.freeze({
     ...legacyProjection.document,
     documentNumber: revision.documentNumber,
@@ -23,12 +24,7 @@ const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, rev
     activeAmount: revision.activeAmount,
     historicalPrint: true,
     currentAuthority: revision.currentAuthority,
-    lifecycleActions: Object.freeze({
-      canCreateAdjustedRevision: false,
-      canConsolidate: false,
-      canInvoice: false,
-      canPrintHistorical: true,
-    }),
+    lifecycleActions,
     revision: Object.freeze({
       id: revision.id,
       revisionNumber: revision.revisionNumber,
@@ -60,7 +56,7 @@ const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, rev
       predecessor: revision.predecessor,
       successor: revision.successor,
       returnSources: revision.returnSources,
-      actions: document.lifecycleActions,
+      actions: lifecycleActions,
     }),
     deliveryNoteReadAuthority: Object.freeze({
       source: 'PERSISTED_HISTORICAL_REVISION',
@@ -75,4 +71,16 @@ const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, rev
   });
 };
 
-module.exports = Object.freeze({ projectHistoricalSaleDeliveryNoteRevision });
+const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, revisionId }) => {
+  const [revision, legacyProjection] = await Promise.all([
+    getDeliveryNoteRevisionById({ prisma, branchId, saleId, revisionId }),
+    projectSaleDeliveryNote({ branchId, saleId, historicalRead: true }),
+  ]);
+
+  return composeHistoricalRevisionPrintProjection({ revision, legacyProjection });
+};
+
+module.exports = Object.freeze({
+  composeHistoricalRevisionPrintProjection,
+  projectHistoricalSaleDeliveryNoteRevision,
+});
