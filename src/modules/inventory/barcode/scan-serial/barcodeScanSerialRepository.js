@@ -1,4 +1,5 @@
 const { prisma } = require('../../../../../lib/prisma');
+const { measurePerformance } = require('../../../../../lib/performanceTiming');
 
 const barcodeReceiptItemSelect = {
   kind: true,
@@ -15,28 +16,46 @@ const barcodeReceiptItemSelect = {
   },
 };
 
-const findReadyToScanSnReceipts = ({ branchId }) => prisma.purchaseOrderReceipt.findMany({
-  where: {
-    branchId,
-    barcodeReceiptItem: { some: {} },
+// This is intentionally a conservative superset of the service-level pending
+// rules. It removes receipts whose barcode rows are all fully received while
+// keeping the service as the final authority for SN/LOT classification.
+const pendingReceiptCandidateWhere = (branchId) => ({
+  branchId,
+  barcodeReceiptItem: {
+    some: {
+      OR: [
+        { status: { not: 'SN_RECEIVED' } },
+        { stockItemId: null },
+      ],
+    },
   },
-  include: {
-    purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
-    barcodeReceiptItem: { select: barcodeReceiptItemSelect },
-  },
-  orderBy: { createdAt: 'desc' },
-  take: 200,
 });
 
-const findReadyToScanReceipts = ({ branchId }) => prisma.purchaseOrderReceipt.findMany({
-  where: { branchId, barcodeReceiptItem: { some: {} } },
-  include: {
-    purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
-    barcodeReceiptItem: { select: barcodeReceiptItemSelect },
-  },
-  orderBy: { createdAt: 'desc' },
-  take: 200,
-});
+const findReadyToScanSnReceipts = ({ branchId }) => measurePerformance(
+  'barcodes.readyToScan.repo.snReceipts',
+  () => prisma.purchaseOrderReceipt.findMany({
+    where: pendingReceiptCandidateWhere(branchId),
+    include: {
+      purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
+      barcodeReceiptItem: { select: barcodeReceiptItemSelect },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  }),
+);
+
+const findReadyToScanReceipts = ({ branchId }) => measurePerformance(
+  'barcodes.readyToScan.repo.receipts',
+  () => prisma.purchaseOrderReceipt.findMany({
+    where: pendingReceiptCandidateWhere(branchId),
+    include: {
+      purchaseOrder: { select: { code: true, supplier: { select: { name: true } } } },
+      barcodeReceiptItem: { select: barcodeReceiptItemSelect },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  }),
+);
 
 const findBarcodeWithStockItem = ({ branchId, barcode }) => prisma.barcodeReceiptItem.findFirst({
   where: { barcode, branchId },
