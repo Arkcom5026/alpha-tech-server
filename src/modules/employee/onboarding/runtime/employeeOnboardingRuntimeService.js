@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const repository = require('./employeeOnboardingRuntimeRepository');
 const {
   POSITION_CAPABILITIES,
+  deriveCompatibilityRoleFromPosition,
   hasCapability,
 } = require('../../authorization/employeePositionAuthority');
 
@@ -42,13 +43,13 @@ const addSubEmployee = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = normalize(req.body?.password);
     const phone = normalize(req.body?.phone) || null;
-    const v2Role = normalizeUpper(req.body?.v2Role);
+    const requestedV2Role = normalizeUpper(req.body?.v2Role);
     const positionId = toPositiveInt(req.body?.positionId);
 
-    if (!name || !email || !password || !v2Role || !positionId) {
+    if (!name || !email || !password || !positionId) {
       return res.status(400).json({
         code: 'EMPLOYEE_ONBOARDING_FIELDS_REQUIRED',
-        message: 'กรุณากรอกชื่อ อีเมล รหัสผ่าน บทบาทในร้าน และตำแหน่งงานให้ครบถ้วน',
+        message: 'กรุณากรอกชื่อ อีเมล รหัสผ่าน และตำแหน่งงานให้ครบถ้วน',
       });
     }
 
@@ -63,13 +64,6 @@ const addSubEmployee = async (req, res) => {
       return res.status(400).json({
         code: 'EMPLOYEE_PASSWORD_TOO_SHORT',
         message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 8 ตัวอักษร',
-      });
-    }
-
-    if (!['MANAGER', 'CASHIER'].includes(v2Role)) {
-      return res.status(400).json({
-        code: 'EMPLOYEE_STORE_ROLE_INVALID',
-        message: 'บทบาทในร้านต้องเป็น MANAGER หรือ CASHIER',
       });
     }
 
@@ -89,6 +83,15 @@ const addSubEmployee = async (req, res) => {
       return res.status(400).json({
         code: 'EMPLOYEE_POSITION_NOT_FOUND',
         message: 'ไม่พบตำแหน่งงานที่ใช้งานได้ในสาขาปัจจุบัน กรุณาโหลดรายการตำแหน่งใหม่',
+      });
+    }
+
+    const positionDerivedRole = deriveCompatibilityRoleFromPosition(position);
+    const v2Role = positionDerivedRole || requestedV2Role;
+    if (!['MANAGER', 'CASHIER'].includes(v2Role)) {
+      return res.status(400).json({
+        code: 'EMPLOYEE_STORE_ROLE_INVALID',
+        message: 'ตำแหน่งงานนี้ยังใช้ระบบสิทธิ์เดิม กรุณาระบุบทบาทเดิมเป็น MANAGER หรือ CASHIER',
       });
     }
 
@@ -123,10 +126,6 @@ const addSubEmployee = async (req, res) => {
 
       return { user, employeeProfile };
     });
-
-    console.log(
-      `👥 [Employee Onboarding] "${name}" created for Branch ID: ${branchId}, Position ID: ${positionId}`,
-    );
 
     return res.status(201).json({
       ok: true,
