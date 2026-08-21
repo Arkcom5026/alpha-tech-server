@@ -16,6 +16,10 @@ const {
   allowTaxClosingHandoffCapabilities,
 } = require('../handoff/taxClosingHandoffAuthorization');
 const vatSettlementController = require('../settlement/vatSettlementController');
+const {
+  TAX_VAT_SETTLEMENT_CAPABILITY,
+  allowVatSettlementCapabilities,
+} = require('../settlement/vatSettlementAuthorization');
 const vatCarryForwardController = require('../settlement/vatCarryForwardController');
 const withholdingTaxController = require('../withholdingTax/withholdingTaxController');
 const unifiedTaxReadinessController = require('../readiness/unifiedTaxReadinessController');
@@ -46,6 +50,9 @@ const allowTaxClosingHandoffFinalize = allowTaxClosingHandoffCapabilities(
 const allowTaxReadinessRead = allowTaxReadinessCapabilities(
   TAX_READINESS_CAPABILITY.READ,
 );
+const allowVatSettlementRead = allowVatSettlementCapabilities(
+  TAX_VAT_SETTLEMENT_CAPABILITY.READ,
+);
 
 router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
 router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
@@ -54,7 +61,7 @@ router.get('/accounting-office/packages/:taxPeriodId', allowAccountingOfficeRead
 router.get('/tax-closing-handoff/:taxPeriodId', allowTaxClosingHandoffRead, taxClosingHandoffController.getBundle);
 router.post('/tax-closing-handoff/:taxPeriodId/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController.finalizeBundle);
 router.get('/tax-readiness/:taxPeriodId', allowTaxReadinessRead, unifiedTaxReadinessController.getWorkspace);
-router.get('/vat-settlement/:taxPeriodId', vatSettlementController.getPreparation);
+router.get('/vat-settlement/:taxPeriodId', allowVatSettlementRead, vatSettlementController.getPreparation);
 router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
 router.post('/vat-carry-forward/:taxPeriodId/confirm', vatCarryForwardController.confirmAuthority);
 router.get('/withholding-tax/:taxPeriodId', withholdingTaxController.getWorkspace);

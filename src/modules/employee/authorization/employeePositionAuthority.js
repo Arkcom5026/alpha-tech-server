@@ -59,6 +59,7 @@ const POSITION_CAPABILITIES = Object.freeze({
   TAX_CLOSING_HANDOFF_FINALIZE: 'tax.closing-handoff.finalize',
   TAX_ACCOUNTING_OFFICE_READ: 'tax.accounting-office.read',
   TAX_READINESS_READ: 'tax.readiness.read',
+  TAX_VAT_SETTLEMENT_READ: 'tax.vat-settlement.read',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -150,6 +151,10 @@ const TAX_READINESS_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.TAX_READINESS_READ,
 ]);
 
+const TAX_VAT_SETTLEMENT_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.TAX_VAT_SETTLEMENT_READ,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -176,6 +181,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...TAX_CLOSING_HANDOFF_CAPABILITIES,
       ...TAX_ACCOUNTING_OFFICE_CAPABILITIES,
       ...TAX_READINESS_CAPABILITIES,
+      ...TAX_VAT_SETTLEMENT_CAPABILITIES,
       POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
@@ -275,6 +281,7 @@ module.exports = {
   TAX_CLOSING_HANDOFF_CAPABILITIES,
   TAX_ACCOUNTING_OFFICE_CAPABILITIES,
   TAX_READINESS_CAPABILITIES,
+  TAX_VAT_SETTLEMENT_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
