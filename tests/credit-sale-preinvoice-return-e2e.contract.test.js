@@ -9,6 +9,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
 const authoritySource = read('src/modules/sales/shared/creditReceivableAuthority.js');
 const eligibilitySource = read('src/modules/customer-money/settlement/delivery-credit/listEligibleDeliveryCreditsService.js');
+const settlementCreateSource = read('src/modules/customer-money/settlement/delivery-credit/createDeliveryCreditSettlementService.js');
 const paymentProjectionSource = read('src/modules/sales/completion/services/salePaymentPostingService.js');
 const documentHistorySource = read('src/modules/finance/combined-billing/unifiedDocumentHistoryController.js');
 const saleReturnValidatorSource = read('src/modules/sales/return/validators/saleReturnValidator.js');
@@ -56,6 +57,16 @@ assert.match(eligibilitySource, /calculateReturnedReceivableAmount\(sale\)/);
 assert.match(eligibilitySource, /calculateNetReceivableTotal\(sale\)/);
 assert.match(eligibilitySource, /outstandingAmount:\s*outstanding\(sale\)/);
 assert.match(eligibilitySource, /line\.quantity > 0 && line\.remainingAmount > 0/);
+
+// Settlement write authority must independently re-check returned quantity/value.
+assert.match(settlementCreateSource, /calculateOutstandingReceivable/);
+assert.match(settlementCreateSource, /returnedQuantity:\s*true/);
+assert.match(settlementCreateSource, /originalQuantity/);
+assert.match(settlementCreateSource, /returnedQuantity/);
+assert.match(settlementCreateSource, /lineAmount = originalQuantity > 0/);
+assert.match(settlementCreateSource, /const outstanding = money\(calculateOutstandingReceivable\(sale\)\)/);
+assert.match(settlementCreateSource, /SETTLEMENT_LINE_EXCEEDS_REMAINING/);
+assert.match(settlementCreateSource, /SETTLEMENT_EXCEEDS_SALE_OUTSTANDING/);
 
 // Delivery-note history preserves original total but exposes the return adjustment and net balance.
 assert.match(documentHistorySource, /grossTotalAmount:\s*totalAmount/);
