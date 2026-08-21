@@ -7,6 +7,14 @@ const { mapCandidateToTaxDocumentDraft } = require('../../tax/candidates/mapping
 const candidateRepository = require('../../tax/candidates/repository/taxCandidateRepository');
 const taxDocumentRepository = require('../../tax/documents/repository/taxDocumentRepository');
 const { resolveFinancialCustomerGroup } = require('../../customer/financial-group/customerFinancialGroupResolver');
+const {
+  projectWorkspaceReadLine,
+  summarizeWorkspaceLines,
+} = require('./documentWorkspaceReadProjection');
+const {
+  projectWorkspaceWriteSource,
+  assertWorkspaceWriteSelection,
+} = require('./documentWorkspaceWriteAuthority');
 
 const money = (value) => Number(Number(value || 0).toFixed(2));
 const keyOf = (type, id) => `${type}:${id}`;
@@ -31,24 +39,12 @@ const registerConsolidatedTaxCandidate = async ({ tx, document, branchId, employ
   return taxDocument;
 };
 
-const lineProjection = (sale, type, item, settledAmount) => {
-  const quantity = type === 'STOCK' ? 1 : money(item.quantity);
-  const amount = money(item.price);
-  return {
-    saleId: sale.id,
-    saleCode: sale.code,
-    sourceDocumentNo: sale.officialDocumentNumber,
-    soldAt: sale.soldAt,
-    lineType: type,
-    lineId: item.id,
-    status: settledAmount >= amount ? 'PAID_READY' : settledAmount > 0 ? 'PARTIALLY_PAID' : 'UNPAID',
-    description: item.documentDescription || item.product?.name || item.stockItem?.product?.name || 'สินค้า',
-    quantity,
-    sourceUnitPrice: quantity ? money(amount / quantity) : amount,
-    sourceAmount: amount,
-    settledAmount: money(settledAmount),
-  };
-};
+const lineProjection = (sale, type, item, settledAmount) => projectWorkspaceWriteSource({
+  sale,
+  type,
+  item,
+  settledAmount,
+});
 
 const listDocumentWorkspace = async ({ branchId, customerId }) => {
   branchId = Number(branchId); customerId = Number(customerId);
@@ -64,8 +60,8 @@ const listDocumentWorkspace = async ({ branchId, customerId }) => {
     },
     select: {
       id: true, customerId: true, code: true, officialDocumentNumber: true, soldAt: true,
-      items: { select: { id: true, price: true, documentDescription: true, stockItem: { select: { product: { select: { name: true } } } } } },
-      simpleItems: { select: { id: true, quantity: true, price: true, documentDescription: true, product: { select: { name: true } } } },
+      items: { select: { id: true, price: true, returnedQuantity: true, documentDescription: true, stockItem: { select: { product: { select: { name: true } } } } } },
+      simpleItems: { select: { id: true, quantity: true, price: true, returnedQuantity: true, documentDescription: true, product: { select: { name: true } } } },
     },
     orderBy: [{ soldAt: 'asc' }, { id: 'asc' }],
   });
@@ -79,12 +75,32 @@ const listDocumentWorkspace = async ({ branchId, customerId }) => {
   const consumed = new Map(documented.map((row) => [keyOf(row.sourceLineType, row.sourceLineId), row.combinedBillingId]));
   return sales.map((sale) => {
     const lines = [
-      ...sale.items.map((item) => lineProjection(sale, 'STOCK', item, paid.get(`${sale.id}:${keyOf('STOCK', item.id)}`) || 0)),
-      ...sale.simpleItems.map((item) => lineProjection(sale, 'SIMPLE', item, paid.get(`${sale.id}:${keyOf('SIMPLE', item.id)}`) || 0)),
-    ].map((line) => consumed.has(keyOf(line.lineType, line.lineId)) ? { ...line, status: 'DOCUMENTED', combinedBillingId: consumed.get(keyOf(line.lineType, line.lineId)) } : line);
-    const counts = lines.reduce((acc, line) => ({ ...acc, [line.status]: (acc[line.status] || 0) + 1 }), {});
-    const documentStatus = lines.length && lines.every((line) => line.status === 'DOCUMENTED') ? 'CLOSED' : lines.some((line) => line.status === 'DOCUMENTED') ? 'PARTIALLY_DOCUMENTED' : 'OPEN';
-    return { id: sale.id, customerId: sale.customerId, code: sale.code, documentNo: sale.officialDocumentNumber, soldAt: sale.soldAt, documentStatus, counts, lines };
+      ...sale.items.map((item) => projectWorkspaceReadLine({ sale, type: 'STOCK', item, settledAmount: paid.get(`${sale.id}:${keyOf('STOCK', item.id)}`) || 0 })),
+      ...sale.simpleItems.map((item) => projectWorkspaceReadLine({ sale, type: 'SIMPLE', item, settledAmount: paid.get(`${sale.id}:${keyOf('SIMPLE', item.id)}`) || 0 })),
+    ].map((line) => consumed.has(keyOf(line.lineType, line.lineId))
+      ? {
+          ...line,
+          status: 'DOCUMENTED',
+          selectableForConsolidation: false,
+          combinedBillingId: consumed.get(keyOf(line.lineType, line.lineId)),
+        }
+      : line);
+    const summary = summarizeWorkspaceLines(lines);
+    return {
+      id: sale.id,
+      customerId: sale.customerId,
+      code: sale.code,
+      documentNo: sale.officialDocumentNumber,
+      soldAt: sale.soldAt,
+      documentStatus: summary.documentStatus,
+      counts: summary.counts,
+      hasReturn: summary.hasReturn,
+      originalAmount: summary.originalAmount,
+      returnedAmount: summary.returnedAmount,
+      activeAmount: summary.activeAmount,
+      selectableForConsolidation: lines.some((line) => line.selectableForConsolidation === true),
+      lines,
+    };
   });
 };
 
@@ -142,11 +158,23 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
     const data = requested.map((request) => {
       const item = source.get(keyOf(request.lineType, request.lineId));
       const settledAmount = settled.get(keyOf(request.lineType, request.lineId)) || 0;
-      const documentAmount = money(request.documentUnitPrice * item.quantity);
+      const authority = assertWorkspaceWriteSelection({ projection: item, documentUnitPrice: request.documentUnitPrice });
+      const documentAmount = money(authority.documentAmount);
       if (settledAmount < documentAmount) fail('DOCUMENT_WORKSPACE_ADDITIONAL_PAYMENT_REQUIRED', `ยอดชำระของ ${item.description} ไม่พอราคาสุดท้าย`, 409);
-      const priceAdjustment = money(request.documentUnitPrice - item.sourceUnitPrice);
+      const priceAdjustment = money(request.documentUnitPrice - authority.sourceUnitPrice);
       if (priceAdjustment !== 0 && !request.adjustmentReason) fail('DOCUMENT_WORKSPACE_ADJUSTMENT_REASON_REQUIRED', 'กรุณาระบุเหตุผลเมื่อปรับราคา');
-      return { request, item, settledAmount, documentAmount, priceAdjustment };
+      return {
+        request,
+        item: {
+          ...item,
+          quantity: authority.quantity,
+          sourceUnitPrice: authority.sourceUnitPrice,
+          sourceAmount: authority.sourceAmount,
+        },
+        settledAmount,
+        documentAmount,
+        priceAdjustment,
+      };
     });
 
     const sourceSaleIds = [...new Set(data.map((row) => Number(row.item.saleId)))];

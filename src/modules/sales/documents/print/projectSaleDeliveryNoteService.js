@@ -11,6 +11,9 @@ const { getSaleQuotationReference } = require('../../lineage/saleQuotationRefere
 const {
   loadCurrentReplacementPrintProjection,
 } = require('../../document-replacement/documentReplacementPrintProjection');
+const {
+  loadLegacySaleDeliveryNoteLifecycle,
+} = require('../../delivery-note/lifecycle/loadLegacySaleDeliveryNoteLifecycle');
 
 const fail = (code, message, statusCode = 400) => {
   const error = new Error(message);
@@ -37,7 +40,7 @@ const mapLine = ({ id, quantity, basePrice, discount, price, description, produc
   barcode,
 });
 
-const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
+const projectSaleDeliveryNote = async ({ branchId, saleId, historicalRead = false }) => {
   const normalizedBranchId = positiveInt(branchId, 'SALE_BRANCH_REQUIRED', 'branchId');
   const normalizedSaleId = positiveInt(saleId, 'SALE_ID_REQUIRED', 'saleId');
 
@@ -79,6 +82,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
           basePrice: true,
           discount: true,
           price: true,
+          returnedQuantity: true,
           documentDescription: true,
           stockItem: {
             select: {
@@ -95,6 +99,7 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
           basePrice: true,
           discount: true,
           price: true,
+          returnedQuantity: true,
           documentDescription: true,
           product: { select: { name: true } },
         },
@@ -124,13 +129,19 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
     select: { combinedBillingId: true },
   });
-  if (consolidatedSource) {
+  if (consolidatedSource && historicalRead !== true) {
     fail(
       'DELIVERY_NOTE_ALREADY_CONSOLIDATED',
       'This delivery note has already been consolidated and is no longer printable as an active source',
       409,
     );
   }
+
+  const lifecycle = await loadLegacySaleDeliveryNoteLifecycle({
+    prisma,
+    branchId: normalizedBranchId,
+    saleId: normalizedSaleId,
+  });
 
   const preparation = await prisma.saleDocumentPreparation.findUnique({
     where: {
@@ -208,6 +219,11 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
       vatRate: amount(sale.vatRate),
       paymentStatus: sale.statusPayment,
       isCredit: sale.isCredit === true,
+      lifecycleState: lifecycle.lifecycleState,
+      grossAmount: lifecycle.grossAmount,
+      returnedAmount: lifecycle.returnedAmount,
+      activeAmount: lifecycle.activeAmount,
+      lifecycleActions: lifecycle.actions,
       sourceQuotation: quotationReference ? {
         quotationId: quotationReference.quotationId,
         code: quotationReference.quotationCode,
@@ -240,8 +256,10 @@ const projectSaleDeliveryNote = async ({ branchId, saleId }) => {
     },
     note: sale.note || null,
     lines,
+    deliveryNoteLifecycle: lifecycle,
     replacementProjection: currentReplacement,
     presentationSnapshot: presentationRecord.snapshot,
+    historicalRead: historicalRead === true,
   });
 };
 
