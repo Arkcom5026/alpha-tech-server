@@ -93,7 +93,7 @@ test('platform admin remains authorized regardless of migrated position capabili
   }
 });
 
-test('stock item routes guard receive and manual lifecycle mutations while sales-owned mark-sold stays separate', () => {
+test('stock item routes keep inventory authority separate while mark-sold follows sales completion authority', () => {
   const routes = fs.readFileSync(
     path.join(__dirname, '../routes/stockItemRoutes.js'),
     'utf8',
@@ -108,7 +108,9 @@ test('stock item routes guard receive and manual lifecycle mutations while sales
   assert.match(routes, /router\.delete\('\/:id', allowInventoryLifecycle, lifecycleSlices\.deleteStockItem\)/);
   assert.match(routes, /router\.patch\('\/:id\/status', allowInventoryLifecycle, lifecycleSlices\.updateStockItemStatus\)/);
 
-  assert.match(routes, /router\.patch\('\/mark-sold', lifecycleSlices\.markStockItemsAsSold\)/);
+  assert.match(routes, /SALES_CAPABILITY\.CORE/);
+  assert.match(routes, /SALES_CAPABILITY\.COMPLETE/);
+  assert.match(routes, /router\.patch\('\/mark-sold', allowSalesCompletion, lifecycleSlices\.markStockItemsAsSold\)/);
   assert.doesNotMatch(routes, /router\.patch\('\/mark-sold', allowInventoryLifecycle/);
   assert.match(routes, /router\.get\('\/search', querySlices\.searchStockItem\)/);
   assert.match(routes, /router\.get\('\/available', querySlices\.getAvailableStockItemsByProduct\)/);
