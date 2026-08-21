@@ -54,27 +54,38 @@ const main = async () => {
       if (!constraintNames.has(name)) fail(`Missing Delivery Note lifecycle constraint: ${name}`);
     }
 
+    // PostgreSQL truncates identifiers to 63 bytes. Verify index authority by
+    // table + indexed column definition instead of relying on long Prisma names.
     const indexes = await prisma.$queryRawUnsafe(`
-      SELECT indexname
+      SELECT tablename, indexname, indexdef
       FROM pg_indexes
       WHERE schemaname = current_schema()
-        AND indexname IN (
-          'DeliveryNoteDocument_documentNumber_key',
-          'DeliveryNoteDocument_currentKey_key',
-          'DeliveryNoteDocument_branchId_saleId_revisionNumber_key',
-          'DeliveryNoteDocumentLine_deliveryNoteDocumentId_sourceLineType_sourceLineId_key',
-          'DeliveryNoteDocumentReturnSource_deliveryNoteDocumentId_saleReturnId_key'
+        AND tablename IN (
+          'DeliveryNoteDocument',
+          'DeliveryNoteDocumentLine',
+          'DeliveryNoteDocumentReturnSource'
         )
     `);
-    const indexNames = new Set(indexes.map((row) => row.indexname));
-    for (const name of [
-      'DeliveryNoteDocument_documentNumber_key',
-      'DeliveryNoteDocument_currentKey_key',
-      'DeliveryNoteDocument_branchId_saleId_revisionNumber_key',
-      'DeliveryNoteDocumentLine_deliveryNoteDocumentId_sourceLineType_sourceLineId_key',
-      'DeliveryNoteDocumentReturnSource_deliveryNoteDocumentId_saleReturnId_key',
-    ]) {
-      if (!indexNames.has(name)) fail(`Missing Delivery Note lifecycle index: ${name}`);
+
+    const hasIndex = (table, requiredColumns, unique = true) => indexes.some((row) => {
+      if (row.tablename !== table) return false;
+      const def = String(row.indexdef || '');
+      if (unique && !/CREATE UNIQUE INDEX/i.test(def)) return false;
+      return requiredColumns.every((column) => def.includes(`"${column}"`));
+    });
+
+    const expectedIndexes = [
+      ['DeliveryNoteDocument', ['documentNumber']],
+      ['DeliveryNoteDocument', ['currentKey']],
+      ['DeliveryNoteDocument', ['branchId', 'saleId', 'revisionNumber']],
+      ['DeliveryNoteDocumentLine', ['deliveryNoteDocumentId', 'sourceLineType', 'sourceLineId']],
+      ['DeliveryNoteDocumentReturnSource', ['deliveryNoteDocumentId', 'saleReturnId']],
+    ];
+
+    for (const [table, columns] of expectedIndexes) {
+      if (!hasIndex(table, columns, true)) {
+        fail(`Missing Delivery Note lifecycle unique index on ${table}(${columns.join(', ')})`);
+      }
     }
 
     const counts = await prisma.$queryRawUnsafe(`
