@@ -1,6 +1,10 @@
 const bcrypt = require('bcryptjs');
 
 const repository = require('./employeeOnboardingRuntimeRepository');
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../authorization/employeePositionAuthority');
 
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
@@ -11,18 +15,9 @@ const toPositiveInt = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-const canCreateEmployee = (actor = {}) => {
-  const systemRole = normalizeUpper(actor.role);
-  const employeeRole = normalizeUpper(actor.employeeRole || actor.v2Role);
-
-  return Boolean(
-    actor.isSuperAdmin
-    || systemRole === 'SUPERADMIN'
-    || systemRole === 'ADMIN'
-    || employeeRole === 'OWNER'
-    || employeeRole === 'MANAGER'
-  );
-};
+const canCreateEmployee = (actor = {}) => (
+  hasCapability(actor, POSITION_CAPABILITIES.EMPLOYEE_MANAGE)
+);
 
 const addSubEmployee = async (req, res) => {
   try {
@@ -31,7 +26,7 @@ const addSubEmployee = async (req, res) => {
     if (!canCreateEmployee(actor)) {
       return res.status(403).json({
         code: 'EMPLOYEE_ONBOARDING_FORBIDDEN',
-        message: 'เฉพาะเจ้าของร้าน ผู้ดูแลระบบ หรือผู้จัดการร้านเท่านั้นที่เพิ่มพนักงานใหม่ได้',
+        message: 'ตำแหน่งของบัญชีนี้ไม่มีสิทธิ์เพิ่มพนักงานใหม่',
       });
     }
 
