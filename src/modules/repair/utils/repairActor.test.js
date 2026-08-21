@@ -2,21 +2,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveRepairActor } = require('./repairActor');
 
-test('prefers direct actor identities and normalizes numeric strings', () => {
+test('prefers direct actor identities and carries position-derived repair capabilities', () => {
   assert.deepEqual(resolveRepairActor({
     id: '5',
     branchId: '7',
     employeeId: '9',
     v2Role: 'MANAGER',
+    repairCapabilities: ['repair.intake', 'repair.customer-override', 'repair.intake'],
+    positionAuthorityMode: 'POSITION',
   }), {
     branchId: 7,
     employeeId: 9,
     role: 'MANAGER',
+    repairCapabilities: ['repair.intake', 'repair.customer-override'],
+    positionAuthorityMode: 'POSITION',
     userId: 5,
   });
 });
 
-test('falls back to nested employee profile identities', () => {
+test('falls back to nested employee profile identities without inventing capabilities', () => {
   assert.deepEqual(resolveRepairActor({
     userId: 5,
     employeeProfile: {
@@ -28,11 +32,13 @@ test('falls back to nested employee profile identities', () => {
     branchId: 7,
     employeeId: 9,
     role: 'STAFF',
+    repairCapabilities: [],
+    positionAuthorityMode: null,
     userId: 5,
   });
 });
 
-test('falls back to nested employee identity and legacy role', () => {
+test('falls back to nested employee identity and keeps legacy role as metadata only', () => {
   assert.deepEqual(resolveRepairActor({
     id: 5,
     role: 'OWNER',
@@ -41,6 +47,8 @@ test('falls back to nested employee identity and legacy role', () => {
     branchId: 7,
     employeeId: 9,
     role: 'OWNER',
+    repairCapabilities: [],
+    positionAuthorityMode: null,
     userId: 5,
   });
 });
@@ -68,6 +76,8 @@ test('allows missing employee identity but never derives it from request data', 
     branchId: 7,
     employeeId: null,
     role: 'STAFF',
+    repairCapabilities: [],
+    positionAuthorityMode: null,
     userId: 5,
   });
 });

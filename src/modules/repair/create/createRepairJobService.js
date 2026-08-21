@@ -11,8 +11,22 @@ const {
 const { createRepairJobNo } = require('../utils/repairCode');
 const { mapRepairJob } = require('../mappers/repairMapper');
 
+const CUSTOMER_OVERRIDE_CAPABILITY = 'repair.customer-override';
+
 function isPrismaUniqueConflict(error) {
   return error?.code === 'P2002';
+}
+
+function hasRepairCapability(actor, capability) {
+  return Array.isArray(actor?.repairCapabilities)
+    && actor.repairCapabilities.includes(capability);
+}
+
+function canOverrideCustomerOwnership(actor, payload) {
+  return Boolean(
+    payload?.allowCustomerOverride
+    && hasRepairCapability(actor, CUSTOMER_OVERRIDE_CAPABILITY)
+  );
 }
 
 function createRepairIntakeReference(branchId) {
@@ -43,7 +57,7 @@ function assertRegisteredDeviceForIntake(device, actor, payload) {
   if (
     ownerCustomerId &&
     Number(ownerCustomerId) !== Number(payload.customerId) &&
-    !(payload.allowCustomerOverride && actor.role === 'MANAGER')
+    !canOverrideCustomerOwnership(actor, payload)
   ) {
     throw new RepairError(
       RepairFailureCode.DEVICE_CUSTOMER_MISMATCH,
@@ -99,7 +113,7 @@ class CreateRepairJobService {
           assertCustomerMatchesLatestSale(
             stockItem,
             payload.customerId,
-            payload.allowCustomerOverride && actor.role === 'MANAGER'
+            canOverrideCustomerOwnership(actor, payload)
           );
 
           intakeStockItem = stockItem;
@@ -253,4 +267,5 @@ class CreateRepairJobService {
 module.exports = new CreateRepairJobService();
 module.exports.CreateRepairJobService = CreateRepairJobService;
 module.exports.assertRegisteredDeviceForIntake = assertRegisteredDeviceForIntake;
+module.exports.canOverrideCustomerOwnership = canOverrideCustomerOwnership;
 module.exports.createRepairIntakeReference = createRepairIntakeReference;

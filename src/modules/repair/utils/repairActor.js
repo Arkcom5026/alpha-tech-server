@@ -8,6 +8,13 @@ function firstPositiveInteger(values) {
   return null;
 }
 
+function normalizeCapabilities(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((capability) => String(capability || '').trim())
+    .filter(Boolean))];
+}
+
 function resolveRepairActor(user) {
   if (!user || typeof user !== 'object') {
     throw new RepairError(
@@ -42,6 +49,8 @@ function resolveRepairActor(user) {
     branchId,
     employeeId,
     role: user.v2Role || user.role || user.employeeProfile?.v2Role || null,
+    repairCapabilities: normalizeCapabilities(user.repairCapabilities),
+    positionAuthorityMode: user.positionAuthorityMode || null,
     userId: firstPositiveInteger([user.id, user.userId]),
   };
 }
