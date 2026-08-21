@@ -21,6 +21,10 @@ const {
   allowVatSettlementCapabilities,
 } = require('../settlement/vatSettlementAuthorization');
 const vatCarryForwardController = require('../settlement/vatCarryForwardController');
+const {
+  TAX_VAT_CARRY_FORWARD_CAPABILITY,
+  allowVatCarryForwardCapabilities,
+} = require('../settlement/vatCarryForwardAuthorization');
 const withholdingTaxController = require('../withholdingTax/withholdingTaxController');
 const unifiedTaxReadinessController = require('../readiness/unifiedTaxReadinessController');
 const {
@@ -53,6 +57,13 @@ const allowTaxReadinessRead = allowTaxReadinessCapabilities(
 const allowVatSettlementRead = allowVatSettlementCapabilities(
   TAX_VAT_SETTLEMENT_CAPABILITY.READ,
 );
+const allowVatCarryForwardRead = allowVatCarryForwardCapabilities(
+  TAX_VAT_CARRY_FORWARD_CAPABILITY.READ,
+);
+const allowVatCarryForwardConfirm = allowVatCarryForwardCapabilities(
+  TAX_VAT_CARRY_FORWARD_CAPABILITY.READ,
+  TAX_VAT_CARRY_FORWARD_CAPABILITY.CONFIRM,
+);
 
 router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
 router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
@@ -62,8 +73,8 @@ router.get('/tax-closing-handoff/:taxPeriodId', allowTaxClosingHandoffRead, taxC
 router.post('/tax-closing-handoff/:taxPeriodId/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController.finalizeBundle);
 router.get('/tax-readiness/:taxPeriodId', allowTaxReadinessRead, unifiedTaxReadinessController.getWorkspace);
 router.get('/vat-settlement/:taxPeriodId', allowVatSettlementRead, vatSettlementController.getPreparation);
-router.get('/vat-carry-forward/:taxPeriodId', vatCarryForwardController.getAuthority);
-router.post('/vat-carry-forward/:taxPeriodId/confirm', vatCarryForwardController.confirmAuthority);
+router.get('/vat-carry-forward/:taxPeriodId', allowVatCarryForwardRead, vatCarryForwardController.getAuthority);
+router.post('/vat-carry-forward/:taxPeriodId/confirm', allowVatCarryForwardConfirm, vatCarryForwardController.confirmAuthority);
 router.get('/withholding-tax/:taxPeriodId', withholdingTaxController.getWorkspace);
 router.post('/withholding-tax/items/:taxExpenseItemId/treatment', withholdingTaxController.transitionTreatment);
 router.post('/withholding-tax/:taxPeriodId/certificates/issue', withholdingTaxController.issueCertificate);
