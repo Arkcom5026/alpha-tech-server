@@ -1,0 +1,78 @@
+'use strict';
+
+const { prisma } = require('../../../../../lib/prisma');
+const { getDeliveryNoteRevisionById } = require('../../delivery-note/lifecycle/deliveryNoteRevisionHistoryService');
+const { projectSaleDeliveryNote } = require('./projectSaleDeliveryNoteService');
+
+const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, revisionId }) => {
+  const [revision, legacyProjection] = await Promise.all([
+    getDeliveryNoteRevisionById({ prisma, branchId, saleId, revisionId }),
+    projectSaleDeliveryNote({ branchId, saleId, historicalRead: true }),
+  ]);
+
+  const document = Object.freeze({
+    ...legacyProjection.document,
+    documentNumber: revision.documentNumber,
+    issuedAt: revision.issuedAt,
+    totalBeforeDiscount: revision.activeAmount,
+    totalDiscount: 0,
+    totalAmount: revision.activeAmount,
+    lifecycleState: revision.state,
+    grossAmount: revision.grossAmount,
+    returnedAmount: revision.returnedAmount,
+    activeAmount: revision.activeAmount,
+    historicalPrint: true,
+    currentAuthority: revision.currentAuthority,
+    lifecycleActions: Object.freeze({
+      canCreateAdjustedRevision: false,
+      canConsolidate: false,
+      canInvoice: false,
+      canPrintHistorical: true,
+    }),
+    revision: Object.freeze({
+      id: revision.id,
+      revisionNumber: revision.revisionNumber,
+      revisionKind: revision.revisionKind,
+      state: revision.state,
+      predecessor: revision.predecessor,
+      successor: revision.successor,
+      returnSources: revision.returnSources,
+    }),
+    replacement: null,
+  });
+
+  return Object.freeze({
+    ...legacyProjection,
+    document,
+    lines: revision.lines,
+    replacementProjection: null,
+    deliveryNoteLifecycle: Object.freeze({
+      lifecycleState: revision.state,
+      historicalReadable: true,
+      currentAuthority: revision.currentAuthority,
+      grossAmount: revision.grossAmount,
+      returnedAmount: revision.returnedAmount,
+      activeAmount: revision.activeAmount,
+      persistedRevision: true,
+      revisionId: revision.id,
+      revisionNumber: revision.revisionNumber,
+      revisionKind: revision.revisionKind,
+      predecessor: revision.predecessor,
+      successor: revision.successor,
+      returnSources: revision.returnSources,
+      actions: document.lifecycleActions,
+    }),
+    deliveryNoteReadAuthority: Object.freeze({
+      source: 'PERSISTED_HISTORICAL_REVISION',
+      persistedRevision: true,
+      historicalPrint: true,
+      revisionId: revision.id,
+      revisionNumber: revision.revisionNumber,
+      documentNumber: revision.documentNumber,
+      state: revision.state,
+      currentAuthority: revision.currentAuthority,
+    }),
+  });
+};
+
+module.exports = Object.freeze({ projectHistoricalSaleDeliveryNoteRevision });
