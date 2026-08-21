@@ -6,6 +6,10 @@ const {
   allowTaxPeriodCapabilities,
 } = require('./taxPeriodAuthorization');
 const accountingOfficeController = require('../accountingOffice/accountingOfficePackageController');
+const {
+  TAX_ACCOUNTING_OFFICE_CAPABILITY,
+  allowAccountingOfficeCapabilities,
+} = require('../accountingOffice/accountingOfficeAuthorization');
 const taxClosingHandoffController = require('../handoff/taxClosingHandoffController');
 const {
   TAX_CLOSING_HANDOFF_CAPABILITY,
@@ -25,6 +29,9 @@ const allowTaxPeriodReopen = allowTaxPeriodCapabilities(
   TAX_PERIOD_CAPABILITY.MANAGE,
   TAX_PERIOD_CAPABILITY.REOPEN,
 );
+const allowAccountingOfficeRead = allowAccountingOfficeCapabilities(
+  TAX_ACCOUNTING_OFFICE_CAPABILITY.READ,
+);
 const allowTaxClosingHandoffRead = allowTaxClosingHandoffCapabilities(
   TAX_CLOSING_HANDOFF_CAPABILITY.READ,
 );
@@ -36,7 +43,7 @@ const allowTaxClosingHandoffFinalize = allowTaxClosingHandoffCapabilities(
 router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
 router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
 router.get('/periods/:taxPeriodId', allowTaxPeriodRead, controller.getPeriodDetail);
-router.get('/accounting-office/packages/:taxPeriodId', accountingOfficeController.getPackage);
+router.get('/accounting-office/packages/:taxPeriodId', allowAccountingOfficeRead, accountingOfficeController.getPackage);
 router.get('/tax-closing-handoff/:taxPeriodId', allowTaxClosingHandoffRead, taxClosingHandoffController.getBundle);
 router.post('/tax-closing-handoff/:taxPeriodId/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController.finalizeBundle);
 router.get('/tax-readiness/:taxPeriodId', unifiedTaxReadinessController.getWorkspace);
