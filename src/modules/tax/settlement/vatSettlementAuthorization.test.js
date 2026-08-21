@@ -43,8 +43,7 @@ test('VAT settlement route is position-gated while controller retains branch iso
   assert.doesNotMatch(controller, /VAT_SETTLEMENT_ACCESS_FORBIDDEN/);
   assert.match(controller, /VAT_SETTLEMENT_BRANCH_FORBIDDEN/);
 
-  // Carry-forward is position-gated in Wave 2Y; withholding tax remains outside this wave.
   assert.match(routes, /router\.get\('\/vat-carry-forward\/:taxPeriodId', allowVatCarryForwardRead, vatCarryForwardController\.getAuthority\)/);
   assert.match(routes, /router\.post\('\/vat-carry-forward\/:taxPeriodId\/confirm', allowVatCarryForwardConfirm, vatCarryForwardController\.confirmAuthority\)/);
-  assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', withholdingTaxController\.getWorkspace\)/);
+  assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', allowWithholdingRead, withholdingTaxController\.getWorkspace\)/);
 });

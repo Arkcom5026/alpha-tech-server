@@ -26,6 +26,10 @@ const {
   allowVatCarryForwardCapabilities,
 } = require('../settlement/vatCarryForwardAuthorization');
 const withholdingTaxController = require('../withholdingTax/withholdingTaxController');
+const {
+  TAX_WITHHOLDING_CAPABILITY,
+  allowWithholdingTaxCapabilities,
+} = require('../withholdingTax/withholdingTaxAuthorization');
 const unifiedTaxReadinessController = require('../readiness/unifiedTaxReadinessController');
 const {
   TAX_READINESS_CAPABILITY,
@@ -64,6 +68,26 @@ const allowVatCarryForwardConfirm = allowVatCarryForwardCapabilities(
   TAX_VAT_CARRY_FORWARD_CAPABILITY.READ,
   TAX_VAT_CARRY_FORWARD_CAPABILITY.CONFIRM,
 );
+const allowWithholdingRead = allowWithholdingTaxCapabilities(
+  TAX_WITHHOLDING_CAPABILITY.READ,
+);
+const allowWithholdingTreatment = allowWithholdingTaxCapabilities(
+  TAX_WITHHOLDING_CAPABILITY.READ,
+  TAX_WITHHOLDING_CAPABILITY.TREATMENT,
+);
+const allowWithholdingCertificateIssue = allowWithholdingTaxCapabilities(
+  TAX_WITHHOLDING_CAPABILITY.READ,
+  TAX_WITHHOLDING_CAPABILITY.CERTIFICATE_ISSUE,
+);
+const allowWithholdingFilingPrepare = allowWithholdingTaxCapabilities(
+  TAX_WITHHOLDING_CAPABILITY.READ,
+  TAX_WITHHOLDING_CAPABILITY.FILING_PREPARE,
+);
+const allowWithholdingFilingSubmit = allowWithholdingTaxCapabilities(
+  TAX_WITHHOLDING_CAPABILITY.READ,
+  TAX_WITHHOLDING_CAPABILITY.FILING_PREPARE,
+  TAX_WITHHOLDING_CAPABILITY.FILING_SUBMIT,
+);
 
 router.get('/periods', allowTaxPeriodRead, controller.listPeriods);
 router.get('/periods/summary', allowTaxPeriodRead, controller.getPeriodSummary);
@@ -75,11 +99,11 @@ router.get('/tax-readiness/:taxPeriodId', allowTaxReadinessRead, unifiedTaxReadi
 router.get('/vat-settlement/:taxPeriodId', allowVatSettlementRead, vatSettlementController.getPreparation);
 router.get('/vat-carry-forward/:taxPeriodId', allowVatCarryForwardRead, vatCarryForwardController.getAuthority);
 router.post('/vat-carry-forward/:taxPeriodId/confirm', allowVatCarryForwardConfirm, vatCarryForwardController.confirmAuthority);
-router.get('/withholding-tax/:taxPeriodId', withholdingTaxController.getWorkspace);
-router.post('/withholding-tax/items/:taxExpenseItemId/treatment', withholdingTaxController.transitionTreatment);
-router.post('/withholding-tax/:taxPeriodId/certificates/issue', withholdingTaxController.issueCertificate);
-router.post('/withholding-tax/:taxPeriodId/filings/:formType/prepare', withholdingTaxController.prepareFiling);
-router.post('/withholding-tax/:taxPeriodId/filings/:formType/submit', withholdingTaxController.submitFiling);
+router.get('/withholding-tax/:taxPeriodId', allowWithholdingRead, withholdingTaxController.getWorkspace);
+router.post('/withholding-tax/items/:taxExpenseItemId/treatment', allowWithholdingTreatment, withholdingTaxController.transitionTreatment);
+router.post('/withholding-tax/:taxPeriodId/certificates/issue', allowWithholdingCertificateIssue, withholdingTaxController.issueCertificate);
+router.post('/withholding-tax/:taxPeriodId/filings/:formType/prepare', allowWithholdingFilingPrepare, withholdingTaxController.prepareFiling);
+router.post('/withholding-tax/:taxPeriodId/filings/:formType/submit', allowWithholdingFilingSubmit, withholdingTaxController.submitFiling);
 router.post('/periods/ensure', allowTaxPeriodManage, controller.ensureMonthlyPeriod);
 router.post('/periods/:taxPeriodId/close', allowTaxPeriodManage, controller.closePeriod);
 router.post('/periods/:taxPeriodId/lock', allowTaxPeriodManage, controller.lockPeriod);

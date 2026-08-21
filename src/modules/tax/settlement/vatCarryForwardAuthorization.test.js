@@ -51,6 +51,6 @@ test('VAT carry-forward routes split read and elevated confirm authority while c
   assert.doesNotMatch(controller, /VAT_CARRY_FORWARD_ACCESS_FORBIDDEN/);
   assert.match(controller, /VAT_CARRY_FORWARD_BRANCH_FORBIDDEN/);
 
-  // Withholding tax remains outside Wave 2Y.
-  assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', withholdingTaxController\.getWorkspace\)/);
+  // Withholding tax is position-gated in Wave 2Z.
+  assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', allowWithholdingRead, withholdingTaxController\.getWorkspace\)/);
 });
