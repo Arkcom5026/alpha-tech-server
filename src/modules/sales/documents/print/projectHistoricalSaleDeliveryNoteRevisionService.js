@@ -72,10 +72,10 @@ const composeHistoricalRevisionPrintProjection = ({ revision, legacyProjection }
 };
 
 const projectHistoricalSaleDeliveryNoteRevision = async ({ branchId, saleId, revisionId }) => {
-  const [revision, legacyProjection] = await Promise.all([
-    getDeliveryNoteRevisionById({ prisma, branchId, saleId, revisionId }),
-    projectSaleDeliveryNote({ branchId, saleId, historicalRead: true }),
-  ]);
+  // Resolve immutable lineage first. If the requested revision does not exist,
+  // fail before touching presentation snapshot authority for the Sale.
+  const revision = await getDeliveryNoteRevisionById({ prisma, branchId, saleId, revisionId });
+  const legacyProjection = await projectSaleDeliveryNote({ branchId, saleId, historicalRead: true });
 
   return composeHistoricalRevisionPrintProjection({ revision, legacyProjection });
 };

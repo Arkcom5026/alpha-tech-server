@@ -108,8 +108,8 @@ const projectSaleDeliveryNote = async ({ branchId, saleId, historicalRead = fals
   });
 
   if (!sale) fail('SALE_NOT_FOUND', 'Sale not found', 404);
-  if (sale.status === 'CANCELLED') {
-    fail('DELIVERY_NOTE_SALE_CANCELLED', 'A cancelled sale cannot be printed as a delivery note', 409);
+  if (sale.status === 'CANCELLED' && historicalRead !== true) {
+    fail('DELIVERY_NOTE_SALE_CANCELLED', 'A cancelled sale cannot be printed as an active delivery note', 409);
   }
 
   if (!sale.officialDocumentNumber) {
