@@ -1,6 +1,25 @@
 const POSITION_CAPABILITIES = Object.freeze({
   EMPLOYEE_MANAGE: 'employee.manage',
+  REPAIR_READ: 'repair.read',
+  REPAIR_INTAKE: 'repair.intake',
+  REPAIR_WORKFLOW: 'repair.workflow',
+  REPAIR_PARTS: 'repair.parts',
+  REPAIR_ESTIMATE: 'repair.estimate',
+  REPAIR_CLAIM: 'repair.claim',
+  REPAIR_HANDOVER: 'repair.handover',
+  REPAIR_CUSTOMER_ACCESS: 'repair.customer-access',
 });
+
+const REPAIR_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.REPAIR_READ,
+  POSITION_CAPABILITIES.REPAIR_INTAKE,
+  POSITION_CAPABILITIES.REPAIR_WORKFLOW,
+  POSITION_CAPABILITIES.REPAIR_PARTS,
+  POSITION_CAPABILITIES.REPAIR_ESTIMATE,
+  POSITION_CAPABILITIES.REPAIR_CLAIM,
+  POSITION_CAPABILITIES.REPAIR_HANDOVER,
+  POSITION_CAPABILITIES.REPAIR_CUSTOMER_ACCESS,
+]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
@@ -13,9 +32,29 @@ const normalizeCapabilityArray = (value) => {
 
 const legacyCapabilitiesForRole = (role) => {
   const normalized = normalizeUpper(role);
+
   if (normalized === 'OWNER' || normalized === 'MANAGER') {
-    return [POSITION_CAPABILITIES.EMPLOYEE_MANAGE];
+    return [POSITION_CAPABILITIES.EMPLOYEE_MANAGE, ...REPAIR_CAPABILITIES];
   }
+
+  if (normalized === 'CASHIER') {
+    return [
+      POSITION_CAPABILITIES.REPAIR_READ,
+      POSITION_CAPABILITIES.REPAIR_INTAKE,
+      POSITION_CAPABILITIES.REPAIR_ESTIMATE,
+      POSITION_CAPABILITIES.REPAIR_CLAIM,
+      POSITION_CAPABILITIES.REPAIR_CUSTOMER_ACCESS,
+    ];
+  }
+
+  if (normalized === 'TECHNICIAN') {
+    return [
+      POSITION_CAPABILITIES.REPAIR_READ,
+      POSITION_CAPABILITIES.REPAIR_WORKFLOW,
+      POSITION_CAPABILITIES.REPAIR_PARTS,
+    ];
+  }
+
   return [];
 };
 
@@ -58,6 +97,7 @@ const hasCapability = (actor, capability) => {
 
 module.exports = {
   POSITION_CAPABILITIES,
+  REPAIR_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
