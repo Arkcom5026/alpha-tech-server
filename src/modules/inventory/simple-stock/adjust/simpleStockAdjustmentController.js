@@ -1,12 +1,16 @@
 const service = require('./simpleStockAdjustmentService')
 const { parseSimpleStockAdjustmentInput } = require('./simpleStockAdjustmentInput')
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../../employee/authorization/employeePositionAuthority')
 
 const createSimpleAdjustment = async (req, res, next) => {
   try {
-    const canAdjust =
-      req.user?.isSuperAdmin === true ||
-      req.user?.role === 'ADMIN' ||
-      ['OWNER', 'MANAGER'].includes(req.user?.employeeRole)
+    const canAdjust = hasCapability(
+      req.user,
+      POSITION_CAPABILITIES.INVENTORY_ADJUST
+    )
 
     if (!canAdjust) {
       const error = new Error('SIMPLE_STOCK_ADJUSTMENT_FORBIDDEN')
