@@ -91,7 +91,19 @@ const projectSaleRevisionState = (sale) => {
   return Object.freeze({ grossAmount, returnedAmount, activeAmount, originalLines, adjustedLines });
 };
 
-const currentKeyOf = ({ branchId, saleId }) => `${Number(branchId)}:${Number(saleId)}`;
+const currentKeyOf = ({ branchId, saleId, id } = {}) => {
+  const normalizedBranchId = Number(branchId);
+  const normalizedSaleId = Number(saleId ?? id);
+  if (!Number.isInteger(normalizedBranchId) || normalizedBranchId <= 0
+    || !Number.isInteger(normalizedSaleId) || normalizedSaleId <= 0) {
+    fail(
+      'DELIVERY_NOTE_CURRENT_KEY_IDENTITY_REQUIRED',
+      'Delivery Note current key requires positive branchId and saleId',
+      500,
+    );
+  }
+  return `${normalizedBranchId}:${normalizedSaleId}`;
+};
 
 const buildOriginalMaterialization = ({ sale, createdById, issuedAt = null }) => {
   if (!sale?.officialDocumentNumber) {
