@@ -2,6 +2,7 @@
 
 const { Prisma } = require('../../../../../lib/prisma');
 const { findIssuedTaxAuthority } = require('./loadLegacySaleDeliveryNoteLifecycle');
+const { deriveDeliveryNoteRevisionNumber } = require('./deliveryNoteRevisionNumberPolicy');
 const {
   buildOriginalMaterialization,
   buildReturnAdjustedRevision,
@@ -148,7 +149,7 @@ const createReturnAdjustedDeliveryNoteRevision = async ({
   branchId,
   saleId,
   employeeId,
-  documentNumber,
+  documentNumber = null,
 }) => {
   if (!prisma) fail('DELIVERY_NOTE_REVISION_PRISMA_REQUIRED', 'prisma is required', 500);
   const normalizedBranchId = normalizePositiveInt(branchId, 'DELIVERY_NOTE_BRANCH_REQUIRED', 'branchId');
@@ -212,8 +213,6 @@ const createReturnAdjustedDeliveryNoteRevision = async ({
       },
     });
 
-    // A legacy original materialized after historical returns needs those returns
-    // to seed revision 2, because its issuedAt reflects the historical Sale date.
     const returnSources = completedReturns.length
       ? completedReturns
       : predecessor.revisionNumber === 1
@@ -234,10 +233,16 @@ const createReturnAdjustedDeliveryNoteRevision = async ({
           })
         : [];
 
+    const nextRevisionNumber = Number(predecessor.revisionNumber) + 1;
+    const resolvedDocumentNumber = documentNumber || deriveDeliveryNoteRevisionNumber({
+      originalDocumentNumber: sale.officialDocumentNumber,
+      revisionNumber: nextRevisionNumber,
+    });
+
     const command = buildReturnAdjustedRevision({
       sale,
       predecessor,
-      documentNumber,
+      documentNumber: resolvedDocumentNumber,
       createdById: normalizedEmployeeId,
       returnSources,
     });
