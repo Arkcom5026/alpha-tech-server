@@ -1,12 +1,16 @@
 const service = require('./simpleStockTransferService')
 const { parseSimpleStockTransferInput } = require('./simpleStockTransferInput')
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../../employee/authorization/employeePositionAuthority')
 
 const createSimpleTransfer = async (req, res, next) => {
   try {
-    const canTransfer =
-      req.user?.isSuperAdmin === true ||
-      req.user?.role === 'ADMIN' ||
-      ['OWNER', 'MANAGER'].includes(req.user?.employeeRole)
+    const canTransfer = hasCapability(
+      req.user,
+      POSITION_CAPABILITIES.INVENTORY_TRANSFER
+    )
 
     if (!canTransfer) {
       const error = new Error('SIMPLE_STOCK_TRANSFER_FORBIDDEN')
