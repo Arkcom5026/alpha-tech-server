@@ -9,8 +9,11 @@ const STOCK_ITEM_CAPABILITY = Object.freeze({
 });
 
 const createForbiddenError = (requiredCapabilities) => {
-  const error = new Error('STOCK_ITEM_FORBIDDEN');
-  error.code = 'STOCK_ITEM_FORBIDDEN';
+  const receiveOnly = requiredCapabilities.length === 1
+    && requiredCapabilities[0] === STOCK_ITEM_CAPABILITY.RECEIVE;
+  const code = receiveOnly ? 'STOCK_ITEM_RECEIVE_FORBIDDEN' : 'STOCK_ITEM_LIFECYCLE_FORBIDDEN';
+  const error = new Error(code);
+  error.code = code;
   error.statusCode = 403;
   error.details = { requiredCapabilities };
   return error;
