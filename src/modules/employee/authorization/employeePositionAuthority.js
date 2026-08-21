@@ -18,6 +18,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   INVENTORY_QUICK_STOCK: 'inventory.quick-stock',
   INVENTORY_QUICK_RECEIPT: 'inventory.quick-receipt',
   INVENTORY_QUICK_RECEIPT_FINALIZE: 'inventory.quick-receipt.finalize',
+  PROCUREMENT_RECEIPT: 'procurement.receipt',
+  PROCUREMENT_RECEIPT_FINALIZE: 'procurement.receipt.finalize',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -44,6 +46,11 @@ const INVENTORY_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT_FINALIZE,
 ]);
 
+const PROCUREMENT_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.PROCUREMENT_RECEIPT,
+  POSITION_CAPABILITIES.PROCUREMENT_RECEIPT_FINALIZE,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -61,6 +68,7 @@ const legacyCapabilitiesForRole = (role) => {
       POSITION_CAPABILITIES.EMPLOYEE_MANAGE,
       ...REPAIR_CAPABILITIES,
       ...INVENTORY_CAPABILITIES,
+      ...PROCUREMENT_CAPABILITIES,
     ];
   }
 
@@ -78,6 +86,7 @@ const legacyCapabilitiesForRole = (role) => {
       POSITION_CAPABILITIES.INVENTORY_QUICK_STOCK,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT_FINALIZE,
+      ...PROCUREMENT_CAPABILITIES,
     ];
   }
 
@@ -93,6 +102,7 @@ const legacyCapabilitiesForRole = (role) => {
       POSITION_CAPABILITIES.INVENTORY_QUICK_STOCK,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT,
       POSITION_CAPABILITIES.INVENTORY_QUICK_RECEIPT_FINALIZE,
+      ...PROCUREMENT_CAPABILITIES,
     ];
   }
 
@@ -140,6 +150,7 @@ module.exports = {
   POSITION_CAPABILITIES,
   REPAIR_CAPABILITIES,
   INVENTORY_CAPABILITIES,
+  PROCUREMENT_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
