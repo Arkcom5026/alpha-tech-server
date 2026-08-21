@@ -36,7 +36,7 @@ test('HTTP analytics reports latency, error, conflict and response-size baseline
   assert.equal(endpoint.conflictRate, 0.333333);
 });
 
-test('duplicate signal requires the same exact target, not only the same path', () => {
+test('duplicate signal requires the same exact target while keeping target values out of summaries', () => {
   const requests = [
     { timestamp: '2026-08-21T03:00:00.000Z', method: 'GET', path: '/api/search', target: '/api/search?q=one', status: 200, durationMs: 100 },
     { timestamp: '2026-08-21T03:00:00.500Z', method: 'GET', path: '/api/search', target: '/api/search?q=two', status: 200, durationMs: 100 },
@@ -46,7 +46,8 @@ test('duplicate signal requires the same exact target, not only the same path', 
   const analytics = buildHttpAnalytics(requests);
   assert.equal(analytics.exactRepeatCandidates2s, 1);
   assert.equal(analytics.duplicateCallRate2s, 0.333333);
-  assert.equal(analytics.exactRepeatCandidates[0].key, 'GET /api/search?q=one');
+  assert.match(analytics.exactRepeatCandidates[0].key, /^GET \/api\/search target=[a-f0-9]{12}$/);
+  assert.equal(analytics.exactRepeatCandidates[0].key.includes('q=one'), false);
 });
 
 test('request burst metric captures requests sharing a one-second bucket', () => {
