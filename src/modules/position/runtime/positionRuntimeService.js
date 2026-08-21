@@ -1,4 +1,10 @@
 const repository = require('./positionRuntimeRepository');
+const {
+  POSITION_CAPABILITIES,
+  normalizeCapabilityArray,
+} = require('../../employee/authorization/employeePositionAuthority');
+
+const SUPPORTED_CAPABILITIES = new Set(Object.values(POSITION_CAPABILITIES));
 
 const toInt = (value, fallback = null) => {
   const parsed = Number(value);
@@ -21,6 +27,22 @@ const createError = (statusCode, payload) => {
   error.statusCode = statusCode;
   error.payload = payload;
   return error;
+};
+
+const normalizeCapabilitiesInput = (value) => {
+  const normalized = normalizeCapabilityArray(value);
+  if (normalized === null) {
+    throw createError(400, { error: 'รูปแบบสิทธิ์ของตำแหน่งงานไม่ถูกต้อง' });
+  }
+
+  const unsupported = normalized.filter((key) => !SUPPORTED_CAPABILITIES.has(key));
+  if (unsupported.length > 0) {
+    throw createError(400, {
+      code: 'POSITION_CAPABILITY_UNSUPPORTED',
+      message: `พบสิทธิ์ของตำแหน่งงานที่ระบบยังไม่รองรับ: ${unsupported.join(', ')}`,
+    });
+  }
+  return normalized;
 };
 
 const ensureBranchId = (branchId) => {
@@ -90,6 +112,9 @@ const createPosition = async ({ branchId, body = {} }) => {
   const normalizedBranchId = ensureBranchId(branchId);
   const name = normalizeText(body.name);
   const description = normalizeDescription(body.description);
+  const capabilities = Object.prototype.hasOwnProperty.call(body, 'capabilities')
+    ? normalizeCapabilitiesInput(body.capabilities)
+    : null;
   if (typeof name !== 'string' || name.length < 2) {
     throw createError(400, { error: 'ชื่อตำแหน่งต้องยาวอย่างน้อย 2 ตัวอักษร' });
   }
@@ -102,6 +127,7 @@ const createPosition = async ({ branchId, body = {} }) => {
       await repository.createPosition({
         name,
         description,
+        capabilities,
         branchId: normalizedBranchId,
         isActive: true,
       }),
@@ -134,6 +160,9 @@ const updatePosition = async ({ branchId, id, body = {} }) => {
       throw createError(400, { error: 'รูปแบบคำอธิบายไม่ถูกต้อง' });
     }
     data.description = description;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'capabilities')) {
+    data.capabilities = normalizeCapabilitiesInput(body.capabilities);
   }
   if (Object.prototype.hasOwnProperty.call(body, 'isActive')) {
     if (typeof body.isActive !== 'boolean') {
