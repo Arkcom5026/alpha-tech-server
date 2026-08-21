@@ -56,10 +56,10 @@ const addSubEmployee = async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return res.status(400).json({
         code: 'EMPLOYEE_PASSWORD_TOO_SHORT',
-        message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
+        message: 'รหัสผ่านเริ่มต้นต้องมีความยาวอย่างน้อย 8 ตัวอักษร',
       });
     }
 
@@ -72,7 +72,7 @@ const addSubEmployee = async (req, res) => {
 
     const [existingUser, position] = await Promise.all([
       repository.findUserByEmail(email),
-      repository.findPositionById(positionId),
+      repository.findPositionForBranch({ id: positionId, branchId }),
     ]);
 
     if (existingUser) {
@@ -85,7 +85,7 @@ const addSubEmployee = async (req, res) => {
     if (!position) {
       return res.status(400).json({
         code: 'EMPLOYEE_POSITION_NOT_FOUND',
-        message: 'ไม่พบตำแหน่งงานที่เลือก กรุณาโหลดรายการตำแหน่งใหม่',
+        message: 'ไม่พบตำแหน่งงานที่ใช้งานได้ในสาขาปัจจุบัน กรุณาโหลดรายการตำแหน่งใหม่',
       });
     }
 
