@@ -58,10 +58,10 @@ test('output tax routes separate read, prepare, issue, credit-note and lifecycle
 
   assert.match(routes, /router\.post\('\/candidates\/register', allowOutputTaxPrepare, controller\.registerCandidate\)/);
   assert.match(routes, /router\.get\('\/documents', allowOutputTaxRead, controller\.listDocuments\)/);
+  assert.match(routes, /router\.get\('\/documents\/:taxDocumentId\/presentation', allowOutputTaxRead, getStatutoryTaxPresentation\)/);
   assert.match(routes, /router\.post\('\/documents\/:taxDocumentId\/issue', allowOutputTaxIssue, controller\.issueOutputTaxDocument\)/);
   assert.match(routes, /router\.post\('\/documents\/:taxDocumentId\/credit-note', allowOutputTaxCreditNote, controller\.issueOutputTaxCreditNote\)/);
   assert.match(routes, /router\.post\('\/documents\/:taxDocumentId\/transition', allowOutputTaxLifecycle, controller\.transitionDocument\)/);
-  assert.match(routes, /router\.get\('\/documents\/:taxDocumentId\/presentation', getStatutoryTaxPresentation\)/);
 
   assert.doesNotMatch(controller, /Tax intake requires OWNER or MANAGER authority/);
   assert.doesNotMatch(controller, /\['OWNER', 'MANAGER'\]/);
