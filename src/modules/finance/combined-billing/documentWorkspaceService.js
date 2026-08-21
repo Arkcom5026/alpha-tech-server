@@ -11,6 +11,10 @@ const {
   projectWorkspaceReadLine,
   summarizeWorkspaceLines,
 } = require('./documentWorkspaceReadProjection');
+const {
+  projectWorkspaceWriteSource,
+  assertWorkspaceWriteSelection,
+} = require('./documentWorkspaceWriteAuthority');
 
 const money = (value) => Number(Number(value || 0).toFixed(2));
 const keyOf = (type, id) => `${type}:${id}`;
@@ -35,24 +39,12 @@ const registerConsolidatedTaxCandidate = async ({ tx, document, branchId, employ
   return taxDocument;
 };
 
-const lineProjection = (sale, type, item, settledAmount) => {
-  const quantity = type === 'STOCK' ? 1 : money(item.quantity);
-  const amount = money(item.price);
-  return {
-    saleId: sale.id,
-    saleCode: sale.code,
-    sourceDocumentNo: sale.officialDocumentNumber,
-    soldAt: sale.soldAt,
-    lineType: type,
-    lineId: item.id,
-    status: settledAmount >= amount ? 'PAID_READY' : settledAmount > 0 ? 'PARTIALLY_PAID' : 'UNPAID',
-    description: item.documentDescription || item.product?.name || item.stockItem?.product?.name || 'สินค้า',
-    quantity,
-    sourceUnitPrice: quantity ? money(amount / quantity) : amount,
-    sourceAmount: amount,
-    settledAmount: money(settledAmount),
-  };
-};
+const lineProjection = (sale, type, item, settledAmount) => projectWorkspaceWriteSource({
+  sale,
+  type,
+  item,
+  settledAmount,
+});
 
 const listDocumentWorkspace = async ({ branchId, customerId }) => {
   branchId = Number(branchId); customerId = Number(customerId);
@@ -166,11 +158,23 @@ const confirmDocumentWorkspace = async ({ branchId, customerId, employeeId, note
     const data = requested.map((request) => {
       const item = source.get(keyOf(request.lineType, request.lineId));
       const settledAmount = settled.get(keyOf(request.lineType, request.lineId)) || 0;
-      const documentAmount = money(request.documentUnitPrice * item.quantity);
+      const authority = assertWorkspaceWriteSelection({ projection: item, documentUnitPrice: request.documentUnitPrice });
+      const documentAmount = money(authority.documentAmount);
       if (settledAmount < documentAmount) fail('DOCUMENT_WORKSPACE_ADDITIONAL_PAYMENT_REQUIRED', `ยอดชำระของ ${item.description} ไม่พอราคาสุดท้าย`, 409);
-      const priceAdjustment = money(request.documentUnitPrice - item.sourceUnitPrice);
+      const priceAdjustment = money(request.documentUnitPrice - authority.sourceUnitPrice);
       if (priceAdjustment !== 0 && !request.adjustmentReason) fail('DOCUMENT_WORKSPACE_ADJUSTMENT_REASON_REQUIRED', 'กรุณาระบุเหตุผลเมื่อปรับราคา');
-      return { request, item, settledAmount, documentAmount, priceAdjustment };
+      return {
+        request,
+        item: {
+          ...item,
+          quantity: authority.quantity,
+          sourceUnitPrice: authority.sourceUnitPrice,
+          sourceAmount: authority.sourceAmount,
+        },
+        settledAmount,
+        documentAmount,
+        priceAdjustment,
+      };
     });
 
     const sourceSaleIds = [...new Set(data.map((row) => Number(row.item.saleId)))];
