@@ -1,4 +1,7 @@
 const prisma = require('../../../database/prisma/client');
+const {
+  publishRepairWorkflowEvent,
+} = require('../workflow/events/repairWorkflowEventStore');
 
 const columns = `"id", "repairJobId", "status", "method", "recipientName",
   "recipientPhone", "customerConfirmedBy", "customerConfirmedAt", "customerNote",
@@ -142,6 +145,41 @@ class RepairHandoverRepository {
         where: { id: Number(repairJobId) },
         select: { id: true, jobNo: true, branchId: true, deviceId: true, deviceIntake: { select: { id: true } } },
       });
+
+      const occurredAt = new Date();
+      const eventKey = `repair-workflow:${repairJobId}:handover-delivered`;
+      const correlationId = `repair-job:${repairJobId}`;
+      const causationId = `repair-handover:${rows[0].id}`;
+      const title = `งานซ่อม ${job?.jobNo || repairJobId}: ส่งมอบแล้ว`;
+      const description = `ผู้รับ: ${rows[0].customerConfirmedBy}`;
+      const metadata = {
+        repairJobId: Number(repairJobId),
+        action: 'DELIVER',
+        workflowPreviousStatus: 'READY_FOR_DELIVERY',
+        workflowTargetStatus: 'DELIVERED',
+        legacyServiceStatus: 'COMPLETED',
+        terminal: false,
+        handover: snapshot,
+      };
+
+      await publishRepairWorkflowEvent(tx, {
+        repairJobId: Number(repairJobId),
+        branchId: Number(snapshot.branchId),
+        eventType: 'DELIVERED',
+        action: 'DELIVER',
+        previousStatus: 'READY_FOR_DELIVERY',
+        targetStatus: 'DELIVERED',
+        eventKey,
+        correlationId,
+        causationId,
+        title,
+        description,
+        actorEmployeeId: Number(employeeId),
+        customerVisible: true,
+        metadata,
+        occurredAt,
+      });
+
       if (job?.deviceId) {
         await tx.devicePassportEvent.create({
           data: {
@@ -149,25 +187,17 @@ class RepairHandoverRepository {
             eventType: 'DELIVERED',
             sourceType: 'REPAIR_JOB',
             sourceId: String(repairJobId),
-            eventKey: `repair-workflow:${repairJobId}:handover-delivered`,
-            correlationId: `repair-job:${repairJobId}`,
-            causationId: `repair-handover:${rows[0].id}`,
-            title: `งานซ่อม ${job.jobNo}: ส่งมอบแล้ว`,
-            description: `ผู้รับ: ${rows[0].customerConfirmedBy}`,
+            eventKey,
+            correlationId,
+            causationId,
+            title,
+            description,
             actorType: 'EMPLOYEE',
             actorEmployeeId: Number(employeeId),
             branchId: snapshot.branchId,
             customerVisible: true,
-            metadata: {
-              repairJobId: Number(repairJobId),
-              action: 'DELIVER',
-              workflowPreviousStatus: 'READY_FOR_DELIVERY',
-              workflowTargetStatus: 'DELIVERED',
-              legacyServiceStatus: 'COMPLETED',
-              terminal: false,
-              handover: snapshot,
-            },
-            occurredAt: new Date(),
+            metadata,
+            occurredAt,
           },
         });
       }
