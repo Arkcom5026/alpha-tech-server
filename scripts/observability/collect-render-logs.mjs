@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { buildHttpAnalytics } from './render-log-analytics.mjs';
 
 const API_BASE = 'https://api.render.com/v1';
 const apiKey = process.env.RENDER_API_KEY?.trim();
@@ -69,6 +70,18 @@ const parseDurationMs = (entry) => {
   if (!matches.length) return null;
   const candidate = Number(matches[matches.length - 1][1]);
   return Number.isFinite(candidate) ? candidate : null;
+};
+
+const parseResponseBytes = (entry) => {
+  const direct = Number(firstValue(
+    valueOf(entry, 'responseSizeBytes', 'response_size_bytes', 'responseBytes', 'bodySize', 'bytes'),
+  ));
+  if (Number.isFinite(direct) && direct >= 0) return direct;
+  const match = messageOf(entry).match(
+    /\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\S+\s+\d{3}\s+(\d+)\s+-\s+\d+(?:\.\d+)?\s*ms\b/i,
+  );
+  const candidate = Number(match?.[1]);
+  return Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
 };
 
 const normalizeTimestamp = (entry) => {
@@ -172,6 +185,7 @@ const normalized = sanitizedLogs.map((entry, index) => ({
   status: extractStatus(entry),
   requestId: extractRequestId(entry),
   durationMs: parseDurationMs(entry),
+  responseBytes: parseResponseBytes(entry),
   level: valueOf(entry, 'level'),
   type: valueOf(entry, 'type'),
   entry,
@@ -226,6 +240,12 @@ const countBy = (items, selector) => {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
 };
 
+const httpAnalytics = buildHttpAnalytics(completedRequests);
+const percent = (value) => `${((Number(value) || 0) * 100).toFixed(2)}%`;
+const endpointBaseline = httpAnalytics.endpoints
+  .filter((item) => item.latencySamples >= 2)
+  .slice(0, 20);
+
 const snapshot = {
   generatedAt: new Date().toISOString(),
   window: { start: start.toISOString(), end: end.toISOString(), lookbackMinutes },
@@ -248,17 +268,19 @@ const summary = {
   printableRequests: printable.length,
   printableWithCacheBustTs: printableWithCacheBustTs.length,
   rapidRepeatCandidates10s: rapidRepeatCandidates.length,
+  httpAnalytics,
   topPaths: countBy(completedRequests, (item) => item.path).map(([pathName, count]) => ({ path: pathName, count })),
   topStatuses: countBy(completedRequests, (item) => String(item.status)).map(([status, count]) => ({ status: Number(status), count })),
   slowest: slow
     .sort((a, b) => b.durationMs - a.durationMs)
     .slice(0, 20)
-    .map(({ timestamp, method, path: requestPath, status, durationMs, requestId }) => ({
+    .map(({ timestamp, method, path: requestPath, status, durationMs, responseBytes, requestId }) => ({
       timestamp,
       method,
       path: requestPath,
       status,
       durationMs,
+      responseBytes,
       requestId,
     })),
   rapidRepeatCandidates: rapidRepeatCandidates.slice(0, 50),
@@ -280,14 +302,33 @@ const summaryText = [
   `Rapid-repeat candidates <=10s: ${summary.rapidRepeatCandidates10s}`,
   'Rapid repeats are a review signal only; repeated method/path does not prove an accidental duplicate request.',
   '',
+  'HTTP quality baseline:',
+  `- Latency p50: ${httpAnalytics.p50Ms ?? '-'}ms`,
+  `- Latency p95: ${httpAnalytics.p95Ms ?? '-'}ms`,
+  `- Error rate (5xx): ${percent(httpAnalytics.errorRate)} (${httpAnalytics.errors5xx}/${httpAnalytics.requestCount})`,
+  `- Conflict rate (409): ${percent(httpAnalytics.conflictRate)} (${httpAnalytics.conflicts409}/${httpAnalytics.requestCount})`,
+  `- Exact duplicate-call candidate rate <=2s: ${percent(httpAnalytics.duplicateCallRate2s)} (${httpAnalytics.exactRepeatCandidates2s}/${httpAnalytics.requestCount})`,
+  `- Average response size: ${httpAnalytics.avgResponseBytes ?? '-'} bytes`,
+  `- Response size p95: ${httpAnalytics.p95ResponseBytes ?? '-'} bytes`,
+  `- Max requests in 1s bucket: ${httpAnalytics.requestBurst.maxRequestsPerBucket}`,
+  '',
+  'Endpoint latency baseline (>=2 samples, sorted by p95):',
+  ...endpointBaseline.map((item) => `- ${item.key} count=${item.count} p50=${item.p50Ms ?? '-'}ms p95=${item.p95Ms ?? '-'}ms max=${item.maxMs ?? '-'}ms 5xx=${percent(item.errorRate)} 409=${percent(item.conflictRate)} avgBytes=${item.avgResponseBytes ?? '-'}`),
+  '',
   'Top paths:',
   ...summary.topPaths.map((item) => `- ${item.count} ${item.path}`),
   '',
   'Slowest requests:',
-  ...summary.slowest.map((item) => `- ${item.durationMs}ms ${item.status || '-'} ${item.method || '-'} ${item.path || '-'} reqId=${item.requestId || '-'}`),
+  ...summary.slowest.map((item) => `- ${item.durationMs}ms ${item.status || '-'} ${item.method || '-'} ${item.path || '-'} bytes=${item.responseBytes ?? '-'} reqId=${item.requestId || '-'}`),
   '',
   'Rapid-repeat candidates:',
   ...summary.rapidRepeatCandidates.map((item) => `- ${item.key} gap=${item.gapMs}ms reqIds=${item.firstRequestId || '-'} -> ${item.secondRequestId || '-'} ${item.first} -> ${item.second}`),
+  '',
+  'Exact duplicate-call candidates <=2s:',
+  ...httpAnalytics.exactRepeatCandidates.map((item) => `- ${item.key} gap=${item.gapMs}ms reqIds=${item.firstRequestId || '-'} -> ${item.secondRequestId || '-'}`),
+  '',
+  'Top 1s request bursts:',
+  ...httpAnalytics.requestBurst.topBuckets.map((item) => `- ${item.bucketStart} requests=${item.count}`),
 ].join('\n');
 
 await mkdir(outputDir, { recursive: true });
