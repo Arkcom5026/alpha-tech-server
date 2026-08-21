@@ -45,6 +45,7 @@ test('tax readiness route is position-gated while controller retains branch isol
 
   // Adjacent tax administration surfaces stay explicit as later waves claim them.
   assert.match(routes, /router\.get\('\/vat-settlement\/:taxPeriodId', allowVatSettlementRead, vatSettlementController\.getPreparation\)/);
-  assert.match(routes, /router\.post\('\/vat-carry-forward\/:taxPeriodId\/confirm', vatCarryForwardController\.confirmAuthority\)/);
+  assert.match(routes, /router\.get\('\/vat-carry-forward\/:taxPeriodId', allowVatCarryForwardRead, vatCarryForwardController\.getAuthority\)/);
+  assert.match(routes, /router\.post\('\/vat-carry-forward\/:taxPeriodId\/confirm', allowVatCarryForwardConfirm, vatCarryForwardController\.confirmAuthority\)/);
   assert.match(routes, /router\.get\('\/withholding-tax\/:taxPeriodId', withholdingTaxController\.getWorkspace\)/);
 });
