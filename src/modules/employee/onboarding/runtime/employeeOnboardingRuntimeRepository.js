@@ -5,9 +5,13 @@ const findUserByEmail = (email) => prisma.user.findUnique({
   select: { id: true },
 });
 
-const findPositionById = (id) => prisma.position.findUnique({
-  where: { id },
-  select: { id: true, name: true },
+const findPositionForBranch = ({ id, branchId }) => prisma.position.findFirst({
+  where: {
+    id,
+    branchId,
+    isActive: true,
+  },
+  select: { id: true, name: true, branchId: true, isActive: true },
 });
 
 const createUser = (data, tx = prisma) => tx.user.create({ data });
@@ -26,7 +30,7 @@ const runTransaction = (work) => prisma.$transaction(work);
 
 module.exports = {
   findUserByEmail,
-  findPositionById,
+  findPositionForBranch,
   createUser,
   createEmployeeProfile,
   createCustomerProfile,
