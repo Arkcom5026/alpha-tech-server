@@ -7,32 +7,52 @@ const { resolveFinancialCustomerGroup } = require('../../../customer/financial-g
 const {
   buildActiveCreditReceivableWhere,
   calculateOutstandingReceivable,
+  calculateReturnedReceivableAmount,
+  calculateNetReceivableTotal,
 } = require('../../../sales/shared/creditReceivableAuthority');
 
 const money = (value) => Number(value || 0);
 const outstanding = calculateOutstandingReceivable;
 
-const mapStockLine = (item) => ({
-  lineType: 'STOCK',
-  saleItemId: item.id,
-  description: item.documentDescription || item.stockItem?.product?.name || 'สินค้า',
-  quantity: 1,
-  unitAmount: money(item.basePrice),
-  discountAmount: money(item.discount),
-  lineAmount: money(item.price),
-  barcode: item.stockItem?.barcode || null,
-});
+const mapStockLine = (item) => {
+  const returnedQuantity = Math.min(1, Math.max(0, money(item.returnedQuantity)));
+  const quantity = Math.max(0, 1 - returnedQuantity);
+  return {
+    lineType: 'STOCK',
+    saleItemId: item.id,
+    description: item.documentDescription || item.stockItem?.product?.name || 'สินค้า',
+    quantity,
+    originalQuantity: 1,
+    returnedQuantity,
+    unitAmount: money(item.basePrice),
+    discountAmount: money(item.discount),
+    originalLineAmount: money(item.price),
+    lineAmount: Number((money(item.price) * quantity).toFixed(2)),
+    barcode: item.stockItem?.barcode || null,
+  };
+};
 
-const mapSimpleLine = (item) => ({
-  lineType: 'SIMPLE',
-  saleItemId: item.id,
-  description: item.documentDescription || item.product?.name || 'สินค้า',
-  quantity: money(item.quantity),
-  unitAmount: money(item.basePrice),
-  discountAmount: money(item.discount),
-  lineAmount: money(item.price),
-  barcode: null,
-});
+const mapSimpleLine = (item) => {
+  const originalQuantity = Math.max(0, money(item.quantity));
+  const returnedQuantity = Math.min(originalQuantity, Math.max(0, money(item.returnedQuantity)));
+  const quantity = Math.max(0, originalQuantity - returnedQuantity);
+  const lineAmount = originalQuantity > 0
+    ? Number((money(item.price) * (quantity / originalQuantity)).toFixed(2))
+    : 0;
+  return {
+    lineType: 'SIMPLE',
+    saleItemId: item.id,
+    description: item.documentDescription || item.product?.name || 'สินค้า',
+    quantity,
+    originalQuantity,
+    returnedQuantity,
+    unitAmount: money(item.basePrice),
+    discountAmount: money(item.discount),
+    originalLineAmount: money(item.price),
+    lineAmount,
+    barcode: null,
+  };
+};
 
 const lineKey = (saleId, lineType, saleItemId) => `${saleId}:${lineType}:${saleItemId}`;
 
@@ -79,6 +99,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
           basePrice: true,
           discount: true,
           price: true,
+          returnedQuantity: true,
           documentDescription: true,
           stockItem: { select: { barcode: true, product: { select: { name: true } } } },
         },
@@ -87,6 +108,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
         select: {
           id: true,
           quantity: true,
+          returnedQuantity: true,
           basePrice: true,
           discount: true,
           price: true,
@@ -149,6 +171,8 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
       sourceCustomerIds,
     },
     sales: sales.map((sale) => {
+      const returnedAmount = calculateReturnedReceivableAmount(sale);
+      const billableAmount = calculateNetReceivableTotal(sale);
       const lines = [...sale.items.map(mapStockLine), ...sale.simpleItems.map(mapSimpleLine)]
         .map((line) => {
           const appliedAmount = appliedByLine.get(lineKey(sale.id, line.lineType, line.saleItemId)) || 0;
@@ -158,7 +182,7 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
             remainingAmount: Math.max(0, Number((line.lineAmount - appliedAmount).toFixed(2))),
           };
         })
-        .filter((line) => line.remainingAmount > 0);
+        .filter((line) => line.quantity > 0 && line.remainingAmount > 0);
       return {
         id: sale.id,
         customerId: sale.customerId,
@@ -168,6 +192,8 @@ const listEligibleDeliveryCredits = async ({ prisma, command }) => {
         soldAt: sale.soldAt,
         dueDate: sale.dueDate,
         totalAmount: money(sale.totalAmount),
+        returnedAmount,
+        billableAmount,
         paidAmount: money(sale.paidAmount),
         outstandingAmount: outstanding(sale),
         statusPayment: sale.statusPayment,
