@@ -94,9 +94,16 @@ const verifyToken = async (req, res, next) => {
           select: {
             id: true,
             branchId: true,
+            positionId: true,
             approved: true,
             active: true,
             v2Role: true,
+            position: {
+              select: {
+                id: true,
+                capabilities: true,
+              },
+            },
           },
         },
       },
@@ -131,6 +138,9 @@ const verifyToken = async (req, res, next) => {
     }
 
     const employeeId = employeeProfile?.id || null;
+    const positionCapabilities = Array.isArray(employeeProfile?.position?.capabilities)
+      ? employeeProfile.position.capabilities
+      : null;
     const customerProfileId = decoded?.customerProfileId ?? (
       profileType === 'customer' ? decoded?.profileId ?? null : null
     );
@@ -145,6 +155,9 @@ const verifyToken = async (req, res, next) => {
       customerProfileId,
       employeeId,
       branchId: employeeProfile?.branchId || null,
+      positionId: employeeProfile?.positionId || null,
+      positionCapabilities,
+      positionAuthorityMode: positionCapabilities === null ? 'V2_ROLE_COMPAT' : 'POSITION',
       employeeApproved: employeeProfile?.approved ?? null,
       employeeActive: employeeProfile?.active ?? null,
       employeeRole: employeeProfile?.v2Role || null,
@@ -159,6 +172,8 @@ const verifyToken = async (req, res, next) => {
       profileType,
       employeeId,
       branchId: req.user.branchId,
+      positionId: req.user.positionId,
+      positionAuthorityMode: req.user.positionAuthorityMode,
     });
 
     return next();

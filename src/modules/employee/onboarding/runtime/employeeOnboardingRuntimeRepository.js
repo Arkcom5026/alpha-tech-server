@@ -11,7 +11,7 @@ const findPositionForBranch = ({ id, branchId }) => prisma.position.findFirst({
     branchId,
     isActive: true,
   },
-  select: { id: true, name: true, branchId: true, isActive: true },
+  select: { id: true, name: true, branchId: true, isActive: true, capabilities: true },
 });
 
 const createUser = (data, tx = prisma) => tx.user.create({ data });

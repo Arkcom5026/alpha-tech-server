@@ -11,13 +11,14 @@ let positionLookup = null
 let createdProfile = null
 let transactionRuns = 0
 let allowPosition = false
+let positionCapabilities = null
 
 const repositoryStub = {
   findUserByEmail: async () => null,
   findPositionForBranch: async (input) => {
     positionLookup = input
     return allowPosition
-      ? { id: input.id, name: 'แคชเชียร์', branchId: input.branchId, isActive: true }
+      ? { id: input.id, name: 'ตำแหน่งทดสอบ', branchId: input.branchId, isActive: true, capabilities: positionCapabilities }
       : null
   },
   runTransaction: async (work) => {
@@ -30,7 +31,7 @@ const repositoryStub = {
     return {
       id: 601,
       ...data,
-      position: { id: data.positionId, name: 'แคชเชียร์' },
+      position: { id: data.positionId, name: 'ตำแหน่งทดสอบ', capabilities: positionCapabilities },
       branch: { id: data.branchId, name: 'สาขาทดสอบ' },
     }
   },
@@ -76,11 +77,20 @@ async function main() {
   {
     const res = makeResponse()
     await service.addSubEmployee({
-      user: { role: 'EMPLOYEE', employeeRole: 'CASHIER', branchId: 2 },
+      user: { role: 'EMPLOYEE', employeeRole: 'CASHIER', branchId: 2, positionCapabilities: null },
       body: validBody,
     }, res)
     assert.equal(res.result.statusCode, 403)
     assert.equal(res.result.payload.code, 'EMPLOYEE_ONBOARDING_FORBIDDEN')
+  }
+
+  {
+    const res = makeResponse()
+    await service.addSubEmployee({
+      user: { role: 'EMPLOYEE', employeeRole: 'CASHIER', branchId: 2, positionCapabilities: ['employee.manage'] },
+      body: validBody,
+    }, res)
+    assert.notEqual(res.result.statusCode, 403, 'position capability must override legacy CASHIER authority')
   }
 
   {
@@ -124,6 +134,7 @@ async function main() {
 
   {
     allowPosition = true
+    positionCapabilities = null
     createdProfile = null
     transactionRuns = 0
     const res = makeResponse()
@@ -137,6 +148,32 @@ async function main() {
     assert.equal(createdProfile.positionId, 9)
     assert.equal(createdProfile.v2Role, 'CASHIER')
     assert.equal(res.result.payload.data.branchId, 2)
+  }
+
+  {
+    allowPosition = true
+    positionCapabilities = ['employee.manage']
+    createdProfile = null
+    const res = makeResponse()
+    await service.addSubEmployee({
+      user: { role: 'ADMIN', branchId: 2 },
+      body: { ...validBody, v2Role: undefined },
+    }, res)
+    assert.equal(res.result.statusCode, 201)
+    assert.equal(createdProfile.v2Role, 'MANAGER', 'migrated position must derive the compatibility role')
+  }
+
+  {
+    allowPosition = true
+    positionCapabilities = []
+    createdProfile = null
+    const res = makeResponse()
+    await service.addSubEmployee({
+      user: { role: 'ADMIN', branchId: 2 },
+      body: { ...validBody, v2Role: 'MANAGER' },
+    }, res)
+    assert.equal(res.result.statusCode, 201)
+    assert.equal(createdProfile.v2Role, 'CASHIER', 'explicit position authority must override requested legacy role')
   }
 
   console.log('employee-onboarding-branch-authority.contract.test.js: PASS')

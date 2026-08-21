@@ -23,7 +23,7 @@ const listPositions = ({ where, skip, take }) =>
 
 const listDropdowns = ({ where }) =>
   prisma.position.findMany({
-    select: { id: true, name: true },
+    select: { id: true, name: true, capabilities: true },
     where,
     orderBy: { name: 'asc' },
   });

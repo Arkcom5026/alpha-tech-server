@@ -11,6 +11,7 @@ const listPositions = ({ branchId }) => prisma.position.findMany({
     description: true,
     branchId: true,
     isActive: true,
+    capabilities: true,
   },
   orderBy: { name: 'asc' },
 });
