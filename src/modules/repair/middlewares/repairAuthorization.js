@@ -1,5 +1,8 @@
 const prisma = require('../../../database/prisma/client');
 const {
+  resolveActorCapabilities,
+} = require('../../employee/authorization/employeePositionAuthority');
+const {
   RepairError,
   RepairFailureCode,
 } = require('../contracts/repairError');
@@ -16,7 +19,11 @@ const REPAIR_CAPABILITY = Object.freeze({
 });
 
 const ALL_REPAIR_CAPABILITIES = Object.freeze(Object.values(REPAIR_CAPABILITY));
+const REPAIR_CAPABILITY_SET = new Set(ALL_REPAIR_CAPABILITIES);
 
+// Legacy matrix is retained only for compatibility verification while old positions
+// still have Position.capabilities = NULL. Runtime authority now resolves through
+// employeePositionAuthority so migrated positions override v2Role completely.
 const REPAIR_CAPABILITIES_BY_ROLE = Object.freeze({
   OWNER: ALL_REPAIR_CAPABILITIES,
   MANAGER: ALL_REPAIR_CAPABILITIES,
@@ -42,6 +49,14 @@ const normalizeRole = (role) =>
 const resolveRepairCapabilities = (role) =>
   [...(REPAIR_CAPABILITIES_BY_ROLE[normalizeRole(role)] || [])];
 
+const resolveRepairCapabilitiesForActor = (actor = {}) => {
+  const authority = resolveActorCapabilities(actor);
+  return {
+    mode: authority.mode,
+    capabilities: authority.capabilities.filter((capability) => REPAIR_CAPABILITY_SET.has(capability)),
+  };
+};
+
 const loadRepairEmployeeContext = async (req, res, next) => {
   try {
     const employeeId = Number(req.user?.employeeId);
@@ -65,6 +80,12 @@ const loadRepairEmployeeContext = async (req, res, next) => {
         v2Role: true,
         active: true,
         approved: true,
+        position: {
+          select: {
+            id: true,
+            capabilities: true,
+          },
+        },
       },
     });
 
@@ -93,13 +114,26 @@ const loadRepairEmployeeContext = async (req, res, next) => {
     }
 
     const v2Role = normalizeRole(employee.v2Role);
+    const positionCapabilities = Array.isArray(employee.position?.capabilities)
+      ? employee.position.capabilities
+      : null;
+    const repairAuthority = resolveRepairCapabilitiesForActor({
+      ...req.user,
+      employeeRole: v2Role,
+      v2Role,
+      positionCapabilities,
+    });
 
     req.user = {
       ...req.user,
       employeeId: employee.id,
       branchId: employee.branchId,
+      employeeRole: v2Role,
       v2Role,
-      repairCapabilities: resolveRepairCapabilities(v2Role),
+      positionId: employee.position?.id || req.user?.positionId || null,
+      positionCapabilities,
+      positionAuthorityMode: repairAuthority.mode,
+      repairCapabilities: repairAuthority.capabilities,
     };
 
     return next();
@@ -127,6 +161,7 @@ const allowRepairCapabilities = (...capabilities) => {
             requiredCapabilities: [...requiredCapabilities],
             missingCapabilities,
             actualCapabilities: [...actualCapabilities],
+            authorityMode: req.user?.positionAuthorityMode || null,
             actualRole: normalizeRole(req.user?.v2Role) || null,
           }
         )
@@ -170,4 +205,5 @@ module.exports = {
   loadRepairEmployeeContext,
   normalizeRole,
   resolveRepairCapabilities,
+  resolveRepairCapabilitiesForActor,
 };
