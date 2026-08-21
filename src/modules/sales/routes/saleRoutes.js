@@ -12,6 +12,9 @@ const {
   issueSaleDeliveryNoteController,
 } = require('../documents/controllers/saleDeliveryNoteController');
 const {
+  getDeliveryNoteListLifecycleSummaries,
+} = require('../delivery-note/list/deliveryNoteListLifecycleController');
+const {
   SALES_DOCUMENT_CAPABILITY,
   allowSalesDocumentCapabilities,
 } = require('../documents/shared/salesDocumentAuthorization');
@@ -77,6 +80,7 @@ router.get('/', allowSalesCore, getAllSales);
 router.get('/return', allowSalesCore, getAllSalesReturn);
 router.get('/printable', allowSalesCore, searchPrintableSales);
 router.get('/printable-sales', allowSalesCore, searchPrintableSales);
+router.get('/delivery-note/lifecycle-summaries', allowSalesCore, getDeliveryNoteListLifecycleSummaries);
 router.post('/:id/document-preparation', allowDocumentPreparation, createSaleDocumentPreparationController);
 router.get('/:id/document-preparation', allowDocumentPreparation, getSaleDocumentPreparationController);
 router.put('/:id/document-preparation/lines', allowDocumentPreparation, replaceSaleDocumentPreparationLinesController);
