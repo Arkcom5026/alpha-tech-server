@@ -8,19 +8,10 @@ const normalizeRole = (value) => String(value || '').trim().toUpperCase();
 const resolveBranchId = (req, source) => {
   const requestedBranchId = Number(source?.branchId || 0);
   const accountRole = normalizeRole(req.user?.role);
-  const employeeRole = normalizeRole(req.user?.employeeRole || req.user?.position);
   const authorityBranchId = Number(
     req.user?.branchId || req.user?.employeeBranchId || req.user?.currentBranchId || 0,
   );
   const platformAdmin = ['SUPERADMIN', 'ADMIN'].includes(accountRole);
-  const storeTaxAdmin = ['OWNER', 'MANAGER'].includes(employeeRole);
-
-  if (!platformAdmin && !storeTaxAdmin) {
-    const error = new Error('Tax issuer profile requires OWNER or MANAGER authority');
-    error.code = 'TAX_ISSUER_PROFILE_ACCESS_FORBIDDEN';
-    error.statusCode = 403;
-    throw error;
-  }
 
   if (!platformAdmin) {
     if (!Number.isInteger(authorityBranchId) || authorityBranchId <= 0) {

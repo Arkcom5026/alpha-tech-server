@@ -13,11 +13,13 @@ const service = read('src/modules/tax/issuerProfile/update/upsertTaxIssuerProfil
 const repository = read('src/modules/tax/issuerProfile/shared/taxIssuerProfileRepository.js');
 const taxRoutes = read('src/modules/tax/http/taxIntakeRoutes.js');
 
-assert.match(routes, /router\.get\('\/'/);
-assert.match(routes, /router\.put\('\/'/);
+assert.match(routes, /router\.get\('\/', allowTaxIssuerProfileRead/);
+assert.match(routes, /router\.put\('\/', allowTaxIssuerProfileManage/);
 assert.match(routes, /verifyToken/);
+assert.match(routes, /TAX_ISSUER_PROFILE_CAPABILITY\.READ/);
+assert.match(routes, /TAX_ISSUER_PROFILE_CAPABILITY\.MANAGE/);
 assert.match(controller, /TAX_ISSUER_PROFILE_BRANCH_FORBIDDEN/);
-assert.match(controller, /OWNER.*MANAGER/);
+assert.doesNotMatch(controller, /OWNER.*MANAGER|MANAGER.*OWNER/);
 assert.match(service, /TAX_ISSUER_PROFILE_ACTIVATION_INCOMPLETE/);
 assert.match(service, /exactly 13 digits/);
 assert.match(service, /TAX_ISSUER_PROFILE_FIELD_FORBIDDEN/);
