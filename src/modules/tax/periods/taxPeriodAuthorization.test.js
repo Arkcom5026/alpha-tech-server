@@ -69,7 +69,8 @@ test('tax period routes separate read, manage, and elevated reopen authority', (
   assert.doesNotMatch(controller, /OWNER.*MANAGER|MANAGER.*OWNER/);
   assert.match(controller, /TAX_PERIOD_ADMINISTRATIVE_BRANCH_FORBIDDEN/);
 
-  // Adjacent tax administration surfaces remain outside this wave.
+  // Accounting Office remains outside the tax-period wave. Tax Closing Handoff is
+  // now owned by its adjacent Position-authority boundary and must stay guarded.
   assert.match(routes, /router\.get\('\/accounting-office\/packages\/:taxPeriodId', accountingOfficeController\.getPackage\)/);
-  assert.match(routes, /router\.post\('\/tax-closing-handoff\/:taxPeriodId\/finalize', taxClosingHandoffController\.finalizeBundle\)/);
+  assert.match(routes, /router\.post\('\/tax-closing-handoff\/:taxPeriodId\/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController\.finalizeBundle\)/);
 });
