@@ -23,6 +23,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   PROCUREMENT_PURCHASE_ORDER: 'procurement.purchase-order',
   PROCUREMENT_PURCHASE_ORDER_CONTROL: 'procurement.purchase-order.control',
   PROCUREMENT_SUPPLIER_PAYMENT_READ: 'procurement.supplier-payment.read',
+  PROCUREMENT_SUPPLIER_PAYMENT_MANAGE: 'procurement.supplier-payment.manage',
+  PROCUREMENT_SUPPLIER_PAYMENT_VOID: 'procurement.supplier-payment.void',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -75,6 +77,10 @@ const legacyCapabilitiesForRole = (role) => {
       ...REPAIR_CAPABILITIES,
       ...INVENTORY_CAPABILITIES,
       ...PROCUREMENT_CAPABILITIES,
+      POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
+      ...(normalized === 'OWNER'
+        ? [POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_VOID]
+        : []),
     ];
   }
 
