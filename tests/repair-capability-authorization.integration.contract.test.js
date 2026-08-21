@@ -10,6 +10,8 @@ const assert = (condition, message) => {
 const authorization = read(
   'src/modules/repair/middlewares/repairAuthorization.js'
 );
+const repairActor = read('src/modules/repair/utils/repairActor.js');
+const createRepairJobService = read('src/modules/repair/create/createRepairJobService.js');
 const positionAuthority = read(
   'src/modules/employee/authorization/employeePositionAuthority.js'
 );
@@ -24,6 +26,7 @@ const requiredCapabilities = [
   'repair.claim',
   'repair.handover',
   'repair.customer-access',
+  'repair.customer-override',
 ];
 
 for (const capability of requiredCapabilities) {
@@ -49,6 +52,17 @@ assert(
   'Repair runtime must expose whether authority came from Position or compatibility fallback'
 );
 assert(
+  repairActor.includes('repairCapabilities: normalizeCapabilities(user.repairCapabilities)') &&
+    repairActor.includes('positionAuthorityMode: user.positionAuthorityMode || null'),
+  'Repair actor projection must carry capability authority into application services'
+);
+assert(
+  createRepairJobService.includes("const CUSTOMER_OVERRIDE_CAPABILITY = 'repair.customer-override'") &&
+    createRepairJobService.includes('hasRepairCapability(actor, CUSTOMER_OVERRIDE_CAPABILITY)') &&
+    !createRepairJobService.includes("actor.role === 'MANAGER'"),
+  'Repair customer ownership override must be capability-owned rather than MANAGER-role-owned'
+);
+assert(
   authorization.includes('missingCapabilities'),
   'Capability denial must report missing capabilities'
 );
@@ -67,7 +81,8 @@ assert(
 );
 assert(
   positionAuthority.includes("REPAIR_WORKFLOW: 'repair.workflow'") &&
-    positionAuthority.includes("REPAIR_PARTS: 'repair.parts'"),
+    positionAuthority.includes("REPAIR_PARTS: 'repair.parts'") &&
+    positionAuthority.includes("REPAIR_CUSTOMER_OVERRIDE: 'repair.customer-override'"),
   'Repair capabilities must be first-class Position capabilities'
 );
 
