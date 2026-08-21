@@ -1,7 +1,7 @@
 'use strict';
 
 const { issueSaleDeliveryNote } = require('../issue/issueSaleDeliveryNoteService');
-const { projectSaleDeliveryNote } = require('../print/projectSaleDeliveryNoteService');
+const { projectCurrentSaleDeliveryNote } = require('../print/projectCurrentSaleDeliveryNoteService');
 
 const authenticatedBranchId = (req) => {
   const branchId = Number(req.user?.branchId);
@@ -15,7 +15,7 @@ const getSaleDeliveryNote = async (req, res, next) => {
       return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authenticated branch is required' });
     }
 
-    const result = await projectSaleDeliveryNote({
+    const result = await projectCurrentSaleDeliveryNote({
       branchId,
       saleId: req.params.id,
     });
