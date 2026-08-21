@@ -22,6 +22,7 @@ const POSITION_CAPABILITIES = Object.freeze({
   PROCUREMENT_RECEIPT_FINALIZE: 'procurement.receipt.finalize',
   PROCUREMENT_PURCHASE_ORDER: 'procurement.purchase-order',
   PROCUREMENT_PURCHASE_ORDER_CONTROL: 'procurement.purchase-order.control',
+  PROCUREMENT_SUPPLIER_PAYMENT_READ: 'procurement.supplier-payment.read',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -53,6 +54,7 @@ const PROCUREMENT_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.PROCUREMENT_RECEIPT_FINALIZE,
   POSITION_CAPABILITIES.PROCUREMENT_PURCHASE_ORDER,
   POSITION_CAPABILITIES.PROCUREMENT_PURCHASE_ORDER_CONTROL,
+  POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_READ,
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
