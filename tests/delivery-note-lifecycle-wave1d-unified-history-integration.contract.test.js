@@ -9,6 +9,10 @@ const controller = fs.readFileSync(
   path.join(root, 'src/modules/finance/combined-billing/unifiedDocumentHistoryController.js'),
   'utf8',
 );
+const projector = fs.readFileSync(
+  path.join(root, 'src/modules/sales/delivery-note/lifecycle/projectDeliveryNoteHistoryLifecycle.js'),
+  'utf8',
+);
 
 assert.match(
   controller,
@@ -36,14 +40,24 @@ assert.match(
 
 assert.match(
   controller,
-  /lifecycleHistoricalReadable/,
-  'unified Delivery Note history must expose historical readability semantics',
+  /sourceType:\s*'DOCUMENT_PREPARATION'/,
+  'Delivery Note history must detect issued tax authority that moved through document preparation',
+);
+assert.match(
+  controller,
+  /preparedTaxBySaleId/,
+  'prepared tax authority must be mapped back to the source Sale lifecycle row',
 );
 
 assert.match(
-  controller,
+  projector,
+  /lifecycleHistoricalReadable/,
+  'shared history projector must expose historical readability semantics',
+);
+assert.match(
+  projector,
   /lifecycleCurrentAuthority/,
-  'unified Delivery Note history must expose current action authority separately from history',
+  'shared history projector must expose current action authority separately from history',
 );
 
 console.log('Delivery Note lifecycle Wave 1D unified history integration contract: PASS');
