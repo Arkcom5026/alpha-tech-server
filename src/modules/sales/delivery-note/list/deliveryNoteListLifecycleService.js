@@ -10,6 +10,12 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const toTimestamp = (value) => {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const normalizeSaleIds = (saleIds) => {
   const source = Array.isArray(saleIds) ? saleIds : [];
   const ids = [...new Set(source.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))];
@@ -30,10 +36,19 @@ const summarizeLegacyReturnLines = (sale = {}) => {
   let returnedLineCount = 0;
   let fullyReturnedLineCount = 0;
   let returnedQuantity = 0;
+  let latestReturnAt = null;
+
+  const rememberReturnAt = (value) => {
+    if (!value) return;
+    if (!latestReturnAt || toTimestamp(value) > toTimestamp(latestReturnAt)) latestReturnAt = value;
+  };
 
   for (const item of stockLines) {
     const returned = Math.max(0, Math.min(1, toNumber(item?.returnedQuantity)));
-    if (returned > EPSILON) returnedLineCount += 1;
+    if (returned > EPSILON) {
+      returnedLineCount += 1;
+      rememberReturnAt(item?.lastReturnedAt);
+    }
     if (returned >= 1 - EPSILON) fullyReturnedLineCount += 1;
     returnedQuantity += returned;
   }
@@ -41,7 +56,10 @@ const summarizeLegacyReturnLines = (sale = {}) => {
   for (const item of simpleLines) {
     const original = Math.max(0, toNumber(item?.quantity));
     const returned = Math.max(0, Math.min(original, toNumber(item?.returnedQuantity)));
-    if (returned > EPSILON) returnedLineCount += 1;
+    if (returned > EPSILON) {
+      returnedLineCount += 1;
+      rememberReturnAt(item?.lastReturnedAt);
+    }
     if (original > EPSILON && returned >= original - EPSILON) fullyReturnedLineCount += 1;
     returnedQuantity += returned;
   }
@@ -50,6 +68,7 @@ const summarizeLegacyReturnLines = (sale = {}) => {
     lineCount,
     returnedLineCount,
     returnedQuantity: Number(returnedQuantity.toFixed(2)),
+    latestReturnAt,
     hasReturnActivity: returnedLineCount > 0,
     fullyReturned: lineCount > 0 && fullyReturnedLineCount === lineCount,
   });
@@ -62,10 +81,18 @@ const projectLifecycleSummary = ({ sale, currentDocument } = {}) => {
   const isAdjustedRevision = String(currentDocument?.revisionKind || '').toUpperCase() === 'RETURN_ADJUSTMENT'
     || (revisionNumber != null && revisionNumber > 1);
   const hasReturnActivity = legacy.hasReturnActivity || persistedReturnedAmount > EPSILON || isAdjustedRevision;
+  const latestReturnTimestamp = toTimestamp(legacy.latestReturnAt);
+  const currentIssuedTimestamp = toTimestamp(currentDocument?.issuedAt);
+  const hasReturnAfterCurrentRevision = hasReturnActivity && (
+    !currentDocument
+    || (latestReturnTimestamp > 0 && latestReturnTimestamp > currentIssuedTimestamp)
+  );
 
   let lifecycleStatus = 'NORMAL';
-  if (hasReturnActivity && legacy.fullyReturned && !isAdjustedRevision) {
+  if (hasReturnActivity && legacy.fullyReturned && hasReturnAfterCurrentRevision) {
     lifecycleStatus = 'FULLY_RETURNED';
+  } else if (hasReturnAfterCurrentRevision) {
+    lifecycleStatus = 'RETURNED_PENDING_REVISION';
   } else if (hasReturnActivity && isAdjustedRevision) {
     lifecycleStatus = 'RETURN_ADJUSTED_CURRENT';
   } else if (hasReturnActivity) {
@@ -76,9 +103,11 @@ const projectLifecycleSummary = ({ sale, currentDocument } = {}) => {
     saleId: Number(sale?.id),
     lifecycleStatus,
     hasReturnActivity,
+    hasReturnAfterCurrentRevision,
     fullyReturned: legacy.fullyReturned,
     returnedLineCount: legacy.returnedLineCount,
     returnedQuantity: legacy.returnedQuantity,
+    latestReturnAt: legacy.latestReturnAt || null,
     currentRevision: currentDocument
       ? Object.freeze({
           id: Number(currentDocument.id),
@@ -86,6 +115,7 @@ const projectLifecycleSummary = ({ sale, currentDocument } = {}) => {
           revisionNumber,
           revisionKind: currentDocument.revisionKind || null,
           state: currentDocument.state || null,
+          issuedAt: currentDocument.issuedAt || null,
           activeAmount: Number(toNumber(currentDocument.activeAmount).toFixed(2)),
           returnedAmount: Number(persistedReturnedAmount.toFixed(2)),
         })
@@ -110,8 +140,8 @@ const loadDeliveryNoteListLifecycleSummaries = async ({ branchId, saleIds, db = 
       where: { branchId: normalizedBranchId, id: { in: ids } },
       select: {
         id: true,
-        items: { select: { returnedQuantity: true } },
-        simpleItems: { select: { quantity: true, returnedQuantity: true } },
+        items: { select: { returnedQuantity: true, lastReturnedAt: true } },
+        simpleItems: { select: { quantity: true, returnedQuantity: true, lastReturnedAt: true } },
       },
     }),
     db.deliveryNoteDocument.findMany({
@@ -127,6 +157,7 @@ const loadDeliveryNoteListLifecycleSummaries = async ({ branchId, saleIds, db = 
         revisionNumber: true,
         revisionKind: true,
         state: true,
+        issuedAt: true,
         activeAmount: true,
         returnedAmount: true,
       },
