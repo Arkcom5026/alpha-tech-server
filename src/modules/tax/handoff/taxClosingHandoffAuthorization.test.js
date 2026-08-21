@@ -45,7 +45,7 @@ test('closing handoff routes separate read and elevated finalize authority', () 
   const routes = read('src/modules/tax/periods/taxPeriodRoutes.js');
   const controller = read('src/modules/tax/handoff/taxClosingHandoffController.js');
 
-  assert.match(routes, /allowTaxClosingHandoffCapabilities\(\s*TAX_CLOSING_HANDOFF_CAPABILITY\.READ\s*\)/);
+  assert.match(routes, /allowTaxClosingHandoffCapabilities\(\s*TAX_CLOSING_HANDOFF_CAPABILITY\.READ,?\s*\)/);
   assert.match(routes, /allowTaxClosingHandoffCapabilities\(\s*TAX_CLOSING_HANDOFF_CAPABILITY\.READ,\s*TAX_CLOSING_HANDOFF_CAPABILITY\.FINALIZE,?\s*\)/);
   assert.match(routes, /router\.get\('\/tax-closing-handoff\/:taxPeriodId', allowTaxClosingHandoffRead, taxClosingHandoffController\.getBundle\)/);
   assert.match(routes, /router\.post\('\/tax-closing-handoff\/:taxPeriodId\/finalize', allowTaxClosingHandoffFinalize, taxClosingHandoffController\.finalizeBundle\)/);
