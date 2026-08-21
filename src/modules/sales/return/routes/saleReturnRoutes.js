@@ -9,8 +9,10 @@ const {
 const {
   getSaleReturnById,
 } = require('../query/detail/getSaleReturnByIdController');
+const { requireSaleReturnAccess } = require('../shared/saleReturnAuthorization');
 
 const router = express.Router();
+router.use(requireSaleReturnAccess);
 
 router.get('/eligible/:saleId', getSaleReturnEligibilityController);
 router.post('/complete', completeSaleReturnController);
