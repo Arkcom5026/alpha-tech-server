@@ -13,7 +13,6 @@ const { assertCanApproveDeductedRefund } = require('../policies/saleReturnApprov
 const {
   findSaleForReturn,
   findCompletionCommand,
-  findEmployeeReturnAuthority,
   runSaleReturnTransaction,
   createSaleReturnHeader,
   restoreSerializedItem,
@@ -44,7 +43,9 @@ const loadVerifiedReplay = async ({ branchId, commandId, requestHash }) => {
   });
 };
 
-const completeSaleReturn = async ({ command, branchId, employeeId, actorRole }) => {
+const completeSaleReturn = async ({ command, actor }) => {
+  const branchId = Number(actor?.branchId);
+  const employeeId = Number(actor?.employeeId);
   const replay = await loadVerifiedReplay({
     branchId,
     commandId: command.commandId,
@@ -87,13 +88,9 @@ const completeSaleReturn = async ({ command, branchId, employeeId, actorRole }) 
         ),
       });
 
-      const employeeAuthority = projection.deductedAmount.gt(0)
-        ? await findEmployeeReturnAuthority({ employeeId, branchId, client: tx })
-        : null;
       assertCanApproveDeductedRefund({
         deductedAmount: projection.deductedAmount,
-        actorRole,
-        employeeRole: employeeAuthority?.v2Role,
+        actor,
       });
 
       const occurredAt = new Date();
