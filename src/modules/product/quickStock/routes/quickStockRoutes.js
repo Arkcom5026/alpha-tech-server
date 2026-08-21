@@ -9,6 +9,10 @@ const {
   QUICK_STOCK_CAPABILITY,
   allowQuickStockCapabilities,
 } = require('../shared/quickStockAuthorization')
+const {
+  QUICK_RECEIPT_CAPABILITY,
+  allowQuickReceiptCapabilities,
+} = require('../shared/quickReceiptAuthorization')
 
 const handleQuickEnroll = quickStockController?.handleQuickEnroll
   ? quickStockController.handleQuickEnroll.bind(quickStockController)
@@ -47,22 +51,26 @@ const allowQuickStockForEmployeeContext = (req, res, next) => {
 router.use(verifyToken, allowQuickStockForEmployeeContext)
 
 const allowQuickStockMutation = allowQuickStockCapabilities(QUICK_STOCK_CAPABILITY.MUTATE)
+const allowQuickReceiptAccess = allowQuickReceiptCapabilities(QUICK_RECEIPT_CAPABILITY.ACCESS)
+const allowQuickReceiptFinalize = allowQuickReceiptCapabilities(
+  QUICK_RECEIPT_CAPABILITY.ACCESS,
+  QUICK_RECEIPT_CAPABILITY.FINALIZE,
+)
 
 router.get('/dropdowns', handleQuickReceiveDropdowns)
 router.post('/quick-enroll', allowQuickStockMutation, handleQuickEnroll)
 router.post('/all-in-one', allowQuickStockMutation, handleQuickStockInAllInOne)
 router.post('/existing', allowQuickStockMutation, handleQuickStockExistingReceive)
 
-// Quick Receipt Session: one delivery note, many product types, resumable or one-shot.
-// Its authority remains separate and is intentionally not migrated in Wave 2F.
-router.get('/receipts', quickReceiptSessionController.list)
-router.post('/receipts', quickReceiptSessionController.create)
-router.post('/receipts/complete', quickReceiptSessionController.complete)
-router.get('/receipts/:id', quickReceiptSessionController.detail)
-router.patch('/receipts/:id', quickReceiptSessionController.update)
-router.post('/receipts/:id/items', quickReceiptSessionController.addItem)
-router.delete('/receipts/:id/items/:itemId', quickReceiptSessionController.deleteItem)
-router.post('/receipts/:id/finalize', quickReceiptSessionController.finalize)
-router.post('/receipts/:id/cancel', quickReceiptSessionController.cancel)
+// Quick Receipt Session: draft/read work is distinct from actions that close the session.
+router.get('/receipts', allowQuickReceiptAccess, quickReceiptSessionController.list)
+router.post('/receipts', allowQuickReceiptAccess, quickReceiptSessionController.create)
+router.post('/receipts/complete', allowQuickReceiptFinalize, quickReceiptSessionController.complete)
+router.get('/receipts/:id', allowQuickReceiptAccess, quickReceiptSessionController.detail)
+router.patch('/receipts/:id', allowQuickReceiptAccess, quickReceiptSessionController.update)
+router.post('/receipts/:id/items', allowQuickReceiptAccess, quickReceiptSessionController.addItem)
+router.delete('/receipts/:id/items/:itemId', allowQuickReceiptAccess, quickReceiptSessionController.deleteItem)
+router.post('/receipts/:id/finalize', allowQuickReceiptFinalize, quickReceiptSessionController.finalize)
+router.post('/receipts/:id/cancel', allowQuickReceiptFinalize, quickReceiptSessionController.cancel)
 
 module.exports = router
