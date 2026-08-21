@@ -24,19 +24,29 @@ const { markSaleAsPaid } = require('../settlement/controllers/saleSettlementCont
 const saleReturnRoutes = require('../return/routes/saleReturnRoutes');
 const posHeldCartRoutes = require('../held-cart/routes/posHeldCartRoutes');
 const quotationRoutes = require('../../quotation/http/quotationRoutes');
+const {
+  SALES_CAPABILITY,
+  allowSalesCapabilities,
+} = require('../shared/salesAuthorization');
 
 const router = express.Router();
+const allowSalesCore = allowSalesCapabilities(SALES_CAPABILITY.CORE);
+const allowSalesCompletion = allowSalesCapabilities(
+  SALES_CAPABILITY.CORE,
+  SALES_CAPABILITY.COMPLETE,
+);
+
 router.use(verifyToken);
 router.use('/quotations', quotationRoutes);
-router.use('/held-carts', posHeldCartRoutes);
-router.get('/items/search', searchSaleItemsController);
-router.post('/complete', completeSaleController);
+router.use('/held-carts', allowSalesCore, posHeldCartRoutes);
+router.get('/items/search', allowSalesCore, searchSaleItemsController);
+router.post('/complete', allowSalesCompletion, completeSaleController);
 router.use('/returns', saleReturnRoutes);
-router.post('/', createSale);
-router.get('/', getAllSales);
-router.get('/return', getAllSalesReturn);
-router.get('/printable', searchPrintableSales);
-router.get('/printable-sales', searchPrintableSales);
+router.post('/', allowSalesCore, createSale);
+router.get('/', allowSalesCore, getAllSales);
+router.get('/return', allowSalesCore, getAllSalesReturn);
+router.get('/printable', allowSalesCore, searchPrintableSales);
+router.get('/printable-sales', allowSalesCore, searchPrintableSales);
 router.post('/:id/document-preparation', createSaleDocumentPreparationController);
 router.get('/:id/document-preparation', getSaleDocumentPreparationController);
 router.put('/:id/document-preparation/lines', replaceSaleDocumentPreparationLinesController);
@@ -51,7 +61,7 @@ router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
 router.get('/:id/delivery-note', getSaleDeliveryNote);
 router.get('/:id/quotation-reference', getSaleQuotationReferenceController);
 router.put('/:id/document-descriptions', updateSaleDocumentLinesController);
-router.get('/:id', getSaleById);
+router.get('/:id', allowSalesCore, getSaleById);
 router.post('/:id/mark-paid', markSaleAsPaid);
 
 module.exports = router;
