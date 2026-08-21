@@ -89,7 +89,14 @@ test('executes the command with the authenticated repair actor', async () => {
 
   await controller(
     {
-      user: { id: 2, branchId: 3, employeeId: 7, role: 'MANAGER' },
+      user: {
+        id: 2,
+        branchId: 3,
+        employeeId: 7,
+        role: 'MANAGER',
+        repairCapabilities: ['repair.workflow'],
+        positionAuthorityMode: 'POSITION',
+      },
       params: { id: '41' },
       body: { action: 'START_DIAGNOSIS', commandKey: 'cmd-1' },
     },
@@ -102,6 +109,8 @@ test('executes the command with the authenticated repair actor', async () => {
     branchId: 3,
     employeeId: 7,
     role: 'MANAGER',
+    repairCapabilities: ['repair.workflow'],
+    positionAuthorityMode: 'POSITION',
     userId: 2,
   });
   assert.equal(receivedCommand.repairJobId, '41');
