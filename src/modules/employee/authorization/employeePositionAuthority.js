@@ -67,6 +67,8 @@ const POSITION_CAPABILITIES = Object.freeze({
   TAX_WITHHOLDING_CERTIFICATE_ISSUE: 'tax.withholding.certificate.issue',
   TAX_WITHHOLDING_FILING_PREPARE: 'tax.withholding.filing.prepare',
   TAX_WITHHOLDING_FILING_SUBMIT: 'tax.withholding.filing.submit',
+  TAX_ISSUER_PROFILE_READ: 'tax.issuer-profile.read',
+  TAX_ISSUER_PROFILE_MANAGE: 'tax.issuer-profile.manage',
 });
 
 const REPAIR_CAPABILITIES = Object.freeze([
@@ -175,6 +177,11 @@ const TAX_WITHHOLDING_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.TAX_WITHHOLDING_FILING_SUBMIT,
 ]);
 
+const TAX_ISSUER_PROFILE_CAPABILITIES = Object.freeze([
+  POSITION_CAPABILITIES.TAX_ISSUER_PROFILE_READ,
+  POSITION_CAPABILITIES.TAX_ISSUER_PROFILE_MANAGE,
+]);
+
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeCapabilityArray = (value) => {
@@ -204,6 +211,7 @@ const legacyCapabilitiesForRole = (role) => {
       ...TAX_VAT_SETTLEMENT_CAPABILITIES,
       ...TAX_VAT_CARRY_FORWARD_CAPABILITIES,
       ...TAX_WITHHOLDING_CAPABILITIES,
+      ...TAX_ISSUER_PROFILE_CAPABILITIES,
       POSITION_CAPABILITIES.SALES_RETURN_DEDUCTION_APPROVE,
       POSITION_CAPABILITIES.PROCUREMENT_SUPPLIER_PAYMENT_MANAGE,
       ...(normalized === 'OWNER'
@@ -306,6 +314,7 @@ module.exports = {
   TAX_VAT_SETTLEMENT_CAPABILITIES,
   TAX_VAT_CARRY_FORWARD_CAPABILITIES,
   TAX_WITHHOLDING_CAPABILITIES,
+  TAX_ISSUER_PROFILE_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
   deriveCompatibilityRoleFromPosition,
