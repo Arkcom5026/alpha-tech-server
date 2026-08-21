@@ -6,6 +6,7 @@ const { updateSaleDocumentLinesController } = require('../documents/controllers/
 const {
   getSaleDeliveryNote,
   getSaleDeliveryNoteRevisions,
+  createSaleDeliveryNoteRevision,
   getSaleDeliveryNoteRevision,
   getSaleDeliveryNoteRevisionPrint,
   issueSaleDeliveryNoteController,
@@ -64,6 +65,7 @@ router.put('/:id/document-replacement/lines', replaceSaleDocumentReplacementLine
 router.post('/:id/document-replacement/lock', lockSaleDocumentReplacementController);
 router.put('/:id/document-lines', updateSaleDocumentLinesController);
 router.post('/:id/delivery-note', issueSaleDeliveryNoteController);
+router.post('/:id/delivery-note/revisions', allowSalesCore, createSaleDeliveryNoteRevision);
 router.get('/:id/delivery-note/revisions', getSaleDeliveryNoteRevisions);
 router.get('/:id/delivery-note/revisions/:revisionId/print', getSaleDeliveryNoteRevisionPrint);
 router.get('/:id/delivery-note/revisions/:revisionId', getSaleDeliveryNoteRevision);
