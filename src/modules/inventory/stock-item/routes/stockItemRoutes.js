@@ -14,6 +14,10 @@ const {
   STOCK_ITEM_CAPABILITY,
   allowStockItemCapabilities,
 } = require('../shared/stockItemAuthorization')
+const {
+  SALES_CAPABILITY,
+  allowSalesCapabilities,
+} = require('../../../sales/shared/salesAuthorization')
 
 const router = express.Router()
 
@@ -21,9 +25,13 @@ router.use(verifyToken)
 
 const allowInventoryReceive = allowStockItemCapabilities(STOCK_ITEM_CAPABILITY.RECEIVE)
 const allowInventoryLifecycle = allowStockItemCapabilities(STOCK_ITEM_CAPABILITY.LIFECYCLE)
+const allowSalesCompletion = allowSalesCapabilities(
+  SALES_CAPABILITY.CORE,
+  SALES_CAPABILITY.COMPLETE,
+)
 
 router.post('/', allowInventoryReceive, receiptSlices.addStockItemFromReceipt)
-router.patch('/mark-sold', lifecycleSlices.markStockItemsAsSold)
+router.patch('/mark-sold', allowSalesCompletion, lifecycleSlices.markStockItemsAsSold)
 router.get('/by-receipt/:receiptId', receiptSlices.getStockItemsByReceipt)
 router.get('/search', querySlices.searchStockItem)
 router.get('/available', querySlices.getAvailableStockItemsByProduct)
