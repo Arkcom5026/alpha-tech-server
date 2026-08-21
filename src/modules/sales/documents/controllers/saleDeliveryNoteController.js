@@ -8,10 +8,18 @@ const {
   listDeliveryNoteRevisionHistory,
   getDeliveryNoteRevisionById,
 } = require('../../delivery-note/lifecycle/deliveryNoteRevisionHistoryService');
+const {
+  createReturnAdjustedDeliveryNoteRevision,
+} = require('../../delivery-note/lifecycle/deliveryNoteRevisionService');
 
 const authenticatedBranchId = (req) => {
   const branchId = Number(req.user?.branchId);
   return Number.isInteger(branchId) && branchId > 0 ? branchId : null;
+};
+
+const authenticatedEmployeeId = (req) => {
+  const employeeId = Number(req.user?.employeeId);
+  return Number.isInteger(employeeId) && employeeId > 0 ? employeeId : null;
 };
 
 const getSaleDeliveryNote = async (req, res, next) => {
@@ -44,6 +52,32 @@ const getSaleDeliveryNoteRevisions = async (req, res, next) => {
       saleId: req.params.id,
     });
     return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const createSaleDeliveryNoteRevision = async (req, res, next) => {
+  try {
+    const branchId = authenticatedBranchId(req);
+    const employeeId = authenticatedEmployeeId(req);
+    if (!branchId || !employeeId) {
+      return res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: 'Authenticated branch and employee are required',
+      });
+    }
+
+    const result = await createReturnAdjustedDeliveryNoteRevision({
+      prisma,
+      branchId,
+      saleId: req.params.id,
+      employeeId,
+      // Numbering is server-owned. Client input must never choose an immutable
+      // Delivery Note revision number.
+    });
+
+    return res.status(201).json({ ok: true, data: result });
   } catch (error) {
     return next(error);
   }
@@ -105,6 +139,7 @@ const issueSaleDeliveryNoteController = async (req, res, next) => {
 module.exports = Object.freeze({
   getSaleDeliveryNote,
   getSaleDeliveryNoteRevisions,
+  createSaleDeliveryNoteRevision,
   getSaleDeliveryNoteRevision,
   getSaleDeliveryNoteRevisionPrint,
   issueSaleDeliveryNoteController,
