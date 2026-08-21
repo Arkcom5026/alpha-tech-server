@@ -27,9 +27,31 @@ const average = (values) => {
   return usable.reduce((sum, value) => sum + value, 0) / usable.length;
 };
 
+export const sampleMaturity = (count) => {
+  const value = Number(count) || 0;
+  if (value >= 20) return 'ESTABLISHED';
+  if (value >= 5) return 'EMERGING';
+  return 'LOW';
+};
+
+export const normalizeRoutePath = (pathValue) => {
+  const path = String(pathValue || '');
+  if (!path) return path;
+  return path
+    .split('/')
+    .map((segment) => {
+      if (/^\d+$/.test(segment)) return ':id';
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(segment)) return ':uuid';
+      if (/^[0-9a-f]{24}$/i.test(segment)) return ':hexid';
+      return segment;
+    })
+    .join('/');
+};
+
 const endpointKey = (item) => `${item.method} ${item.path}`;
+const routeFamilyKey = (item) => `${item.method} ${normalizeRoutePath(item.path)}`;
 const fingerprint = (value) => createHash('sha256').update(String(value || '')).digest('hex').slice(0, 12);
-const exactTargetKey = (item) => `${item.method} ${item.path} target=${fingerprint(item.target || item.path)}`;
+const exactTargetKey = (item) => `${item.method} ${normalizeRoutePath(item.path)} target=${fingerprint(item.target || item.path)}`;
 
 const buildEndpointMetrics = (requests) => {
   const groups = new Map();
@@ -51,6 +73,7 @@ const buildEndpointMetrics = (requests) => {
         method: items[0].method,
         path: items[0].path,
         count: items.length,
+        sampleMaturity: sampleMaturity(items.length),
         latencySamples: durations.length,
         p50Ms: percentile(durations, 0.5),
         p95Ms: percentile(durations, 0.95),
@@ -90,6 +113,7 @@ const buildExactRepeatMetrics = (requests, thresholdMs = 2000) => {
       if (gapMs >= 0 && gapMs <= thresholdMs) {
         candidates.push({
           key,
+          routeFamily: routeFamilyKey(item),
           gapMs,
           first: previous.timestamp,
           second: item.timestamp,
@@ -108,6 +132,45 @@ const buildExactRepeatMetrics = (requests, thresholdMs = 2000) => {
     thresholdMs,
     candidateCount: candidates.length,
     rate: rate(candidates.length, requests.length),
+    candidates: candidates.slice(0, 50),
+  };
+};
+
+const buildRetryAfterErrorMetrics = (requests, thresholdMs = 10_000) => {
+  const previousByTarget = new Map();
+  const candidates = [];
+  for (const item of requests) {
+    if (!item?.timestamp || !item?.method || !item?.path) continue;
+    const targetIdentity = item.target || item.path;
+    const previousKey = `${item.method} ${targetIdentity}`;
+    const currentMs = Date.parse(item.timestamp);
+    if (!Number.isFinite(currentMs)) continue;
+    const previous = previousByTarget.get(previousKey);
+    if (previous && previous.status >= 400) {
+      const gapMs = currentMs - previous.timeMs;
+      if (gapMs >= 0 && gapMs <= thresholdMs) {
+        candidates.push({
+          key: exactTargetKey(item),
+          routeFamily: routeFamilyKey(item),
+          gapMs,
+          previousStatus: previous.status,
+          resultingStatus: item.status,
+          recovered: item.status < 400,
+          firstRequestId: previous.requestId || null,
+          secondRequestId: item.requestId || null,
+        });
+      }
+    }
+    previousByTarget.set(previousKey, {
+      timeMs: currentMs,
+      status: item.status,
+      requestId: item.requestId,
+    });
+  }
+  return {
+    thresholdMs,
+    candidateCount: candidates.length,
+    recoveryCount: candidates.filter((item) => item.recovered).length,
     candidates: candidates.slice(0, 50),
   };
 };
@@ -137,6 +200,40 @@ const buildBurstMetrics = (requests, bucketMs = 1000, threshold = 5) => {
   };
 };
 
+const buildRouteFamilyTrafficQuality = (requests) => {
+  const groups = new Map();
+  for (const item of requests) {
+    if (!item?.method || !item?.path) continue;
+    const key = routeFamilyKey(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  return [...groups.entries()]
+    .map(([key, items]) => {
+      const repeats = buildExactRepeatMetrics(items);
+      const retries = buildRetryAfterErrorMetrics(items);
+      const bursts = buildBurstMetrics(items);
+      return {
+        key,
+        count: items.length,
+        sampleMaturity: sampleMaturity(items.length),
+        exactRepeatCandidates2s: repeats.candidateCount,
+        duplicateCallRate2s: repeats.rate,
+        retryAfterErrorCandidates10s: retries.candidateCount,
+        retryRecoveryCount10s: retries.recoveryCount,
+        maxRequestsPer1s: bursts.maxRequestsPerBucket,
+        burstBucketCount1s: bursts.burstBucketCount,
+      };
+    })
+    .sort((left, right) => (
+      right.exactRepeatCandidates2s - left.exactRepeatCandidates2s
+      || right.retryAfterErrorCandidates10s - left.retryAfterErrorCandidates10s
+      || right.maxRequestsPer1s - left.maxRequestsPer1s
+      || right.count - left.count
+    ));
+};
+
 export const buildHttpAnalytics = (requests = []) => {
   const completed = requests.filter((item) => item?.method && item?.path && Number.isInteger(item?.status));
   const durations = completed.map((item) => item.durationMs).filter(finite).map(Number);
@@ -144,10 +241,14 @@ export const buildHttpAnalytics = (requests = []) => {
   const errors5xx = completed.filter((item) => item.status >= 500 && item.status < 600).length;
   const conflicts409 = completed.filter((item) => item.status === 409).length;
   const exactRepeats = buildExactRepeatMetrics(completed);
+  const retriesAfterError = buildRetryAfterErrorMetrics(completed);
   const bursts = buildBurstMetrics(completed);
+  const routeFamilies = buildRouteFamilyTrafficQuality(completed);
 
   return {
     requestCount: completed.length,
+    sampleMaturity: sampleMaturity(completed.length),
+    lowSampleCaution: completed.length < 20,
     latencySamples: durations.length,
     p50Ms: percentile(durations, 0.5),
     p95Ms: percentile(durations, 0.95),
@@ -164,7 +265,14 @@ export const buildHttpAnalytics = (requests = []) => {
     duplicateCallRate2s: exactRepeats.rate,
     exactRepeatCandidates2s: exactRepeats.candidateCount,
     exactRepeatCandidates: exactRepeats.candidates,
+    retryAfterErrorCandidates10s: retriesAfterError.candidateCount,
+    retryRecoveryCount10s: retriesAfterError.recoveryCount,
+    retryAfterErrorCandidates: retriesAfterError.candidates,
     requestBurst: bursts,
+    trafficQuality: {
+      lowSampleCaution: completed.length < 20,
+      routeFamilies,
+    },
     endpoints: buildEndpointMetrics(completed),
   };
 };
