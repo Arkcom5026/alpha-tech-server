@@ -12,12 +12,13 @@ test('settlement keeps owner-to-sale lock order and reconciles payment evidence 
   assert.match(service, /await acquireCustomerMoneySettlementLock\(tx, command\.branchId, command\.customerId, group\.ownerId\)/);
   assert.match(service, /await projectSalePaymentStatus\(tx, saleId\)/);
   assert.match(service, /const sale = await selectSale\(tx, saleId, command\.branchId, group\.memberIds\)/);
+  assert.match(service, /const outstanding = money\(calculateOutstandingReceivable\(sale\)\)/);
 
   const customerLockIndex = service.indexOf('await acquireCustomerMoneySettlementLock(tx, command.branchId, command.customerId, group.ownerId)');
   const saleProjectionIndex = service.indexOf('await projectSalePaymentStatus(tx, saleId)');
-  const outstandingIndex = service.indexOf('const outstanding = money(sale.totalAmount).minus(money(sale.paidAmount))');
+  const outstandingIndex = service.indexOf('const outstanding = money(calculateOutstandingReceivable(sale))');
   assert.ok(customerLockIndex >= 0 && saleProjectionIndex > customerLockIndex, 'financial owner lock must precede sale lock');
-  assert.ok(outstandingIndex > saleProjectionIndex, 'outstanding must be validated after unified payment projection');
+  assert.ok(outstandingIndex > saleProjectionIndex, 'return-aware outstanding must be validated after unified payment projection');
 });
 
 test('settlement validates immutable branch/customer/credit identity before sale projection', () => {
