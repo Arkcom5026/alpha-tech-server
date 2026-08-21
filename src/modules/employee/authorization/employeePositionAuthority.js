@@ -19,6 +19,14 @@ const legacyCapabilitiesForRole = (role) => {
   return [];
 };
 
+const deriveCompatibilityRoleFromPosition = (position = {}) => {
+  const capabilities = normalizeCapabilityArray(position.capabilities);
+  if (capabilities === null) return null;
+  return capabilities.includes(POSITION_CAPABILITIES.EMPLOYEE_MANAGE)
+    ? 'MANAGER'
+    : 'CASHIER';
+};
+
 const resolveActorCapabilities = (actor = {}) => {
   const systemRole = normalizeUpper(actor.role);
   if (actor.isSuperAdmin || systemRole === 'SUPERADMIN' || systemRole === 'ADMIN') {
@@ -52,6 +60,7 @@ module.exports = {
   POSITION_CAPABILITIES,
   normalizeCapabilityArray,
   legacyCapabilitiesForRole,
+  deriveCompatibilityRoleFromPosition,
   resolveActorCapabilities,
   hasCapability,
 };
