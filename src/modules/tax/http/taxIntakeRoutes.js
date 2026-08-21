@@ -14,8 +14,18 @@ const taxPublicationRetryRoutes = require('../publicationRetry/taxPublicationRet
 const {
   getStatutoryTaxPresentation,
 } = require('../documents/presentation/getStatutoryTaxPresentationController');
+const {
+  OUTPUT_TAX_CAPABILITY,
+  allowOutputTaxCapabilities,
+} = require('../authorization/outputTaxAuthorization');
 
 const router = express.Router();
+const allowOutputTaxRead = allowOutputTaxCapabilities(OUTPUT_TAX_CAPABILITY.READ);
+const allowOutputTaxPrepare = allowOutputTaxCapabilities(OUTPUT_TAX_CAPABILITY.PREPARE);
+const allowOutputTaxIssue = allowOutputTaxCapabilities(OUTPUT_TAX_CAPABILITY.ISSUE);
+const allowOutputTaxCreditNote = allowOutputTaxCapabilities(OUTPUT_TAX_CAPABILITY.CREDIT_NOTE);
+const allowOutputTaxLifecycle = allowOutputTaxCapabilities(OUTPUT_TAX_CAPABILITY.LIFECYCLE);
+
 router.use(verifyToken);
 
 router.use('/input-documents/overview', inputTaxOverviewRoutes);
@@ -27,17 +37,17 @@ router.use('/issuer-profile', taxIssuerProfileRoutes);
 router.use('/output-filings', salesTaxFilingRoutes);
 router.use('/publication', taxPublicationRetryRoutes);
 
-router.post('/candidates/register', controller.registerCandidate);
-router.post('/candidates/register-sale/:saleId', controller.registerSaleCandidate);
-router.get('/candidates', controller.listCandidates);
-router.get('/documents', controller.listDocuments);
-router.get('/documents/:taxDocumentId', controller.getDocumentDetail);
-router.get('/documents/:taxDocumentId/printable', controller.getPrintableOutputTaxDocument);
+router.post('/candidates/register', allowOutputTaxPrepare, controller.registerCandidate);
+router.post('/candidates/register-sale/:saleId', allowOutputTaxPrepare, controller.registerSaleCandidate);
+router.get('/candidates', allowOutputTaxRead, controller.listCandidates);
+router.get('/documents', allowOutputTaxRead, controller.listDocuments);
+router.get('/documents/:taxDocumentId', allowOutputTaxRead, controller.getDocumentDetail);
+router.get('/documents/:taxDocumentId/printable', allowOutputTaxRead, controller.getPrintableOutputTaxDocument);
 router.get('/documents/:taxDocumentId/presentation', getStatutoryTaxPresentation);
-router.post('/documents/:taxDocumentId/recipient/refresh', controller.refreshDraftRecipient);
-router.post('/documents/:taxDocumentId/issue', controller.issueOutputTaxDocument);
-router.post('/documents/:taxDocumentId/credit-note', controller.issueOutputTaxCreditNote);
-router.post('/credit-notes/from-sale-return/:saleReturnId', controller.issueOutputTaxCreditNoteForSaleReturn);
-router.post('/documents/:taxDocumentId/transition', controller.transitionDocument);
+router.post('/documents/:taxDocumentId/recipient/refresh', allowOutputTaxPrepare, controller.refreshDraftRecipient);
+router.post('/documents/:taxDocumentId/issue', allowOutputTaxIssue, controller.issueOutputTaxDocument);
+router.post('/documents/:taxDocumentId/credit-note', allowOutputTaxCreditNote, controller.issueOutputTaxCreditNote);
+router.post('/credit-notes/from-sale-return/:saleReturnId', allowOutputTaxCreditNote, controller.issueOutputTaxCreditNoteForSaleReturn);
+router.post('/documents/:taxDocumentId/transition', allowOutputTaxLifecycle, controller.transitionDocument);
 
 module.exports = router;
