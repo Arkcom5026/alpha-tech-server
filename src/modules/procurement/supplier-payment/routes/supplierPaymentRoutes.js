@@ -15,9 +15,17 @@ const {
 const {
   requireSupplierPaymentActor,
 } = require('../shared/requireSupplierPaymentActor');
+const {
+  SUPPLIER_PAYMENT_CAPABILITY,
+  allowSupplierPaymentCapabilities,
+} = require('../shared/supplierPaymentAuthorization');
 
 const router = express.Router();
 router.use(verifyToken);
+
+const allowSupplierPaymentRead = allowSupplierPaymentCapabilities(
+  SUPPLIER_PAYMENT_CAPABILITY.READ,
+);
 
 router.post('/', requireSupplierPaymentActor, (req, res) =>
   res.status(409).json({
@@ -26,10 +34,10 @@ router.post('/', requireSupplierPaymentActor, (req, res) =>
   })
 );
 
-router.get('/advance', getAdvancePaymentsBySupplier);
-router.get('/by-supplier/:supplierId', getSupplierPaymentsBySupplier);
-router.get('/', getAllSupplierPayments);
-router.get('/by-po/:poId', getSupplierPaymentsByPO);
+router.get('/advance', allowSupplierPaymentRead, getAdvancePaymentsBySupplier);
+router.get('/by-supplier/:supplierId', allowSupplierPaymentRead, getSupplierPaymentsBySupplier);
+router.get('/', allowSupplierPaymentRead, getAllSupplierPayments);
+router.get('/by-po/:poId', allowSupplierPaymentRead, getSupplierPaymentsByPO);
 router.delete('/:id', (req, res) =>
   res.status(409).json({
     code: 'SUPPLIER_PAYMENT_REVERSAL_REQUIRED',
