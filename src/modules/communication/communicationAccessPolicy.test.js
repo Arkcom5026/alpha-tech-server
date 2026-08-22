@@ -36,7 +36,7 @@ test('migrated positions require explicit communication capabilities', () => {
       employeeId: 12,
       role: 'EMPLOYEE',
       employeeRole: 'CASHIER',
-      positionCapabilities: ['communication.access'],
+      positionCapabilities: ['communication.use'],
     }),
     { viewCommunication: true, manageCommunicationProfiles: false },
   );
@@ -45,7 +45,7 @@ test('migrated positions require explicit communication capabilities', () => {
       employeeId: 12,
       role: 'EMPLOYEE',
       employeeRole: 'CASHIER',
-      positionCapabilities: ['communication.access', 'communication.profile.manage'],
+      positionCapabilities: ['communication.use', 'communication.profile.manage'],
     }),
     { viewCommunication: true, manageCommunicationProfiles: true },
   );
