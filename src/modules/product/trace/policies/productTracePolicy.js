@@ -7,7 +7,7 @@ const {
 const {
   RESIDUAL_BUSINESS_CAPABILITIES,
   hasResidualBusinessCapability,
-} = require('../../employee/authorization/residualBusinessPositionAuthority')
+} = require('../../../employee/authorization/residualBusinessPositionAuthority')
 
 const buildProductTracePermissions = ({ actor = {}, employeeProfile = null }) => {
   const authorityActor = {
