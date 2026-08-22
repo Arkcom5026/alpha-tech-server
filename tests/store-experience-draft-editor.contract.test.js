@@ -15,7 +15,7 @@ const repository = read('src/modules/storeExperience/draft/storeExperienceDraftR
 assert.match(server, /app\.use\('\/api\/store-experience', storeExperienceDraftRoutes\)/);
 assert.match(routes, /router\.use\(verifyToken, allowEmployeeContext\)/);
 assert.match(routes, /router\.get\('\/draft', controller\.getCurrentDraft\)/);
-assert.match(routes, /router\.put\('\/draft', controller\.saveCurrentDraft\)/);
+assert.match(routes, /router\.put\('\/draft', allowManage, controller\.saveCurrentDraft\)/);
 assert.match(controller, /req\.employee\?\.branchId \|\| req\.user\?\.branchId/);
 assert.doesNotMatch(controller, /req\.body\?\.branchId|req\.body\.branchId/);
 assert.match(service, /THEME_PRESETS/);
