@@ -2,19 +2,42 @@ const {
   ProductTraceFailureCode,
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+  resolveActorCapabilities,
+} = require('../../../employee/authorization/employeePositionAuthority')
 
-const FINANCIAL_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
-const FINANCIAL_EMPLOYEE_ROLES = new Set(['OWNER', 'MANAGER'])
+const PRODUCT_TRACE_CAPABILITY = Object.freeze({
+  READ: POSITION_CAPABILITIES.PRODUCT_TRACE_READ,
+  FINANCIAL: POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIAL,
+})
+
+const normalize = (value) => String(value || '').trim().toUpperCase()
 
 const buildProductTracePermissions = ({ actor, employeeProfile }) => {
-  const role = String(actor?.role || '').toUpperCase()
-  const employeeRole = String(employeeProfile?.v2Role || '').toUpperCase()
+  const role = normalize(actor?.role)
+  const employeeRole = normalize(actor?.employeeRole || actor?.v2Role || employeeProfile?.v2Role)
+  const effectiveActor = {
+    ...(actor || {}),
+    employeeRole: actor?.employeeRole || actor?.v2Role || employeeProfile?.v2Role || null,
+  }
+  const resolved = resolveActorCapabilities(effectiveActor)
 
-  const canViewFinancials =
-    FINANCIAL_ROLES.has(role) || FINANCIAL_EMPLOYEE_ROLES.has(employeeRole)
+  let canViewTrace
+  let canViewFinancials
+
+  if (resolved.mode === 'V2_ROLE_COMPAT') {
+    canViewTrace = Boolean(actor?.id)
+    canViewFinancials = ['OWNER', 'MANAGER'].includes(employeeRole)
+  } else {
+    canViewTrace = hasCapability(effectiveActor, PRODUCT_TRACE_CAPABILITY.READ)
+    canViewFinancials = canViewTrace
+      && hasCapability(effectiveActor, PRODUCT_TRACE_CAPABILITY.FINANCIAL)
+  }
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
     canViewCustomerContact: true,
@@ -34,6 +57,7 @@ const assertCanViewProductTrace = (permissions) => {
 }
 
 module.exports = {
+  PRODUCT_TRACE_CAPABILITY,
   buildProductTracePermissions,
   assertCanViewProductTrace,
 }
