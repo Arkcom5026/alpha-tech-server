@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { getCommunicationCapabilities } = require('./communicationAccessPolicy');
 
 test('legacy employee compatibility preserves communication usage while profile management stays elevated', () => {
@@ -67,4 +69,15 @@ test('non-employee cannot access communication authority', () => {
     getCommunicationCapabilities({ role: 'CUSTOMER' }),
     { viewCommunication: false, manageCommunicationProfiles: false },
   );
+});
+
+test('communication routes keep operational use separate from branch profile management', () => {
+  const routeSource = fs.readFileSync(path.join(__dirname, 'communicationRoutes.js'), 'utf8');
+
+  assert.match(routeSource, /router\.get\('\/profiles', canView,/);
+  assert.match(routeSource, /router\.post\('\/profiles', canManageProfiles,/);
+  assert.match(routeSource, /router\.post\('\/customers\/:customerId\/channels', canView,/);
+  assert.match(routeSource, /router\.put\('\/repairs\/:repairJobId\/preference', canView,/);
+  assert.match(routeSource, /router\.post\('\/repairs\/:repairJobId\/activities', canView,/);
+  assert.doesNotMatch(routeSource, /employeeRole|v2Role|OWNER|MANAGER|CASHIER|TECHNICIAN/);
 });
