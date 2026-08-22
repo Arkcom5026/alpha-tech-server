@@ -1,5 +1,9 @@
 'use strict';
 
+const {
+  resolveActorCapabilities,
+} = require('./employeePositionAuthority');
+
 const OPERATIONAL_POSITION_CAPABILITIES = Object.freeze({
   COMMUNICATION_OPERATE: 'communication.operate',
   COMMUNICATION_PROFILE_MANAGE: 'communication.profile.manage',
@@ -20,10 +24,6 @@ const LEGACY_BASE_EMPLOYEE_CAPABILITIES = Object.freeze([
 ]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
-const normalizeCapabilityArray = (value) => {
-  if (!Array.isArray(value)) return null;
-  return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
-};
 
 const legacyOperationalCapabilitiesForRole = (role) => {
   const normalized = normalizeUpper(role);
@@ -41,19 +41,23 @@ const legacyOperationalCapabilitiesForRole = (role) => {
 
 const resolveOperationalActorCapabilities = (actor = {}) => {
   const systemRole = normalizeUpper(actor.role);
-  if (actor.isSuperAdmin === true || systemRole === 'ADMIN' || systemRole === 'SUPERADMIN' || systemRole === 'SUPPERADMIN') {
+  if (systemRole === 'SUPPERADMIN') {
     return {
       mode: 'SYSTEM_ROLE',
       capabilities: [...OPERATIONAL_CAPABILITIES],
     };
   }
 
-  const positionCapabilities = normalizeCapabilityArray(actor.positionCapabilities);
-  if (positionCapabilities !== null) {
+  const resolvedCoreAuthority = resolveActorCapabilities(actor);
+  if (resolvedCoreAuthority.mode === 'SYSTEM_ROLE') {
     return {
-      mode: 'POSITION',
-      capabilities: positionCapabilities,
+      mode: 'SYSTEM_ROLE',
+      capabilities: [...OPERATIONAL_CAPABILITIES],
     };
+  }
+
+  if (resolvedCoreAuthority.mode === 'POSITION') {
+    return resolvedCoreAuthority;
   }
 
   const compatibilityRole = actor.employeeRole || actor.v2Role || (
