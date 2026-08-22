@@ -3,8 +3,14 @@ const {
   POSITION_CAPABILITIES,
   normalizeCapabilityArray,
 } = require('../../employee/authorization/employeePositionAuthority');
+const {
+  RESIDUAL_POSITION_CAPABILITIES,
+} = require('../../employee/authorization/residualPositionAuthority');
 
-const SUPPORTED_CAPABILITIES = new Set(Object.values(POSITION_CAPABILITIES));
+const SUPPORTED_CAPABILITIES = new Set([
+  ...Object.values(POSITION_CAPABILITIES),
+  ...Object.values(RESIDUAL_POSITION_CAPABILITIES),
+]);
 
 const toInt = (value, fallback = null) => {
   const parsed = Number(value);
