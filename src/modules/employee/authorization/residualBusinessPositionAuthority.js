@@ -1,71 +1,39 @@
 'use strict';
 
 const {
-  normalizeCapabilityArray,
+  POSITION_CAPABILITIES,
+  RESIDUAL_BUSINESS_CAPABILITIES: CENTRAL_RESIDUAL_BUSINESS_CAPABILITIES,
+  legacyCapabilitiesForRole,
+  resolveActorCapabilities,
+  hasCapability,
 } = require('./employeePositionAuthority');
 
 const RESIDUAL_BUSINESS_CAPABILITIES = Object.freeze({
-  COMMUNICATION_OPERATE: 'communication.operate',
-  COMMUNICATION_PROFILE_MANAGE: 'communication.profile.manage',
-  STORE_EXPERIENCE_READ: 'store-experience.read',
-  STORE_EXPERIENCE_MANAGE: 'store-experience.manage',
-  STORE_EXPERIENCE_PUBLISH: 'store-experience.publish',
-  PRODUCT_TRACE_FINANCIALS: 'product.trace.financials',
+  COMMUNICATION_OPERATE: POSITION_CAPABILITIES.COMMUNICATION_OPERATE,
+  COMMUNICATION_PROFILE_MANAGE: POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE,
+  STORE_EXPERIENCE_READ: POSITION_CAPABILITIES.STORE_EXPERIENCE_READ,
+  STORE_EXPERIENCE_MANAGE: POSITION_CAPABILITIES.STORE_EXPERIENCE_MANAGE,
+  STORE_EXPERIENCE_PUBLISH: POSITION_CAPABILITIES.STORE_EXPERIENCE_PUBLISH,
+  PRODUCT_TRACE_FINANCIALS: POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIALS,
 });
 
-const ALL_RESIDUAL_BUSINESS_CAPABILITIES = Object.freeze(
-  Object.values(RESIDUAL_BUSINESS_CAPABILITIES),
-);
+const ALL_RESIDUAL_BUSINESS_CAPABILITIES = Object.freeze([
+  ...CENTRAL_RESIDUAL_BUSINESS_CAPABILITIES,
+]);
+const residualCapabilitySet = new Set(ALL_RESIDUAL_BUSINESS_CAPABILITIES);
+const onlyResidual = (capabilities) => capabilities.filter((capability) => residualCapabilitySet.has(capability));
 
-const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
-
-const legacyResidualCapabilitiesForRole = (role) => {
-  const normalized = normalizeUpper(role);
-
-  if (normalized === 'OWNER' || normalized === 'MANAGER') {
-    return [...ALL_RESIDUAL_BUSINESS_CAPABILITIES];
-  }
-
-  if (normalized === 'CASHIER' || normalized === 'TECHNICIAN') {
-    return [
-      RESIDUAL_BUSINESS_CAPABILITIES.COMMUNICATION_OPERATE,
-      RESIDUAL_BUSINESS_CAPABILITIES.STORE_EXPERIENCE_READ,
-      RESIDUAL_BUSINESS_CAPABILITIES.STORE_EXPERIENCE_MANAGE,
-      RESIDUAL_BUSINESS_CAPABILITIES.STORE_EXPERIENCE_PUBLISH,
-    ];
-  }
-
-  return [];
-};
+const legacyResidualCapabilitiesForRole = (role) => onlyResidual(legacyCapabilitiesForRole(role));
 
 const resolveResidualBusinessCapabilities = (actor = {}) => {
-  const systemRole = normalizeUpper(actor.role);
-  if (actor.isSuperAdmin === true || systemRole === 'SUPERADMIN' || systemRole === 'ADMIN') {
-    return {
-      mode: 'SYSTEM_ROLE',
-      capabilities: [...ALL_RESIDUAL_BUSINESS_CAPABILITIES],
-    };
-  }
-
-  const positionCapabilities = normalizeCapabilityArray(actor.positionCapabilities);
-  if (positionCapabilities !== null) {
-    return {
-      mode: 'POSITION',
-      capabilities: positionCapabilities,
-    };
-  }
-
+  const resolved = resolveActorCapabilities(actor);
   return {
-    mode: 'V2_ROLE_COMPAT',
-    capabilities: legacyResidualCapabilitiesForRole(actor.employeeRole || actor.v2Role),
+    mode: resolved.mode,
+    capabilities: onlyResidual(resolved.capabilities),
   };
 };
 
-const hasResidualBusinessCapability = (actor, capability) => {
-  const key = String(capability || '').trim();
-  if (!key) return false;
-  return resolveResidualBusinessCapabilities(actor).capabilities.includes(key);
-};
+const hasResidualBusinessCapability = (actor, capability) => hasCapability(actor, capability);
 
 module.exports = {
   RESIDUAL_BUSINESS_CAPABILITIES,
