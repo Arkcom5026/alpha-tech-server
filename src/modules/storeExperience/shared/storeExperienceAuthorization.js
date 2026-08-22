@@ -18,13 +18,16 @@ const createForbiddenPayload = (requiredCapabilities) => ({
   details: { requiredCapabilities },
 });
 
+const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
+
 const requireStoreExperienceEmployeeContext = (req, res, next) => {
-  const employeeId = Number(req?.user?.employeeId);
-  const branchId = Number(req?.user?.branchId);
+  const systemRole = normalizeUpper(req?.user?.role);
+  const nestedRole = normalizeUpper(req?.employee?.role);
+  const employeeProfile = String(req?.user?.profileType || '').trim().toLowerCase() === 'employee';
   const valid =
-    String(req?.user?.profileType || '').trim().toLowerCase() === 'employee' &&
-    Number.isInteger(employeeId) && employeeId > 0 &&
-    Number.isInteger(branchId) && branchId > 0;
+    employeeProfile ||
+    ['EMPLOYEE', 'ADMIN', 'SUPERADMIN', 'SUPPERADMIN'].includes(systemRole) ||
+    ['EMPLOYEE', 'ADMIN', 'SUPERADMIN', 'SUPPERADMIN'].includes(nestedRole);
 
   if (!valid) return res.status(403).json(createForbiddenPayload([]));
   return next();
