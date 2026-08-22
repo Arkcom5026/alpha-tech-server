@@ -1,13 +1,18 @@
 const AppError = require('../../shared/errors/AppError');
-
-const normalize = (value) => String(value || '').trim().toUpperCase();
+const {
+  OPERATIONAL_POSITION_CAPABILITIES,
+  hasOperationalCapability,
+} = require('../employee/authorization/employeeOperationalPositionAuthority');
 
 const getCommunicationCapabilities = (actor = {}) => {
-  const role = normalize(actor.role);
-  const employeeRole = normalize(actor.employeeRole || actor.v2Role || actor.position);
   const authenticatedEmployee = Number.isInteger(Number(actor.employeeId)) && Number(actor.employeeId) > 0;
-  const elevated = actor.isSuperAdmin === true || ['ADMIN', 'SUPERADMIN'].includes(role) || ['OWNER', 'MANAGER', 'ADMIN'].includes(employeeRole);
-  return Object.freeze({ viewCommunication: authenticatedEmployee, manageCommunicationProfiles: authenticatedEmployee && elevated });
+  const canOperate = hasOperationalCapability(actor, OPERATIONAL_POSITION_CAPABILITIES.COMMUNICATION_OPERATE);
+  const canManageProfiles = hasOperationalCapability(actor, OPERATIONAL_POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE);
+
+  return Object.freeze({
+    viewCommunication: authenticatedEmployee && canOperate,
+    manageCommunicationProfiles: authenticatedEmployee && canOperate && canManageProfiles,
+  });
 };
 
 const requireCommunicationCapability = (capability) => (req, _res, next) => {
