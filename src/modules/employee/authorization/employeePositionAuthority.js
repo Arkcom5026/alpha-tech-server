@@ -37,6 +37,7 @@ const POSITION_CAPABILITIES = Object.freeze({
   FINANCE_BANK_MANAGE: 'finance.bank.manage',
   FINANCE_BANK_DELETE: 'finance.bank.delete',
   FINANCE_RECEIVABLES_READ: 'finance.receivables.read',
+  FINANCE_DAILY_CLOSING_READ: 'finance.daily-closing.read',
   SALES_CORE: 'sales.core',
   SALES_COMPLETE: 'sales.complete',
   SALES_RETURN: 'sales.return',
@@ -141,6 +142,7 @@ const BANK_CAPABILITIES = Object.freeze([
 
 const FINANCE_RECEIVABLE_CAPABILITIES = Object.freeze([
   POSITION_CAPABILITIES.FINANCE_RECEIVABLES_READ,
+  POSITION_CAPABILITIES.FINANCE_DAILY_CLOSING_READ,
 ]);
 
 const SALES_CAPABILITIES = Object.freeze([
