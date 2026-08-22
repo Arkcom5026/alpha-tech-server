@@ -1,20 +1,32 @@
 const AppError = require('../../shared/errors/AppError');
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../employee/authorization/employeePositionAuthority');
 
-const normalize = (value) => String(value || '').trim().toUpperCase();
+const COMMUNICATION_CAPABILITY = Object.freeze({
+  READ: POSITION_CAPABILITIES.COMMUNICATION_READ,
+  PROFILE_MANAGE: POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE,
+});
 
-const getCommunicationCapabilities = (actor = {}) => {
-  const role = normalize(actor.role);
-  const employeeRole = normalize(actor.employeeRole || actor.v2Role || actor.position);
-  const authenticatedEmployee = Number.isInteger(Number(actor.employeeId)) && Number(actor.employeeId) > 0;
-  const elevated = actor.isSuperAdmin === true || ['ADMIN', 'SUPERADMIN'].includes(role) || ['OWNER', 'MANAGER', 'ADMIN'].includes(employeeRole);
-  return Object.freeze({ viewCommunication: authenticatedEmployee, manageCommunicationProfiles: authenticatedEmployee && elevated });
-};
+const getCommunicationCapabilities = (actor = {}) => Object.freeze({
+  viewCommunication: hasCapability(actor, COMMUNICATION_CAPABILITY.READ),
+  manageCommunicationProfiles: hasCapability(actor, COMMUNICATION_CAPABILITY.PROFILE_MANAGE),
+});
 
 const requireCommunicationCapability = (capability) => (req, _res, next) => {
   try {
-    if (!getCommunicationCapabilities(req.user)[capability]) throw new AppError(`Communication capability ${capability} is required`, 403);
+    if (!getCommunicationCapabilities(req.user)[capability]) {
+      throw new AppError(`Communication capability ${capability} is required`, 403);
+    }
     next();
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-module.exports = { getCommunicationCapabilities, requireCommunicationCapability };
+module.exports = {
+  COMMUNICATION_CAPABILITY,
+  getCommunicationCapabilities,
+  requireCommunicationCapability,
+};
