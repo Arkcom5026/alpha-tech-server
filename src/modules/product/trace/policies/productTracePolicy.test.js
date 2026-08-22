@@ -1,6 +1,11 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { buildProductTracePermissions } = require('./productTracePolicy')
+
+const root = path.resolve(__dirname, '../../../..')
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 
 test('legacy owner and manager preserve product trace financial visibility', () => {
   for (const employeeRole of ['OWNER', 'MANAGER']) {
@@ -62,4 +67,10 @@ test('platform admins retain product trace financial authority', () => {
 test('general product trace visibility remains authenticated rather than position-gated', () => {
   assert.equal(buildProductTracePermissions({ actor: { id: 6, role: 'CUSTOMER' }, employeeProfile: null }).canViewTrace, true)
   assert.equal(buildProductTracePermissions({ actor: {}, employeeProfile: null }).canViewTrace, false)
+})
+
+test('product trace employee authority never falls back to a generic profile id', () => {
+  const serviceSource = read('src/modules/product/trace/services/productTraceService.js')
+  assert.match(serviceSource, /employeeId:\s*actor\?\.employeeId/)
+  assert.doesNotMatch(serviceSource, /actor\?\.employeeId\s*\|\|\s*actor\?\.profileId/)
 })
