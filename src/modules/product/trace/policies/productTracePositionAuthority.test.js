@@ -13,24 +13,49 @@ test('product trace keeps authenticated read compatibility while financials stay
   }
 })
 
-test('migrated position explicitly controls product trace financial visibility', () => {
-  assert.equal(buildProductTracePermissions({
+test('migrated employee position explicitly controls product trace read and financial visibility', () => {
+  const empty = buildProductTracePermissions({
     actor: { id: 1, role: 'EMPLOYEE', employeeId: 7, employeeRole: 'OWNER', positionCapabilities: [] },
     employeeProfile: { v2Role: 'OWNER' },
-  }).canViewFinancials, false)
+  })
+  assert.equal(empty.canViewTrace, false)
+  assert.equal(empty.canViewFinancials, false)
 
-  assert.equal(buildProductTracePermissions({
+  const readOnly = buildProductTracePermissions({
     actor: {
       id: 1,
       role: 'EMPLOYEE',
       employeeId: 7,
-      positionCapabilities: ['product.trace.financial.read'],
+      positionCapabilities: ['product.trace.read'],
+    },
+    employeeProfile: { v2Role: 'OWNER' },
+  })
+  assert.equal(readOnly.canViewTrace, true)
+  assert.equal(readOnly.canViewFinancials, false)
+
+  const financial = buildProductTracePermissions({
+    actor: {
+      id: 1,
+      role: 'EMPLOYEE',
+      employeeId: 7,
+      positionCapabilities: ['product.trace.read', 'product.trace.financial.read'],
     },
     employeeProfile: { v2Role: 'CASHIER' },
-  }).canViewFinancials, true)
+  })
+  assert.equal(financial.canViewTrace, true)
+  assert.equal(financial.canViewFinancials, true)
 })
 
-test('platform admin retains product trace financial visibility', () => {
+test('non-employee authenticated trace behavior remains unchanged', () => {
+  const permissions = buildProductTracePermissions({
+    actor: { id: 99, role: 'CUSTOMER' },
+    employeeProfile: null,
+  })
+  assert.equal(permissions.canViewTrace, true)
+  assert.equal(permissions.canViewFinancials, false)
+})
+
+test('platform admin retains product trace authority', () => {
   const permissions = buildProductTracePermissions({
     actor: { id: 1, role: 'ADMIN', positionCapabilities: [] },
     employeeProfile: null,
