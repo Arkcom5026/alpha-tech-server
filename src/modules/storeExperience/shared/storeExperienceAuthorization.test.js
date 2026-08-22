@@ -49,8 +49,8 @@ test('platform admins retain store experience authority', () => {
 });
 
 test('store experience routes split read, manage, publish and media authority without direct role checks', () => {
-  const draftRoutes = read('storeExperience/draft/storeExperienceDraftRoutes.js');
-  const mediaRoutes = read('storeExperience/media/storefrontMediaRoutes.js');
+  const draftRoutes = read('src/modules/storeExperience/draft/storeExperienceDraftRoutes.js');
+  const mediaRoutes = read('src/modules/storeExperience/media/storefrontMediaRoutes.js');
 
   assert.match(draftRoutes, /STORE_EXPERIENCE_CAPABILITY\.READ/);
   assert.match(draftRoutes, /STORE_EXPERIENCE_CAPABILITY\.MANAGE/);
