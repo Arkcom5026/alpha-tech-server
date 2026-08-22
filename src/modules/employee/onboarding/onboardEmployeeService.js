@@ -4,23 +4,18 @@ const {
   createOnboardedEmployee,
 } = require('./onboardEmployeeRepository');
 const { toPositiveInt } = require('../shared/employeeUtils');
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../authorization/employeePositionAuthority');
 
 const normalize = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalize(value).toLowerCase();
 const normalizeUpper = (value) => normalize(value).toUpperCase();
 
-const canCreateEmployee = (actor = {}) => {
-  const systemRole = normalizeUpper(actor.role);
-  const employeeRole = normalizeUpper(actor.employeeRole || actor.v2Role);
-
-  return Boolean(
-    actor.isSuperAdmin
-    || systemRole === 'SUPERADMIN'
-    || systemRole === 'ADMIN'
-    || employeeRole === 'OWNER'
-    || employeeRole === 'MANAGER'
-  );
-};
+const canCreateEmployee = (actor = {}) => (
+  hasCapability(actor, POSITION_CAPABILITIES.EMPLOYEE_MANAGE)
+);
 
 const onboardEmployee = async ({ actor = {}, input = {} }) => {
   if (!canCreateEmployee(actor)) {
@@ -28,7 +23,7 @@ const onboardEmployee = async ({ actor = {}, input = {} }) => {
       status: 403,
       body: {
         code: 'EMPLOYEE_ONBOARDING_FORBIDDEN',
-        message: 'เฉพาะเจ้าของร้าน ผู้ดูแลระบบ หรือผู้จัดการร้านเท่านั้นที่เพิ่มพนักงานใหม่ได้',
+        message: 'เฉพาะผู้ที่ได้รับสิทธิ์จัดการพนักงานเท่านั้นที่เพิ่มพนักงานใหม่ได้',
       },
     };
   }
