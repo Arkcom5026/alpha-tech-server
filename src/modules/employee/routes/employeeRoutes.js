@@ -10,6 +10,7 @@ const { updateUserRole } = require('../role/updateEmployeeRoleController');
 const { getAllPositions } = require('../lookup/positions/positionLookupController');
 const { getBranchDropdowns } = require('../lookup/branches/branchLookupController');
 const { deleteEmployee } = require('../delete/deleteEmployeeController');
+const { requireEmployeeManage } = require('../authorization/employeeManagementAuthorization');
 
 const verifyToken = require('../../../../middlewares/verifyToken');
 const requireAdmin = require('../../../../middlewares/requireAdmin');
@@ -31,10 +32,10 @@ router.post('/approve-employee', (_req, res) => res.status(410).json({
 }));
 
 router.get('/', getAllEmployees);
-router.post('/', createEmployeeController);
+router.post('/', requireEmployeeManage, createEmployeeController);
 router.get('/:id', getEmployeesById);
-router.put('/:id', updateEmployeeController);
-router.patch('/:id/status', toggleEmployeeStatus);
+router.put('/:id', requireEmployeeManage, updateEmployeeController);
+router.patch('/:id/status', requireEmployeeManage, toggleEmployeeStatus);
 router.delete('/:id', deleteEmployee);
 
 module.exports = router;
