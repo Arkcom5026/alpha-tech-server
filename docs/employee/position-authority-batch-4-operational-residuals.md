@@ -15,16 +15,16 @@ No Prisma schema or migration is required.
 ## Capabilities
 
 ### Communication
-- `communication.access`
+- `communication.use`
 - `communication.profile.manage`
 
 Historical compatibility:
-- OWNER / MANAGER: access + profile management
-- CASHIER / TECHNICIAN: access only
+- OWNER / MANAGER: use + profile management
+- CASHIER / TECHNICIAN: use only
 - platform ADMIN / SUPERADMIN: central capability resolver remains authoritative, while communication routes still require employee context
 - migrated non-null Position capability arrays are authoritative, including `[]`
 
-Existing operational semantics are preserved: customer channels, repair communication preferences and repair communication activities continue to use the normal communication access boundary; only branch-level communication profile administration requires the elevated profile capability.
+Existing operational semantics are preserved: customer channels, repair communication preferences and repair communication activities continue to use the normal communication use boundary; only branch-level communication profile administration requires the elevated profile capability.
 
 ### Store Experience
 - `store-experience.read`
@@ -56,6 +56,7 @@ Historical compatibility:
 - No controller/service business-domain invariants are moved into the capability layer.
 - No public storefront projection rules are changed.
 - No Product Trace branch scoping or general authentication behavior is changed.
+- Communication reuses the already-established `communication.use` key from Wave 3L so grouped integration does not create a second equivalent capability.
 
 ## Verification target
 
