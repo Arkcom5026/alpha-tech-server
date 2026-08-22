@@ -7,33 +7,25 @@ const onlineVisibilityController = require('../onlineVisibility/onlineProductVis
 const onlineProductControlController = require('../onlineProductControl/onlineProductControlController')
 const onboardingRoutes = require('../onboarding/partnerStoreOnboardingRoutes')
 const operationalReadinessRoutes = require('../readiness/partnerStoreOperationalReadinessRoutes')
+const {
+  PARTNER_STORE_CAPABILITY,
+  requirePartnerStoreEmployeeContext,
+  allowPartnerStoreCapabilities,
+} = require('../authorization/partnerStorePositionAuthorization')
 
 const router = express.Router()
-
-const cleanRole = (value) => String(value || '').trim().toUpperCase()
-const allowEmployeeContext = (req, res, next) => {
-  const legacyRole = cleanRole(req?.user?.role)
-  const legacyProfileType = String(req?.user?.profileType || '').trim().toLowerCase()
-  const employeeRole = cleanRole(req?.employee?.role)
-  const authorized =
-    ['EMPLOYEE', 'ADMIN', 'SUPERADMIN', 'SUPPERADMIN'].includes(legacyRole) ||
-    ['EMPLOYEE', 'ADMIN', 'SUPERADMIN', 'SUPPERADMIN'].includes(employeeRole) ||
-    legacyProfileType === 'employee'
-
-  if (authorized) return next()
-  return res.status(403).json({
-    success: false,
-    code: 'FORBIDDEN_PARTNER_STORE_ACCESS',
-    message: 'ไม่มีสิทธิ์จัดการการตั้งค่าร้าน',
-  })
-}
+const canReadStoreExperience = allowPartnerStoreCapabilities(PARTNER_STORE_CAPABILITY.READ)
+const canManageStoreExperience = allowPartnerStoreCapabilities(
+  PARTNER_STORE_CAPABILITY.READ,
+  PARTNER_STORE_CAPABILITY.MANAGE,
+)
 
 router.use('/onboarding', onboardingRoutes)
 router.use('/readiness', operationalReadinessRoutes)
-router.use(verifyToken, allowEmployeeContext)
-router.get('/capability', controller.getCurrentBranchCapability)
-router.put('/capability', controller.saveCurrentBranchCapability)
-router.get('/online-products/visibility-audit', onlineVisibilityController.getCurrentBranchAudit)
-router.patch('/online-products/:productId/price', onlineProductControlController.updateMarketplacePrice)
+router.use(verifyToken, requirePartnerStoreEmployeeContext)
+router.get('/capability', canReadStoreExperience, controller.getCurrentBranchCapability)
+router.put('/capability', canManageStoreExperience, controller.saveCurrentBranchCapability)
+router.get('/online-products/visibility-audit', canReadStoreExperience, onlineVisibilityController.getCurrentBranchAudit)
+router.patch('/online-products/:productId/price', canManageStoreExperience, onlineProductControlController.updateMarketplacePrice)
 
 module.exports = router
