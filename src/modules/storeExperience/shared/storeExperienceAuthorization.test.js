@@ -6,11 +6,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   STORE_EXPERIENCE_CAPABILITY,
+  requireStoreExperienceEmployeeContext,
   allowStoreExperienceCapabilities,
 } = require('./storeExperienceAuthorization');
 
-const invoke = (middleware, user) => new Promise((resolve) => {
-  const req = { user };
+const invoke = (middleware, user, employee = null) => new Promise((resolve) => {
+  const req = { user, employee };
   const res = {
     statusCode: 200,
     payload: null,
@@ -56,6 +57,21 @@ test('migrated positions require explicit store experience capabilities', async 
   assert.equal((await invoke(publish, {
     role: 'EMPLOYEE',
     positionCapabilities: [STORE_EXPERIENCE_CAPABILITY.READ, STORE_EXPERIENCE_CAPABILITY.MANAGE],
+  })).res.statusCode, 403);
+});
+
+test('store experience context preserves historical employee and platform access shape', async () => {
+  assert.equal((await invoke(requireStoreExperienceEmployeeContext, {
+    role: 'EMPLOYEE',
+    profileType: 'employee',
+  })).nextCalled, true);
+  assert.equal((await invoke(requireStoreExperienceEmployeeContext, {
+    role: 'ADMIN',
+    profileType: 'admin',
+  })).nextCalled, true);
+  assert.equal((await invoke(requireStoreExperienceEmployeeContext, {
+    role: 'CUSTOMER',
+    profileType: 'customer',
   })).res.statusCode, 403);
 });
 
