@@ -103,8 +103,8 @@ const run = async () => {
     path.join(__dirname, '../src/modules/storeExperience/media/storefrontMediaRoutes.js'),
     'utf8'
   );
-  assert.match(routesSource, /router\.use\(verifyToken, allowEmployeeContext\)/);
-  assert.match(routesSource, /router\.get\('\/'\s*,\s*controller\.listStorefrontMedia\)/);
+  assert.match(routesSource, /router\.use\(verifyToken\)/);
+  assert.match(routesSource, /router\.get\('\/'\s*,\s*allowRead\s*,\s*controller\.listStorefrontMedia\)/);
 
   const controllerSource = fs.readFileSync(
     path.join(__dirname, '../src/modules/storeExperience/media/storefrontMediaController.js'),
