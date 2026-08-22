@@ -11,6 +11,13 @@ const OPERATIONAL_POSITION_CAPABILITIES = Object.freeze({
 });
 
 const OPERATIONAL_CAPABILITIES = Object.freeze(Object.values(OPERATIONAL_POSITION_CAPABILITIES));
+const LEGACY_BASE_EMPLOYEE_CAPABILITIES = Object.freeze([
+  OPERATIONAL_POSITION_CAPABILITIES.COMMUNICATION_OPERATE,
+  OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_READ,
+  OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_MANAGE,
+  OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_PUBLISH,
+  OPERATIONAL_POSITION_CAPABILITIES.PRODUCT_TRACE_READ,
+]);
 
 const normalizeUpper = (value) => String(value || '').trim().toUpperCase();
 const normalizeCapabilityArray = (value) => {
@@ -25,14 +32,8 @@ const legacyOperationalCapabilitiesForRole = (role) => {
     return [...OPERATIONAL_CAPABILITIES];
   }
 
-  if (normalized === 'CASHIER' || normalized === 'TECHNICIAN') {
-    return [
-      OPERATIONAL_POSITION_CAPABILITIES.COMMUNICATION_OPERATE,
-      OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_READ,
-      OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_MANAGE,
-      OPERATIONAL_POSITION_CAPABILITIES.STORE_EXPERIENCE_PUBLISH,
-      OPERATIONAL_POSITION_CAPABILITIES.PRODUCT_TRACE_READ,
-    ];
+  if (normalized === 'CASHIER' || normalized === 'TECHNICIAN' || normalized === 'EMPLOYEE') {
+    return [...LEGACY_BASE_EMPLOYEE_CAPABILITIES];
   }
 
   return [];
@@ -55,9 +56,15 @@ const resolveOperationalActorCapabilities = (actor = {}) => {
     };
   }
 
+  const compatibilityRole = actor.employeeRole || actor.v2Role || (
+    String(actor.profileType || '').trim().toLowerCase() === 'employee' || Number(actor.employeeId) > 0
+      ? 'EMPLOYEE'
+      : null
+  );
+
   return {
     mode: 'V2_ROLE_COMPAT',
-    capabilities: legacyOperationalCapabilitiesForRole(actor.employeeRole || actor.v2Role),
+    capabilities: legacyOperationalCapabilitiesForRole(compatibilityRole),
   };
 };
 
@@ -70,6 +77,7 @@ const hasOperationalCapability = (actor, capability) => {
 module.exports = {
   OPERATIONAL_POSITION_CAPABILITIES,
   OPERATIONAL_CAPABILITIES,
+  LEGACY_BASE_EMPLOYEE_CAPABILITIES,
   legacyOperationalCapabilitiesForRole,
   resolveOperationalActorCapabilities,
   hasOperationalCapability,
