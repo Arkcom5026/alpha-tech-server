@@ -15,14 +15,16 @@ const buildProductTracePermissions = ({ actor, employeeProfile }) => {
   }
   const role = String(actor?.role || '').trim().toUpperCase()
   const normalizedEmployeeRole = String(employeeRole || '').trim().toUpperCase()
-  const canViewTrace = hasCapability(authorityActor, POSITION_CAPABILITIES.PRODUCT_TRACE_READ)
-  const canViewFinancials = hasCapability(authorityActor, POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIAL_READ)
+  const canViewFinancials = hasCapability(
+    authorityActor,
+    POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIAL_READ,
+  )
 
   return {
-    canViewTrace,
+    canViewTrace: Boolean(actor?.id),
     canViewFinancials,
     canViewSupplier: canViewFinancials,
-    canViewCustomerContact: canViewTrace,
+    canViewCustomerContact: true,
     role: role || null,
     employeeRole: normalizedEmployeeRole || null,
   }
