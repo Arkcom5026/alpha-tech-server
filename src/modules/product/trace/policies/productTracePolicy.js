@@ -2,24 +2,29 @@ const {
   ProductTraceFailureCode,
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
-
-const FINANCIAL_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
-const FINANCIAL_EMPLOYEE_ROLES = new Set(['OWNER', 'MANAGER'])
+const {
+  POSITION_CAPABILITIES,
+  hasCapability,
+} = require('../../../employee/authorization/employeePositionAuthority')
 
 const buildProductTracePermissions = ({ actor, employeeProfile }) => {
-  const role = String(actor?.role || '').toUpperCase()
-  const employeeRole = String(employeeProfile?.v2Role || '').toUpperCase()
-
-  const canViewFinancials =
-    FINANCIAL_ROLES.has(role) || FINANCIAL_EMPLOYEE_ROLES.has(employeeRole)
+  const employeeRole = actor?.employeeRole || actor?.v2Role || employeeProfile?.v2Role || null
+  const authorityActor = {
+    ...(actor || {}),
+    employeeRole,
+  }
+  const role = String(actor?.role || '').trim().toUpperCase()
+  const normalizedEmployeeRole = String(employeeRole || '').trim().toUpperCase()
+  const canViewTrace = hasCapability(authorityActor, POSITION_CAPABILITIES.PRODUCT_TRACE_READ)
+  const canViewFinancials = hasCapability(authorityActor, POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIAL_READ)
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
-    canViewCustomerContact: true,
+    canViewCustomerContact: canViewTrace,
     role: role || null,
-    employeeRole: employeeRole || null,
+    employeeRole: normalizedEmployeeRole || null,
   }
 }
 
