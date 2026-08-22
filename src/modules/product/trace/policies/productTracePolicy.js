@@ -10,7 +10,14 @@ const {
 const buildProductTracePermissions = ({ actor, employeeProfile }) => {
   const role = String(actor?.role || '').toUpperCase()
   const employeeRole = String(employeeProfile?.v2Role || actor?.employeeRole || actor?.v2Role || '').toUpperCase()
-  const canViewFinancials = hasCapability(actor || {}, POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIALS)
+  const authorityActor = {
+    ...(actor || {}),
+    employeeRole: actor?.employeeRole || actor?.v2Role || employeeProfile?.v2Role || null,
+  }
+  const canViewFinancials = hasCapability(
+    authorityActor,
+    POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIALS,
+  )
 
   return {
     canViewTrace: Boolean(actor?.id),
