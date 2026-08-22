@@ -117,7 +117,8 @@ const run = async () => {
   );
 
   const routesSource = fs.readFileSync(path.join(__dirname, '../src/modules/storeExperience/media/storefrontMediaRoutes.js'), 'utf8');
-  assert.match(routesSource, /router\.use\(verifyToken, allowEmployeeContext\)/);
+  assert.match(routesSource, /router\.use\(verifyToken\)/);
+  assert.match(routesSource, /router\.post\('\/upload', allowManage,/);
   assert.match(routesSource, /single\('file'\)/);
 
   const controllerSource = fs.readFileSync(path.join(__dirname, '../src/modules/storeExperience/media/storefrontMediaController.js'), 'utf8');
