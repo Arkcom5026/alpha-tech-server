@@ -4,15 +4,33 @@ const {
   hasCapability,
 } = require('../employee/authorization/employeePositionAuthority');
 
+const normalize = (value) => String(value || '').trim().toUpperCase();
 const authenticatedEmployee = (actor = {}) => (
   Number.isInteger(Number(actor.employeeId)) && Number(actor.employeeId) > 0
 );
 
 const getCommunicationCapabilities = (actor = {}) => {
   const employeeContext = authenticatedEmployee(actor);
+  if (!employeeContext) {
+    return Object.freeze({ viewCommunication: false, manageCommunicationProfiles: false });
+  }
+
+  if (Array.isArray(actor.positionCapabilities)) {
+    return Object.freeze({
+      viewCommunication: hasCapability(actor, POSITION_CAPABILITIES.COMMUNICATION_USE),
+      manageCommunicationProfiles: hasCapability(actor, POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE),
+    });
+  }
+
+  const role = normalize(actor.role);
+  const employeeRole = normalize(actor.employeeRole || actor.v2Role);
+  const elevated = actor.isSuperAdmin === true
+    || ['ADMIN', 'SUPERADMIN'].includes(role)
+    || ['OWNER', 'MANAGER', 'ADMIN'].includes(employeeRole);
+
   return Object.freeze({
-    viewCommunication: employeeContext && hasCapability(actor, POSITION_CAPABILITIES.COMMUNICATION_USE),
-    manageCommunicationProfiles: employeeContext && hasCapability(actor, POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE),
+    viewCommunication: true,
+    manageCommunicationProfiles: elevated,
   });
 };
 
