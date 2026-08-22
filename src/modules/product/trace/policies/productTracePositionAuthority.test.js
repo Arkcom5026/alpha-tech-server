@@ -7,7 +7,7 @@ const { POSITION_CAPABILITIES } = require('../../../employee/authorization/emplo
 
 const FINANCIALS = POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIALS;
 
-const permissions = (actor) => buildProductTracePermissions({ actor, employeeProfile: null });
+const permissions = (actor, employeeProfile = null) => buildProductTracePermissions({ actor, employeeProfile });
 
 test('legacy product trace financial disclosure remains OWNER and MANAGER only', () => {
   for (const employeeRole of ['OWNER', 'MANAGER']) {
@@ -18,6 +18,17 @@ test('legacy product trace financial disclosure remains OWNER and MANAGER only',
   }
 });
 
+test('legacy product trace authority still falls back to the loaded employee profile', () => {
+  assert.equal(
+    permissions({ id: 1, role: 'EMPLOYEE' }, { v2Role: 'MANAGER' }).canViewFinancials,
+    true,
+  );
+  assert.equal(
+    permissions({ id: 1, role: 'EMPLOYEE' }, { v2Role: 'TECHNICIAN' }).canViewFinancials,
+    false,
+  );
+});
+
 test('migrated positions explicitly control product trace financial disclosure', () => {
   assert.equal(
     permissions({ id: 1, role: 'EMPLOYEE', employeeRole: 'OWNER', positionCapabilities: [] }).canViewFinancials,
@@ -26,6 +37,13 @@ test('migrated positions explicitly control product trace financial disclosure',
   assert.equal(
     permissions({ id: 1, role: 'EMPLOYEE', employeeRole: 'TECHNICIAN', positionCapabilities: [FINANCIALS] }).canViewFinancials,
     true,
+  );
+  assert.equal(
+    permissions(
+      { id: 1, role: 'EMPLOYEE', positionCapabilities: [] },
+      { v2Role: 'OWNER' },
+    ).canViewFinancials,
+    false,
   );
 });
 
