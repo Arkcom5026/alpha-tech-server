@@ -5,7 +5,7 @@ const {
 const {
   RESIDUAL_POSITION_CAPABILITIES,
   hasResidualCapability,
-} = require('../../employee/authorization/residualPositionAuthority')
+} = require('../../../employee/authorization/residualPositionAuthority')
 
 const PRODUCT_TRACE_CAPABILITY = Object.freeze({
   READ: RESIDUAL_POSITION_CAPABILITIES.PRODUCT_TRACE_READ,
