@@ -13,7 +13,7 @@ const getCommunicationCapabilities = (actor = {}) => {
   const viewCommunication = authenticatedEmployee && resolveResidualCapability(
     actor,
     OPERATIONAL_RESIDUAL_CAPABILITIES.COMMUNICATION_VIEW,
-    { legacyRoles: ['OWNER', 'MANAGER', 'CASHIER', 'TECHNICIAN'] },
+    { legacyAuthenticated: true },
   );
   const manageCommunicationProfiles = authenticatedEmployee && resolveResidualCapability(
     actor,
