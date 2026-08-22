@@ -1,20 +1,35 @@
+'use strict'
+
 const {
   ProductTraceFailureCode,
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
+const {
+  OPERATIONAL_RESIDUAL_CAPABILITIES,
+  resolveResidualCapability,
+} = require('../../../employee/authorization/operationalResidualAuthority')
 
-const FINANCIAL_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
-const FINANCIAL_EMPLOYEE_ROLES = new Set(['OWNER', 'MANAGER'])
+const buildProductTracePermissions = ({ actor = {}, employeeProfile }) => {
+  const authorityActor = {
+    ...actor,
+    employeeRole: actor.employeeRole || actor.v2Role || employeeProfile?.v2Role || null,
+  }
+  const role = String(authorityActor.role || '').trim().toUpperCase()
+  const employeeRole = String(authorityActor.employeeRole || '').trim().toUpperCase()
 
-const buildProductTracePermissions = ({ actor, employeeProfile }) => {
-  const role = String(actor?.role || '').toUpperCase()
-  const employeeRole = String(employeeProfile?.v2Role || '').toUpperCase()
-
-  const canViewFinancials =
-    FINANCIAL_ROLES.has(role) || FINANCIAL_EMPLOYEE_ROLES.has(employeeRole)
+  const canViewTrace = resolveResidualCapability(
+    authorityActor,
+    OPERATIONAL_RESIDUAL_CAPABILITIES.PRODUCT_TRACE_READ,
+    { legacyAuthenticated: true },
+  )
+  const canViewFinancials = resolveResidualCapability(
+    authorityActor,
+    OPERATIONAL_RESIDUAL_CAPABILITIES.PRODUCT_TRACE_FINANCIALS,
+    { legacyRoles: ['OWNER', 'MANAGER'] },
+  )
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
     canViewCustomerContact: true,
