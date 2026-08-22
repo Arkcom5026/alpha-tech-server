@@ -35,14 +35,16 @@ const handle = (work, status = 200) => async (req, res, next) => {
 };
 
 const canView = requireCommunicationCapability('viewCommunication');
+const canOperate = requireCommunicationCapability('operateCommunication');
 const canManageProfiles = requireCommunicationCapability('manageCommunicationProfiles');
+
 router.get('/profiles', canView, handle((req) => service.listProfiles(req.communicationBranchId)));
-router.post('/profiles', canManageProfiles, handle((req) => service.saveProfile(req.communicationBranchId, req.body), 201));
+router.post('/profiles', canView, canManageProfiles, handle((req) => service.saveProfile(req.communicationBranchId, req.body), 201));
 router.get('/customers/:customerId/channels', canView, handle((req) => service.listCustomerChannels(req.communicationBranchId, req.params.customerId)));
-router.post('/customers/:customerId/channels', canView, handle((req) => service.saveCustomerChannel(req.communicationBranchId, req.params.customerId, req.body), 201));
+router.post('/customers/:customerId/channels', canView, canOperate, handle((req) => service.saveCustomerChannel(req.communicationBranchId, req.params.customerId, req.body), 201));
 router.get('/repairs/:repairJobId/preference', canView, handle((req) => service.getPreference(req.communicationBranchId, req.params.repairJobId)));
-router.put('/repairs/:repairJobId/preference', canView, handle((req) => service.savePreference(req.communicationBranchId, req.params.repairJobId, req.body)));
+router.put('/repairs/:repairJobId/preference', canView, canOperate, handle((req) => service.savePreference(req.communicationBranchId, req.params.repairJobId, req.body)));
 router.get('/repairs/:repairJobId/activities', canView, handle((req) => service.listRepairActivities(req.communicationBranchId, req.params.repairJobId)));
-router.post('/repairs/:repairJobId/activities', canView, handle((req) => service.recordRepairActivity(req.communicationBranchId, req.params.repairJobId, req.user.employeeId, req.body), 201));
+router.post('/repairs/:repairJobId/activities', canView, canOperate, handle((req) => service.recordRepairActivity(req.communicationBranchId, req.params.repairJobId, req.user.employeeId, req.body), 201));
 
 module.exports = router;
