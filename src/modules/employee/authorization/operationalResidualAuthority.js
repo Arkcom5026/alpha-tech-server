@@ -22,8 +22,12 @@ const resolveResidualCapability = (actor = {}, capability, { legacyRoles = [], l
   const key = String(capability || '').trim();
   if (!key) return false;
 
+  const systemRole = normalizeUpper(actor.role);
+  if (actor.isSuperAdmin === true || ['ADMIN', 'SUPERADMIN', 'SUPPERADMIN'].includes(systemRole)) {
+    return true;
+  }
+
   const resolved = resolveActorCapabilities(actor);
-  if (resolved.mode === 'SYSTEM_ROLE') return true;
   if (resolved.mode === 'POSITION') {
     const positionCapabilities = normalizeCapabilityArray(actor.positionCapabilities) || [];
     return positionCapabilities.includes(key);
