@@ -1,25 +1,40 @@
+'use strict';
+
 const {
   ProductTraceFailureCode,
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
+const {
+  RESIDUAL_BUSINESS_CAPABILITIES,
+  hasResidualBusinessCapability,
+} = require('../../employee/authorization/residualBusinessPositionAuthority')
 
-const FINANCIAL_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
-const FINANCIAL_EMPLOYEE_ROLES = new Set(['OWNER', 'MANAGER'])
+const buildProductTracePermissions = ({ actor = {}, employeeProfile = null }) => {
+  const authorityActor = {
+    ...actor,
+    employeeRole: actor.employeeRole || actor.v2Role || employeeProfile?.v2Role || null,
+  }
+  const employeeContext = Boolean(
+    employeeProfile
+      || Number(authorityActor.employeeId || authorityActor.profileId) > 0
+      || String(authorityActor.profileType || '').trim().toLowerCase() === 'employee',
+  )
 
-const buildProductTracePermissions = ({ actor, employeeProfile }) => {
-  const role = String(actor?.role || '').toUpperCase()
-  const employeeRole = String(employeeProfile?.v2Role || '').toUpperCase()
-
-  const canViewFinancials =
-    FINANCIAL_ROLES.has(role) || FINANCIAL_EMPLOYEE_ROLES.has(employeeRole)
+  const canViewTrace = employeeContext
+    ? hasResidualBusinessCapability(authorityActor, RESIDUAL_BUSINESS_CAPABILITIES.PRODUCT_TRACE_READ)
+    : Boolean(authorityActor.id)
+  const canViewFinancials = hasResidualBusinessCapability(
+    authorityActor,
+    RESIDUAL_BUSINESS_CAPABILITIES.PRODUCT_TRACE_FINANCIAL,
+  )
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
     canViewCustomerContact: true,
-    role: role || null,
-    employeeRole: employeeRole || null,
+    role: String(authorityActor.role || '').trim().toUpperCase() || null,
+    employeeRole: String(authorityActor.employeeRole || '').trim().toUpperCase() || null,
   }
 }
 
