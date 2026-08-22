@@ -3,7 +3,6 @@ const {
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
 const {
-  findEmployeeAuthorizationContext,
   findProductTraceByLookup,
 } = require('../repositories/productTraceRepository')
 const {
@@ -23,11 +22,7 @@ const { mapProductTraceTimeline } = require('../mappers/productTraceTimelineMapp
 const { mapProductTraceResponse } = require('../mappers/productTraceMapper')
 
 const getProductTraceByLookup = async ({ lookup, branchId, actor }) => {
-  const employeeProfile = await findEmployeeAuthorizationContext({
-    employeeId: actor?.employeeId || actor?.profileId,
-  })
-
-  const permissions = buildProductTracePermissions({ actor, employeeProfile })
+  const permissions = buildProductTracePermissions({ actor })
   assertCanViewProductTrace(permissions)
 
   const stockItem = await findProductTraceByLookup({ lookup, branchId })
