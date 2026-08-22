@@ -44,8 +44,12 @@ const legacyResidualCapabilitiesForRole = (role) => {
 };
 
 const resolveResidualActorCapabilities = (actor = {}) => {
+  const systemRole = normalizeUpper(actor.role);
   const baseResolution = resolveActorCapabilities(actor);
-  if (baseResolution.mode === 'SYSTEM_ROLE') {
+  if (
+    baseResolution.mode === 'SYSTEM_ROLE'
+    || systemRole === 'SUPPERADMIN'
+  ) {
     return {
       mode: 'SYSTEM_ROLE',
       capabilities: ALL_RESIDUAL_POSITION_CAPABILITIES,
