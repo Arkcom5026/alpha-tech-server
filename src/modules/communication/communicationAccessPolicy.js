@@ -1,20 +1,44 @@
 const AppError = require('../../shared/errors/AppError');
+const {
+  RESIDUAL_POSITION_CAPABILITIES,
+  hasResidualCapability,
+} = require('../employee/authorization/residualPositionAuthority');
 
-const normalize = (value) => String(value || '').trim().toUpperCase();
+const COMMUNICATION_CAPABILITY = Object.freeze({
+  READ: RESIDUAL_POSITION_CAPABILITIES.COMMUNICATION_READ,
+  PROFILE_MANAGE: RESIDUAL_POSITION_CAPABILITIES.COMMUNICATION_PROFILE_MANAGE,
+});
+
+const LEGACY_COMMUNICATION_READ_ROLES = Object.freeze(['OWNER', 'MANAGER', 'CASHIER', 'TECHNICIAN']);
+const LEGACY_COMMUNICATION_PROFILE_MANAGE_ROLES = Object.freeze(['OWNER', 'MANAGER']);
 
 const getCommunicationCapabilities = (actor = {}) => {
-  const role = normalize(actor.role);
-  const employeeRole = normalize(actor.employeeRole || actor.v2Role || actor.position);
   const authenticatedEmployee = Number.isInteger(Number(actor.employeeId)) && Number(actor.employeeId) > 0;
-  const elevated = actor.isSuperAdmin === true || ['ADMIN', 'SUPERADMIN'].includes(role) || ['OWNER', 'MANAGER', 'ADMIN'].includes(employeeRole);
-  return Object.freeze({ viewCommunication: authenticatedEmployee, manageCommunicationProfiles: authenticatedEmployee && elevated });
+  const viewCommunication = authenticatedEmployee && hasResidualCapability(
+    actor,
+    COMMUNICATION_CAPABILITY.READ,
+    { legacyRoles: LEGACY_COMMUNICATION_READ_ROLES },
+  );
+  const manageCommunicationProfiles = authenticatedEmployee && hasResidualCapability(
+    actor,
+    COMMUNICATION_CAPABILITY.PROFILE_MANAGE,
+    { legacyRoles: LEGACY_COMMUNICATION_PROFILE_MANAGE_ROLES },
+  );
+
+  return Object.freeze({ viewCommunication, manageCommunicationProfiles });
 };
 
 const requireCommunicationCapability = (capability) => (req, _res, next) => {
   try {
-    if (!getCommunicationCapabilities(req.user)[capability]) throw new AppError(`Communication capability ${capability} is required`, 403);
+    if (!getCommunicationCapabilities(req.user)[capability]) {
+      throw new AppError(`Communication capability ${capability} is required`, 403);
+    }
     next();
   } catch (error) { next(error); }
 };
 
-module.exports = { getCommunicationCapabilities, requireCommunicationCapability };
+module.exports = {
+  COMMUNICATION_CAPABILITY,
+  getCommunicationCapabilities,
+  requireCommunicationCapability,
+};
