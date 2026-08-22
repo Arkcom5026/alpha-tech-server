@@ -2,19 +2,34 @@ const {
   ProductTraceFailureCode,
   ProductTraceError,
 } = require('../contracts/productTraceFailureCode')
+const {
+  OPERATIONAL_POSITION_CAPABILITIES,
+  hasOperationalCapability,
+} = require('../../../employee/authorization/employeeOperationalPositionAuthority')
 
-const FINANCIAL_ROLES = new Set(['SUPERADMIN', 'ADMIN'])
-const FINANCIAL_EMPLOYEE_ROLES = new Set(['OWNER', 'MANAGER'])
+const buildProductTracePermissions = ({ actor = {}, employeeProfile = null }) => {
+  const role = String(actor?.role || '').trim().toUpperCase()
+  const employeeRole = String(actor?.employeeRole || actor?.v2Role || employeeProfile?.v2Role || '').trim().toUpperCase()
+  const employeeContext = Boolean(
+    employeeProfile
+    || Number(actor?.employeeId) > 0
+    || String(actor?.profileType || '').trim().toLowerCase() === 'employee',
+  )
+  const authorityActor = {
+    ...actor,
+    employeeRole: employeeRole || undefined,
+  }
 
-const buildProductTracePermissions = ({ actor, employeeProfile }) => {
-  const role = String(actor?.role || '').toUpperCase()
-  const employeeRole = String(employeeProfile?.v2Role || '').toUpperCase()
-
-  const canViewFinancials =
-    FINANCIAL_ROLES.has(role) || FINANCIAL_EMPLOYEE_ROLES.has(employeeRole)
+  const canViewTrace = employeeContext
+    ? hasOperationalCapability(authorityActor, OPERATIONAL_POSITION_CAPABILITIES.PRODUCT_TRACE_READ)
+    : Boolean(actor?.id)
+  const canViewFinancials = hasOperationalCapability(
+    authorityActor,
+    OPERATIONAL_POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIALS,
+  )
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
     canViewCustomerContact: true,
