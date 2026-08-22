@@ -15,16 +15,24 @@ const buildProductTracePermissions = ({ actor, employeeProfile }) => {
   }
   const role = String(actor?.role || '').trim().toUpperCase()
   const normalizedEmployeeRole = String(employeeRole || '').trim().toUpperCase()
+  const employeeContext = (
+    String(actor?.profileType || '').trim().toLowerCase() === 'employee'
+    || (Number.isInteger(Number(actor?.employeeId)) && Number(actor?.employeeId) > 0)
+  )
+  const migratedEmployee = employeeContext && Array.isArray(actor?.positionCapabilities)
+  const canViewTrace = migratedEmployee
+    ? hasCapability(authorityActor, POSITION_CAPABILITIES.PRODUCT_TRACE_READ)
+    : Boolean(actor?.id)
   const canViewFinancials = hasCapability(
     authorityActor,
     POSITION_CAPABILITIES.PRODUCT_TRACE_FINANCIAL_READ,
   )
 
   return {
-    canViewTrace: Boolean(actor?.id),
+    canViewTrace,
     canViewFinancials,
     canViewSupplier: canViewFinancials,
-    canViewCustomerContact: true,
+    canViewCustomerContact: canViewTrace,
     role: role || null,
     employeeRole: normalizedEmployeeRole || null,
   }
