@@ -33,7 +33,7 @@ const allowStoreExperienceCapabilities = (...requiredCapabilities) => (req, res,
   const allowed = requiredCapabilities.every((capability) => resolveResidualCapability(
     actor,
     capability,
-    { legacyRoles: ['OWNER', 'MANAGER', 'CASHIER', 'TECHNICIAN'] },
+    { legacyAuthenticated: true },
   ));
 
   if (!allowed) {
