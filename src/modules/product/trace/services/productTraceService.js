@@ -24,7 +24,7 @@ const { mapProductTraceResponse } = require('../mappers/productTraceMapper')
 
 const getProductTraceByLookup = async ({ lookup, branchId, actor }) => {
   const employeeProfile = await findEmployeeAuthorizationContext({
-    employeeId: actor?.employeeId || actor?.profileId,
+    employeeId: actor?.employeeId,
   })
 
   const permissions = buildProductTracePermissions({ actor, employeeProfile })
